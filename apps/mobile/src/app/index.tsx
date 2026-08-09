@@ -8,6 +8,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WebBadge } from '@/components/web-badge';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { AppButton } from '@/components/ui/button';
+import { useSession } from '@/context/session-provider';
 
 function getDevMenuHint() {
   if (Platform.OS === 'web') {
@@ -29,6 +31,7 @@ function getDevMenuHint() {
 }
 
 export default function HomeScreen() {
+  const { logOut } = useSession();
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -42,6 +45,10 @@ export default function HomeScreen() {
         <ThemedText type="code" style={styles.code}>
           get started
         </ThemedText>
+
+        <AppButton
+          onPress={() => logOut()}
+        />
 
         <ThemedView type="backgroundElement" style={styles.stepContainer}>
           <HintRow

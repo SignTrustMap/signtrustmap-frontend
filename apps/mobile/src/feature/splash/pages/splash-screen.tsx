@@ -2,8 +2,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { Canvas, useFrame } from '@react-three/fiber/native';
+import { useRouter } from 'expo-router';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import * as THREE from 'three';
+import { useSession } from '@/context/session-provider';
 
 const SPLASH_DURATION = 1800;
 const EXIT_ANIMATION_DURATION = 700;
@@ -48,6 +50,8 @@ function ThreeScene() {
 }
 
 export function AppSplashScreen() {
+    const { session, loading } = useSession();
+    const router = useRouter();
     const [visible, setVisible] = useState(true);
     const [ready, setReady] = useState(false);
 
@@ -64,16 +68,17 @@ export function AppSplashScreen() {
     });
 
     useEffect(() => {
-        if (!ready) return;
+        if (!ready || loading) return;
 
         SplashScreen.hideAsync();
 
         const timer = setTimeout(() => {
+            router.replace(session ? '/' : '/login');
             setVisible(false);
         }, SPLASH_DURATION);
 
         return () => clearTimeout(timer);
-    }, [ready]);
+    }, [loading, ready, router, session]);
 
     if (!visible) {
         return null;
