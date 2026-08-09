@@ -1,4 +1,5 @@
 import * as Device from 'expo-device';
+import { useRouter } from 'expo-router';
 import { Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,6 +33,13 @@ function getDevMenuHint() {
 
 export default function HomeScreen() {
   const { logOut } = useSession();
+  const router = useRouter();
+
+  const handleLogOut = async () => {
+    await logOut();
+    router.replace('/login');
+  };
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -47,7 +55,7 @@ export default function HomeScreen() {
         </ThemedText>
 
         <AppButton
-          onPress={() => logOut()}
+          onPress={handleLogOut}
         />
 
         <ThemedView type="backgroundElement" style={styles.stepContainer}>

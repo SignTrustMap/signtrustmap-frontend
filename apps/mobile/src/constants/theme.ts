@@ -9,18 +9,32 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
+    primary: '#000000',
+    secondary: '#d3f7ff',
+    tertiary: '#007b8b',
+    neutral: '#F8F7F7',
+    surface: '#FFFFFF',
+    onTertiary: '#FFFFFF',
+    border: '#E8E4E3',
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    background: '#F8F7F7',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#d3f7ff',
+    textSecondary: '#007b8b',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    primary: '#FFFFFF',
+    secondary: '#103F47',
+    tertiary: '#66D9E8',
+    neutral: '#111111',
+    surface: '#1A1A1A',
+    onTertiary: '#000000',
+    border: '#333333',
+    text: '#FFFFFF',
+    background: '#111111',
+    backgroundElement: '#1A1A1A',
+    backgroundSelected: '#103F47',
+    textSecondary: '#66D9E8',
   },
 } as const;
 
@@ -28,37 +42,48 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
+    sans: 'Public Sans',
+    body: 'Google Sans',
+    title: 'Arvo',
+    serif: 'Arvo',
+    rounded: 'Google Sans',
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
+    sans: 'Public Sans',
+    body: 'Google Sans',
+    title: 'Arvo',
+    serif: 'Arvo',
+    rounded: 'Google Sans',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
+    sans: 'Public Sans, var(--font-display)',
+    body: 'Google Sans, var(--font-display)',
+    title: 'Arvo, var(--font-serif)',
+    serif: 'Arvo, var(--font-serif)',
+    rounded: 'Google Sans, var(--font-rounded)',
     mono: 'var(--font-mono)',
   },
 });
 
 export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
+  half: 4,
+  one: 8,
+  two: 12,
   three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  four: 20,
+  five: 24,
+  six: 48,
+  sm: 8,
+  md: 16,
+  lg: 24,
+} as const;
+
+export const Rounded = {
+  sm: 4,
+  md: 8,
+  lg: 12,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

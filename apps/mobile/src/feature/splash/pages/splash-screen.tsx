@@ -7,10 +7,9 @@ import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import * as THREE from 'three';
 import { useSession } from '@/context/session-provider';
 
-const SPLASH_DURATION = 1800;
-const EXIT_ANIMATION_DURATION = 700;
 const EXIT_TRANSLATE_Y = Dimensions.get('screen').height;
-
+const EXIT_ANIMATION_DURATION = 500;
+const DELAY_BEFORE_EXIT = 1000;
 function Cube() {
     const meshRef = useRef<THREE.Mesh>(null);
 
@@ -52,8 +51,8 @@ function ThreeScene() {
 export function AppSplashScreen() {
     const { session, loading } = useSession();
     const router = useRouter();
+
     const [visible, setVisible] = useState(true);
-    const [ready, setReady] = useState(false);
 
     const exitKeyframe = new Keyframe({
         0: {
@@ -68,17 +67,25 @@ export function AppSplashScreen() {
     });
 
     useEffect(() => {
-        if (!ready || loading) return;
+        if (loading) return;
 
-        SplashScreen.hideAsync();
+        const navigate = async () => {
+            await SplashScreen.hideAsync();
 
-        const timer = setTimeout(() => {
-            router.replace(session ? '/' : '/login');
-            setVisible(false);
-        }, SPLASH_DURATION);
 
-        return () => clearTimeout(timer);
-    }, [loading, ready, router, session]);
+            if (session) {
+                router.replace('/');
+            } else {
+                router.replace('/login');
+            }
+
+            setTimeout(() => {
+                setVisible(false);
+            }, DELAY_BEFORE_EXIT);
+        };
+
+        navigate();
+    }, [loading, router, session]);
 
     if (!visible) {
         return null;
@@ -93,9 +100,6 @@ export function AppSplashScreen() {
                 camera={{
                     position: [0, 0, 4],
                     fov: 45,
-                }}
-                onCreated={() => {
-                    setReady(true);
                 }}
             >
                 <ThreeScene />
