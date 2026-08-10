@@ -1,10 +1,14 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Spacing } from '@/constants/theme';
-import { previousDriverLocations } from '@/data/driverLocations';
+import {
+  driverCurrentLocation,
+  driverStartLocations,
+  previousDriverLocations,
+} from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
 const filters = [
@@ -13,14 +17,31 @@ const filters = [
   { id: 'saved', icon: 'S', label: 'Saved' },
 ];
 
-export function DriverSearchScreen() {
+export function DriverStartScreen() {
   const router = useRouter();
+  const { destinationId } = useLocalSearchParams<{ destinationId?: string }>();
   const theme = useTheme();
+  const destination = previousDriverLocations.find((location) => location.id === destinationId);
 
-  const handleSelectLocation = (locationId: string) => {
+  const handleSelectCurrentLocation = () => {
+    if (!destinationId) return;
+
     router.replace({
       pathname: '/(driver)',
-      params: { destinationId: locationId },
+      params: {
+        destinationId,
+        startLat: String(driverCurrentLocation.coordinate[1]),
+        startLng: String(driverCurrentLocation.coordinate[0]),
+      },
+    });
+  };
+
+  const handleSelectStart = (startId: string) => {
+    if (!destinationId) return;
+
+    router.replace({
+      pathname: '/(driver)',
+      params: { destinationId, startId },
     });
   };
 
@@ -35,10 +56,22 @@ export function DriverSearchScreen() {
           style={styles.backButton}
           variant="ghost"
         >
-          <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
+          <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
         </AppButton>
-        <Text style={[styles.searchPrompt, { color: theme.text }]}>Where to?</Text>
+        <Text style={[styles.gpsIcon, { color: theme.tertiary }]}>G</Text>
+        <Text numberOfLines={1} style={[styles.searchPrompt, { color: theme.placeholder }]}>
+          Input your starting point
+        </Text>
       </View>
+
+      {destination ? (
+        <View style={styles.destinationRow}>
+          <Text style={[styles.pinIcon, { color: theme.textSecondary }]}>P</Text>
+          <Text numberOfLines={1} style={[styles.destinationText, { color: theme.text }]}>
+            {destination.title}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.filterRow}>
         {filters.map((filter) => (
@@ -60,12 +93,35 @@ export function DriverSearchScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       >
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>RECENT</Text>
-        {previousDriverLocations.map((location) => (
+        <AppButton
+          accessibilityLabel="Use current location"
+          onPress={handleSelectCurrentLocation}
+          pressedOpacity={0.72}
+          style={[styles.currentLocationRow, { borderColor: theme.border }]}
+          variant="ghost"
+        >
+          <View style={[styles.currentIconCircle, { backgroundColor: theme.backgroundSelected }]}>
+            <Text style={[styles.currentIcon, { color: theme.tertiary }]}>G</Text>
+          </View>
+          <View style={styles.locationCopy}>
+            <Text style={[styles.locationTitle, { color: theme.text }]}>Current Location</Text>
+            <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+              Using GPS accuracy
+            </Text>
+          </View>
+          <Text style={[styles.arrowIcon, { color: theme.tertiary }]}>{'>'}</Text>
+        </AppButton>
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionLabel, { color: theme.text }]}>Recent History</Text>
+          <Text style={[styles.clearAction, { color: theme.tertiary }]}>Clear All</Text>
+        </View>
+
+        {driverStartLocations.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
             key={location.id}
-            onPress={() => handleSelectLocation(location.id)}
+            onPress={() => handleSelectStart(location.id)}
             pressedOpacity={0.72}
             style={[styles.locationRow, { borderColor: theme.border }]}
             variant="ghost"
@@ -75,11 +131,11 @@ export function DriverSearchScreen() {
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+              <Text numberOfLines={1} style={[styles.locationSubtitle, { color: theme.text }]}>
                 {location.subtitle}
               </Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>/</Text>
+            <Text style={[styles.arrowIcon, { color: theme.border }]}>/</Text>
           </AppButton>
         ))}
       </ScrollView>
@@ -112,9 +168,35 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 700,
   },
+  gpsIcon: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: 900,
+  },
   searchPrompt: {
+    flex: 1,
     fontFamily: Fonts.body,
     fontSize: 15,
+    fontWeight: 700,
+  },
+  destinationRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.four,
+  },
+  pinIcon: {
+    width: 36,
+    textAlign: 'center',
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: 900,
+  },
+  destinationText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 14,
     fontWeight: 700,
   },
   filterRow: {
@@ -150,11 +232,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
   },
+  currentLocationRow: {
+    minHeight: 64,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  currentIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentIcon: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 900,
+  },
+  sectionHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionLabel: {
     fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 900,
-    marginBottom: Spacing.one,
+    fontSize: 13,
+    fontWeight: 700,
+  },
+  clearAction: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 700,
   },
   locationRow: {
     minHeight: 64,
@@ -166,9 +279,9 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   recentIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -183,7 +296,7 @@ const styles = StyleSheet.create({
   },
   locationTitle: {
     fontFamily: Fonts.body,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 900,
   },
   locationSubtitle: {
@@ -194,6 +307,6 @@ const styles = StyleSheet.create({
   arrowIcon: {
     fontFamily: Fonts.body,
     fontSize: 16,
-    fontWeight: 700,
+    fontWeight: 900,
   },
 });

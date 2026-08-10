@@ -1,15 +1,49 @@
-import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import type { ReactNode } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  type PressableProps,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type AppButtonProps = PressableProps & {
-  label: string;
+  children?: ReactNode;
+  label?: string;
+  pressedOpacity?: number;
   style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+  variant?: 'primary' | 'surface' | 'ghost';
 };
 
-export function AppButton({ label, disabled, style, ...pressableProps }: AppButtonProps) {
+export function AppButton({
+  children,
+  disabled,
+  label,
+  pressedOpacity = 0.82,
+  style,
+  textStyle,
+  variant = 'primary',
+  ...pressableProps
+}: AppButtonProps) {
   const theme = useTheme();
+  const variantStyle = {
+    primary: {
+      backgroundColor: theme.tertiary,
+    },
+    surface: {
+      backgroundColor: theme.backgroundElement,
+    },
+    ghost: {
+      backgroundColor: 'transparent',
+    },
+  }[variant];
+  const textColor = variant === 'primary' ? theme.onTertiary : theme.text;
 
   return (
     <Pressable
@@ -18,14 +52,14 @@ export function AppButton({ label, disabled, style, ...pressableProps }: AppButt
       style={({ pressed }) => [
         styles.button,
         {
-          backgroundColor: theme.tertiary,
-          opacity: disabled ? 0.55 : pressed ? 0.82 : 1,
+          opacity: disabled ? 0.55 : pressed ? pressedOpacity : 1,
         },
+        variantStyle,
         style,
       ]}
       {...pressableProps}
     >
-      <Text style={[styles.buttonText, { color: theme.onTertiary }]}>{label}</Text>
+      {children ?? <Text style={[styles.buttonText, { color: textColor }, textStyle]}>{label}</Text>}
     </Pressable>
   );
 }

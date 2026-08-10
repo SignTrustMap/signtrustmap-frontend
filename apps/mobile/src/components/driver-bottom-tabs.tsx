@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppButton } from '@/components/ui/button';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -42,49 +44,56 @@ export function DriverBottomTabs({ activeRoute }: { activeRoute: DriverTab['rout
   const theme = useTheme();
 
   return (
-    <View
+    <SafeAreaView
+      edges={['bottom']}
       style={[
-        styles.container,
+        styles.safeArea,
         {
           backgroundColor: theme.backgroundElement,
           borderColor: theme.border,
         },
       ]}
     >
-      {tabs.map((tab) => {
-        const isActive = tab.route === activeRoute;
+      <View style={styles.container}>
+        {tabs.map((tab) => {
+          const isActive = tab.route === activeRoute;
 
-        return (
-          <Pressable
-            accessibilityRole="button"
-            key={tab.route}
-            onPress={() => router.replace(tab.route)}
-            style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
-          >
-            <SymbolView
-              fallback={
-                <Text style={[styles.iconFallback, { color: isActive ? theme.tertiary : theme.text }]}>
-                  {tab.fallbackLabel}
-                </Text>
-              }
-              name={tab.symbol}
-              size={18}
-              tintColor={isActive ? theme.tertiary : theme.text}
-            />
-            <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+          return (
+            <AppButton
+              accessibilityLabel={tab.label}
+              key={tab.route}
+              onPress={() => router.replace(tab.route)}
+              pressedOpacity={0.7}
+              style={styles.tab}
+              variant="ghost"
+            >
+              <SymbolView
+                fallback={
+                  <Text style={[styles.iconFallback, { color: isActive ? theme.tertiary : theme.text }]}>
+                    {tab.fallbackLabel}
+                  </Text>
+                }
+                name={tab.symbol}
+                size={18}
+                tintColor={isActive ? theme.tertiary : theme.text}
+              />
+              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
+                {tab.label}
+              </Text>
+            </AppButton>
+          );
+        })}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    borderTopWidth: 1,
+  },
   container: {
     height: 58,
-    borderTopWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -92,12 +101,13 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-  },
-  pressed: {
-    opacity: 0.7,
+    minHeight: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   label: {
     fontFamily: Fonts.body,

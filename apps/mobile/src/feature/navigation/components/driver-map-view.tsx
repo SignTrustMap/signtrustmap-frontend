@@ -2,10 +2,30 @@ import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
-import { driverCurrentLocation, driverMapSignMarkers } from '@/data/driverLocations';
+import {
+  driverCurrentLocation,
+  driverMapSignMarkers,
+  type MapCoordinate,
+  type PreviousLocation,
+} from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
+
+type DriverMapViewProps = {
+  destination?: PreviousLocation;
+  routeCoordinates?: MapCoordinate[];
+  routeStart?: MapCoordinate;
+};
+
+function getRouteBounds(start: MapCoordinate, destination: MapCoordinate) {
+  return [
+    Math.min(start[0], destination[0]),
+    Math.min(start[1], destination[1]),
+    Math.max(start[0], destination[0]),
+    Math.max(start[1], destination[1]),
+  ] as [west: number, south: number, east: number, north: number];
+}
 
 function loadMapLibre(): MapLibreModule | null {
   try {
@@ -36,9 +56,21 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-export function DriverMapView() {
+export function DriverMapView({ destination, routeCoordinates, routeStart }: DriverMapViewProps) {
   const theme = useTheme();
   const mapLibre = loadMapLibre();
+  const cameraCenter = destination?.coordinate ?? driverCurrentLocation.coordinate;
+  const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
+  const routeGeoJson = routeCoordinates?.length
+    ? ({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: routeCoordinates,
+        },
+      } as GeoJSON.Feature<GeoJSON.LineString>)
+    : null;
 
   if (!mapLibre) {
     return (
@@ -54,7 +86,7 @@ export function DriverMapView() {
     );
   }
 
-  const { Camera, Map, Marker } = mapLibre;
+  const { Camera, GeoJSONSource, Layer, Map, Marker } = mapLibre;
 
   return (
     <Map
@@ -68,12 +100,40 @@ export function DriverMapView() {
       touchPitch={false}
       touchRotate={false}
     >
-      <Camera
-        center={driverCurrentLocation.coordinate}
-        maxZoom={19}
-        minZoom={11}
-        zoom={15}
-      />
+      {routeBounds ? (
+        <Camera
+          bounds={routeBounds}
+          duration={900}
+          easing="fly"
+          maxZoom={19}
+          minZoom={11}
+          padding={{ bottom: 160, left: 44, right: 44, top: 100 }}
+        />
+      ) : (
+        <Camera
+          center={cameraCenter}
+          duration={900}
+          easing="fly"
+          maxZoom={19}
+          minZoom={11}
+          zoom={destination ? 14 : 15}
+        />
+      )}
+
+      {routeGeoJson ? (
+        <GeoJSONSource data={routeGeoJson} id="selected-route-source">
+          <Layer
+            id="selected-route-line"
+            type="line"
+            style={{
+              lineCap: 'round',
+              lineColor: theme.tertiary,
+              lineJoin: 'round',
+              lineWidth: 5,
+            }}
+          />
+        </GeoJSONSource>
+      ) : null}
 
       {driverMapSignMarkers.map((marker) => (
         <Marker anchor="center" id={marker.id} key={marker.id} lngLat={marker.coordinate}>
@@ -88,6 +148,22 @@ export function DriverMapView() {
           <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
         </View>
       </Marker>
+
+      {routeStart ? (
+        <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
+          <View style={styles.startMarker}>
+            <Text style={styles.startMarkerText}>S</Text>
+          </View>
+        </Marker>
+      ) : null}
+
+      {destination ? (
+        <Marker anchor="bottom" id="destination-location" lngLat={destination.coordinate}>
+          <View style={styles.destinationMarker}>
+            <Text style={styles.destinationMarkerText}>D</Text>
+          </View>
+        </Marker>
+      ) : null}
     </Map>
   );
 }
@@ -148,5 +224,37 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  destinationMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#148594',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  destinationMarkerText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  startMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#1767D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startMarkerText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 900,
   },
 });

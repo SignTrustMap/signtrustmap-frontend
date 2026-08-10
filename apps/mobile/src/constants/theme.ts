@@ -32,7 +32,7 @@ export const Colors = {
     onTertiary: '#FFFFFF',
     border: '#333333',
     text: '#FFFFFF',
-    background: '#111111',
+    background: '#666666',
     backgroundElement: '#1A1A1A',
     backgroundSelected: '#103F47',
     textSecondary: '#66D9E8',

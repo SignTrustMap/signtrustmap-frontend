@@ -1,14 +1,25 @@
 export type DriverRole = 'driver' | 'surveyor' | 'reviewer';
 
+export type MapCoordinate = [longitude: number, latitude: number];
+
 export type PreviousLocation = {
+  coordinate: MapCoordinate;
   id: string;
   title: string;
   subtitle: string;
   category: 'home' | 'work' | 'saved' | 'recent';
+
+};
+
+export type DriverStartLocation = {
+  coordinate: MapCoordinate;
+  id: string;
+  title: string;
+  subtitle: string;
 };
 
 export type MapSignMarker = {
-  coordinate: [longitude: number, latitude: number];
+  coordinate: MapCoordinate;
   id: string;
   top: `${number}%`;
   left: `${number}%`;
@@ -16,22 +27,55 @@ export type MapSignMarker = {
 
 export const previousDriverLocations: PreviousLocation[] = [
   {
+    coordinate: [-73.973, 40.7648],
     id: 'fifth-ave',
     title: '5th Ave, New York',
     subtitle: 'Midtown Manhattan, near Central Park',
     category: 'recent',
+
   },
   {
+    coordinate: [-73.7781, 40.6413],
     id: 'jfk-airport',
     title: 'JFK International Airport',
     subtitle: 'Queens, NY 11430',
     category: 'recent',
+
   },
   {
+    coordinate: [-73.9969, 40.7033],
     id: 'brooklyn-bridge-park',
     title: 'Brooklyn Bridge Park',
     subtitle: '334 Furman St, Brooklyn, NY',
     category: 'recent',
+
+  },
+];
+
+export const driverStartLocations: DriverStartLocation[] = [
+  {
+    coordinate: [-73.7781, 40.6413],
+    id: 'jfk-airport',
+    title: 'JFK International Airport',
+    subtitle: 'Queens, NY 11430, United States',
+  },
+  {
+    coordinate: [-73.9969, 40.7033],
+    id: 'brooklyn-bridge-park',
+    title: 'Brooklyn Bridge Park',
+    subtitle: '334 Furman St, Brooklyn, NY 11201',
+  },
+  {
+    coordinate: [-73.9857, 40.7484],
+    id: 'empire-state-building',
+    title: 'Empire State Building',
+    subtitle: '20 W 34th St, New York, NY 10001',
+  },
+  {
+    coordinate: [-73.9632, 40.7794],
+    id: 'metropolitan-museum',
+    title: 'The Metropolitan Museum of Art',
+    subtitle: '1000 5th Ave, New York, NY 10028',
   },
 ];
 
@@ -43,7 +87,7 @@ export const driverMapSignMarkers: MapSignMarker[] = [
 ];
 
 export const driverCurrentLocation = {
-  coordinate: [-73.9846, 40.7536] as [longitude: number, latitude: number],
+  coordinate: [-73.9846, 40.7536] as MapCoordinate,
   label: 'Current driver location',
 };
 
