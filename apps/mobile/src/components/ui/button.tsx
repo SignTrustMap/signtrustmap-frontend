@@ -1,34 +1,47 @@
-import { Button, Host } from '@expo/ui'
-import { Text, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
-export function AppButton(
-    { onPress }: { onPress: () => void }
-) {
-    return (
-        <View style={styles.buttonContainer}>
-            <Host matchContents>
-                <Button
-                    variant='text'
-                    onPress={onPress}
-                    style={styles.button}
-                >
-                    <Text style={styles.buttonText}>Log in</Text>
-                </Button>
-            </Host>
-        </View>
-    )
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+type AppButtonProps = PressableProps & {
+  label: string;
+  style?: StyleProp<ViewStyle>;
+};
+
+export function AppButton({ label, disabled, style, ...pressableProps }: AppButtonProps) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.button,
+        {
+          backgroundColor: theme.tertiary,
+          opacity: disabled ? 0.55 : pressed ? 0.82 : 1,
+        },
+        style,
+      ]}
+      {...pressableProps}
+    >
+      <Text style={[styles.buttonText, { color: theme.onTertiary }]}>{label}</Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
-    buttonContainer: {
-        alignItems: 'center',
-    },
-    button: {
-        borderRadius: 4,
-        backgroundColor: '#208AEF',
-    },
-
-    buttonText: {
-        color: '#fff',
-    }
-})
+  button: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Rounded.md,
+    minHeight: 48,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+  },
+  buttonText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 700,
+  },
+});

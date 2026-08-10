@@ -5,7 +5,8 @@ const AuthContext = createContext<{
   logIn: (session: string) => Promise<void>;
   logOut: () => Promise<void>;
   session: string | null;
-  loading: boolean;
+  isLoading: boolean;
+  isInitializing: boolean;
 } | null>(null);
 
 export const useSession = () => {
@@ -20,7 +21,8 @@ export const useSession = () => {
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     async function loadSession() {
@@ -28,7 +30,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
         const storedSession = await getStorageItemAsync('session');
         setSession(storedSession);
       } finally {
-        setLoading(false);
+        setIsInitializing(false);
+        setIsLoading(false);
       }
     }
 
@@ -50,6 +53,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       logIn,
       logOut,
       session,
-      loading
+      isLoading,
+      isInitializing
     }}>{children}</AuthContext.Provider>;
 }

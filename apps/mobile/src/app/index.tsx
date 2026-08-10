@@ -56,6 +56,7 @@ export default function HomeScreen() {
 
         <AppButton
           onPress={handleLogOut}
+          label="Log out"
         />
 
         <ThemedView type="backgroundElement" style={styles.stepContainer}>

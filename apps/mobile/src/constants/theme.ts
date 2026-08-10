@@ -11,7 +11,7 @@ export const Colors = {
   light: {
     primary: '#000000',
     secondary: '#d3f7ff',
-    tertiary: '#007b8b',
+    tertiary: '#148594',
     neutral: '#F8F7F7',
     surface: '#FFFFFF',
     onTertiary: '#FFFFFF',
@@ -21,20 +21,22 @@ export const Colors = {
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#d3f7ff',
     textSecondary: '#007b8b',
+    placeholder: '#888888',
   },
   dark: {
     primary: '#FFFFFF',
     secondary: '#103F47',
-    tertiary: '#66D9E8',
+    tertiary: '#148594',
     neutral: '#111111',
     surface: '#1A1A1A',
-    onTertiary: '#000000',
+    onTertiary: '#FFFFFF',
     border: '#333333',
     text: '#FFFFFF',
     background: '#111111',
     backgroundElement: '#1A1A1A',
     backgroundSelected: '#103F47',
     textSecondary: '#66D9E8',
+    placeholder: '#888888',
   },
 } as const;
 
