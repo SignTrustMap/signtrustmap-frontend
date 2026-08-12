@@ -65,12 +65,9 @@ export function DriverMapScreen() {
   const [navigationError, setNavigationError] = useState<string>();
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
-  const isFptStudentHouseRoute =
-    selectedStart?.id === 'dai-hoc-fpt'
-    && selectedDestination?.id === 'nha-van-hoa-sinh-vien';
   const plannedStopSignCoordinates = useMemo(
-    () => (isFptStudentHouseRoute ? getRouteStopCoordinates(routeCoordinates) : []),
-    [isFptStudentHouseRoute, routeCoordinates],
+    () => getRouteStopCoordinates(routeCoordinates),
+    [routeCoordinates],
   );
   const isNavigating = Boolean(routeKey && navigationSession?.routeKey === routeKey);
   const visibleStopSignCoordinates = isNavigating
@@ -98,7 +95,7 @@ export function DriverMapScreen() {
   const handleBeginNavigation = async () => {
     if (Platform.OS === 'web' || !selectedDestination || !routeStart || !routeKey) return;
 
-    if (isFptStudentHouseRoute && plannedStopSignCoordinates.length !== 5) {
+    if (plannedStopSignCoordinates.length !== 5) {
       setNavigationError('The route is still loading. Try again in a moment.');
       return;
     }
