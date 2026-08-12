@@ -1,9 +1,11 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, type ColorSchemeName } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { Colors } from '@/constants/theme';
+import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
+import { SessionProvider, useSession } from '@/context/session-provider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -11,8 +13,37 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+      <SessionProvider>
+        <RootNavigation colorScheme={colorScheme} />
+      </SessionProvider>
     </ThemeProvider>
+  );
+}
+
+function RootNavigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+
+  const { isInitializing, session } = useSession();
+
+  if (isInitializing) {
+    return <AppSplashScreen />;
+  }
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: theme.background,
+        },
+      }}
+    >
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="(public)/login" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!session}>
+        <Stack.Screen name="index" />
+      </Stack.Protected>
+    </Stack>
   );
 }

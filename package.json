@@ -34,5 +34,13 @@
   "bugs": {
     "url": "https://github.com/SignTrustMap/signtrustmap-frontend/issues"
   },
-  "homepage": "https://github.com/SignTrustMap/signtrustmap-frontend#readme"
+  "homepage": "https://github.com/SignTrustMap/signtrustmap-frontend#readme",
+  "dependencies": {
+    "@react-three/fiber": "^9.7.0",
+    "expo-gl": "~57.0.2",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4"
+  }
 }
