@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-
-import { DriverBottomTabs } from '@/components/driver-bottom-tabs';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -15,6 +13,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { DriverMapView } from '../components/driver-map-view';
 import { getDrivingRoute } from '../services/osrm';
+import { getRouteStopCoordinates } from '../utils/route-stop-markers';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
@@ -58,8 +57,25 @@ export function DriverMapScreen() {
     coordinates: MapCoordinate[];
     key: string;
   }>();
+  const [navigationSession, setNavigationSession] = useState<{
+    routeKey: string;
+    stopSignCoordinates: MapCoordinate[];
+  }>();
+  const [isStartingNavigation, setIsStartingNavigation] = useState(false);
+  const [navigationError, setNavigationError] = useState<string>();
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
+  const isFptStudentHouseRoute =
+    selectedStart?.id === 'dai-hoc-fpt'
+    && selectedDestination?.id === 'nha-van-hoa-sinh-vien';
+  const plannedStopSignCoordinates = useMemo(
+    () => (isFptStudentHouseRoute ? getRouteStopCoordinates(routeCoordinates) : []),
+    [isFptStudentHouseRoute, routeCoordinates],
+  );
+  const isNavigating = Boolean(routeKey && navigationSession?.routeKey === routeKey);
+  const visibleStopSignCoordinates = isNavigating
+    ? navigationSession?.stopSignCoordinates ?? []
+    : plannedStopSignCoordinates;
 
   useEffect(() => {
     if (!selectedDestination || !routeStart || !routeKey) return;
@@ -79,8 +95,47 @@ export function DriverMapScreen() {
     };
   }, [routeKey, routeStart, selectedDestination]);
 
-  const handleBeginNavigation = () => {
-    return;
+  const handleBeginNavigation = async () => {
+    if (Platform.OS === 'web' || !selectedDestination || !routeStart || !routeKey) return;
+
+    if (isFptStudentHouseRoute && plannedStopSignCoordinates.length !== 5) {
+      setNavigationError('The route is still loading. Try again in a moment.');
+      return;
+    }
+
+    setIsStartingNavigation(true);
+    setNavigationError(undefined);
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+      const hasPermission = await mapLibre.LocationManager.requestPermissions();
+
+      if (!hasPermission) {
+        setNavigationError('Location permission is required to start navigation.');
+        return;
+      }
+
+      const currentPosition = await mapLibre.LocationManager.getCurrentPosition();
+
+      if (!currentPosition) {
+        setNavigationError('Your current location is not available. Try again outdoors.');
+        return;
+      }
+
+      setNavigationSession({
+        routeKey,
+        stopSignCoordinates: plannedStopSignCoordinates,
+      });
+    } catch {
+      setNavigationError('Navigation could not start on this device.');
+    } finally {
+      setIsStartingNavigation(false);
+    }
+  };
+
+  const handleClearDestination = () => {
+    router.replace('/(driver)');
   };
 
   const handleGo = async () => {
@@ -139,8 +194,10 @@ export function DriverMapScreen() {
       <View style={styles.map}>
         <DriverMapView
           destination={selectedDestination}
+          navigationActive={Platform.OS !== 'web' && isNavigating}
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
+          routeStopCoordinates={visibleStopSignCoordinates}
         />
 
         <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
@@ -162,18 +219,70 @@ export function DriverMapScreen() {
                     {routeStartTitle}
                   </Text>
                 </AppButton>
+                <View
+                  style={[
+                    styles.selectedDestinationInput,
+                    { backgroundColor: theme.backgroundElement },
+                  ]}
+                >
+                  <AppButton
+                    accessibilityLabel="Clear destination"
+                    hitSlop={Spacing.one}
+                    onPress={handleClearDestination}
+                    pressedOpacity={0.7}
+                    style={styles.inlineBackButton}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
+                  </AppButton>
+                  <AppButton
+                    accessibilityLabel="Change destination"
+                    onPress={() => router.push('/(driver)/search')}
+                    style={styles.destinationNameButton}
+                    variant="ghost"
+                  >
+                    <Text
+                      ellipsizeMode="tail"
+                      numberOfLines={1}
+                      style={[styles.destinationNameText, { color: theme.text }]}
+                    >
+                      {selectedDestination.title}
+                    </Text>
+                  </AppButton>
+                </View>
+              </>
+            ) : selectedDestination ? (
+              <View
+                style={[
+                  styles.selectedDestinationInput,
+                  { backgroundColor: theme.backgroundElement },
+                ]}
+              >
+                <AppButton
+                  accessibilityLabel="Clear destination"
+                  hitSlop={Spacing.one}
+                  onPress={handleClearDestination}
+                  pressedOpacity={0.7}
+                  style={styles.inlineBackButton}
+                  variant="ghost"
+                >
+                  <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
+                </AppButton>
                 <AppButton
                   accessibilityLabel="Change destination"
                   onPress={() => router.push('/(driver)/search')}
-                  style={styles.routeInput}
-                  variant="surface"
+                  style={styles.destinationNameButton}
+                  variant="ghost"
                 >
-                  <Text style={[styles.routeInputSearchIcon, { color: theme.text }]}>Q</Text>
-                  <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
+                  <Text
+                    ellipsizeMode="tail"
+                    numberOfLines={1}
+                    style={[styles.destinationNameText, { color: theme.text }]}
+                  >
                     {selectedDestination.title}
                   </Text>
                 </AppButton>
-              </>
+              </View>
             ) : (
               <AppButton
                 accessibilityLabel="Search destination"
@@ -181,18 +290,14 @@ export function DriverMapScreen() {
                 style={styles.searchButton}
                 variant="surface"
               >
-                <Text style={[styles.searchIcon, { color: theme.tertiary }]}>Q</Text>
                 <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
-                  {selectedDestination?.title ?? 'Where to?'}
+                  Where to?
                 </Text>
-                <Text style={[styles.profileIcon, { color: theme.text }]}>U</Text>
               </AppButton>
             )}
           </View>
         </SafeAreaView>
       </View>
-
-      <DriverBottomTabs activeRoute="/(driver)" />
 
       {selectedDestination ? (
         <SafeAreaView
@@ -200,12 +305,27 @@ export function DriverMapScreen() {
           style={[styles.destinationSheet, { backgroundColor: theme.backgroundElement }]}
         >
           <View style={styles.destinationSheetHandle} />
-          <Text numberOfLines={1} style={[styles.destinationTitle, { color: theme.text }]}>
+          <Text
+            numberOfLines={1}
+            style={[styles.destinationTitle, { color: theme.text }]}
+          >
             {selectedDestination.title}
           </Text>
+          {navigationError ? (
+            <Text accessibilityRole="alert" style={styles.navigationError}>
+              {navigationError}
+            </Text>
+          ) : null}
           <AppButton
-            accessibilityLabel={routeStart ? 'Begin navigation' : 'Start route'}
-            label="Go"
+            accessibilityLabel={
+              isNavigating
+                ? 'Navigation active'
+                : routeStart
+                  ? 'Begin navigation'
+                  : 'Start route'
+            }
+            disabled={isNavigating || isStartingNavigation}
+            label={isNavigating ? 'Navigating' : isStartingNavigation ? 'Starting...' : 'Go'}
             onPress={routeStart ? handleBeginNavigation : handleGo}
             style={styles.goButton}
           />
@@ -231,6 +351,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
   },
+  inlineBackButton: {
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  backIcon: {
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: 700,
+  },
+  selectedDestinationInput: {
+    minHeight: 44,
+    borderRadius: Rounded.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: Spacing.three,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  destinationNameButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  destinationNameText: {
+    flexShrink: 1,
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 700,
+  },
   searchButton: {
     minHeight: 42,
     borderRadius: Rounded.md,
@@ -244,21 +404,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  searchIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 900,
-  },
   searchText: {
     flex: 1,
     fontFamily: Fonts.body,
     fontSize: 14,
     fontWeight: 700,
-  },
-  profileIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 800,
   },
   routeInput: {
     minHeight: 44,
@@ -282,12 +432,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 15,
     fontWeight: 900,
-  },
-  routeInputSearchIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 900,
-    marginLeft: Spacing.three,
   },
   routeInputText: {
     flex: 1,
@@ -324,6 +468,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 900,
     marginBottom: Spacing.three,
+  },
+  navigationError: {
+    color: '#B42318',
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 18,
+    marginBottom: Spacing.two,
   },
   goButton: {
     alignSelf: 'stretch',

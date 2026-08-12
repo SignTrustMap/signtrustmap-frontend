@@ -7,11 +7,6 @@ import { Fonts, Spacing } from '@/constants/theme';
 import { previousDriverLocations } from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
-const filters = [
-  { id: 'home', icon: 'H', label: 'Home' },
-  { id: 'work', icon: 'W', label: 'Work' },
-  { id: 'saved', icon: 'S', label: 'Saved' },
-];
 
 export function DriverSearchScreen() {
   const router = useRouter();
@@ -38,21 +33,6 @@ export function DriverSearchScreen() {
           <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
         </AppButton>
         <Text style={[styles.searchPrompt, { color: theme.text }]}>Where to?</Text>
-      </View>
-
-      <View style={styles.filterRow}>
-        {filters.map((filter) => (
-          <AppButton
-            accessibilityLabel={`${filter.label} locations`}
-            key={filter.id}
-            pressedOpacity={0.75}
-            style={[styles.filterPill, { backgroundColor: theme.background, borderColor: theme.border }]}
-            variant="ghost"
-          >
-            <Text style={[styles.filterIcon, { color: theme.tertiary }]}>{filter.icon}</Text>
-            <Text style={[styles.filterText, { color: theme.text }]}>{filter.label}</Text>
-          </AppButton>
-        ))}
       </View>
 
       <ScrollView

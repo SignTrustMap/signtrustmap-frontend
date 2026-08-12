@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image as ReactNativeImage, StyleSheet, View } from 'react-native';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
   driverCurrentLocation,
-  driverMapSignMarkers,
   type MapCoordinate,
   type PreviousLocation,
 } from '@/data/driverLocations';
@@ -15,7 +14,11 @@ type DriverMapViewProps = {
   destination?: PreviousLocation;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
+  routeStopCoordinates?: MapCoordinate[];
 };
+
+const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
+const stopSignImageUri = ReactNativeImage.resolveAssetSource(stopSignImage).uri;
 
 const openStreetMapStyle: StyleSpecification = {
   version: 8,
@@ -36,20 +39,14 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-function createSignMarkerElement() {
-  const marker = document.createElement('div');
-  marker.style.width = '22px';
-  marker.style.height = '22px';
-  marker.style.border = '2px solid #FFFFFF';
-  marker.style.borderRadius = '11px';
-  marker.style.background = '#E1382D';
-  marker.style.color = '#FFFFFF';
-  marker.style.display = 'flex';
-  marker.style.alignItems = 'center';
-  marker.style.justifyContent = 'center';
-  marker.style.fontSize = '12px';
-  marker.style.fontWeight = '900';
-  marker.textContent = '!';
+function createStopSignMarkerElement() {
+  const marker = document.createElement('img');
+  marker.src = stopSignImageUri;
+  marker.alt = 'Stop sign';
+  marker.style.width = '36px';
+  marker.style.height = '36px';
+  marker.style.objectFit = 'contain';
+  marker.style.filter = 'drop-shadow(0 2px 3px rgba(9, 35, 60, 0.24))';
 
   return marker;
 }
@@ -112,12 +109,18 @@ function createStartMarkerElement() {
   return marker;
 }
 
-export function DriverMapView({ destination, routeCoordinates, routeStart }: DriverMapViewProps) {
+export function DriverMapView({
+  destination,
+  routeCoordinates,
+  routeStart,
+  routeStopCoordinates = [],
+}: DriverMapViewProps) {
   const theme = useTheme();
   const destinationMarkerRef = useRef<Marker | null>(null);
   const mapRef = useRef<Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const startMarkerRef = useRef<Marker | null>(null);
+  const stopSignMarkersRef = useRef<Marker[]>([]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -139,12 +142,6 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
 
-    driverMapSignMarkers.forEach((marker) => {
-      new Marker({ element: createSignMarkerElement() })
-        .setLngLat(marker.coordinate)
-        .addTo(map);
-    });
-
     new Marker({ element: createDriverMarkerElement(theme.tertiary) })
       .setLngLat(driverCurrentLocation.coordinate)
       .addTo(map);
@@ -152,6 +149,8 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
     return () => {
       destinationMarkerRef.current?.remove();
       startMarkerRef.current?.remove();
+      stopSignMarkersRef.current.forEach((marker) => marker.remove());
+      stopSignMarkersRef.current = [];
       destinationMarkerRef.current = null;
       startMarkerRef.current = null;
       mapRef.current = null;
@@ -165,8 +164,10 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
     const map = mapRef.current;
     destinationMarkerRef.current?.remove();
     startMarkerRef.current?.remove();
+    stopSignMarkersRef.current.forEach((marker) => marker.remove());
     destinationMarkerRef.current = null;
     startMarkerRef.current = null;
+    stopSignMarkersRef.current = [];
 
     if (map.getLayer('selected-route-line')) {
       map.removeLayer('selected-route-line');
@@ -226,6 +227,14 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
         .setLngLat(routeStart)
         .addTo(map);
 
+      if (routeStopCoordinates.length > 0) {
+        stopSignMarkersRef.current = routeStopCoordinates.map((coordinate) => (
+          new Marker({ element: createStopSignMarkerElement() })
+            .setLngLat(coordinate)
+            .addTo(map)
+        ));
+      }
+
       map.fitBounds([routeStart, destination.coordinate], {
         duration: 900,
         padding: { bottom: 160, left: 44, right: 44, top: 100 },
@@ -246,7 +255,7 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeStart, theme.tertiary]);
+  }, [destination, routeCoordinates, routeStart, routeStopCoordinates, theme.tertiary]);
 
   return (
     <View style={styles.container}>

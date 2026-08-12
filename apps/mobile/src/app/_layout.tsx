@@ -1,4 +1,5 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme, type ColorSchemeName } from 'react-native';
 
@@ -22,7 +23,7 @@ export default function TabLayout() {
 function RootNavigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
   const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
-  const { isInitializing } = useSession();
+  const { isInitializing, session } = useSession();
 
   if (isInitializing) {
     return <AppSplashScreen />;
@@ -37,12 +38,12 @@ function RootNavigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
         },
       }}
     >
-      {/* <Stack.Protected guard={!session}>
-        <Stack.Screen name="(auth)/login" />
+      <Stack.Protected guard={!session}>
+        <Stack.Screen name="(public)/login" />
       </Stack.Protected>
       <Stack.Protected guard={!!session}>
-        <Stack.Screen name="(tabs)" />
-      </Stack.Protected> */}
+        <Stack.Screen name="index" />
+      </Stack.Protected>
     </Stack>
   );
 }

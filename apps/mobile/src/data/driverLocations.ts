@@ -8,7 +8,6 @@ export type PreviousLocation = {
   title: string;
   subtitle: string;
   category: 'home' | 'work' | 'saved' | 'recent';
-
 };
 
 export type DriverStartLocation = {
@@ -27,72 +26,75 @@ export type MapSignMarker = {
 
 export const previousDriverLocations: PreviousLocation[] = [
   {
-    coordinate: [-73.973, 40.7648],
-    id: 'fifth-ave',
-    title: '5th Ave, New York',
-    subtitle: 'Midtown Manhattan, near Central Park',
+    coordinate: [106.691383, 10.770046],
+    id: 'metro-ben-thanh',
+    title: 'Ga Metro Bến Thành',
+    subtitle: 'Gần chợ Bến Thành, Thành phố Hồ Chí Minh',
     category: 'recent',
-
   },
   {
-    coordinate: [-73.7781, 40.6413],
-    id: 'jfk-airport',
-    title: 'JFK International Airport',
-    subtitle: 'Queens, NY 11430',
+    coordinate: [106.80988299558288, 10.841285649563071],
+    id: 'dai-hoc-fpt',
+    title: 'Trường Đại học FPT',
+    subtitle: 'Khu Công nghệ cao, Thành phố Hồ Chí Minh',
     category: 'recent',
-
   },
   {
-    coordinate: [-73.9969, 40.7033],
-    id: 'brooklyn-bridge-park',
-    title: 'Brooklyn Bridge Park',
-    subtitle: '334 Furman St, Brooklyn, NY',
+    coordinate: [106.80071256674707, 10.87521547849516],
+    id: 'nha-van-hoa-sinh-vien',
+    title: 'Nhà Văn hóa Sinh viên',
+    subtitle: 'Khu đô thị Đại học Quốc gia Thành phố Hồ Chí Minh',
     category: 'recent',
-
   },
 ];
 
 export const driverStartLocations: DriverStartLocation[] = [
   {
-    coordinate: [-73.7781, 40.6413],
-    id: 'jfk-airport',
-    title: 'JFK International Airport',
-    subtitle: 'Queens, NY 11430, United States',
+    coordinate: [106.80988299558288, 10.841285649563071],
+    id: 'dai-hoc-fpt',
+    title: 'Trường Đại học FPT',
+    subtitle: 'Khu Công nghệ cao, Thành phố Hồ Chí Minh',
   },
   {
-    coordinate: [-73.9969, 40.7033],
-    id: 'brooklyn-bridge-park',
-    title: 'Brooklyn Bridge Park',
-    subtitle: '334 Furman St, Brooklyn, NY 11201',
+    coordinate: [106.691383, 10.770046],
+    id: 'metro-ben-thanh',
+    title: 'Ga Metro Bến Thành',
+    subtitle: 'Gần chợ Bến Thành, Thành phố Hồ Chí Minh',
   },
   {
-    coordinate: [-73.9857, 40.7484],
-    id: 'empire-state-building',
-    title: 'Empire State Building',
-    subtitle: '20 W 34th St, New York, NY 10001',
+    coordinate: [106.80071256674707, 10.87521547849516],
+    id: 'nha-van-hoa-sinh-vien',
+    title: 'Nhà Văn hóa Sinh viên',
+    subtitle: 'Số 1 Lưu Hữu Phước, Thành phố Hồ Chí Minh',
   },
   {
-    coordinate: [-73.9632, 40.7794],
-    id: 'metropolitan-museum',
-    title: 'The Metropolitan Museum of Art',
-    subtitle: '1000 5th Ave, New York, NY 10028',
+    coordinate: [106.75486531627588, 10.63528464347232],
+    id: 'truong-thpt-mac-dinh-chi',
+    title: 'Trường THPT Mạc Đĩnh Chi',
+    subtitle: 'Thành phố Hồ Chí Minh',
+  },
+  {
+    coordinate: [106.8107, 10.879],
+    id: 'ben-xe-mien-dong-moi',
+    title: 'Bến xe Miền Đông mới',
+    subtitle: 'Đường Hoàng Hữu Nam, Thành phố Hồ Chí Minh',
   },
 ];
 
 export const driverMapSignMarkers: MapSignMarker[] = [
-  { id: 'sign-182', coordinate: [-73.9862, 40.7583], top: '29%', left: '24%' },
-  { id: 'sign-219', coordinate: [-73.9812, 40.7557], top: '41%', left: '66%' },
-  { id: 'sign-277', coordinate: [-73.9788, 40.7526], top: '53%', left: '82%' },
-  { id: 'sign-304', coordinate: [-73.9902, 40.7506], top: '70%', left: '44%' },
+  { id: 'bien-bao-182', coordinate: [106.8048, 10.8482], top: '29%', left: '24%' },
+  { id: 'bien-bao-219', coordinate: [106.8112, 10.846], top: '41%', left: '66%' },
+  { id: 'bien-bao-277', coordinate: [106.814, 10.8428], top: '53%', left: '82%' },
+  { id: 'bien-bao-304', coordinate: [106.8061, 10.8399], top: '70%', left: '44%' },
 ];
 
 export const driverCurrentLocation = {
-  coordinate: [-73.9846, 40.7536] as MapCoordinate,
-  label: 'Current driver location',
+  coordinate: [106.8075, 10.845] as MapCoordinate,
+  label: 'Vị trí hiện tại của tài xế',
 };
 
 export const openStreetMapTiles = [
-  ['https://tile.openstreetmap.org/16/19297/24630.png', 'https://tile.openstreetmap.org/16/19298/24630.png'],
-  ['https://tile.openstreetmap.org/16/19297/24631.png', 'https://tile.openstreetmap.org/16/19298/24631.png'],
-  ['https://tile.openstreetmap.org/16/19297/24632.png', 'https://tile.openstreetmap.org/16/19298/24632.png'],
+  ['https://tile.openstreetmap.org/16/52210/30780.png', 'https://tile.openstreetmap.org/16/52211/30780.png'],
+  ['https://tile.openstreetmap.org/16/52210/30781.png', 'https://tile.openstreetmap.org/16/52211/30781.png'],
+  ['https://tile.openstreetmap.org/16/52210/30782.png', 'https://tile.openstreetmap.org/16/52211/30782.png'],
 ];

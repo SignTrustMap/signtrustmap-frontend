@@ -11,17 +11,22 @@ import {
 } from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
-const filters = [
-  { id: 'home', icon: 'H', label: 'Home' },
-  { id: 'work', icon: 'W', label: 'Work' },
-  { id: 'saved', icon: 'S', label: 'Saved' },
-];
+
 
 export function DriverStartScreen() {
   const router = useRouter();
   const { destinationId } = useLocalSearchParams<{ destinationId?: string }>();
   const theme = useTheme();
   const destination = previousDriverLocations.find((location) => location.id === destinationId);
+
+  const handleBack = () => {
+    if (destinationId) {
+      router.replace({
+        pathname: '/(driver)',
+        params: {},
+      })
+    }
+  }
 
   const handleSelectCurrentLocation = () => {
     if (!destinationId) return;
@@ -51,7 +56,7 @@ export function DriverStartScreen() {
         <AppButton
           accessibilityLabel="Go back"
           hitSlop={Spacing.one}
-          onPress={() => router.back()}
+          onPress={() => handleBack()}
           pressedOpacity={0.7}
           style={styles.backButton}
           variant="ghost"
@@ -60,7 +65,7 @@ export function DriverStartScreen() {
         </AppButton>
         <Text style={[styles.gpsIcon, { color: theme.tertiary }]}>G</Text>
         <Text numberOfLines={1} style={[styles.searchPrompt, { color: theme.placeholder }]}>
-          Input your starting point
+          Your starting point...
         </Text>
       </View>
 
@@ -72,21 +77,6 @@ export function DriverStartScreen() {
           </Text>
         </View>
       ) : null}
-
-      <View style={styles.filterRow}>
-        {filters.map((filter) => (
-          <AppButton
-            accessibilityLabel={`${filter.label} locations`}
-            key={filter.id}
-            pressedOpacity={0.75}
-            style={[styles.filterPill, { backgroundColor: theme.background, borderColor: theme.border }]}
-            variant="ghost"
-          >
-            <Text style={[styles.filterIcon, { color: theme.tertiary }]}>{filter.icon}</Text>
-            <Text style={[styles.filterText, { color: theme.text }]}>{filter.label}</Text>
-          </AppButton>
-        ))}
-      </View>
 
       <ScrollView
         contentContainerStyle={styles.listContent}

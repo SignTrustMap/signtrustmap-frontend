@@ -1,10 +1,9 @@
 import type { StyleSpecification } from '@maplibre/maplibre-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   driverCurrentLocation,
-  driverMapSignMarkers,
   type MapCoordinate,
   type PreviousLocation,
 } from '@/data/driverLocations';
@@ -14,9 +13,13 @@ type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
 type DriverMapViewProps = {
   destination?: PreviousLocation;
+  navigationActive?: boolean;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
+  routeStopCoordinates?: MapCoordinate[];
 };
+
+const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 function getRouteBounds(start: MapCoordinate, destination: MapCoordinate) {
   return [
@@ -56,22 +59,27 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-export function DriverMapView({ destination, routeCoordinates, routeStart }: DriverMapViewProps) {
+export function DriverMapView({
+  destination,
+  navigationActive = false,
+  routeCoordinates,
+  routeStart,
+  routeStopCoordinates = [],
+}: DriverMapViewProps) {
   const theme = useTheme();
   const mapLibre = loadMapLibre();
   const cameraCenter = destination?.coordinate ?? driverCurrentLocation.coordinate;
   const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
   const routeGeoJson = routeCoordinates?.length
     ? ({
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: routeCoordinates,
-        },
-      } as GeoJSON.Feature<GeoJSON.LineString>)
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: routeCoordinates,
+      },
+    } as GeoJSON.Feature<GeoJSON.LineString>)
     : null;
-
   if (!mapLibre) {
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
@@ -86,7 +94,7 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
     );
   }
 
-  const { Camera, GeoJSONSource, Layer, Map, Marker } = mapLibre;
+  const { Camera, GeoJSONSource, Layer, Map, Marker, UserLocation } = mapLibre;
 
   return (
     <Map
@@ -100,7 +108,17 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
       touchPitch={false}
       touchRotate={false}
     >
-      {routeBounds ? (
+      {navigationActive ? (
+        <Camera
+          duration={900}
+          easing="fly"
+          maxZoom={19}
+          minZoom={11}
+          padding={{ bottom: 210, left: 24, right: 24, top: 120 }}
+          trackUserLocation="heading"
+          zoom={17}
+        />
+      ) : routeBounds ? (
         <Camera
           bounds={routeBounds}
           duration={900}
@@ -135,19 +153,28 @@ export function DriverMapView({ destination, routeCoordinates, routeStart }: Dri
         </GeoJSONSource>
       ) : null}
 
-      {driverMapSignMarkers.map((marker) => (
-        <Marker anchor="center" id={marker.id} key={marker.id} lngLat={marker.coordinate}>
-          <View style={styles.signMarker}>
-            <Text style={styles.signMarkerText}>!</Text>
+      {routeStopCoordinates.map((coordinate, index) => (
+        <Marker anchor="center" id={`route-stop-sign-${index + 1}`} key={index} lngLat={coordinate}>
+          <View style={styles.stopSignMarker}>
+            <Image
+              accessibilityLabel="Stop sign"
+              source={stopSignImage}
+              resizeMode="contain"
+              style={styles.stopSignImage}
+            />
           </View>
         </Marker>
       ))}
 
-      <Marker anchor="center" id="driver-location" lngLat={driverCurrentLocation.coordinate}>
-        <View style={styles.currentLocationHalo}>
-          <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
-        </View>
-      </Marker>
+      {navigationActive ? (
+        <UserLocation accuracy animated heading minDisplacement={1} />
+      ) : (
+        <Marker anchor="center" id="driver-location" lngLat={driverCurrentLocation.coordinate}>
+          <View style={styles.currentLocationHalo}>
+            <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
+          </View>
+        </Marker>
+      )}
 
       {routeStart ? (
         <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
@@ -194,21 +221,20 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     lineHeight: 19,
   },
-  signMarker: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#E1382D',
+  stopSignMarker: {
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.24,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  signMarkerText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 900,
+  stopSignImage: {
+    width: 36,
+    height: 36,
   },
   currentLocationHalo: {
     width: 58,

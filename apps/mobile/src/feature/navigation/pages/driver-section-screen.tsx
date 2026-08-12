@@ -1,17 +1,15 @@
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DriverBottomTabs } from '@/components/driver-bottom-tabs';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 
 type DriverSectionScreenProps = {
-  activeRoute: '/(driver)/tasks' | '/(driver)/credits' | '/(driver)/profile';
   title: string;
 };
 
-export function DriverSectionScreen({ activeRoute, title }: DriverSectionScreenProps) {
+export function DriverSectionScreen({ title }: DriverSectionScreenProps) {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.content}>
@@ -24,7 +22,6 @@ export function DriverSectionScreen({ activeRoute, title }: DriverSectionScreenP
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
-      <DriverBottomTabs activeRoute={activeRoute} />
     </ThemedView>
   );
 }

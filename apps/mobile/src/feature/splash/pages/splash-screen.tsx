@@ -22,7 +22,7 @@ export function AppSplashScreen() {
     });
 
     useEffect(() => {
-        SplashScreen.hideAsync();
+        void SplashScreen.hideAsync();
     }, []);
 
     return (
