@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 
 import { DriverMapView } from '../components/driver-map-view';
-import { getDrivingRoute } from '../services/osrm';
+import { getDrivingRoute, type OsrmRouteStep } from '../services/osrm';
 import { getRouteStopCoordinates } from '../utils/route-stop-markers';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
@@ -56,6 +56,7 @@ export function DriverMapScreen() {
   const [routeResult, setRouteResult] = useState<{
     coordinates: MapCoordinate[];
     key: string;
+    steps: OsrmRouteStep[];
   }>();
   const [navigationSession, setNavigationSession] = useState<{
     routeKey: string;
@@ -65,6 +66,7 @@ export function DriverMapScreen() {
   const [navigationError, setNavigationError] = useState<string>();
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
+  const routeSteps = routeResult && routeResult.key === routeKey ? routeResult.steps : undefined;
   const plannedStopSignCoordinates = useMemo(
     () => getRouteStopCoordinates(routeCoordinates),
     [routeCoordinates],
@@ -80,8 +82,8 @@ export function DriverMapScreen() {
     const controller = new AbortController();
 
     getDrivingRoute(routeStart, selectedDestination.coordinate, controller.signal)
-      .then((coordinates) => {
-        setRouteResult({ coordinates, key: routeKey });
+      .then(({ coordinates, steps }) => {
+        setRouteResult({ coordinates, key: routeKey, steps });
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;
@@ -313,6 +315,48 @@ export function DriverMapScreen() {
               {navigationError}
             </Text>
           ) : null}
+          {routeStart ? (
+            <View style={styles.directionsSection}>
+              <Text style={[styles.directionsHeading, { color: theme.text }]}>Directions</Text>
+              {routeSteps ? (
+                routeSteps.length > 0 ? (
+                  <ScrollView
+                    contentContainerStyle={styles.directionsList}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.directionsScroll}
+                  >
+                    {routeSteps.map((step, index) => (
+                      <View
+                        key={`${index}-${step.maneuver.type}-${step.name}`}
+                        style={styles.directionRow}
+                      >
+                        <Text style={[styles.directionNumber, { color: theme.tertiary }]}>
+                          {index + 1}
+                        </Text>
+                        <View style={styles.directionCopy}>
+                          <Text style={[styles.directionInstruction, { color: theme.text }]}>
+                            {formatRouteInstruction(step)}
+                          </Text>
+                          <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
+                            {formatRouteDistance(step.distance)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
+                    No turn-by-turn directions are available for this route.
+                  </Text>
+                )
+              ) : (
+                <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
+                  Loading directions...
+                </Text>
+              )}
+            </View>
+          ) : null}
           <AppButton
             accessibilityLabel={
               isNavigating
@@ -330,6 +374,41 @@ export function DriverMapScreen() {
       ) : null}
     </View>
   );
+}
+
+function formatRouteInstruction(step: OsrmRouteStep) {
+  const roadName = step.name || 'the road';
+  const modifier = step.maneuver.modifier?.replaceAll('_', ' ');
+
+  switch (step.maneuver.type) {
+    case 'depart':
+      return `Start on ${roadName}`;
+    case 'arrive':
+      return 'Arrive at your destination';
+    case 'turn':
+      return `Turn ${modifier ?? ''} onto ${roadName}`.replace('  ', ' ');
+    case 'continue':
+      return `Continue${modifier ? ` ${modifier}` : ''} on ${roadName}`;
+    case 'new name':
+      return `Continue onto ${roadName}`;
+    case 'merge':
+      return `Merge${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
+    case 'on ramp':
+      return `Take the ramp${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
+    case 'off ramp':
+      return `Take the exit${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
+    case 'roundabout':
+    case 'rotary':
+      return `Enter the roundabout toward ${roadName}`;
+    default:
+      return `${step.maneuver.type.replaceAll('_', ' ')} on ${roadName}`;
+  }
+}
+
+function formatRouteDistance(distanceInMeters: number) {
+  if (distanceInMeters < 1000) return `${Math.round(distanceInMeters)} m`;
+
+  return `${(distanceInMeters / 1000).toFixed(1)} km`;
 }
 
 const styles = StyleSheet.create({
@@ -473,6 +552,56 @@ const styles = StyleSheet.create({
     fontWeight: 700,
     lineHeight: 18,
     marginBottom: Spacing.two,
+  },
+  directionsSection: {
+    gap: Spacing.one,
+    marginBottom: Spacing.three,
+  },
+  directionsHeading: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 900,
+  },
+  directionsScroll: {
+    maxHeight: 156,
+  },
+  directionsList: {
+    gap: Spacing.two,
+    paddingRight: Spacing.one,
+  },
+  directionRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    alignItems: 'flex-start',
+  },
+  directionNumber: {
+    width: 22,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 900,
+    textAlign: 'center',
+  },
+  directionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  directionInstruction: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: 18,
+  },
+  directionDistance: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 600,
+    lineHeight: 16,
+  },
+  directionsStatus: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+    lineHeight: 18,
   },
   goButton: {
     alignSelf: 'stretch',

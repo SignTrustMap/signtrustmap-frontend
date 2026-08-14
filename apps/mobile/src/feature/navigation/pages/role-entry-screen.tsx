@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,11 +14,9 @@ type RoleEntryScreenProps = {
 
 export function RoleEntryScreen({ role, title }: RoleEntryScreenProps) {
   const { logOut } = useSession();
-  const router = useRouter();
 
   const handleLogOut = async () => {
     await logOut();
-    router.replace('/login');
   };
 
   return (

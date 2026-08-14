@@ -44,8 +44,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }
 
   async function logOut() {
-    await removeStorageItemAsync('session');
     setSession(null);
+    await removeStorageItemAsync('session');
   }
 
   return <AuthContext.Provider

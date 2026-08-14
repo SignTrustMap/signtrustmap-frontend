@@ -1,7 +1,6 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme, type ColorSchemeName } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
@@ -10,20 +9,18 @@ import { SessionProvider, useSession } from '@/context/session-provider';
 SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <SessionProvider>
-        <RootNavigation colorScheme={colorScheme} />
+        <RootNavigation />
       </SessionProvider>
     </ThemeProvider>
   );
 }
 
-function RootNavigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
-  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
-
+function RootNavigation() {
   const { isInitializing, session } = useSession();
+  const hasValidSession = Boolean(session?.trim());
 
   if (isInitializing) {
     return <AppSplashScreen />;
@@ -34,15 +31,18 @@ function RootNavigation({ colorScheme }: { colorScheme: ColorSchemeName }) {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: theme.background,
+          backgroundColor: Colors.background,
         },
       }}
     >
-      <Stack.Protected guard={!session}>
+      <Stack.Protected guard={!hasValidSession}>
         <Stack.Screen name="(public)/login" />
       </Stack.Protected>
-      <Stack.Protected guard={!!session}>
+      <Stack.Protected guard={hasValidSession}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="(driver)" />
+        <Stack.Screen name="(surveyor)" />
+        <Stack.Screen name="(reviewer)" />
       </Stack.Protected>
     </Stack>
   );
