@@ -1,10 +1,12 @@
 import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 
 import { Colors } from '@/constants/theme';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import { SessionProvider, useSession } from '@/context/session-provider';
+import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,6 +23,14 @@ export default function TabLayout() {
 function RootNavigation() {
   const { isInitializing, session } = useSession();
   const hasValidSession = Boolean(session?.trim());
+
+  useEffect(() => {
+    if (isInitializing) return;
+
+    requestLocationPermissionOnFirstLaunch().catch(() => {
+      // Permission storage failures should not prevent the app from opening.
+    });
+  }, [isInitializing]);
 
   if (isInitializing) {
     return <AppSplashScreen />;

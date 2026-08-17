@@ -15,7 +15,7 @@ export default function DriverLayout() {
   const segments = useSegments();
   const currentRoute = segments[segments.length - 1];
   const activeRoute = tabRoutes[currentRoute as keyof typeof tabRoutes] ?? '/(driver)';
-  const showTabs = currentRoute !== 'search' && currentRoute !== 'start';
+  const showTabs = currentRoute === '(driver)' || currentRoute in tabRoutes;
 
   return (
     <View style={styles.layout}>

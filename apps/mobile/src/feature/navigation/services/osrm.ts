@@ -3,6 +3,8 @@ import type { MapCoordinate } from '@/data/driverLocations';
 type OsrmRouteResponse = {
   code: string;
   routes?: {
+    distance?: number;
+    duration?: number;
     geometry?: {
       coordinates?: MapCoordinate[];
       type: 'LineString';
@@ -17,6 +19,7 @@ export type OsrmRouteStep = {
   distance: number;
   duration: number;
   maneuver: {
+    location?: MapCoordinate;
     modifier?: string;
     type: string;
   };
@@ -25,6 +28,8 @@ export type OsrmRouteStep = {
 
 export type OsrmRouteResult = {
   coordinates: MapCoordinate[];
+  distance: number;
+  duration: number;
   steps: OsrmRouteStep[];
 };
 
@@ -51,8 +56,12 @@ export async function getDrivingRoute(
     throw new Error('OSRM did not return a route geometry');
   }
 
+  const steps = route?.legs?.flatMap((leg) => leg.steps ?? []) ?? [];
+
   return {
     coordinates,
-    steps: route?.legs?.flatMap((leg) => leg.steps ?? []) ?? [],
+    distance: route?.distance ?? steps.reduce((total, step) => total + step.distance, 0),
+    duration: route?.duration ?? steps.reduce((total, step) => total + step.duration, 0),
+    steps,
   };
 }

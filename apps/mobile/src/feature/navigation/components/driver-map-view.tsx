@@ -17,6 +17,7 @@ type DriverMapViewProps = {
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeStopCoordinates?: MapCoordinate[];
+  showCurrentLocation?: boolean;
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
@@ -65,6 +66,7 @@ export function DriverMapView({
   routeCoordinates,
   routeStart,
   routeStopCoordinates = [],
+  showCurrentLocation = true,
 }: DriverMapViewProps) {
   const theme = useTheme();
   const mapLibre = loadMapLibre();
@@ -168,13 +170,13 @@ export function DriverMapView({
 
       {navigationActive ? (
         <UserLocation accuracy animated heading minDisplacement={1} />
-      ) : (
+      ) : showCurrentLocation ? (
         <Marker anchor="center" id="driver-location" lngLat={driverCurrentLocation.coordinate}>
           <View style={styles.currentLocationHalo}>
             <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
           </View>
         </Marker>
-      )}
+      ) : null}
 
       {routeStart ? (
         <Marker anchor="center" id="route-start-location" lngLat={routeStart}>

@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { AppToast } from '@/components/ui/toast';
 import { Fonts, Spacing } from '@/constants/theme';
 import {
   driverCurrentLocation,
@@ -11,13 +13,23 @@ import {
 } from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
+import { areSameLocation } from '../utils/location';
 
+const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
 
 export function DriverStartScreen() {
   const router = useRouter();
   const { destinationId } = useLocalSearchParams<{ destinationId?: string }>();
   const theme = useTheme();
   const destination = previousDriverLocations.find((location) => location.id === destinationId);
+  const [toast, setToast] = useState<{ id: number; message: string }>();
+
+  const showSameLocationToast = () => {
+    setToast((currentToast) => ({
+      id: (currentToast?.id ?? 0) + 1,
+      message: SAME_LOCATION_MESSAGE,
+    }));
+  };
 
   const handleBack = () => {
     if (destinationId) {
@@ -31,6 +43,11 @@ export function DriverStartScreen() {
   const handleSelectCurrentLocation = () => {
     if (!destinationId) return;
 
+    if (areSameLocation(driverCurrentLocation.coordinate, destination?.coordinate)) {
+      showSameLocationToast();
+      return;
+    }
+
     router.replace({
       pathname: '/(driver)',
       params: {
@@ -43,6 +60,13 @@ export function DriverStartScreen() {
 
   const handleSelectStart = (startId: string) => {
     if (!destinationId) return;
+
+    const start = driverStartLocations.find((location) => location.id === startId);
+
+    if (areSameLocation(start?.coordinate, destination?.coordinate)) {
+      showSameLocationToast();
+      return;
+    }
 
     router.replace({
       pathname: '/(driver)',
@@ -63,7 +87,6 @@ export function DriverStartScreen() {
         >
           <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
         </AppButton>
-        <Text style={[styles.gpsIcon, { color: theme.tertiary }]}>G</Text>
         <Text numberOfLines={1} style={[styles.searchPrompt, { color: theme.placeholder }]}>
           Your starting point...
         </Text>
@@ -71,7 +94,6 @@ export function DriverStartScreen() {
 
       {destination ? (
         <View style={styles.destinationRow}>
-          <Text style={[styles.pinIcon, { color: theme.textSecondary }]}>P</Text>
           <Text numberOfLines={1} style={[styles.destinationText, { color: theme.text }]}>
             {destination.title}
           </Text>
@@ -104,7 +126,6 @@ export function DriverStartScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionLabel, { color: theme.text }]}>Recent History</Text>
-          <Text style={[styles.clearAction, { color: theme.tertiary }]}>Clear All</Text>
         </View>
 
         {driverStartLocations.map((location) => (
@@ -129,6 +150,13 @@ export function DriverStartScreen() {
           </AppButton>
         ))}
       </ScrollView>
+      {toast ? (
+        <AppToast
+          key={toast.id}
+          message={toast.message}
+          onDismiss={() => setToast(undefined)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -158,11 +186,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 700,
   },
-  gpsIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 900,
-  },
   searchPrompt: {
     flex: 1,
     fontFamily: Fonts.body,
@@ -173,15 +196,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-  },
-  pinIcon: {
-    width: 36,
-    textAlign: 'center',
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 900,
+    paddingLeft: Spacing.four + 36 + Spacing.two,
+    paddingRight: Spacing.four,
   },
   destinationText: {
     flex: 1,

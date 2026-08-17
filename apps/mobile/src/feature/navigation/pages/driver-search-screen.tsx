@@ -1,21 +1,51 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { AppToast } from '@/components/ui/toast';
 import { Fonts, Spacing } from '@/constants/theme';
-import { previousDriverLocations } from '@/data/driverLocations';
+import { driverStartLocations, previousDriverLocations, type MapCoordinate } from '@/data/driverLocations';
 import { useTheme } from '@/hooks/use-theme';
 
+import { areSameLocation } from '../utils/location';
 
+const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
 export function DriverSearchScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { startId, startLat, startLng } = useLocalSearchParams<{
+    startId?: string;
+    startLat?: string;
+    startLng?: string;
+  }>();
+  const [toast, setToast] = useState<{ id: number; message: string }>();
+  const selectedStart = driverStartLocations.find((location) => location.id === startId);
+  const coordinateStart = useMemo(
+    () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
+    [startLat, startLng],
+  );
+  const routeStart = coordinateStart ?? selectedStart?.coordinate;
 
   const handleSelectLocation = (locationId: string) => {
+    const destination = previousDriverLocations.find((location) => location.id === locationId);
+
+    if (areSameLocation(destination?.coordinate, routeStart)) {
+      setToast((currentToast) => ({
+        id: (currentToast?.id ?? 0) + 1,
+        message: SAME_LOCATION_MESSAGE,
+      }));
+      return;
+    }
+
     router.replace({
       pathname: '/(driver)',
-      params: { destinationId: locationId },
+      params: {
+        destinationId: locationId,
+        ...(startId ? { startId } : {}),
+        ...(startLat && startLng ? { startLat, startLng } : {}),
+      },
     });
   };
 
@@ -63,6 +93,13 @@ export function DriverSearchScreen() {
           </AppButton>
         ))}
       </ScrollView>
+      {toast ? (
+        <AppToast
+          key={toast.id}
+          message={toast.message}
+          onDismiss={() => setToast(undefined)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

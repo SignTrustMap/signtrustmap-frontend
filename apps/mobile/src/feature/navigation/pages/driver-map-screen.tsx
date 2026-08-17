@@ -3,6 +3,7 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppButton } from '@/components/ui/button';
+import { NavigationManeuverBanner } from '@/components/navigation-maneuver-banner';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   driverStartLocations,
@@ -13,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { DriverMapView } from '../components/driver-map-view';
 import { getDrivingRoute, type OsrmRouteStep } from '../services/osrm';
+import { getRouteProgressMeters } from '../utils/route-progress';
 import { getRouteStopCoordinates } from '../utils/route-stop-markers';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
@@ -55,26 +57,71 @@ export function DriverMapScreen() {
       : undefined;
   const [routeResult, setRouteResult] = useState<{
     coordinates: MapCoordinate[];
+    distance: number;
+    duration: number;
     key: string;
     steps: OsrmRouteStep[];
   }>();
   const [navigationSession, setNavigationSession] = useState<{
+    hasLiveLocation: boolean;
     routeKey: string;
     stopSignCoordinates: MapCoordinate[];
   }>();
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string>();
+  const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
+  const routeDistance = routeResult && routeResult.key === routeKey ? routeResult.distance : undefined;
+  const routeDuration = routeResult && routeResult.key === routeKey ? routeResult.duration : undefined;
   const routeSteps = routeResult && routeResult.key === routeKey ? routeResult.steps : undefined;
   const plannedStopSignCoordinates = useMemo(
     () => getRouteStopCoordinates(routeCoordinates),
     [routeCoordinates],
   );
   const isNavigating = Boolean(routeKey && navigationSession?.routeKey === routeKey);
+  const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
   const visibleStopSignCoordinates = isNavigating
     ? navigationSession?.stopSignCoordinates ?? []
     : plannedStopSignCoordinates;
+  const maneuverProgresses = useMemo(
+    () => routeSteps?.map((step) =>
+      step.maneuver.location && routeCoordinates
+        ? getRouteProgressMeters(step.maneuver.location, routeCoordinates)
+        : undefined),
+    [routeCoordinates, routeSteps],
+  );
+  const activeManeuver = useMemo(() => {
+    const navigationCoordinate = userCoordinate ?? routeStart;
+
+    if (
+      !isNavigating ||
+      !navigationCoordinate ||
+      !routeCoordinates ||
+      !routeSteps?.length ||
+      !maneuverProgresses
+    ) {
+      return undefined;
+    }
+
+    const currentProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
+    let stepIndex = routeSteps.findIndex((step, index) => {
+      const maneuverProgress = maneuverProgresses[index];
+
+      return (
+        step.maneuver.type !== 'depart' &&
+        maneuverProgress !== undefined &&
+        maneuverProgress >= currentProgress + 10
+      );
+    });
+
+    if (stepIndex < 0) stepIndex = routeSteps.length - 1;
+
+    return {
+      distance: Math.max(0, (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress),
+      step: routeSteps[stepIndex],
+    };
+  }, [isNavigating, maneuverProgresses, routeCoordinates, routeStart, routeSteps, userCoordinate]);
 
   useEffect(() => {
     if (!selectedDestination || !routeStart || !routeKey) return;
@@ -82,8 +129,8 @@ export function DriverMapScreen() {
     const controller = new AbortController();
 
     getDrivingRoute(routeStart, selectedDestination.coordinate, controller.signal)
-      .then(({ coordinates, steps }) => {
-        setRouteResult({ coordinates, key: routeKey, steps });
+      .then(({ coordinates, distance, duration, steps }) => {
+        setRouteResult({ coordinates, distance, duration, key: routeKey, steps });
       })
       .catch((error: unknown) => {
         if (error instanceof Error && error.name === 'AbortError') return;
@@ -93,6 +140,29 @@ export function DriverMapScreen() {
       controller.abort();
     };
   }, [routeKey, routeStart, selectedDestination]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || !hasLiveLocation) return;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+      const handleLocationUpdate = (position: {
+        coords: { latitude: number; longitude: number };
+      }) => {
+        setUserCoordinate([position.coords.longitude, position.coords.latitude]);
+      };
+
+      mapLibre.LocationManager.setMinDisplacement(3);
+      mapLibre.LocationManager.addListener(handleLocationUpdate);
+
+      return () => {
+        mapLibre.LocationManager.removeListener(handleLocationUpdate);
+      };
+    } catch {
+      return;
+    }
+  }, [hasLiveLocation]);
 
   const handleBeginNavigation = async () => {
     if (Platform.OS === 'web' || !selectedDestination || !routeStart || !routeKey) return;
@@ -108,33 +178,53 @@ export function DriverMapScreen() {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
-      const hasPermission = await mapLibre.LocationManager.requestPermissions();
-
-      if (!hasPermission) {
-        setNavigationError('Location permission is required to start navigation.');
-        return;
-      }
-
       const currentPosition = await mapLibre.LocationManager.getCurrentPosition();
 
-      if (!currentPosition) {
-        setNavigationError('Your current location is not available. Try again outdoors.');
-        return;
-      }
+      setUserCoordinate(
+        currentPosition
+          ? [currentPosition.coords.longitude, currentPosition.coords.latitude]
+          : routeStart,
+      );
 
       setNavigationSession({
+        hasLiveLocation: Boolean(currentPosition),
         routeKey,
         stopSignCoordinates: plannedStopSignCoordinates,
       });
     } catch {
-      setNavigationError('Navigation could not start on this device.');
+      setUserCoordinate(routeStart);
+      setNavigationSession({
+        hasLiveLocation: false,
+        routeKey,
+        stopSignCoordinates: plannedStopSignCoordinates,
+      });
     } finally {
       setIsStartingNavigation(false);
     }
   };
 
-  const handleClearDestination = () => {
+  const handleBackToDriverHome = () => {
     router.replace('/(driver)');
+  };
+
+  const handleBackToDestinationInput = () => {
+    router.replace({
+      pathname: '/(driver)/search',
+      params: {
+        ...(startId ? { startId } : {}),
+        ...(startLat && startLng ? { startLat, startLng } : {}),
+      },
+    });
+  };
+
+  const handleChangeDestination = () => {
+    router.push({
+      pathname: '/(driver)/search',
+      params: {
+        ...(startId ? { startId } : {}),
+        ...(startLat && startLng ? { startLat, startLng } : {}),
+      },
+    });
   };
 
   const handleGo = async () => {
@@ -193,31 +283,61 @@ export function DriverMapScreen() {
       <View style={styles.map}>
         <DriverMapView
           destination={selectedDestination}
-          navigationActive={Platform.OS !== 'web' && isNavigating}
+          navigationActive={
+            Platform.OS !== 'web' &&
+            isNavigating &&
+            Boolean(navigationSession?.hasLiveLocation)
+          }
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
           routeStopCoordinates={visibleStopSignCoordinates}
+          showCurrentLocation={!isNavigating}
         />
 
-        <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
+        {isNavigating && activeManeuver ? (
+          <NavigationManeuverBanner
+            distance={formatManeuverDistance(activeManeuver.distance)}
+            instruction={formatRouteInstruction(activeManeuver.step)}
+            symbol={getManeuverSymbol(activeManeuver.step)}
+          />
+        ) : null}
+
+        {!isNavigating ? (
+          <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
           <View style={styles.topControls}>
             {selectedDestination && routeStart ? (
               <>
-                <AppButton
-                  accessibilityLabel="Change starting point"
-                  onPress={() => router.push({
-                    pathname: '/(driver)/start',
-                    params: { destinationId: selectedDestination.id },
-                  })}
-                  style={styles.routeInput}
-                  variant="surface"
+                <View
+                  style={[
+                    styles.routeInput,
+                    { backgroundColor: theme.backgroundElement },
+                  ]}
                 >
-                  <Text style={[styles.routeInputBackIcon, { color: theme.text }]}>{'<'}</Text>
-                  <Text style={[styles.routeInputIcon, { color: theme.tertiary }]}>G</Text>
-                  <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
-                    {routeStartTitle}
-                  </Text>
-                </AppButton>
+                  <AppButton
+                    accessibilityLabel="Back to driver home"
+                    hitSlop={Spacing.one}
+                    onPress={handleBackToDriverHome}
+                    pressedOpacity={0.7}
+                    style={styles.routeInputBackButton}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.routeInputBackIcon, { color: theme.text }]}>{'<'}</Text>
+                  </AppButton>
+                  <AppButton
+                    accessibilityLabel="Change starting point"
+                    onPress={() => router.push({
+                      pathname: '/(driver)/start',
+                      params: { destinationId: selectedDestination.id },
+                    })}
+                    style={styles.routeInputContentButton}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.routeInputIcon, { color: theme.tertiary }]}>G</Text>
+                    <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
+                      {routeStartTitle}
+                    </Text>
+                  </AppButton>
+                </View>
                 <View
                   style={[
                     styles.selectedDestinationInput,
@@ -225,9 +345,9 @@ export function DriverMapScreen() {
                   ]}
                 >
                   <AppButton
-                    accessibilityLabel="Clear destination"
+                    accessibilityLabel="Back to destination input"
                     hitSlop={Spacing.one}
-                    onPress={handleClearDestination}
+                    onPress={handleBackToDestinationInput}
                     pressedOpacity={0.7}
                     style={styles.inlineBackButton}
                     variant="ghost"
@@ -236,7 +356,7 @@ export function DriverMapScreen() {
                   </AppButton>
                   <AppButton
                     accessibilityLabel="Change destination"
-                    onPress={() => router.push('/(driver)/search')}
+                    onPress={handleChangeDestination}
                     style={styles.destinationNameButton}
                     variant="ghost"
                   >
@@ -258,9 +378,9 @@ export function DriverMapScreen() {
                 ]}
               >
                 <AppButton
-                  accessibilityLabel="Clear destination"
+                  accessibilityLabel="Back to destination input"
                   hitSlop={Spacing.one}
-                  onPress={handleClearDestination}
+                  onPress={handleBackToDestinationInput}
                   pressedOpacity={0.7}
                   style={styles.inlineBackButton}
                   variant="ghost"
@@ -269,7 +389,7 @@ export function DriverMapScreen() {
                 </AppButton>
                 <AppButton
                   accessibilityLabel="Change destination"
-                  onPress={() => router.push('/(driver)/search')}
+                  onPress={handleChangeDestination}
                   style={styles.destinationNameButton}
                   variant="ghost"
                 >
@@ -290,18 +410,23 @@ export function DriverMapScreen() {
                 variant="surface"
               >
                 <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
-                  Where to?
+                  Search here...
                 </Text>
               </AppButton>
             )}
           </View>
-        </SafeAreaView>
+          </SafeAreaView>
+        ) : null}
       </View>
 
       {selectedDestination ? (
         <SafeAreaView
           edges={['bottom']}
-          style={[styles.destinationSheet, { backgroundColor: theme.backgroundElement }]}
+          style={[
+            styles.destinationSheet,
+            routeStart ? styles.routeDestinationSheet : undefined,
+            { backgroundColor: theme.backgroundElement },
+          ]}
         >
           <View style={styles.destinationSheetHandle} />
           <Text
@@ -317,7 +442,17 @@ export function DriverMapScreen() {
           ) : null}
           {routeStart ? (
             <View style={styles.directionsSection}>
-              <Text style={[styles.directionsHeading, { color: theme.text }]}>Directions</Text>
+              {routeDuration !== undefined && routeDistance !== undefined ? (
+                <Text style={[styles.routeSummary, { color: theme.text }]}>
+                  ETA {formatRouteDuration(routeDuration)} (
+                  {formatRouteDistanceInKilometers(routeDistance)})
+                </Text>
+              ) : (
+                <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
+                  Calculating ETA...
+                </Text>
+              )}
+              <Text style={[styles.directionsHeading, { color: theme.text }]}>Sections:</Text>
               {routeSteps ? (
                 routeSteps.length > 0 ? (
                   <ScrollView
@@ -366,7 +501,7 @@ export function DriverMapScreen() {
                   : 'Start route'
             }
             disabled={isNavigating || isStartingNavigation}
-            label={isNavigating ? 'Navigating' : isStartingNavigation ? 'Starting...' : 'Go'}
+            label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
             onPress={routeStart ? handleBeginNavigation : handleGo}
             style={styles.goButton}
           />
@@ -405,10 +540,45 @@ function formatRouteInstruction(step: OsrmRouteStep) {
   }
 }
 
+function getManeuverSymbol(step: OsrmRouteStep) {
+  if (step.maneuver.type === 'arrive') return '●';
+  if (step.maneuver.type === 'roundabout' || step.maneuver.type === 'rotary') return '↻';
+
+  const modifier = step.maneuver.modifier ?? '';
+
+  if (modifier.includes('left')) return modifier.includes('sharp') ? '↰' : '↖';
+  if (modifier.includes('right')) return modifier.includes('sharp') ? '↱' : '↗';
+  if (modifier.includes('uturn')) return '↶';
+
+  return '↑';
+}
+
+function formatManeuverDistance(distanceInMeters: number) {
+  if (distanceInMeters < 20) return 'Now';
+  if (distanceInMeters < 1000) return `${Math.max(10, Math.round(distanceInMeters / 10) * 10)} m`;
+
+  return `${(distanceInMeters / 1000).toFixed(1)} km`;
+}
+
 function formatRouteDistance(distanceInMeters: number) {
   if (distanceInMeters < 1000) return `${Math.round(distanceInMeters)} m`;
 
   return `${(distanceInMeters / 1000).toFixed(1)} km`;
+}
+
+function formatRouteDistanceInKilometers(distanceInMeters: number) {
+  return `${(distanceInMeters / 1000).toFixed(1)} km`;
+}
+
+function formatRouteDuration(durationInSeconds: number) {
+  const totalMinutes = Math.max(1, Math.round(durationInSeconds / 60));
+
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
 }
 
 const styles = StyleSheet.create({
@@ -491,13 +661,32 @@ const styles = StyleSheet.create({
     borderRadius: Rounded.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 4,
+  },
+  routeInputBackButton: {
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  routeInputContentButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: Spacing.two,
+    paddingHorizontal: 0,
+    paddingRight: Spacing.three,
+    paddingVertical: 0,
   },
   routeInputBackIcon: {
     fontFamily: Fonts.body,
@@ -531,6 +720,10 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8,
   },
+  routeDestinationSheet: {
+    height: '48%',
+    maxHeight: 440,
+  },
   destinationSheetHandle: {
     width: 36,
     height: 4,
@@ -554,8 +747,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   directionsSection: {
-    gap: Spacing.one,
+    flex: 1,
+    gap: Spacing.two,
     marginBottom: Spacing.three,
+    minHeight: 0,
+  },
+  routeSummary: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: 900,
+    lineHeight: 24,
   },
   directionsHeading: {
     fontFamily: Fonts.body,
@@ -563,7 +764,8 @@ const styles = StyleSheet.create({
     fontWeight: 900,
   },
   directionsScroll: {
-    maxHeight: 156,
+    flex: 1,
+    minHeight: 0,
   },
   directionsList: {
     gap: Spacing.two,
@@ -605,6 +807,7 @@ const styles = StyleSheet.create({
   },
   goButton: {
     alignSelf: 'stretch',
+    marginTop: 'auto',
   },
   creditPill: {
     alignSelf: 'flex-end',
