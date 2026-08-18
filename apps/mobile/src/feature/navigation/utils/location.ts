@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/data/driverLocations';
+import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
 
 const COORDINATE_EPSILON = 0.000001;
 

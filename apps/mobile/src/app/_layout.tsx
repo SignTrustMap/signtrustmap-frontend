@@ -22,7 +22,7 @@ export default function TabLayout() {
 
 function RootNavigation() {
   const { isInitializing, session } = useSession();
-  const hasValidSession = Boolean(session?.trim());
+  const hasValidSession = Boolean(session?.accessToken);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -50,9 +50,7 @@ function RootNavigation() {
       </Stack.Protected>
       <Stack.Protected guard={hasValidSession}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="(driver)" />
-        <Stack.Screen name="(surveyor)" />
-        <Stack.Screen name="(reviewer)" />
+        <Stack.Screen name="(authenticated)" />
       </Stack.Protected>
     </Stack>
   );

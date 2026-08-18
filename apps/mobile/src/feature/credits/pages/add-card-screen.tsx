@@ -47,12 +47,12 @@ export function AddCardScreen() {
   if (status === 'success') {
     return (
       <View style={[styles.screen, { backgroundColor: theme.background }]}>
-        <CreditScreenHeader onBack={() => router.replace('/(driver)/credits/top-up')} title="Payment Methods" />
+        <CreditScreenHeader onBack={() => router.replace('/credits/top-up')} title="Payment Methods" />
         <CreditFlowState
           actionLabel="Continue to top up"
           detail={<SavedCardPreview isDefault={isDefault} />}
           message="Your Visa ending in 4242 is ready for top-ups and payments."
-          onAction={() => router.replace('/(driver)/credits/top-up')}
+          onAction={() => router.replace('/credits/top-up')}
           title="Card added successfully"
           variant="success"
         />

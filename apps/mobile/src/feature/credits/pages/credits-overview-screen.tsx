@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-import { CreditScreenHeader } from '../components/credit-screen-header';
 import { TransactionList } from '../components/transaction-list';
 import { recentCreditTransactions, walletSummary } from '../data/mock-credit-data';
 
@@ -15,63 +15,59 @@ export function CreditsOverviewScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <CreditScreenHeader
-        onBack={() => router.replace('/(driver)')}
-        rightContent={
-          <View style={[styles.avatar, { backgroundColor: theme.backgroundSelected }]}>
-            <Text style={[styles.avatarText, { color: theme.tertiary }]}>DR</Text>
-          </View>
-        }
-        title="My Credits"
-      />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[styles.balanceCard, { backgroundColor: theme.tertiary }]}>
-          <Text style={[styles.balanceLabel, { color: theme.onTertiary }]}>Current balance</Text>
-          <View style={styles.balanceRow}>
-            <Text style={[styles.balanceValue, { color: theme.onTertiary }]}>
-              {walletSummary.balance}
-            </Text>
-            <Text style={[styles.balanceUnit, { color: theme.onTertiary }]}>credits</Text>
-          </View>
-          <View style={styles.balanceMetaRow}>
-            <View>
-              <Text style={styles.metaLabel}>STATUS</Text>
-              <Text style={styles.metaValue}>{walletSummary.status}</Text>
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.balanceCard, { backgroundColor: theme.tertiary }]}>
+            <Text style={[styles.balanceLabel, { color: theme.onTertiary }]}>Current balance</Text>
+            <View style={styles.balanceRow}>
+              <Text style={[styles.balanceValue, { color: theme.onTertiary }]}>
+                {walletSummary.balance}
+              </Text>
+              <Text style={[styles.balanceUnit, { color: theme.onTertiary }]}>credits</Text>
             </View>
-            <View style={styles.metaRight}>
-              <Text style={styles.metaLabel}>NEXT PAYOUT</Text>
-              <Text style={styles.metaValue}>{walletSummary.nextPayout}</Text>
+            <View style={styles.balanceMetaRow}>
+              <View>
+                <Text style={styles.metaLabel}>STATUS</Text>
+                <Text style={styles.metaValue}>{walletSummary.status}</Text>
+              </View>
+              <View style={styles.metaRight}>
+                <Text style={styles.metaLabel}>NEXT PAYOUT</Text>
+                <Text style={styles.metaValue}>{walletSummary.nextPayout}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.sectionHeading}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent activity</Text>
+          <View style={styles.sectionHeading}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent activity</Text>
+            <AppButton
+              accessibilityLabel="View all credit activity"
+              label="View all"
+              onPress={() => router.push('/credits/history')}
+              style={styles.viewAllButton}
+              textStyle={{ color: theme.tertiary }}
+              variant="ghost"
+            />
+          </View>
+          <TransactionList transactions={recentCreditTransactions} />
           <AppButton
-            accessibilityLabel="View all credit activity"
-            label="View all"
-            onPress={() => router.push('/(driver)/credits/history')}
-            style={styles.viewAllButton}
-            textStyle={{ color: theme.tertiary }}
-            variant="ghost"
-          />
-        </View>
-        <TransactionList transactions={recentCreditTransactions} />
-        <AppButton
           label="＋  Add credits"
-          onPress={() => router.push('/(driver)/credits/top-up')}
-          style={styles.addButton}
-        />
-      </ScrollView>
+            onPress={() => router.push('/credits/top-up')}
+            style={styles.addButton}
+          />
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
+    flex: 1,
+  },
+  safeArea: {
     flex: 1,
   },
   scrollContent: {
@@ -81,18 +77,6 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.four,
     paddingBottom: Spacing.five,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 900,
   },
   balanceCard: {
     minHeight: 188,

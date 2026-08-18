@@ -12,7 +12,7 @@ export const useAuthentication = (key: string) => {
                 if (currentUser) {
                     setUser(currentUser);
                 }
-            } catch (error) {
+            } catch {
                 console.log('No user signed in');
             } finally {
                 setLoading(false);

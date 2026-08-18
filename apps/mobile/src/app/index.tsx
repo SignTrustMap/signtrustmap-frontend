@@ -5,9 +5,9 @@ import { useSession } from '@/context/session-provider';
 export default function IndexRoute() {
   const { session } = useSession();
 
-  if (!session?.trim()) {
+  if (!session?.accessToken) {
     return <Redirect href="/(public)/login" />;
   }
 
-  return <Redirect href="/(driver)" />;
+  return <Redirect href="/home" />;
 }

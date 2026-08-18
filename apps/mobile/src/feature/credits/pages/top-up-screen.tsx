@@ -59,7 +59,7 @@ export function TopUpScreen() {
           })}
         </View>
         <AppButton
-          onPress={() => router.push('/(driver)/credits/custom-amount')}
+          onPress={() => router.push('/credits/custom-amount')}
           style={[styles.customAmountButton, { borderColor: theme.border }]}
           variant="surface"
         >
@@ -99,7 +99,7 @@ export function TopUpScreen() {
           })}
           <AppButton
             label="＋  Add new payment method"
-            onPress={() => router.push('/(driver)/credits/add-card')}
+            onPress={() => router.push('/credits/add-card')}
             style={styles.addMethodButton}
             textStyle={{ color: theme.tertiary }}
             variant="ghost"
@@ -113,7 +113,7 @@ export function TopUpScreen() {
         <AppButton
           accessibilityLabel={`Pay ${amount} credits with ${selectedMethod?.label ?? 'selected payment method'}`}
           label={`Confirm and pay  (${amount.toFixed(2)} credits)`}
-          onPress={() => router.replace('/(driver)/credits')}
+          onPress={() => router.replace('/credits')}
           style={styles.payButton}
         />
       </SafeAreaView>

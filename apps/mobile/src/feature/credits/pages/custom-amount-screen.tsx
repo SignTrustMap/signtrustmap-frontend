@@ -22,7 +22,7 @@ export function CustomAmountScreen() {
 
   const continueToPayment = () => {
     if (numericAmount <= 0) return;
-    router.replace({ pathname: '/(driver)/credits/top-up', params: { amount } });
+    router.replace({ pathname: '/credits/top-up', params: { amount } });
   };
 
   return (
