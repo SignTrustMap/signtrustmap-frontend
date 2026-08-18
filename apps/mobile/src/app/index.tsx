@@ -1,5 +1,13 @@
 import { Redirect } from 'expo-router';
 
+import { useSession } from '@/context/session-provider';
+
 export default function IndexRoute() {
-  return <Redirect href="/(driver)" />;
+  const { session } = useSession();
+
+  if (!session?.accessToken) {
+    return <Redirect href="/(public)/login" />;
+  }
+
+  return <Redirect href="/home" />;
 }

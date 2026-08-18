@@ -1,46 +1,24 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
 export const Colors = {
-  light: {
-    primary: '#000000',
-    secondary: '#d3f7ff',
-    tertiary: '#148594',
-    neutral: '#F8F7F7',
-    surface: '#FFFFFF',
-    onTertiary: '#FFFFFF',
-    border: '#E8E4E3',
-    text: '#000000',
-    background: '#F8F7F7',
-    backgroundElement: '#FFFFFF',
-    backgroundSelected: '#d3f7ff',
-    textSecondary: '#007b8b',
-    placeholder: '#888888',
-  },
-  dark: {
-    primary: '#FFFFFF',
-    secondary: '#103F47',
-    tertiary: '#148594',
-    neutral: '#111111',
-    surface: '#1A1A1A',
-    onTertiary: '#FFFFFF',
-    border: '#333333',
-    text: '#FFFFFF',
-    background: '#666666',
-    backgroundElement: '#1A1A1A',
-    backgroundSelected: '#103F47',
-    textSecondary: '#66D9E8',
-    placeholder: '#888888',
-  },
+  primary: '#000000',
+  secondary: '#d3f7ff',
+  tertiary: '#148594',
+  neutral: '#F8F7F7',
+  surface: '#FFFFFF',
+  onTertiary: '#FFFFFF',
+  border: '#E8E4E3',
+  text: '#000000',
+  background: '#F8F7F7',
+  backgroundElement: '#FFFFFF',
+  backgroundSelected: '#d3f7ff',
+  textSecondary: '#007b8b',
+  placeholder: '#888888',
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors;
 
 export const Fonts = Platform.select({
   ios: {

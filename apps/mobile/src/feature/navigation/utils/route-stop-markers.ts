@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/data/driverLocations';
+import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
 
 export function getRouteStopCoordinates(
   routeCoordinates: MapCoordinate[] | undefined,

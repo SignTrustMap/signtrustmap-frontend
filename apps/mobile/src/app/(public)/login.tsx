@@ -9,23 +9,10 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AppButton } from '@/components/ui/button';
 import { AppInput } from '@/components/ui/input';
 import { useSession } from '@/context/session-provider';
+import { createFakeSession } from '@/feature/auth/data/fake-session';
 import { useTheme } from '@/hooks/use-theme';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-type LoginRole = 'driver' | 'surveyor' | 'reviewer';
-
-const roleEntryRoute: Record<LoginRole, '/(driver)' | '/(surveyor)' | '/(reviewer)'> = {
-  driver: '/(driver)',
-  surveyor: '/(surveyor)',
-  reviewer: '/(reviewer)',
-};
-
-async function simulateLoginApi(role: LoginRole) {
-  return {
-    role,
-    token: `simulated-${role}-session-token`,
-  };
-}
 
 export default function LoginScreen() {
   const { logIn } = useSession();
@@ -47,15 +34,13 @@ export default function LoginScreen() {
       return;
     }
 
-    await logIn('your-session-token');
+    await logIn(createFakeSession(email.trim()));
     router.replace('/');
   };
 
-  const handleGoogleLogIn = async (role: LoginRole) => {
-    const response = await simulateLoginApi(role);
-
-    await logIn(response.token);
-    router.replace(roleEntryRoute[response.role]);
+  const handleGoogleLogIn = async () => {
+    await logIn(createFakeSession());
+    router.replace('/');
   };
 
   return (
@@ -112,44 +97,14 @@ export default function LoginScreen() {
                 styles.googleButton,
                 { borderColor: theme.border, opacity: pressed ? 0.75 : 1 },
               ]}
-              onPress={() => handleGoogleLogIn('driver')}
+              onPress={handleGoogleLogIn}
             >
               <Image
                 accessibilityIgnoresInvertColors
                 source={require('../../../assets/brand/google-g.png')}
                 style={styles.googleIcon}
               />
-              <Text style={[styles.googleText, { color: theme.text }]}>Driver with Google</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.googleButton,
-                { borderColor: theme.border, opacity: pressed ? 0.75 : 1 },
-              ]}
-              onPress={() => handleGoogleLogIn('surveyor')}
-            >
-              <Image
-                accessibilityIgnoresInvertColors
-                source={require('../../../assets/brand/google-g.png')}
-                style={styles.googleIcon}
-              />
-              <Text style={[styles.googleText, { color: theme.text }]}>Surveyor with Google</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.googleButton,
-                { borderColor: theme.border, opacity: pressed ? 0.75 : 1 },
-              ]}
-              onPress={() => handleGoogleLogIn('reviewer')}
-            >
-              <Image
-                accessibilityIgnoresInvertColors
-                source={require('../../../assets/brand/google-g.png')}
-                style={styles.googleIcon}
-              />
-              <Text style={[styles.googleText, { color: theme.text }]}>Reviewer with Google</Text>
+              <Text style={[styles.googleText, { color: theme.text }]}>Log in with google</Text>
             </Pressable>
           </ThemedView>
 
