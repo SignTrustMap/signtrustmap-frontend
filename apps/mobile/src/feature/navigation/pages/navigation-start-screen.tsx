@@ -12,10 +12,9 @@ import {
   startLocations,
 } from '@/feature/navigation/data/navigation-locations';
 import { useTheme } from '@/hooks/use-theme';
-
+import { SAME_LOCATION_MESSAGE } from '@/constants/message';
 import { areSameLocation } from '../utils/location';
 
-const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
 
 export function NavigationStartScreen() {
   const router = useRouter();
