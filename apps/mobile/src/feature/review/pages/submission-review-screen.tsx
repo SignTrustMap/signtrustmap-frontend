@@ -20,23 +20,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { Fonts, Rounded, Spacing, Colors } from '@/constants/theme';
+import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import {
-  sampleReviewSubmissions,
-  type ReviewSubmission,
-} from '@/feature/review/data/sample-submissions';
+  type ReviewActionType,
+  useReviewWorkflow,
+} from '@/feature/review/context/review-workflow-provider';
+import { sampleReviewSubmissions } from '@/feature/review/data/sample-submissions';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
 
 type SubmissionReviewScreenProps = {
   state?: SubmissionReviewState;
-};
-
-type ReviewActionType = 'approved' | 'declined' | 'reported';
-
-type CompletedReview = {
-  action: ReviewActionType;
-  submission: ReviewSubmission;
 };
 
 type ReviewSheet = 'decline' | 'report';
@@ -90,15 +85,31 @@ function SubmissionReviewSkeleton() {
   );
 }
 
-function MetaItem({ icon, label, value }: { icon: string; label: string; value: string }) {
+function MetaItem({
+  fixedLines,
+  icon,
+  label,
+  value,
+}: {
+  fixedLines?: number;
+  icon: string;
+  label: string;
+  value: string;
+}) {
   const theme = useTheme();
 
   return (
     <View style={styles.metaItem}>
       <Text style={[styles.metaLabel, { color: theme.placeholder }]}>{label}</Text>
-      <View style={styles.metaValueRow}>
+      <View style={[styles.metaValueRow, fixedLines ? { height: 17 * fixedLines } : undefined]}>
         <Text style={[styles.metaIcon, { color: theme.text }]}>{icon}</Text>
-        <Text style={[styles.metaValue, { color: theme.text }]}>{value}</Text>
+        <Text
+          ellipsizeMode="tail"
+          numberOfLines={fixedLines}
+          style={[styles.metaValue, { color: theme.text }]}
+        >
+          {value}
+        </Text>
       </View>
     </View>
   );
@@ -338,14 +349,21 @@ function ReasonInput({
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
   const router = useRouter();
   const theme = useTheme();
-  const [pendingSubmissions, setPendingSubmissions] = useState(() =>
-    state === 'reviewed' ? sampleReviewSubmissions.slice(1) : sampleReviewSubmissions,
-  );
-  const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>(() =>
-    state === 'reviewed'
-      ? [{ action: 'approved', submission: sampleReviewSubmissions[0] }]
-      : [],
-  );
+  const {
+    checkedReviewIndex,
+    checkingSubmission,
+    completeCurrentReview,
+    finishSubmissionCheck,
+    goToNextCheckedReview,
+    goToPreviousCheckedReview,
+    pendingSubmissions,
+    recheckingPreviousAction,
+    recheckingReviewIndex,
+    recheckingSubmission,
+    reviewCheckedSubmissionAgain,
+    reviewHistory,
+    undoLastReview,
+  } = useReviewWorkflow();
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
@@ -355,17 +373,23 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     message: string;
     tone: 'default' | 'success';
   }>();
-  const submission = pendingSubmissions[0];
-  const reviewPosition = Math.min(
-    reviewHistory.length + (submission ? 1 : 0),
-    sampleReviewSubmissions.length,
-  );
+  const checkedReview = checkingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
+  const displayedReviewAction = checkedReview?.action ?? recheckingPreviousAction;
+  const submission = checkedReview?.submission ?? pendingSubmissions[0];
+  const reviewPosition = checkingSubmission
+    ? checkedReviewIndex + 1
+    : recheckingSubmission
+      ? (recheckingReviewIndex ?? 0) + 1
+      : Math.min(
+          reviewHistory.length + (submission ? 1 : 0),
+          sampleReviewSubmissions.length,
+        );
 
   const completeReview = (action: ReviewActionType) => {
     if (!submission) return;
+    const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
 
-    setReviewHistory((history) => [...history, { action, submission }]);
-    setPendingSubmissions((pending) => pending.slice(1));
+    completeCurrentReview(action);
 
     const toastMessages: Record<ReviewActionType, string> = {
       approved: 'Sign approved',
@@ -378,6 +402,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       message: toastMessages[action],
       tone: action === 'approved' ? 'success' : 'default',
     }));
+
+    if (completesReviewQueue) {
+      router.replace('/work/submission-summary');
+    }
   };
 
   const closeSheet = () => setActiveSheet(undefined);
@@ -404,8 +432,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     const lastReview = reviewHistory[reviewHistory.length - 1];
     if (!lastReview) return;
 
-    setReviewHistory((history) => history.slice(0, -1));
-    setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
+    undoLastReview();
     setToast(undefined);
   };
 
@@ -449,7 +476,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         </View>
         <View style={[styles.counterBar, { backgroundColor: theme.backgroundElement }]}>
           <Text style={[styles.counter, { color: theme.textSecondary }]}>
-            {submission ? 'REVIEWING' : 'REVIEWED'} {reviewPosition} OF{' '}
+            {checkingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
+            {reviewPosition} OF{' '}
             {sampleReviewSubmissions.length}
           </Text>
         </View>
@@ -485,53 +513,172 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               ]}
             >
-              <Text style={[styles.signTitle, { color: theme.text }]}>{submission.title}</Text>
+              <View style={styles.signTitleRow}>
+                <Text style={[styles.signTitle, { color: theme.text }]}>{submission.title}</Text>
+                {displayedReviewAction ? (
+                  <View
+                    style={[
+                      styles.signStatusBadge,
+                      {
+                        backgroundColor:
+                          displayedReviewAction === 'approved'
+                            ? '#E8F7ED'
+                            : displayedReviewAction === 'declined'
+                              ? '#FEECEC'
+                              : '#FFF1E8',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.signStatusBadgeLabel,
+                        {
+                          color:
+                            displayedReviewAction === 'approved'
+                              ? '#16803A'
+                              : displayedReviewAction === 'declined'
+                                ? Colors.danger
+                                : '#C2410C',
+                        },
+                      ]}
+                    >
+                      {displayedReviewAction === 'approved'
+                        ? 'Approved'
+                        : displayedReviewAction === 'declined'
+                          ? 'Declined'
+                          : 'Reported'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <View style={styles.metaGrid}>
-                <MetaItem icon="⌖" label="LOCATION" value={submission.location} />
+                <MetaItem fixedLines={3} icon="⌖" label="LOCATION" value={submission.location} />
                 <MetaItem icon="♙" label="SURVEYOR ID" value={submission.surveyorId} />
                 <MetaItem icon="◷" label="CAPTURED" value={submission.captured} />
               </View>
             </View>
 
-            <View style={styles.primaryActions}>
-              <ReviewAction
-                color={theme.tertiary}
-                label="Approve"
-                onPress={() => completeReview('approved')}
-                symbol="✓"
-                variant="filled"
-              />
-            </View>
+            {checkedReview ? (
+              <View style={styles.checkedReviewActions}>
+                <View
+                  style={[
+                    styles.reviewedStatus,
+                    {
+                      backgroundColor:
+                        checkedReview.action === 'approved'
+                          ? '#E8F7ED'
+                          : checkedReview.action === 'declined'
+                            ? '#FEECEC'
+                            : '#FFF1E8',
+                      borderColor:
+                        checkedReview.action === 'approved'
+                          ? '#16803A'
+                          : checkedReview.action === 'declined'
+                            ? Colors.danger
+                            : '#C2410C',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.reviewedStatusSymbol,
+                      {
+                        color:
+                          checkedReview.action === 'approved'
+                            ? '#16803A'
+                            : checkedReview.action === 'declined'
+                              ? Colors.danger
+                              : '#C2410C',
+                      },
+                    ]}
+                  >
+                    {checkedReview.action === 'approved'
+                      ? '✓'
+                      : checkedReview.action === 'declined'
+                        ? '×'
+                        : '!'}
+                  </Text>
+                  <View style={styles.reviewedStatusCopy}>
+                    <Text style={[styles.reviewedStatusLabel, { color: theme.text }]}> 
+                      {checkedReview.action === 'approved'
+                        ? 'Approved'
+                        : checkedReview.action === 'declined'
+                          ? 'Declined'
+                          : 'Reported'}
+                    </Text>
+                    <Text style={[styles.reviewedStatusDescription, { color: theme.textSecondary }]}> 
+                      This was your submitted review for this sign.
+                    </Text>
+                  </View>
+                </View>
+                <AppButton label="Review again" onPress={reviewCheckedSubmissionAgain} />
+                <View style={styles.checkNavigation}>
+                  <AppButton
+                    disabled={checkedReviewIndex === 0}
+                    label="←  Previous"
+                    onPress={goToPreviousCheckedReview}
+                    style={[styles.checkNavigationButton, { borderColor: theme.border }]}
+                    variant="surface"
+                  />
+                  <AppButton
+                    label={checkedReviewIndex >= reviewHistory.length - 1 ? 'Finish' : 'Next  →'}
+                    onPress={() => {
+                      if (checkedReviewIndex >= reviewHistory.length - 1) {
+                        finishSubmissionCheck();
+                        router.replace('/work/submission-summary');
+                        return;
+                      }
 
-            <View style={styles.secondaryActions}>
-              <ReviewAction
-                color={Colors.danger}
-                label="Decline"
-                onPress={() => setActiveSheet('decline')}
-                style={styles.secondaryButton}
-                symbol="×"
-              />
-              <AppButton
-                label="⚑  Report"
-                onPress={() => setActiveSheet('report')}
-                style={[styles.secondaryButton, { borderColor: theme.border }]}
-                textStyle={styles.secondaryButtonLabel}
-                variant="surface"
-              />
-            </View>
-
-            {reviewHistory.length > 0 ? (
-              <AppButton
-                label="↶  Undo Last Action"
-                onPress={undoLastAction}
-                style={[styles.undoButton, { borderColor: theme.border }]}
-                textStyle={styles.undoLabel}
-                variant="surface"
-              />
+                      goToNextCheckedReview();
+                    }}
+                    style={[styles.checkNavigationButton, { borderColor: theme.border }]}
+                    variant="surface"
+                  />
+                </View>
+              </View>
             ) : (
-              <Text style={[styles.swipeHint, { color: theme.placeholder }]}>
-                SWIPE RIGHT TO APPROVE  •  SWIPE LEFT TO DECLINE
-              </Text>
+              <>
+                <View style={styles.primaryActions}>
+                  <ReviewAction
+                    color={theme.tertiary}
+                    label="Approve"
+                    onPress={() => completeReview('approved')}
+                    symbol="✓"
+                    variant="filled"
+                  />
+                </View>
+
+                <View style={styles.secondaryActions}>
+                  <ReviewAction
+                    color={Colors.danger}
+                    label="Decline"
+                    onPress={() => setActiveSheet('decline')}
+                    style={styles.secondaryButton}
+                    symbol="×"
+                  />
+                  <AppButton
+                    label="⚑  Report"
+                    onPress={() => setActiveSheet('report')}
+                    style={[styles.secondaryButton, { borderColor: theme.border }]}
+                    textStyle={styles.secondaryButtonLabel}
+                    variant="surface"
+                  />
+                </View>
+
+                {reviewHistory.length > 0 && !recheckingSubmission ? (
+                  <AppButton
+                    label="↶  Undo Last Action"
+                    onPress={undoLastAction}
+                    style={[styles.undoButton, { borderColor: theme.border }]}
+                    textStyle={styles.undoLabel}
+                    variant="surface"
+                  />
+                ) : !recheckingSubmission ? (
+                  <Text style={[styles.swipeHint, { color: theme.placeholder }]}> 
+                    SWIPE RIGHT TO APPROVE  •  SWIPE LEFT TO DECLINE
+                  </Text>
+                ) : null}
+              </>
             )}
           </ScrollView>
         ) : (
@@ -555,6 +702,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
         )}
       </SafeAreaView>
+      <ReviewBottomTabs activeTab="review" />
       {toast ? (
         <AppToast
           duration={1300}
@@ -640,9 +788,9 @@ const styles = StyleSheet.create({
   },
   imageCard: {
     position: 'relative',
-    height: 300,
-    minHeight: 300,
-    maxHeight: 300,
+    height: 286,
+    minHeight: 286,
+    maxHeight: 286,
     flexShrink: 0,
     overflow: 'hidden',
     borderRadius: Rounded.lg,
@@ -672,17 +820,50 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   signTitle: {
+    minWidth: 0,
+    flex: 1,
     fontFamily: Fonts.body,
     fontSize: 18,
     fontWeight: 800,
     lineHeight: 24,
   },
+  signTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  signStatusBadge: { borderRadius: 11, paddingHorizontal: Spacing.one, paddingVertical: 3 },
+  signStatusBadgeLabel: { fontFamily: Fonts.body, fontSize: 10, fontWeight: 800, lineHeight: 14 },
   metaGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.three },
   metaItem: { width: '50%', gap: 3, paddingRight: Spacing.one },
   metaLabel: { fontFamily: Fonts.body, fontSize: 9, fontWeight: 800, letterSpacing: 0.65 },
   metaValueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   metaIcon: { width: 12, fontSize: 12, lineHeight: 17 },
   metaValue: { flex: 1, fontFamily: Fonts.body, fontSize: 12, fontWeight: 600, lineHeight: 17 },
+  checkedReviewActions: { gap: Spacing.one },
+  reviewedStatus: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+  },
+  reviewedStatusSymbol: {
+    width: 28,
+    fontFamily: Fonts.body,
+    fontSize: 24,
+    fontWeight: 900,
+    textAlign: 'center',
+  },
+  reviewedStatusCopy: { minWidth: 0, flex: 1 },
+  reviewedStatusLabel: { fontFamily: Fonts.body, fontSize: 14, fontWeight: 800, lineHeight: 19 },
+  reviewedStatusDescription: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 500,
+    lineHeight: 16,
+  },
+  checkNavigation: { flexDirection: 'row', gap: Spacing.one },
+  checkNavigationButton: { flex: 1, minHeight: 46, borderWidth: 1 },
   primaryActions: { gap: Spacing.one },
   decisionButton: {
     minHeight: 48,
