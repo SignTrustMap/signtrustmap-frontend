@@ -16,7 +16,9 @@
     "android": {
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_MEDIA_LOCATION",
+        "READ_MEDIA_IMAGES"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
@@ -40,6 +42,25 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SignTrustMap to access photos and videos for survey records.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow SignTrustMap to read the selected photo's location metadata.",
+          "savePhotosPermission": false,
+          "isAccessMediaLocationEnabled": true,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
       "@maplibre/maplibre-react-native"
     ],
     "experiments": {

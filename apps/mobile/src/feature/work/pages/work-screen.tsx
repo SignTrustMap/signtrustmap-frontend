@@ -1,3 +1,5 @@
+import { useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
+import { SurveyorWorkPanel } from '@/feature/surveyor/components/surveyor-work-panel';
 import { useTheme } from '@/hooks/use-theme';
 
 type WorkItem = {
@@ -53,6 +56,7 @@ const demoWork: Record<AccountRole, WorkItem[]> = {
 };
 
 export function WorkScreen() {
+  const router = useRouter();
   const { session } = useSession();
   const theme = useTheme();
   const availableRoles = session
@@ -106,20 +110,39 @@ export function WorkScreen() {
             </Text>
           </View>
 
-          <View style={[styles.workList, { borderColor: theme.border }]}>
-            {workItems.map((item) => (
-              <View key={item.title} style={styles.workItem}>
-                <View style={styles.workCopy}>
-                  <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
-                  <Text style={[styles.workLocation, { color: theme.textSecondary }]}>
-                    {item.location}
-                  </Text>
+          {selectedRole === 'surveyor' ? (
+            <SurveyorWorkPanel />
+          ) : (
+            <View style={[styles.workList, { borderColor: theme.border }]}>
+              {workItems.map((item) => (
+                <View key={item.title} style={styles.workItem}>
+                  <View style={styles.workCopy}>
+                    <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
+                    <Text style={[styles.workLocation, { color: theme.textSecondary }]}>
+                      {item.location}
+                    </Text>
+                  </View>
+                  <AppButton label={item.action} style={styles.workAction} />
                 </View>
-                <AppButton label={item.action} style={styles.workAction} />
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
+        {selectedRole === 'surveyor' ? (
+          <AppButton
+            accessibilityLabel="Create new survey record"
+            onPress={() => router.push('/work/new-survey')}
+            pressedOpacity={0.72}
+            style={styles.floatingAction}
+          >
+            <SymbolView
+              fallback={<Text style={[styles.floatingActionFallback, { color: theme.onTertiary }]}>+</Text>}
+              name={{ android: 'add', ios: 'plus', web: 'add' }}
+              size={26}
+              tintColor={theme.onTertiary}
+            />
+          </AppButton>
+        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -139,7 +162,7 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
-    paddingBottom: Spacing.five,
+    paddingBottom: 96,
   },
   header: {
     gap: Spacing.half,
@@ -207,5 +230,27 @@ const styles = StyleSheet.create({
   },
   workAction: {
     alignSelf: 'flex-start',
+  },
+  floatingAction: {
+    position: 'absolute',
+    right: Spacing.three,
+    bottom: Spacing.three,
+    width: 56,
+    height: 56,
+    minHeight: 56,
+    borderRadius: Rounded.lg,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    shadowColor: '#0C5963',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  floatingActionFallback: {
+    fontFamily: Fonts.body,
+    fontSize: 30,
+    fontWeight: 500,
+    lineHeight: 32,
   },
 });
