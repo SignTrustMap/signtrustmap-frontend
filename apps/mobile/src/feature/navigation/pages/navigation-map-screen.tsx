@@ -21,28 +21,6 @@ import { getRouteStopCoordinates } from '../utils/route-stop-markers';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
-async function getWebGpsCoordinate(): Promise<MapCoordinate> {
-  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-    throw new Error('Location is not available on this device.');
-  }
-
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => resolve([coords.longitude, coords.latitude]),
-      (error) => {
-        reject(
-          new Error(
-            error.code === error.PERMISSION_DENIED
-              ? 'Allow location access to use your current position.'
-              : 'Turn on location services and try again.',
-          ),
-        );
-      },
-      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 10_000 },
-    );
-  });
-}
-
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   try {
     // Guarded require keeps Expo Go or stale native builds on the manual-start path.
@@ -238,25 +216,23 @@ export function NavigationMapScreen() {
     try {
       let coordinate: MapCoordinate;
 
-      if (Platform.OS === 'web') {
-        coordinate = await getWebGpsCoordinate();
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
-        const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
-        if (!hasPermission) {
-          throw new Error('Allow location access to use your current position.');
-        }
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+      const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
-        const position = await mapLibre.LocationManager.getCurrentPosition();
-
-        if (!position) {
-          throw new Error('Turn on GPS and try again.');
-        }
-
-        coordinate = [position.coords.longitude, position.coords.latitude];
+      if (!hasPermission) {
+        throw new Error('Allow location access to use your current position.');
       }
+
+      const position = await mapLibre.LocationManager.getCurrentPosition();
+
+      if (!position) {
+        throw new Error('Turn on GPS and try again.');
+      }
+
+      coordinate = [position.coords.longitude, position.coords.latitude];
+
 
       setMapFocus((current) => ({
         coordinate,
@@ -375,40 +351,73 @@ export function NavigationMapScreen() {
 
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
-          <View style={styles.topControls}>
-            {selectedDestination && routeStart ? (
-              <>
-                <View
-                  style={[
-                    styles.routeInput,
-                    { backgroundColor: theme.backgroundElement },
-                  ]}
-                >
-                  <AppButton
-                    accessibilityLabel="Back to driver home"
-                    hitSlop={Spacing.one}
-                    onPress={handleBackToDriverHome}
-                    pressedOpacity={0.7}
-                    style={styles.routeInputBackButton}
-                    variant="ghost"
+            <View style={styles.topControls}>
+              {selectedDestination && routeStart ? (
+                <>
+                  <View
+                    style={[
+                      styles.routeInput,
+                      { backgroundColor: theme.backgroundElement },
+                    ]}
                   >
-                    <Text style={[styles.routeInputBackIcon, { color: theme.text }]}>{'<'}</Text>
-                  </AppButton>
-                  <AppButton
-                    accessibilityLabel="Change starting point"
-                    onPress={() => router.push({
-                      pathname: '/home/start',
-                      params: { destinationId: selectedDestination.id },
-                    })}
-                    style={styles.routeInputContentButton}
-                    variant="ghost"
+                    <AppButton
+                      accessibilityLabel="Back to driver home"
+                      hitSlop={Spacing.one}
+                      onPress={handleBackToDriverHome}
+                      pressedOpacity={0.7}
+                      style={styles.routeInputBackButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.routeInputBackIcon, { color: theme.text }]}>{'<'}</Text>
+                    </AppButton>
+                    <AppButton
+                      accessibilityLabel="Change starting point"
+                      onPress={() => router.push({
+                        pathname: '/home/start',
+                        params: { destinationId: selectedDestination.id },
+                      })}
+                      style={styles.routeInputContentButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.routeInputIcon, { color: theme.tertiary }]}>G</Text>
+                      <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
+                        {routeStartTitle}
+                      </Text>
+                    </AppButton>
+                  </View>
+                  <View
+                    style={[
+                      styles.selectedDestinationInput,
+                      { backgroundColor: theme.backgroundElement },
+                    ]}
                   >
-                    <Text style={[styles.routeInputIcon, { color: theme.tertiary }]}>G</Text>
-                    <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
-                      {routeStartTitle}
-                    </Text>
-                  </AppButton>
-                </View>
+                    <AppButton
+                      accessibilityLabel="Back to destination input"
+                      hitSlop={Spacing.one}
+                      onPress={handleBackToDestinationInput}
+                      pressedOpacity={0.7}
+                      style={styles.inlineBackButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
+                    </AppButton>
+                    <AppButton
+                      accessibilityLabel="Change destination"
+                      onPress={handleChangeDestination}
+                      style={styles.destinationNameButton}
+                      variant="ghost"
+                    >
+                      <Text
+                        ellipsizeMode="tail"
+                        numberOfLines={1}
+                        style={[styles.destinationNameText, { color: theme.text }]}
+                      >
+                        {selectedDestination.title}
+                      </Text>
+                    </AppButton>
+                  </View>
+                </>
+              ) : selectedDestination ? (
                 <View
                   style={[
                     styles.selectedDestinationInput,
@@ -440,91 +449,57 @@ export function NavigationMapScreen() {
                     </Text>
                   </AppButton>
                 </View>
-              </>
-            ) : selectedDestination ? (
-              <View
-                style={[
-                  styles.selectedDestinationInput,
-                  { backgroundColor: theme.backgroundElement },
-                ]}
-              >
+              ) : (
                 <AppButton
-                  accessibilityLabel="Back to destination input"
-                  hitSlop={Spacing.one}
-                  onPress={handleBackToDestinationInput}
-                  pressedOpacity={0.7}
-                  style={styles.inlineBackButton}
-                  variant="ghost"
+                  accessibilityLabel="Search destination"
+                  onPress={() => router.push('/home/search')}
+                  style={styles.searchButton}
+                  variant="surface"
                 >
-                  <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
-                </AppButton>
-                <AppButton
-                  accessibilityLabel="Change destination"
-                  onPress={handleChangeDestination}
-                  style={styles.destinationNameButton}
-                  variant="ghost"
-                >
-                  <Text
-                    ellipsizeMode="tail"
-                    numberOfLines={1}
-                    style={[styles.destinationNameText, { color: theme.text }]}
-                  >
-                    {selectedDestination.title}
+                  <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
+                    Search here...
                   </Text>
                 </AppButton>
-              </View>
-            ) : (
-              <AppButton
-                accessibilityLabel="Search destination"
-                onPress={() => router.push('/home/search')}
-                style={styles.searchButton}
-                variant="surface"
-              >
-                <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
-                  Search here...
-                </Text>
-              </AppButton>
-            )}
-          </View>
-          {!selectedDestination ? (
-            <View style={styles.mapActions}>
-              <AppButton
-                accessibilityLabel={isLocating ? 'Getting current location' : 'Use current location'}
-                disabled={isLocating}
-                onPress={handleUseCurrentLocation}
-                style={[
-                  styles.mapActionButton,
-                  styles.locationActionButton,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.tertiary },
-                ]}
-                variant="surface"
-              >
-                <SymbolView
-                  name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                  size={22}
-                  tintColor={theme.tertiary}
-                />
-              </AppButton>
-              <AppButton
-                accessibilityLabel="Search destination"
-                onPress={() => router.push('/home/search')}
-                style={styles.mapActionButton}
-              >
-                <SymbolView
-                  name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
-                  size={22}
-                  tintColor={theme.onTertiary}
-                />
-              </AppButton>
+              )}
             </View>
-          ) : null}
+            {!selectedDestination ? (
+              <View style={styles.mapActions}>
+                <AppButton
+                  accessibilityLabel={isLocating ? 'Getting current location' : 'Use current location'}
+                  disabled={isLocating}
+                  onPress={handleUseCurrentLocation}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.tertiary },
+                  ]}
+                  variant="surface"
+                >
+                  <SymbolView
+                    name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                    size={22}
+                    tintColor={theme.tertiary}
+                  />
+                </AppButton>
+                <AppButton
+                  accessibilityLabel="Search destination"
+                  onPress={() => router.push('/home/search')}
+                  style={styles.mapActionButton}
+                >
+                  <SymbolView
+                    name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
+                    size={22}
+                    tintColor={theme.onTertiary}
+                  />
+                </AppButton>
+              </View>
+            ) : null}
           </SafeAreaView>
         ) : null}
       </View>
 
       {selectedDestination ? (
-        <SafeAreaView
-          edges={['bottom']}
+        <View
           style={[
             styles.destinationSheet,
             routeStart ? styles.routeDestinationSheet : undefined,
@@ -608,7 +583,7 @@ export function NavigationMapScreen() {
             onPress={routeStart ? handleBeginNavigation : handleGo}
             style={styles.goButton}
           />
-        </SafeAreaView>
+        </View>
       ) : null}
       {locationToast ? (
         <AppToast

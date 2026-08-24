@@ -7,7 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
-import { SurveyorWorkPanel } from '@/feature/surveyor/components/surveyor-work-panel';
+import { ReviewerWorkPanel } from '@/feature/review/components/reviewer-work-panel';
+import { SurveyorWorkPanel } from '@/feature/upload/components/surveyor-work-panel';
 import { useTheme } from '@/hooks/use-theme';
 
 type WorkItem = {
@@ -112,6 +113,8 @@ export function WorkScreen() {
 
           {selectedRole === 'surveyor' ? (
             <SurveyorWorkPanel />
+          ) : selectedRole === 'reviewer' ? (
+            <ReviewerWorkPanel />
           ) : (
             <View style={[styles.workList, { borderColor: theme.border }]}>
               {workItems.map((item) => (

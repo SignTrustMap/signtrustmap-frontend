@@ -11,7 +11,7 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   extractImageGpsCoordinates,
   type ImageGpsCoordinates,
-} from '@/feature/surveyor/utils/image-gps';
+} from '@/feature/upload/utils/image-gps';
 import { useTheme } from '@/hooks/use-theme';
 
 function isValidGpsCoordinates(
@@ -19,10 +19,10 @@ function isValidGpsCoordinates(
 ): coordinates is ImageGpsCoordinates {
   return Boolean(
     coordinates &&
-      Number.isFinite(coordinates.latitude) &&
-      Number.isFinite(coordinates.longitude) &&
-      Math.abs(coordinates.latitude) <= 90 &&
-      Math.abs(coordinates.longitude) <= 180,
+    Number.isFinite(coordinates.latitude) &&
+    Number.isFinite(coordinates.longitude) &&
+    Math.abs(coordinates.latitude) <= 90 &&
+    Math.abs(coordinates.longitude) <= 180,
   );
 }
 
@@ -292,15 +292,15 @@ export function NewSurveyRecordScreen() {
                 params: {
                   ...(selectedAsset
                     ? {
-                        imageType: selectedAsset.type ?? 'image',
-                        imageUri: selectedAsset.uri,
-                      }
+                      imageType: selectedAsset.type ?? 'image',
+                      imageUri: selectedAsset.uri,
+                    }
                     : {}),
                   ...(selectedGps
                     ? {
-                        latitude: String(selectedGps.latitude),
-                        longitude: String(selectedGps.longitude),
-                      }
+                      latitude: String(selectedGps.latitude),
+                      longitude: String(selectedGps.longitude),
+                    }
                     : {}),
                 },
               })

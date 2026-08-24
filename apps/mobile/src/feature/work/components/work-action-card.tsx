@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -9,14 +8,14 @@ import { useTheme } from '@/hooks/use-theme';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
-type SurveyorActionProps = {
+type WorkActionCardProps = {
   count: number;
   label: string;
   onPress?: () => void;
   symbol: SymbolName;
 };
 
-function SurveyorAction({ count, label, onPress, symbol }: SurveyorActionProps) {
+export function WorkActionCard({ count, label, onPress, symbol }: WorkActionCardProps) {
   const theme = useTheme();
 
   return (
@@ -42,30 +41,7 @@ function SurveyorAction({ count, label, onPress, symbol }: SurveyorActionProps) 
   );
 }
 
-export function SurveyorWorkPanel() {
-  const router = useRouter();
-
-  return (
-    <View style={styles.panel}>
-      <SurveyorAction
-        count={2}
-        label="Revalidation Map"
-        onPress={() => router.replace('/home')}
-        symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}
-      />
-      <SurveyorAction
-        count={5}
-        label="Pending Submissions"
-        symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  panel: {
-    gap: Spacing.three,
-  },
   action: {
     position: 'relative',
     minHeight: 112,
