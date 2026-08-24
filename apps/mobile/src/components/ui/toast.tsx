@@ -8,9 +8,17 @@ type AppToastProps = {
   duration?: number;
   message: string;
   onDismiss?: () => void;
+  placement?: 'bottom' | 'center';
+  tone?: 'default' | 'success';
 };
 
-export function AppToast({ duration = 3000, message, onDismiss }: AppToastProps) {
+export function AppToast({
+  duration = 3000,
+  message,
+  onDismiss,
+  placement = 'bottom',
+  tone = 'default',
+}: AppToastProps) {
   useEffect(() => {
     if (!onDismiss) return;
 
@@ -19,8 +27,16 @@ export function AppToast({ duration = 3000, message, onDismiss }: AppToastProps)
   }, [duration, onDismiss]);
 
   return (
-    <SafeAreaView edges={['bottom']} pointerEvents="none" style={styles.positioner}>
-      <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.toast}>
+    <SafeAreaView
+      edges={placement === 'bottom' ? ['bottom'] : []}
+      pointerEvents="none"
+      style={[styles.positioner, placement === 'center' ? styles.centerPositioner : undefined]}
+    >
+      <View
+        accessibilityLiveRegion="assertive"
+        accessibilityRole="alert"
+        style={[styles.toast, tone === 'success' ? styles.successToast : undefined]}
+      >
         <Text numberOfLines={2} style={styles.message}>
           {message}
         </Text>
@@ -38,6 +54,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     zIndex: 20,
   },
+  centerPositioner: {
+    top: 0,
+    justifyContent: 'center',
+  },
   toast: {
     maxWidth: 520,
     minHeight: 48,
@@ -53,6 +73,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     marginBottom: Spacing.four,
+  },
+  successToast: {
+    backgroundColor: '#16803A',
   },
   message: {
     color: '#FFFFFF',

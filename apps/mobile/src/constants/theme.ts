@@ -16,6 +16,7 @@ export const Colors = {
   backgroundSelected: '#d3f7ff',
   textSecondary: '#007b8b',
   placeholder: '#888888',
+  danger: '#FF0000',
 } as const;
 
 export type ThemeColor = keyof typeof Colors;
