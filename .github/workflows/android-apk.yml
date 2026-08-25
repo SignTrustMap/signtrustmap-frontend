@@ -24,6 +24,8 @@ jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_APP_COMMIT_SHA: ${{ github.sha }}
 
     steps:
       - name: Checkout repository
@@ -51,24 +53,31 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Configure ABI Splits
+        run: |
+          sed -i '/android {/a \    splits { abi { enable true; reset(); include "arm64-v8a", "armeabi-v7a", "x86_64"; universalApk false } }' apps/mobile/android/app/build.gradle
+
       - name: Build APK with Gradle
         working-directory: apps/mobile/android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Prepare APK artifact
+      - name: Prepare APK artifacts
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          APK_NAME="signtrustmap-${SHORT_SHA}.apk"
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "apps/mobile/${APK_NAME}"
-          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
+          OUTPUT_DIR="apps/mobile/android/app/build/outputs/apk/release"
+          cp "${OUTPUT_DIR}/app-arm64-v8a-release.apk" "apps/mobile/signtrustmap-arm64-v8a.apk"
+          cp "${OUTPUT_DIR}/app-armeabi-v7a-release.apk" "apps/mobile/signtrustmap-armeabi-v7a.apk"
+          cp "${OUTPUT_DIR}/app-x86_64-release.apk" "apps/mobile/signtrustmap-x86_64.apk"
 
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APK_NAME }}
-          path: apps/mobile/${{ env.APK_NAME }}
+          name: signtrustmap-apks
+          path: |
+            apps/mobile/signtrustmap-arm64-v8a.apk
+            apps/mobile/signtrustmap-armeabi-v7a.apk
+            apps/mobile/signtrustmap-x86_64.apk
           retention-days: 14
 
       - name: Create or Update GitHub Release
@@ -77,8 +86,8 @@ jobs:
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TAG="build-${SHORT_SHA}"
-          TITLE="Build #${{ github.run_number }} (${SHORT_SHA})"
-          APK_PATH="apps/mobile/${{ env.APK_NAME }}"
+          TITLE="Build ${{ github.run_number }}"
+          FILES="apps/mobile/signtrustmap-arm64-v8a.apk apps/mobile/signtrustmap-armeabi-v7a.apk apps/mobile/signtrustmap-x86_64.apk"
 
           {
             echo "### Changes in this build"
@@ -88,13 +97,18 @@ jobs:
             echo "* **Commit:** ${{ github.sha }}"
             echo "* **Author:** ${{ github.actor }}"
             echo "* **Triggered by:** ${{ github.event_name }}"
+            echo ""
+            echo "### 📱 Downloads by Architecture"
+            echo "* **[ARM64 (Most modern phones)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-arm64-v8a.apk)**"
+            echo "* **[ARMv7 (Older 32-bit phones)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-armeabi-v7a.apk)**"
+            echo "* **[x86_64 (Emulators / PC)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-x86_64.apk)**"
           } > release_notes.md
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK_PATH" --clobber
+            gh release upload "$TAG" $FILES --clobber
             gh release edit "$TAG" --notes-file release_notes.md --title "$TITLE"
           else
-            gh release create "$TAG" "$APK_PATH" \
+            gh release create "$TAG" $FILES \
               --title "$TITLE" \
               --notes-file release_notes.md \
               --target "${{ github.sha }}"

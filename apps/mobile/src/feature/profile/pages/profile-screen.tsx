@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { UpdateModal } from '@/components/update-modal';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   ACCOUNT_ROLES,
@@ -9,6 +10,7 @@ import {
   type OptionalAccountRole,
   useSession,
 } from '@/context/session-provider';
+import { useAppUpdate } from '@/hooks/use-app-update';
 import { useTheme } from '@/hooks/use-theme';
 
 const roleLabels: Record<AccountRole, string> = {
@@ -20,6 +22,16 @@ const roleLabels: Record<AccountRole, string> = {
 export function ProfileScreen() {
   const { logOut, session, setRoleEnabled } = useSession();
   const theme = useTheme();
+  const {
+    checkForUpdates,
+    closeModal,
+    currentCommit,
+    currentVersion,
+    errorMessage,
+    isModalOpen,
+    releaseInfo,
+    status,
+  } = useAppUpdate();
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -88,9 +100,45 @@ export function ProfileScreen() {
             </View>
           </View>
 
+          <View style={styles.rolesSection}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Application</Text>
+            <View
+              style={[
+                styles.appInfoCard,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.appInfoRow}>
+                <Text style={[styles.appInfoLabel, { color: theme.text }]}>Current Version</Text>
+                <Text style={[styles.appInfoValue, { color: theme.textSecondary }]}>
+                  v{currentVersion}
+                  {currentCommit ? ` (${currentCommit.slice(0, 7)})` : ''}
+                </Text>
+              </View>
+              <AppButton
+                label={status === 'checking' ? 'Checking for updates...' : 'Check for updates'}
+                disabled={status === 'checking'}
+                onPress={checkForUpdates}
+                style={[styles.updateButton, { borderColor: theme.border }]}
+                variant="surface"
+              />
+            </View>
+          </View>
+
           <AppButton label="Log out" onPress={logOut} style={styles.logoutButton} variant="surface" />
         </View>
       </SafeAreaView>
+
+      <UpdateModal
+        currentCommit={currentCommit}
+        currentVersion={currentVersion}
+        errorMessage={errorMessage}
+        onClose={closeModal}
+        onRetry={checkForUpdates}
+        releaseInfo={releaseInfo}
+        status={status}
+        visible={isModalOpen}
+      />
     </View>
   );
 }
@@ -184,6 +232,30 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 800,
+  },
+  appInfoCard: {
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  appInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  appInfoLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 700,
+  },
+  appInfoValue: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  updateButton: {
+    borderWidth: 1,
   },
   logoutButton: {
     alignSelf: 'stretch',
