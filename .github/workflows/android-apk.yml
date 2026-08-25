@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - apps/mobile/**
+      - packages/**
       - package.json
       - package-lock.json
       - .github/workflows/android-apk.yml
@@ -13,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -26,16 +27,21 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify Mobile Code
+        run: |
+          npm run lint:mobile
+          npm run typecheck:mobile
 
       - name: Set up Expo and EAS
         uses: expo/expo-github-action@v8
@@ -63,11 +69,43 @@ jobs:
             exit 1
           fi
 
-          curl --fail --location "$BUILD_URL" --output app-release.apk
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          APK_NAME="signtrustmap-${SHORT_SHA}.apk"
+          curl --fail --location "$BUILD_URL" --output "$APK_NAME"
+          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: apps/mobile/app-release.apk
+          name: ${{ env.APK_NAME }}
+          path: apps/mobile/${{ env.APK_NAME }}
           retention-days: 14
+
+      - name: Create or Update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG="build-${SHORT_SHA}"
+          TITLE="Build #${{ github.run_number }} (${SHORT_SHA})"
+          APK_PATH="apps/mobile/${{ env.APK_NAME }}"
+
+          {
+            echo "### Changes in this build"
+            git log -1 --pretty=%B
+            echo ""
+            echo "---"
+            echo "* **Commit:** ${{ github.sha }}"
+            echo "* **Author:** ${{ github.actor }}"
+            echo "* **Triggered by:** ${{ github.event_name }}"
+          } > release_notes.md
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK_PATH" --clobber
+            gh release edit "$TAG" --notes-file release_notes.md --title "$TITLE"
+          else
+            gh release create "$TAG" "$APK_PATH" \
+              --title "$TITLE" \
+              --notes-file release_notes.md \
+              --target "${{ github.sha }}"
+          fi
