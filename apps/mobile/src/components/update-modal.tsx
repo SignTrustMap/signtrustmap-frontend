@@ -1,10 +1,11 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
+import { Octicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  ScrollView,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -34,7 +35,6 @@ export function UpdateModal({
   releaseInfo,
   errorMessage,
   currentVersion,
-  currentCommit,
   onClose,
   onRetry,
 }: UpdateModalProps) {
@@ -48,7 +48,7 @@ export function UpdateModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownload = () => {
+  const handleUpdate = () => {
     const url = releaseInfo?.apkAsset?.downloadUrl || releaseInfo?.htmlUrl;
     if (url) {
       Linking.openURL(url);
@@ -60,6 +60,10 @@ export function UpdateModal({
       Linking.openURL(releaseInfo.htmlUrl);
     }
   };
+
+  const displayTitle = releaseInfo?.name
+    ? releaseInfo.name.replace(/\s*\(.*?\)/g, '').trim()
+    : 'Build #9';
 
   return (
     <Modal
@@ -90,36 +94,44 @@ export function UpdateModal({
           {status === 'available' && releaseInfo && (
             <View style={styles.content}>
               <View style={styles.header}>
-                <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
-                  <Text style={[styles.badgeText, { color: theme.tertiary }]}>New Version</Text>
+                <View style={styles.topRow}>
+                  <View style={styles.titleGroup}>
+                    <Text style={[styles.title, { color: theme.text }]}>{displayTitle}</Text>
+                    <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
+                      <Text style={[styles.newBadgeText, { color: theme.tertiary }]}>NEW</Text>
+                    </View>
+                  </View>
+
+                  {releaseInfo.htmlUrl && (
+                    <Pressable
+                      accessibilityLabel="View release on GitHub"
+                      accessibilityRole="button"
+                      onPress={handleOpenGitHub}
+                      style={({ pressed }) => [
+                        styles.githubBtn,
+                        {
+                          borderColor: theme.border,
+                          backgroundColor: pressed ? theme.backgroundSelected : theme.background,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.githubText, { color: theme.text }]}>View</Text>
+                      <Octicons name="mark-github" size={13} color={theme.text} />
+                    </Pressable>
+                  )}
                 </View>
-                <Text style={[styles.title, { color: theme.text }]}>{releaseInfo.name}</Text>
+
                 <Text style={[styles.metaText, { color: theme.placeholder }]}>
-                  Tag: {releaseInfo.tagName} • {releaseInfo.publishedAt}
+                  Released {releaseInfo.publishedAt}
                   {releaseInfo.apkAsset ? ` • ${releaseInfo.apkAsset.sizeFormatted}` : ''}
                 </Text>
               </View>
 
-              <View style={[styles.notesCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                <Text style={[styles.notesTitle, { color: theme.text }]}>What&apos;s New:</Text>
-                <ScrollView style={styles.notesScroll} showsVerticalScrollIndicator>
-                  <Text style={[styles.notesText, { color: theme.text }]}>{releaseInfo.body}</Text>
-                </ScrollView>
-              </View>
-
               <View style={styles.actions}>
-                {releaseInfo.apkAsset && (
-                  <AppButton
-                    label={`Download APK (${releaseInfo.apkAsset.sizeFormatted})`}
-                    onPress={handleDownload}
-                    variant="primary"
-                  />
-                )}
                 <AppButton
-                  label="View on GitHub"
-                  onPress={handleOpenGitHub}
-                  variant="surface"
-                  style={{ borderColor: theme.border, borderWidth: 1 }}
+                  label="Update"
+                  onPress={handleUpdate}
+                  variant="primary"
                 />
                 <AppButton
                   label="Later"
@@ -133,17 +145,16 @@ export function UpdateModal({
           {status === 'up-to-date' && (
             <View style={styles.content}>
               <View style={styles.header}>
-                <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
-                  <Text style={[styles.badgeText, { color: theme.tertiary }]}>Up to Date</Text>
+                <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
+                  <Text style={[styles.newBadgeText, { color: theme.tertiary }]}>UP TO DATE</Text>
                 </View>
                 <Text style={[styles.title, { color: theme.text }]}>You&apos;re up to date!</Text>
                 <Text style={[styles.metaText, { color: theme.placeholder }]}>
                   Current version: v{currentVersion}
-                  {currentCommit ? ` (${currentCommit.slice(0, 7)})` : ''}
                 </Text>
               </View>
 
-              <Text style={[styles.description, { color: theme.text }]}>
+              <Text style={[styles.description, { color: theme.textSecondary }]}>
                 You are currently running the latest version of SignTrustMap.
               </Text>
 
@@ -156,8 +167,8 @@ export function UpdateModal({
           {status === 'error' && (
             <View style={styles.content}>
               <View style={styles.header}>
-                <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.badgeText, { color: '#DC2626' }]}>Check Failed</Text>
+                <View style={[styles.newBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Text style={[styles.newBadgeText, { color: '#DC2626' }]}>FAILED</Text>
                 </View>
                 <Text style={[styles.title, { color: theme.text }]}>Unable to check updates</Text>
               </View>
@@ -200,22 +211,22 @@ export function UpdateModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.four,
   },
   container: {
     width: '100%',
-    maxWidth: Math.min(MaxContentWidth, 420),
+    maxWidth: Math.min(MaxContentWidth, 360),
     borderRadius: Rounded.lg,
     borderWidth: 1,
     padding: Spacing.four,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
   },
   checkingBox: {
     alignItems: 'center',
@@ -235,24 +246,50 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.one,
   },
-  badge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-    borderRadius: Rounded.sm,
+  topRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  badgeText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
+  titleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   title: {
     fontFamily: Fonts.body,
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 900,
+  },
+  newBadge: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 3,
+    borderRadius: Rounded.sm,
+  },
+  newBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 900,
+    letterSpacing: 0.5,
+  },
+  githubBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: Rounded.sm,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+  },
+  githubText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 700,
   },
   metaText: {
     fontFamily: Fonts.body,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 500,
   },
   description: {
@@ -260,26 +297,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 500,
     lineHeight: 20,
-  },
-  notesCard: {
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    padding: Spacing.three,
-    maxHeight: 180,
-    gap: Spacing.one,
-  },
-  notesTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
-  },
-  notesScroll: {
-    maxHeight: 130,
-  },
-  notesText: {
-    fontFamily: Fonts.mono,
-    fontSize: 12,
-    lineHeight: 18,
   },
   errorContainer: {
     gap: Spacing.one,
@@ -301,5 +318,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.two,
+    marginTop: Spacing.one,
   },
 });

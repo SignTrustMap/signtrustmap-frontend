@@ -1,3 +1,4 @@
+import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 
 export interface ReleaseAsset {
@@ -10,7 +11,6 @@ export interface ReleaseAsset {
 export interface ReleaseInfo {
   tagName: string;
   name: string;
-  body: string;
   publishedAt: string;
   htmlUrl: string;
   apkAsset: ReleaseAsset | null;
@@ -30,6 +30,37 @@ function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(1)} MB`;
+}
+
+function formatRelativeDate(dateStr?: string): string {
+  if (!dateStr) return 'Recently';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  if (isNaN(diffMs)) return 'Recently';
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) {
+    const diffMins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  }
+
+  if (diffDays < 7) {
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  }
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
@@ -75,16 +106,25 @@ function parseReleaseData(data: any): ReleaseInfo {
       typeof asset.name === 'string' && asset.name.toLowerCase().endsWith('.apk')
     );
 
-    const preferredApk =
-      apkAssets.find((a: any) => a.name.toLowerCase().includes('arm64')) ||
-      apkAssets[0];
+    if (apkAssets.length > 0) {
+      const supportedAbis = (Device.supportedCpuArchitectures ?? []).map((abi) => abi.toLowerCase());
 
-    if (preferredApk) {
+      let matched = apkAssets.find((asset: any) => {
+        const lowerName = asset.name.toLowerCase();
+        return supportedAbis.some((abi) => lowerName.includes(abi));
+      });
+
+      if (!matched) {
+        matched =
+          apkAssets.find((asset: any) => asset.name.toLowerCase().includes('arm64')) ||
+          apkAssets[0];
+      }
+
       apkAsset = {
-        name: preferredApk.name,
-        downloadUrl: preferredApk.browser_download_url,
-        sizeBytes: preferredApk.size,
-        sizeFormatted: formatBytes(preferredApk.size),
+        name: matched.name,
+        downloadUrl: matched.browser_download_url,
+        sizeBytes: matched.size,
+        sizeFormatted: formatBytes(matched.size),
       };
     }
   }
@@ -92,8 +132,7 @@ function parseReleaseData(data: any): ReleaseInfo {
   return {
     tagName: data.tag_name ?? '',
     name: data.name || data.tag_name || 'Latest Release',
-    body: data.body || 'No release notes provided.',
-    publishedAt: data.published_at ? new Date(data.published_at).toLocaleDateString() : 'Recent',
+    publishedAt: formatRelativeDate(data.published_at),
     htmlUrl: data.html_url,
     apkAsset,
   };

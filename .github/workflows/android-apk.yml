@@ -86,7 +86,7 @@ jobs:
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           TAG="build-${SHORT_SHA}"
-          TITLE="Build #${{ github.run_number }} (${SHORT_SHA})"
+          TITLE="Build ${{ github.run_number }}"
           FILES="apps/mobile/signtrustmap-arm64-v8a.apk apps/mobile/signtrustmap-armeabi-v7a.apk apps/mobile/signtrustmap-x86_64.apk"
 
           {
