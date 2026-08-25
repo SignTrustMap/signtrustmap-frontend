@@ -71,16 +71,20 @@ function parseReleaseData(data: any): ReleaseInfo {
   let apkAsset: ReleaseAsset | null = null;
 
   if (Array.isArray(data.assets)) {
-    const foundApk = data.assets.find((asset: any) =>
+    const apkAssets = data.assets.filter((asset: any) =>
       typeof asset.name === 'string' && asset.name.toLowerCase().endsWith('.apk')
     );
 
-    if (foundApk) {
+    const preferredApk =
+      apkAssets.find((a: any) => a.name.toLowerCase().includes('arm64')) ||
+      apkAssets[0];
+
+    if (preferredApk) {
       apkAsset = {
-        name: foundApk.name,
-        downloadUrl: foundApk.browser_download_url,
-        sizeBytes: foundApk.size,
-        sizeFormatted: formatBytes(foundApk.size),
+        name: preferredApk.name,
+        downloadUrl: preferredApk.browser_download_url,
+        sizeBytes: preferredApk.size,
+        sizeFormatted: formatBytes(preferredApk.size),
       };
     }
   }
