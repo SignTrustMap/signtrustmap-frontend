@@ -35,6 +35,15 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Install dependencies
         run: npm ci
 
@@ -43,36 +52,18 @@ jobs:
           npm run lint:mobile
           npm run typecheck:mobile
 
-      - name: Set up Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Build APK with EAS
-        working-directory: apps/mobile
+      - name: Build APK with Gradle
+        working-directory: apps/mobile/android
         run: |
-          eas build \
-            --platform android \
-            --profile preview \
-            --non-interactive \
-            --wait \
-            --json > build-result.json
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Download APK
-        working-directory: apps/mobile
+      - name: Prepare APK artifact
         run: |
-          BUILD_URL=$(jq -r '.[0].artifacts.buildUrl' build-result.json)
-
-          if [ -z "$BUILD_URL" ] || [ "$BUILD_URL" = "null" ]; then
-            echo "Could not find APK download URL"
-            exit 1
-          fi
-
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           APK_NAME="signtrustmap-${SHORT_SHA}.apk"
-          curl --fail --location "$BUILD_URL" --output "$APK_NAME"
-          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "apps/mobile/${APK_NAME}"
+          echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
