@@ -351,7 +351,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const theme = useTheme();
   const {
     checkedReviewIndex,
-    checkingSubmission,
+    isCheckingSubmission,
     completeCurrentReview,
     finishSubmissionCheck,
     goToNextCheckedReview,
@@ -359,7 +359,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     pendingSubmissions,
     recheckingPreviousAction,
     recheckingReviewIndex,
-    recheckingSubmission,
+    isRecheckingSubmission,
     reviewCheckedSubmissionAgain,
     reviewHistory,
     undoLastReview,
@@ -373,21 +373,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     message: string;
     tone: 'default' | 'success';
   }>();
-  const checkedReview = checkingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
+  const checkedReview = isCheckingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
   const displayedReviewAction = checkedReview?.action ?? recheckingPreviousAction;
   const submission = checkedReview?.submission ?? pendingSubmissions[0];
-  const reviewPosition = checkingSubmission
+  const reviewPosition = isCheckingSubmission
     ? checkedReviewIndex + 1
-    : recheckingSubmission
+    : isRecheckingSubmission
       ? (recheckingReviewIndex ?? 0) + 1
       : Math.min(
-          reviewHistory.length + (submission ? 1 : 0),
-          sampleReviewSubmissions.length,
-        );
+        reviewHistory.length + (submission ? 1 : 0),
+        sampleReviewSubmissions.length,
+      );
 
   const completeReview = (action: ReviewActionType) => {
     if (!submission) return;
-    const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
+    const completesReviewQueue = !isRecheckingSubmission && pendingSubmissions.length === 1;
 
     completeCurrentReview(action);
 
@@ -476,7 +476,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         </View>
         <View style={[styles.counterBar, { backgroundColor: theme.backgroundElement }]}>
           <Text style={[styles.counter, { color: theme.textSecondary }]}>
-            {checkingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
+            {isCheckingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
             {reviewPosition} OF{' '}
             {sampleReviewSubmissions.length}
           </Text>
@@ -599,14 +599,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                         : '!'}
                   </Text>
                   <View style={styles.reviewedStatusCopy}>
-                    <Text style={[styles.reviewedStatusLabel, { color: theme.text }]}> 
+                    <Text style={[styles.reviewedStatusLabel, { color: theme.text }]}>
                       {checkedReview.action === 'approved'
                         ? 'Approved'
                         : checkedReview.action === 'declined'
                           ? 'Declined'
                           : 'Reported'}
                     </Text>
-                    <Text style={[styles.reviewedStatusDescription, { color: theme.textSecondary }]}> 
+                    <Text style={[styles.reviewedStatusDescription, { color: theme.textSecondary }]}>
                       This was your submitted review for this sign.
                     </Text>
                   </View>
@@ -665,7 +665,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   />
                 </View>
 
-                {reviewHistory.length > 0 && !recheckingSubmission ? (
+                {reviewHistory.length > 0 && !isRecheckingSubmission ? (
                   <AppButton
                     label="↶  Undo Last Action"
                     onPress={undoLastAction}
@@ -673,8 +673,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                     textStyle={styles.undoLabel}
                     variant="surface"
                   />
-                ) : !recheckingSubmission ? (
-                  <Text style={[styles.swipeHint, { color: theme.placeholder }]}> 
+                ) : !isRecheckingSubmission ? (
+                  <Text style={[styles.swipeHint, { color: theme.placeholder }]}>
                     SWIPE RIGHT TO APPROVE  •  SWIPE LEFT TO DECLINE
                   </Text>
                 ) : null}

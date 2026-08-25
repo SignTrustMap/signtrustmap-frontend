@@ -13,6 +13,7 @@ import {
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
 import { useTheme } from '@/hooks/use-theme';
+import { AppInput } from '@/components/ui/input';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
@@ -70,9 +71,9 @@ export function SurveyRecordDetailsScreen() {
   const parsedLongitude = longitude ? Number(longitude) : Number.NaN;
   const imageCoordinate: MapCoordinate | undefined =
     Number.isFinite(parsedLatitude) &&
-    Number.isFinite(parsedLongitude) &&
-    Math.abs(parsedLatitude) <= 90 &&
-    Math.abs(parsedLongitude) <= 180
+      Number.isFinite(parsedLongitude) &&
+      Math.abs(parsedLatitude) <= 90 &&
+      Math.abs(parsedLongitude) <= 180
       ? [parsedLongitude, parsedLatitude]
       : undefined;
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
@@ -244,8 +245,8 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.label, { color: theme.text }]}>Note</Text>
-            <TextInput
+            <AppInput
+              label={'Note'}
               accessibilityLabel="Survey note"
               multiline
               placeholder="Enter additional details..."

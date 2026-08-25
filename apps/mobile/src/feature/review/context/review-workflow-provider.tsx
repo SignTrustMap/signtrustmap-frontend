@@ -15,7 +15,7 @@ export type CompletedReview = {
 type ReviewWorkflowContextValue = {
   beginSubmissionCheck: () => void;
   checkedReviewIndex: number;
-  checkingSubmission: boolean;
+  isCheckingSubmission: boolean;
   completeCurrentReview: (action: ReviewActionType) => void;
   finishSubmissionCheck: () => void;
   goToNextCheckedReview: () => void;
@@ -23,7 +23,7 @@ type ReviewWorkflowContextValue = {
   pendingSubmissions: ReviewSubmission[];
   recheckingPreviousAction?: ReviewActionType;
   recheckingReviewIndex?: number;
-  recheckingSubmission: boolean;
+  isRecheckingSubmission: boolean;
   resetReviewWorkflow: () => void;
   reviewCheckedSubmissionAgain: () => void;
   reviewHistory: CompletedReview[];
@@ -35,28 +35,28 @@ const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefin
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [pendingSubmissions, setPendingSubmissions] = useState(sampleReviewSubmissions);
   const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>([]);
-  const [checkingSubmission, setCheckingSubmission] = useState(false);
+  const [isCheckingSubmission, setIsCheckingSubmission] = useState(false);
   const [checkedReviewIndex, setCheckedReviewIndex] = useState(0);
-  const [recheckingSubmission, setRecheckingSubmission] = useState(false);
+  const [isRecheckingSubmission, setIsRecheckingSubmission] = useState(false);
   const [recheckingReviewIndex, setRecheckingReviewIndex] = useState<number>();
   const [recheckingPreviousAction, setRecheckingPreviousAction] = useState<ReviewActionType>();
 
   const beginSubmissionCheck = () => {
     setCheckedReviewIndex(0);
-    setCheckingSubmission(true);
+    setIsCheckingSubmission(true);
   };
 
   const finishSubmissionCheck = () => {
     setCheckedReviewIndex(0);
-    setCheckingSubmission(false);
+    setIsCheckingSubmission(false);
   };
 
   const resetReviewWorkflow = () => {
     setPendingSubmissions(sampleReviewSubmissions);
     setReviewHistory([]);
-    setCheckingSubmission(false);
+    setIsCheckingSubmission(false);
     setCheckedReviewIndex(0);
-    setRecheckingSubmission(false);
+    setIsRecheckingSubmission(false);
     setRecheckingReviewIndex(undefined);
     setRecheckingPreviousAction(undefined);
   };
@@ -72,7 +72,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const completeCurrentReview = (action: ReviewActionType) => {
     const submission = pendingSubmissions[0];
     if (!submission) return;
-    const completedRecheckIndex = recheckingSubmission ? recheckingReviewIndex : undefined;
+    const completedRecheckIndex = isRecheckingSubmission ? recheckingReviewIndex : undefined;
 
     setReviewHistory((history) => {
       const completedReview = { action, submission };
@@ -88,9 +88,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setPendingSubmissions((pending) => pending.slice(1));
     if (completedRecheckIndex !== undefined) {
       setCheckedReviewIndex(completedRecheckIndex);
-      setCheckingSubmission(true);
+      setIsCheckingSubmission(true);
     }
-    setRecheckingSubmission(false);
+    setIsRecheckingSubmission(false);
     setRecheckingReviewIndex(undefined);
     setRecheckingPreviousAction(undefined);
   };
@@ -112,8 +112,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingPreviousAction(checkedReview.action);
     setRecheckingReviewIndex(checkedReviewIndex);
     setCheckedReviewIndex(0);
-    setCheckingSubmission(false);
-    setRecheckingSubmission(true);
+    setIsCheckingSubmission(false);
+    setIsRecheckingSubmission(true);
   };
 
   return (
@@ -121,7 +121,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       value={{
         beginSubmissionCheck,
         checkedReviewIndex,
-        checkingSubmission,
+        isCheckingSubmission,
         completeCurrentReview,
         finishSubmissionCheck,
         goToNextCheckedReview,
@@ -129,7 +129,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         pendingSubmissions,
         recheckingPreviousAction,
         recheckingReviewIndex,
-        recheckingSubmission,
+        isRecheckingSubmission,
         resetReviewWorkflow,
         reviewCheckedSubmissionAgain,
         reviewHistory,

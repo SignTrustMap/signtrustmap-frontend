@@ -2,7 +2,10 @@ import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-
+import {
+  QueryClient,
+  QueryClientProvider
+} from '@tanstack/react-query';
 import { Colors } from '@/constants/theme';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import { SessionProvider, useSession } from '@/context/session-provider';
@@ -10,13 +13,23 @@ import { requestLocationPermissionOnFirstLaunch } from '@/services/location-perm
 
 SplashScreen.preventAutoHideAsync();
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+    }
+  },
+});
+
 export default function TabLayout() {
   return (
-    <ThemeProvider value={DefaultTheme}>
-      <SessionProvider>
-        <RootNavigation />
-      </SessionProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider value={DefaultTheme}>
+        <SessionProvider>
+          <RootNavigation />
+        </SessionProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

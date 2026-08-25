@@ -58,8 +58,8 @@ function parseStoredSession(value: string | null): AppSession | null {
     return {
       accessToken: parsed.accessToken,
       account: {
-        displayName: parsed.account.displayName ?? 'Demo Field Worker',
-        email: parsed.account.email ?? 'field.worker@example.com',
+        displayName: parsed.account.displayName ?? 'Demo User',
+        email: parsed.account.email ?? 'demo@example.com',
         id: parsed.account.id,
         roles: normalizeRoles(parsed.account.roles),
       },
@@ -69,8 +69,8 @@ function parseStoredSession(value: string | null): AppSession | null {
     return {
       accessToken: value,
       account: {
-        displayName: 'Demo Field Worker',
-        email: 'field.worker@example.com',
+        displayName: 'Demo User',
+        email: 'demo@example.com',
         id: 'demo-account',
         roles: [...ACCOUNT_ROLES],
       },
