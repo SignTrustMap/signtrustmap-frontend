@@ -17,114 +17,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-interface SignItem {
-  id: string
-  code: string
-  name: string
-  category: 'P' | 'R' | 'W' | 'I' | 'S'
-  lat: number
-  lng: number
-  heading: number
-  trustScore: number
-  location: string
-  verifiedAt: string
-}
+import { mockSigns, signCategories } from '@/data'
 
-const mockSigns: SignItem[] = [
-  {
-    id: 'sgn-01',
-    code: 'P.102',
-    name: 'Cấm đi ngược chiều',
-    category: 'P',
-    lat: 10.7769,
-    lng: 106.7009,
-    heading: 180,
-    trustScore: 99.4,
-    location: 'Đường Nguyễn Huệ, Quận 1, TP.HCM',
-    verifiedAt: '12/08/2026',
-  },
-  {
-    id: 'sgn-02',
-    code: 'P.127',
-    name: 'Tốc độ tối đa cho phép (50 km/h)',
-    category: 'P',
-    lat: 10.7725,
-    lng: 106.698,
-    heading: 90,
-    trustScore: 98.7,
-    location: 'Đường Lê Lợi, Quận 1, TP.HCM',
-    verifiedAt: '15/08/2026',
-  },
-  {
-    id: 'sgn-03',
-    code: 'R.301a',
-    name: 'Hướng đi phải theo (Đi thẳng)',
-    category: 'R',
-    lat: 10.7798,
-    lng: 106.6995,
-    heading: 0,
-    trustScore: 97.5,
-    location: 'Giao lộ Đồng Khởi - Lê Thánh Tôn, Quận 1, TP.HCM',
-    verifiedAt: '18/08/2026',
-  },
-  {
-    id: 'sgn-04',
-    code: 'W.201a',
-    name: 'Chỗ ngoặt nguy hiểm vòng bên trái',
-    category: 'W',
-    lat: 10.783,
-    lng: 106.704,
-    heading: 270,
-    trustScore: 96.1,
-    location: 'Đường Tôn Đức Thắng, Quận 1, TP.HCM',
-    verifiedAt: '20/08/2026',
-  },
-  {
-    id: 'sgn-05',
-    code: 'I.407a',
-    name: 'Đường một chiều',
-    category: 'I',
-    lat: 10.775,
-    lng: 106.705,
-    heading: 135,
-    trustScore: 99.0,
-    location: 'Đường Hàm Nghi, Quận 1, TP.HCM',
-    verifiedAt: '22/08/2026',
-  },
-  {
-    id: 'sgn-06',
-    code: 'P.130',
-    name: 'Cấm dừng xe và đỗ xe',
-    category: 'P',
-    lat: 10.7712,
-    lng: 106.7035,
-    heading: 45,
-    trustScore: 99.2,
-    location: 'Đường Pasteur, Quận 1, TP.HCM',
-    verifiedAt: '24/08/2026',
-  },
-  {
-    id: 'sgn-07',
-    code: 'R.302b',
-    name: 'Hướng phải đi vòng sang phải',
-    category: 'R',
-    lat: 10.7745,
-    lng: 106.692,
-    heading: 315,
-    trustScore: 98.1,
-    location: 'Vòng xoay Ngã Sáu Phù Đổng, Quận 1, TP.HCM',
-    verifiedAt: '25/08/2026',
-  },
-]
-
-const categoryList = [
-  { id: 'ALL', label: 'Tất cả' },
-  { id: 'P', label: 'Biển Cấm (P)', color: '#ef4444' },
-  { id: 'R', label: 'Hiệu Lệnh (R)', color: '#007b8b' },
-  { id: 'W', label: 'Cảnh Báo (W)', color: '#f59e0b' },
-  { id: 'I', label: 'Chỉ Dẫn (I)', color: '#00c4de' },
-  { id: 'S', label: 'Biển Phụ (S)', color: '#6b7280' },
-]
 
 export default function ProductMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -319,7 +213,7 @@ export default function ProductMap() {
               <FunnelSimple size={14} className="text-[#00c4de]" />
               <span>Nhóm:</span>
             </div>
-            {categoryList.map((cat) => {
+            {signCategories.map((cat) => {
               const active = selectedCategory === cat.id
               return (
                 <button
@@ -336,6 +230,7 @@ export default function ProductMap() {
                 </button>
               )
             })}
+
           </div>
 
           {/* Right Controls: Tile Switcher & Result Count */}

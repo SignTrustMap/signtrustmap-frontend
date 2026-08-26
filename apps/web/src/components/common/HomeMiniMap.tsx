@@ -13,69 +13,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-interface MiniMapSign {
-  id: string
-  code: string
-  name: string
-  category: 'P' | 'R' | 'W' | 'I'
-  lat: number
-  lng: number
-  heading: number
-  trust: number
-}
+import { mockSigns } from '@/data'
 
-const sampleSigns: MiniMapSign[] = [
-  {
-    id: 's1',
-    code: 'P.102',
-    name: 'Cấm đi ngược chiều',
-    category: 'P',
-    lat: 10.7769,
-    lng: 106.7009,
-    heading: 180,
-    trust: 99.4,
-  },
-  {
-    id: 's2',
-    code: 'P.127',
-    name: 'Tốc độ tối đa (50 km/h)',
-    category: 'P',
-    lat: 10.7725,
-    lng: 106.698,
-    heading: 90,
-    trust: 98.7,
-  },
-  {
-    id: 's3',
-    code: 'R.301a',
-    name: 'Hướng đi phải theo (Đi thẳng)',
-    category: 'R',
-    lat: 10.7798,
-    lng: 106.6995,
-    heading: 0,
-    trust: 97.5,
-  },
-  {
-    id: 's4',
-    code: 'W.201a',
-    name: 'Chỗ ngoặt nguy hiểm vòng bên trái',
-    category: 'W',
-    lat: 10.783,
-    lng: 106.704,
-    heading: 270,
-    trust: 88.4,
-  },
-  {
-    id: 's5',
-    code: 'I.407a',
-    name: 'Đường một chiều',
-    category: 'I',
-    lat: 10.775,
-    lng: 106.705,
-    heading: 135,
-    trust: 99.0,
-  },
-]
 
 export function HomeMiniMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -103,11 +42,12 @@ export function HomeMiniMap() {
     tileLayerRef.current = tile
 
     // Add interactive sign markers
-    sampleSigns.forEach((sign) => {
+    mockSigns.forEach((sign) => {
       let bgHex = '#ef4444' // P
       if (sign.category === 'R') bgHex = '#007b8b'
       if (sign.category === 'W') bgHex = '#f59e0b'
       if (sign.category === 'I') bgHex = '#00c4de'
+      if (sign.category === 'S') bgHex = '#6b7280'
 
       const customIcon = L.divIcon({
         className: 'custom-home-marker',
@@ -142,7 +82,7 @@ export function HomeMiniMap() {
         <div style="font-family: 'Geist', sans-serif; padding: 2px; color: #111827; min-width: 170px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <strong style="background: #007b8b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-family: monospace;">${sign.code}</strong>
-            <span style="color: #059669; font-size: 11px; font-weight: bold; font-family: monospace;">${sign.trust}% Trust</span>
+            <span style="color: #059669; font-size: 11px; font-weight: bold; font-family: monospace;">${sign.trustScore}% Trust</span>
           </div>
           <p style="font-size: 12px; font-weight: 700; margin: 4px 0 2px 0; line-height: 1.3;">${sign.name}</p>
           <p style="font-size: 10px; color: #6b7280; margin: 0; font-family: monospace;">Hướng xe: ${sign.heading}°</p>
@@ -151,6 +91,7 @@ export function HomeMiniMap() {
 
       marker.bindPopup(popupContent)
     })
+
 
     mapInstanceRef.current = map
 

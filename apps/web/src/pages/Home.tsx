@@ -12,82 +12,9 @@ import {
 } from '@phosphor-icons/react'
 import { TopographicContour } from '@/components/common/TopographicContour'
 
-/* ─── 1. AI & TECH ECOSYSTEM LOGO MARQUEE (Infinite Loop, Enlarged) ─── */
-const sponsorList = [
-  {
-    name: 'Cursor',
-    label: 'Cursor AI',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2L2 19.5h20L12 2zm0 3.8l6.5 11.4H5.5L12 5.8z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Claude',
-    label: 'Anthropic Claude',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M13.5 3h-3L4 21h3.5l1.5-4.5h6l1.5 4.5H20L13.5 3zm-3.3 10.5L12 7.8l1.8 5.7h-3.6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Gemini',
-    label: 'Google Gemini',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2C12 7.5 7.5 12 2 12c5.5 0 10 4.5 10 10 0-5.5 4.5-10 10-10-5.5 0-10-4.5-10-10z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'OpenAI',
-    label: 'OpenAI / ChatGPT',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M22.28 10.55a6.03 6.03 0 00-.51-4.88 6.13 6.13 0 00-5.9-3.05 6.06 6.06 0 00-4.66-2.12c-3.15 0-5.74 2.37-6.08 5.48a6.05 6.05 0 00-4.04 2.92 6.13 6.13 0 00.75 6.58 6.03 6.03 0 00.51 4.88 6.13 6.13 0 005.9 3.05 6.05 6.05 0 004.66 2.12c3.15 0 5.74-2.37 6.08-5.48a6.05 6.05 0 004.04-2.92 6.13 6.13 0 00-.75-6.58zm-7.6 10.4a4.42 4.42 0 01-2.68.9 4.5 4.5 0 01-4.43-3.66l.08-.04 4.36-2.52a.8.8 0 00.4-.69v-6.17l1.85 1.07a.08.08 0 01.04.07v6.86a4.43 4.43 0 01.38 4.18z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'v0',
-    label: 'v0 by Vercel',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13H5.5L12 6.5z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Windsurf',
-    label: 'Windsurf AI',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M3 17h18c-2-4-5-8-9-8s-7 4-9 8zm0-6h18c-1-3-4-6-9-6s-8 3-9 6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Copilot',
-    label: 'GitHub Copilot',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Hugging Face',
-    label: 'Hugging Face',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-3 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm6 0a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3 8c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z" />
-      </svg>
-    ),
-  },
-]
+import { sponsorList } from '@/data'
 
+/* ─── 1. AI & TECH ECOSYSTEM LOGO MARQUEE (Infinite Loop, Enlarged) ─── */
 function AiMarqueeLogos() {
   return (
     <div className="w-full pt-8 pb-6 overflow-hidden">
@@ -99,15 +26,17 @@ function AiMarqueeLogos() {
       <div className="relative w-full overflow-hidden marquee-mask">
         <div className="animate-marquee flex items-center gap-12 sm:gap-16 py-2">
           {/* First set of logos */}
-          {sponsorList.map((s, i) => (
+          {sponsorList.map((s) => (
             <div
-              key={`logo-1-${i}`}
+              key={`logo-1-${s.id}`}
               className="flex items-center gap-3 text-gray-300 hover:text-[#00c4de] transition-colors cursor-default shrink-0 group"
               title={s.label}
             >
-              <div className="text-gray-400 group-hover:text-[#00c4de] transition-colors">
-                {s.svg}
-              </div>
+              <img
+                src={s.logoUrl}
+                alt={s.name}
+                className="w-8 h-8 object-contain brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all"
+              />
               <span className="text-base sm:text-lg font-bold tracking-wide font-sans text-white group-hover:text-[#00c4de] transition-colors">
                 {s.name}
               </span>
@@ -115,15 +44,17 @@ function AiMarqueeLogos() {
           ))}
 
           {/* Duplicate set of logos for seamless infinite loop */}
-          {sponsorList.map((s, i) => (
+          {sponsorList.map((s) => (
             <div
-              key={`logo-2-${i}`}
+              key={`logo-2-${s.id}`}
               className="flex items-center gap-3 text-gray-300 hover:text-[#00c4de] transition-colors cursor-default shrink-0 group"
               title={s.label}
             >
-              <div className="text-gray-400 group-hover:text-[#00c4de] transition-colors">
-                {s.svg}
-              </div>
+              <img
+                src={s.logoUrl}
+                alt={s.name}
+                className="w-8 h-8 object-contain brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all"
+              />
               <span className="text-base sm:text-lg font-bold tracking-wide font-sans text-white group-hover:text-[#00c4de] transition-colors">
                 {s.name}
               </span>
@@ -134,6 +65,7 @@ function AiMarqueeLogos() {
     </div>
   )
 }
+
 
 /* ─── 2. HERO SECTION (Breathable, Spacious DigitalOcean Vibe) ─────── */
 function HeroSection() {
