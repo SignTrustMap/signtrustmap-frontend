@@ -39,21 +39,32 @@ export default function Signup() {
       }`}
     >
       {/* Background Decorator */}
-      {isDark ? (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <img
-            src="/images/hero-wireframe.jpg"
-            alt="3D Wireframe Terrain Mesh"
-            className="w-full h-full object-cover object-bottom opacity-45 brightness-[0.75] contrast-[1.2] mix-blend-screen"
-          />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent blur-[130px]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#030708]/90 via-[#030708]/60 to-[#030708]" />
-        </div>
-      ) : (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[750px] h-[350px] bg-gradient-to-b from-[#007b8b]/10 via-[#d3f7ff]/20 to-transparent blur-[120px]" />
-        </div>
-      )}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <img
+          src="/images/hero-wireframe.jpg"
+          alt="3D Wireframe Terrain Mesh"
+          className={`w-full h-full object-cover object-bottom transition-all ${
+            isDark
+              ? 'opacity-45 brightness-[0.75] contrast-[1.2] mix-blend-screen'
+              : 'opacity-30 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-125'
+          }`}
+        />
+        <div
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-[750px] h-[350px] blur-[130px] ${
+            isDark
+              ? 'bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent'
+              : 'bg-gradient-to-b from-[#007b8b]/15 via-[#d3f7ff]/30 to-transparent'
+          }`}
+        />
+        <div
+          className={`absolute inset-0 bg-gradient-to-b ${
+            isDark
+              ? 'from-[#030708]/90 via-[#030708]/60 to-[#030708]'
+              : 'from-[#F8F7F7]/90 via-[#F8F7F7]/60 to-[#F8F7F7]'
+          }`}
+        />
+      </div>
+
 
       {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">

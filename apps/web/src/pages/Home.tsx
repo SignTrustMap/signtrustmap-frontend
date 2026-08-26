@@ -108,27 +108,43 @@ function HeroSection() {
       }`}
     >
       {/* 3D Wireframe Terrain Background Asset */}
-      {isDark ? (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          <img
-            src="/images/hero-wireframe.jpg"
-            alt="3D Wireframe Terrain Mesh"
-            className="w-full h-full object-cover object-bottom opacity-50 brightness-[0.75] contrast-[1.2] mix-blend-screen"
-          />
-          {/* Overhead spotlight beam with soft cyan glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[750px] h-[420px] bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent blur-[140px]" />
-          {/* Soft radial scrim behind text */}
-          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[520px] bg-[#030708]/60 rounded-full blur-[110px]" />
-          {/* Top and bottom dark fades */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#030708] via-transparent to-[#030708]" />
-        </div>
-      ) : (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          {/* Light Mode Soft Radial Teal Glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[450px] bg-gradient-to-b from-[#007b8b]/10 via-[#d3f7ff]/20 to-transparent blur-[120px]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#F8F7F7]/60 to-[#F8F7F7]" />
-        </div>
-      )}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <img
+          src="/images/hero-wireframe.jpg"
+          alt="3D Wireframe Terrain Mesh"
+          className={`w-full h-full object-cover object-bottom transition-all ${
+            isDark
+              ? 'opacity-50 brightness-[0.75] contrast-[1.2] mix-blend-screen'
+              : 'opacity-35 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-125'
+          }`}
+        />
+
+        {/* Overhead spotlight beam with soft glow */}
+        <div
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[450px] blur-[130px] ${
+            isDark
+              ? 'bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent'
+              : 'bg-gradient-to-b from-[#007b8b]/15 via-[#d3f7ff]/30 to-transparent'
+          }`}
+        />
+
+        {/* Soft radial scrim behind text */}
+        <div
+          className={`absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[520px] rounded-full blur-[110px] ${
+            isDark ? 'bg-[#030708]/60' : 'bg-[#F8F7F7]/60'
+          }`}
+        />
+
+        {/* Top and bottom gradient fades */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-b ${
+            isDark
+              ? 'from-[#030708] via-transparent to-[#030708]'
+              : 'from-[#F8F7F7]/80 via-transparent to-[#F8F7F7]'
+          }`}
+        />
+      </div>
+
 
       {/* Main Hero Content */}
       <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
