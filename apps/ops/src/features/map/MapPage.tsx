@@ -1,125 +1,434 @@
-import { MapTrifold, FunnelSimple, MagnifyingGlass, ArrowSquareOut } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import {
+  MagnifyingGlass,
+  MapPin,
+  X,
+  Stack,
+  NavigationArrow,
+  ShieldCheck,
+  ArrowsClockwise,
+  Check,
+} from '@phosphor-icons/react'
+
+
+// Fix Leaflet default icon paths in bundlers
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+interface OpsSignItem {
+  id: string
+  code: string
+  name: string
+  category: 'P' | 'R' | 'W' | 'I' | 'S'
+  lat: number
+  lng: number
+  heading: number
+  trustScore: number
+  status: 'verified' | 'pending' | 'flagged' | 'revalidating'
+  location: string
+  reviewerVotes: { approve: number; reject: number; modify: number }
+  aiConfidence: number
+  verifiedAt: string
+  imageUrl: string
+  detectedBy: string
+}
+
+const mockOpsSigns: OpsSignItem[] = [
+  {
+    id: 'sgn-01',
+    code: 'P.102',
+    name: 'Cấm đi ngược chiều',
+    category: 'P',
+    lat: 10.7769,
+    lng: 106.7009,
+    heading: 180,
+    trustScore: 99.4,
+    status: 'verified',
+    location: 'Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
+    reviewerVotes: { approve: 8, reject: 0, modify: 0 },
+    aiConfidence: 98.2,
+    verifiedAt: '12/08/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop&q=80',
+    detectedBy: 'YOLO12 + BoT-SORT (Survey #482)',
+  },
+  {
+    id: 'sgn-02',
+    code: 'P.127',
+    name: 'Tốc độ tối đa cho phép (50 km/h)',
+    category: 'P',
+    lat: 10.7725,
+    lng: 106.698,
+    heading: 90,
+    trustScore: 98.7,
+    status: 'verified',
+    location: 'Đường Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
+    reviewerVotes: { approve: 6, reject: 0, modify: 1 },
+    aiConfidence: 96.5,
+    verifiedAt: '15/08/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=500&auto=format&fit=crop&q=80',
+    detectedBy: 'YOLO12 + CLIP (Survey #510)',
+  },
+  {
+    id: 'sgn-03',
+    code: 'R.301a',
+    name: 'Hướng đi phải theo (Đi thẳng)',
+    category: 'R',
+    lat: 10.7798,
+    lng: 106.6995,
+    heading: 0,
+    trustScore: 97.5,
+    status: 'verified',
+    location: 'Giao lộ Đồng Khởi - Lê Thánh Tôn, Quận 1, TP.HCM',
+    reviewerVotes: { approve: 5, reject: 0, modify: 0 },
+    aiConfidence: 95.1,
+    verifiedAt: '18/08/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=500&auto=format&fit=crop&q=80',
+    detectedBy: 'YOLO12 + BoT-SORT (Survey #523)',
+  },
+  {
+    id: 'sgn-04',
+    code: 'W.201a',
+    name: 'Chỗ ngoặt nguy hiểm vòng bên trái',
+    category: 'W',
+    lat: 10.783,
+    lng: 106.704,
+    heading: 270,
+    trustScore: 78.4,
+    status: 'pending',
+    location: 'Đường Tôn Đức Thắng (đoạn vòng bờ sông), Quận 1, TP.HCM',
+    reviewerVotes: { approve: 2, reject: 1, modify: 0 },
+    aiConfidence: 81.3,
+    verifiedAt: 'Đang chờ đồng thuận',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80',
+    detectedBy: 'YOLO12 + BoT-SORT (Survey #540)',
+  },
+  {
+    id: 'sgn-05',
+    code: 'I.407a',
+    name: 'Đường một chiều',
+    category: 'I',
+    lat: 10.775,
+    lng: 106.705,
+    heading: 135,
+    trustScore: 99.0,
+    status: 'verified',
+    location: 'Đường Hàm Nghi, Quận 1, TP.HCM',
+    reviewerVotes: { approve: 9, reject: 0, modify: 0 },
+    aiConfidence: 99.1,
+    verifiedAt: '22/08/2026',
+    imageUrl: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500&auto=format&fit=crop&q=80',
+    detectedBy: 'YOLO12 + CLIP (Survey #555)',
+  },
+]
 
 const SIGN_GROUPS = [
-  'Tất cả',
-  'Biển báo cấm',
-  'Biển hiệu lệnh',
-  'Biển cảnh báo',
-  'Biển chỉ dẫn',
-  'Biển phụ',
+  { id: 'ALL', label: 'Tất cả' },
+  { id: 'P', label: 'Biển Cấm (P)' },
+  { id: 'R', label: 'Hiệu Lệnh (R)' },
+  { id: 'W', label: 'Cảnh Báo (W)' },
+  { id: 'I', label: 'Chỉ Dẫn (I)' },
+  { id: 'S', label: 'Biển Phụ (S)' },
 ]
 
 export default function MapPage() {
-  const [activeGroup, setActiveGroup] = useState('Tất cả')
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<L.Map | null>(null)
+  const markersLayerRef = useRef<L.LayerGroup | null>(null)
+
+  const [activeGroup, setActiveGroup] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedSign, setSelectedSign] = useState<OpsSignItem | null>(null)
+  const [tileMode, setTileMode] = useState<'osm' | 'voyager'>('osm')
+  const tileLayerRef = useRef<L.TileLayer | null>(null)
+
+  // Initialize Map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapInstanceRef.current) return
+
+    const map = L.map(mapContainerRef.current, {
+      center: [10.7769, 106.7009],
+      zoom: 15,
+      zoomControl: false,
+    })
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map)
+
+    // Standard OpenStreetMap Tile Layer
+    const osmTile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map)
+
+    tileLayerRef.current = osmTile
+
+    const markersLayer = L.layerGroup().addTo(map)
+    markersLayerRef.current = markersLayer
+
+    mapInstanceRef.current = map
+
+    setTimeout(() => {
+      map.invalidateSize()
+    }, 200)
+
+    return () => {
+      map.remove()
+      mapInstanceRef.current = null
+    }
+  }, [])
+
+  // Switch Tile Layer
+  useEffect(() => {
+    if (!mapInstanceRef.current || !tileLayerRef.current) return
+
+    mapInstanceRef.current.removeLayer(tileLayerRef.current)
+
+    const newUrl =
+      tileMode === 'osm'
+        ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+
+    const newLayer = L.tileLayer(newUrl, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(mapInstanceRef.current)
+
+    tileLayerRef.current = newLayer
+  }, [tileMode])
+
+  // Filter & Render Markers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markersLayerRef.current) return
+
+    markersLayerRef.current.clearLayers()
+
+    const filtered = mockOpsSigns.filter((sign) => {
+      const matchCat = activeGroup === 'ALL' || sign.category === activeGroup
+      const matchSearch =
+        sign.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        sign.location.toLowerCase().includes(searchQuery.toLowerCase())
+      return matchCat && matchSearch
+    })
+
+    filtered.forEach((sign) => {
+      let bgHex = '#ef4444' // P
+      if (sign.category === 'R') bgHex = '#007b8b'
+      if (sign.category === 'W') bgHex = '#f59e0b'
+      if (sign.category === 'I') bgHex = '#00c4de'
+      if (sign.category === 'S') bgHex = '#6b7280'
+
+      const isSelected = selectedSign?.id === sign.id
+
+      const customIcon = L.divIcon({
+        className: 'custom-ops-marker',
+        html: `
+          <div style="
+            background: ${bgHex};
+            width: ${isSelected ? '36px' : '30px'};
+            height: ${isSelected ? '36px' : '30px'};
+            border-radius: 50%;
+            border: ${isSelected ? '3px solid #007b8b' : '2px solid #ffffff'};
+            box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: ${isSelected ? '12px' : '11px'};
+            font-family: monospace;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          ">
+            ${sign.category}
+          </div>
+        `,
+        iconSize: isSelected ? [36, 36] : [30, 30],
+        iconAnchor: isSelected ? [18, 18] : [15, 15],
+      })
+
+      const marker = L.marker([sign.lat, sign.lng], { icon: customIcon })
+
+      marker.on('click', () => {
+        setSelectedSign(sign)
+        mapInstanceRef.current?.flyTo([sign.lat, sign.lng], 17, { duration: 0.8 })
+      })
+
+      markersLayerRef.current?.addLayer(marker)
+    })
+  }, [activeGroup, searchQuery, selectedSign])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Filter bar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#E8E4E3] bg-white shrink-0 overflow-x-auto">
-        {/* Search */}
-        <div className="relative flex-shrink-0">
-          <MagnifyingGlass
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="search"
-            placeholder="Tìm biển báo..."
-            className="pl-8 pr-3 py-1.5 text-xs rounded-[4px] border border-[#E8E4E3] bg-white w-44 focus:outline-none focus:border-[#007b8b] transition-colors"
-          />
+    <div className="flex flex-col h-full bg-[#F8F7F7] font-sans relative overflow-hidden">
+      {/* Top Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-b border-[#E8E4E3] shrink-0 z-10">
+        {/* Left: Search input */}
+        <div className="flex items-center gap-3 flex-1 min-w-[240px] max-w-sm">
+          <div className="relative w-full">
+            <MagnifyingGlass
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm theo mã biển báo, tên, tuyến đường..."
+              className="w-full pl-9 pr-8 py-1.5 text-xs rounded-[6px] border border-[#E8E4E3] bg-gray-50 focus:bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b] transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Group pills */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Center: Category Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
           {SIGN_GROUPS.map((g) => (
             <button
-              key={g}
-              onClick={() => setActiveGroup(g)}
-              className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors whitespace-nowrap ${
-                activeGroup === g
-                  ? 'bg-[#007b8b] text-white border-[#007b8b]'
+              key={g.id}
+              onClick={() => setActiveGroup(g.id)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-all whitespace-nowrap ${
+                activeGroup === g.id
+                  ? 'bg-[#007b8b] text-white border-[#007b8b] shadow-sm'
                   : 'bg-white text-gray-600 border-[#E8E4E3] hover:border-[#007b8b] hover:text-[#007b8b]'
               }`}
             >
-              {g}
+              {g.label}
             </button>
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-          <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 border border-[#E8E4E3] rounded-[4px] hover:border-[#007b8b] hover:text-[#007b8b] transition-colors">
-            <FunnelSimple size={13} />
-            Lọc nâng cao
-          </button>
-          <a
-            href="/"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 border border-[#E8E4E3] rounded-[4px] hover:border-[#007b8b] hover:text-[#007b8b] transition-colors"
+        {/* Right: Controls & Tile mode */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setTileMode((m) => (m === 'osm' ? 'voyager' : 'osm'))}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-[#E8E4E3] rounded-full hover:bg-gray-50 transition-colors shadow-sm"
+            title="Đổi kiểu bản đồ"
           >
-            <ArrowSquareOut size={13} />
-            Toàn màn hình
-          </a>
+            <Stack size={14} className="text-[#007b8b]" />
+            <span>{tileMode === 'osm' ? 'OpenStreetMap Chuẩn' : 'OSM Voyager'}</span>
+          </button>
         </div>
       </div>
 
-      {/* Map canvas */}
-      <div className="flex-1 relative bg-[#e8f4f6]">
-        {/* Simulated tile pattern */}
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(0,123,139,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(0,123,139,0.12) 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
+      {/* Main Map Container */}
+      <div className="flex-1 relative w-full h-full overflow-hidden">
+        {/* Leaflet OpenStreetMap canvas */}
+        <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#e8f4f6]" />
 
-        {/* Sample markers */}
-        {[
-          { top: '35%', left: '45%', label: 'R.301', trust: 95 },
-          { top: '50%', left: '55%', label: 'P.102', trust: 88 },
-          { top: '60%', left: '35%', label: 'W.201', trust: 72 },
-          { top: '40%', left: '65%', label: 'I.407', trust: 99 },
-        ].map((m) => (
-          <button
-            key={m.label}
-            style={{ top: m.top, left: m.left }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 group"
-            title={`${m.label} — Trust ${m.trust}%`}
-          >
-            <div className={`w-5 h-5 rounded-full border-2 border-white shadow-md flex items-center justify-center transition-transform group-hover:scale-125 ${
-              m.trust >= 90 ? 'bg-[#007b8b]' : m.trust >= 75 ? 'bg-amber-500' : 'bg-red-500'
-            }`}>
-              <MapTrifold size={10} weight="fill" className="text-white" />
+        {/* Floating Telemetry Badge */}
+        <div className="absolute top-3 left-3 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-[#E8E4E3] text-xs text-gray-700 shadow-md">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-mono font-bold text-[#007b8b]">OPENSTREETMAP LIVE</span>
+          <span className="text-gray-300">•</span>
+          <span>Hệ tọa độ WGS 84 • QCVN 41</span>
+        </div>
+
+        {/* Selected Sign Inspector Drawer (Right Floating Card in Ops) */}
+        {selectedSign && (
+          <div className="absolute top-3 right-3 z-20 w-full max-w-sm bg-white rounded-[16px] border border-[#E8E4E3] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right duration-200 text-gray-900">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-[#007b8b]/10 via-transparent to-transparent border-b border-[#E8E4E3] flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-[#007b8b] text-white">
+                    {selectedSign.code}
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1 font-mono">
+                    <ShieldCheck size={14} weight="fill" />
+                    {selectedSign.status === 'verified' ? `Đã duyệt (${selectedSign.trustScore}%)` : 'Chờ kiểm duyệt'}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-900">{selectedSign.name}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedSign(null)}
+                className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
             </div>
-          </button>
-        ))}
 
-        {/* Info overlay */}
-        <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-[8px] border border-[#E8E4E3] px-3 py-2 text-xs text-gray-600 shadow-sm">
-          <span className="font-semibold text-gray-900">142,381</span> biển báo •{' '}
-          <span className="font-semibold text-gray-900">{activeGroup}</span>
-        </div>
+            {/* Body */}
+            <div className="p-4 space-y-3.5 text-xs text-left">
+              {/* Camera Evidence Crop */}
+              <div className="relative rounded-lg overflow-hidden aspect-video bg-black border border-gray-200">
+                <img
+                  src={selectedSign.imageUrl}
+                  alt={selectedSign.name}
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/80 text-[10px] font-mono text-[#00c4de] border border-[#00c4de]/30">
+                  {selectedSign.detectedBy}
+                </span>
+              </div>
 
-        {/* Legend */}
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-[8px] border border-[#E8E4E3] px-3 py-2 shadow-sm flex flex-col gap-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">Trust Score</p>
-          {[
-            { color: 'bg-[#007b8b]', label: '≥ 90%' },
-            { color: 'bg-amber-500', label: '75–89%' },
-            { color: 'bg-red-500', label: '< 75%' },
-          ].map((l) => (
-            <div key={l.label} className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${l.color}`} />
-              <span className="text-[10px] text-gray-600">{l.label}</span>
+              {/* Specs Grid */}
+              <div className="grid grid-cols-2 gap-2 font-mono">
+                <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase">Hướng áp dụng</p>
+                  <p className="text-xs font-bold text-[#007b8b] flex items-center gap-1 mt-0.5">
+                    <NavigationArrow size={13} className="rotate-45" />
+                    {selectedSign.heading}° (Bắc/Nam)
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase">Tọa độ GPS</p>
+                  <p className="text-xs font-bold text-gray-900 mt-0.5 truncate">
+                    {selectedSign.lat.toFixed(4)}, {selectedSign.lng.toFixed(4)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Reviewer Consensus Stats */}
+              <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-700">
+                <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">
+                  Đồng thuận Reviewer (Weighted Consensus):
+                </p>
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-emerald-600 font-bold">✓ Duyệt: {selectedSign.reviewerVotes.approve}</span>
+                  <span className="text-amber-600 font-bold">✎ Sửa: {selectedSign.reviewerVotes.modify}</span>
+                  <span className="text-red-600 font-bold">✕ Từ chối: {selectedSign.reviewerVotes.reject}</span>
+                </div>
+              </div>
+
+              {/* Location string */}
+              <div className="flex items-start gap-2 text-gray-600">
+                <MapPin size={15} className="text-[#007b8b] shrink-0 mt-0.5" />
+                <span className="text-xs">{selectedSign.location}</span>
+              </div>
+
+              {/* Moderator Actions */}
+              <div className="pt-3 border-t border-gray-100 flex gap-2">
+                <button
+                  onClick={() => alert(`Đã phê duyệt biển báo ${selectedSign.code} xuất bản lên GIS!`)}
+                  className="flex-1 py-2 rounded-lg bg-[#007b8b] hover:bg-[#006272] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <Check size={13} weight="bold" />
+                  <span>Duyệt nhanh</span>
+                </button>
+                <button
+                  onClick={() => alert(`Đã tạo nhiệm vụ tái thẩm định cho biển báo ${selectedSign.code}!`)}
+                  className="py-2 px-3 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1"
+                  title="Yêu cầu tái thẩm định thực địa"
+                >
+                  <ArrowsClockwise size={13} />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-
-        {/* Leaflet placeholder note */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-1.5 text-[11px] text-amber-700 shadow-sm whitespace-nowrap">
-          Leaflet map integration — install react-leaflet để mount bản đồ thật
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
