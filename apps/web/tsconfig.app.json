@@ -16,9 +16,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Path alias — ignoreDeprecations required for TS 6 compatibility */
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
+    /* Path alias */
     "paths": {
       "@/*": ["./src/*"]
     },
@@ -26,9 +24,7 @@
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
 }
-

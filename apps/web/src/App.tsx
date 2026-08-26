@@ -10,7 +10,7 @@ import Signup from '@/pages/Signup'
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
-    <div className="min-h-[50dvh] flex items-center justify-center bg-[#030708] text-white">
+    <div className="min-h-[50dvh] flex items-center justify-center bg-[#030708] text-white w-full">
       <p className="text-gray-400 text-sm">{title} — Đang được cập nhật</p>
     </div>
   )
@@ -19,10 +19,10 @@ function PlaceholderPage({ title }: { title: string }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="flex flex-col min-h-[100dvh] bg-[#030708] text-white">
+      <div className="flex flex-col min-h-[100dvh] w-full bg-[#030708] text-white">
         <AnnouncementBar />
         <Navbar />
-        <main className="flex-1">
+        <main className="flex-1 w-full flex flex-col">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/product/map" element={<ProductMap />} />
@@ -34,14 +34,8 @@ export default function App() {
             <Route path="/docs" element={<PlaceholderPage title="Tài liệu kỹ thuật" />} />
           </Routes>
         </main>
-        {/* Hide footer on login and signup pages only */}
-        <Routes>
-          <Route path="/login" element={null} />
-          <Route path="/signup" element={null} />
-          <Route path="*" element={<Footer />} />
-        </Routes>
+        <Footer />
       </div>
     </BrowserRouter>
-
   )
 }
