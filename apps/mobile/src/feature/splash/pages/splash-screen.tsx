@@ -1,14 +1,25 @@
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, Keyframe } from 'react-native-reanimated';
+import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+    cancelAnimation,
+    Easing,
+    interpolateColor,
+    Keyframe,
+    useAnimatedStyle,
+    useReducedMotion,
+    useSharedValue,
+    withTiming,
+} from 'react-native-reanimated';
 
-import { Fonts } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
+import { EXIT_ANIMATION_DURATION_MS, SPLASH_PROGRESS_DURATION_MS } from '@/constants/const';
 
 const EXIT_TRANSLATE_Y = Dimensions.get('screen').height;
-const EXIT_ANIMATION_DURATION = 500;
 
 export function AppSplashScreen() {
+    const progress = useSharedValue(0);
+    const shouldReduceMotion = useReducedMotion();
     const exitKeyframe = new Keyframe({
         0: {
             transform: [{ translateY: 0 }],
@@ -23,17 +34,42 @@ export function AppSplashScreen() {
 
     useEffect(() => {
         void SplashScreen.hideAsync();
-    }, []);
+
+        progress.value = withTiming(1, {
+            duration: shouldReduceMotion ? 0 : SPLASH_PROGRESS_DURATION_MS,
+            easing: Easing.linear,
+        });
+
+        return () => cancelAnimation(progress);
+    }, [progress, shouldReduceMotion]);
+
+    const progressStyle = useAnimatedStyle(() => ({
+        backgroundColor: interpolateColor(
+            progress.value,
+            [0, 1],
+            [Colors.placeholder, Colors.tertiary],
+        ),
+        transform: [{ scaleX: progress.value }],
+    }));
 
     return (
         <Animated.View
-            exiting={exitKeyframe.duration(EXIT_ANIMATION_DURATION)}
+            exiting={exitKeyframe.duration(EXIT_ANIMATION_DURATION_MS)}
             style={styles.splashOverlay}
         >
-            <View style={styles.logoMark}>
-                <Text style={styles.logoText}>STM</Text>
-            </View>
+            <Image
+                accessibilityLabel="SignTrustMap logo"
+                source={require('../../../../assets/images/app-logo.png')}
+                style={styles.logo}
+            />
             <Text style={styles.title}>SignTrustMap</Text>
+            <View
+                accessibilityLabel="Loading SignTrustMap"
+                accessibilityRole="progressbar"
+                style={styles.progressTrack}
+            >
+                <Animated.View style={[styles.progressFill, progressStyle]} />
+            </View>
         </Animated.View>
     );
 }
@@ -41,30 +77,34 @@ export function AppSplashScreen() {
 const styles = StyleSheet.create({
     splashOverlay: {
         ...StyleSheet.absoluteFill,
-        backgroundColor: '#208AEF',
+        backgroundColor: Colors.background,
         alignItems: 'center',
         justifyContent: 'center',
         gap: 16,
         zIndex: 1000,
     },
-    logoMark: {
-        width: 72,
-        height: 72,
-        borderRadius: 18,
-        backgroundColor: '#FFFFFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    logoText: {
-        color: '#208AEF',
-        fontFamily: Fonts.body,
-        fontSize: 18,
-        fontWeight: 900,
+    logo: {
+        width: 120,
+        height: 120,
+        borderRadius: 24,
     },
     title: {
-        color: '#FFFFFF',
+        color: Colors.text,
         fontFamily: Fonts.title,
         fontSize: 24,
         fontWeight: 700,
+    },
+    progressTrack: {
+        width: 220,
+        height: 6,
+        overflow: 'hidden',
+        borderRadius: 3,
+        backgroundColor: Colors.border,
+    },
+    progressFill: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 3,
+        transformOrigin: 'left center',
     },
 });

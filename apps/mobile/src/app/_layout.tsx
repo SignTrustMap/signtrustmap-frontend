@@ -1,12 +1,13 @@
 import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   QueryClient,
   QueryClientProvider
 } from '@tanstack/react-query';
 import { Colors } from '@/constants/theme';
+import { SPLASH_PROGRESS_DURATION_MS } from '@/constants/const';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import { SessionProvider, useSession } from '@/context/session-provider';
 import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
@@ -35,7 +36,17 @@ export default function TabLayout() {
 
 function RootNavigation() {
   const { isInitializing, session } = useSession();
+  const [hasSplashProgressElapsed, setHasSplashProgressElapsed] = useState(false);
   const hasValidSession = Boolean(session?.accessToken);
+  const shouldShowSplash = isInitializing || !hasSplashProgressElapsed;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasSplashProgressElapsed(true);
+    }, SPLASH_PROGRESS_DURATION_MS);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -45,26 +56,25 @@ function RootNavigation() {
     });
   }, [isInitializing]);
 
-  if (isInitializing) {
-    return <AppSplashScreen />;
-  }
-
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: {
-          backgroundColor: Colors.background,
-        },
-      }}
-    >
-      <Stack.Protected guard={!hasValidSession}>
-        <Stack.Screen name="(public)/login" />
-      </Stack.Protected>
-      <Stack.Protected guard={hasValidSession}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(authenticated)" />
-      </Stack.Protected>
-    </Stack>
+    <>
+      {shouldShowSplash ? <AppSplashScreen /> : null}
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: Colors.background,
+          },
+        }}
+      >
+        <Stack.Protected guard={!hasValidSession}>
+          <Stack.Screen name="(public)/login" />
+        </Stack.Protected>
+        <Stack.Protected guard={hasValidSession}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(authenticated)" />
+        </Stack.Protected>
+      </Stack>
+    </>
   );
 }

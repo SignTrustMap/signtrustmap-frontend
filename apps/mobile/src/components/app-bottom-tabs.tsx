@@ -49,12 +49,12 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
       style={[
         styles.safeArea,
         {
-          backgroundColor: theme.backgroundElement,
+          backgroundColor: '#000000',
           borderColor: theme.border,
         },
       ]}
     >
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
         {tabs.map((tab) => {
           const isActive = tab.route === activeRoute;
 
@@ -79,7 +79,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
                 size={18}
                 tintColor={isActive ? theme.tertiary : theme.text}
               />
-              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}> 
+              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
                 {tab.label}
               </Text>
               <View
