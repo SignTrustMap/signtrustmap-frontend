@@ -13,9 +13,9 @@ export function AnnouncementBar() {
         className="flex items-center gap-2 font-medium hover:text-[#00c4de] transition-colors group"
       >
         <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#007b8b]/30 text-[#00c4de] font-semibold text-[10px] tracking-wide uppercase border border-[#00c4de]/20">
-          <Sparkle size={10} weight="fill" /> Mới ra mắt
+          <Sparkle size={10} weight="fill" /> Mới cập nhật
         </span>
-        <span>SignTrustMap Vision AI v2.0 đã hỗ trợ nhận diện tự động biển báo QCVN 41 tại Việt Nam</span>
+        <span>SignTrustMap — Nền tảng kết hợp AI và cộng đồng xây dựng cơ sở dữ liệu biển báo tin cậy</span>
         <ArrowRight size={12} weight="bold" className="text-[#00c4de] group-hover:translate-x-1 transition-transform" />
       </Link>
       <button

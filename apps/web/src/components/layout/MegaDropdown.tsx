@@ -6,6 +6,8 @@ import {
   ShieldCheck,
   Compass,
   Code,
+  Coins,
+  ArrowsClockwise,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
@@ -22,38 +24,54 @@ interface ProductItem {
 const productItems: ProductItem[] = [
   {
     icon: <MapTrifold size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Bản Đồ Biển Báo 3D',
-    description: 'Truy cập dữ liệu biển báo giao thông thời gian thực với toạ độ GPS chuẩn xác.',
+    title: 'Bản Đồ Biển Báo GIS',
+    description: 'Tra cứu, lọc phân cụm và kiểm tra dữ liệu biển báo chuẩn QCVN 41 kèm thông tin hướng giao thông.',
     href: '/product/map',
-    badge: 'Phổ biến',
+    badge: 'Cốt lõi',
     category: 'explore',
   },
   {
     icon: <Brain size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Vision AI Classifier',
-    description: 'Tự động bóc tách và phân loại biển báo QCVN 41 từ hình ảnh Dashcam.',
+    title: 'Pipeline AI (YOLO12 + CLIP)',
+    description: 'Trích xuất tự động từ video Dashcam, theo dõi vật thể BoT-SORT và phân loại vector pgvector.',
     href: '/product/map',
-    badge: 'Mới',
+    badge: 'AI Pipeline',
     category: 'explore',
   },
   {
     icon: <DeviceMobile size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'SignTrustMap Mobile App',
-    description: 'Ứng dụng khảo sát thực địa cho Surveyor & Driver trên iOS & Android.',
+    title: 'Ứng Dụng Khảo Sát & Dẫn Đường',
+    description: 'Ghi nhận chuyến đi GPX thực địa và cảnh báo biển báo theo đúng chiều di chuyển của xe.',
     href: '/product/app',
+    badge: 'Mobile App',
     category: 'apps',
   },
   {
     icon: <ShieldCheck size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Trust Score Engine',
-    description: 'Hệ thống đánh giá độ tin cậy đa tầng và chống gian lận dữ liệu định vị.',
+    title: 'Không Gian Reviewer & Đồng Thuận',
+    description: 'Cơ chế xác thực đồng đẳng (Peer Review) và tính điểm đồng thuận trọng số (Weighted Consensus).',
     href: '/product/map',
     category: 'apps',
   },
   {
+    icon: <Coins size={26} weight="duotone" className="text-[#00c4de]" />,
+    title: 'Kinh Tế Tín Dụng & Thưởng Đóng Góp',
+    description: 'Nhận thưởng khi đóng góp dữ liệu hợp lệ và sử dụng tín dụng cho các tiện ích nâng cao.',
+    href: '/docs',
+    category: 'apps',
+  },
+  {
+    icon: <ArrowsClockwise size={26} weight="duotone" className="text-[#00c4de]" />,
+    title: 'Tái Thẩm Định & Vòng Lặp MLOps',
+    description: 'Tự động giao nhiệm vụ làm mới biển báo cũ và đưa dữ liệu đã duyệt vào tái huấn luyện mô hình AI.',
+    href: '/docs',
+    badge: 'MLOps',
+    category: 'developer',
+  },
+  {
     icon: <Code size={26} weight="duotone" className="text-[#00c4de]" />,
     title: 'Geospatial API & SDK',
-    description: 'Tích hợp dữ liệu biển báo vào các ứng dụng bản đồ & xe tự hành.',
+    description: 'API truy xuất dữ liệu không gian PostGIS phục vụ nghiên cứu xe tự hành và logistics.',
     href: '/docs',
     badge: 'API',
     category: 'developer',
@@ -61,9 +79,9 @@ const productItems: ProductItem[] = [
 ]
 
 const categories = [
-  { id: 'explore', label: 'Bản đồ & Dữ liệu', icon: <Compass size={18} /> },
+  { id: 'explore', label: 'Bản đồ GIS & AI Pipeline', icon: <Compass size={18} /> },
   { id: 'apps', label: 'Ứng dụng & Xác thực', icon: <DeviceMobile size={18} /> },
-  { id: 'developer', label: 'Dành cho Lập trình viên', icon: <Code size={18} /> },
+  { id: 'developer', label: 'MLOps & Nhà phát triển', icon: <Code size={18} /> },
 ]
 
 interface MegaDropdownProps {
@@ -78,7 +96,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
   )
 
   return (
-    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[840px] max-w-[calc(100vw-2rem)]">
+    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[860px] max-w-[calc(100vw-2rem)]">
       {/* Decorative arrow */}
       <div className="mx-auto w-fit">
         <div className="w-3 h-3 bg-[#0a1619] border-l border-t border-white/10 rotate-45 translate-y-1.5 ml-16" />
@@ -88,7 +106,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
         {/* Left Sidebar */}
         <div className="w-full md:w-64 bg-[#050e10] p-5 border-b md:border-b-0 md:border-r border-white/10 flex flex-col gap-1.5">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 px-3 py-1.5">
-            Danh mục sản phẩm
+            Danh mục tính năng
           </p>
           {categories.map((cat) => {
             const active = selectedCat === cat.id
@@ -150,7 +168,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                   </p>
                 </div>
                 <div className="mt-3.5 flex items-center gap-1 text-xs font-semibold text-[#00c4de] opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span>Khám phá</span>
+                  <span>Xem chi tiết</span>
                   <ArrowRight size={12} weight="bold" />
                 </div>
               </Link>
@@ -158,7 +176,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
           </div>
 
           <div className="mt-5 pt-3.5 border-t border-white/5 flex items-center justify-between text-xs text-gray-400">
-            <span>Dữ liệu mở theo tiêu chuẩn QCVN 41:2019/BGTVT</span>
+            <span>Chuẩn hóa danh mục theo QCVN 41:2019/BGTVT</span>
             <Link
               to="/docs"
               onClick={onClose}

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { CaretDown, List, X } from '@phosphor-icons/react'
 import { MegaDropdown } from './MegaDropdown'
-import { env } from '@/config/env'
 
 
 const navLinks = [
@@ -38,9 +37,6 @@ export function Navbar() {
     return () => document.removeEventListener('keydown', handleKey)
   }, [])
 
-  const loginUrl = env.isDev
-    ? `http://${env.opsDomain}/login`
-    : `https://${env.opsDomain}/login`
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#030708]/90 backdrop-blur-xl transition-all">
@@ -61,9 +57,7 @@ export function Navbar() {
             </span>
           </Link>
 
-
-
-          {/* Desktop nav — Sized to 15px matching DigitalOcean standard */}
+          {/* Desktop nav — Vietnamese synchronized */}
           <nav className="hidden lg:flex items-center gap-1.5" aria-label="Main navigation">
             {/* Product Dropdown trigger */}
             <div ref={dropdownRef} className="relative">
@@ -77,7 +71,7 @@ export function Navbar() {
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <span>Products</span>
+                <span>Sản phẩm</span>
                 <CaretDown
                   size={14}
                   weight="bold"
@@ -104,24 +98,20 @@ export function Navbar() {
             ))}
           </nav>
 
-          {/* Right Action buttons (DigitalOcean style: Log in + Sign up) */}
+          {/* Right Action buttons (Local Web Routes) */}
           <div className="hidden lg:flex items-center gap-3 shrink-0">
-            <a
-              href={loginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/login"
               className="px-4 py-2 text-[15px] font-medium text-gray-300 hover:text-white transition-colors"
             >
-              Log in
-            </a>
-            <a
-              href={loginUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2 text-[15px] font-bold text-black bg-[#00c4de] hover:bg-[#34d7ee] rounded-full shadow-md shadow-[#00c4de]/25 hover:shadow-lg hover:shadow-[#00c4de]/40 active:scale-[0.98] transition-all"
+              Đăng nhập
+            </Link>
+            <Link
+              to="/signup"
+              className="px-5 py-2 text-[15px] font-bold text-black bg-[#00c4de] hover:bg-[#38dbf1] rounded-full shadow-md shadow-[#00c4de]/25 hover:shadow-lg hover:shadow-[#00c4de]/40 active:scale-[0.98] transition-all"
             >
-              Sign up
-            </a>
+              Đăng ký
+            </Link>
           </div>
 
           {/* Mobile hamburger */}
@@ -147,14 +137,14 @@ export function Navbar() {
               onClick={() => setMobileOpen(false)}
               className="px-3 py-2.5 text-base font-medium text-gray-200 hover:text-[#00c4de] rounded-[8px] hover:bg-white/5"
             >
-              🗺️ Bản Đồ Biển Báo 3D
+              🗺️ Bản Đồ Biển Báo GIS
             </Link>
             <Link
               to="/product/app"
               onClick={() => setMobileOpen(false)}
               className="px-3 py-2.5 text-base font-medium text-gray-200 hover:text-[#00c4de] rounded-[8px] hover:bg-white/5"
             >
-              📱 Tải Ứng Dụng Mobile
+              📱 Ứng Dụng Khảo Sát & Dẫn Đường
             </Link>
             <div className="my-2 border-t border-white/10" />
             {navLinks.map((link) => (
@@ -168,23 +158,22 @@ export function Navbar() {
               </Link>
             ))}
             <div className="mt-4 pt-3 border-t border-white/10 flex flex-col gap-2.5">
-              <a
-                href={loginUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/login"
+                onClick={() => setMobileOpen(false)}
                 className="text-center py-2.5 text-sm font-medium text-gray-300 border border-white/15 rounded-full"
               >
-                Log in
-              </a>
-              <a
-                href={loginUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                Đăng nhập
+              </Link>
+              <Link
+                to="/signup"
+                onClick={() => setMobileOpen(false)}
                 className="text-center py-2.5 text-sm font-bold text-black bg-[#00c4de] rounded-full"
               >
-                Sign up
-              </a>
+                Đăng ký
+              </Link>
             </div>
+
           </nav>
         </div>
       )}

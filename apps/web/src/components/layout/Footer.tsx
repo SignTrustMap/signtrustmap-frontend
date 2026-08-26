@@ -1,30 +1,29 @@
 import { Link } from 'react-router-dom'
 import { GithubLogo, XLogo, FacebookLogo, ArrowSquareOut } from '@phosphor-icons/react'
 
-
 const footerLinks = {
   'Sản phẩm': [
-    { label: 'Bản đồ tương tác 3D', href: '/product/map' },
-    { label: 'Ứng dụng di động (iOS & Android)', href: '/product/app' },
-    { label: 'Vision AI Classifier', href: '/product/map' },
-    { label: 'Danh mục QCVN 41:2019', href: '/docs' },
+    { label: 'Bản đồ biển báo GIS', href: '/product/map' },
+    { label: 'Ứng dụng khảo sát & dẫn đường', href: '/product/app' },
+    { label: 'Pipeline AI (YOLO12 + CLIP)', href: '/product/map' },
+    { label: 'Danh mục chuẩn QCVN 41:2019', href: '/docs' },
   ],
   'Giải pháp': [
-    { label: 'Dành cho Khảo sát viên', href: '/product/app' },
-    { label: 'Dành cho Tài xế lái xe', href: '/product/app' },
-    { label: 'Dành cho Nhà phát triển', href: '/docs' },
-    { label: 'Cổng Quản Trị Ops Portal', href: 'https://ops.signtrustmap.site', external: true },
+    { label: 'Dành cho Khảo sát viên (Surveyor)', href: '/product/app' },
+    { label: 'Dành cho Người kiểm duyệt (Reviewer)', href: 'https://ops.signtrustmap.site', external: true },
+    { label: 'Dành cho Tài xế & Dẫn đường', href: '/product/app' },
+    { label: 'Cổng Quản trị & Điều hành Ops', href: 'https://ops.signtrustmap.site', external: true },
   ],
-  'Tài liệu & API': [
-    { label: 'Tài liệu hướng dẫn API', href: '/docs' },
-    { label: 'Geospatial SDK', href: '/docs' },
+  'Tài liệu & MLOps': [
+    { label: 'Tài liệu kỹ thuật API', href: '/docs' },
+    { label: 'Quy trình Active Learning', href: '/docs' },
     { label: 'Mã nguồn GitHub', href: 'https://github.com/SignTrustMap', external: true },
   ],
   'Dự án': [
-    { label: 'Về SignTrustMap', href: '/about' },
-    { label: 'Bài viết & Cập nhật', href: '/blog' },
+    { label: 'Về dự án SignTrustMap', href: '/about' },
+    { label: 'Blog & Tin tức', href: '/blog' },
     { label: 'Chính sách bảo mật', href: '/privacy' },
-    { label: 'Điều khoản sử dụng', href: '/terms' },
+    { label: 'Điều khoản dịch vụ', href: '/terms' },
   ],
 }
 
@@ -49,10 +48,8 @@ export function Footer() {
                 Sign<span className="text-[#00c4de]">Trust</span>Map
               </span>
             </Link>
-
-
             <p className="text-xs text-gray-400 leading-relaxed max-w-[220px]">
-              Hạ tầng bản đồ biển báo giao thông AI-Native hàng đầu Việt Nam.
+              Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.
             </p>
 
             {/* Social Icons */}
@@ -112,13 +109,13 @@ export function Footer() {
 
         {/* Bottom Bar */}
         <div className="mt-14 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} SignTrustMap Platform. Bản quyền được bảo lưu.</p>
+          <p>© {new Date().getFullYear()} SignTrustMap Project. Bản quyền được bảo lưu.</p>
           <div className="flex items-center gap-4 text-[11px] font-mono">
             <span className="flex items-center gap-1.5 text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Tất cả hệ thống hoạt động bình thường
             </span>
-            <span>v2.0.0-alpha</span>
+            <span>v1.0.0</span>
           </div>
         </div>
       </div>
