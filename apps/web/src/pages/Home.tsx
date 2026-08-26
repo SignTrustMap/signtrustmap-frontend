@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
+import { HomeMiniMap } from '@/components/common/HomeMiniMap'
 import {
   ArrowRight,
   Brain,
   ShieldCheck,
   DeviceMobile,
-  Compass,
   CheckCircle,
   ArrowsClockwise,
   Coins,
@@ -379,69 +379,16 @@ function MapPreviewSection() {
             </Link>
           </div>
 
-          {/* Right Simulated Interactive Map Card */}
+          {/* Right Real Interactive Leaflet OpenStreetMap Card */}
           <div className="lg:col-span-7">
-            <div className="glass-panel rounded-[20px] overflow-hidden border border-white/15 shadow-2xl relative aspect-[16/10] bg-[#08171b]">
-              {/* Map Header Bar */}
-              <div className="flex items-center justify-between px-4 py-3 bg-[#040c0e] border-b border-white/10 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-                  <span className="text-xs text-gray-400 ml-2 font-mono">
-                    signtrustmap.site/gis/viewer
-                  </span>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#007b8b]/30 text-[#00c4de] font-mono">
-                  GIS LIVE VIEW
-                </span>
-              </div>
-
-              {/* Map Simulation Canvas */}
-              <div className="relative w-full h-[calc(100%-41px)] bg-[#071317] flex items-center justify-center overflow-hidden">
-                {/* Grid roads */}
-                <div
-                  className="absolute inset-0 opacity-20"
-                  style={{
-                    backgroundImage:
-                      'radial-gradient(circle, #00c4de 1px, transparent 1px), linear-gradient(to right, #007b8b 1px, transparent 1px), linear-gradient(to bottom, #007b8b 1px, transparent 1px)',
-                    backgroundSize: '40px 40px',
-                  }}
-                />
-
-                {/* Simulated Pins */}
-                <div className="absolute top-[30%] left-[35%] flex flex-col items-center group cursor-pointer">
-                  <div className="w-7 h-7 rounded-full bg-[#00c4de] text-black font-bold text-xs flex items-center justify-center shadow-lg shadow-[#00c4de]/50 border-2 border-white animate-bounce">
-                    P
-                  </div>
-                  <span className="mt-1 px-2.5 py-1 rounded bg-black/90 text-[10px] font-mono text-[#00c4de] border border-[#00c4de]/30">
-                    P.102 (Cấm đi ngược chiều) • Hướng: 180° • 99% Trust
-                  </span>
-                </div>
-
-                <div className="absolute top-[55%] left-[60%] flex flex-col items-center group cursor-pointer">
-                  <div className="w-7 h-7 rounded-full bg-[#007b8b] text-white font-bold text-xs flex items-center justify-center shadow-lg border-2 border-white">
-                    R
-                  </div>
-                  <span className="mt-1 px-2.5 py-1 rounded bg-black/90 text-[10px] font-mono text-gray-300 border border-white/10">
-                    R.301 (Hướng đi phải theo) • Hướng: 90° • 96% Trust
-                  </span>
-                </div>
-
-                {/* Center Explore button overlay */}
-                <div className="relative z-10 text-center p-5 rounded-2xl bg-black/75 backdrop-blur-md border border-white/10">
-                  <Compass size={36} weight="duotone" className="text-[#00c4de] mx-auto mb-2" />
-                  <p className="text-sm font-bold text-white">Bản Đồ Biển Báo Không Gian GIS</p>
-                  <p className="text-xs text-gray-400 mt-1">PostGIS & pgvector Indexing</p>
-                </div>
-              </div>
-            </div>
+            <HomeMiniMap />
           </div>
         </div>
       </div>
     </section>
   )
 }
+
 
 /* ─── 5. MOBILE APP & CREDIT INCENTIVE CTA ────────────────────────── */
 function MobileDownloadSection() {

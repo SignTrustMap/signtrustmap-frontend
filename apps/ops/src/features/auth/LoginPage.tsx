@@ -114,8 +114,9 @@ export default function LoginPage() {
                 htmlFor="ops-email"
                 className="text-xs font-bold text-[#007b8b] font-mono uppercase tracking-wide"
               >
-                email nội bộ<span className="text-red-500">*</span>
+                email<span className="text-red-500">*</span>
               </label>
+
               <input
                 id="ops-email"
                 type="email"

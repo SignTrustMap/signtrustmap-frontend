@@ -1,9 +1,8 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Arvo:wght@400;700&display=swap');
+@import "tailwindcss";
 
 /* ─── SignTrustMap Dark Tech Design Tokens (Geist & DESIGN.md) ──── */
 @theme {
-
   --color-brand-cyan:    #00c4de;
   --color-brand-teal:    #007b8b;
   --color-brand-sky:     #d3f7ff;
@@ -30,7 +29,6 @@
   --radius-xl: 16px;
   --radius-pill: 9999px;
 }
-
 
 /* ─── Base reset & Theme Lock ───────────────────────────────────── */
 *, *::before, *::after {
@@ -126,4 +124,3 @@ body {
   mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
 }
-
