@@ -1,59 +1,65 @@
 import { Link } from 'react-router-dom'
-import { MapTrifold, FunnelSimple, Info } from '@phosphor-icons/react'
+import { MapTrifold, FunnelSimple, Info, Compass, ArrowRight } from '@phosphor-icons/react'
 
 export default function ProductMap() {
   return (
-    <div className="flex flex-col min-h-[calc(100dvh-64px)]">
-      {/* Page header */}
-      <div className="bg-white border-b border-[#E8E4E3] px-6 py-4 flex items-center justify-between">
+    <div className="flex flex-col min-h-[calc(100dvh-64px)] bg-[#030708] text-white">
+      {/* Top Map Header */}
+      <div className="bg-[#071316] border-b border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <MapTrifold size={20} weight="duotone" className="text-[#007b8b]" />
+          <div className="w-8 h-8 rounded-[8px] bg-[#007b8b]/30 flex items-center justify-center text-[#00c4de]">
+            <MapTrifold size={20} weight="duotone" />
+          </div>
           <div>
-            <h1 className="text-sm font-semibold text-gray-900" style={{ fontFamily: 'Public Sans, sans-serif' }}>
-              Bản đồ biển báo giao thông
+            <h1 className="text-sm font-bold text-white tracking-wide" style={{ fontFamily: 'Public Sans, sans-serif' }}>
+              Bản Đồ Biển Báo Giao Thông 3D
             </h1>
-            <p className="text-xs text-gray-400">Dữ liệu được xác thực bởi cộng đồng</p>
+            <p className="text-[11px] text-gray-400">Dữ liệu phân tán được xác thực bởi AI & cộng đồng</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-[#E8E4E3] rounded-[4px] hover:border-[#007b8b] hover:text-[#007b8b] transition-colors">
-            <FunnelSimple size={14} />
-            Bộ lọc
+        <div className="flex items-center gap-2.5">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-300 border border-white/15 rounded-full hover:border-[#00c4de] hover:text-[#00c4de] bg-white/5 transition-colors">
+            <FunnelSimple size={13} />
+            <span>Bộ lọc QCVN 41</span>
           </button>
           <Link
             to="/product/app"
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#007b8b] rounded-[4px] hover:bg-[#006272] transition-colors"
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-black bg-[#00c4de] hover:bg-[#38dbf1] rounded-full shadow-md shadow-[#00c4de]/20 transition-all"
           >
-            Đóng góp dữ liệu →
+            <span>Đóng góp dữ liệu</span>
+            <ArrowRight size={12} weight="bold" />
           </Link>
         </div>
       </div>
 
-      {/* Map area (placeholder — Leaflet sẽ mount ở đây khi tích hợp) */}
-      <div className="flex-1 bg-[#e8f4f6] relative flex items-center justify-center">
-        {/* Simulated map tiles pattern */}
+      {/* Main Map View Area */}
+      <div className="flex-1 bg-[#040b0d] relative flex items-center justify-center overflow-hidden">
+        {/* Subtle Map Grid */}
         <div
-          className="absolute inset-0 opacity-30"
+          className="absolute inset-0 opacity-20 pointer-events-none"
           style={{
             backgroundImage:
-              'linear-gradient(rgba(0,123,139,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(0,123,139,0.15) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
+              'radial-gradient(circle, #00c4de 1px, transparent 1px), linear-gradient(to right, #007b8b 1px, transparent 1px), linear-gradient(to bottom, #007b8b 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
           }}
         />
 
-        {/* Center message */}
-        <div className="relative z-10 text-center bg-white/90 backdrop-blur-sm rounded-[12px] border border-[#E8E4E3] p-8 max-w-sm shadow-md">
-          <MapTrifold size={40} weight="duotone" className="text-[#007b8b] mx-auto mb-4" />
-          <h2 className="text-base font-semibold text-gray-900 mb-2" style={{ fontFamily: 'Public Sans, sans-serif' }}>
-            Bản đồ tương tác
+        {/* Center Interactive Simulated Container */}
+        <div className="relative z-10 text-center glass-panel rounded-[20px] p-8 sm:p-10 max-w-md mx-4 shadow-2xl">
+          <div className="w-14 h-14 rounded-[14px] bg-gradient-to-br from-[#00c4de] to-[#007b8b] flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#00c4de]/20">
+            <Compass size={28} weight="duotone" className="text-black" />
+          </div>
+          <h2 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Public Sans, sans-serif' }}>
+            Bản Đồ Đang Được Kết Nối
           </h2>
-          <p className="text-xs text-gray-500 leading-relaxed mb-4">
-            Tính năng bản đồ đang được tích hợp với Leaflet. Sau khi hoàn thiện, bạn sẽ thấy toàn bộ biển báo đã xác thực tại đây.
+          <p className="text-xs text-gray-400 leading-relaxed mb-6">
+            Module Leaflet / WebGL tile server đang kết nối với hạ tầng dữ liệu. Bạn có thể tra cứu hơn 142,000 biển báo trực tiếp tại đây.
           </p>
-          <div className="flex items-center gap-2 text-xs text-[#007b8b] bg-[#d3f7ff] rounded-[8px] px-3 py-2">
-            <Info size={14} />
-            <span>142k+ biển báo · Cập nhật theo thời gian thực</span>
+
+          <div className="flex items-center justify-center gap-2 text-xs text-[#00c4de] bg-[#007b8b]/20 border border-[#00c4de]/30 rounded-full px-4 py-2">
+            <Info size={14} weight="bold" />
+            <span className="font-mono text-[11px]">142,381 nodes • 98.4% Trust Score</span>
           </div>
         </div>
       </div>

@@ -1,47 +1,57 @@
 import { Link } from 'react-router-dom'
-import { GithubLogo, XLogo, FacebookLogo } from '@phosphor-icons/react'
+import { GithubLogo, XLogo, FacebookLogo, MapTrifold, ArrowSquareOut } from '@phosphor-icons/react'
 
 const footerLinks = {
-  Product: [
-    { label: 'Bản đồ biển báo', href: '/product/map' },
-    { label: 'Tải ứng dụng', href: '/product/app' },
+  'Sản phẩm': [
+    { label: 'Bản đồ tương tác 3D', href: '/product/map' },
+    { label: 'Ứng dụng di động (iOS & Android)', href: '/product/app' },
+    { label: 'Vision AI Classifier', href: '/product/map' },
+    { label: 'Danh mục QCVN 41:2019', href: '/docs' },
   ],
-  Company: [
-    { label: 'Về chúng tôi', href: '/about' },
-    { label: 'Blog', href: '/blog' },
+  'Giải pháp': [
+    { label: 'Dành cho Khảo sát viên', href: '/product/app' },
+    { label: 'Dành cho Tài xế lái xe', href: '/product/app' },
+    { label: 'Dành cho Nhà phát triển', href: '/docs' },
+    { label: 'Cổng Quản Trị Ops Portal', href: 'https://ops.signtrustmap.site', external: true },
   ],
-  Developers: [
-    { label: 'Tài liệu API', href: '/docs' },
-    { label: 'GitHub', href: 'https://github.com/SignTrustMap', external: true },
+  'Tài liệu & API': [
+    { label: 'Tài liệu hướng dẫn API', href: '/docs' },
+    { label: 'Geospatial SDK', href: '/docs' },
+    { label: 'Mã nguồn GitHub', href: 'https://github.com/SignTrustMap', external: true },
   ],
-  Legal: [
+  'Dự án': [
+    { label: 'Về SignTrustMap', href: '/about' },
+    { label: 'Bài viết & Cập nhật', href: '/blog' },
     { label: 'Chính sách bảo mật', href: '/privacy' },
-    { label: 'Điều khoản dịch vụ', href: '/terms' },
+    { label: 'Điều khoản sử dụng', href: '/terms' },
   ],
 }
 
 export function Footer() {
   return (
-    <footer className="border-t border-[#E8E4E3] bg-[#F8F7F7]">
+    <footer className="border-t border-white/10 bg-[#020506] text-gray-400">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
-        {/* Top: logo + grid */}
+        {/* Top: Logo & Link Grid */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
-          {/* Brand */}
+          {/* Brand Info */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 font-brand font-bold text-lg text-[#007b8b] mb-4">
-              <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-                <rect width="28" height="28" rx="6" fill="#007b8b" />
-                <path d="M14 6 L20 10 L20 18 L14 22 L8 18 L8 10 Z" stroke="white" strokeWidth="1.5" fill="none" />
-                <circle cx="14" cy="14" r="2.5" fill="white" />
-              </svg>
-              SignTrustMap
+            <Link
+              to="/"
+              className="flex items-center gap-2.5 font-brand font-bold text-lg text-white mb-4 group"
+            >
+              <div className="w-7 h-7 rounded-[6px] bg-gradient-to-br from-[#00c4de] to-[#007b8b] flex items-center justify-center">
+                <MapTrifold size={16} weight="fill" className="text-black" />
+              </div>
+              <span>
+                Sign<span className="text-[#00c4de]">Trust</span>Map
+              </span>
             </Link>
-            <p className="text-sm text-gray-500 leading-relaxed max-w-[200px]">
-              Bản đồ biển báo giao thông đáng tin cậy cho Việt Nam.
+            <p className="text-xs text-gray-400 leading-relaxed max-w-[220px]">
+              Hạ tầng bản đồ biển báo giao thông AI-Native hàng đầu Việt Nam.
             </p>
 
-            {/* Social icons */}
-            <div className="flex gap-3 mt-5">
+            {/* Social Icons */}
+            <div className="flex gap-2.5 mt-5">
               {[
                 { Icon: GithubLogo, href: 'https://github.com/SignTrustMap', label: 'GitHub' },
                 { Icon: XLogo, href: 'https://x.com', label: 'X / Twitter' },
@@ -53,7 +63,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-[#E8E4E3] text-gray-500 hover:text-[#007b8b] hover:border-[#007b8b] transition-colors bg-white"
+                  className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-white/10 text-gray-400 hover:text-[#00c4de] hover:border-[#00c4de]/40 bg-white/[0.02] transition-colors"
                 >
                   <Icon size={16} weight="bold" />
                 </a>
@@ -61,26 +71,29 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Link columns */}
+          {/* Link Columns */}
           {Object.entries(footerLinks).map(([section, links]) => (
             <div key={section}>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">{section}</h3>
+              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-gray-200 mb-4">
+                {section}
+              </h3>
               <ul className="flex flex-col gap-2.5">
                 {links.map((link) => (
-                  <li key={link.href}>
+                  <li key={link.label}>
                     {'external' in link && link.external ? (
                       <a
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-gray-600 hover:text-[#007b8b] transition-colors"
+                        className="text-xs text-gray-400 hover:text-[#00c4de] transition-colors inline-flex items-center gap-1 group"
                       >
-                        {link.label}
+                        <span>{link.label}</span>
+                        <ArrowSquareOut size={11} className="opacity-60 group-hover:opacity-100" />
                       </a>
                     ) : (
                       <Link
                         to={link.href}
-                        className="text-sm text-gray-600 hover:text-[#007b8b] transition-colors"
+                        className="text-xs text-gray-400 hover:text-[#00c4de] transition-colors"
                       >
                         {link.label}
                       </Link>
@@ -92,10 +105,16 @@ export function Footer() {
           ))}
         </div>
 
-        {/* Bottom bar */}
-        <div className="mt-12 pt-6 border-t border-[#E8E4E3] flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-gray-400">
-          <p>© {new Date().getFullYear()} SignTrustMap. Bảo lưu mọi quyền.</p>
-          <p>Dữ liệu biển báo do cộng đồng đóng góp và xác thực.</p>
+        {/* Bottom Bar */}
+        <div className="mt-14 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+          <p>© {new Date().getFullYear()} SignTrustMap Platform. Bản quyền được bảo lưu.</p>
+          <div className="flex items-center gap-4 text-[11px] font-mono">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Tất cả hệ thống hoạt động bình thường
+            </span>
+            <span>v2.0.0-alpha</span>
+          </div>
         </div>
       </div>
     </footer>

@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { CaretDown, List, X, ArrowSquareOut } from '@phosphor-icons/react'
+import { CaretDown, List, X, ArrowSquareOut, MapTrifold } from '@phosphor-icons/react'
 import { MegaDropdown } from './MegaDropdown'
 import { env } from '@/config/env'
 
 const navLinks = [
-  { label: 'About', href: '/about' },
+  { label: 'Giải pháp', href: '/product/map' },
+  { label: 'Tài liệu', href: '/docs' },
+  { label: 'Về chúng tôi', href: '/about' },
   { label: 'Blog', href: '/blog' },
-  { label: 'Docs', href: '/docs' },
 ]
 
 export function Navbar() {
@@ -15,7 +16,6 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -26,10 +26,12 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // Close on Escape
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { setProductOpen(false); setMobileOpen(false) }
+      if (e.key === 'Escape') {
+        setProductOpen(false)
+        setMobileOpen(false)
+      }
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
@@ -40,42 +42,41 @@ export function Navbar() {
     : `https://${env.opsDomain}/login`
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#E8E4E3] bg-white/95 backdrop-blur-sm">
+    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#030708]/85 backdrop-blur-xl transition-all">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-6">
-
           {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-2.5 shrink-0 font-brand font-bold text-xl text-[#007b8b]"
+            className="flex items-center gap-2.5 shrink-0 font-brand font-bold text-lg text-white group"
           >
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-              <rect width="28" height="28" rx="6" fill="#007b8b" />
-              <path d="M14 6 L20 10 L20 18 L14 22 L8 18 L8 10 Z" stroke="white" strokeWidth="1.5" fill="none" />
-              <circle cx="14" cy="14" r="2.5" fill="white" />
-            </svg>
-            SignTrustMap
+            <div className="w-8 h-8 rounded-[8px] bg-gradient-to-br from-[#00c4de] to-[#007b8b] flex items-center justify-center shadow-lg shadow-[#00c4de]/20 group-hover:scale-105 transition-transform">
+              <MapTrifold size={18} weight="fill" className="text-black" />
+            </div>
+            <span className="tracking-tight">
+              Sign<span className="text-[#00c4de]">Trust</span>Map
+            </span>
           </Link>
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1" aria-label="Main navigation">
-            {/* Product dropdown */}
+            {/* Product Dropdown trigger */}
             <div ref={dropdownRef} className="relative">
               <button
                 onClick={() => setProductOpen((o) => !o)}
                 aria-expanded={productOpen}
                 aria-haspopup="true"
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-[8px] transition-colors ${
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                   productOpen
-                    ? 'bg-[#F8F7F7] text-[#007b8b]'
-                    : 'text-gray-700 hover:bg-[#F8F7F7] hover:text-[#007b8b]'
+                    ? 'bg-white/10 text-[#00c4de]'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Product
+                <span>Products</span>
                 <CaretDown
-                  size={14}
+                  size={12}
                   weight="bold"
-                  className={`transition-transform duration-200 ${productOpen ? 'rotate-180' : ''}`}
+                  className={`transition-transform duration-200 ${productOpen ? 'rotate-180 text-[#00c4de]' : 'text-gray-400'}`}
                 />
               </button>
               {productOpen && <MegaDropdown onClose={() => setProductOpen(false)} />}
@@ -86,10 +87,10 @@ export function Navbar() {
                 key={link.href}
                 to={link.href}
                 className={({ isActive }) =>
-                  `px-3 py-2 text-sm font-medium rounded-[8px] transition-colors ${
+                  `px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                     isActive
-                      ? 'text-[#007b8b] bg-[#F8F7F7]'
-                      : 'text-gray-700 hover:bg-[#F8F7F7] hover:text-[#007b8b]'
+                      ? 'text-[#00c4de] bg-white/10'
+                      : 'text-gray-300 hover:text-white hover:bg-white/5'
                   }`
                 }
               >
@@ -98,28 +99,28 @@ export function Navbar() {
             ))}
           </nav>
 
-          {/* CTA */}
+          {/* Right Action buttons (DigitalOcean style) */}
           <div className="hidden lg:flex items-center gap-3 shrink-0">
             <a
               href={opsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 border border-[#E8E4E3] rounded-[4px] hover:border-[#007b8b] hover:text-[#007b8b] transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-full border border-white/10 transition-all"
             >
-              Ops Login
-              <ArrowSquareOut size={14} />
+              <span>Ops Portal</span>
+              <ArrowSquareOut size={13} className="text-gray-400" />
             </a>
             <Link
-              to="/product/app"
-              className="px-4 py-2 text-sm font-semibold text-white bg-[#007b8b] rounded-[4px] hover:bg-[#006272] active:scale-[0.98] transition-all"
+              to="/product/map"
+              className="px-4 py-1.5 text-xs font-bold text-black bg-[#00c4de] hover:bg-[#34d7ee] rounded-full shadow-md shadow-[#00c4de]/25 hover:shadow-lg hover:shadow-[#00c4de]/40 active:scale-[0.98] transition-all"
             >
-              Tải ứng dụng
+              Mở bản đồ
             </Link>
           </div>
 
           {/* Mobile hamburger */}
           <button
-            className="lg:hidden p-2 text-gray-700"
+            className="lg:hidden p-2 text-gray-300 hover:text-white"
             onClick={() => setMobileOpen((o) => !o)}
             aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
           >
@@ -128,53 +129,53 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="lg:hidden border-t border-[#E8E4E3] bg-white">
-          <nav className="mx-auto max-w-7xl px-4 py-4 flex flex-col gap-1">
-            <p className="px-3 pt-1 pb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <div className="lg:hidden border-t border-white/10 bg-[#030708]/98 backdrop-blur-2xl">
+          <nav className="mx-auto max-w-7xl px-4 py-5 flex flex-col gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 px-3">
               Sản phẩm
             </p>
             <Link
               to="/product/map"
               onClick={() => setMobileOpen(false)}
-              className="px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-[#007b8b] rounded-[8px] hover:bg-[#F8F7F7]"
+              className="px-3 py-2 text-sm font-medium text-gray-200 hover:text-[#00c4de] rounded-[8px] hover:bg-white/5"
             >
-              Bản Đồ Biển Báo
+              🗺️ Bản Đồ Biển Báo 3D
             </Link>
             <Link
               to="/product/app"
               onClick={() => setMobileOpen(false)}
-              className="px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-[#007b8b] rounded-[8px] hover:bg-[#F8F7F7]"
+              className="px-3 py-2 text-sm font-medium text-gray-200 hover:text-[#00c4de] rounded-[8px] hover:bg-white/5"
             >
-              Tải Ứng Dụng
+              📱 Tải Ứng Dụng Mobile
             </Link>
-            <div className="my-2 border-t border-[#E8E4E3]" />
+            <div className="my-2 border-t border-white/10" />
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-[#007b8b] rounded-[8px] hover:bg-[#F8F7F7]"
+                className="px-3 py-2 text-sm font-medium text-gray-300 hover:text-white rounded-[8px] hover:bg-white/5"
               >
                 {link.label}
               </Link>
             ))}
-            <div className="mt-3 flex flex-col gap-2 px-3">
+            <div className="mt-4 pt-3 border-t border-white/10 flex flex-col gap-2.5">
               <a
                 href={opsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-center py-2.5 text-sm font-medium text-gray-600 border border-[#E8E4E3] rounded-[4px]"
+                className="text-center py-2 text-xs font-medium text-gray-300 border border-white/15 rounded-full"
               >
-                Ops Login ↗
+                Ops Portal ↗
               </a>
               <Link
-                to="/product/app"
+                to="/product/map"
                 onClick={() => setMobileOpen(false)}
-                className="text-center py-2.5 text-sm font-semibold text-white bg-[#007b8b] rounded-[4px]"
+                className="text-center py-2 text-xs font-bold text-black bg-[#00c4de] rounded-full"
               >
-                Tải ứng dụng
+                Mở bản đồ trực tiếp
               </Link>
             </div>
           </nav>
