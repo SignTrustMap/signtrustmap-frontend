@@ -11,7 +11,7 @@ export default function ProductMap() {
             <MapTrifold size={20} weight="duotone" />
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white tracking-wide" style={{ fontFamily: 'Public Sans, sans-serif' }}>
+            <h1 className="text-sm font-bold text-white tracking-wide">
               Bản Đồ Biển Báo Giao Thông 3D
             </h1>
             <p className="text-[11px] text-gray-400">Dữ liệu phân tán được xác thực bởi AI & cộng đồng</p>
@@ -50,7 +50,7 @@ export default function ProductMap() {
           <div className="w-14 h-14 rounded-[14px] bg-gradient-to-br from-[#00c4de] to-[#007b8b] flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#00c4de]/20">
             <Compass size={28} weight="duotone" className="text-black" />
           </div>
-          <h2 className="text-lg font-bold text-white mb-2" style={{ fontFamily: 'Public Sans, sans-serif' }}>
+          <h2 className="text-lg font-bold text-white mb-2">
             Bản Đồ Đang Được Kết Nối
           </h2>
           <p className="text-xs text-gray-400 leading-relaxed mb-6">

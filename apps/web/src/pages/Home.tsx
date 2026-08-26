@@ -154,7 +154,7 @@ function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
           className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.08] mb-6"
-          style={{ fontFamily: 'Public Sans, sans-serif' }}
+
         >
           Bản Đồ Biển Báo Số{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00c4de] via-[#d3f7ff] to-[#007b8b] glow-cyan">
@@ -235,7 +235,7 @@ function HeroSection() {
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#00c4de]/10 rounded-full blur-2xl group-hover:bg-[#00c4de]/20 transition-all pointer-events-none" />
               <p
                 className="text-4xl font-extrabold text-[#00c4de] tracking-tight mb-1"
-                style={{ fontFamily: 'Public Sans, sans-serif' }}
+      
               >
                 {item.stat}
               </p>
@@ -262,7 +262,7 @@ function TopographicTransitionSection() {
           </p>
           <h2
             className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight"
-            style={{ fontFamily: 'Public Sans, sans-serif' }}
+  
           >
             Hệ sinh thái xử lý dữ liệu bản đồ toàn diện
           </h2>
@@ -332,7 +332,7 @@ function MapPreviewSection() {
             </span>
             <h2
               className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight mb-4"
-              style={{ fontFamily: 'Public Sans, sans-serif' }}
+    
             >
               Bản đồ tương tác không cần đăng nhập
             </h2>
@@ -445,7 +445,7 @@ function MobileDownloadSection() {
               </span>
               <h2
                 className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight mb-4"
-                style={{ fontFamily: 'Public Sans, sans-serif' }}
+      
               >
                 Khảo sát biển báo, nhận thưởng tín dụng
               </h2>

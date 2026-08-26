@@ -32,7 +32,7 @@ export default function ProductApp() {
 
               <h1
                 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight mb-5"
-                style={{ fontFamily: 'Public Sans, sans-serif' }}
+
               >
                 Tải Ứng Dụng{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00c4de] to-[#007b8b]">
