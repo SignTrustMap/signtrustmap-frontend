@@ -12,6 +12,9 @@
     "dev:web": "npm run dev --workspace=web",
     "build:web": "npm run build --workspace=web",
     "lint:web": "npm run lint --workspace=web",
+    "dev:ops": "npm run dev --workspace=ops",
+    "build:ops": "npm run build --workspace=ops",
+    "lint:ops": "npm run lint --workspace=ops",
     "dev:mobile": "npm run start --workspace=mobile",
     "android:mobile": "npm run android --workspace=mobile",
     "ios:mobile": "npm run ios --workspace=mobile",
@@ -19,7 +22,8 @@
     "lint:mobile": "npm run lint --workspace=mobile",
     "typecheck:mobile": "npm run typecheck --workspace=mobile",
     "doctor:mobile": "cd apps/mobile && npx expo-doctor",
-    "ci": "npm run lint:web && npm run build:web && npm run lint:mobile && npm run typecheck:mobile"
+    "ci": "npm run lint:web && npm run build:web && npm run lint:ops && npm run build:ops && npm run lint:mobile && npm run typecheck:mobile"
+
   },
   "repository": {
     "type": "git",

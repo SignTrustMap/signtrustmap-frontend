@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Arvo:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+
+/* ─── SignTrustMap Ops Design Tokens ─────────────────────────────── */
+@theme {
+  --color-brand-teal:    #007b8b;
+
+  --color-brand-sky:     #d3f7ff;
+  --color-brand-neutral: #F8F7F7;
+  --color-surface:       #FFFFFF;
+  --color-border:        #E8E4E3;
+  --color-ink:           #000000;
+
+  --font-sans:  'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-brand: 'Arvo', ui-serif, Georgia, serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-brand-neutral);
+  color: var(--color-ink);
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}
