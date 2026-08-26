@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { GithubLogo, XLogo, FacebookLogo, ArrowSquareOut } from '@phosphor-icons/react'
+import { useTheme } from '@/context/ThemeContext'
 
 const footerLinks = {
   'Sản phẩm': [
@@ -28,16 +29,26 @@ const footerLinks = {
 }
 
 export function Footer() {
+  const { isDark } = useTheme()
+
   return (
-    <footer className="border-t border-white/10 bg-[#020506] text-gray-400">
+    <footer
+      className={`border-t transition-colors ${
+        isDark
+          ? 'border-white/10 bg-[#020506] text-gray-400'
+          : 'border-[#E8E4E3] bg-white text-gray-600'
+      }`}
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
         {/* Top: Logo & Link Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12 text-left">
           {/* Brand Info */}
           <div className="col-span-2 md:col-span-1">
             <Link
               to="/"
-              className="flex items-center gap-3 font-brand font-bold text-xl text-white mb-4 group"
+              className={`flex items-center gap-3 font-brand font-bold text-xl mb-4 group transition-colors ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}
             >
               <img
                 src="/brand/brand_logo_nobg.svg"
@@ -45,10 +56,10 @@ export function Footer() {
                 className="w-8 h-8 object-contain"
               />
               <span className="font-sans">
-                Sign<span className="text-[#00c4de]">Trust</span>Map
+                Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
               </span>
             </Link>
-            <p className="text-xs text-gray-400 leading-relaxed max-w-[220px]">
+            <p className={`text-xs leading-relaxed max-w-[220px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.
             </p>
 
@@ -65,7 +76,11 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-8 h-8 flex items-center justify-center rounded-[8px] border border-white/10 text-gray-400 hover:text-[#00c4de] hover:border-[#00c4de]/40 bg-white/[0.02] transition-colors"
+                  className={`w-8 h-8 flex items-center justify-center rounded-[8px] border transition-colors ${
+                    isDark
+                      ? 'border-white/10 text-gray-400 hover:text-[#00c4de] hover:border-[#00c4de]/40 bg-white/[0.02]'
+                      : 'border-gray-200 text-gray-600 hover:text-[#007b8b] hover:border-[#007b8b]/40 bg-gray-50'
+                  }`}
                 >
                   <Icon size={16} weight="bold" />
                 </a>
@@ -76,7 +91,11 @@ export function Footer() {
           {/* Link Columns */}
           {Object.entries(footerLinks).map(([section, links]) => (
             <div key={section}>
-              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-gray-200 mb-4">
+              <h3
+                className={`text-xs font-mono font-bold uppercase tracking-wider mb-4 ${
+                  isDark ? 'text-gray-200' : 'text-gray-900'
+                }`}
+              >
                 {section}
               </h3>
               <ul className="flex flex-col gap-2.5">
@@ -87,7 +106,11 @@ export function Footer() {
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-gray-400 hover:text-[#00c4de] transition-colors inline-flex items-center gap-1 group"
+                        className={`text-xs transition-colors inline-flex items-center gap-1 group ${
+                          isDark
+                            ? 'text-gray-400 hover:text-[#00c4de]'
+                            : 'text-gray-600 hover:text-[#007b8b]'
+                        }`}
                       >
                         <span>{link.label}</span>
                         <ArrowSquareOut size={11} className="opacity-60 group-hover:opacity-100" />
@@ -95,7 +118,11 @@ export function Footer() {
                     ) : (
                       <Link
                         to={link.href}
-                        className="text-xs text-gray-400 hover:text-[#00c4de] transition-colors"
+                        className={`text-xs transition-colors ${
+                          isDark
+                            ? 'text-gray-400 hover:text-[#00c4de]'
+                            : 'text-gray-600 hover:text-[#007b8b]'
+                        }`}
                       >
                         {link.label}
                       </Link>
@@ -108,13 +135,13 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-14 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} SignTrustMap Project. Bản quyền được bảo lưu.</p>
+        <div
+          className={`mt-14 pt-6 border-t flex flex-col sm:flex-row justify-between items-center gap-4 text-xs ${
+            isDark ? 'border-white/5 text-gray-500' : 'border-gray-200 text-gray-500'
+          }`}
+        >
+          <p>© {new Date().getFullYear()} SignTrustMap Project.</p>
           <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Tất cả hệ thống hoạt động bình thường
-            </span>
             <span>v1.0.0</span>
           </div>
         </div>
