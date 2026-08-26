@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 
 export type Theme = 'dark' | 'light'
 
@@ -53,13 +54,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     let x: number
     let y: number
 
-    if (e?.currentTarget) {
+    if (e?.clientX !== undefined && e?.clientY !== undefined && e.clientX > 0 && e.clientY > 0) {
+      x = e.clientX
+      y = e.clientY
+    } else if (e?.currentTarget) {
       const rect = e.currentTarget.getBoundingClientRect()
       x = rect.left + rect.width / 2
       y = rect.top + rect.height / 2
-    } else if (e?.clientX !== undefined && e?.clientY !== undefined) {
-      x = e.clientX
-      y = e.clientY
     } else {
       x = window.innerWidth - 65
       y = 20
@@ -70,8 +71,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       Math.max(y, window.innerHeight - y)
     )
 
+    // Synchronously apply DOM class changes inside flushSync so the View Transition captures the REAL new DOM state!
     const transition = doc.startViewTransition(() => {
-      setThemeState(nextTheme)
+      flushSync(() => {
+        setThemeState(nextTheme)
+        const root = document.documentElement
+        root.classList.remove('dark', 'light')
+        root.classList.add(nextTheme)
+        root.setAttribute('data-theme', nextTheme)
+        root.style.colorScheme = nextTheme
+        localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
+      })
     })
 
     transition.ready.then(() => {
@@ -80,14 +90,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         `circle(${endRadius}px at ${x}px ${y}px)`,
       ]
 
-      // Always animate the incoming new theme expanding outward from the icon center
       document.documentElement.animate(
         {
           clipPath: clipPath,
         },
         {
-          duration: 480,
-          easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+          duration: 520,
+          easing: 'cubic-bezier(0.2, 0, 0, 1)',
           pseudoElement: '::view-transition-new(root)',
         }
       )
