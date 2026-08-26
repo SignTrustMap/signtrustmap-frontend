@@ -34,14 +34,14 @@ export default function App() {
             <Route path="/docs" element={<PlaceholderPage title="Tài liệu kỹ thuật" />} />
           </Routes>
         </main>
-        {/* Hide footer on full-screen map, login, and signup pages */}
+        {/* Hide footer on login and signup pages only */}
         <Routes>
-          <Route path="/product/map" element={null} />
           <Route path="/login" element={null} />
           <Route path="/signup" element={null} />
           <Route path="*" element={<Footer />} />
         </Routes>
       </div>
     </BrowserRouter>
+
   )
 }
