@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Arvo:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ─── SignTrustMap Ops Design Tokens (Synchronized with DESIGN.md & Web) ── */
+@theme {
+  --color-brand-teal:    #007b8b;
+  --color-brand-cyan:    #00c4de;
+  --color-brand-sky:     #d3f7ff;
+  --color-brand-neutral: #F8F7F7;
+  --color-surface:       #FFFFFF;
+  --color-border:        #E8E4E3;
+  --color-ink:           #000000;
+
+  --font-sans:  'Geist', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-brand: 'Arvo', ui-serif, Georgia, serif;
+  --font-mono:  'Geist Mono', monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-brand-neutral);
+  color: var(--color-ink);
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #007b8b; }
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-teal);
+  outline-offset: 2px;
+}

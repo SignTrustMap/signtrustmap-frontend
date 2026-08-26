@@ -1,31 +1,31 @@
 {
-  "name": "web",
+  "name": "ops",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5174",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview --port 5174"
   },
   "dependencies": {
-    "@phosphor-icons/react": "^2.1.10",
-    "@tailwindcss/vite": "^4.3.3",
+    "@phosphor-icons/react": "^2.1.7",
     "@types/leaflet": "^1.9.22",
     "leaflet": "^1.9.4",
-    "motion": "^13.1.1",
+    "motion": "^12.23.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-router-dom": "^7.18.2",
-    "tailwindcss": "^4.3.3"
+    "react-router-dom": "^7.6.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "tailwindcss": "^4.1.11",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }
