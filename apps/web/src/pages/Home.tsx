@@ -116,20 +116,24 @@ function AiSponsorLogos() {
 function HeroSection() {
   return (
     <section className="relative min-h-[100dvh] flex flex-col justify-between overflow-hidden bg-[#030708] pt-12 pb-16">
-      {/* 3D Wireframe Terrain Background Asset */}
+      {/* 3D Wireframe Terrain Background Asset (Dimmed for high text readability) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
           src="/hero-wireframe.jpg"
           alt="3D Wireframe Terrain Mountain"
-          className="w-full h-full object-cover object-bottom opacity-85 mix-blend-screen"
+          className="w-full h-full object-cover object-bottom opacity-40 brightness-[0.65] contrast-[1.25] mix-blend-screen"
         />
 
-        {/* Overhead spotlight beam (DigitalOcean signature glow) */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-b from-[#00c4de]/25 via-[#007b8b]/15 to-transparent blur-[120px]" />
+        {/* Soft subtle overhead spotlight beam */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-b from-[#00c4de]/12 via-[#007b8b]/6 to-transparent blur-[140px]" />
+
+        {/* Dark radial vignette behind headline for razor-sharp text clarity */}
+        <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] bg-[#030708]/75 rounded-full blur-[100px]" />
 
         {/* Top and bottom subtle dark fades */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#030708] via-transparent to-[#030708]" />
       </div>
+
 
       {/* Main Hero Content */}
       <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center pt-8 sm:pt-14">
