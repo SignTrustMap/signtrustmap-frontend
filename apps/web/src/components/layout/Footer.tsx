@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { GithubLogo, XLogo, FacebookLogo, MapTrifold, ArrowSquareOut } from '@phosphor-icons/react'
+import { GithubLogo, XLogo, FacebookLogo, ArrowSquareOut } from '@phosphor-icons/react'
+
 
 const footerLinks = {
   'Sản phẩm': [
@@ -37,15 +38,19 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link
               to="/"
-              className="flex items-center gap-2.5 font-brand font-bold text-lg text-white mb-4 group"
+              className="flex items-center gap-3 font-brand font-bold text-xl text-white mb-4 group"
             >
-              <div className="w-7 h-7 rounded-[6px] bg-gradient-to-br from-[#00c4de] to-[#007b8b] flex items-center justify-center">
-                <MapTrifold size={16} weight="fill" className="text-black" />
-              </div>
-              <span>
+              <img
+                src="/brand/brand_logo_nobg.svg"
+                alt="SignTrustMap Logo"
+                className="w-8 h-8 object-contain"
+              />
+              <span className="font-sans">
                 Sign<span className="text-[#00c4de]">Trust</span>Map
               </span>
             </Link>
+
+
             <p className="text-xs text-gray-400 leading-relaxed max-w-[220px]">
               Hạ tầng bản đồ biển báo giao thông AI-Native hàng đầu Việt Nam.
             </p>

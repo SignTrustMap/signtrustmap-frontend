@@ -63,22 +63,23 @@ export function Sidebar() {
   return (
     <aside className="flex flex-col w-56 shrink-0 border-r border-[#E8E4E3] bg-white h-full">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 h-14 border-b border-[#E8E4E3]">
-        <div className="w-7 h-7 rounded-[6px] bg-[#007b8b] flex items-center justify-center shrink-0">
-          <svg width="16" height="16" viewBox="0 0 28 28" fill="none">
-            <path d="M14 4 L22 9 L22 19 L14 24 L6 19 L6 9 Z" stroke="white" strokeWidth="1.8" fill="none" />
-            <circle cx="14" cy="14" r="2.8" fill="white" />
-          </svg>
-        </div>
+      <div className="flex items-center gap-2.5 px-4 h-16 border-b border-[#E8E4E3]">
+        <img
+          src="/brand/brand_logo_nobg.svg"
+          alt="SignTrustMap Logo"
+          className="w-8 h-8 object-contain shrink-0"
+        />
         <div className="leading-tight">
-          <p className="text-sm font-bold text-gray-900" style={{ fontFamily: 'Arvo, serif' }}>
-            SignTrustMap
+          <p className="text-sm font-bold text-gray-900 font-brand">
+            Sign<span className="text-[#007b8b]">Trust</span>Map
           </p>
-          <p className="text-[10px] text-gray-400">
+          <p className="text-[10px] text-gray-400 font-mono">
             {isAdmin ? 'Admin Portal' : 'Staff Portal'}
           </p>
         </div>
       </div>
+
+
 
       {/* User info */}
       <div className="px-4 py-3 border-b border-[#E8E4E3]">

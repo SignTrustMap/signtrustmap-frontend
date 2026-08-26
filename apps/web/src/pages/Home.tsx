@@ -119,10 +119,11 @@ function HeroSection() {
       {/* 3D Wireframe Terrain Background Asset (Slightly brighter & vibrant) */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
-          src="/hero-wireframe.jpg"
+          src="/images/hero-wireframe.jpg"
           alt="3D Wireframe Terrain Mountain"
           className="w-full h-full object-cover object-bottom opacity-55 brightness-[0.8] contrast-[1.2] mix-blend-screen"
         />
+
 
         {/* Overhead spotlight beam with vibrant cyan glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[650px] h-[380px] bg-gradient-to-b from-[#00c4de]/18 via-[#007b8b]/8 to-transparent blur-[130px]" />
@@ -143,10 +144,10 @@ function HeroSection() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#007b8b]/20 border border-[#00c4de]/30 text-xs font-medium text-[#d3f7ff] mb-6 backdrop-blur-md shadow-lg shadow-[#00c4de]/10"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#007b8b]/20 border border-[#00c4de]/30 text-xs sm:text-sm font-medium text-[#d3f7ff] mb-6 backdrop-blur-md shadow-lg shadow-[#00c4de]/10"
         >
           <span className="w-2 h-2 rounded-full bg-[#00c4de] animate-ping" />
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-[#00c4de]">
+          <span className="text-xs uppercase tracking-wider font-semibold text-[#00c4de]">
             Nền Tảng AI-Native Cloud
           </span>
           <span className="text-gray-400">•</span>
@@ -172,7 +173,7 @@ function HeroSection() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
-          className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed mb-8"
+          className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed mb-10"
         >
           Hệ thống số hóa hạ tầng giao thông kết hợp thị giác máy tính AI và cơ chế xác thực cộng đồng phi tập trung.
         </motion.p>
@@ -186,16 +187,16 @@ function HeroSection() {
         >
           <Link
             to="/product/map"
-            className="w-full sm:w-auto px-7 py-3 rounded-full font-bold text-sm text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-xl shadow-[#00c4de]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-base text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-xl shadow-[#00c4de]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
           >
             <span>Khám phá bản đồ</span>
-            <ArrowRight size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
+            <ArrowRight size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
             to="/product/app"
-            className="w-full sm:w-auto px-7 py-3 rounded-full font-medium text-sm text-white bg-white/5 hover:bg-white/10 border border-white/15 backdrop-blur-md transition-all flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-full font-medium text-base text-white bg-white/5 hover:bg-white/10 border border-white/15 backdrop-blur-md transition-all flex items-center justify-center gap-2"
           >
-            <DeviceMobile size={16} />
+            <DeviceMobile size={18} />
             <span>Tải ứng dụng mobile</span>
           </Link>
         </motion.div>
@@ -211,8 +212,8 @@ function HeroSection() {
       </div>
 
       {/* 3 Metric Glassmorphism Cards (DigitalOcean 3-col stats style) */}
-      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6">
           {[
             {
               stat: '142k+',
@@ -235,17 +236,16 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.35 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-card rounded-[14px] p-6 text-left relative overflow-hidden group"
+              className="glass-card rounded-[16px] p-7 text-left relative overflow-hidden group"
             >
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#00c4de]/10 rounded-full blur-2xl group-hover:bg-[#00c4de]/20 transition-all pointer-events-none" />
+              <div className="absolute top-0 right-0 w-28 h-28 bg-[#00c4de]/10 rounded-full blur-2xl group-hover:bg-[#00c4de]/20 transition-all pointer-events-none" />
               <p
-                className="text-4xl font-extrabold text-[#00c4de] tracking-tight mb-1"
-      
+                className="text-4xl sm:text-5xl font-extrabold text-[#00c4de] tracking-tight mb-2 font-mono"
               >
                 {item.stat}
               </p>
-              <h3 className="text-sm font-bold text-white mb-2">{item.title}</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
+              <h3 className="text-base font-bold text-white mb-2">{item.title}</h3>
+              <p className="text-sm text-gray-300 leading-relaxed">{item.desc}</p>
             </motion.div>
           ))}
         </div>

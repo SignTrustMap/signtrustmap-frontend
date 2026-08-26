@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import { Eye, EyeSlash, MapTrifold, CircleNotch } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
+
 
 export default function LoginPage() {
   const { login, isLoading } = useAuth()
@@ -42,24 +43,51 @@ export default function LoginPage() {
       {/* Card */}
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-[12px] bg-[#007b8b] flex items-center justify-center mb-4 shadow-md">
-            <MapTrifold size={24} weight="duotone" className="text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'Public Sans, sans-serif' }}>
-            SignTrustMap Ops
+        <div className="flex flex-col items-center mb-6">
+          <img
+            src="/brand/brand_logo_nobg.svg"
+            alt="SignTrustMap Logo"
+            className="w-14 h-14 object-contain mb-3"
+          />
+          <h1 className="text-2xl font-bold text-gray-900 font-brand">
+            Sign<span className="text-[#007b8b]">Trust</span>Map
           </h1>
-          <p className="text-sm text-gray-400 mt-1">Hệ thống vận hành nội bộ</p>
+          <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-mono">
+            Hệ thống vận hành Ops Portal
+          </p>
         </div>
 
+
         {/* Form card */}
-        <div className="bg-white rounded-[12px] border border-[#E8E4E3] p-6 shadow-sm">
+        <div className="bg-white rounded-[14px] border border-[#E8E4E3] p-6 shadow-sm">
+          {/* Google Sign In button */}
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('staff@signtrustmap.site')
+              setPassword('google-oauth')
+            }}
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-[6px] border border-[#E8E4E3] hover:bg-[#F8F7F7] text-sm font-medium text-gray-700 transition-all shadow-sm active:scale-[0.98] mb-5"
+          >
+            <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
+            <span>Tiếp tục với Google Workspace</span>
+          </button>
+
+          {/* Divider */}
+          <div className="relative flex items-center justify-center mb-5">
+            <div className="border-t border-[#E8E4E3] w-full" />
+            <span className="bg-white px-3 text-[11px] text-gray-400 uppercase tracking-wider shrink-0 font-medium">
+              Hoặc tài khoản nội bộ
+            </span>
+          </div>
+
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="ops-email" className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                 Email
               </label>
+
               <input
                 id="ops-email"
                 type="email"
