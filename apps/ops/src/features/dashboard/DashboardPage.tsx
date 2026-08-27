@@ -17,9 +17,9 @@ const stats = [
 ]
 
 const recentActivity = [
-  { action: 'Kiểm duyệt biển P.102 — Phường 5, Q.Tân Bình', time: '2 phút trước', status: 'approved' },
-  { action: 'Báo cáo sự cố biển W.201 — Ngã tư Bình Phước', time: '15 phút trước', status: 'pending' },
-  { action: 'Kiểm duyệt biển R.301 — Đường Hoàng Văn Thụ', time: '1 giờ trước', status: 'approved' },
+  { action: 'Kiểm duyệt biển P.102 - Phường 5, Q.Tân Bình', time: '2 phút trước', status: 'approved' },
+  { action: 'Báo cáo sự cố biển W.201 - Ngã tư Bình Phước', time: '15 phút trước', status: 'pending' },
+  { action: 'Kiểm duyệt biển R.301 - Đường Hoàng Văn Thụ', time: '1 giờ trước', status: 'approved' },
   { action: 'Yêu cầu thưởng từ user #1042', time: '2 giờ trước', status: 'pending' },
 ]
 

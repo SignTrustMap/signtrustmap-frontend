@@ -18,7 +18,7 @@ function PlaceholderPage({ titleKey }: { titleKey: string }) {
   const { t } = useTranslation('common')
   return (
     <div className="min-h-[50dvh] flex items-center justify-center w-full">
-      <p className="text-gray-400 text-sm">{t(titleKey)} — {t('placeholder.coming_soon')}</p>
+      <p className="text-gray-400 text-sm">{t(titleKey)} - {t('placeholder.coming_soon')}</p>
     </div>
   )
 }
