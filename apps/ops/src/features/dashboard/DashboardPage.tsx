@@ -19,7 +19,6 @@ import {
   staffKpisData,
   adminActivitiesData,
   staffActivitiesData,
-  type KpiItem,
 } from '@/data'
 
 export default function DashboardPage() {
@@ -45,9 +44,64 @@ export default function DashboardPage() {
     <Users size={22} weight="bold" />,
   ]
 
-  const currentKpis: KpiItem[] = isAdmin ? adminKpisData : staffKpisData
+  const baseKpis = isAdmin ? adminKpisData : staffKpisData
   const currentIcons = isAdmin ? adminIcons : staffIcons
-  const recentActivities = isAdmin ? adminActivitiesData : staffActivitiesData
+  const rawActivities = isAdmin ? adminActivitiesData : staffActivitiesData
+
+  // Localized KPIs
+  const currentKpis = baseKpis.map((kpi, idx) => {
+    let label = kpi.label
+    let changeText = kpi.changeText
+
+    if (isAdmin) {
+      if (idx === 0) {
+        label = t('dashboard.kpi_admin_users_label')
+        changeText = t('dashboard.kpi_admin_users_sub')
+      } else if (idx === 1) {
+        label = t('dashboard.kpi_admin_staff_label')
+        changeText = t('dashboard.kpi_admin_staff_sub')
+      } else if (idx === 2) {
+        label = t('dashboard.kpi_admin_audit_label')
+        changeText = t('dashboard.kpi_admin_audit_sub')
+      } else if (idx === 3) {
+        label = t('dashboard.kpi_admin_security_label')
+        changeText = t('dashboard.kpi_admin_security_sub')
+      }
+    } else {
+      if (idx === 0) {
+        label = t('dashboard.kpi_staff_candidates_label')
+        changeText = t('dashboard.kpi_staff_candidates_sub')
+      } else if (idx === 1) {
+        label = t('dashboard.kpi_staff_reports_label')
+        changeText = t('dashboard.kpi_staff_reports_sub')
+      } else if (idx === 2) {
+        label = t('dashboard.kpi_staff_tasks_label')
+        changeText = t('dashboard.kpi_staff_tasks_sub')
+      } else if (idx === 3) {
+        label = t('dashboard.kpi_staff_credits_label')
+        changeText = t('dashboard.kpi_staff_credits_sub')
+      }
+    }
+
+    return {
+      ...kpi,
+      label,
+      changeText,
+    }
+  })
+
+  // Localized Activities
+  const recentActivities = rawActivities.map((act) => {
+    const prefix = isAdmin ? 'act_admin_' : 'act_staff_'
+    const titleKey = `dashboard.${prefix}${act.id}_title`
+    const descKey = `dashboard.${prefix}${act.id}_desc`
+
+    return {
+      ...act,
+      title: t(titleKey, { defaultValue: act.title }),
+      desc: t(descKey, { defaultValue: act.desc }),
+    }
+  })
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
@@ -275,11 +329,11 @@ export default function DashboardPage() {
 
             {/* X Axis Labels */}
             <div className="flex justify-between pl-10 pr-2 pt-2 text-[11px] font-mono text-gray-400">
-              <span>Tuần 1</span>
-              <span>Tuần 2</span>
-              <span>Tuần 3</span>
-              <span>Tuần 4</span>
-              <span>Tuần 5</span>
+              <span>{t('dashboard.week_1')}</span>
+              <span>{t('dashboard.week_2')}</span>
+              <span>{t('dashboard.week_3')}</span>
+              <span>{t('dashboard.week_4')}</span>
+              <span>{t('dashboard.week_5')}</span>
             </div>
           </div>
         </div>

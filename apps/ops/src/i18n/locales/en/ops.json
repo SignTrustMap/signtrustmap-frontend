@@ -8,6 +8,27 @@
     "time_range_30": "Last 30 days",
     "time_range_90": "Last 90 days",
     "export_report": "Export Report",
+    "kpi_staff_candidates_label": "Sign Candidates to Moderate",
+    "kpi_staff_candidates_sub": "new submissions today",
+    "kpi_staff_reports_label": "Reported Sign Incidents",
+    "kpi_staff_reports_sub": "urgent pending",
+    "kpi_staff_tasks_label": "Revalidation Tasks (Stale)",
+    "kpi_staff_tasks_sub": "with new evidence",
+    "kpi_staff_credits_label": "Reward Credits to Audit",
+    "kpi_staff_credits_sub": "suspicious transactions",
+    "kpi_admin_users_label": "Total System Users",
+    "kpi_admin_users_sub": "vs last month",
+    "kpi_admin_staff_label": "Staff & Surveyor Accounts",
+    "kpi_admin_staff_sub": "newly activated",
+    "kpi_admin_audit_label": "Audit Events Recorded",
+    "kpi_admin_audit_sub": "logged activities",
+    "kpi_admin_security_label": "Security Warnings",
+    "kpi_admin_security_sub": "vs last week",
+    "week_1": "Week 1",
+    "week_2": "Week 2",
+    "week_3": "Week 3",
+    "week_4": "Week 4",
+    "week_5": "Week 5",
     "chart_traffic_title": "User Growth & Traffic",
     "chart_traffic_subtitle": "New signups vs active accounts",
     "chart_pipeline_title": "Report & Verification Pipeline",
@@ -30,7 +51,19 @@
     "recent_activities": "Recent Activity Feed",
     "filter_all_events": "All Events",
     "filter_critical_only": "Critical Alerts Only",
-    "filter_user_only": "User Activities Only"
+    "filter_user_only": "User Activities Only",
+    "act_staff_1_title": "Flagged candidate for GPS discrepancy",
+    "act_staff_1_desc": "Candidate CD-99012-XT submitted coordinate data mismatched with route.",
+    "act_staff_2_title": "Resolved sign incident #REP-2045",
+    "act_staff_2_desc": "No-entry sign at Dragon Bridge verified and updated.",
+    "act_staff_3_title": "New revalidation evidence submitted",
+    "act_staff_3_desc": "Surveyor submitted fresh photo for sign P.102 at Ba Dinh, Hanoi.",
+    "act_admin_1_title": "Consecutive failed logins detected",
+    "act_admin_1_desc": "Account USR-1022 entered incorrect password 5 times from IP 198.51.100.22.",
+    "act_admin_2_title": "Modified permissions for Reviewer role",
+    "act_admin_2_desc": "Administrator granted reward approval permissions to Reviewer role.",
+    "act_admin_3_title": "Scheduled database backup completed",
+    "act_admin_3_desc": "Created 4.2GB PostGIS spatial database snapshot successfully."
   },
   "candidates": {
     "title": "Candidate Moderation & Reports",
@@ -56,6 +89,16 @@
     "th_actions": "Actions",
     "showing_results": "Showing 1 to {{count}} of {{total}} reports",
     "btn_review": "Review"
+  },
+  "candidate_detail": {
+    "breadcrumb": "Candidate Moderation",
+    "title": "Investigation: Certificate & GPS Data Discrepancy",
+    "priority_high": "HIGH PRIORITY",
+    "btn_approve": "Approve & Clear Flag",
+    "btn_resurvey": "Request Re-survey",
+    "btn_reject": "Reject & Remove",
+    "tab_overview": "Candidate Details",
+    "tab_evidence": "Evidence & History"
   },
   "reports": {
     "title": "Sign Incident Reports",
@@ -151,10 +194,19 @@
     "th_location": "Assigned Region",
     "th_last_active": "Last Active",
     "th_actions": "Actions",
+    "btn_details": "Details",
     "status_active": "Active",
     "status_suspended": "Suspended",
     "status_inactive": "Inactive",
     "showing_results": "Showing 1 to {{count}} of {{total}} staff members"
+  },
+  "staff_detail": {
+    "breadcrumb": "Staff Directory",
+    "breadcrumb_current": "Staff Details",
+    "tab_profile": "Profile Details",
+    "tab_history": "Activity History",
+    "tab_records": "Audit Records",
+    "btn_reset_pw": "Reset Password"
   },
   "roles": {
     "title": "System Roles & Permissions",
@@ -176,7 +228,17 @@
     "tab_credits": "Reward Thresholds",
     "tab_api": "API Integrations",
     "btn_save": "Save Changes",
-    "btn_reset": "Reset to Default"
+    "btn_reset": "Reset to Default",
+    "setting_maintenance_title": "System Maintenance Mode",
+    "setting_maintenance_desc": "Temporarily pause receiving new surveys from mobile apps.",
+    "setting_currency_title": "Display Currency",
+    "setting_currency_desc": "Currency used when converting contribution rewards.",
+    "setting_review_timeout_title": "Task Review Timeout (Days)",
+    "setting_review_timeout_desc": "Auto-flag as Stale if no survey occurs within this window.",
+    "setting_auto_archive_title": "Auto-Archive Resolved Reports (Days)",
+    "setting_auto_archive_desc": "Move old logs to cold storage for optimized PostGIS queries.",
+    "setting_max_credits_title": "Daily Max Reward Credits",
+    "setting_max_credits_desc": "Maximum credits a surveyor can earn in 24 hours to mitigate farming."
   },
   "audit": {
     "title": "Activity Audit Logs",
@@ -196,5 +258,12 @@
     "type_alert": "Security Alert",
     "type_data_access": "Data Access",
     "showing_results": "Showing 1 to {{count}} of {{total}} log entries"
+  },
+  "not_allowed": {
+    "title": "Access Restricted",
+    "desc": "This page requires Admin privileges.",
+    "account": "Account",
+    "btn_back": "Back to Operations",
+    "btn_contact": "Contact Admin"
   }
 }

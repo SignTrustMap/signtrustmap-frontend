@@ -260,7 +260,7 @@ export default function StaffDirectoryPage() {
                       onClick={() => navigate(`/staff/${user.id}`)}
                       className="px-3 py-1.5 rounded-lg bg-[#007b8b]/10 dark:bg-[#00c4de]/15 border border-[#007b8b]/25 dark:border-[#00c4de]/30 text-xs font-semibold text-[#007b8b] dark:text-[#00c4de] hover:bg-[#007b8b] hover:text-white dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
                     >
-                      Chi tiết
+                      {t('staff.btn_details')}
                     </button>
                   </td>
                 </tr>

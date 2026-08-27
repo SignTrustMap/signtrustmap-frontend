@@ -1,29 +1,11 @@
-import { useLocation } from 'react-router-dom'
 import { Bell, Sun, Moon, Globe } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { LANG_STORAGE_KEY } from '@/i18n'
 
 export function Topbar() {
-  const { pathname } = useLocation()
   const { isDark, toggleTheme } = useTheme()
   const { t, i18n } = useTranslation('common')
-
-  const ROUTE_LABELS: Record<string, string> = {
-    '/': t('nav.dashboard_ops'),
-    '/staff': t('nav.staff'),
-    '/roles': t('nav.roles'),
-    '/candidates': t('nav.candidates'),
-    '/reports': t('nav.reports'),
-    '/tasks': t('nav.tasks'),
-    '/credits': t('nav.credits'),
-    '/audit-logs': t('nav.audit'),
-    '/map': t('nav.map'),
-    '/settings': t('nav.settings'),
-  }
-
-  const baseRoute = '/' + pathname.split('/')[1]
-  const label = ROUTE_LABELS[pathname] ?? ROUTE_LABELS[baseRoute] ?? t('nav.dashboard_ops')
 
   const currentLang = i18n.language.startsWith('en') ? 'en' : 'vi'
 
@@ -34,17 +16,15 @@ export function Topbar() {
   }
 
   return (
-    <header className="flex items-center justify-between px-6 h-16 border-b border-[#E8E4E3] bg-white shrink-0 shadow-xs transition-colors">
-      {/* Page title */}
-      <h1 className="text-base font-bold text-gray-900 font-sans tracking-tight">
-        {label}
-      </h1>
+    <header className="flex items-center justify-between px-6 h-16 border-b border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] shrink-0 shadow-xs transition-colors">
+      {/* Left empty container to push controls to the right and avoid duplicate page titles */}
+      <div />
 
       {/* Right: Notifications, Theme Switcher, Language Switcher */}
       <div className="flex items-center gap-3">
         {/* Notification Bell */}
         <button
-          className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:bg-[#F8F7F7] hover:text-gray-900 transition-colors cursor-pointer"
+          className="relative w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-[#F8F7F7] dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
           aria-label="Thông báo"
           title="Thông báo"
         >
@@ -59,26 +39,26 @@ export function Topbar() {
         <button
           type="button"
           onClick={(e) => toggleTheme(e)}
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 hover:bg-[#F8F7F7] hover:text-[#007b8b] transition-all cursor-pointer active:scale-95"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-amber-400 transition-all cursor-pointer active:scale-95 border border-transparent dark:border-white/10 shadow-xs"
           title={isDark ? t('common.switch_theme_light') : t('common.switch_theme_dark')}
           aria-label="Đổi giao diện"
         >
           {isDark ? (
-            <Sun size={18} weight="bold" className="text-amber-400" />
+            <Sun size={18} weight="bold" />
           ) : (
-            <Moon size={18} weight="bold" className="text-[#007b8b]" />
+            <Moon size={18} weight="bold" />
           )}
         </button>
 
-        {/* Language Toggle Pill */}
+        {/* Language Switcher Pill */}
         <button
           type="button"
           onClick={toggleLang}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#E8E4E3] bg-white hover:bg-gray-50 transition-all text-xs font-bold font-mono text-gray-800 cursor-pointer active:scale-95 shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-white border border-transparent dark:border-white/10 transition-all text-xs font-bold font-mono cursor-pointer active:scale-95 shadow-xs"
           title={t('common.switch_lang')}
           aria-label="Đổi ngôn ngữ"
         >
-          <Globe size={14} weight="bold" className="text-[#007b8b]" />
+          <Globe size={14} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
           <span>{currentLang.toUpperCase()}</span>
         </button>
       </div>

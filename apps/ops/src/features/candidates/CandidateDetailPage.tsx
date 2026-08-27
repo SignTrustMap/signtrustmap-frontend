@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   CaretRight,
   WarningOctagon,
@@ -9,13 +10,13 @@ import {
   Prohibit,
   ArrowsClockwise,
   CheckCircle,
-  FilePdf,
   FileImage,
   ArrowSquareOut,
   ShieldCheck,
 } from '@phosphor-icons/react'
 
 export default function CandidateDetailPage() {
+  const { t } = useTranslation('ops')
   const { id } = useParams<{ id: string }>()
   const reportId = id ? `Hồ sơ #${id}` : 'Hồ sơ #RC-8924-A'
 
@@ -41,295 +42,207 @@ export default function CandidateDetailPage() {
       <nav className="flex items-center gap-2 text-xs text-gray-500 font-medium">
         <Link
           to="/candidates"
-          className="hover:text-[#007b8b] transition-colors"
+          className="hover:text-[#007b8b] dark:hover:text-[#00c4de] transition-colors"
         >
-          Hồ sơ kiểm duyệt
+          {t('candidate_detail.breadcrumb')}
         </Link>
         <CaretRight size={12} />
-        <span className="text-gray-900 font-bold font-mono">{reportId}</span>
+        <span className="text-gray-900 dark:text-white font-bold font-mono">{reportId}</span>
       </nav>
 
       {/* Page Title & Priority Badge */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E8E4E3] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E8E4E3] dark:border-white/10 pb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Điều tra: nghi vấn sai lệch chứng chỉ & dữ liệu
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            {t('candidate_detail.title')}
           </h1>
           <div className="flex items-center gap-3 mt-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold bg-[#fee2e2] text-[#b91c1c] uppercase tracking-wider">
-              <WarningOctagon size={14} weight="fill" /> ƯU TIÊN CAO
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30 uppercase tracking-wider">
+              <WarningOctagon size={14} weight="fill" /> {t('candidate_detail.priority_high')}
             </span>
-            <span className="text-xs text-gray-500 font-mono">
-              Thời gian gửi: 24/10/2023 lúc 14:30
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+              Trạng thái: <strong className="text-gray-900 dark:text-white">{currentStatus}</strong>
             </span>
           </div>
         </div>
 
-        {/* Current status pill */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Trạng thái:</span>
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#dbeafe] text-[#1d4ed8]">
-            {currentStatus}
-          </span>
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => handleAction('reject')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/25 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+          >
+            <Prohibit size={15} />
+            <span>{t('candidate_detail.btn_reject')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAction('resurvey')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+          >
+            <ArrowsClockwise size={15} />
+            <span>{t('candidate_detail.btn_resurvey')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAction('approve')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer active:scale-95"
+          >
+            <CheckCircle size={15} weight="bold" />
+            <span>{t('candidate_detail.btn_approve')}</span>
+          </button>
         </div>
       </div>
 
       {actionNotice && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={20} weight="fill" className="text-emerald-600 shrink-0" />
-            <span>{actionNotice}</span>
-          </div>
-          <button
-            onClick={() => setActionNotice(null)}
-            className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
-          >
-            Đóng
-          </button>
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
+          <ShieldCheck size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>{actionNotice}</span>
         </div>
       )}
 
-      {/* 2 Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ─── LEFT COLUMN (8 cols) ─────────────────────────────────── */}
+      {/* Main Grid: 8 Cols Left (Evidence + Details) + 4 Cols Right (Profile + Logs) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Candidate Profile Card */}
-          <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#E8E4E3] pb-4 mb-5">
-              <div className="flex items-center gap-2.5">
-                <User size={20} className="text-[#007b8b]" weight="bold" />
-                <h2 className="text-base font-bold text-gray-900">
-                  Thông tin ứng viên / khảo sát viên
-                </h2>
-              </div>
-              <a
-                href="#"
-                onClick={(e) => e.preventDefault()}
-                className="text-xs font-semibold text-[#007b8b] hover:underline inline-flex items-center gap-1"
-              >
-                <span>Xem hồ sơ đầy đủ</span>
-                <ArrowSquareOut size={13} />
-              </a>
+          {/* Card: Violation Details */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+              <FileText size={20} className="text-[#007b8b] dark:text-[#00c4de]" />
+              <span>Nội dung cảnh báo & Chi tiết vi phạm</span>
+            </h2>
+
+            <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-500/20 rounded-xl p-4 mb-4">
+              <p className="text-xs font-bold text-red-900 dark:text-red-300 mb-1">
+                Lý do gắn cờ tự động (AI Quality Gate):
+              </p>
+              <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">
+                Độ lệch tọa độ GPS vượt quá 45 mét so với vị trí biển báo gốc trên cơ sở dữ liệu đường bộ QCVN 41. Ảnh chụp đính kèm có dấu hiệu qua xử lý phần mềm hoặc tái sử dụng từ khảo sát trước đó.
+              </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              <div className="w-20 h-20 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center font-bold text-2xl shadow-md shrink-0 border border-gray-200">
-                JD
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#F8F7F7] dark:bg-white/5 border border-gray-100 dark:border-white/10 space-y-1">
+                <span className="text-gray-400 font-mono text-[11px] uppercase">Mã biển báo gốc</span>
+                <p className="font-bold text-gray-900 dark:text-white font-mono text-sm">P.102 (Cấm đi ngược chiều)</p>
               </div>
-
-              {/* Grid info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-xs flex-1">
-                <div>
-                  <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Họ và tên
-                  </p>
-                  <p className="font-bold text-gray-900 text-sm mt-0.5">
-                    Jonathan Doe
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Mã định danh (ID)
-                  </p>
-                  <p className="font-bold font-mono text-gray-900 text-sm mt-0.5">
-                    CD-99012-XT
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Vị trí đăng ký
-                  </p>
-                  <p className="font-medium text-gray-800 text-xs mt-0.5">
-                    Điều phối viên logistics cao cấp
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Khu vực hoạt động
-                  </p>
-                  <p className="font-medium text-gray-800 text-xs mt-0.5">
-                    Khu vực Tây Bắc (NW-01)
-                  </p>
-                </div>
+              <div className="p-3.5 rounded-xl bg-[#F8F7F7] dark:bg-white/5 border border-gray-100 dark:border-white/10 space-y-1">
+                <span className="text-gray-400 font-mono text-[11px] uppercase">Tọa độ phản ánh</span>
+                <p className="font-bold text-gray-900 dark:text-white font-mono text-sm">10.7769° N, 106.7009° E</p>
               </div>
             </div>
           </div>
 
-          {/* Report Details & Evidence Card */}
-          <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs space-y-5">
-            <div className="flex items-center gap-2.5 border-b border-[#E8E4E3] pb-4">
-              <FileText size={20} className="text-[#007b8b]" weight="bold" />
-              <h2 className="text-base font-bold text-gray-900">
-                Chi tiết báo cáo & Bằng chứng
-              </h2>
-            </div>
+          {/* Card: Attached Evidence */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+              <FileImage size={20} className="text-[#007b8b] dark:text-[#00c4de]" />
+              <span>Bằng chứng hình ảnh & Tệp đính kèm</span>
+            </h2>
 
-            {/* Reporter's Statement */}
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono mb-2">
-                Trích dẫn lời khai của người báo cáo
-              </p>
-              <div className="p-4 rounded-xl bg-[#F8F7F7] border border-[#E8E4E3] text-gray-700 italic text-xs sm:text-sm leading-relaxed">
-                "Trong quá trình kiểm tra hồ sơ định kỳ, chúng tôi phát hiện sự không đồng nhất
-                trong tài liệu chứng nhận xử lý vật liệu nguy hiểm được cung cấp. Con dấu của cơ quan
-                cấp có dấu hiệu chỉnh sửa kỹ thuật số và mã xác thực không khớp với cơ sở dữ liệu chính thức."
-              </div>
-              <p className="text-right text-[11px] text-gray-400 mt-2 font-mono">
-                Người báo cáo: <strong>Hệ thống kiểm toán tự động (Auto-Flagged)</strong>
-              </p>
-            </div>
-
-            {/* Flagged Documents */}
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono mb-3">
-                Tài liệu bị gắn cờ (2)
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Doc 1 */}
-                <div className="border border-[#E8E4E3] rounded-xl p-3 bg-white hover:border-[#007b8b]/50 transition-all group">
-                  <div className="h-32 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex flex-col items-center justify-center p-3 text-center mb-2 overflow-hidden relative">
-                    <FilePdf size={36} className="text-red-500 mb-1" weight="duotone" />
-                    <span className="text-[11px] text-gray-500 font-mono">
-                      [Bản xem trước tài liệu]
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      Dấu xác thực chứng chỉ #4492
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-gray-800 truncate">
-                      Chung_chi_HazMat_JD.pdf
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">2.4 MB</span>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 group">
+                <div className="aspect-video bg-gray-100 dark:bg-black relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80"
+                    alt="Evidence 1"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 text-white text-[10px] font-mono">
+                    Ảnh 1: Hiện trường biển báo
+                  </span>
                 </div>
+                <div className="p-3 bg-[#F8F7F7] dark:bg-white/5 flex items-center justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-300 font-medium">evidence_cam_01.jpg</span>
+                  <a
+                    href="#"
+                    className="text-[#007b8b] dark:text-[#00c4de] hover:underline inline-flex items-center gap-1 font-semibold"
+                  >
+                    Xem gốc <ArrowSquareOut size={12} />
+                  </a>
+                </div>
+              </div>
 
-                {/* Doc 2 */}
-                <div className="border border-[#E8E4E3] rounded-xl p-3 bg-white hover:border-[#007b8b]/50 transition-all group">
-                  <div className="h-32 rounded-lg bg-slate-900 text-emerald-400 flex flex-col items-center justify-center p-3 text-center mb-2 overflow-hidden font-mono text-[10px] leading-tight">
-                    <FileImage size={28} className="text-emerald-400 mb-1" weight="duotone" />
-                    <span>&gt; ERR_HASH_MISMATCH</span>
-                    <span className="text-gray-500">Mã bản ghi #CD-99012</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-gray-800 truncate">
-                      Nhat_ky_kiem_tra_he_thong.png
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">840 KB</span>
-                  </div>
+              <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 group">
+                <div className="aspect-video bg-gray-100 dark:bg-black relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600&auto=format&fit=crop&q=80"
+                    alt="Evidence 2"
+                    className="w-full h-full object-cover"
+                  />
+                  <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 text-white text-[10px] font-mono">
+                    Ảnh 2: Tọa độ đối chiếu GIS
+                  </span>
+                </div>
+                <div className="p-3 bg-[#F8F7F7] dark:bg-white/5 flex items-center justify-between text-xs">
+                  <span className="text-gray-600 dark:text-gray-300 font-medium">gps_telemetry.png</span>
+                  <a
+                    href="#"
+                    className="text-[#007b8b] dark:text-[#00c4de] hover:underline inline-flex items-center gap-1 font-semibold"
+                  >
+                    Xem gốc <ArrowSquareOut size={12} />
+                  </a>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ─── RIGHT COLUMN (4 cols) ────────────────────────────────── */}
+        {/* Right Column (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Resolution Actions Card */}
-          <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 border-b border-[#E8E4E3] pb-3">
-              <ShieldCheck size={20} className="text-[#007b8b]" weight="bold" />
-              <h2 className="text-base font-bold text-gray-900">
-                Hành động xử lý
-              </h2>
+          {/* User Profile Card */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs">
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+              <User size={18} className="text-[#007b8b] dark:text-[#00c4de]" />
+              <span>Đối tượng khảo sát</span>
+            </h2>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[#dcfce7] text-[#15803d] font-bold text-base flex items-center justify-center">
+                TH
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 dark:text-white text-sm">Trần Hoàng Long</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">Khảo sát viên Cấp 2</p>
+              </div>
             </div>
 
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Chọn hành động phù hợp để giải quyết vụ việc. Trạng thái ứng viên sẽ được đồng bộ trên toàn hệ thống.
-            </p>
-
-            {/* Action Buttons */}
-            <div className="space-y-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => handleAction('reject')}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#b91c1c] hover:bg-[#991b1b] text-white font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-[0.98] cursor-pointer"
-              >
-                <Prohibit size={18} weight="bold" />
-                <span>Từ chối & Gỡ bỏ hồ sơ</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleAction('resurvey')}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#e0f2fe] hover:bg-[#bae6fd] text-[#0369a1] font-bold text-xs sm:text-sm transition-all active:scale-[0.98] cursor-pointer"
-              >
-                <ArrowsClockwise size={18} weight="bold" />
-                <span>Yêu cầu khảo sát lại</span>
-              </button>
-
-              <div className="relative flex items-center justify-center my-3">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#E8E4E3]" />
-                </div>
-                <span className="relative px-3 bg-white text-[10px] font-mono text-gray-400 uppercase">
-                  HOẶC
-                </span>
+            <div className="space-y-2.5 text-xs border-t border-gray-100 dark:border-white/10 pt-3">
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Điểm uy tín (Trust Score):</span>
+                <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">92.4%</span>
               </div>
-
-              <button
-                type="button"
-                onClick={() => handleAction('approve')}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm transition-all active:scale-[0.98] cursor-pointer"
-              >
-                <CheckCircle size={18} weight="bold" className="text-emerald-600" />
-                <span>Phê duyệt bản ghi (Xóa cờ)</span>
-              </button>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Tổng lượt khảo sát:</span>
+                <span className="font-bold font-mono text-gray-900 dark:text-white">148 lượt</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Tỷ lệ chính xác:</span>
+                <span className="font-bold font-mono text-gray-900 dark:text-white">96.8%</span>
+              </div>
             </div>
           </div>
 
-          {/* Audit Trail Card */}
-          <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 border-b border-[#E8E4E3] pb-3">
-              <ClockCounterClockwise
-                size={20}
-                className="text-[#007b8b]"
-                weight="bold"
-              />
-              <h2 className="text-base font-bold text-gray-900">Dòng thời gian kiểm toán</h2>
-            </div>
+          {/* Audit History Log */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs">
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+              <ClockCounterClockwise size={18} className="text-[#007b8b] dark:text-[#00c4de]" />
+              <span>Nhật ký xử lý hồ sơ</span>
+            </h2>
 
-            {/* Timeline */}
-            <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200 text-xs">
-              {/* Event 1 */}
-              <div className="relative">
-                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-[#007b8b]" />
-                <p className="text-[11px] text-gray-400 font-mono">
-                  25/10/2023 - 09:15 SA
-                </p>
-                <p className="font-bold text-gray-900 mt-0.5">Đang xem xét</p>
-                <p className="text-gray-500 text-[11px]">
-                  Cập nhật bởi Quản trị viên (A. Smith)
-                </p>
+            <div className="space-y-3.5 text-xs">
+              <div className="border-l-2 border-[#007b8b] dark:border-[#00c4de] pl-3 py-0.5">
+                <p className="font-bold text-gray-900 dark:text-white">Đã tiếp nhận hồ sơ</p>
+                <p className="text-gray-500 dark:text-gray-400 text-[11px]">Hệ thống AI Quality Gate • 14:20 24/10</p>
               </div>
-
-              {/* Event 2 */}
-              <div className="relative">
-                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-amber-500" />
-                <p className="text-[11px] text-gray-400 font-mono">
-                  24/10/2023 - 14:30 CH
-                </p>
-                <p className="font-bold text-gray-900 mt-0.5">Đã tạo báo cáo</p>
-                <p className="text-gray-500 text-[11px]">
-                  Hệ thống tự động gắn cờ cảnh báo chứng chỉ.
-                </p>
+              <div className="border-l-2 border-amber-400 pl-3 py-0.5">
+                <p className="font-bold text-gray-900 dark:text-white">Gắn cờ cảnh báo cấp 2</p>
+                <p className="text-gray-500 dark:text-gray-400 text-[11px]">Tự động gắn cờ độ lệch GPS • 14:22 24/10</p>
               </div>
-
-              {/* Event 3 */}
-              <div className="relative">
-                <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-gray-300" />
-                <p className="text-[11px] text-gray-400 font-mono">
-                  20/10/2023 - 11:00 SA
-                </p>
-                <p className="font-bold text-gray-900 mt-0.5">
-                  Đã nộp hồ sơ ban đầu
-                </p>
-                <p className="text-gray-500 text-[11px]">
-                  Ứng viên đã nộp thông tin đăng ký hồ sơ.
-                </p>
+              <div className="border-l-2 border-gray-300 dark:border-white/20 pl-3 py-0.5">
+                <p className="font-bold text-gray-900 dark:text-white">Đang xem xét thẩm định</p>
+                <p className="text-gray-500 dark:text-gray-400 text-[11px]">Chuyên viên vận hành • Hiện tại</p>
               </div>
             </div>
           </div>

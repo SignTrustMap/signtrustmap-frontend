@@ -8,6 +8,27 @@
     "time_range_30": "30 ngày qua",
     "time_range_90": "90 ngày qua",
     "export_report": "Xuất báo cáo",
+    "kpi_staff_candidates_label": "Hồ sơ biển báo cần duyệt",
+    "kpi_staff_candidates_sub": "hồ sơ mới hôm nay",
+    "kpi_staff_reports_label": "Sự cố biển báo tiếp nhận",
+    "kpi_staff_reports_sub": "chờ xử lý gấp",
+    "kpi_staff_tasks_label": "Nhiệm vụ tái xác thực (Stale)",
+    "kpi_staff_tasks_sub": "có bằng chứng mới",
+    "kpi_staff_credits_label": "Điểm thưởng chờ thẩm định",
+    "kpi_staff_credits_sub": "giao dịch nghi vấn",
+    "kpi_admin_users_label": "Tổng người dùng hệ thống",
+    "kpi_admin_users_sub": "so với tháng trước",
+    "kpi_admin_staff_label": "Tài khoản nhân sự & KSV",
+    "kpi_admin_staff_sub": "mới kích hoạt",
+    "kpi_admin_audit_label": "Sự kiện kiểm toán (Audit)",
+    "kpi_admin_audit_sub": "hoạt động ghi nhận",
+    "kpi_admin_security_label": "Cảnh báo an ninh",
+    "kpi_admin_security_sub": "so với tuần trước",
+    "week_1": "Tuần 1",
+    "week_2": "Tuần 2",
+    "week_3": "Tuần 3",
+    "week_4": "Tuần 4",
+    "week_5": "Tuần 5",
     "chart_traffic_title": "Tăng trưởng người dùng & Lưu lượng",
     "chart_traffic_subtitle": "Đăng ký mới so với tài khoản kích hoạt",
     "chart_pipeline_title": "Tiến độ xử lý hồ sơ & Báo cáo",
@@ -30,7 +51,19 @@
     "recent_activities": "Nhật ký hoạt động gần đây",
     "filter_all_events": "Tất cả sự kiện",
     "filter_critical_only": "Chỉ cảnh báo nghiêm trọng",
-    "filter_user_only": "Chỉ hoạt động người dùng"
+    "filter_user_only": "Chỉ hoạt động người dùng",
+    "act_staff_1_title": "Gắn cờ hồ sơ nghi vấn gian lận GPS",
+    "act_staff_1_desc": "Ứng viên CD-99012-XT gửi dữ liệu tọa độ không khớp với hành trình.",
+    "act_staff_2_title": "Đã xử lý sự cố biển báo #REP-2045",
+    "act_staff_2_desc": "Biển báo cấm ngược chiều tại Cầu Rồng đã được xác minh cập nhật.",
+    "act_staff_3_title": "Bằng chứng tái xác thực mới được gửi",
+    "act_staff_3_desc": "Khảo sát viên gửi ảnh mới cho biển P.102 tại Ba Đình, Hà Nội.",
+    "act_admin_1_title": "Phát hiện đăng nhập thất bại liên tiếp",
+    "act_admin_1_desc": "Tài khoản USR-1022 nhập sai mật khẩu 5 lần từ IP 198.51.100.22.",
+    "act_admin_2_title": "Thay đổi quyền hạn vai trò Kiểm duyệt viên",
+    "act_admin_2_desc": "Quản trị viên đã cấp thêm quyền duyệt điểm thưởng cho vai trò Reviewer.",
+    "act_admin_3_title": "Sao lưu cơ sở dữ liệu định kỳ hoàn tất",
+    "act_admin_3_desc": "Tạo bản sao lưu không gian PostGIS dung lượng 4.2GB thành công."
   },
   "candidates": {
     "title": "Hồ sơ kiểm duyệt & Báo cáo",
@@ -56,6 +89,16 @@
     "th_actions": "Thao tác",
     "showing_results": "Hiển thị 1 đến {{count}} trong {{total}} báo cáo",
     "btn_review": "Xem xét"
+  },
+  "candidate_detail": {
+    "breadcrumb": "Hồ sơ kiểm duyệt",
+    "title": "Điều tra: nghi vấn sai lệch chứng chỉ & dữ liệu",
+    "priority_high": "ƯU TIÊN CAO",
+    "btn_approve": "Phê duyệt & Xóa cờ",
+    "btn_resurvey": "Yêu cầu khảo sát lại",
+    "btn_reject": "Từ chối & Gỡ bỏ",
+    "tab_overview": "Chi tiết hồ sơ",
+    "tab_evidence": "Bằng chứng & Lịch sử"
   },
   "reports": {
     "title": "Báo cáo sự cố biển báo",
@@ -151,10 +194,19 @@
     "th_location": "Khu vực phụ trách",
     "th_last_active": "Hoạt động gần nhất",
     "th_actions": "Thao tác",
+    "btn_details": "Chi tiết",
     "status_active": "Đang hoạt động",
     "status_suspended": "Tạm ngưng",
     "status_inactive": "Không hoạt động",
     "showing_results": "Hiển thị 1 đến {{count}} trong {{total}} nhân sự"
+  },
+  "staff_detail": {
+    "breadcrumb": "Quản lý nhân sự",
+    "breadcrumb_current": "Chi tiết nhân sự",
+    "tab_profile": "Hồ sơ nhân sự",
+    "tab_history": "Lịch sử hoạt động",
+    "tab_records": "Biên bản kiểm duyệt",
+    "btn_reset_pw": "Đặt lại mật khẩu"
   },
   "roles": {
     "title": "Phân quyền hệ thống",
@@ -176,7 +228,17 @@
     "tab_credits": "Hạn mức điểm thưởng",
     "tab_api": "Tích hợp API",
     "btn_save": "Lưu thay đổi",
-    "btn_reset": "Khôi phục mặc định"
+    "btn_reset": "Khôi phục mặc định",
+    "setting_maintenance_title": "Chế độ bảo trì hệ thống (Maintenance Mode)",
+    "setting_maintenance_desc": "Tạm thời ngừng tiếp nhận lượt khảo sát mới từ ứng dụng mobile.",
+    "setting_currency_title": "Đơn vị tiền tệ hiển thị",
+    "setting_currency_desc": "Đơn vị áp dụng khi quy đổi điểm thưởng đóng góp sang hiện kim.",
+    "setting_review_timeout_title": "Thời hạn tối đa thẩm định nhiệm vụ (ngày)",
+    "setting_review_timeout_desc": "Tự động gắn cờ Stale nếu biển báo không có khảo sát mới sau khoảng thời gian này.",
+    "setting_auto_archive_title": "Tự động lưu trữ báo cáo đã giải quyết (ngày)",
+    "setting_auto_archive_desc": "Chuyển dữ liệu cũ vào kho lạnh Cold Storage để tối ưu tốc độ truy vấn PostGIS.",
+    "setting_max_credits_title": "Hạn mức điểm thưởng tối đa / ngày",
+    "setting_max_credits_desc": "Số điểm tối đa một khảo sát viên có thể nhận trong 24h nhằm hạn chế farm điểm."
   },
   "audit": {
     "title": "Nhật ký hoạt động (Audit Logs)",
@@ -196,5 +258,12 @@
     "type_alert": "Cảnh báo",
     "type_data_access": "Truy cập dữ liệu",
     "showing_results": "Hiển thị 1 đến {{count}} trong {{total}} bản ghi"
+  },
+  "not_allowed": {
+    "title": "Không có quyền truy cập",
+    "desc": "Trang này yêu cầu quyền Admin.",
+    "account": "Tài khoản",
+    "btn_back": "Quay về Vận hành",
+    "btn_contact": "Liên hệ Admin"
   }
 }
