@@ -52,6 +52,10 @@ export default function LoginPage() {
     }
   }
 
+  const communityPortalUrl =
+    import.meta.env.VITE_WEB_URL ||
+    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://signtrustmap.site')
+
   return (
     <div
       className={`relative min-h-screen w-full flex flex-col justify-between overflow-hidden font-sans transition-colors duration-300 ${
@@ -177,7 +181,7 @@ export default function LoginPage() {
 
           {/* Link to Community Portal */}
           <a
-            href="http://localhost:5173"
+            href={communityPortalUrl}
             className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all shadow-xs ${
               isDark
                 ? 'bg-[#00c4de]/10 border-[#00c4de]/30 text-[#00c4de] hover:bg-[#00c4de]/20'
