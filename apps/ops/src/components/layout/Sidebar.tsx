@@ -1,18 +1,18 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useTranslation } from 'react-i18next'
 import {
   MapTrifold,
   SquaresFour,
-  CheckSquare,
-  Flag,
   Warning,
-  CurrencyDollar,
   Users,
-  Book,
-  GearSix,
+  ShieldCheck,
   ClipboardText,
-  ChartBar,
+  GearSix,
   SignOut,
+  Flag,
+  CurrencyCircleDollar,
+  CheckSquare,
 } from '@phosphor-icons/react'
 
 interface NavItem {
@@ -20,38 +20,99 @@ interface NavItem {
   label: string
   href: string
   badge?: number
-  adminOnly?: boolean
-  section?: string
 }
-
-const navItems: NavItem[] = [
-  // Ops section
-  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ', href: '/map', section: 'ops' },
-  { icon: <SquaresFour size={18} weight="duotone" />, label: 'Dashboard', href: '/', section: 'ops' },
-  { icon: <CheckSquare size={18} weight="duotone" />, label: 'Kiểm duyệt', href: '/moderation', badge: 12, section: 'ops' },
-  { icon: <Flag size={18} weight="duotone" />, label: 'Vùng khảo sát', href: '/tasks', section: 'ops' },
-  { icon: <Warning size={18} weight="duotone" />, label: 'Sự cố biển báo', href: '/reports', badge: 3, section: 'ops' },
-  { icon: <CurrencyDollar size={18} weight="duotone" />, label: 'Duyệt thưởng', href: '/credits', badge: 5, section: 'ops' },
-  // Admin section
-  { icon: <ChartBar size={18} weight="duotone" />, label: 'KPIs & Analytics', href: '/admin', adminOnly: true, section: 'admin' },
-  { icon: <Users size={18} weight="duotone" />, label: 'Quản lý User', href: '/admin/users', adminOnly: true, section: 'admin' },
-  { icon: <Book size={18} weight="duotone" />, label: 'Danh mục QCVN 41', href: '/admin/catalog', adminOnly: true, section: 'admin' },
-  { icon: <GearSix size={18} weight="duotone" />, label: 'Cài đặt hệ thống', href: '/admin/settings', adminOnly: true, section: 'admin' },
-  { icon: <ClipboardText size={18} weight="duotone" />, label: 'Audit Logs', href: '/admin/audit-logs', adminOnly: true, section: 'admin' },
-]
 
 export function Sidebar() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation('common')
   const navigate = useNavigate()
   const isAdmin = user?.role === 'admin'
 
-  const opsItems = navItems.filter((i) => i.section === 'ops')
-  const adminItems = navItems.filter((i) => i.section === 'admin')
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : isAdmin
+    ? 'AD'
+    : 'MN'
+
+  const displayName = user?.name || (isAdmin ? 'Admin' : 'Minh Nhật')
+
+  // Staff Only Navigation Items
+  const staffNavItems: NavItem[] = [
+    {
+      icon: <SquaresFour size={18} weight="duotone" />,
+      label: t('nav.dashboard_ops'),
+      href: '/',
+    },
+    {
+      icon: <Warning size={18} weight="duotone" />,
+      label: t('nav.candidates'),
+      href: '/candidates',
+      badge: 4,
+    },
+    {
+      icon: <Flag size={18} weight="duotone" />,
+      label: t('nav.reports'),
+      href: '/reports',
+      badge: 3,
+    },
+    {
+      icon: <CheckSquare size={18} weight="duotone" />,
+      label: t('nav.tasks'),
+      href: '/tasks',
+      badge: 3,
+    },
+    {
+      icon: <CurrencyCircleDollar size={18} weight="duotone" />,
+      label: t('nav.credits'),
+      href: '/credits',
+    },
+    {
+      icon: <MapTrifold size={18} weight="duotone" />,
+      label: t('nav.map'),
+      href: '/map',
+    },
+  ]
+
+  // Admin Only Navigation Items
+  const adminNavItems: NavItem[] = [
+    {
+      icon: <SquaresFour size={18} weight="duotone" />,
+      label: t('nav.dashboard_admin'),
+      href: '/',
+    },
+    {
+      icon: <Users size={18} weight="duotone" />,
+      label: t('nav.staff'),
+      href: '/staff',
+    },
+    {
+      icon: <ShieldCheck size={18} weight="duotone" />,
+      label: t('nav.roles'),
+      href: '/roles',
+    },
+    {
+      icon: <GearSix size={18} weight="duotone" />,
+      label: t('nav.settings'),
+      href: '/settings',
+    },
+    {
+      icon: <ClipboardText size={18} weight="duotone" />,
+      label: t('nav.audit'),
+      href: '/audit-logs',
+    },
+  ]
+
+  const currentNavItems = isAdmin ? adminNavItems : staffNavItems
 
   const linkClass = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-2 rounded-[6px] text-sm font-medium transition-colors ${
+    `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-colors ${
       isActive
-        ? 'bg-[#d3f7ff] text-[#007b8b]'
+        ? 'bg-[#d3f7ff] text-[#007b8b] font-bold shadow-xs'
         : 'text-gray-600 hover:bg-[#F8F7F7] hover:text-gray-900'
     }`
 
@@ -61,55 +122,38 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex flex-col w-56 shrink-0 border-r border-[#E8E4E3] bg-white h-full">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 h-16 border-b border-[#E8E4E3]">
+    <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] bg-white h-full shadow-xs transition-colors">
+      {/* ─── Top Brand Header ────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E8E4E3]">
         <img
           src="/brand/brand_logo_nobg.svg"
           alt="SignTrustMap Logo"
           className="w-8 h-8 object-contain shrink-0"
         />
-        <div className="leading-tight">
-          <p className="text-sm font-bold text-gray-900 font-brand">
+        <div className="leading-tight min-w-0">
+          <p className="text-sm font-bold text-gray-900 truncate font-brand">
             Sign<span className="text-[#007b8b]">Trust</span>Map
           </p>
-          <p className="text-[10px] text-gray-400 font-mono">
-            {isAdmin ? 'Admin Portal' : 'Staff Portal'}
+          <p className="text-[11px] text-gray-500 truncate font-mono">
+            {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
           </p>
         </div>
       </div>
 
-
-
-      {/* User info */}
-      <div className="px-4 py-3 border-b border-[#E8E4E3]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#007b8b]/15 flex items-center justify-center shrink-0">
-            <span className="text-sm font-bold text-[#007b8b]">
-              {user?.name?.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-gray-900 truncate">{user?.name}</p>
-            <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-0.5">
-        {/* Ops section */}
-        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          Vận hành
+      {/* ─── Nav List ────────────────────────────────────────────── */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1">
+        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
+          {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
         </p>
-        {opsItems.map((item) => (
+
+        {currentNavItems.map((item) => (
           <NavLink
             key={item.href}
             to={item.href}
             end={item.href === '/'}
             className={({ isActive }) => linkClass(isActive)}
           >
-            {item.icon}
+            <span className="text-current shrink-0">{item.icon}</span>
             <span className="flex-1 truncate">{item.label}</span>
             {item.badge ? (
               <span className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#007b8b] text-white text-[10px] font-bold px-1">
@@ -118,44 +162,41 @@ export function Sidebar() {
             ) : null}
           </NavLink>
         ))}
-
-        {/* Admin section — only for admin */}
-        {isAdmin && (
-          <>
-            <p className="px-3 py-1.5 mt-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Admin
-            </p>
-            {adminItems.map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                end={item.href === '/admin'}
-                className={({ isActive }) => linkClass(isActive)}
-              >
-                {item.icon}
-                <span className="flex-1 truncate">{item.label}</span>
-              </NavLink>
-            ))}
-          </>
-        )}
       </nav>
 
-      {/* Bottom */}
-      <div className="px-2 py-3 border-t border-[#E8E4E3] flex flex-col gap-0.5">
-        <NavLink
-          to="/settings"
-          className={({ isActive }) => linkClass(isActive)}
-        >
-          <GearSix size={18} weight="duotone" />
-          Cài đặt cá nhân
-        </NavLink>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 rounded-[6px] text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left"
-        >
-          <SignOut size={18} weight="duotone" />
-          Đăng xuất
-        </button>
+      {/* ─── Bottom User Profile & Full-Width Sign Out Card ──────── */}
+      <div className="p-3 border-t border-[#E8E4E3] dark:border-white/10">
+        <div className="p-3 rounded-2xl bg-[#F4F4F4] dark:bg-[#0C1D23] border border-transparent dark:border-white/10 transition-colors flex flex-col gap-2.5">
+          {/* Top: Avatar + Full Name + Role Subtitle */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${
+                isAdmin ? 'bg-[#7c3aed]' : 'bg-[#9333ea]'
+              }`}
+            >
+              {userInitials}
+            </div>
+            <div className="min-w-0 flex-1 leading-snug">
+              <p className="text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
+                {displayName}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
+                {isAdmin ? 'Admin' : 'Staff'}
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom: Full-Width Sign Out Button */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full py-2 px-3 rounded-xl bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/15 border border-gray-200/80 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-500/30 transition-all shadow-2xs active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+            title={t('nav.logout')}
+          >
+            <SignOut size={14} weight="bold" />
+            <span>{t('nav.logout')}</span>
+          </button>
+        </div>
       </div>
     </aside>
   )

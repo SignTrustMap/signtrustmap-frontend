@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -11,7 +12,6 @@ import {
   ArrowsClockwise,
   Check,
 } from '@phosphor-icons/react'
-
 
 // Fix Leaflet default icon paths in bundlers
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
@@ -127,16 +127,8 @@ const mockOpsSigns: OpsSignItem[] = [
   },
 ]
 
-const SIGN_GROUPS = [
-  { id: 'ALL', label: 'Tất cả' },
-  { id: 'P', label: 'Biển Cấm (P)' },
-  { id: 'R', label: 'Hiệu Lệnh (R)' },
-  { id: 'W', label: 'Cảnh Báo (W)' },
-  { id: 'I', label: 'Chỉ Dẫn (I)' },
-  { id: 'S', label: 'Biển Phụ (S)' },
-]
-
 export default function MapPage() {
+  const { t } = useTranslation('ops')
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
@@ -146,6 +138,15 @@ export default function MapPage() {
   const [selectedSign, setSelectedSign] = useState<OpsSignItem | null>(null)
   const [tileMode, setTileMode] = useState<'osm' | 'voyager'>('osm')
   const tileLayerRef = useRef<L.TileLayer | null>(null)
+
+  const signGroups = [
+    { id: 'ALL', label: t('map.group_all') },
+    { id: 'P', label: t('map.group_p') },
+    { id: 'R', label: t('map.group_r') },
+    { id: 'W', label: t('map.group_w') },
+    { id: 'I', label: t('map.group_i') },
+    { id: 'S', label: t('map.group_s') },
+  ]
 
   // Initialize Map
   useEffect(() => {
@@ -172,11 +173,16 @@ export default function MapPage() {
 
     mapInstanceRef.current = map
 
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       map.invalidateSize()
-    }, 200)
+    }, 250)
+
+    const handleResize = () => map.invalidateSize()
+    window.addEventListener('resize', handleResize)
 
     return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', handleResize)
       map.remove()
       mapInstanceRef.current = null
     }
@@ -233,8 +239,8 @@ export default function MapPage() {
             width: ${isSelected ? '36px' : '30px'};
             height: ${isSelected ? '36px' : '30px'};
             border-radius: 50%;
-            border: ${isSelected ? '3px solid #007b8b' : '2px solid #ffffff'};
-            box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+            border: ${isSelected ? '3px solid #00c4de' : '2px solid #ffffff'};
+            box-shadow: 0 4px 14px rgba(0,0,0,0.4);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -264,9 +270,9 @@ export default function MapPage() {
   }, [activeGroup, searchQuery, selectedSign])
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F7F7] font-sans relative overflow-hidden">
+    <div className="flex flex-col flex-1 h-full min-h-[500px] w-full bg-[#F8F7F7] dark:bg-[#030708] font-sans relative overflow-hidden">
       {/* Top Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-b border-[#E8E4E3] shrink-0 z-10">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white dark:bg-[#071317] border-b border-[#E8E4E3] dark:border-white/10 shrink-0 z-10">
         {/* Left: Search input */}
         <div className="flex items-center gap-3 flex-1 min-w-[240px] max-w-sm">
           <div className="relative w-full">
@@ -278,13 +284,13 @@ export default function MapPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã biển báo, tên, tuyến đường..."
-              className="w-full pl-9 pr-8 py-1.5 text-xs rounded-[6px] border border-[#E8E4E3] bg-gray-50 focus:bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b] transition-all"
+              placeholder={t('map.search_placeholder')}
+              className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-[#E8E4E3] dark:border-white/15 bg-gray-50 dark:bg-[#061115] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#00c4de] transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
               >
                 <X size={13} />
               </button>
@@ -294,14 +300,14 @@ export default function MapPage() {
 
         {/* Center: Category Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
-          {SIGN_GROUPS.map((g) => (
+          {signGroups.map((g) => (
             <button
               key={g.id}
               onClick={() => setActiveGroup(g.id)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all whitespace-nowrap cursor-pointer ${
                 activeGroup === g.id
-                  ? 'bg-[#007b8b] text-white border-[#007b8b] shadow-sm'
-                  : 'bg-white text-gray-600 border-[#E8E4E3] hover:border-[#007b8b] hover:text-[#007b8b]'
+                  ? 'bg-[#007b8b] dark:bg-[#00c4de] text-white dark:text-black border-[#007b8b] dark:border-[#00c4de] shadow-sm font-bold'
+                  : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border-[#E8E4E3] dark:border-white/10 hover:border-[#00c4de] hover:text-[#00c4de]'
               }`}
             >
               {g.label}
@@ -313,48 +319,50 @@ export default function MapPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setTileMode((m) => (m === 'osm' ? 'voyager' : 'osm'))}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-[#E8E4E3] rounded-full hover:bg-gray-50 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 border border-[#E8E4E3] dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm cursor-pointer"
             title="Đổi kiểu bản đồ"
           >
-            <Stack size={14} className="text-[#007b8b]" />
-            <span>{tileMode === 'osm' ? 'OpenStreetMap Chuẩn' : 'OSM Voyager'}</span>
+            <Stack size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
+            <span>{tileMode === 'osm' ? t('map.tile_osm') : t('map.tile_voyager')}</span>
           </button>
         </div>
       </div>
 
       {/* Main Map Container */}
-      <div className="flex-1 relative w-full h-full overflow-hidden">
+      <div className="flex-1 relative w-full h-full min-h-0 overflow-hidden">
         {/* Leaflet OpenStreetMap canvas */}
-        <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#e8f4f6]" />
+        <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#061014]" />
 
         {/* Floating Telemetry Badge */}
-        <div className="absolute top-3 left-3 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-[#E8E4E3] text-xs text-gray-700 shadow-md">
+        <div className="absolute top-3 left-3 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-[#081317]/90 backdrop-blur-md border border-[#E8E4E3] dark:border-white/10 text-xs text-gray-700 dark:text-gray-300 shadow-md">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-mono font-bold text-[#007b8b]">OPENSTREETMAP LIVE</span>
-          <span className="text-gray-300">•</span>
-          <span>Hệ tọa độ WGS 84 • QCVN 41</span>
+          <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">OPENSTREETMAP LIVE</span>
+          <span className="text-gray-300 dark:text-gray-600">•</span>
+          <span>{t('map.telemetry')}</span>
         </div>
 
-        {/* Selected Sign Inspector Drawer (Right Floating Card in Ops) */}
+        {/* Selected Sign Inspector Drawer */}
         {selectedSign && (
-          <div className="absolute top-3 right-3 z-20 w-full max-w-sm bg-white rounded-[16px] border border-[#E8E4E3] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right duration-200 text-gray-900">
+          <div className="absolute top-3 right-3 z-20 w-full max-w-sm bg-white dark:bg-[#0A171C] rounded-[16px] border border-[#E8E4E3] dark:border-white/15 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right duration-200 text-gray-900 dark:text-white">
             {/* Header */}
-            <div className="p-4 bg-gradient-to-r from-[#007b8b]/10 via-transparent to-transparent border-b border-[#E8E4E3] flex items-start justify-between">
+            <div className="p-4 bg-gradient-to-r from-[#007b8b]/10 via-transparent to-transparent border-b border-[#E8E4E3] dark:border-white/10 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-[#007b8b] text-white">
                     {selectedSign.code}
                   </span>
-                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1 font-mono">
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
                     <ShieldCheck size={14} weight="fill" />
-                    {selectedSign.status === 'verified' ? `Đã duyệt (${selectedSign.trustScore}%)` : 'Chờ kiểm duyệt'}
+                    {selectedSign.status === 'verified'
+                      ? t('map.drawer_verified', { score: selectedSign.trustScore })
+                      : t('map.drawer_pending')}
                   </span>
                 </div>
-                <h3 className="text-sm font-bold text-gray-900">{selectedSign.name}</h3>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">{selectedSign.name}</h3>
               </div>
               <button
                 onClick={() => setSelectedSign(null)}
-                className="p-1 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                className="p-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -363,7 +371,7 @@ export default function MapPage() {
             {/* Body */}
             <div className="p-4 space-y-3.5 text-xs text-left">
               {/* Camera Evidence Crop */}
-              <div className="relative rounded-lg overflow-hidden aspect-video bg-black border border-gray-200">
+              <div className="relative rounded-lg overflow-hidden aspect-video bg-black border border-gray-200 dark:border-white/10">
                 <img
                   src={selectedSign.imageUrl}
                   alt={selectedSign.name}
@@ -376,52 +384,52 @@ export default function MapPage() {
 
               {/* Specs Grid */}
               <div className="grid grid-cols-2 gap-2 font-mono">
-                <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-[10px] text-gray-400 uppercase">Hướng áp dụng</p>
-                  <p className="text-xs font-bold text-[#007b8b] flex items-center gap-1 mt-0.5">
+                <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
+                  <p className="text-[10px] text-gray-400 uppercase">{t('map.drawer_heading')}</p>
+                  <p className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] flex items-center gap-1 mt-0.5">
                     <NavigationArrow size={13} className="rotate-45" />
                     {selectedSign.heading}° (Bắc/Nam)
                   </p>
                 </div>
-                <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="text-[10px] text-gray-400 uppercase">Tọa độ GPS</p>
-                  <p className="text-xs font-bold text-gray-900 mt-0.5 truncate">
+                <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
+                  <p className="text-[10px] text-gray-400 uppercase">{t('map.drawer_coords')}</p>
+                  <p className="text-xs font-bold text-gray-900 dark:text-white mt-0.5 truncate">
                     {selectedSign.lat.toFixed(4)}, {selectedSign.lng.toFixed(4)}
                   </p>
                 </div>
               </div>
 
               {/* Reviewer Consensus Stats */}
-              <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-100 text-gray-700">
+              <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 text-gray-700 dark:text-gray-300">
                 <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">
-                  Đồng thuận Reviewer (Weighted Consensus):
+                  {t('map.drawer_consensus')}
                 </p>
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-emerald-600 font-bold">✓ Duyệt: {selectedSign.reviewerVotes.approve}</span>
-                  <span className="text-amber-600 font-bold">✎ Sửa: {selectedSign.reviewerVotes.modify}</span>
-                  <span className="text-red-600 font-bold">✕ Từ chối: {selectedSign.reviewerVotes.reject}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ Duyệt: {selectedSign.reviewerVotes.approve}</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">✎ Sửa: {selectedSign.reviewerVotes.modify}</span>
+                  <span className="text-red-600 dark:text-red-400 font-bold">✕ Từ chối: {selectedSign.reviewerVotes.reject}</span>
                 </div>
               </div>
 
               {/* Location string */}
-              <div className="flex items-start gap-2 text-gray-600">
-                <MapPin size={15} className="text-[#007b8b] shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
+                <MapPin size={15} className="text-[#007b8b] dark:text-[#00c4de] shrink-0 mt-0.5" />
                 <span className="text-xs">{selectedSign.location}</span>
               </div>
 
               {/* Moderator Actions */}
-              <div className="pt-3 border-t border-gray-100 flex gap-2">
+              <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex gap-2">
                 <button
-                  onClick={() => alert(`Đã phê duyệt biển báo ${selectedSign.code} xuất bản lên GIS!`)}
-                  className="flex-1 py-2 rounded-lg bg-[#007b8b] hover:bg-[#006272] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  onClick={() => alert(`Đã phê duyệt biển báo ${selectedSign.code} xuất bản!`)}
+                  className="flex-1 py-2 rounded-lg bg-[#007b8b] hover:bg-[#006272] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm cursor-pointer"
                 >
                   <Check size={13} weight="bold" />
-                  <span>Duyệt nhanh</span>
+                  <span>{t('map.btn_quick_approve')}</span>
                 </button>
                 <button
                   onClick={() => alert(`Đã tạo nhiệm vụ tái thẩm định cho biển báo ${selectedSign.code}!`)}
-                  className="py-2 px-3 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                  title="Yêu cầu tái thẩm định thực địa"
+                  className="py-2 px-3 rounded-lg border border-gray-300 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  title={t('map.btn_revalidate_title')}
                 >
                   <ArrowsClockwise size={13} />
                 </button>

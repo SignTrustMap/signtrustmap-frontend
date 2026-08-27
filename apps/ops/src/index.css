@@ -1,15 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Arvo:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* ─── SignTrustMap Ops Design Tokens (Synchronized with DESIGN.md & Web) ── */
+/* ─── SignTrustMap Ops Design Tokens ────────────────────────────── */
 @theme {
   --color-brand-teal:    #007b8b;
   --color-brand-cyan:    #00c4de;
   --color-brand-sky:     #d3f7ff;
   --color-brand-neutral: #F8F7F7;
-  --color-surface:       #FFFFFF;
-  --color-border:        #E8E4E3;
-  --color-ink:           #000000;
+  --color-dark-bg:       #030708;
+  --color-dark-surface:  #071317;
+  --color-dark-card:     #0B1A1F;
+  --color-dark-border:   rgba(255, 255, 255, 0.08);
 
   --font-sans:  'Geist', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
   --font-brand: 'Arvo', ui-serif, Georgia, serif;
@@ -22,28 +23,273 @@
   --radius-pill: 9999px;
 }
 
-/* ─── Base ───────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
+/* ─── Base Reset & Defaults ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  background-color: #F8F7F7;
+  color: #111827;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: var(--color-brand-neutral);
-  color: var(--color-ink);
+  background-color: #F8F7F7;
+  color: #111827;
   line-height: 1.5;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #007b8b; }
+/* ─── High-Contrast Premium Dark Mode System (Deep Space Teal) ───── */
+
+/* 1. Page Background */
+html.dark, html.dark body {
+  background-color: #03080A !important;
+  color: #f1f5f9 !important;
+}
+
+/* 2. Topbar Header & Sidebar Structure */
+html.dark header {
+  background-color: #071317 !important;
+  border-bottom-color: rgba(0, 196, 222, 0.15) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark aside {
+  background-color: #071317 !important;
+  border-right-color: rgba(0, 196, 222, 0.15) !important;
+  color: #f8fafc !important;
+}
+
+/* Sidebar nav items */
+html.dark aside nav a {
+  color: #94a3b8 !important;
+}
+html.dark aside nav a:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #f8fafc !important;
+}
+html.dark aside nav a.bg-\[\#d3f7ff\] {
+  background-color: rgba(0, 196, 222, 0.16) !important;
+  color: #00c4de !important;
+  border: 1px solid rgba(0, 196, 222, 0.35) !important;
+  box-shadow: 0 0 15px rgba(0, 196, 222, 0.15) !important;
+}
+
+/* Sidebar Footer User Card */
+html.dark aside .bg-\[\#F4F4F4\] {
+  background-color: #0C1D23 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+html.dark aside .bg-\[\#F4F4F4\]:hover {
+  background-color: #10262E !important;
+  border-color: rgba(0, 196, 222, 0.3) !important;
+}
+
+/* 3. Cards, Containers & Panels (Elevation Layer) */
+html.dark .bg-white {
+  background-color: #0A171C !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35) !important;
+}
+html.dark .bg-white:hover {
+  border-color: rgba(0, 196, 222, 0.25) !important;
+}
+
+/* 4. Table Styling & Striping */
+html.dark table thead tr {
+  background-color: #061014 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+html.dark table thead th {
+  color: #94a3b8 !important;
+  font-weight: 700 !important;
+}
+html.dark table tbody tr {
+  border-bottom-color: rgba(255, 255, 255, 0.05) !important;
+}
+html.dark table tbody tr:hover {
+  background-color: rgba(0, 196, 222, 0.06) !important;
+}
+
+/* Fix table pagination & container bottom */
+html.dark .border-t {
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+html.dark .border-b {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+html.dark .border-\[\#E8E4E3\] {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 5. Inputs, Selects & Search Boxes */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #061115 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #00c4de !important;
+  box-shadow: 0 0 0 2px rgba(0, 196, 222, 0.25), inset 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+html.dark input::placeholder {
+  color: #64748b !important;
+}
+
+/* 6. High-Contrast Badges & Status Pills */
+
+/* Red / Danger / Cao / Chờ xử lý / Gian lận */
+html.dark .bg-\[\#fee2e2\],
+html.dark .bg-red-50,
+html.dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+  border: 1px solid rgba(239, 68, 68, 0.35) !important;
+  color: #f87171 !important;
+}
+
+/* Green / Success / An toàn / Đã giải quyết / Đang hoạt động */
+html.dark .bg-\[\#dcfce7\],
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-100 {
+  background-color: rgba(34, 197, 94, 0.16) !important;
+  border: 1px solid rgba(34, 197, 94, 0.35) !important;
+  color: #4ade80 !important;
+}
+
+/* Amber / Warning / Nghi vấn / Vừa / Hết hạn */
+html.dark .bg-\[\#fef3c7\],
+html.dark .bg-\[\#ffedd5\],
+html.dark .bg-amber-50,
+html.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  color: #fbbf24 !important;
+}
+
+/* Blue / Teal / Info / Đang xem xét / Đang xác minh */
+html.dark .bg-\[\#dbeafe\],
+html.dark .bg-\[\#e0f2fe\],
+html.dark .bg-\[\#d3f7ff\],
+html.dark .bg-blue-50,
+html.dark .bg-blue-100 {
+  background-color: rgba(0, 196, 222, 0.16) !important;
+  border: 1px solid rgba(0, 196, 222, 0.35) !important;
+  color: #38bdf8 !important;
+}
+
+/* Gray / Inactive / Thấp */
+html.dark .bg-gray-100,
+html.dark .bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #cbd5e1 !important;
+}
+
+/* 7. Typography High Contrast */
+html.dark .text-gray-900 {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+html.dark .text-gray-800 {
+  color: #f1f5f9 !important;
+}
+html.dark .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+html.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+html.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+/* 8. Action Buttons Enhancement in Dark Mode */
+html.dark button.bg-\[\#007b8b\] {
+  background: linear-gradient(135deg, #007b8b 0%, #0099ad 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(0, 196, 222, 0.3) !important;
+}
+html.dark button.bg-\[\#007b8b\]:hover {
+  background: linear-gradient(135deg, #008fa1 0%, #00b8ce 100%) !important;
+  box-shadow: 0 4px 20px rgba(0, 196, 222, 0.45) !important;
+}
+
+/* Secondary & Ghost buttons */
+html.dark button.bg-emerald-50,
+html.dark button.bg-emerald-600 {
+  background: rgba(34, 197, 94, 0.2) !important;
+  border: 1px solid rgba(34, 197, 94, 0.4) !important;
+  color: #4ade80 !important;
+}
+html.dark button.bg-emerald-50:hover,
+html.dark button.bg-emerald-600:hover {
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+html.dark button.bg-red-50,
+html.dark button.bg-red-100 {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  color: #f87171 !important;
+}
+html.dark button.bg-red-50:hover,
+html.dark button.bg-red-100:hover {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #162c33;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #007b8b;
+}
 
 :focus-visible {
-  outline: 2px solid var(--color-brand-teal);
+  outline: 2px solid var(--color-brand-cyan);
   outline-offset: 2px;
+}
+
+/* ─── Circular View Transition (Theme Ripple Effect) ─────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2147483646;
 }

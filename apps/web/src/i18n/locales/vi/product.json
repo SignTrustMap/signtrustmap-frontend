@@ -1,0 +1,53 @@
+{
+  "mega": {
+    "category_label": "Danh mục tính năng",
+    "view_all": "Xem tất cả danh mục",
+    "standard_note": "Chuẩn hóa danh mục theo QCVN 41:2019/BGTVT",
+    "tech_docs": "Tài liệu kỹ thuật",
+    "view_detail": "Xem chi tiết",
+    "categories": {
+      "explore": "Bản đồ GIS & AI Pipeline",
+      "apps": "Ứng dụng & Xác thực",
+      "developer": "MLOps & Nhà phát triển"
+    },
+    "items": {
+      "gis_map_title": "Bản Đồ Biển Báo GIS",
+      "gis_map_desc": "Tra cứu, lọc phân cụm và kiểm tra dữ liệu biển báo chuẩn QCVN 41 kèm thông tin hướng giao thông.",
+      "gis_map_badge": "Cốt lõi",
+      "ai_pipeline_title": "Pipeline AI (YOLO12 + CLIP)",
+      "ai_pipeline_desc": "Trích xuất tự động từ video Dashcam, theo dõi vật thể BoT-SORT và phân loại vector pgvector.",
+      "ai_pipeline_badge": "AI Pipeline",
+      "mobile_app_title": "Ứng Dụng Khảo Sát & Dẫn Đường",
+      "mobile_app_desc": "Ghi nhận chuyến đi GPX thực địa và cảnh báo biển báo theo đúng chiều di chuyển của xe.",
+      "mobile_app_badge": "Mobile App",
+      "reviewer_title": "Không Gian Reviewer & Đồng Thuận",
+      "reviewer_desc": "Cơ chế xác thực đồng đẳng (Peer Review) và tính điểm đồng thuận trọng số (Weighted Consensus).",
+      "credit_title": "Kinh Tế Tín Dụng & Thưởng Đóng Góp",
+      "credit_desc": "Nhận thưởng khi đóng góp dữ liệu hợp lệ và sử dụng tín dụng cho các tiện ích nâng cao.",
+      "credit_badge": "Credits",
+      "active_learning_title": "Active Learning & Revalidation",
+      "active_learning_desc": "Vòng lặp tự động làm mới biển báo cũ (Stale Signs) và nạp lại mô hình AI định kỳ.",
+      "active_learning_badge": "MLOps",
+      "api_title": "Geospatial API & SDK",
+      "api_desc": "API truy xuất dữ liệu không gian PostGIS phục vụ nghiên cứu xe tự hành và logistics.",
+      "api_badge": "API"
+    }
+  },
+  "app_page": {
+    "eyebrow": "// ỨNG DỤNG MOBILE",
+    "title": "Ứng Dụng Khảo Sát & Dẫn Đường",
+    "subtitle": "Ghi nhận chuyến đi GPX thực địa, cảnh báo biển báo theo đúng chiều di chuyển, và tích lũy tín dụng khi đóng góp được kiểm duyệt.",
+    "download_ios": "App Store",
+    "download_android": "Google Play",
+    "coming_soon": "Sắp ra mắt",
+    "features_title": "Tính năng nổi bật",
+    "feature_1_title": "Ghi Nhận Chuyến Đi (Video + GPX)",
+    "feature_1_desc": "Đồng bộ hóa video camera hành trình và vệt quỹ đạo GPX thực địa để hệ thống AI tự động bóc tách biển báo.",
+    "feature_2_title": "Cảnh Báo Đúng Hướng Di Chuyển",
+    "feature_2_desc": "Nhận diện chiều xe chạy và chỉ phát cảnh báo âm thanh/hình ảnh đối với các biển báo có hiệu lực theo làn đường.",
+    "feature_3_title": "Thưởng Tín Dụng (Credit Economy)",
+    "feature_3_desc": "Tích lũy điểm thưởng tín dụng minh bạch khi chuyến đi hoặc hình ảnh đóng góp được cộng đồng kiểm duyệt thông qua.",
+    "feature_4_title": "Nhiệm Vụ Tái Thẩm Định Thực Địa",
+    "feature_4_desc": "Nhận các nhiệm vụ kiểm tra lại biển báo cũ (Stale Signs) xung quanh vị trí của bạn để nhận thêm phần thưởng lớn."
+  }
+}
