@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -126,16 +127,8 @@ const mockOpsSigns: OpsSignItem[] = [
   },
 ]
 
-const SIGN_GROUPS = [
-  { id: 'ALL', label: 'Tất cả' },
-  { id: 'P', label: 'Biển Cấm (P)' },
-  { id: 'R', label: 'Hiệu Lệnh (R)' },
-  { id: 'W', label: 'Cảnh Báo (W)' },
-  { id: 'I', label: 'Chỉ Dẫn (I)' },
-  { id: 'S', label: 'Biển Phụ (S)' },
-]
-
 export default function MapPage() {
+  const { t } = useTranslation('ops')
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
@@ -145,6 +138,15 @@ export default function MapPage() {
   const [selectedSign, setSelectedSign] = useState<OpsSignItem | null>(null)
   const [tileMode, setTileMode] = useState<'osm' | 'voyager'>('osm')
   const tileLayerRef = useRef<L.TileLayer | null>(null)
+
+  const signGroups = [
+    { id: 'ALL', label: t('map.group_all') },
+    { id: 'P', label: t('map.group_p') },
+    { id: 'R', label: t('map.group_r') },
+    { id: 'W', label: t('map.group_w') },
+    { id: 'I', label: t('map.group_i') },
+    { id: 'S', label: t('map.group_s') },
+  ]
 
   // Initialize Map
   useEffect(() => {
@@ -282,7 +284,7 @@ export default function MapPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã biển báo, tên, tuyến đường..."
+              placeholder={t('map.search_placeholder')}
               className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-[#E8E4E3] dark:border-white/15 bg-gray-50 dark:bg-[#061115] text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-[#00c4de] transition-all"
             />
             {searchQuery && (
@@ -298,7 +300,7 @@ export default function MapPage() {
 
         {/* Center: Category Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
-          {SIGN_GROUPS.map((g) => (
+          {signGroups.map((g) => (
             <button
               key={g.id}
               onClick={() => setActiveGroup(g.id)}
@@ -321,7 +323,7 @@ export default function MapPage() {
             title="Đổi kiểu bản đồ"
           >
             <Stack size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
-            <span>{tileMode === 'osm' ? 'OpenStreetMap Chuẩn' : 'OSM Voyager'}</span>
+            <span>{tileMode === 'osm' ? t('map.tile_osm') : t('map.tile_voyager')}</span>
           </button>
         </div>
       </div>
@@ -336,7 +338,7 @@ export default function MapPage() {
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">OPENSTREETMAP LIVE</span>
           <span className="text-gray-300 dark:text-gray-600">•</span>
-          <span>Hệ tọa độ WGS 84 • QCVN 41</span>
+          <span>{t('map.telemetry')}</span>
         </div>
 
         {/* Selected Sign Inspector Drawer */}
@@ -351,7 +353,9 @@ export default function MapPage() {
                   </span>
                   <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-mono">
                     <ShieldCheck size={14} weight="fill" />
-                    {selectedSign.status === 'verified' ? `Đã duyệt (${selectedSign.trustScore}%)` : 'Chờ kiểm duyệt'}
+                    {selectedSign.status === 'verified'
+                      ? t('map.drawer_verified', { score: selectedSign.trustScore })
+                      : t('map.drawer_pending')}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">{selectedSign.name}</h3>
@@ -381,14 +385,14 @@ export default function MapPage() {
               {/* Specs Grid */}
               <div className="grid grid-cols-2 gap-2 font-mono">
                 <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                  <p className="text-[10px] text-gray-400 uppercase">Hướng áp dụng</p>
+                  <p className="text-[10px] text-gray-400 uppercase">{t('map.drawer_heading')}</p>
                   <p className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] flex items-center gap-1 mt-0.5">
                     <NavigationArrow size={13} className="rotate-45" />
                     {selectedSign.heading}° (Bắc/Nam)
                   </p>
                 </div>
                 <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
-                  <p className="text-[10px] text-gray-400 uppercase">Tọa độ GPS</p>
+                  <p className="text-[10px] text-gray-400 uppercase">{t('map.drawer_coords')}</p>
                   <p className="text-xs font-bold text-gray-900 dark:text-white mt-0.5 truncate">
                     {selectedSign.lat.toFixed(4)}, {selectedSign.lng.toFixed(4)}
                   </p>
@@ -398,7 +402,7 @@ export default function MapPage() {
               {/* Reviewer Consensus Stats */}
               <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 text-gray-700 dark:text-gray-300">
                 <p className="text-[10px] font-bold uppercase text-gray-400 mb-1">
-                  Đồng thuận Reviewer (Weighted Consensus):
+                  {t('map.drawer_consensus')}
                 </p>
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ Duyệt: {selectedSign.reviewerVotes.approve}</span>
@@ -420,12 +424,12 @@ export default function MapPage() {
                   className="flex-1 py-2 rounded-lg bg-[#007b8b] hover:bg-[#006272] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm cursor-pointer"
                 >
                   <Check size={13} weight="bold" />
-                  <span>Duyệt nhanh</span>
+                  <span>{t('map.btn_quick_approve')}</span>
                 </button>
                 <button
                   onClick={() => alert(`Đã tạo nhiệm vụ tái thẩm định cho biển báo ${selectedSign.code}!`)}
                   className="py-2 px-3 rounded-lg border border-gray-300 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  title="Yêu cầu tái thẩm định thực địa"
+                  title={t('map.btn_revalidate_title')}
                 >
                   <ArrowsClockwise size={13} />
                 </button>

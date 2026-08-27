@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useTranslation } from 'react-i18next'
 import {
   Users,
   WarningCircle,
@@ -23,10 +24,11 @@ import {
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { t } = useTranslation('ops')
   const isAdmin = user?.role === 'admin'
 
   const [timeRange, setTimeRange] = useState('30 ngày qua')
-  const [feedFilter, setFeedFilter] = useState('Tất cả sự kiện')
+  const [feedFilter, setFeedFilter] = useState('all')
 
   // Icons map for KPIs
   const adminIcons = [
@@ -53,12 +55,12 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {isAdmin ? 'Tổng quan Quản trị Hệ thống' : 'Tổng quan Nghiệp vụ Vận hành'}
+            {isAdmin ? t('dashboard.admin_title') : t('dashboard.staff_title')}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {isAdmin
-              ? 'Theo dõi trạng thái tài khoản, an ninh, tham số hệ thống và phân quyền.'
-              : 'Theo dõi tiến độ kiểm duyệt hồ sơ, sự cố biển báo và nhiệm vụ tái xác thực.'}
+              ? t('dashboard.admin_subtitle')
+              : t('dashboard.staff_subtitle')}
           </p>
         </div>
 
@@ -70,9 +72,9 @@ export default function DashboardPage() {
               onChange={(e) => setTimeRange(e.target.value)}
               className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg font-semibold text-gray-700 dark:text-gray-200 focus:outline-none focus:border-[#00c4de] shadow-xs cursor-pointer"
             >
-              <option value="7 ngày qua">7 ngày qua</option>
-              <option value="30 ngày qua">30 ngày qua</option>
-              <option value="90 ngày qua">90 ngày qua</option>
+              <option value="7 ngày qua">{t('dashboard.time_range_7')}</option>
+              <option value="30 ngày qua">{t('dashboard.time_range_30')}</option>
+              <option value="90 ngày qua">{t('dashboard.time_range_90')}</option>
             </select>
             <CalendarBlank
               size={16}
@@ -86,7 +88,7 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             <DownloadSimple size={16} />
-            <span>Xuất báo cáo</span>
+            <span>{t('dashboard.export_report')}</span>
           </button>
         </div>
       </div>
@@ -143,10 +145,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                {isAdmin ? 'Tăng trưởng người dùng & Lưu lượng' : 'Tiến độ xử lý hồ sơ & Báo cáo'}
+                {isAdmin ? t('dashboard.chart_traffic_title') : t('dashboard.chart_pipeline_title')}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {isAdmin ? 'Đăng ký mới so với tài khoản kích hoạt' : 'Hồ sơ tiếp nhận so với đã xử lý xong'}
+                {isAdmin ? t('dashboard.chart_traffic_subtitle') : t('dashboard.chart_pipeline_subtitle')}
               </p>
             </div>
             <div className="flex items-center gap-5 text-xs sm:text-sm">
@@ -161,7 +163,7 @@ export default function DashboardPage() {
                     strokeWidth="2.5"
                   />
                 </svg>
-                <span>{isAdmin ? 'Đăng ký mới' : 'Hồ sơ tiếp nhận'}</span>
+                <span>{isAdmin ? t('dashboard.legend_new_reg') : t('dashboard.legend_intake')}</span>
               </span>
 
               <span className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
@@ -176,7 +178,7 @@ export default function DashboardPage() {
                     strokeDasharray="2.5 2"
                   />
                 </svg>
-                <span>{isAdmin ? 'Đang hoạt động' : 'Đã hoàn tất'}</span>
+                <span>{isAdmin ? t('dashboard.legend_active') : t('dashboard.legend_resolved')}</span>
               </span>
 
               <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 cursor-pointer">
@@ -287,10 +289,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                {isAdmin ? 'Phân loại tài khoản' : 'Phân loại vi phạm nghiệp vụ'}
+                {isAdmin ? t('dashboard.chart_donut_admin_title') : t('dashboard.chart_donut_staff_title')}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {isAdmin ? 'Theo nhóm vai trò' : 'Theo mức độ nghiêm trọng'}
+                {isAdmin ? t('dashboard.chart_donut_admin_subtitle') : t('dashboard.chart_donut_staff_subtitle')}
               </p>
             </div>
             <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1">
@@ -356,19 +358,19 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3] dark:border-white/10">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#00c4de] shrink-0" />
-              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Tài xế / Driver' : 'Sai lệch thông tin'}</span>
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? t('dashboard.legend_driver') : t('dashboard.legend_misleading')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shrink-0" />
-              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Tài khoản vi phạm' : 'Lo ngại an toàn'}</span>
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? t('dashboard.legend_violator') : t('dashboard.legend_safety')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shrink-0" />
-              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Khảo sát viên' : 'Chất lượng kém'}</span>
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? t('dashboard.legend_surveyor') : t('dashboard.legend_poor_quality')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-white/20 shrink-0" />
-              <span className="text-gray-700 dark:text-gray-300 truncate">Khác</span>
+              <span className="text-gray-700 dark:text-gray-300 truncate">{t('dashboard.legend_other')}</span>
             </div>
           </div>
         </div>
@@ -379,7 +381,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between border-b border-[#E8E4E3] dark:border-white/10 pb-4 mb-4">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-gray-900 dark:text-white">
-              Nhật ký hoạt động gần đây
+              {t('dashboard.recent_activities')}
             </h2>
           </div>
 
@@ -388,13 +390,13 @@ export default function DashboardPage() {
             onChange={(e) => setFeedFilter(e.target.value)}
             className="text-xs border border-[#E8E4E3] dark:border-white/15 rounded-lg px-3 py-1.5 bg-[#F8F7F7] dark:bg-[#061115] text-gray-700 dark:text-gray-200 font-semibold focus:outline-none focus:border-[#00c4de]"
           >
-            <option value="Tất cả sự kiện">Tất cả sự kiện</option>
-            <option value="Chỉ cảnh báo nghiêm trọng">Chỉ cảnh báo nghiêm trọng</option>
-            <option value="Chỉ hoạt động người dùng">Chỉ hoạt động người dùng</option>
+            <option value="all">{t('dashboard.filter_all_events')}</option>
+            <option value="critical">{t('dashboard.filter_critical_only')}</option>
+            <option value="user">{t('dashboard.filter_user_only')}</option>
           </select>
         </div>
 
-        {/* Activity Feed List (Clean, No horizontal divider lines) */}
+        {/* Activity Feed List */}
         <div className="space-y-1.5 pt-1">
           {recentActivities.map((act) => (
             <div

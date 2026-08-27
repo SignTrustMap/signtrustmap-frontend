@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CheckCircle,
   MagnifyingGlass,
@@ -7,6 +8,7 @@ import {
 import { mockCreditApprovals, type CreditApprovalItem } from '@/data'
 
 export default function CreditsApprovalPage() {
+  const { t } = useTranslation('ops')
   const [items, setItems] = useState<CreditApprovalItem[]>(mockCreditApprovals)
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -17,7 +19,7 @@ export default function CreditsApprovalPage() {
     )
     setToast(
       decision === 'Approved'
-        ? `Đã phê duyệt cộng ${items.find((i) => i.id === id)?.amount} điểm thưởng cho người dùng.`
+        ? `Đã phê duyệt cộng điểm thưởng cho giao dịch ${id}.`
         : `Đã từ chối cấp thưởng cho giao dịch ${id}.`
     )
     setTimeout(() => setToast(null), 3000)
@@ -37,10 +39,10 @@ export default function CreditsApprovalPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            Duyệt thưởng & Điểm đóng góp
+            {t('credits.title')}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Kiểm soát chi trả điểm thưởng đóng góp của khảo sát viên và reviewer, phát hiện gian lận và farm điểm.
+            {t('credits.subtitle')}
           </p>
         </div>
 
@@ -51,7 +53,7 @@ export default function CreditsApprovalPage() {
           />
           <input
             type="text"
-            placeholder="Tìm theo tên, email hoặc mã..."
+            placeholder={t('credits.search_placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de] shadow-xs"
@@ -72,13 +74,13 @@ export default function CreditsApprovalPage() {
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
               <tr className="border-b border-[#E8E4E3] dark:border-white/10 bg-[#F8F7F7]/60 dark:bg-[#061014] text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-mono">
-                <th className="py-4 px-6">Mã giao dịch</th>
-                <th className="py-4 px-6">Người nhận thưởng</th>
-                <th className="py-4 px-6">Hoạt động đóng góp</th>
-                <th className="py-4 px-6 text-center">Điểm yêu cầu</th>
-                <th className="py-4 px-6 text-center">Mức độ rủi ro</th>
-                <th className="py-4 px-6">Bằng chứng & Đánh giá</th>
-                <th className="py-4 px-6 text-right">Quyết định</th>
+                <th className="py-4 px-6">{t('credits.th_id')}</th>
+                <th className="py-4 px-6">{t('credits.th_user')}</th>
+                <th className="py-4 px-6">{t('credits.th_activity')}</th>
+                <th className="py-4 px-6 text-center">{t('credits.th_amount')}</th>
+                <th className="py-4 px-6 text-center">{t('credits.th_risk')}</th>
+                <th className="py-4 px-6">{t('credits.th_evidence')}</th>
+                <th className="py-4 px-6 text-right">{t('credits.th_decision')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10">
@@ -109,18 +111,18 @@ export default function CreditsApprovalPage() {
                   <td className="py-4 px-6 text-center">
                     {item.riskLevel === 'Thấp' && (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#dcfce7] text-[#15803d] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/30">
-                        An toàn
+                        {t('credits.risk_safe')}
                       </span>
                     )}
                     {item.riskLevel === 'Cảnh báo gian lận' && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
                         <ShieldWarning size={13} weight="bold" />
-                        Gian lận
+                        {t('credits.risk_fraud')}
                       </span>
                     )}
                     {item.riskLevel === 'Nghi vấn' && (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fef3c7] text-[#b45309] dark:bg-amber-500/15 dark:text-amber-400 dark:border dark:border-amber-500/30">
-                        Nghi vấn
+                        {t('credits.risk_suspect')}
                       </span>
                     )}
                   </td>
@@ -136,14 +138,14 @@ export default function CreditsApprovalPage() {
                           onClick={() => handleDecision(item.id, 'Approved')}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer text-xs"
                         >
-                          Phê duyệt
+                          {t('credits.btn_approve')}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDecision(item.id, 'Rejected')}
                           className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-500/15 dark:hover:bg-red-500/25 text-red-700 dark:text-red-400 border border-transparent dark:border-red-500/30 font-semibold rounded-lg transition-all active:scale-95 cursor-pointer text-xs"
                         >
-                          Từ chối
+                          {t('credits.btn_reject')}
                         </button>
                       </>
                     ) : (
@@ -152,7 +154,7 @@ export default function CreditsApprovalPage() {
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border dark:border-emerald-500/30'
                           : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border dark:border-red-500/30'
                       }`}>
-                        {item.status === 'Approved' ? '✓ Đã duyệt' : '✕ Đã từ chối'}
+                        {item.status === 'Approved' ? t('credits.tag_approved') : t('credits.tag_rejected')}
                       </span>
                     )}
                   </td>

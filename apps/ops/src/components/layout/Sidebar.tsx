@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useTranslation } from 'react-i18next'
 import {
   MapTrifold,
   SquaresFour,
@@ -21,35 +22,92 @@ interface NavItem {
   badge?: number
 }
 
-// ─── Staff Only Navigation Items ──────────────────────────────────
-const staffNavItems: NavItem[] = [
-  { icon: <SquaresFour size={18} weight="duotone" />, label: 'Tổng quan vận hành', href: '/' },
-  { icon: <Warning size={18} weight="duotone" />, label: 'Hồ sơ kiểm duyệt', href: '/candidates', badge: 4 },
-  { icon: <Flag size={18} weight="duotone" />, label: 'Sự cố biển báo', href: '/reports', badge: 3 },
-  { icon: <CheckSquare size={18} weight="duotone" />, label: 'Vùng khảo sát & Tái xác thực', href: '/tasks', badge: 3 },
-  { icon: <CurrencyCircleDollar size={18} weight="duotone" />, label: 'Duyệt điểm thưởng', href: '/credits' },
-  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ biển báo', href: '/map' },
-]
-
-// ─── Admin Only Navigation Items ──────────────────────────────────
-const adminNavItems: NavItem[] = [
-  { icon: <SquaresFour size={18} weight="duotone" />, label: 'Tổng quan hệ thống', href: '/' },
-  { icon: <Users size={18} weight="duotone" />, label: 'Quản lý người dùng & nhân sự', href: '/staff' },
-  { icon: <ShieldCheck size={18} weight="duotone" />, label: 'Phân quyền hệ thống', href: '/roles' },
-  { icon: <GearSix size={18} weight="duotone" />, label: 'Cài đặt hệ thống', href: '/settings' },
-  { icon: <ClipboardText size={18} weight="duotone" />, label: 'Nhật ký hoạt động (Audit)', href: '/audit-logs' },
-]
-
 export function Sidebar() {
   const { user, logout } = useAuth()
+  const { t } = useTranslation('common')
   const navigate = useNavigate()
   const isAdmin = user?.role === 'admin'
-  const currentNavItems = isAdmin ? adminNavItems : staffNavItems
-  const userInitials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : (isAdmin ? 'AD' : 'MN')
 
-  const displayName = user?.name || (isAdmin ? 'Admin Quản trị' : 'Minh Nhật')
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : isAdmin
+    ? 'AD'
+    : 'MN'
+
+  const displayName = user?.name || (isAdmin ? 'Admin' : 'Minh Nhật')
+
+  // Staff Only Navigation Items
+  const staffNavItems: NavItem[] = [
+    {
+      icon: <SquaresFour size={18} weight="duotone" />,
+      label: t('nav.dashboard_ops'),
+      href: '/',
+    },
+    {
+      icon: <Warning size={18} weight="duotone" />,
+      label: t('nav.candidates'),
+      href: '/candidates',
+      badge: 4,
+    },
+    {
+      icon: <Flag size={18} weight="duotone" />,
+      label: t('nav.reports'),
+      href: '/reports',
+      badge: 3,
+    },
+    {
+      icon: <CheckSquare size={18} weight="duotone" />,
+      label: t('nav.tasks'),
+      href: '/tasks',
+      badge: 3,
+    },
+    {
+      icon: <CurrencyCircleDollar size={18} weight="duotone" />,
+      label: t('nav.credits'),
+      href: '/credits',
+    },
+    {
+      icon: <MapTrifold size={18} weight="duotone" />,
+      label: t('nav.map'),
+      href: '/map',
+    },
+  ]
+
+  // Admin Only Navigation Items
+  const adminNavItems: NavItem[] = [
+    {
+      icon: <SquaresFour size={18} weight="duotone" />,
+      label: t('nav.dashboard_admin'),
+      href: '/',
+    },
+    {
+      icon: <Users size={18} weight="duotone" />,
+      label: t('nav.staff'),
+      href: '/staff',
+    },
+    {
+      icon: <ShieldCheck size={18} weight="duotone" />,
+      label: t('nav.roles'),
+      href: '/roles',
+    },
+    {
+      icon: <GearSix size={18} weight="duotone" />,
+      label: t('nav.settings'),
+      href: '/settings',
+    },
+    {
+      icon: <ClipboardText size={18} weight="duotone" />,
+      label: t('nav.audit'),
+      href: '/audit-logs',
+    },
+  ]
+
+  const currentNavItems = isAdmin ? adminNavItems : staffNavItems
 
   const linkClass = (isActive: boolean) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-colors ${
@@ -64,7 +122,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] bg-white h-full shadow-xs">
+    <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] bg-white h-full shadow-xs transition-colors">
       {/* ─── Top Brand Header ────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E8E4E3]">
         <img
@@ -77,7 +135,7 @@ export function Sidebar() {
             Sign<span className="text-[#007b8b]">Trust</span>Map
           </p>
           <p className="text-[11px] text-gray-500 truncate font-mono">
-            {isAdmin ? 'Cổng quản trị' : 'Cổng vận hành'}
+            {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
           </p>
         </div>
       </div>
@@ -85,7 +143,7 @@ export function Sidebar() {
       {/* ─── Nav List ────────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1">
         <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-          {isAdmin ? 'Quản trị Hệ thống' : 'Nghiệp vụ Vận hành'}
+          {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
         </p>
 
         {currentNavItems.map((item) => (
@@ -106,35 +164,37 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* ─── Bottom ChatGPT-style User Pill Card ─────────────────── */}
-      <div className="p-3 border-t border-[#E8E4E3]">
-        <div className="flex items-center justify-between gap-2.5 p-2.5 rounded-2xl bg-[#F4F4F4] hover:bg-[#EBEBEB] transition-colors group">
-          {/* Left: Avatar + Name + Subtitle */}
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0 shadow-xs ${
-              isAdmin ? 'bg-[#7c3aed]' : 'bg-[#9333ea]'
-            }`}>
+      {/* ─── Bottom User Profile & Full-Width Sign Out Card ──────── */}
+      <div className="p-3 border-t border-[#E8E4E3] dark:border-white/10">
+        <div className="p-3 rounded-2xl bg-[#F4F4F4] dark:bg-[#0C1D23] border border-transparent dark:border-white/10 transition-colors flex flex-col gap-2.5">
+          {/* Top: Avatar + Full Name + Role Subtitle */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${
+                isAdmin ? 'bg-[#7c3aed]' : 'bg-[#9333ea]'
+              }`}
+            >
               {userInitials}
             </div>
-            <div className="min-w-0 leading-tight">
-              <p className="text-sm font-semibold text-gray-900 truncate">
+            <div className="min-w-0 flex-1 leading-snug">
+              <p className="text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
                 {displayName}
               </p>
-              <p className="text-xs text-gray-500 truncate mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
                 {isAdmin ? 'Admin' : 'Staff'}
               </p>
             </div>
           </div>
 
-          {/* Right: Pill Logout button matching ChatGPT "Nâng cấp" button */}
+          {/* Bottom: Full-Width Sign Out Button */}
           <button
             type="button"
             onClick={handleLogout}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 hover:text-red-600 transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1"
-            title="Đăng xuất khỏi hệ thống"
+            className="w-full py-2 px-3 rounded-xl bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/15 border border-gray-200/80 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-500/30 transition-all shadow-2xs active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+            title={t('nav.logout')}
           >
-            <SignOut size={13} weight="bold" />
-            <span>Thoát</span>
+            <SignOut size={14} weight="bold" />
+            <span>{t('nav.logout')}</span>
           </button>
         </div>
       </div>

@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useTranslation } from 'react-i18next'
+import { LANG_STORAGE_KEY } from '@/i18n'
 import {
   Eye,
   EyeSlash,
@@ -16,6 +18,7 @@ import {
 export default function LoginPage() {
   const { login, isLoading } = useAuth()
   const { isDark, toggleTheme } = useTheme()
+  const { t, i18n } = useTranslation('common')
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
@@ -24,17 +27,12 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
 
-  // Language state
-  const [lang, setLang] = useState<string>(() => {
-    return localStorage.getItem('stm_ops_lang') || 'vi'
-  })
+  const currentLang = i18n.language.startsWith('en') ? 'en' : 'vi'
 
   function toggleLang() {
-    setLang((prev) => {
-      const next = prev === 'vi' ? 'en' : 'vi'
-      localStorage.setItem('stm_ops_lang', next)
-      return next
-    })
+    const nextLang = currentLang === 'vi' ? 'en' : 'vi'
+    i18n.changeLanguage(nextLang)
+    localStorage.setItem(LANG_STORAGE_KEY, nextLang)
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -132,7 +130,7 @@ export default function LoginPage() {
                   : 'bg-[#007b8b]/15 text-[#007b8b] border border-[#007b8b]/25'
               }`}
             >
-              Ops Portal
+              {t('nav.ops_portal')}
             </span>
           </div>
         </a>
@@ -148,7 +146,7 @@ export default function LoginPage() {
                 ? 'bg-white/10 border-white/15 text-amber-400 hover:bg-white/15 shadow-xs'
                 : 'bg-white border-[#E8E4E3] text-[#007b8b] hover:bg-gray-50 shadow-xs'
             }`}
-            title={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+            title={isDark ? t('common.switch_theme_light') : t('common.switch_theme_dark')}
             aria-label="Đổi giao diện"
           >
             {isDark ? (
@@ -167,11 +165,11 @@ export default function LoginPage() {
                 ? 'bg-white/10 border-white/15 text-white hover:bg-white/15'
                 : 'bg-white border-[#E8E4E3] text-gray-800 hover:bg-gray-50'
             }`}
-            title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+            title={t('common.switch_lang')}
             aria-label="Đổi ngôn ngữ"
           >
             <Globe size={14} weight="bold" className="text-[#00c4de]" />
-            <span>{lang.toUpperCase()}</span>
+            <span>{currentLang.toUpperCase()}</span>
           </button>
 
           {/* Divider */}
@@ -186,7 +184,7 @@ export default function LoginPage() {
                 : 'bg-white border-gray-200 text-gray-700 hover:text-[#007b8b]'
             }`}
           >
-            <span>Cổng cộng đồng</span>
+            <span>{t('nav.community_portal')}</span>
             <ArrowSquareOut size={13} />
           </a>
         </div>
@@ -209,21 +207,21 @@ export default function LoginPage() {
               }`}
             >
               <ShieldCheck size={16} weight="fill" />
-              <span>Hệ thống vận hành nội bộ</span>
+              <span>{t('login.internal_system')}</span>
             </div>
             <h1
               className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              Đăng nhập Ops Portal
+              {t('login.title')}
             </h1>
             <p
               className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${
                 isDark ? 'text-gray-400' : 'text-gray-500'
               }`}
             >
-              Dành riêng cho kiểm duyệt viên (Staff) và quản trị viên (Admin).
+              {t('login.subtitle')}
             </p>
           </div>
 
@@ -237,7 +235,7 @@ export default function LoginPage() {
                   isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                 }`}
               >
-                email<span className="text-red-500">*</span>
+                {t('login.email')}<span className="text-red-500">*</span>
               </label>
 
               <input
@@ -265,7 +263,7 @@ export default function LoginPage() {
                     isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                   }`}
                 >
-                  mật khẩu<span className="text-red-500">*</span>
+                  {t('login.password')}<span className="text-red-500">*</span>
                 </label>
                 <a
                   href="#"
@@ -273,7 +271,7 @@ export default function LoginPage() {
                     isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                   }`}
                 >
-                  Quên mật khẩu?
+                  {t('login.forgot_password')}
                 </a>
               </div>
               <div className="relative">
@@ -325,10 +323,10 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <CircleNotch size={18} className="animate-spin" />
-                  <span>Đang đăng nhập...</span>
+                  <span>{t('login.submitting')}</span>
                 </>
               ) : (
-                <span>Đăng nhập</span>
+                <span>{t('login.submit')}</span>
               )}
             </button>
 
@@ -349,7 +347,7 @@ export default function LoginPage() {
                       : 'bg-white text-gray-400'
                   }`}
                 >
-                  HOẶC
+                  {t('login.or')}
                 </span>
               </div>
             </div>
@@ -372,7 +370,7 @@ export default function LoginPage() {
                 alt="Google"
                 className="w-5 h-5 object-contain"
               />
-              <span>Đăng nhập với Google</span>
+              <span>{t('login.google_login')}</span>
             </button>
           </form>
 
@@ -384,7 +382,7 @@ export default function LoginPage() {
               }`}
             >
               <p className="text-[10px] font-mono uppercase text-gray-400 mb-2">
-                Đăng nhập nhanh môi trường Dev:
+                {t('login.dev_quick')}
               </p>
               <div className="flex gap-2">
                 <button
@@ -399,7 +397,7 @@ export default function LoginPage() {
                       : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
                   }`}
                 >
-                  👤 Staff Portal
+                  {t('login.staff_portal')}
                 </button>
                 <button
                   type="button"
@@ -413,7 +411,7 @@ export default function LoginPage() {
                       : 'bg-[#007b8b]/10 hover:bg-[#007b8b]/20 border-[#007b8b]/30 text-[#007b8b]'
                   }`}
                 >
-                  ⚡ Admin Portal
+                  {t('login.admin_portal')}
                 </button>
               </div>
             </div>
@@ -428,8 +426,7 @@ export default function LoginPage() {
         }`}
       >
         <p>
-          © {new Date().getFullYear()} SignTrustMap Ops Portal • Hệ thống quản
-          trị nội bộ bảo mật
+          {t('login.footer', { year: new Date().getFullYear() })}
         </p>
       </footer>
     </div>

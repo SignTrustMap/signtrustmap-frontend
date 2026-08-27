@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   DownloadSimple,
   MapPin,
@@ -10,29 +11,31 @@ import {
 import { mockSignReports, type SignReportItem, type ReportStatus } from '@/data'
 
 function ReportStatusBadge({ status }: { status: ReportStatus }) {
+  const { t } = useTranslation('ops')
   switch (status) {
     case 'Pending':
       return (
         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
-          Chờ xử lý
+          {t('reports.tab_pending')}
         </span>
       )
     case 'Investigating':
       return (
         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-[#dbeafe] text-[#1d4ed8] dark:bg-cyan-500/15 dark:text-[#00c4de] dark:border dark:border-cyan-500/30">
-          Đang xác minh
+          {t('reports.tab_investigating')}
         </span>
       )
     case 'Resolved':
       return (
         <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 dark:border dark:border-white/10">
-          Đã giải quyết
+          {t('reports.tab_resolved')}
         </span>
       )
   }
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation('ops')
   const navigate = useNavigate()
   const [reports] = useState<SignReportItem[]>(mockSignReports)
   const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Investigating' | 'Resolved'>('All')
@@ -40,10 +43,10 @@ export default function ReportsPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const tabLabels: Record<'All' | 'Pending' | 'Investigating' | 'Resolved', string> = {
-    All: 'Tất cả báo cáo',
-    Pending: 'Chờ xử lý',
-    Investigating: 'Đang xác minh',
-    Resolved: 'Đã giải quyết',
+    All: t('reports.tab_all'),
+    Pending: t('reports.tab_pending'),
+    Investigating: t('reports.tab_investigating'),
+    Resolved: t('reports.tab_resolved'),
   }
 
   const filteredReports = reports.filter((r) => {
@@ -78,10 +81,10 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            Báo cáo sự cố biển báo
+            {t('reports.title')}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Quản lý và giải quyết các phản ánh về biển báo bị hư hỏng, che khuất hoặc thiếu sót.
+            {t('reports.subtitle')}
           </p>
         </div>
 
@@ -91,7 +94,7 @@ export default function ReportsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-all cursor-pointer"
         >
           <DownloadSimple size={16} />
-          <span>Xuất báo cáo</span>
+          <span>{t('reports.export_report')}</span>
         </button>
       </div>
 
@@ -141,7 +144,7 @@ export default function ReportsPage() {
           />
           <input
             type="text"
-            placeholder="Tìm kiếm sự cố..."
+            placeholder={t('reports.search_placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
@@ -155,12 +158,12 @@ export default function ReportsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#E8E4E3] dark:border-white/10 bg-[#F8F7F7]/60 dark:bg-[#061014] text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-mono">
-                <th className="py-4 px-6">Mã báo cáo</th>
-                <th className="py-4 px-6">Vị trí phản ánh</th>
-                <th className="py-4 px-6">Người báo cáo</th>
-                <th className="py-4 px-6">Ngày gửi</th>
-                <th className="py-4 px-6 text-center">Trạng thái</th>
-                <th className="py-4 px-6 text-right">Thao tác</th>
+                <th className="py-4 px-6">{t('reports.th_id')}</th>
+                <th className="py-4 px-6">{t('reports.th_location')}</th>
+                <th className="py-4 px-6">{t('reports.th_reporter')}</th>
+                <th className="py-4 px-6">{t('reports.th_date')}</th>
+                <th className="py-4 px-6 text-center">{t('reports.th_status')}</th>
+                <th className="py-4 px-6 text-right">{t('reports.th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10 text-sm">
@@ -214,7 +217,7 @@ export default function ReportsPage() {
                           type="button"
                           className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
                         >
-                          Phân công
+                          {t('reports.btn_assign')}
                         </button>
                         <button
                           type="button"
@@ -225,7 +228,7 @@ export default function ReportsPage() {
                           }
                           className="px-3 py-1.5 rounded-lg bg-[#007b8b]/10 dark:bg-[#00c4de]/15 border border-[#007b8b]/25 dark:border-[#00c4de]/30 text-xs font-semibold text-[#007b8b] dark:text-[#00c4de] hover:bg-[#007b8b] hover:text-white dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
                         >
-                          Kiểm tra
+                          {t('reports.btn_inspect')}
                         </button>
                       </>
                     ) : (
@@ -236,7 +239,7 @@ export default function ReportsPage() {
                         }
                         className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 transition-colors cursor-pointer"
                       >
-                        Xem chi tiết
+                        {t('reports.btn_details')}
                       </button>
                     )}
                   </td>
@@ -248,13 +251,13 @@ export default function ReportsPage() {
 
         {/* Footer pagination */}
         <div className="py-3.5 px-6 border-t border-[#E8E4E3] dark:border-white/10 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>Hiển thị 1 đến {filteredReports.length} trong 24 kết quả</span>
+          <span>{t('reports.showing_results', { count: filteredReports.length, total: 24 })}</span>
 
           <div className="flex items-center gap-1">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 cursor-pointer"
             >
               <CaretLeft size={14} />
             </button>
@@ -269,7 +272,7 @@ export default function ReportsPage() {
             </button>
             <button
               onClick={() => setCurrentPage((p) => p + 1)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 cursor-pointer"
             >
               <CaretRight size={14} />
             </button>
