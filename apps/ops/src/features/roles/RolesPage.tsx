@@ -27,8 +27,8 @@ export interface RoleDefinition {
 const initialRoles: RoleDefinition[] = [
   {
     id: 'admin',
-    name: 'Administrator',
-    desc: 'Full system access',
+    name: 'Quản trị viên cấp cao',
+    desc: 'Toàn quyền truy cập hệ thống',
     isSystemDefault: true,
     permissions: {
       userMgt: { read: true, create: true, update: true, delete: true },
@@ -39,8 +39,8 @@ const initialRoles: RoleDefinition[] = [
   },
   {
     id: 'staff_mgr',
-    name: 'Staff Manager',
-    desc: 'Manage personnel & schedules',
+    name: 'Quản lý vận hành',
+    desc: 'Quản lý nhân sự và lịch trình',
     permissions: {
       userMgt: { read: true, create: true, update: true, delete: false },
       taskApproval: { read: true, create: true, update: true, delete: false },
@@ -50,8 +50,8 @@ const initialRoles: RoleDefinition[] = [
   },
   {
     id: 'reviewer',
-    name: 'Reviewer',
-    desc: 'Read-only auditing access',
+    name: 'Kiểm duyệt viên',
+    desc: 'Quyền xem và duyệt kiểm toán',
     permissions: {
       userMgt: { read: true, create: false, update: false, delete: false },
       taskApproval: { read: true, create: false, update: false, delete: false },
@@ -61,8 +61,8 @@ const initialRoles: RoleDefinition[] = [
   },
   {
     id: 'support',
-    name: 'Support Agent',
-    desc: 'Ticketing & basic logs',
+    name: 'Nhân viên hỗ trợ',
+    desc: 'Tiếp nhận phản ánh & nhật ký cơ bản',
     permissions: {
       userMgt: { read: true, create: false, update: false, delete: false },
       taskApproval: { read: false, create: false, update: false, delete: false },
@@ -106,13 +106,13 @@ export default function RolesPage() {
   }
 
   function handleSave() {
-    setToastMessage(`Permissions for "${selectedRole.name}" updated successfully.`)
+    setToastMessage(`Quyền hạn cho vai trò "${selectedRole.name}" đã được cập nhật.`)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
   function handleDiscard() {
     setRoles(initialRoles)
-    setToastMessage('Changes discarded.')
+    setToastMessage('Đã hủy các thay đổi.')
     setTimeout(() => setToastMessage(null), 2000)
   }
 
@@ -122,10 +122,10 @@ export default function RolesPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            System Access Control
+            Phân quyền hệ thống
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage global roles and granular module permissions.
+            Quản lý các vai trò toàn hệ thống và cấu hình quyền hạn chi tiết trên từng nhóm chức năng.
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export default function RolesPage() {
           className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-[0.98] shrink-0 cursor-pointer"
         >
           <Plus size={16} weight="bold" />
-          <span>Create New Role</span>
+          <span>Tạo vai trò mới</span>
         </button>
       </div>
 
@@ -157,7 +157,7 @@ export default function RolesPage() {
             />
             <input
               type="text"
-              placeholder="Search roles..."
+              placeholder="Tìm kiếm vai trò..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
@@ -209,17 +209,16 @@ export default function RolesPage() {
             <div className="border-b border-[#E8E4E3] pb-4 mb-5">
               <div className="flex items-center gap-2.5">
                 <h2 className="text-lg font-bold text-gray-900">
-                  {selectedRole.name} Permissions
+                  Quyền hạn vai trò {selectedRole.name}
                 </h2>
                 {selectedRole.isSystemDefault && (
                   <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#e0f2fe] text-[#0369a1] uppercase font-mono">
-                    System Default
+                    Mặc định hệ thống
                   </span>
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Granular access control configuration for the selected role. Modifying
-                core permissions may require secondary authorization.
+                Cấu hình kiểm soát truy cập chi tiết cho vai trò được chọn. Việc chỉnh sửa các quyền cốt lõi có thể yêu cầu phê duyệt bảo mật bổ sung.
               </p>
             </div>
 
@@ -228,11 +227,11 @@ export default function RolesPage() {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-[#F8F7F7] border-b border-[#E8E4E3] font-bold text-gray-600 font-mono">
-                    <th className="py-3 px-5">Module Category</th>
-                    <th className="py-3 px-4 text-center w-20">Read</th>
-                    <th className="py-3 px-4 text-center w-20">Create</th>
-                    <th className="py-3 px-4 text-center w-20">Update</th>
-                    <th className="py-3 px-4 text-center w-20">Delete</th>
+                    <th className="py-3 px-5">Nhóm chức năng</th>
+                    <th className="py-3 px-4 text-center w-20">Xem (Read)</th>
+                    <th className="py-3 px-4 text-center w-20">Tạo (Create)</th>
+                    <th className="py-3 px-4 text-center w-20">Sửa (Update)</th>
+                    <th className="py-3 px-4 text-center w-20">Xóa (Delete)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E8E4E3]">
@@ -243,10 +242,10 @@ export default function RolesPage() {
                         <Users size={20} className="text-[#007b8b] mt-0.5 shrink-0" weight="duotone" />
                         <div>
                           <p className="font-bold text-gray-900 text-sm">
-                            User Management
+                            Quản lý người dùng
                           </p>
                           <p className="text-gray-400 text-xs mt-0.5">
-                            Control over user accounts and lifecycles
+                            Kiểm soát tài khoản và vòng đời người dùng
                           </p>
                         </div>
                       </div>
@@ -270,10 +269,10 @@ export default function RolesPage() {
                         <CheckSquare size={20} className="text-[#007b8b] mt-0.5 shrink-0" weight="duotone" />
                         <div>
                           <p className="font-bold text-gray-900 text-sm">
-                            Task Approval
+                            Phê duyệt nhiệm vụ
                           </p>
                           <p className="text-gray-400 text-xs mt-0.5">
-                            Workflow transitions and sign-offs
+                            Chuyển đổi quy trình và ký duyệt nhiệm vụ khảo sát
                           </p>
                         </div>
                       </div>
@@ -297,10 +296,10 @@ export default function RolesPage() {
                         <Bank size={20} className="text-[#007b8b] mt-0.5 shrink-0" weight="duotone" />
                         <div>
                           <p className="font-bold text-gray-900 text-sm">
-                            Financial Records
+                            Báo cáo tài chính & Thưởng
                           </p>
                           <p className="text-gray-400 text-xs mt-0.5">
-                            Invoices, payroll, and ledger access
+                            Hóa đơn, điểm thưởng và quyền truy cập sổ cái
                           </p>
                         </div>
                       </div>
@@ -324,10 +323,10 @@ export default function RolesPage() {
                         <FileText size={20} className="text-[#007b8b] mt-0.5 shrink-0" weight="duotone" />
                         <div>
                           <p className="font-bold text-gray-900 text-sm">
-                            System Logs
+                            Nhật ký hệ thống
                           </p>
                           <p className="text-gray-400 text-xs mt-0.5">
-                            Audit trails and error reporting
+                            Dấu vết kiểm toán và theo dõi lỗi hệ thống
                           </p>
                         </div>
                       </div>
@@ -355,7 +354,7 @@ export default function RolesPage() {
               onClick={handleDiscard}
               className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-200/60 rounded-lg transition-colors cursor-pointer"
             >
-              Discard Changes
+              Hủy thay đổi
             </button>
             <button
               type="button"
@@ -363,7 +362,7 @@ export default function RolesPage() {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer"
             >
               <FloppyDisk size={16} weight="bold" />
-              <span>Update Role Permissions</span>
+              <span>Cập nhật quyền hạn</span>
             </button>
           </div>
         </div>

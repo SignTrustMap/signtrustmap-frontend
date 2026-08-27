@@ -17,21 +17,21 @@ import {
 
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const reportId = id ? `Report #${id}` : 'Report #RC-8924-A'
+  const reportId = id ? `Hồ sơ #${id}` : 'Hồ sơ #RC-8924-A'
 
-  const [currentStatus, setCurrentStatus] = useState<string>('Under Review')
+  const [currentStatus, setCurrentStatus] = useState<string>('Đang xem xét')
   const [actionNotice, setActionNotice] = useState<string | null>(null)
 
   function handleAction(action: string) {
     if (action === 'reject') {
-      setCurrentStatus('Rejected & Removed')
-      setActionNotice('Candidate has been rejected and removed from system.')
+      setCurrentStatus('Đã từ chối & Gỡ bỏ')
+      setActionNotice('Hồ sơ ứng viên đã bị từ chối và gỡ bỏ khỏi hệ thống.')
     } else if (action === 'resurvey') {
-      setCurrentStatus('Re-survey Requested')
-      setActionNotice('Re-survey request dispatched to field surveyor.')
+      setCurrentStatus('Đã yêu cầu khảo sát lại')
+      setActionNotice('Yêu cầu tái khảo sát đã được gửi đến đội ngũ kiểm tra thực địa.')
     } else if (action === 'approve') {
-      setCurrentStatus('Approved & Cleared')
-      setActionNotice('Candidate record has been approved and flags cleared.')
+      setCurrentStatus('Đã phê duyệt & Xóa cờ')
+      setActionNotice('Bản ghi đã được duyệt hợp lệ và các cờ cảnh báo đã được gỡ bỏ.')
     }
   }
 
@@ -43,7 +43,7 @@ export default function CandidateDetailPage() {
           to="/candidates"
           className="hover:text-[#007b8b] transition-colors"
         >
-          Reported Candidates
+          Hồ sơ kiểm duyệt
         </Link>
         <CaretRight size={12} />
         <span className="text-gray-900 font-bold font-mono">{reportId}</span>
@@ -53,21 +53,21 @@ export default function CandidateDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E8E4E3] pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Investigation: falsified credentials
+            Điều tra: nghi vấn sai lệch chứng chỉ & dữ liệu
           </h1>
           <div className="flex items-center gap-3 mt-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold bg-[#fee2e2] text-[#b91c1c] uppercase tracking-wider">
-              <WarningOctagon size={14} weight="fill" /> HIGH PRIORITY
+              <WarningOctagon size={14} weight="fill" /> ƯU TIÊN CAO
             </span>
             <span className="text-xs text-gray-500 font-mono">
-              Submitted: Oct 24, 2023 at 14:30 PST
+              Thời gian gửi: 24/10/2023 lúc 14:30
             </span>
           </div>
         </div>
 
         {/* Current status pill */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Status:</span>
+          <span className="text-xs text-gray-500">Trạng thái:</span>
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#dbeafe] text-[#1d4ed8]">
             {currentStatus}
           </span>
@@ -82,9 +82,9 @@ export default function CandidateDetailPage() {
           </div>
           <button
             onClick={() => setActionNotice(null)}
-            className="text-xs font-bold text-emerald-700 hover:underline"
+            className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
           >
-            Dismiss
+            Đóng
           </button>
         </div>
       )}
@@ -99,7 +99,7 @@ export default function CandidateDetailPage() {
               <div className="flex items-center gap-2.5">
                 <User size={20} className="text-[#007b8b]" weight="bold" />
                 <h2 className="text-base font-bold text-gray-900">
-                  Candidate Profile
+                  Thông tin ứng viên / khảo sát viên
                 </h2>
               </div>
               <a
@@ -107,13 +107,12 @@ export default function CandidateDetailPage() {
                 onClick={(e) => e.preventDefault()}
                 className="text-xs font-semibold text-[#007b8b] hover:underline inline-flex items-center gap-1"
               >
-                <span>View Full Profile</span>
+                <span>Xem hồ sơ đầy đủ</span>
                 <ArrowSquareOut size={13} />
               </a>
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-              {/* Avatar placeholder / professional avatar */}
               <div className="w-20 h-20 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center font-bold text-2xl shadow-md shrink-0 border border-gray-200">
                 JD
               </div>
@@ -122,7 +121,7 @@ export default function CandidateDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-xs flex-1">
                 <div>
                   <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Full Name
+                    Họ và tên
                   </p>
                   <p className="font-bold text-gray-900 text-sm mt-0.5">
                     Jonathan Doe
@@ -131,7 +130,7 @@ export default function CandidateDetailPage() {
 
                 <div>
                   <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Candidate ID
+                    Mã định danh (ID)
                   </p>
                   <p className="font-bold font-mono text-gray-900 text-sm mt-0.5">
                     CD-99012-XT
@@ -140,19 +139,19 @@ export default function CandidateDetailPage() {
 
                 <div>
                   <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Applied Role
+                    Vị trí đăng ký
                   </p>
                   <p className="font-medium text-gray-800 text-xs mt-0.5">
-                    Senior Logistics Coordinator
+                    Điều phối viên logistics cao cấp
                   </p>
                 </div>
 
                 <div>
                   <p className="text-gray-400 font-mono uppercase tracking-wider text-[10px]">
-                    Region
+                    Khu vực hoạt động
                   </p>
                   <p className="font-medium text-gray-800 text-xs mt-0.5">
-                    Northwest Region (NW-01)
+                    Khu vực Tây Bắc (NW-01)
                   </p>
                 </div>
               </div>
@@ -164,31 +163,29 @@ export default function CandidateDetailPage() {
             <div className="flex items-center gap-2.5 border-b border-[#E8E4E3] pb-4">
               <FileText size={20} className="text-[#007b8b]" weight="bold" />
               <h2 className="text-base font-bold text-gray-900">
-                Report Details & Evidence
+                Chi tiết báo cáo & Bằng chứng
               </h2>
             </div>
 
             {/* Reporter's Statement */}
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono mb-2">
-                Reporter's Statement
+                Trích dẫn lời khai của người báo cáo
               </p>
               <div className="p-4 rounded-xl bg-[#F8F7F7] border border-[#E8E4E3] text-gray-700 italic text-xs sm:text-sm leading-relaxed">
-                "During the routine background check, we identified discrepancies
-                in the provided certification documents for hazardous materials
-                handling. The issuing authority stamp appears digitally altered,
-                and the verification number does not match their official
-                records."
+                "Trong quá trình kiểm tra hồ sơ định kỳ, chúng tôi phát hiện sự không đồng nhất
+                trong tài liệu chứng nhận xử lý vật liệu nguy hiểm được cung cấp. Con dấu của cơ quan
+                cấp có dấu hiệu chỉnh sửa kỹ thuật số và mã xác thực không khớp với cơ sở dữ liệu chính thức."
               </div>
               <p className="text-right text-[11px] text-gray-400 mt-2 font-mono">
-                Reported by: <strong>System Audit Bot (Auto-Flagged)</strong>
+                Người báo cáo: <strong>Hệ thống kiểm toán tự động (Auto-Flagged)</strong>
               </p>
             </div>
 
             {/* Flagged Documents */}
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono mb-3">
-                Flagged Documents (2)
+                Tài liệu bị gắn cờ (2)
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Doc 1 */}
@@ -196,15 +193,15 @@ export default function CandidateDetailPage() {
                   <div className="h-32 rounded-lg bg-gray-100 border border-dashed border-gray-300 flex flex-col items-center justify-center p-3 text-center mb-2 overflow-hidden relative">
                     <FilePdf size={36} className="text-red-500 mb-1" weight="duotone" />
                     <span className="text-[11px] text-gray-500 font-mono">
-                      [Document Preview]
+                      [Bản xem trước tài liệu]
                     </span>
                     <span className="text-[10px] text-gray-400">
-                      Stamp Verification Stamp #4492
+                      Dấu xác thực chứng chỉ #4492
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-gray-800 truncate">
-                      HazMat_Cert_JD.pdf
+                      Chung_chi_HazMat_JD.pdf
                     </span>
                     <span className="text-[10px] text-gray-400 font-mono">2.4 MB</span>
                   </div>
@@ -215,11 +212,11 @@ export default function CandidateDetailPage() {
                   <div className="h-32 rounded-lg bg-slate-900 text-emerald-400 flex flex-col items-center justify-center p-3 text-center mb-2 overflow-hidden font-mono text-[10px] leading-tight">
                     <FileImage size={28} className="text-emerald-400 mb-1" weight="duotone" />
                     <span>&gt; ERR_HASH_MISMATCH</span>
-                    <span className="text-gray-500">Record #CD-99012</span>
+                    <span className="text-gray-500">Mã bản ghi #CD-99012</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-gray-800 truncate">
-                      System_Verification_Log.png
+                      Nhat_ky_kiem_tra_he_thong.png
                     </span>
                     <span className="text-[10px] text-gray-400 font-mono">840 KB</span>
                   </div>
@@ -236,13 +233,12 @@ export default function CandidateDetailPage() {
             <div className="flex items-center gap-2 border-b border-[#E8E4E3] pb-3">
               <ShieldCheck size={20} className="text-[#007b8b]" weight="bold" />
               <h2 className="text-base font-bold text-gray-900">
-                Resolution Actions
+                Hành động xử lý
               </h2>
             </div>
 
             <p className="text-xs text-gray-500 leading-relaxed">
-              Select an action to resolve this investigation. This will update the
-              candidate's status globally.
+              Chọn hành động phù hợp để giải quyết vụ việc. Trạng thái ứng viên sẽ được đồng bộ trên toàn hệ thống.
             </p>
 
             {/* Action Buttons */}
@@ -253,7 +249,7 @@ export default function CandidateDetailPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#b91c1c] hover:bg-[#991b1b] text-white font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 <Prohibit size={18} weight="bold" />
-                <span>Reject & Remove</span>
+                <span>Từ chối & Gỡ bỏ hồ sơ</span>
               </button>
 
               <button
@@ -262,7 +258,7 @@ export default function CandidateDetailPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#e0f2fe] hover:bg-[#bae6fd] text-[#0369a1] font-bold text-xs sm:text-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 <ArrowsClockwise size={18} weight="bold" />
-                <span>Request Re-survey</span>
+                <span>Yêu cầu khảo sát lại</span>
               </button>
 
               <div className="relative flex items-center justify-center my-3">
@@ -270,7 +266,7 @@ export default function CandidateDetailPage() {
                   <div className="w-full border-t border-[#E8E4E3]" />
                 </div>
                 <span className="relative px-3 bg-white text-[10px] font-mono text-gray-400 uppercase">
-                  OR
+                  HOẶC
                 </span>
               </div>
 
@@ -280,7 +276,7 @@ export default function CandidateDetailPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 <CheckCircle size={18} weight="bold" className="text-emerald-600" />
-                <span>Approve Record (Clear Flag)</span>
+                <span>Phê duyệt bản ghi (Xóa cờ)</span>
               </button>
             </div>
           </div>
@@ -293,7 +289,7 @@ export default function CandidateDetailPage() {
                 className="text-[#007b8b]"
                 weight="bold"
               />
-              <h2 className="text-base font-bold text-gray-900">Audit Trail</h2>
+              <h2 className="text-base font-bold text-gray-900">Dòng thời gian kiểm toán</h2>
             </div>
 
             {/* Timeline */}
@@ -302,11 +298,11 @@ export default function CandidateDetailPage() {
               <div className="relative">
                 <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-[#007b8b]" />
                 <p className="text-[11px] text-gray-400 font-mono">
-                  Oct 25, 2023 - 09:15 AM
+                  25/10/2023 - 09:15 SA
                 </p>
-                <p className="font-bold text-gray-900 mt-0.5">Under Review</p>
+                <p className="font-bold text-gray-900 mt-0.5">Đang xem xét</p>
                 <p className="text-gray-500 text-[11px]">
-                  Status updated by Admin (A. Smith)
+                  Cập nhật bởi Quản trị viên (A. Smith)
                 </p>
               </div>
 
@@ -314,11 +310,11 @@ export default function CandidateDetailPage() {
               <div className="relative">
                 <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-amber-500" />
                 <p className="text-[11px] text-gray-400 font-mono">
-                  Oct 24, 2023 - 14:30 PM
+                  24/10/2023 - 14:30 CH
                 </p>
-                <p className="font-bold text-gray-900 mt-0.5">Report Generated</p>
+                <p className="font-bold text-gray-900 mt-0.5">Đã tạo báo cáo</p>
                 <p className="text-gray-500 text-[11px]">
-                  System Audit Bot flagged credentials.
+                  Hệ thống tự động gắn cờ cảnh báo chứng chỉ.
                 </p>
               </div>
 
@@ -326,13 +322,13 @@ export default function CandidateDetailPage() {
               <div className="relative">
                 <div className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-white border-4 border-gray-300" />
                 <p className="text-[11px] text-gray-400 font-mono">
-                  Oct 20, 2023 - 11:00 AM
+                  20/10/2023 - 11:00 SA
                 </p>
                 <p className="font-bold text-gray-900 mt-0.5">
-                  Application Submitted
+                  Đã nộp hồ sơ ban đầu
                 </p>
                 <p className="text-gray-500 text-[11px]">
-                  Candidate submitted initial profile.
+                  Ứng viên đã nộp thông tin đăng ký hồ sơ.
                 </p>
               </div>
             </div>

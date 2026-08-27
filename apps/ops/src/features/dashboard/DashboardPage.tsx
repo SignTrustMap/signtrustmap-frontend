@@ -11,42 +11,42 @@ import {
 } from '@phosphor-icons/react'
 
 export default function DashboardPage() {
-  const [timeRange, setTimeRange] = useState('Last 30 Days')
-  const [feedFilter, setFeedFilter] = useState('All Events')
+  const [timeRange, setTimeRange] = useState('30 ngày qua')
+  const [feedFilter, setFeedFilter] = useState('Tất cả sự kiện')
 
   const kpis = [
     {
-      label: 'Total Users',
+      label: 'Tổng người dùng',
       value: '142.8k',
       change: '+12.5%',
-      changeText: 'vs last month',
+      changeText: 'so với tháng trước',
       isPositive: true,
       icon: <Users size={22} weight="bold" />,
       iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
     },
     {
-      label: 'Active Drivers',
+      label: 'Khảo sát viên / Tài xế',
       value: '45.2k',
       change: '+8.2%',
-      changeText: 'vs last month',
+      changeText: 'so với tháng trước',
       isPositive: true,
       icon: <Truck size={22} weight="bold" />,
       iconBg: 'bg-emerald-100 text-emerald-700',
     },
     {
-      label: 'Reported Candidates',
+      label: 'Hồ sơ gắn cờ cảnh báo',
       value: '324',
       change: '+4.1%',
-      changeText: 'Needs attention',
+      changeText: 'Cần chú ý',
       isWarning: true,
       icon: <WarningCircle size={22} weight="bold" />,
       iconBg: 'bg-red-100 text-red-600',
     },
     {
-      label: 'Pending Reviews',
+      label: 'Đang chờ xét duyệt',
       value: '1,845',
       change: '0.0%',
-      changeText: 'Stable volume',
+      changeText: 'Khối lượng ổn định',
       isNeutral: true,
       icon: <FolderSimple size={22} weight="bold" />,
       iconBg: 'bg-amber-100 text-amber-700',
@@ -58,31 +58,31 @@ export default function DashboardPage() {
       id: '1',
       type: 'critical',
       dotColor: 'bg-red-500',
-      title: 'High-Severity Safety Report Flagged',
-      desc: 'Automated system detection triggered by user review pattern.',
+      title: 'Báo cáo an toàn mức nghiêm trọng được gắn cờ',
+      desc: 'Hệ thống tự động phát hiện mẫu hành vi kiểm tra bất thường.',
       user: 'SYS-AUTO',
       avatar: null,
-      time: '10:42 AM',
+      time: '10:42 SA',
     },
     {
       id: '2',
       type: 'success',
       dotColor: 'bg-emerald-500',
-      title: 'Candidate Identity Verified',
-      desc: 'Manual override applied to pending identity check.',
+      title: 'Danh tính ứng viên đã được xác minh',
+      desc: 'Quản trị viên đã phê duyệt thủ công cho hồ sơ đang chờ kiểm tra.',
       user: 'Sarah Jenkins',
       avatar: 'SJ',
-      time: '09:15 AM',
+      time: '09:15 SA',
     },
     {
       id: '3',
       type: 'info',
       dotColor: 'bg-blue-500',
-      title: 'Batch Survey Tasks Dispatched',
-      desc: '12 new revalidation targets assigned to District 1 surveyor team.',
+      title: 'Đã phân bổ loạt nhiệm vụ khảo sát mới',
+      desc: '12 mục tiêu kiểm tra lại được giao cho đội ngũ khảo sát Khu vực 1.',
       user: 'Marcus Rodriguez',
       avatar: 'MR',
-      time: '08:30 AM',
+      time: '08:30 SA',
     },
   ]
 
@@ -92,10 +92,10 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Overview
+            Tổng quan hệ thống
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Operational metrics and system status for the past 30 days.
+            Chỉ số vận hành và trạng thái hệ thống trong 30 ngày qua.
           </p>
         </div>
 
@@ -107,9 +107,9 @@ export default function DashboardPage() {
               onChange={(e) => setTimeRange(e.target.value)}
               className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg font-semibold text-gray-700 focus:outline-none focus:border-[#007b8b] shadow-xs cursor-pointer"
             >
-              <option value="Last 7 Days">Last 7 Days</option>
-              <option value="Last 30 Days">Last 30 Days</option>
-              <option value="Last 90 Days">Last 90 Days</option>
+              <option value="7 ngày qua">7 ngày qua</option>
+              <option value="30 ngày qua">30 ngày qua</option>
+              <option value="90 ngày qua">90 ngày qua</option>
             </select>
             <CalendarBlank
               size={16}
@@ -123,7 +123,7 @@ export default function DashboardPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] bg-white hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             <DownloadSimple size={16} />
-            <span>Export</span>
+            <span>Xuất báo cáo</span>
           </button>
         </div>
       </div>
@@ -180,20 +180,20 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900">
-                User Growth Pipeline
+                Tiến trình tăng trưởng người dùng
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                New signups vs active road surveyors across weeks
+                Đăng ký mới so với khảo sát viên hoạt động theo tuần
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-[#007b8b] bg-white" />
-                New Registrations
+                Đăng ký mới
               </span>
               <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-gray-500 bg-white" />
-                Active Drivers
+                Khảo sát viên
               </span>
               <button className="text-gray-400 hover:text-gray-700 p-1">
                 <DotsThreeVertical size={18} weight="bold" />
@@ -288,11 +288,11 @@ export default function DashboardPage() {
 
             {/* X Axis Labels */}
             <div className="flex justify-between pl-10 pr-2 pt-2 text-[11px] font-mono text-gray-400">
-              <span>Week 1</span>
-              <span>Week 2</span>
-              <span>Week 3</span>
-              <span>Week 4</span>
-              <span>Week 5</span>
+              <span>Tuần 1</span>
+              <span>Tuần 2</span>
+              <span>Tuần 3</span>
+              <span>Tuần 4</span>
+              <span>Tuần 5</span>
             </div>
           </div>
         </div>
@@ -302,9 +302,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-base font-bold text-gray-900">
-                Reported Categories
+                Phân loại vi phạm
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">By violation severity</p>
+              <p className="text-xs text-gray-400 mt-0.5">Theo mức độ nghiêm trọng</p>
             </div>
             <button className="text-gray-400 hover:text-gray-700 p-1">
               <DotsThreeVertical size={18} weight="bold" />
@@ -368,19 +368,19 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3]">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#007b8b] shrink-0" />
-              <span className="text-gray-700 truncate">Identity Mismatch</span>
+              <span className="text-gray-700 truncate">Sai lệch thông tin</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] shrink-0" />
-              <span className="text-gray-700 truncate">Safety Concerns</span>
+              <span className="text-gray-700 truncate">Lo ngại an toàn</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#d97706] shrink-0" />
-              <span className="text-gray-700 truncate">Performance</span>
+              <span className="text-gray-700 truncate">Chất lượng dữ liệu</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" />
-              <span className="text-gray-700 truncate">Other</span>
+              <span className="text-gray-700 truncate">Khác</span>
             </div>
           </div>
         </div>
@@ -391,7 +391,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between border-b border-[#E8E4E3] pb-4 mb-4">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-gray-900">
-              Recent Activity Feed
+              Nhật ký hoạt động gần đây
             </h2>
           </div>
 
@@ -400,9 +400,9 @@ export default function DashboardPage() {
             onChange={(e) => setFeedFilter(e.target.value)}
             className="text-xs border border-[#E8E4E3] rounded-lg px-3 py-1.5 bg-[#F8F7F7] text-gray-700 font-semibold focus:outline-none focus:border-[#007b8b]"
           >
-            <option value="All Events">All Events</option>
-            <option value="Critical">Critical Only</option>
-            <option value="Verification">Verification Only</option>
+            <option value="Tất cả sự kiện">Tất cả sự kiện</option>
+            <option value="Chỉ cảnh báo nghiêm trọng">Chỉ cảnh báo nghiêm trọng</option>
+            <option value="Chỉ xác minh danh tính">Chỉ xác minh danh tính</option>
           </select>
         </div>
 

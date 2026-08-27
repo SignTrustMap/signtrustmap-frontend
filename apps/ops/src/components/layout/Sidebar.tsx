@@ -17,17 +17,16 @@ interface NavItem {
   label: string
   href: string
   badge?: number
-  adminOnly?: boolean
 }
 
 const navItems: NavItem[] = [
-  { icon: <SquaresFour size={18} weight="duotone" />, label: 'Dashboard', href: '/' },
-  { icon: <Users size={18} weight="duotone" />, label: 'Staff Directory', href: '/staff' },
-  { icon: <ShieldCheck size={18} weight="duotone" />, label: 'Roles & Permissions', href: '/roles' },
-  { icon: <Warning size={18} weight="duotone" />, label: 'Reported Candidates', href: '/candidates', badge: 4 },
-  { icon: <Flag size={18} weight="duotone" />, label: 'Missing Signs Reports', href: '/reports', badge: 3 },
-  { icon: <ClipboardText size={18} weight="duotone" />, label: 'Audit Logs', href: '/audit-logs' },
-  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ GIS', href: '/map' },
+  { icon: <SquaresFour size={18} weight="duotone" />, label: 'Tổng quan', href: '/' },
+  { icon: <Users size={18} weight="duotone" />, label: 'Quản lý nhân sự', href: '/staff' },
+  { icon: <ShieldCheck size={18} weight="duotone" />, label: 'Phân quyền hệ thống', href: '/roles' },
+  { icon: <Warning size={18} weight="duotone" />, label: 'Hồ sơ kiểm duyệt', href: '/candidates', badge: 4 },
+  { icon: <Flag size={18} weight="duotone" />, label: 'Sự cố biển báo', href: '/reports', badge: 3 },
+  { icon: <ClipboardText size={18} weight="duotone" />, label: 'Nhật ký hoạt động', href: '/audit-logs' },
+  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ biển báo', href: '/map' },
 ]
 
 export function Sidebar() {
@@ -56,10 +55,10 @@ export function Sidebar() {
         </div>
         <div className="leading-tight min-w-0">
           <p className="text-sm font-bold text-gray-900 truncate font-sans">
-            Staff Management
+            Quản trị vận hành
           </p>
           <p className="text-[11px] text-gray-400 truncate font-mono">
-            Enterprise Admin
+            {user?.role === 'admin' ? 'Quản trị viên cấp cao' : 'Nhân sự vận hành'}
           </p>
         </div>
       </div>
@@ -91,7 +90,7 @@ export function Sidebar() {
           className={({ isActive }) => linkClass(isActive)}
         >
           <GearSix size={18} weight="duotone" />
-          <span>Settings</span>
+          <span>Cài đặt hệ thống</span>
         </NavLink>
         <button
           type="button"
@@ -99,7 +98,7 @@ export function Sidebar() {
           className="flex items-center gap-3 px-3.5 py-2.5 rounded-[8px] text-xs sm:text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors w-full text-left cursor-pointer"
         >
           <SignOut size={18} weight="duotone" />
-          <span>Log Out</span>
+          <span>Đăng xuất</span>
         </button>
       </div>
     </aside>

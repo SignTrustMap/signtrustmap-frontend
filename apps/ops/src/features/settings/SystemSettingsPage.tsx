@@ -7,24 +7,24 @@ import {
 export default function SystemSettingsPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'tasks' | 'credits' | 'api'>('general')
   const [maintenanceMode, setMaintenanceMode] = useState(false)
-  const [currency, setCurrency] = useState('USD ($)')
+  const [currency, setCurrency] = useState('VND (₫)')
   const [maxDailyCredits, setMaxDailyCredits] = useState(500)
   const [reviewTimeout, setReviewTimeout] = useState(15)
   const [autoArchiveDays, setAutoArchiveDays] = useState(90)
   const [toast, setToast] = useState<string | null>(null)
 
   function handleSave() {
-    setToast('System settings saved successfully.')
+    setToast('Cài đặt hệ thống đã được lưu thành công.')
     setTimeout(() => setToast(null), 3000)
   }
 
   function handleReset() {
     setMaintenanceMode(false)
-    setCurrency('USD ($)')
+    setCurrency('VND (₫)')
     setMaxDailyCredits(500)
     setReviewTimeout(15)
     setAutoArchiveDays(90)
-    setToast('Settings reset to system defaults.')
+    setToast('Đã khôi phục cài đặt về mặc định của hệ thống.')
     setTimeout(() => setToast(null), 2500)
   }
 
@@ -33,10 +33,10 @@ export default function SystemSettingsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-          System Settings
+          Cài đặt hệ thống
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Configure platform parameters, operational rules, and limits.
+          Thiết lập các tham số nền tảng, quy tắc vận hành và hạn mức xử lý.
         </p>
       </div>
 
@@ -51,10 +51,10 @@ export default function SystemSettingsPage() {
       <div className="border-b border-[#E8E4E3] flex gap-8 text-xs sm:text-sm font-semibold">
         {(
           [
-            { id: 'general', label: 'General' },
-            { id: 'tasks', label: 'Task Rules' },
-            { id: 'credits', label: 'Credit Thresholds' },
-            { id: 'api', label: 'API Integrations' },
+            { id: 'general', label: 'Cài đặt chung' },
+            { id: 'tasks', label: 'Quy tắc nhiệm vụ' },
+            { id: 'credits', label: 'Hạn mức điểm thưởng' },
+            { id: 'api', label: 'Tích hợp API' },
           ] as const
         ).map((t) => (
           <button
@@ -77,16 +77,16 @@ export default function SystemSettingsPage() {
         {/* Section 1: Application Behavior */}
         <div className="space-y-4">
           <h2 className="text-base font-bold text-gray-900 border-b border-[#E8E4E3] pb-3">
-            Application Behavior
+            Hành vi ứng dụng
           </h2>
 
           <div className="flex items-center justify-between py-2">
             <div>
               <p className="text-xs sm:text-sm font-bold text-gray-900">
-                Maintenance Mode
+                Chế độ bảo trì hệ thống
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Suspend access for non-admin users during system updates.
+                Tạm dừng quyền truy cập đối với người dùng thông thường trong thời gian cập nhật.
               </p>
             </div>
 
@@ -108,15 +108,15 @@ export default function SystemSettingsPage() {
 
           <div className="pt-2 max-w-sm">
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5 font-mono">
-              Default System Currency
+              Đơn vị tiền tệ mặc định
             </label>
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
               className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-xl text-gray-800 focus:outline-none focus:border-[#007b8b]"
             >
-              <option value="USD ($)">USD ($)</option>
               <option value="VND (₫)">VND (₫)</option>
+              <option value="USD ($)">USD ($)</option>
               <option value="EUR (€)">EUR (€)</option>
             </select>
           </div>
@@ -125,13 +125,13 @@ export default function SystemSettingsPage() {
         {/* Section 2: Operational Limits */}
         <div className="space-y-4 pt-2">
           <h2 className="text-base font-bold text-gray-900 border-b border-[#E8E4E3] pb-3">
-            Operational Limits
+            Hạn mức & Giới hạn vận hành
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 font-mono">
-                Max Surveyor Daily Credits
+                Hạn mức thưởng tối đa/ngày của khảo sát viên
               </label>
               <input
                 type="number"
@@ -140,13 +140,13 @@ export default function SystemSettingsPage() {
                 className="w-full px-3.5 py-2.5 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-xl text-gray-900 focus:outline-none focus:border-[#007b8b]"
               />
               <p className="text-[11px] text-gray-400 mt-1">
-                Maximum credits allocatable per day.
+                Số điểm thưởng tối đa có thể cấp cho một tài khoản trong ngày.
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 font-mono">
-                Sign Review Timeout (mins)
+                Thời gian chờ duyệt biển báo (phút)
               </label>
               <input
                 type="number"
@@ -158,7 +158,7 @@ export default function SystemSettingsPage() {
 
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 font-mono">
-                Auto-Archiving Period (days)
+                Thời hạn tự động lưu trữ (ngày)
               </label>
               <input
                 type="number"
@@ -177,7 +177,7 @@ export default function SystemSettingsPage() {
             onClick={handleReset}
             className="px-4 py-2.5 text-xs sm:text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
           >
-            Reset to Default
+            Khôi phục mặc định
           </button>
           <button
             type="button"
@@ -185,7 +185,7 @@ export default function SystemSettingsPage() {
             className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all active:scale-[0.98] cursor-pointer"
           >
             <FloppyDisk size={16} weight="bold" />
-            <span>Save Changes</span>
+            <span>Lưu thay đổi</span>
           </button>
         </div>
       </div>

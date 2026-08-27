@@ -25,23 +25,23 @@ export interface SignReportItem {
 const mockSignReports: SignReportItem[] = [
   {
     id: '#REP-2049',
-    location: 'Terminal B, Gate 14',
-    reporter: { name: 'John Doe', initials: 'JD', avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]' },
-    dateSubmitted: 'Oct 24, 2023',
+    location: 'Đường Nguyễn Huệ, Quận 1, TP.HCM',
+    reporter: { name: 'Nguyễn Văn Hùng', initials: 'NH', avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]' },
+    dateSubmitted: '24/10/2023',
     status: 'Pending',
   },
   {
     id: '#REP-2048',
-    location: 'Concourse C, Restrooms',
-    reporter: { name: 'Alice Smith', initials: 'AS', avatarBg: 'bg-[#ffedd5] text-[#c2410c]' },
-    dateSubmitted: 'Oct 23, 2023',
+    location: 'Ngã tư Trần Phú - Điện Biên Phủ, Hà Nội',
+    reporter: { name: 'Trần Thị Mai', initials: 'TM', avatarBg: 'bg-[#ffedd5] text-[#c2410c]' },
+    dateSubmitted: '23/10/2023',
     status: 'Investigating',
   },
   {
     id: '#REP-2045',
-    location: 'Main Lobby, Exit 3',
-    reporter: { name: 'Bob Wilson', initials: 'BW', avatarBg: 'bg-gray-200 text-gray-700' },
-    dateSubmitted: 'Oct 20, 2023',
+    location: 'Cầu Rồng, Đường Bạch Đằng, Đà Nẵng',
+    reporter: { name: 'Lê Hoàng Nam', initials: 'LN', avatarBg: 'bg-gray-200 text-gray-700' },
+    dateSubmitted: '20/10/2023',
     status: 'Resolved',
   },
 ]
@@ -51,19 +51,19 @@ function ReportStatusBadge({ status }: { status: ReportStatus }) {
     case 'Pending':
       return (
         <span className="px-3 py-1 rounded text-xs font-bold bg-[#fee2e2] text-[#b91c1c]">
-          Pending
+          Chờ xử lý
         </span>
       )
     case 'Investigating':
       return (
         <span className="px-3 py-1 rounded text-xs font-bold bg-[#dbeafe] text-[#1d4ed8]">
-          Investigating
+          Đang xác minh
         </span>
       )
     case 'Resolved':
       return (
         <span className="px-3 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600">
-          Resolved
+          Đã giải quyết
         </span>
       )
   }
@@ -76,6 +76,13 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
+  const tabLabels: Record<'All' | 'Pending' | 'Investigating' | 'Resolved', string> = {
+    All: 'Tất cả báo cáo',
+    Pending: 'Chờ xử lý',
+    Investigating: 'Đang xác minh',
+    Resolved: 'Đã giải quyết',
+  }
+
   const filteredReports = reports.filter((r) => {
     const matchesTab = activeTab === 'All' || r.status === activeTab
     const matchesSearch =
@@ -86,17 +93,17 @@ export default function ReportsPage() {
   })
 
   function handleExport() {
-    const headers = ['ReportID,Location,Reporter,DateSubmitted,Status']
+    const headers = ['Mã báo cáo,Vị trí,Người gửi,Ngày gửi,Trạng thái']
     const rows = filteredReports.map(
       (r) =>
         `"${r.id}","${r.location}","${r.reporter.name}","${r.dateSubmitted}","${r.status}"`
     )
     const csvContent =
-      'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n')
+      'data:text/csv;charset=utf-8,\uFEFF' + [headers, ...rows].join('\n')
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `missing_signs_report_${Date.now()}.csv`)
+    link.setAttribute('download', `bao_cao_su_co_bien_bao_${Date.now()}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -108,10 +115,10 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Missing Signs Reports
+            Báo cáo sự cố biển báo
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage and resolve reported missing or damaged signage.
+            Quản lý và giải quyết các phản ánh về biển báo bị hư hỏng, che khuất hoặc thiếu sót.
           </p>
         </div>
 
@@ -121,7 +128,7 @@ export default function ReportsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 border border-[#E8E4E3] bg-white hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-all cursor-pointer"
         >
           <DownloadSimple size={16} />
-          <span>Export Report</span>
+          <span>Xuất báo cáo</span>
         </button>
       </div>
 
@@ -146,7 +153,7 @@ export default function ReportsPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-900'
                 }`}
               >
-                <span>{tab === 'All' ? 'All Reports' : tab}</span>
+                <span>{tabLabels[tab]}</span>
                 {count > 0 && (
                   <span
                     className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] ${
@@ -171,7 +178,7 @@ export default function ReportsPage() {
           />
           <input
             type="text"
-            placeholder="Search reports..."
+            placeholder="Tìm kiếm sự cố..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
@@ -185,12 +192,12 @@ export default function ReportsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#E8E4E3] bg-[#F8F7F7]/60 text-[11px] font-bold uppercase tracking-wider text-gray-500 font-mono">
-                <th className="py-4 px-6">Report ID</th>
-                <th className="py-4 px-6">Location</th>
-                <th className="py-4 px-6">Reporter</th>
-                <th className="py-4 px-6">Date Submitted</th>
-                <th className="py-4 px-6 text-center">Status</th>
-                <th className="py-4 px-6 text-right">Actions</th>
+                <th className="py-4 px-6">Mã báo cáo</th>
+                <th className="py-4 px-6">Vị trí phản ánh</th>
+                <th className="py-4 px-6">Người báo cáo</th>
+                <th className="py-4 px-6">Ngày gửi</th>
+                <th className="py-4 px-6 text-center">Trạng thái</th>
+                <th className="py-4 px-6 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] text-sm">
@@ -244,7 +251,7 @@ export default function ReportsPage() {
                           type="button"
                           className="text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
                         >
-                          Assign
+                          Phân công
                         </button>
                         <button
                           type="button"
@@ -255,7 +262,7 @@ export default function ReportsPage() {
                           }
                           className="text-xs font-semibold text-[#007b8b] hover:underline cursor-pointer"
                         >
-                          Review
+                          Kiểm tra
                         </button>
                       </>
                     ) : (
@@ -266,7 +273,7 @@ export default function ReportsPage() {
                         }
                         className="text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
                       >
-                        View Details
+                        Xem chi tiết
                       </button>
                     )}
                   </td>
@@ -278,7 +285,7 @@ export default function ReportsPage() {
 
         {/* Footer pagination */}
         <div className="py-3.5 px-6 border-t border-[#E8E4E3] flex items-center justify-between text-xs text-gray-500">
-          <span>Showing 1 to {filteredReports.length} of 24 results</span>
+          <span>Hiển thị 1 đến {filteredReports.length} trong 24 kết quả</span>
 
           <div className="flex items-center gap-1">
             <button

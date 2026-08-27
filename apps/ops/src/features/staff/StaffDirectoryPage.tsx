@@ -27,10 +27,10 @@ const mockSystemUsers: SystemUser[] = [
     id: 'USR-8492',
     name: 'Sarah Jenkins',
     email: 's.jenkins@enterprise.com',
-    role: 'Admin',
+    role: 'Quản trị viên',
     status: 'Active',
-    location: 'New York',
-    lastActive: 'Just now',
+    location: 'Hà Nội',
+    lastActive: 'Vừa xong',
     avatarText: 'SJ',
     avatarBg: 'bg-[#d3f7ff] text-[#007b8b]',
   },
@@ -38,10 +38,10 @@ const mockSystemUsers: SystemUser[] = [
     id: 'USR-7731',
     name: 'Marcus Reed',
     email: 'm.reed@enterprise.com',
-    role: 'Surveyor',
+    role: 'Khảo sát viên',
     status: 'Active',
-    location: 'London',
-    lastActive: '2 hours ago',
+    location: 'TP. Hồ Chí Minh',
+    lastActive: '2 giờ trước',
     avatarText: 'MR',
     avatarBg: 'bg-[#007b8b] text-white',
   },
@@ -49,10 +49,10 @@ const mockSystemUsers: SystemUser[] = [
     id: 'USR-9012',
     name: 'David Chen',
     email: 'd.chen@enterprise.com',
-    role: 'Reviewer',
+    role: 'Kiểm duyệt viên',
     status: 'Suspended',
-    location: 'Singapore',
-    lastActive: 'Oct 12, 2023',
+    location: 'Đà Nẵng',
+    lastActive: '12/10/2023',
     avatarText: 'DC',
     avatarBg: 'bg-slate-800 text-white',
   },
@@ -60,10 +60,10 @@ const mockSystemUsers: SystemUser[] = [
     id: 'USR-6621',
     name: 'Elena Lopez',
     email: 'e.lopez@enterprise.com',
-    role: 'Driver',
+    role: 'Tài xế',
     status: 'Inactive',
-    location: 'New York',
-    lastActive: 'Sep 05, 2023',
+    location: 'Cần Thơ',
+    lastActive: '05/09/2023',
     avatarText: 'EL',
     avatarBg: 'bg-indigo-100 text-indigo-700',
   },
@@ -75,21 +75,21 @@ function StatusDotBadge({ status }: { status: UserStatus }) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#dcfce7] text-[#15803d]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#15803d]" />
-          <span>Active</span>
+          <span>Đang hoạt động</span>
         </span>
       )
     case 'Suspended':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#fee2e2] text-[#b91c1c]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]" />
-          <span>Suspended</span>
+          <span>Tạm ngưng</span>
         </span>
       )
     case 'Inactive':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-          <span>Inactive</span>
+          <span>Không hoạt động</span>
         </span>
       )
   }
@@ -99,9 +99,9 @@ export default function StaffDirectoryPage() {
   const navigate = useNavigate()
   const [users] = useState<SystemUser[]>(mockSystemUsers)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [roleFilter, setRoleFilter] = useState('All Roles')
-  const [statusFilter, setStatusFilter] = useState('All Statuses')
-  const [locationFilter, setLocationFilter] = useState('All Locations')
+  const [roleFilter, setRoleFilter] = useState('Tất cả vai trò')
+  const [statusFilter, setStatusFilter] = useState('Tất cả trạng thái')
+  const [locationFilter, setLocationFilter] = useState('Tất cả khu vực')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -121,9 +121,9 @@ export default function StaffDirectoryPage() {
   }
 
   function handleClear() {
-    setRoleFilter('All Roles')
-    setStatusFilter('All Statuses')
-    setLocationFilter('All Locations')
+    setRoleFilter('Tất cả vai trò')
+    setStatusFilter('Tất cả trạng thái')
+    setLocationFilter('Tất cả khu vực')
     setSearchQuery('')
   }
 
@@ -132,11 +132,11 @@ export default function StaffDirectoryPage() {
       u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.id.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = roleFilter === 'All Roles' || u.role === roleFilter
+    const matchesRole = roleFilter === 'Tất cả vai trò' || u.role === roleFilter
     const matchesStatus =
-      statusFilter === 'All Statuses' || u.status === statusFilter
+      statusFilter === 'Tất cả trạng thái' || u.status === statusFilter
     const matchesLocation =
-      locationFilter === 'All Locations' || u.location === locationFilter
+      locationFilter === 'Tất cả khu vực' || u.location === locationFilter
 
     return matchesSearch && matchesRole && matchesStatus && matchesLocation
   })
@@ -147,10 +147,10 @@ export default function StaffDirectoryPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            System Users
+            Quản lý nhân sự
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage and monitor all personnel across the organization.
+            Quản lý và giám sát toàn bộ nhân sự trên toàn hệ thống.
           </p>
         </div>
 
@@ -163,7 +163,7 @@ export default function StaffDirectoryPage() {
             />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Tìm kiếm nhân sự..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b] shadow-xs"
@@ -175,7 +175,7 @@ export default function StaffDirectoryPage() {
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-[0.98] shrink-0 cursor-pointer"
           >
             <Plus size={16} weight="bold" />
-            <span>Add Staff</span>
+            <span>Thêm nhân sự</span>
           </button>
         </div>
       </div>
@@ -186,53 +186,53 @@ export default function StaffDirectoryPage() {
           {/* Role Filter */}
           <div className="sm:col-span-3">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
-              Role
+              Vai trò
             </label>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
             >
-              <option value="All Roles">All Roles</option>
-              <option value="Admin">Admin</option>
-              <option value="Surveyor">Surveyor</option>
-              <option value="Reviewer">Reviewer</option>
-              <option value="Driver">Driver</option>
+              <option value="Tất cả vai trò">Tất cả vai trò</option>
+              <option value="Quản trị viên">Quản trị viên</option>
+              <option value="Khảo sát viên">Khảo sát viên</option>
+              <option value="Kiểm duyệt viên">Kiểm duyệt viên</option>
+              <option value="Tài xế">Tài xế</option>
             </select>
           </div>
 
           {/* Status Filter */}
           <div className="sm:col-span-3">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
-              Status
+              Trạng thái
             </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
             >
-              <option value="All Statuses">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Suspended">Suspended</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Tất cả trạng thái">Tất cả trạng thái</option>
+              <option value="Active">Đang hoạt động</option>
+              <option value="Suspended">Tạm ngưng</option>
+              <option value="Inactive">Không hoạt động</option>
             </select>
           </div>
 
           {/* Location Filter */}
           <div className="sm:col-span-3">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
-              Location
+              Khu vực
             </label>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
             >
-              <option value="All Locations">All Locations</option>
-              <option value="New York">New York</option>
-              <option value="London">London</option>
-              <option value="Singapore">Singapore</option>
-              <option value="Seattle">Seattle</option>
+              <option value="Tất cả khu vực">Tất cả khu vực</option>
+              <option value="Hà Nội">Hà Nội</option>
+              <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+              <option value="Đà Nẵng">Đà Nẵng</option>
+              <option value="Cần Thơ">Cần Thơ</option>
             </select>
           </div>
 
@@ -243,14 +243,14 @@ export default function StaffDirectoryPage() {
               onClick={handleClear}
               className="flex-1 py-2 px-3 text-xs sm:text-sm font-semibold text-gray-600 bg-white border border-[#E8E4E3] hover:bg-gray-50 rounded-lg transition-colors cursor-pointer text-center"
             >
-              Clear
+              Xóa bộ lọc
             </button>
             <button
               type="button"
               className="flex-1 py-2 px-3 text-xs sm:text-sm font-semibold text-white bg-[#007b8b] hover:bg-[#00606d] rounded-lg transition-colors shadow-xs inline-flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Funnel size={14} />
-              <span>Apply</span>
+              <span>Áp dụng</span>
             </button>
           </div>
         </div>
@@ -272,12 +272,12 @@ export default function StaffDirectoryPage() {
                     className="w-4 h-4 rounded text-[#007b8b] focus:ring-0 cursor-pointer"
                   />
                 </th>
-                <th className="py-4 px-6">User</th>
-                <th className="py-4 px-6">Role</th>
-                <th className="py-4 px-6">Status</th>
-                <th className="py-4 px-6">Location</th>
-                <th className="py-4 px-6">Last Active</th>
-                <th className="py-4 px-6 text-right">Actions</th>
+                <th className="py-4 px-6">Nhân sự</th>
+                <th className="py-4 px-6">Vai trò</th>
+                <th className="py-4 px-6">Trạng thái</th>
+                <th className="py-4 px-6">Khu vực</th>
+                <th className="py-4 px-6">Hoạt động cuối</th>
+                <th className="py-4 px-6 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3]">
@@ -353,7 +353,7 @@ export default function StaffDirectoryPage() {
                         onClick={() => navigate(`/staff/${user.id}`)}
                         className="text-xs font-semibold text-[#007b8b] hover:underline cursor-pointer"
                       >
-                        View Details
+                        Xem chi tiết
                       </button>
                     </td>
                   </tr>
@@ -365,7 +365,7 @@ export default function StaffDirectoryPage() {
 
         {/* Footer Pagination */}
         <div className="py-3.5 px-6 border-t border-[#E8E4E3] flex items-center justify-between text-xs text-gray-500">
-          <span>Showing 1 to {filteredUsers.length} of 97 results</span>
+          <span>Hiển thị 1 đến {filteredUsers.length} trong 97 kết quả</span>
 
           <div className="flex items-center gap-1">
             <button
