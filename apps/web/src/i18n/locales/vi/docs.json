@@ -1,36 +1,36 @@
 {
-  "title": "Tài liệu kỹ thuật SignTrustMap",
-  "subtitle": "Hướng dẫn toàn diện về kiến trúc hệ thống, API và quy trình MLOps của nền tảng SignTrustMap.",
+  "title": "Lorem Ipsum Dolor Sit Amet",
+  "subtitle": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
   "sections": [
     {
-      "id": "overview",
-      "title": "Tổng quan hệ thống",
-      "content": "SignTrustMap là nền tảng kết hợp Crowd-sourcing và AI để xây dựng cơ sở dữ liệu biển báo giao thông Việt Nam theo chuẩn QCVN 41:2019/BGTVT. Hệ thống bao gồm 3 thành phần chính: Mobile App (khảo sát thực địa), AI Pipeline (bóc tách & phân loại biển báo tự động), và Ops Portal (kiểm duyệt & quản trị dữ liệu)."
+      "id": "lorem-ipsum-1",
+      "title": "Lorem Ipsum Dolor",
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
     },
     {
-      "id": "architecture",
-      "title": "Kiến trúc tổng thể",
-      "content": "Kiến trúc monorepo bao gồm: apps/web (cổng cộng đồng & bản đồ GIS), apps/ops (cổng quản trị nội bộ), packages/shared (types & utils dùng chung). Backend sử dụng PostgreSQL + PostGIS cho dữ liệu không gian, pgvector cho embedding AI, và Redis cho hàng đợi tác vụ."
+      "id": "lorem-ipsum-2",
+      "title": "Consectetur Adipiscing Elit",
+      "content": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
     },
     {
-      "id": "ai-pipeline",
-      "title": "AI Pipeline (YOLO12 + CLIP)",
-      "content": "Pipeline AI gồm 3 giai đoạn: (1) Detection: YOLO12 phát hiện biển báo từ frame video Dashcam; (2) Tracking: BoT-SORT theo dõi vật thể qua các frame; (3) Classification: CLIP mã hóa ảnh thành vector và tra cứu nearest neighbor trong pgvector để gán loại biển theo QCVN 41."
+      "id": "lorem-ipsum-3",
+      "title": "Sed Do Eiusmod Tempor",
+      "content": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident."
     },
     {
-      "id": "trust-score",
-      "title": "Hệ thống Trust Score",
-      "content": "Mỗi biển báo có điểm tin cậy (Trust Score) tính theo công thức trọng số: Score = Σ(w_i × v_i) / Σ(w_i), trong đó w_i là trọng số của reviewer (dựa trên lịch sử độ chính xác), v_i là phiếu xác nhận/từ chối. Biển báo đạt threshold 0.75 được chuyển trạng thái thành Verified."
+      "id": "lorem-ipsum-4",
+      "title": "Incididunt Ut Labore Et Dolore",
+      "content": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida."
     },
     {
-      "id": "api",
-      "title": "Geospatial API",
-      "content": "REST API cung cấp endpoint truy vấn biển báo theo bounding box, bán kính, và loại biển. Hỗ trợ filter theo Trust Score, ngày cập nhật, và chiều di chuyển. Dữ liệu trả về theo chuẩn GeoJSON, tương thích với Leaflet, Mapbox và các GIS framework phổ biến."
+      "id": "lorem-ipsum-5",
+      "title": "Magna Aliqua Ut Enim",
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
     },
     {
-      "id": "active-learning",
-      "title": "Active Learning & Revalidation",
-      "content": "Hệ thống tự động xác định các biển báo 'Stale' (không được xác nhận lại sau 90 ngày) và tạo Revalidation Task cho người dùng gần khu vực đó. Dữ liệu mới từ Revalidation được đưa vào vòng huấn luyện lại mô hình AI để cải thiện độ chính xác theo thời gian."
+      "id": "lorem-ipsum-6",
+      "title": "Quis Nostrud Exercitation",
+      "content": "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Curabitur pretium tincidunt lacus, nulla gravida orci a odio."
     }
   ],
   "toc_title": "Mục lục",

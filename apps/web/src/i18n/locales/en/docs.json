@@ -1,36 +1,36 @@
 {
-  "title": "SignTrustMap Technical Documentation",
-  "subtitle": "A comprehensive guide to the system architecture, API, and MLOps pipeline of the SignTrustMap platform.",
+  "title": "Lorem Ipsum Dolor Sit Amet",
+  "subtitle": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
   "sections": [
     {
-      "id": "overview",
-      "title": "System Overview",
-      "content": "SignTrustMap is a platform combining Crowd-sourcing and AI to build a traffic sign database for Vietnam conforming to the QCVN 41:2019/BGTVT standard. The system consists of 3 main components: Mobile App (field surveying), AI Pipeline (automatic sign extraction & classification), and Ops Portal (data moderation & administration)."
+      "id": "lorem-ipsum-1",
+      "title": "Lorem Ipsum Dolor",
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur."
     },
     {
-      "id": "architecture",
-      "title": "Overall Architecture",
-      "content": "The monorepo architecture includes: apps/web (community portal & GIS map), apps/ops (internal admin portal), packages/shared (shared types & utils). The backend uses PostgreSQL + PostGIS for spatial data, pgvector for AI embeddings, and Redis for task queuing."
+      "id": "lorem-ipsum-2",
+      "title": "Consectetur Adipiscing Elit",
+      "content": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
     },
     {
-      "id": "ai-pipeline",
-      "title": "AI Pipeline (YOLO12 + CLIP)",
-      "content": "The AI pipeline consists of 3 stages: (1) Detection: YOLO12 detects signs from dashcam video frames; (2) Tracking: BoT-SORT tracks objects across frames; (3) Classification: CLIP encodes images into vectors and queries the nearest neighbor in pgvector to assign sign types according to QCVN 41."
+      "id": "lorem-ipsum-3",
+      "title": "Sed Do Eiusmod Tempor",
+      "content": "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident."
     },
     {
-      "id": "trust-score",
-      "title": "Trust Score System",
-      "content": "Each sign has a Trust Score computed by a weighted formula: Score = Σ(w_i × v_i) / Σ(w_i), where w_i is the reviewer's weight (based on historical accuracy) and v_i is their confirm/reject vote. Signs reaching a threshold of 0.75 are transitioned to Verified status."
+      "id": "lorem-ipsum-4",
+      "title": "Incididunt Ut Labore Et Dolore",
+      "content": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris. Integer in mauris eu nibh euismod gravida."
     },
     {
-      "id": "api",
-      "title": "Geospatial API",
-      "content": "The REST API provides endpoints to query signs by bounding box, radius, and sign type. Supports filtering by Trust Score, last updated date, and travel direction. Data is returned in GeoJSON format, compatible with Leaflet, Mapbox, and popular GIS frameworks."
+      "id": "lorem-ipsum-5",
+      "title": "Magna Aliqua Ut Enim",
+      "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
     },
     {
-      "id": "active-learning",
-      "title": "Active Learning & Revalidation",
-      "content": "The system automatically identifies 'Stale' signs (not reconfirmed within 90 days) and creates Revalidation Tasks for users near that area. New data from Revalidation is fed into the AI model retraining loop to improve accuracy over time."
+      "id": "lorem-ipsum-6",
+      "title": "Quis Nostrud Exercitation",
+      "content": "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Curabitur pretium tincidunt lacus, nulla gravida orci a odio."
     }
   ],
   "toc_title": "Table of Contents",

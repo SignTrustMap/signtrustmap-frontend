@@ -40,7 +40,7 @@ export function Navbar() {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full backdrop-blur-xl transition-colors border-b ${
+      className={`w-full backdrop-blur-xl transition-colors border-b ${
         isDark
           ? 'bg-[#030708]/90 border-white/10 text-white'
           : 'bg-white/90 border-[#E8E4E3] text-gray-900 shadow-sm'

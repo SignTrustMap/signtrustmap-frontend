@@ -30,8 +30,10 @@ export default function App() {
         <I18nProvider>
           <BrowserRouter>
             <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
-              <AnnouncementBar />
-              <Navbar />
+              <div className="sticky top-0 z-40 w-full">
+                <AnnouncementBar />
+                <Navbar />
+              </div>
               <main className="flex-1 w-full flex flex-col">
                 <Routes>
                   <Route path="/" element={<Home />} />
