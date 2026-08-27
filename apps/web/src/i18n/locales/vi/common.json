@@ -93,5 +93,9 @@
       "hide_pw": "Ẩn mật khẩu",
       "show_pw": "Hiện mật khẩu"
     }
+  },
+  "placeholder": {
+    "about": "Về chúng tôi",
+    "coming_soon": "Đang được cập nhật"
   }
 }

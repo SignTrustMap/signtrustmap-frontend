@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { I18nProvider } from '@/context/I18nContext'
@@ -14,10 +14,11 @@ import Login from '@/pages/Login'
 import Signup from '@/pages/Signup'
 import Docs from '@/pages/Docs'
 
-function PlaceholderPage({ title }: { title: string }) {
+function PlaceholderPage({ titleKey }: { titleKey: string }) {
+  const { t } = useTranslation('common')
   return (
     <div className="min-h-[50dvh] flex items-center justify-center w-full">
-      <p className="text-gray-400 text-sm">{title} — Đang được cập nhật</p>
+      <p className="text-gray-400 text-sm">{t(titleKey)} — {t('placeholder.coming_soon')}</p>
     </div>
   )
 }
@@ -39,7 +40,7 @@ export default function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/docs" element={<Docs />} />
-                  <Route path="/about" element={<PlaceholderPage title="Về chúng tôi" />} />
+                  <Route path="/about" element={<PlaceholderPage titleKey="placeholder.about" />} />
                 </Routes>
               </main>
               <Footer />

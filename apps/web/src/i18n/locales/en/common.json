@@ -93,5 +93,9 @@
       "hide_pw": "Hide password",
       "show_pw": "Show password"
     }
+  },
+  "placeholder": {
+    "about": "About Us",
+    "coming_soon": "Coming soon"
   }
 }
