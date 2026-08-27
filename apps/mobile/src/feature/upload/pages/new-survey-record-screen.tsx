@@ -1,9 +1,21 @@
 import { Image } from 'expo-image';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import * as LegacyMediaLibrary from 'expo-media-library/legacy';
+import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -13,6 +25,14 @@ import {
   type ImageGpsCoordinates,
 } from '@/feature/upload/utils/image-gps';
 import { useTheme } from '@/hooks/use-theme';
+
+type SelectedSurveyMedia = {
+  fileName?: string | null;
+  type: 'image' | 'video';
+  uri: string;
+};
+
+const ANDROID_GALLERY_PAGE_SIZE = 60;
 
 function isValidGpsCoordinates(
   coordinates: ImageGpsCoordinates | null | undefined,
@@ -95,7 +115,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     let mediaAssetId = asset.assetId;
 
     if (mediaAssetId && Platform.OS === 'android' && !mediaAssetId.startsWith('content://')) {
-      const LegacyMediaLibrary = await import('expo-media-library/legacy');
       const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(mediaAssetId);
 
       location = assetInfo.location;
@@ -152,8 +171,108 @@ export function NewSurveyRecordScreen() {
   const theme = useTheme();
   const [isOpeningGallery, setIsOpeningGallery] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
-  const [selectedAsset, setSelectedAsset] = useState<ImagePickerAsset>();
+  const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
   const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
+  const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
+  const [androidGalleryAssets, setAndroidGalleryAssets] = useState<MediaLibraryAsset[]>([]);
+  const [androidGalleryCursor, setAndroidGalleryCursor] = useState<string>();
+  const [androidGalleryHasNextPage, setAndroidGalleryHasNextPage] = useState(false);
+  const [androidGalleryError, setAndroidGalleryError] = useState<string>();
+  const [isAndroidGalleryLoading, setIsAndroidGalleryLoading] = useState(false);
+  const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
+  const isLoadingAndroidGallery = useRef(false);
+
+  const loadAndroidGalleryPage = async (after?: string) => {
+    if (isLoadingAndroidGallery.current) return;
+
+    isLoadingAndroidGallery.current = true;
+    setIsAndroidGalleryLoading(true);
+    setAndroidGalleryError(undefined);
+
+    try {
+      const page = await LegacyMediaLibrary.getAssetsAsync({
+        after,
+        first: ANDROID_GALLERY_PAGE_SIZE,
+        mediaType: LegacyMediaLibrary.MediaType.photo,
+        sortBy: [[LegacyMediaLibrary.SortBy.creationTime, false]],
+      });
+
+      setAndroidGalleryAssets((currentAssets) =>
+        after ? [...currentAssets, ...page.assets] : page.assets,
+      );
+      setAndroidGalleryCursor(page.endCursor);
+      setAndroidGalleryHasNextPage(page.hasNextPage);
+    } catch (error) {
+      console.warn('[Surveyor] Unable to load Android media library:', error);
+      setAndroidGalleryError('Unable to load your photo library. Please try again.');
+    } finally {
+      isLoadingAndroidGallery.current = false;
+      setIsAndroidGalleryLoading(false);
+    }
+  };
+
+  const openAndroidMediaLibrary = async () => {
+    const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo']);
+
+    console.log('[Surveyor] Media permission before gallery:', {
+      accessPrivileges: permission.accessPrivileges,
+      status: permission.status,
+    });
+
+    if (permission.status !== 'granted') {
+      setPickerError('Photo-library permission is required to read image location metadata.');
+      return;
+    }
+
+    setAndroidGalleryAssets([]);
+    setAndroidGalleryCursor(undefined);
+    setAndroidGalleryHasNextPage(false);
+    setAndroidGalleryError(undefined);
+    setIsAndroidGalleryVisible(true);
+    await loadAndroidGalleryPage();
+  };
+
+  const handleSelectAndroidAsset = async (asset: MediaLibraryAsset) => {
+    if (selectingAndroidAssetId) return;
+
+    setSelectingAndroidAssetId(asset.id);
+    setAndroidGalleryError(undefined);
+
+    try {
+      const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+      const exif = assetInfo.exif as Record<string, unknown> | undefined;
+      const exifCoordinates = extractImageGpsCoordinates(exif);
+      const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+        ? {
+            latitude: assetInfo.location.latitude,
+            longitude: assetInfo.location.longitude,
+          }
+        : exifCoordinates;
+
+      console.log('[Surveyor] Selected MediaStore asset:', {
+        assetId: asset.id,
+        fileName: asset.filename,
+        location: assetInfo.location ?? null,
+      });
+      console.log(
+        '[Surveyor] Extracted image GPS data:',
+        gpsCoordinates ? { ...gpsCoordinates, source: 'media-library-original' } : null,
+      );
+
+      setSelectedAsset({
+        fileName: asset.filename,
+        type: 'image',
+        uri: assetInfo.localUri ?? asset.uri,
+      });
+      setSelectedGps(gpsCoordinates ?? null);
+      setIsAndroidGalleryVisible(false);
+    } catch (error) {
+      console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
+      setAndroidGalleryError('Unable to read that photo. Please choose another one.');
+    } finally {
+      setSelectingAndroidAssetId(undefined);
+    }
+  };
 
   const handleOpenGallery = async () => {
     if (isOpeningGallery) return;
@@ -162,21 +281,12 @@ export function NewSurveyRecordScreen() {
     setPickerError(undefined);
 
     try {
-      const ImagePicker = await import('expo-image-picker');
-
       if (Platform.OS === 'android') {
-        try {
-          const MediaLibrary = await import('expo-media-library');
-          const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
-
-          console.log('[Surveyor] Media permission before picker:', {
-            accessPrivileges: permission.accessPrivileges,
-            status: permission.status,
-          });
-        } catch (error) {
-          console.warn('[Surveyor] Unable to request media permission before picker:', error);
-        }
+        await openAndroidMediaLibrary();
+        return;
       }
+
+      const ImagePicker = await import('expo-image-picker');
 
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
@@ -191,7 +301,11 @@ export function NewSurveyRecordScreen() {
         const asset = result.assets[0];
         const gpsCoordinates = await extractSelectedAssetGps(asset);
 
-        setSelectedAsset(asset);
+        setSelectedAsset({
+          fileName: asset.fileName,
+          type: asset.type === 'video' ? 'video' : 'image',
+          uri: asset.uri,
+        });
         setSelectedGps(gpsCoordinates);
       }
     } catch (error) {
@@ -207,6 +321,92 @@ export function NewSurveyRecordScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setIsAndroidGalleryVisible(false)}
+        visible={isAndroidGalleryVisible}
+      >
+        <SafeAreaView
+          edges={['top', 'bottom']}
+          style={[styles.galleryScreen, { backgroundColor: theme.background }]}
+        >
+          <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
+            <View style={styles.galleryHeading}>
+              <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
+              <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
+                Original location metadata will be preserved
+              </Text>
+            </View>
+            <AppButton
+              accessibilityLabel="Close photo library"
+              label="Close"
+              onPress={() => setIsAndroidGalleryVisible(false)}
+              style={styles.galleryCloseButton}
+              variant="ghost"
+            />
+          </View>
+
+          {androidGalleryError ? (
+            <Text accessibilityRole="alert" style={styles.galleryErrorText}>
+              {androidGalleryError}
+            </Text>
+          ) : null}
+
+          <FlatList
+            contentContainerStyle={
+              androidGalleryAssets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
+            }
+            data={androidGalleryAssets}
+            keyExtractor={(asset) => asset.id}
+            ListEmptyComponent={
+              <View style={styles.galleryEmptyState}>
+                {isAndroidGalleryLoading ? (
+                  <ActivityIndicator color={theme.tertiary} size="large" />
+                ) : null}
+                <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
+                  {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
+                </Text>
+              </View>
+            }
+            ListFooterComponent={
+              androidGalleryHasNextPage ? (
+                <ActivityIndicator color={theme.tertiary} style={styles.galleryFooterLoader} />
+              ) : null
+            }
+            numColumns={3}
+            onEndReached={() => {
+              if (androidGalleryHasNextPage && androidGalleryCursor) {
+                void loadAndroidGalleryPage(androidGalleryCursor);
+              }
+            }}
+            onEndReachedThreshold={0.5}
+            renderItem={({ item }) => {
+              const isSelecting = selectingAndroidAssetId === item.id;
+
+              return (
+                <Pressable
+                  accessibilityLabel={`Select ${item.filename}`}
+                  accessibilityRole="button"
+                  disabled={Boolean(selectingAndroidAssetId)}
+                  onPress={() => void handleSelectAndroidAsset(item)}
+                  style={({ pressed }) => [
+                    styles.galleryItem,
+                    { opacity: pressed || isSelecting ? 0.65 : 1 },
+                  ]}
+                >
+                  <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
+                  {isSelecting ? (
+                    <View style={styles.gallerySelectingOverlay}>
+                      <ActivityIndicator color="#FFFFFF" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
+
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
@@ -319,6 +519,89 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  galleryScreen: {
+    flex: 1,
+  },
+  galleryHeader: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    borderBottomWidth: 1,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  galleryHeading: {
+    flex: 1,
+  },
+  galleryTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 20,
+    fontWeight: 700,
+    lineHeight: 28,
+  },
+  gallerySubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 500,
+    lineHeight: 17,
+  },
+  galleryCloseButton: {
+    minHeight: 40,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  galleryErrorText: {
+    color: '#B42318',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  galleryGrid: {
+    padding: 1,
+  },
+  galleryEmptyContent: {
+    flexGrow: 1,
+  },
+  galleryEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    padding: Spacing.four,
+  },
+  galleryEmptyText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 500,
+  },
+  galleryItem: {
+    position: 'relative',
+    width: '33.3333%',
+    aspectRatio: 1,
+    padding: 1,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gallerySelectingOverlay: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    bottom: 1,
+    left: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  galleryFooterLoader: {
+    marginVertical: Spacing.three,
   },
   content: {
     width: '100%',
