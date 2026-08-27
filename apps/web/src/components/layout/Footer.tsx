@@ -1,35 +1,36 @@
 import { Link } from 'react-router-dom'
 import { GithubLogo, XLogo, FacebookLogo, ArrowSquareOut } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
-
-const footerLinks = {
-  'Sản phẩm': [
-    { label: 'Bản đồ biển báo GIS', href: '/product/map' },
-    { label: 'Ứng dụng khảo sát & dẫn đường', href: '/product/app' },
-    { label: 'Pipeline AI (YOLO12 + CLIP)', href: '/product/map' },
-    { label: 'Danh mục chuẩn QCVN 41:2019', href: '/docs' },
-  ],
-  'Giải pháp': [
-    { label: 'Dành cho Khảo sát viên (Surveyor)', href: '/product/app' },
-    { label: 'Dành cho Người kiểm duyệt (Reviewer)', href: 'https://ops.signtrustmap.site', external: true },
-    { label: 'Dành cho Tài xế & Dẫn đường', href: '/product/app' },
-    { label: 'Cổng Quản trị & Điều hành Ops', href: 'https://ops.signtrustmap.site', external: true },
-  ],
-  'Tài liệu & MLOps': [
-    { label: 'Tài liệu kỹ thuật API', href: '/docs' },
-    { label: 'Quy trình Active Learning', href: '/docs' },
-    { label: 'Mã nguồn GitHub', href: 'https://github.com/SignTrustMap', external: true },
-  ],
-  'Dự án': [
-    { label: 'Về dự án SignTrustMap', href: '/about' },
-    { label: 'Blog & Tin tức', href: '/blog' },
-    { label: 'Chính sách bảo mật', href: '/privacy' },
-    { label: 'Điều khoản dịch vụ', href: '/terms' },
-  ],
-}
+import { useTranslation } from 'react-i18next'
 
 export function Footer() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('common')
+
+  const footerLinks = {
+    [t('footer.sections.product')]: [
+      { label: t('footer.links.gis_map'), href: '/product/map' },
+      { label: t('footer.links.mobile_app'), href: '/product/app' },
+      { label: t('footer.links.ai_pipeline'), href: '/product/map' },
+      { label: t('footer.links.qcvn_catalog'), href: '/docs' },
+    ],
+    [t('footer.sections.solutions')]: [
+      { label: t('footer.links.for_surveyor'), href: '/product/app' },
+      { label: t('footer.links.for_reviewer'), href: 'https://ops.signtrustmap.site', external: true },
+      { label: t('footer.links.for_driver'), href: '/product/app' },
+      { label: t('footer.links.ops_portal'), href: 'https://ops.signtrustmap.site', external: true },
+    ],
+    [t('footer.sections.docs_mlops')]: [
+      { label: t('footer.links.api_docs'), href: '/docs' },
+      { label: t('footer.links.active_learning'), href: '/docs' },
+      { label: t('footer.links.github'), href: 'https://github.com/SignTrustMap', external: true },
+    ],
+    [t('footer.sections.project')]: [
+      { label: t('footer.links.about'), href: '/about' },
+      { label: t('footer.links.privacy'), href: '/privacy' },
+      { label: t('footer.links.terms'), href: '/terms' },
+    ],
+  }
 
   return (
     <footer
@@ -60,7 +61,7 @@ export function Footer() {
               </span>
             </Link>
             <p className={`text-xs leading-relaxed max-w-[220px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.
+              {t('footer.description')}
             </p>
 
             {/* Social Icons */}
@@ -140,7 +141,7 @@ export function Footer() {
             isDark ? 'border-white/5 text-gray-500' : 'border-gray-200 text-gray-500'
           }`}
         >
-          <p>© {new Date().getFullYear()} SignTrustMap Project.</p>
+          <p>{t('footer.copyright', { year: new Date().getFullYear() })}</p>
           <div className="flex items-center gap-4 text-[11px] font-mono">
             <span>v1.0.0</span>
           </div>

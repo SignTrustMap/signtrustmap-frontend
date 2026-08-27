@@ -1,0 +1,53 @@
+{
+  "mega": {
+    "category_label": "Feature categories",
+    "view_all": "View all categories",
+    "standard_note": "Standardized by QCVN 41:2019/BGTVT",
+    "tech_docs": "Technical Docs",
+    "view_detail": "View detail",
+    "categories": {
+      "explore": "GIS Map & AI Pipeline",
+      "apps": "Apps & Validation",
+      "developer": "MLOps & Developers"
+    },
+    "items": {
+      "gis_map_title": "GIS Traffic Sign Map",
+      "gis_map_desc": "Search, cluster-filter, and inspect QCVN 41 sign data with traffic direction metadata.",
+      "gis_map_badge": "Core",
+      "ai_pipeline_title": "AI Pipeline (YOLO12 + CLIP)",
+      "ai_pipeline_desc": "Auto-extract from dashcam video, BoT-SORT object tracking, and pgvector classification.",
+      "ai_pipeline_badge": "AI Pipeline",
+      "mobile_app_title": "Survey & Navigation App",
+      "mobile_app_desc": "Record GPX field trips and get directional sign alerts matching your lane of travel.",
+      "mobile_app_badge": "Mobile App",
+      "reviewer_title": "Reviewer Space & Consensus",
+      "reviewer_desc": "Peer-review validation mechanism and weighted consensus scoring.",
+      "credit_title": "Credit Economy & Contribution Rewards",
+      "credit_desc": "Earn rewards for valid data contributions and use credits for premium features.",
+      "credit_badge": "Credits",
+      "active_learning_title": "Active Learning & Revalidation",
+      "active_learning_desc": "Automated loop for refreshing stale signs and periodic AI model retraining.",
+      "active_learning_badge": "MLOps",
+      "api_title": "Geospatial API & SDK",
+      "api_desc": "PostGIS spatial data API for autonomous vehicle research and logistics applications.",
+      "api_badge": "API"
+    }
+  },
+  "app_page": {
+    "eyebrow": "// MOBILE APP",
+    "title": "Survey & Navigation App",
+    "subtitle": "Record GPX field trips, receive directional sign alerts, and earn credits when your contributions pass community review.",
+    "download_ios": "App Store",
+    "download_android": "Google Play",
+    "coming_soon": "Coming Soon",
+    "features_title": "Key Features",
+    "feature_1_title": "Trip Recording (Video + GPX)",
+    "feature_1_desc": "Sync dashcam video and GPX trajectory data for the AI system to automatically extract traffic signs.",
+    "feature_2_title": "Directional Sign Alerts",
+    "feature_2_desc": "Detect vehicle direction and only trigger alerts for signs applicable to your lane.",
+    "feature_3_title": "Credit Rewards (Credit Economy)",
+    "feature_3_desc": "Earn transparent credit points when your trip or image contributions pass community review.",
+    "feature_4_title": "Field Revalidation Tasks",
+    "feature_4_desc": "Receive tasks to re-check stale signs near your location for extra large rewards."
+  }
+}

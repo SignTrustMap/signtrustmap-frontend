@@ -12,11 +12,13 @@ import {
 } from '@phosphor-icons/react'
 import { TopographicContour } from '@/components/common/TopographicContour'
 import { useTheme } from '@/context/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { sponsorList } from '@/data'
 
 /* ─── 1. AI & TECH ECOSYSTEM LOGO MARQUEE (Infinite Loop) ─────────── */
 function AiMarqueeLogos() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('home')
 
   return (
     <div className="w-full pt-8 pb-6 overflow-hidden">
@@ -25,7 +27,7 @@ function AiMarqueeLogos() {
           isDark ? 'text-gray-300' : 'text-gray-600'
         }`}
       >
-        Tương thích và hỗ trợ phát triển bởi các mô hình AI & công cụ lập trình hàng đầu
+        {t('hero.marquee_label')}
       </p>
 
       {/* Infinite Scrolling Track with Soft Gradient Fade Mask */}
@@ -100,6 +102,7 @@ function AiMarqueeLogos() {
 /* ─── 2. HERO SECTION ─────────────────────────────────────────────── */
 function HeroSection() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('home')
 
   return (
     <section
@@ -161,10 +164,10 @@ function HeroSection() {
         >
           <span className={`w-2 h-2 rounded-full animate-ping ${isDark ? 'bg-[#00c4de]' : 'bg-[#007b8b]'}`} />
           <span className={`text-xs uppercase tracking-wider font-semibold ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}`}>
-            Nền tảng Crowd-AI & GIS
+            {t('hero.badge_ai')}
           </span>
           <span className={isDark ? 'text-gray-400' : 'text-gray-300'}>•</span>
-          <span className={isDark ? 'text-gray-200' : 'text-gray-700 font-medium'}>Chuẩn QCVN 41:2019/BGTVT</span>
+          <span className={isDark ? 'text-gray-200' : 'text-gray-700 font-medium'}>{t('hero.badge_standard')}</span>
         </motion.div>
 
         {/* H1 Title: Project Name */}
@@ -198,7 +201,7 @@ function HeroSection() {
             isDark ? 'text-gray-200' : 'text-gray-700'
           }`}
         >
-          Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.
+          {t('hero.subtitle')}
         </motion.h2>
 
         {/* CTA Buttons */}
@@ -216,7 +219,7 @@ function HeroSection() {
                 : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20'
             }`}
           >
-            <span>Khám phá bản đồ GIS</span>
+            <span>{t('hero.cta_map')}</span>
             <ArrowRight size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
@@ -228,7 +231,7 @@ function HeroSection() {
             }`}
           >
             <DeviceMobile size={18} />
-            <span>Tải ứng dụng mobile</span>
+            <span>{t('hero.cta_app')}</span>
           </Link>
         </motion.div>
 
@@ -248,19 +251,19 @@ function HeroSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {[
             {
-              stat: 'Lorem Ipsum',
-              title: 'Dolor Sit Amet Consectetur',
-              desc: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+              stat: t('hero.stats.s1_stat'),
+              title: t('hero.stats.s1_title'),
+              desc: t('hero.stats.s1_desc'),
             },
             {
-              stat: 'Adipiscing Elit',
-              title: 'Eiusmod Tempor Incididunt',
-              desc: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat.',
+              stat: t('hero.stats.s2_stat'),
+              title: t('hero.stats.s2_title'),
+              desc: t('hero.stats.s2_desc'),
             },
             {
-              stat: 'Magna Aliqua',
-              title: 'Labore Et Dolore Magna',
-              desc: 'Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit.',
+              stat: t('hero.stats.s3_stat'),
+              title: t('hero.stats.s3_title'),
+              desc: t('hero.stats.s3_desc'),
             },
           ].map((item, idx) => (
             <motion.div
@@ -299,6 +302,7 @@ function HeroSection() {
 /* ─── 3. TOPOGRAPHIC TRANSITION ───────────────────────────────────── */
 function TopographicTransitionSection() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('home')
 
   return (
     <section
@@ -318,13 +322,13 @@ function TopographicTransitionSection() {
               isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
             }`}
           >
-            // VÒNG ĐỜI DỮ LIỆU KHÉP KÍN
+            {t('topo.eyebrow')}
           </p>
           <h2 className={`text-3xl sm:text-5xl font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            Từ camera thực địa đến bản đồ dẫn đường tin cậy
+            {t('topo.title')}
           </h2>
           <p className={`text-base sm:text-lg mt-4 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-            Quy trình toàn diện giải quyết bài toán độ trễ và sự thay đổi liên tục của biển báo giao thông tại Việt Nam.
+            {t('topo.subtitle')}
           </p>
         </div>
 
@@ -333,21 +337,21 @@ function TopographicTransitionSection() {
           {[
             {
               icon: <Brain size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
-              tag: 'Lorem Ipsum Tag',
-              title: 'Lorem Ipsum Dolor Sit',
-              body: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.',
+              tag: t('topo.cards.c1_tag'),
+              title: t('topo.cards.c1_title'),
+              body: t('topo.cards.c1_body'),
             },
             {
               icon: <ShieldCheck size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
-              tag: 'Consectetur Elit',
-              title: 'Adipiscing Eiusmod Tempor',
-              body: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.',
+              tag: t('topo.cards.c2_tag'),
+              title: t('topo.cards.c2_title'),
+              body: t('topo.cards.c2_body'),
             },
             {
               icon: <ArrowsClockwise size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
-              tag: 'Incididunt Labore',
-              title: 'Magna Aliqua Veniam',
-              body: 'Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris.',
+              tag: t('topo.cards.c3_tag'),
+              title: t('topo.cards.c3_title'),
+              body: t('topo.cards.c3_body'),
             },
           ].map((card) => (
             <div
@@ -399,6 +403,7 @@ function TopographicTransitionSection() {
 /* ─── 4. GIS MAP PREVIEW SECTION ──────────────────────────────────── */
 function MapPreviewSection() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('home')
 
   return (
     <section
@@ -415,20 +420,20 @@ function MapPreviewSection() {
                 isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
               }`}
             >
-              // BẢN ĐỒ GIS TƯƠNG TÁC
+              {t('map_preview.eyebrow')}
             </span>
             <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Tra cứu & phân loại biển báo chuẩn QCVN 41
+              {t('map_preview.title')}
             </h2>
             <p className={`text-base leading-relaxed mb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-              Truy cập bản đồ không gian tương tác hỗ trợ tìm kiếm, lọc phân cụm, kiểm tra lịch sử tái thẩm định và hình ảnh bằng chứng thực địa.
+              {t('map_preview.subtitle')}
             </p>
 
             <ul className="flex flex-col gap-3.5 mb-8">
               {[
-                'Phân loại 5 nhóm: Biển cấm (P), Hiệu lệnh (R), Cảnh báo (W), Chỉ dẫn (I), Biển phụ (S)',
-                'Hiển thị hướng áp dụng giao thông (Traffic Direction Metadata)',
-                'Xem điểm tin cậy (Trust Score) và nguồn dữ liệu cộng đồng',
+                t('map_preview.feature_1'),
+                t('map_preview.feature_2'),
+                t('map_preview.feature_3'),
               ].map((item) => (
                 <li
                   key={item}
@@ -454,7 +459,7 @@ function MapPreviewSection() {
                   : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20'
               }`}
             >
-              <span>Mở bản đồ toàn màn hình</span>
+              <span>{t('map_preview.cta')}</span>
               <ArrowRight size={16} weight="bold" />
             </Link>
           </div>
@@ -472,6 +477,7 @@ function MapPreviewSection() {
 /* ─── 5. MOBILE APP & CREDIT INCENTIVE CTA ────────────────────────── */
 function MobileDownloadSection() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('home')
 
   return (
     <section
@@ -494,13 +500,13 @@ function MobileDownloadSection() {
                   isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
                 }`}
               >
-                // ĐÓNG GÓP & NHẬN THƯỞNG
+                {t('mobile_cta.eyebrow')}
               </span>
               <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                Khảo sát thực địa, nhận thưởng tín dụng Credit
+                {t('mobile_cta.title')}
               </h2>
               <p className={`text-base leading-relaxed mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                Sử dụng ứng dụng SignTrustMap để ghi lại chuyến đi (Video + GPX) hoặc chụp ảnh biển báo mới. Nhận điểm thưởng tín dụng minh bạch khi đóng góp được cộng đồng kiểm duyệt thông qua.
+                {t('mobile_cta.subtitle')}
               </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
@@ -513,7 +519,7 @@ function MobileDownloadSection() {
                   }`}
                 >
                   <DeviceMobile size={18} />
-                  <span>Tải ứng dụng mobile</span>
+                  <span>{t('mobile_cta.cta_app')}</span>
                 </Link>
                 <Link
                   to="/docs"
@@ -524,7 +530,7 @@ function MobileDownloadSection() {
                   }`}
                 >
                   <Coins size={18} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
-                  <span>Cơ chế kinh tế tín dụng →</span>
+                  <span>{t('mobile_cta.cta_credit')}</span>
                 </Link>
               </div>
             </div>
@@ -532,10 +538,10 @@ function MobileDownloadSection() {
             {/* Right Mini Spec Badges */}
             <div className="grid grid-cols-2 gap-3.5">
               {[
-                { title: 'Video & GPX Sync', desc: 'Đồng bộ vệt quỹ đạo hành trình chính xác' },
-                { title: 'Direction Alerts', desc: 'Cảnh báo biển báo đúng chiều di chuyển' },
-                { title: 'Revalidation Tasks', desc: 'Nhận nhiệm vụ làm mới biển báo cũ' },
-                { title: 'Credit Wallet', desc: 'Ví tín dụng và lịch sử thưởng minh bạch' },
+                { title: t('mobile_cta.badge_1_title'), desc: t('mobile_cta.badge_1_desc') },
+                { title: t('mobile_cta.badge_2_title'), desc: t('mobile_cta.badge_2_desc') },
+                { title: t('mobile_cta.badge_3_title'), desc: t('mobile_cta.badge_3_desc') },
+                { title: t('mobile_cta.badge_4_title'), desc: t('mobile_cta.badge_4_desc') },
               ].map((b) => (
                 <div
                   key={b.title}

@@ -1,0 +1,97 @@
+{
+  "nav": {
+    "product": "Products",
+    "docs": "Documentation",
+    "about": "About Us",
+    "login": "Log In",
+    "signup": "Sign Up",
+    "mobile_product": "Products",
+    "mobile_map": "🗺️ GIS Traffic Sign Map",
+    "mobile_app": "📱 Survey & Navigation App",
+    "close_menu": "Close menu",
+    "open_menu": "Open menu"
+  },
+  "announcement": {
+    "badge": "Just Updated",
+    "message": "SignTrustMap — AI + Community platform for building a trusted traffic sign database"
+  },
+  "theme": {
+    "to_light": "Switch to Light mode",
+    "to_dark": "Switch to Dark mode",
+    "toggle_label": "Toggle Light/Dark theme"
+  },
+  "lang": {
+    "toggle_to_en": "Switch to English (EN)",
+    "toggle_to_vi": "Chuyển sang Tiếng Việt (VI)",
+    "toggle_label": "Toggle language"
+  },
+  "footer": {
+    "description": "AI + Community platform for building a reliable and trusted traffic sign database.",
+    "copyright": "© {{year}} SignTrustMap Project.",
+    "sections": {
+      "product": "Product",
+      "solutions": "Solutions",
+      "docs_mlops": "Docs & MLOps",
+      "project": "Project"
+    },
+    "links": {
+      "gis_map": "GIS Traffic Sign Map",
+      "mobile_app": "Survey & Navigation App",
+      "ai_pipeline": "AI Pipeline (YOLO12 + CLIP)",
+      "qcvn_catalog": "QCVN 41:2019 Sign Catalog",
+      "for_surveyor": "For Surveyors",
+      "for_reviewer": "For Reviewers",
+      "for_driver": "For Drivers & Navigation",
+      "ops_portal": "Ops Admin Portal",
+      "api_docs": "Technical API Documentation",
+      "active_learning": "Active Learning Pipeline",
+      "github": "GitHub Source Code",
+      "about": "About SignTrustMap",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Log in to Sign<teal>Trust</teal>Map",
+      "subtitle": "Access your community account to view and contribute traffic signs",
+      "email_label": "Email",
+      "password_label": "Password",
+      "forgot_password": "Forgot password?",
+      "submit": "Log In",
+      "submitting": "Logging in...",
+      "google": "Log in with Google",
+      "or": "OR",
+      "no_account": "Don't have an account?",
+      "go_signup": "Sign up now",
+      "error_default": "Login failed. Please check your email or password.",
+      "hide_pw": "Hide password",
+      "show_pw": "Show password"
+    },
+    "signup": {
+      "title": "Create Sign<teal>Trust</teal>Map Account",
+      "subtitle": "Start contributing and experience the trusted traffic sign map",
+      "name_label": "Full Name",
+      "name_placeholder": "John Doe",
+      "email_label": "Email",
+      "password_label": "Password",
+      "password_placeholder": "Minimum 8 characters",
+      "credits_bonus": "Get <strong>50 Credits</strong> free when you activate your account",
+      "terms_agree": "By signing up below, I agree to the",
+      "terms_link": "Terms of Service",
+      "and": "and",
+      "privacy_link": "Privacy Policy",
+      "terms_of": "of SignTrustMap.",
+      "terms_error": "Please agree to the Terms of Service and Privacy Policy to continue.",
+      "submit": "Sign Up with Email",
+      "submitting": "Creating account...",
+      "google": "Sign up with Google",
+      "or": "OR",
+      "has_account": "Already have an account?",
+      "go_login": "Log in now",
+      "error_default": "Sign up failed. Please try again.",
+      "hide_pw": "Hide password",
+      "show_pw": "Show password"
+    }
+  }
+}

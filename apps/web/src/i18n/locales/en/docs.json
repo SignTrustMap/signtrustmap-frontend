@@ -1,0 +1,38 @@
+{
+  "title": "SignTrustMap Technical Documentation",
+  "subtitle": "A comprehensive guide to the system architecture, API, and MLOps pipeline of the SignTrustMap platform.",
+  "sections": [
+    {
+      "id": "overview",
+      "title": "System Overview",
+      "content": "SignTrustMap is a platform combining Crowd-sourcing and AI to build a traffic sign database for Vietnam conforming to the QCVN 41:2019/BGTVT standard. The system consists of 3 main components: Mobile App (field surveying), AI Pipeline (automatic sign extraction & classification), and Ops Portal (data moderation & administration)."
+    },
+    {
+      "id": "architecture",
+      "title": "Overall Architecture",
+      "content": "The monorepo architecture includes: apps/web (community portal & GIS map), apps/ops (internal admin portal), packages/shared (shared types & utils). The backend uses PostgreSQL + PostGIS for spatial data, pgvector for AI embeddings, and Redis for task queuing."
+    },
+    {
+      "id": "ai-pipeline",
+      "title": "AI Pipeline (YOLO12 + CLIP)",
+      "content": "The AI pipeline consists of 3 stages: (1) Detection: YOLO12 detects signs from dashcam video frames; (2) Tracking: BoT-SORT tracks objects across frames; (3) Classification: CLIP encodes images into vectors and queries the nearest neighbor in pgvector to assign sign types according to QCVN 41."
+    },
+    {
+      "id": "trust-score",
+      "title": "Trust Score System",
+      "content": "Each sign has a Trust Score computed by a weighted formula: Score = Σ(w_i × v_i) / Σ(w_i), where w_i is the reviewer's weight (based on historical accuracy) and v_i is their confirm/reject vote. Signs reaching a threshold of 0.75 are transitioned to Verified status."
+    },
+    {
+      "id": "api",
+      "title": "Geospatial API",
+      "content": "The REST API provides endpoints to query signs by bounding box, radius, and sign type. Supports filtering by Trust Score, last updated date, and travel direction. Data is returned in GeoJSON format, compatible with Leaflet, Mapbox, and popular GIS frameworks."
+    },
+    {
+      "id": "active-learning",
+      "title": "Active Learning & Revalidation",
+      "content": "The system automatically identifies 'Stale' signs (not reconfirmed within 90 days) and creates Revalidation Tasks for users near that area. New data from Revalidation is fed into the AI model retraining loop to improve accuracy over time."
+    }
+  ],
+  "toc_title": "Table of Contents",
+  "last_updated": "Last updated"
+}

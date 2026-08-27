@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -9,15 +8,13 @@ import {
   GithubLogo,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useI18n } from '@/context/I18nContext'
+import { useTranslation } from 'react-i18next'
 
 export function AnnouncementBar() {
   const { isDark, toggleTheme } = useTheme()
-  const [lang, setLang] = useState<'VI' | 'EN'>('VI')
-
-
-  const toggleLanguage = () => {
-    setLang((prev) => (prev === 'VI' ? 'EN' : 'VI'))
-  }
+  const { lang, toggleLang } = useI18n()
+  const { t } = useTranslation('common')
 
   return (
     <div
@@ -59,10 +56,10 @@ export function AnnouncementBar() {
                 ? 'bg-[#007b8b]/30 text-[#00c4de] border-[#00c4de]/25'
                 : 'bg-[#007b8b]/15 text-[#007b8b] border-[#007b8b]/30'
             }`}>
-              <Sparkle size={10} weight="fill" /> Mới cập nhật
+              <Sparkle size={10} weight="fill" /> {t('announcement.badge')}
             </span>
             <span className={`truncate text-xs group-hover:underline ${isDark ? 'text-gray-200 group-hover:text-[#00c4de]' : 'text-gray-800 group-hover:text-[#007b8b]'}`}>
-              SignTrustMap — Nền tảng kết hợp AI và cộng đồng xây dựng cơ sở dữ liệu biển báo tin cậy
+              {t('announcement.message')}
             </span>
             <ArrowRight
               size={12}
@@ -72,7 +69,7 @@ export function AnnouncementBar() {
           </Link>
         </div>
 
-        {/* Right: Theme Switcher & Language Switcher (Permanent, No Close Button) */}
+        {/* Right: Theme Switcher & Language Switcher */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Theme Toggle Button */}
           <button
@@ -83,8 +80,8 @@ export function AnnouncementBar() {
                 ? 'text-gray-300 hover:text-[#00c4de] hover:bg-white/5 border-transparent hover:border-white/10'
                 : 'text-gray-600 hover:text-[#007b8b] hover:bg-black/5 border-transparent hover:border-gray-300'
             }`}
-            title={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
-            aria-label="Chuyển đổi giao diện Sáng/Tối"
+            title={isDark ? t('theme.to_light') : t('theme.to_dark')}
+            aria-label={t('theme.toggle_label')}
           >
             {isDark ? (
               <Moon size={15} weight="bold" className="text-[#00c4de]" />
@@ -99,17 +96,17 @@ export function AnnouncementBar() {
           {/* Language Toggle Pill */}
           <button
             type="button"
-            onClick={toggleLanguage}
+            onClick={toggleLang}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all text-[11px] font-semibold font-mono cursor-pointer active:scale-95 shadow-sm ${
               isDark
                 ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200 hover:text-white'
                 : 'bg-white hover:bg-gray-100 border-[#E8E4E3] text-gray-800 hover:text-black'
             }`}
-            title={`Chuyển ngôn ngữ sang ${lang === 'VI' ? 'English (EN)' : 'Tiếng Việt (VI)'}`}
-            aria-label="Chuyển đổi ngôn ngữ"
+            title={lang === 'vi' ? t('lang.toggle_to_en') : t('lang.toggle_to_vi')}
+            aria-label={t('lang.toggle_label')}
           >
             <Globe size={13} weight="bold" className={isDark ? 'text-gray-300' : 'text-gray-600'} />
-            <span>{lang}</span>
+            <span>{lang.toUpperCase()}</span>
           </button>
         </div>
       </div>

@@ -3,19 +3,19 @@ import { Link, NavLink } from 'react-router-dom'
 import { CaretDown, List, X } from '@phosphor-icons/react'
 import { MegaDropdown } from './MegaDropdown'
 import { useTheme } from '@/context/ThemeContext'
-
-const navLinks = [
-  { label: 'Giải pháp', href: '/product/map' },
-  { label: 'Tài liệu', href: '/docs' },
-  { label: 'Về chúng tôi', href: '/about' },
-  { label: 'Blog', href: '/blog' },
-]
+import { useTranslation } from 'react-i18next'
 
 export function Navbar() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('common')
   const [productOpen, setProductOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const navLinks = [
+    { label: t('nav.docs'), href: '/docs' },
+    { label: t('nav.about'), href: '/about' },
+  ]
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -83,7 +83,7 @@ export function Navbar() {
                       : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <span>Sản phẩm</span>
+                <span>{t('nav.product')}</span>
                 <CaretDown
                   size={14}
                   weight="bold"
@@ -122,7 +122,7 @@ export function Navbar() {
             ))}
           </nav>
 
-          {/* Right Action buttons (Local Web Routes) */}
+          {/* Right Action buttons */}
           <div className="hidden lg:flex items-center gap-3 shrink-0">
             <Link
               to="/login"
@@ -130,7 +130,7 @@ export function Navbar() {
                 isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
               }`}
             >
-              Đăng nhập
+              {t('nav.login')}
             </Link>
             <Link
               to="/signup"
@@ -140,7 +140,7 @@ export function Navbar() {
                   : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20 hover:shadow-[#007b8b]/30'
               }`}
             >
-              Đăng ký
+              {t('nav.signup')}
             </Link>
           </div>
 
@@ -150,7 +150,7 @@ export function Navbar() {
               isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
             }`}
             onClick={() => setMobileOpen((o) => !o)}
-            aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
+            aria-label={mobileOpen ? t('nav.close_menu') : t('nav.open_menu')}
           >
             {mobileOpen ? <X size={24} /> : <List size={24} />}
           </button>
@@ -168,7 +168,7 @@ export function Navbar() {
         >
           <nav className="mx-auto max-w-7xl px-4 py-5 flex flex-col gap-2">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400 px-3">
-              Sản phẩm
+              {t('nav.mobile_product')}
             </p>
             <Link
               to="/product/map"
@@ -177,7 +177,7 @@ export function Navbar() {
                 isDark ? 'text-gray-200 hover:text-[#00c4de] hover:bg-white/5' : 'text-gray-800 hover:text-[#007b8b] hover:bg-gray-100'
               }`}
             >
-              🗺️ Bản Đồ Biển Báo GIS
+              {t('nav.mobile_map')}
             </Link>
             <Link
               to="/product/app"
@@ -186,7 +186,7 @@ export function Navbar() {
                 isDark ? 'text-gray-200 hover:text-[#00c4de] hover:bg-white/5' : 'text-gray-800 hover:text-[#007b8b] hover:bg-gray-100'
               }`}
             >
-              📱 Ứng Dụng Khảo Sát & Dẫn Đường
+              {t('nav.mobile_app')}
             </Link>
             <div className={`my-2 border-t ${isDark ? 'border-white/10' : 'border-[#E8E4E3]'}`} />
             {navLinks.map((link) => (
@@ -209,7 +209,7 @@ export function Navbar() {
                   isDark ? 'text-gray-300 border-white/15 hover:bg-white/5' : 'text-gray-700 border-gray-300 hover:bg-gray-100'
                 }`}
               >
-                Đăng nhập
+                {t('nav.login')}
               </Link>
               <Link
                 to="/signup"
@@ -218,7 +218,7 @@ export function Navbar() {
                   isDark ? 'text-black bg-[#00c4de]' : 'text-white bg-[#007b8b]'
                 }`}
               >
-                Đăng ký
+                {t('nav.signup')}
               </Link>
             </div>
           </nav>

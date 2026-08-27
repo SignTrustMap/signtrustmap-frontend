@@ -12,79 +12,7 @@ import {
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTheme } from '@/context/ThemeContext'
-
-interface ProductItem {
-  icon: React.ReactNode
-  title: string
-  description: string
-  href: string
-  badge?: string
-  category: string
-}
-
-const productItems: ProductItem[] = [
-  {
-    icon: <MapTrifold size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Bản Đồ Biển Báo GIS',
-    description: 'Tra cứu, lọc phân cụm và kiểm tra dữ liệu biển báo chuẩn QCVN 41 kèm thông tin hướng giao thông.',
-    href: '/product/map',
-    badge: 'Cốt lõi',
-    category: 'explore',
-  },
-  {
-    icon: <Brain size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Pipeline AI (YOLO12 + CLIP)',
-    description: 'Trích xuất tự động từ video Dashcam, theo dõi vật thể BoT-SORT và phân loại vector pgvector.',
-    href: '/product/map',
-    badge: 'AI Pipeline',
-    category: 'explore',
-  },
-  {
-    icon: <DeviceMobile size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Ứng Dụng Khảo Sát & Dẫn Đường',
-    description: 'Ghi nhận chuyến đi GPX thực địa và cảnh báo biển báo theo đúng chiều di chuyển của xe.',
-    href: '/product/app',
-    badge: 'Mobile App',
-    category: 'apps',
-  },
-  {
-    icon: <ShieldCheck size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Không Gian Reviewer & Đồng Thuận',
-    description: 'Cơ chế xác thực đồng đẳng (Peer Review) và tính điểm đồng thuận trọng số (Weighted Consensus).',
-    href: '/product/map',
-    category: 'apps',
-  },
-  {
-    icon: <Coins size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Kinh Tế Tín Dụng & Thưởng Đóng Góp',
-    description: 'Nhận thưởng khi đóng góp dữ liệu hợp lệ và sử dụng tín dụng cho các tiện ích nâng cao.',
-    href: '/docs',
-    badge: 'Credits',
-    category: 'apps',
-  },
-  {
-    icon: <ArrowsClockwise size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Active Learning & Revalidation',
-    description: 'Vòng lặp tự động làm mới biển báo cũ (Stale Signs) và nạp lại mô hình AI định kỳ.',
-    href: '/docs',
-    badge: 'MLOps',
-    category: 'developer',
-  },
-  {
-    icon: <Code size={26} weight="duotone" className="text-[#00c4de]" />,
-    title: 'Geospatial API & SDK',
-    description: 'API truy xuất dữ liệu không gian PostGIS phục vụ nghiên cứu xe tự hành và logistics.',
-    href: '/docs',
-    badge: 'API',
-    category: 'developer',
-  },
-]
-
-const categories = [
-  { id: 'explore', label: 'Bản đồ GIS & AI Pipeline', icon: <Compass size={18} /> },
-  { id: 'apps', label: 'Ứng dụng & Xác thực', icon: <DeviceMobile size={18} /> },
-  { id: 'developer', label: 'MLOps & Nhà phát triển', icon: <Code size={18} /> },
-]
+import { useTranslation } from 'react-i18next'
 
 interface MegaDropdownProps {
   onClose: () => void
@@ -92,7 +20,73 @@ interface MegaDropdownProps {
 
 export function MegaDropdown({ onClose }: MegaDropdownProps) {
   const { isDark } = useTheme()
+  const { t } = useTranslation('product')
   const [selectedCat, setSelectedCat] = useState<string>('explore')
+
+  const categories = [
+    { id: 'explore', label: t('mega.categories.explore'), icon: <Compass size={18} /> },
+    { id: 'apps', label: t('mega.categories.apps'), icon: <DeviceMobile size={18} /> },
+    { id: 'developer', label: t('mega.categories.developer'), icon: <Code size={18} /> },
+  ]
+
+  const productItems = [
+    {
+      icon: <MapTrifold size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.gis_map_title'),
+      description: t('mega.items.gis_map_desc'),
+      href: '/product/map',
+      badge: t('mega.items.gis_map_badge'),
+      category: 'explore',
+    },
+    {
+      icon: <Brain size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.ai_pipeline_title'),
+      description: t('mega.items.ai_pipeline_desc'),
+      href: '/product/map',
+      badge: t('mega.items.ai_pipeline_badge'),
+      category: 'explore',
+    },
+    {
+      icon: <DeviceMobile size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.mobile_app_title'),
+      description: t('mega.items.mobile_app_desc'),
+      href: '/product/app',
+      badge: t('mega.items.mobile_app_badge'),
+      category: 'apps',
+    },
+    {
+      icon: <ShieldCheck size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.reviewer_title'),
+      description: t('mega.items.reviewer_desc'),
+      href: '/product/map',
+      badge: undefined,
+      category: 'apps',
+    },
+    {
+      icon: <Coins size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.credit_title'),
+      description: t('mega.items.credit_desc'),
+      href: '/docs',
+      badge: t('mega.items.credit_badge'),
+      category: 'apps',
+    },
+    {
+      icon: <ArrowsClockwise size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.active_learning_title'),
+      description: t('mega.items.active_learning_desc'),
+      href: '/docs',
+      badge: t('mega.items.active_learning_badge'),
+      category: 'developer',
+    },
+    {
+      icon: <Code size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.api_title'),
+      description: t('mega.items.api_desc'),
+      href: '/docs',
+      badge: t('mega.items.api_badge'),
+      category: 'developer',
+    },
+  ]
 
   const filteredItems = productItems.filter(
     (item) => selectedCat === 'all' || item.category === selectedCat
@@ -125,7 +119,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
           }`}
         >
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 px-3 py-1.5">
-            Danh mục tính năng
+            {t('mega.category_label')}
           </p>
           {categories.map((cat) => {
             const active = selectedCat === cat.id
@@ -160,7 +154,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                 isDark ? 'text-gray-400 hover:text-[#00c4de]' : 'text-gray-600 hover:text-[#007b8b]'
               }`}
             >
-              <span>Xem tất cả danh mục</span>
+              <span>{t('mega.view_all')}</span>
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -211,7 +205,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                 <div className={`mt-3.5 flex items-center gap-1 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity ${
                   isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                 }`}>
-                  <span>Xem chi tiết</span>
+                  <span>{t('mega.view_detail')}</span>
                   <ArrowRight size={12} weight="bold" />
                 </div>
               </Link>
@@ -221,7 +215,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
           <div className={`mt-5 pt-3.5 border-t flex items-center justify-between text-xs ${
             isDark ? 'border-white/5 text-gray-400' : 'border-gray-200 text-gray-500'
           }`}>
-            <span>Chuẩn hóa danh mục theo QCVN 41:2019/BGTVT</span>
+            <span>{t('mega.standard_note')}</span>
             <Link
               to="/docs"
               onClick={onClose}
@@ -229,7 +223,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                 isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
               }`}
             >
-              Tài liệu kỹ thuật <ArrowRight size={14} />
+              {t('mega.tech_docs')} <ArrowRight size={14} />
             </Link>
           </div>
         </div>

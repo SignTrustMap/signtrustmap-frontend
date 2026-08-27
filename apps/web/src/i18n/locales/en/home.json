@@ -1,0 +1,62 @@
+{
+  "hero": {
+    "badge_ai": "Crowd-AI & GIS Platform",
+    "badge_standard": "QCVN 41:2019/BGTVT Standard",
+    "title": "SignTrustMap",
+    "subtitle": "AI + Community platform for building a reliable and trusted traffic sign database.",
+    "cta_map": "Explore GIS Map",
+    "cta_app": "Download mobile app",
+    "marquee_label": "Compatible with and powered by leading AI models & dev tools",
+    "stats": {
+      "s1_stat": "Lorem Ipsum",
+      "s1_title": "Dolor Sit Amet Consectetur",
+      "s1_desc": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "s2_stat": "Adipiscing Elit",
+      "s2_title": "Eiusmod Tempor Incididunt",
+      "s2_desc": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat.",
+      "s3_stat": "Magna Aliqua",
+      "s3_title": "Labore Et Dolore Magna",
+      "s3_desc": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit."
+    }
+  },
+  "topo": {
+    "eyebrow": "// CLOSED DATA LIFECYCLE",
+    "title": "From field camera to trusted navigation map",
+    "subtitle": "A comprehensive pipeline solving the data latency and constant change of traffic signs in Vietnam.",
+    "cards": {
+      "c1_tag": "Lorem Ipsum Tag",
+      "c1_title": "Lorem Ipsum Dolor Sit",
+      "c1_body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.",
+      "c2_tag": "Consectetur Elit",
+      "c2_title": "Adipiscing Eiusmod Tempor",
+      "c2_body": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.",
+      "c3_tag": "Incididunt Labore",
+      "c3_title": "Magna Aliqua Veniam",
+      "c3_body": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris."
+    }
+  },
+  "map_preview": {
+    "eyebrow": "// INTERACTIVE GIS MAP",
+    "title": "Search & classify signs by QCVN 41 standard",
+    "subtitle": "Access the interactive spatial map with search, cluster filtering, revalidation history, and field evidence images.",
+    "feature_1": "5 sign groups: Prohibition (P), Mandatory (R), Warning (W), Informational (I), Supplementary (S)",
+    "feature_2": "Traffic direction metadata per sign",
+    "feature_3": "View Trust Score and community data sources",
+    "cta": "Open full-screen map"
+  },
+  "mobile_cta": {
+    "eyebrow": "// CONTRIBUTE & EARN",
+    "title": "Survey the field, earn Credit rewards",
+    "subtitle": "Use the SignTrustMap app to record trips (Video + GPX) or capture new signs. Earn transparent credit rewards when your contributions pass community review.",
+    "cta_app": "Download mobile app",
+    "cta_credit": "Credit economy mechanism →",
+    "badge_1_title": "Video & GPX Sync",
+    "badge_1_desc": "Precise trajectory synchronization",
+    "badge_2_title": "Direction Alerts",
+    "badge_2_desc": "Sign alerts matching your travel direction",
+    "badge_3_title": "Revalidation Tasks",
+    "badge_3_desc": "Receive tasks to refresh outdated signs",
+    "badge_4_title": "Credit Wallet",
+    "badge_4_desc": "Transparent credit wallet & reward history"
+  }
+}

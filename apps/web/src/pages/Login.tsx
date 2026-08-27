@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function Login() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('common')
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +22,7 @@ export default function Login() {
       await new Promise((r) => setTimeout(r, 600))
       navigate('/product/map', { replace: true })
     } catch {
-      setError('Đăng nhập thất bại. Vui lòng kiểm tra lại email hoặc mật khẩu.')
+      setError(t('auth.login.error_default'))
     } finally {
       setIsLoading(false)
     }
@@ -83,10 +85,10 @@ export default function Login() {
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              Đăng nhập Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
+              {t('auth.login.title')}
             </h1>
             <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Truy cập tài khoản cộng đồng để xem và đóng góp biển báo
+              {t('auth.login.subtitle')}
             </p>
           </div>
 
@@ -100,7 +102,7 @@ export default function Login() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                Email
+                {t('auth.login.email_label')}
               </label>
               <input
                 id="login-email"
@@ -127,7 +129,7 @@ export default function Login() {
                     isDark ? 'text-gray-300' : 'text-gray-700'
                   }`}
                 >
-                  Mật khẩu
+                  {t('auth.login.password_label')}
                 </label>
                 <a
                   href="#"
@@ -135,7 +137,7 @@ export default function Login() {
                     isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                   }`}
                 >
-                  Quên mật khẩu?
+                  {t('auth.login.forgot_password')}
                 </a>
               </div>
               <div className="relative">
@@ -159,7 +161,7 @@ export default function Login() {
                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
                     isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-800'
                   }`}
-                  aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  aria-label={showPw ? t('auth.login.hide_pw') : t('auth.login.show_pw')}
                 >
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
@@ -191,10 +193,10 @@ export default function Login() {
               {isLoading ? (
                 <>
                   <CircleNotch size={18} className="animate-spin" />
-                  <span>Đang đăng nhập...</span>
+                  <span>{t('auth.login.submitting')}</span>
                 </>
               ) : (
-                <span>Đăng nhập</span>
+                <span>{t('auth.login.submit')}</span>
               )}
             </button>
 
@@ -209,7 +211,7 @@ export default function Login() {
                     isDark ? 'bg-[#061417] text-gray-400' : 'bg-white text-gray-400'
                   }`}
                 >
-                  HOẶC
+                  {t('auth.login.or')}
                 </span>
               </div>
             </div>
@@ -228,7 +230,7 @@ export default function Login() {
               }`}
             >
               <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
-              <span>Đăng nhập với Google</span>
+              <span>{t('auth.login.google')}</span>
             </button>
           </form>
 
@@ -238,14 +240,14 @@ export default function Login() {
               isDark ? 'text-gray-400 border-white/10' : 'text-gray-600 border-gray-100'
             }`}
           >
-            <span>Chưa có tài khoản? </span>
+            <span>{t('auth.login.no_account')} </span>
             <Link
               to="/signup"
               className={`font-bold hover:underline ${
                 isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
               }`}
             >
-              Đăng ký ngay
+              {t('auth.login.go_signup')}
             </Link>
           </div>
         </div>
