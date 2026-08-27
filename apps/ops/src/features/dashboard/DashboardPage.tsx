@@ -1,116 +1,445 @@
-import { useAuth } from '@/features/auth/AuthContext'
+import { useState } from 'react'
 import {
-  MapTrifold,
-  CheckSquare,
-  Warning,
-  CurrencyDollar,
-  TrendUp,
-  ArrowRight,
+  Users,
+  Truck,
+  WarningCircle,
+  FolderSimple,
+  ArrowUpRight,
+  DotsThreeVertical,
+  DownloadSimple,
+  CalendarBlank,
 } from '@phosphor-icons/react'
-import { Link } from 'react-router-dom'
-
-const stats = [
-  { icon: <MapTrifold size={20} weight="duotone" />, label: 'Biển đã xác thực', value: '142,381', change: '+234 hôm nay', up: true },
-  { icon: <CheckSquare size={20} weight="duotone" />, label: 'Chờ kiểm duyệt', value: '12', change: 'cần xử lý', up: false },
-  { icon: <Warning size={20} weight="duotone" />, label: 'Sự cố mở', value: '3', change: 'báo cáo mới', up: false },
-  { icon: <CurrencyDollar size={20} weight="duotone" />, label: 'Thưởng chờ duyệt', value: '5', change: 'yêu cầu', up: false },
-]
-
-const recentActivity = [
-  { action: 'Kiểm duyệt biển P.102 - Phường 5, Q.Tân Bình', time: '2 phút trước', status: 'approved' },
-  { action: 'Báo cáo sự cố biển W.201 - Ngã tư Bình Phước', time: '15 phút trước', status: 'pending' },
-  { action: 'Kiểm duyệt biển R.301 - Đường Hoàng Văn Thụ', time: '1 giờ trước', status: 'approved' },
-  { action: 'Yêu cầu thưởng từ user #1042', time: '2 giờ trước', status: 'pending' },
-]
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const [timeRange, setTimeRange] = useState('Last 30 Days')
+  const [feedFilter, setFeedFilter] = useState('All Events')
+
+  const kpis = [
+    {
+      label: 'Total Users',
+      value: '142.8k',
+      change: '+12.5%',
+      changeText: 'vs last month',
+      isPositive: true,
+      icon: <Users size={22} weight="bold" />,
+      iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
+    },
+    {
+      label: 'Active Drivers',
+      value: '45.2k',
+      change: '+8.2%',
+      changeText: 'vs last month',
+      isPositive: true,
+      icon: <Truck size={22} weight="bold" />,
+      iconBg: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      label: 'Reported Candidates',
+      value: '324',
+      change: '+4.1%',
+      changeText: 'Needs attention',
+      isWarning: true,
+      icon: <WarningCircle size={22} weight="bold" />,
+      iconBg: 'bg-red-100 text-red-600',
+    },
+    {
+      label: 'Pending Reviews',
+      value: '1,845',
+      change: '0.0%',
+      changeText: 'Stable volume',
+      isNeutral: true,
+      icon: <FolderSimple size={22} weight="bold" />,
+      iconBg: 'bg-amber-100 text-amber-700',
+    },
+  ]
+
+  const recentActivities = [
+    {
+      id: '1',
+      type: 'critical',
+      dotColor: 'bg-red-500',
+      title: 'High-Severity Safety Report Flagged',
+      desc: 'Automated system detection triggered by user review pattern.',
+      user: 'SYS-AUTO',
+      avatar: null,
+      time: '10:42 AM',
+    },
+    {
+      id: '2',
+      type: 'success',
+      dotColor: 'bg-emerald-500',
+      title: 'Candidate Identity Verified',
+      desc: 'Manual override applied to pending identity check.',
+      user: 'Sarah Jenkins',
+      avatar: 'SJ',
+      time: '09:15 AM',
+    },
+    {
+      id: '3',
+      type: 'info',
+      dotColor: 'bg-blue-500',
+      title: 'Batch Survey Tasks Dispatched',
+      desc: '12 new revalidation targets assigned to District 1 surveyor team.',
+      user: 'Marcus Rodriguez',
+      avatar: 'MR',
+      time: '08:30 AM',
+    },
+  ]
 
   return (
-    <div className="p-6 max-w-6xl">
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-0.5" style={{ fontFamily: 'Public Sans, sans-serif' }}>
-          Chào buổi sáng, {user?.name?.split(' ')[0]} 👋
-        </h2>
-        <p className="text-xs text-gray-400">Đây là tình hình hôm nay của hệ thống</p>
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            Overview
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Operational metrics and system status for the past 30 days.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* Time Range Dropdown */}
+          <div className="relative">
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg font-semibold text-gray-700 focus:outline-none focus:border-[#007b8b] shadow-xs cursor-pointer"
+            >
+              <option value="Last 7 Days">Last 7 Days</option>
+              <option value="Last 30 Days">Last 30 Days</option>
+              <option value="Last 90 Days">Last 90 Days</option>
+            </select>
+            <CalendarBlank
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            />
+          </div>
+
+          {/* Export Button */}
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] bg-white hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            <DownloadSimple size={16} />
+            <span>Export</span>
+          </button>
+        </div>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map((s) => (
+      {/* 4 KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {kpis.map((kpi) => (
           <div
-            key={s.label}
-            className="bg-white border border-[#E8E4E3] rounded-[8px] p-4"
+            key={kpi.label}
+            className="bg-white border border-[#E8E4E3] rounded-[18px] p-5 shadow-xs flex flex-col justify-between hover:border-[#007b8b]/40 transition-all group"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-[6px] bg-[#d3f7ff] flex items-center justify-center text-[#007b8b]">
-                {s.icon}
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold text-gray-500">{kpi.label}</p>
+                <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 font-mono tracking-tight">
+                  {kpi.value}
+                </p>
               </div>
-              <TrendUp
-                size={14}
-                weight="bold"
-                className={s.up ? 'text-green-500' : 'text-gray-300'}
-              />
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpi.iconBg}`}
+              >
+                {kpi.icon}
+              </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900 mb-0.5" style={{ fontFamily: 'Arvo, serif' }}>
-              {s.value}
-            </p>
-            <p className="text-[11px] text-gray-400">{s.label}</p>
-            <p className="text-[10px] text-[#007b8b] mt-1 font-medium">{s.change}</p>
+
+            <div className="flex items-center gap-1.5 mt-4 text-xs font-semibold">
+              {kpi.isPositive && (
+                <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold inline-flex items-center">
+                  <ArrowUpRight size={13} weight="bold" />
+                  {kpi.change}
+                </span>
+              )}
+              {kpi.isWarning && (
+                <span className="text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-bold inline-flex items-center">
+                  <ArrowUpRight size={13} weight="bold" />
+                  {kpi.change}
+                </span>
+              )}
+              {kpi.isNeutral && (
+                <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                  {kpi.change}
+                </span>
+              )}
+              <span className="text-gray-400 font-normal">{kpi.changeText}</span>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Two columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Recent activity */}
-        <div className="lg:col-span-2 bg-white border border-[#E8E4E3] rounded-[8px]">
-          <div className="flex items-center justify-between px-5 py-3 border-b border-[#E8E4E3]">
-            <h3 className="text-sm font-semibold text-gray-800">Hoạt động gần đây</h3>
+      {/* Charts 2-Column Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: User Growth Pipeline Area Chart (8 cols) */}
+        <div className="lg:col-span-8 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                User Growth Pipeline
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                New signups vs active road surveyors across weeks
+              </p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="inline-flex items-center gap-1.5 text-gray-600">
+                <span className="w-2.5 h-2.5 rounded-full border-2 border-[#007b8b] bg-white" />
+                New Registrations
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-gray-600">
+                <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-gray-500 bg-white" />
+                Active Drivers
+              </span>
+              <button className="text-gray-400 hover:text-gray-700 p-1">
+                <DotsThreeVertical size={18} weight="bold" />
+              </button>
+            </div>
           </div>
-          <ul className="divide-y divide-[#E8E4E3]">
-            {recentActivity.map((a, i) => (
-              <li key={i} className="flex items-start gap-3 px-5 py-3">
-                <span
-                  className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${
-                    a.status === 'approved' ? 'bg-green-500' : 'bg-amber-400'
-                  }`}
+
+          {/* SVG Area & Line Chart */}
+          <div className="w-full h-64 relative pt-2">
+            <svg
+              className="w-full h-full overflow-visible"
+              viewBox="0 0 700 220"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#007b8b" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#007b8b" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              {/* Grid Lines */}
+              {[0, 50, 100, 150, 200].map((y) => (
+                <line
+                  key={y}
+                  x1="40"
+                  y1={y}
+                  x2="690"
+                  y2={y}
+                  stroke="#E8E4E3"
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-700 leading-relaxed">{a.action}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{a.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+              ))}
+
+              {/* Y Axis Labels */}
+              <text x="5" y="10" fill="#9ca3af" fontSize="10" fontFamily="monospace">3,000</text>
+              <text x="5" y="60" fill="#9ca3af" fontSize="10" fontFamily="monospace">2,000</text>
+              <text x="5" y="110" fill="#9ca3af" fontSize="10" fontFamily="monospace">1,500</text>
+              <text x="5" y="160" fill="#9ca3af" fontSize="10" fontFamily="monospace">500</text>
+              <text x="25" y="205" fill="#9ca3af" fontSize="10" fontFamily="monospace">0</text>
+
+              {/* Area Under Curve 1 (New Registrations) */}
+              <path
+                d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45 L 670 200 L 50 200 Z"
+                fill="url(#growthGradient)"
+              />
+
+              {/* Line 1: New Registrations (Solid Teal) */}
+              <path
+                d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45"
+                fill="none"
+                stroke="#007b8b"
+                strokeWidth="2.5"
+              />
+
+              {/* Points on Line 1 */}
+              {[[50, 145], [210, 120], [360, 145], [520, 85], [670, 45]].map(([cx, cy], i) => (
+                <circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r="4"
+                  fill="#ffffff"
+                  stroke="#007b8b"
+                  strokeWidth="2"
+                />
+              ))}
+
+              {/* Line 2: Active Drivers (Dashed Blue-Gray) */}
+              <path
+                d="M 50 170 C 130 160, 180 150, 210 150 C 270 150, 320 165, 360 160 C 420 155, 480 135, 520 130 C 580 125, 630 105, 670 100"
+                fill="none"
+                stroke="#64748b"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+              />
+
+              {/* Points on Line 2 */}
+              {[[50, 170], [210, 150], [360, 160], [520, 130], [670, 100]].map(([cx, cy], i) => (
+                <circle
+                  key={i}
+                  cx={cx}
+                  cy={cy}
+                  r="3.5"
+                  fill="#ffffff"
+                  stroke="#64748b"
+                  strokeWidth="2"
+                />
+              ))}
+            </svg>
+
+            {/* X Axis Labels */}
+            <div className="flex justify-between pl-10 pr-2 pt-2 text-[11px] font-mono text-gray-400">
+              <span>Week 1</span>
+              <span>Week 2</span>
+              <span>Week 3</span>
+              <span>Week 4</span>
+              <span>Week 5</span>
+            </div>
+          </div>
         </div>
 
-        {/* Quick links */}
-        <div className="bg-white border border-[#E8E4E3] rounded-[8px]">
-          <div className="px-5 py-3 border-b border-[#E8E4E3]">
-            <h3 className="text-sm font-semibold text-gray-800">Truy cập nhanh</h3>
+        {/* Right: Reported Categories Donut Chart (4 cols) */}
+        <div className="lg:col-span-4 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                Reported Categories
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">By violation severity</p>
+            </div>
+            <button className="text-gray-400 hover:text-gray-700 p-1">
+              <DotsThreeVertical size={18} weight="bold" />
+            </button>
           </div>
-          <div className="p-3 flex flex-col gap-1.5">
-            {[
-              { label: 'Mở bản đồ', href: '/map' },
-              { label: 'Xem hàng chờ kiểm duyệt', href: '/moderation' },
-              { label: 'Xử lý sự cố', href: '/reports' },
-              { label: 'Duyệt yêu cầu thưởng', href: '/credits' },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                to={l.href}
-                className="flex items-center justify-between px-3 py-2 rounded-[6px] text-xs font-medium text-gray-700 hover:bg-[#F8F7F7] hover:text-[#007b8b] transition-colors group"
-              >
-                {l.label}
-                <ArrowRight
-                  size={12}
-                  className="text-gray-300 group-hover:text-[#007b8b] group-hover:translate-x-0.5 transition-all"
-                />
-              </Link>
-            ))}
+
+          {/* SVG Donut */}
+          <div className="relative flex items-center justify-center my-4">
+            <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
+              {/* Background ring */}
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                stroke="#f1f5f9"
+                strokeWidth="22"
+                fill="transparent"
+              />
+              {/* Identity Mismatch (Blue 40%) */}
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                stroke="#007b8b"
+                strokeWidth="22"
+                fill="transparent"
+                strokeDasharray="440"
+                strokeDashoffset="264"
+                strokeLinecap="round"
+              />
+              {/* Safety Concerns (Red 28%) */}
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                stroke="#dc2626"
+                strokeWidth="22"
+                fill="transparent"
+                strokeDasharray="440"
+                strokeDashoffset="316"
+                strokeLinecap="round"
+                className="transform rotate-144 origin-center"
+              />
+              {/* Performance (Orange 18%) */}
+              <circle
+                cx="90"
+                cy="90"
+                r="70"
+                stroke="#d97706"
+                strokeWidth="22"
+                fill="transparent"
+                strokeDasharray="440"
+                strokeDashoffset="360"
+                strokeLinecap="round"
+                className="transform rotate-245 origin-center"
+              />
+            </svg>
           </div>
+
+          {/* Donut Legend */}
+          <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3]">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#007b8b] shrink-0" />
+              <span className="text-gray-700 truncate">Identity Mismatch</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] shrink-0" />
+              <span className="text-gray-700 truncate">Safety Concerns</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#d97706] shrink-0" />
+              <span className="text-gray-700 truncate">Performance</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" />
+              <span className="text-gray-700 truncate">Other</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom: Recent Activity Feed */}
+      <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#E8E4E3] pb-4 mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-gray-900">
+              Recent Activity Feed
+            </h2>
+          </div>
+
+          <select
+            value={feedFilter}
+            onChange={(e) => setFeedFilter(e.target.value)}
+            className="text-xs border border-[#E8E4E3] rounded-lg px-3 py-1.5 bg-[#F8F7F7] text-gray-700 font-semibold focus:outline-none focus:border-[#007b8b]"
+          >
+            <option value="All Events">All Events</option>
+            <option value="Critical">Critical Only</option>
+            <option value="Verification">Verification Only</option>
+          </select>
+        </div>
+
+        {/* Activity Feed Table */}
+        <div className="divide-y divide-[#E8E4E3]">
+          {recentActivities.map((act) => (
+            <div
+              key={act.id}
+              className="py-3.5 flex items-center justify-between gap-4 hover:bg-[#F8F7F7]/50 rounded-lg px-2 transition-colors"
+            >
+              <div className="flex items-center gap-3.5 min-w-0">
+                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${act.dotColor}`} />
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                    {act.title}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                    {act.desc}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 shrink-0 text-xs">
+                <div className="flex items-center gap-2">
+                  {act.avatar ? (
+                    <span className="w-6 h-6 rounded-full bg-[#d3f7ff] text-[#007b8b] font-bold text-[10px] flex items-center justify-center">
+                      {act.avatar}
+                    </span>
+                  ) : null}
+                  <span className="font-semibold text-gray-700">{act.user}</span>
+                </div>
+                <span className="font-mono text-gray-400 w-16 text-right">
+                  {act.time}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
