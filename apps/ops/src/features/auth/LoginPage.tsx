@@ -175,15 +175,15 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading || !email || !password}
-              className="mt-1 w-full py-3.5 bg-[#007b8b] hover:bg-[#006573] text-white font-bold text-sm rounded-full shadow-lg shadow-[#007b8b]/25 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="mt-1 w-full py-3.5 bg-[#007b8b] hover:bg-[#00606d] text-white font-bold text-sm rounded-full shadow-lg shadow-[#007b8b]/25 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLoading ? (
                 <>
                   <CircleNotch size={18} className="animate-spin" />
-                  <span>Đang xác thực...</span>
+                  <span>Đang đăng nhập...</span>
                 </>
               ) : (
-                <span>Đăng nhập hệ thống</span>
+                <span>Đăng nhập</span>
               )}
             </button>
 
@@ -199,17 +199,17 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Google Sign In button (Placed below) */}
+            {/* Google Sign In button */}
             <button
               type="button"
               onClick={() => {
                 setEmail('staff@signtrustmap.site')
                 setPassword('google-oauth')
               }}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-700 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-800 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
             >
               <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
-              <span>Tiếp tục với Google</span>
+              <span>Đăng nhập với Google</span>
             </button>
 
           </form>

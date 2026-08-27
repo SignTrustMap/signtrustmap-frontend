@@ -103,7 +103,7 @@ function HeroSection() {
 
   return (
     <section
-      className={`relative overflow-hidden pt-16 sm:pt-24 pb-20 sm:pb-28 transition-colors ${
+      className={`relative overflow-hidden pt-16 sm:pt-24 pb-10 sm:pb-12 transition-colors ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
@@ -302,7 +302,7 @@ function TopographicTransitionSection() {
 
   return (
     <section
-      className={`relative py-20 sm:py-24 overflow-hidden border-t transition-colors ${
+      className={`relative py-10 sm:py-12 overflow-hidden border-t transition-colors ${
         isDark ? 'bg-[#030708] border-white/5 text-white' : 'bg-white border-[#E8E4E3] text-gray-900'
       }`}
     >
@@ -402,7 +402,7 @@ function MapPreviewSection() {
 
   return (
     <section
-      className={`py-20 sm:py-24 border-t transition-colors ${
+      className={`py-10 sm:py-12 border-t transition-colors ${
         isDark ? 'bg-[#050e11] border-white/5 text-white' : 'bg-[#F8F7F7] border-[#E8E4E3] text-gray-900'
       }`}
     >
@@ -475,7 +475,7 @@ function MobileDownloadSection() {
 
   return (
     <section
-      className={`py-20 sm:py-24 border-t relative overflow-hidden transition-colors ${
+      className={`py-10 sm:py-12 border-t relative overflow-hidden transition-colors ${
         isDark ? 'bg-[#030708] border-white/5 text-white' : 'bg-white border-[#E8E4E3] text-gray-900'
       }`}
     >
