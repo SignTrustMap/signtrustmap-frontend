@@ -7,9 +7,10 @@
   --color-brand-cyan:    #00c4de;
   --color-brand-sky:     #d3f7ff;
   --color-brand-neutral: #F8F7F7;
-  --color-surface:       #FFFFFF;
-  --color-border:        #E8E4E3;
-  --color-ink:           #000000;
+  --color-dark-bg:       #030708;
+  --color-dark-surface:  #081215;
+  --color-dark-card:     #0c1a1e;
+  --color-dark-border:   rgba(255, 255, 255, 0.08);
 
   --font-sans:  'Geist', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
   --font-brand: 'Arvo', ui-serif, Georgia, serif;
@@ -22,28 +23,140 @@
   --radius-pill: 9999px;
 }
 
-/* ─── Base ───────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
+/* ─── Base Reset & Defaults ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  background-color: #F8F7F7;
+  color: #111827;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: var(--color-brand-neutral);
-  color: var(--color-ink);
+  background-color: #F8F7F7;
+  color: #111827;
   line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #007b8b; }
+/* ─── Dark Mode Overrides (Matching Web App Deep Space Teal) ────── */
+html.dark, html.dark body {
+  background-color: #030708 !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark aside,
+html.dark header {
+  background-color: #081215 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark .bg-white {
+  background-color: #0c1a1e !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark .bg-\[\#F8F7F7\] {
+  background-color: #081215 !important;
+}
+
+html.dark .bg-\[\#F8F7F7\]\/50,
+html.dark .bg-\[\#F8F7F7\]\/60 {
+  background-color: rgba(8, 18, 21, 0.7) !important;
+}
+
+html.dark .bg-\[\#F4F4F4\] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .bg-\[\#F4F4F4\]:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .border-\[\#E8E4E3\] {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .text-gray-900 {
+  color: #f9fafb !important;
+}
+
+html.dark .text-gray-800 {
+  color: #f3f4f6 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-gray-600 {
+  color: #9ca3af !important;
+}
+
+html.dark .text-gray-500 {
+  color: #9ca3af !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #081215 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f3f4f6 !important;
+}
+
+html.dark input::placeholder {
+  color: #6b7280 !important;
+}
+
+html.dark .divide-\[\#E8E4E3\] > * + * {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #1a2f35;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #007b8b;
+}
 
 :focus-visible {
   outline: 2px solid var(--color-brand-teal);
   outline-offset: 2px;
+}
+
+/* ─── Circular View Transition (Theme Ripple Effect) ─────────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2147483646;
 }

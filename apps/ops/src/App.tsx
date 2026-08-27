@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/features/auth/AuthContext'
+import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthGuard, AdminGuard, StaffGuard } from '@/features/auth/Guards'
 import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/features/auth/LoginPage'
@@ -128,13 +129,15 @@ function ProtectedLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/403" element={<NotAllowedPage />} />
-          <Route path="/*" element={<ProtectedLayout />} />
-        </Routes>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/403" element={<NotAllowedPage />} />
+            <Route path="/*" element={<ProtectedLayout />} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

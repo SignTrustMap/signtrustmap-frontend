@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Bell, Sun, Moon, Globe } from '@phosphor-icons/react'
+import { useTheme } from '@/context/ThemeContext'
 
 // Map route → breadcrumb label in Vietnamese
 const ROUTE_LABELS: Record<string, string> = {
@@ -9,6 +10,8 @@ const ROUTE_LABELS: Record<string, string> = {
   '/roles': 'Phân quyền hệ thống',
   '/candidates': 'Hồ sơ kiểm duyệt',
   '/reports': 'Báo cáo sự cố biển báo',
+  '/tasks': 'Vùng khảo sát & Tái xác thực',
+  '/credits': 'Duyệt điểm thưởng',
   '/audit-logs': 'Nhật ký hoạt động',
   '/map': 'Bản đồ biển báo GIS',
   '/settings': 'Cài đặt hệ thống',
@@ -19,32 +22,12 @@ export function Topbar() {
   const baseRoute = '/' + pathname.split('/')[1]
   const label = ROUTE_LABELS[pathname] ?? ROUTE_LABELS[baseRoute] ?? 'Quản trị vận hành'
 
-  // Theme state
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    const saved = localStorage.getItem('stm_ops_theme')
-    if (saved) return saved === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-  })
+  const { isDark, toggleTheme } = useTheme()
 
   // Language state (default Vietnamese)
   const [lang, setLang] = useState<string>(() => {
     return localStorage.getItem('stm_ops_lang') || 'vi'
   })
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (isDark) {
-      root.classList.add('dark')
-      localStorage.setItem('stm_ops_theme', 'dark')
-    } else {
-      root.classList.remove('dark')
-      localStorage.setItem('stm_ops_theme', 'light')
-    }
-  }, [isDark])
-
-  function toggleTheme() {
-    setIsDark((prev) => !prev)
-  }
 
   function toggleLang() {
     setLang((prev) => {
@@ -76,18 +59,18 @@ export function Topbar() {
         {/* Divider */}
         <div className="w-[1px] h-4 bg-gray-200" />
 
-        {/* Theme Toggle Button */}
+        {/* Theme Toggle Button (Circular Ripple effect on click) */}
         <button
           type="button"
-          onClick={toggleTheme}
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 hover:bg-[#F8F7F7] hover:text-[#007b8b] transition-all cursor-pointer"
+          onClick={(e) => toggleTheme(e)}
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 hover:bg-[#F8F7F7] hover:text-[#007b8b] transition-all cursor-pointer active:scale-95"
           title={isDark ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
           aria-label="Đổi giao diện"
         >
           {isDark ? (
-            <Moon size={18} weight="bold" className="text-[#00c4de]" />
+            <Sun size={18} weight="bold" className="text-amber-400" />
           ) : (
-            <Sun size={18} weight="bold" className="text-amber-500" />
+            <Moon size={18} weight="bold" className="text-[#007b8b]" />
           )}
         </button>
 

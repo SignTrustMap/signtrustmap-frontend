@@ -2,94 +2,36 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   MagnifyingGlass,
-  Plus,
-  Funnel,
+  UserPlus,
   CaretLeft,
   CaretRight,
+  MapPin,
+  Funnel,
+  CheckCircle,
 } from '@phosphor-icons/react'
+import { mockSystemUsers, type SystemUser, type StaffStatus } from '@/data'
 
-export type UserStatus = 'Active' | 'Suspended' | 'Inactive'
-
-export interface SystemUser {
-  id: string
-  name: string
-  email: string
-  role: string
-  status: UserStatus
-  location: string
-  lastActive: string
-  avatarText: string
-  avatarBg: string
-}
-
-const mockSystemUsers: SystemUser[] = [
-  {
-    id: 'USR-8492',
-    name: 'Sarah Jenkins',
-    email: 's.jenkins@enterprise.com',
-    role: 'Quản trị viên',
-    status: 'Active',
-    location: 'Hà Nội',
-    lastActive: 'Vừa xong',
-    avatarText: 'SJ',
-    avatarBg: 'bg-[#d3f7ff] text-[#007b8b]',
-  },
-  {
-    id: 'USR-7731',
-    name: 'Marcus Reed',
-    email: 'm.reed@enterprise.com',
-    role: 'Khảo sát viên',
-    status: 'Active',
-    location: 'TP. Hồ Chí Minh',
-    lastActive: '2 giờ trước',
-    avatarText: 'MR',
-    avatarBg: 'bg-[#007b8b] text-white',
-  },
-  {
-    id: 'USR-9012',
-    name: 'David Chen',
-    email: 'd.chen@enterprise.com',
-    role: 'Kiểm duyệt viên',
-    status: 'Suspended',
-    location: 'Đà Nẵng',
-    lastActive: '12/10/2023',
-    avatarText: 'DC',
-    avatarBg: 'bg-slate-800 text-white',
-  },
-  {
-    id: 'USR-6621',
-    name: 'Elena Lopez',
-    email: 'e.lopez@enterprise.com',
-    role: 'Tài xế',
-    status: 'Inactive',
-    location: 'Cần Thơ',
-    lastActive: '05/09/2023',
-    avatarText: 'EL',
-    avatarBg: 'bg-indigo-100 text-indigo-700',
-  },
-]
-
-function StatusDotBadge({ status }: { status: UserStatus }) {
+function StatusDot({ status }: { status: StaffStatus }) {
   switch (status) {
     case 'Active':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#dcfce7] text-[#15803d]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#15803d]" />
-          <span>Đang hoạt động</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
+          Đang hoạt động
         </span>
       )
     case 'Suspended':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#fee2e2] text-[#b91c1c]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#b91c1c]" />
-          <span>Tạm ngưng</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626]" />
+          Tạm ngưng
         </span>
       )
     case 'Inactive':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-          <span>Không hoạt động</span>
+          Không hoạt động
         </span>
       )
   }
@@ -98,33 +40,38 @@ function StatusDotBadge({ status }: { status: UserStatus }) {
 export default function StaffDirectoryPage() {
   const navigate = useNavigate()
   const [users] = useState<SystemUser[]>(mockSystemUsers)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('Tất cả vai trò')
   const [statusFilter, setStatusFilter] = useState('Tất cả trạng thái')
   const [locationFilter, setLocationFilter] = useState('Tất cả khu vực')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === users.length) {
-      setSelectedIds([])
+  function handleSelectAll(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.checked) {
+      setSelectedUserIds(filteredUsers.map((u) => u.id))
     } else {
-      setSelectedIds(users.map((u) => u.id))
+      setSelectedUserIds([])
     }
   }
 
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+  function handleSelectOne(id: string) {
+    setSelectedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     )
   }
 
-  function handleClear() {
+  function handleClearFilters() {
     setRoleFilter('Tất cả vai trò')
     setStatusFilter('Tất cả trạng thái')
     setLocationFilter('Tất cả khu vực')
     setSearchQuery('')
+  }
+
+  function handleApplyFilters() {
+    setToastMessage('Đã áp dụng các tiêu chí lọc danh sách.')
+    setTimeout(() => setToastMessage(null), 3000)
   }
 
   const filteredUsers = users.filter((u) => {
@@ -132,11 +79,18 @@ export default function StaffDirectoryPage() {
       u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.id.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = roleFilter === 'Tất cả vai trò' || u.role === roleFilter
+
+    const matchesRole =
+      roleFilter === 'Tất cả vai trò' || u.role === roleFilter
+
     const matchesStatus =
-      statusFilter === 'Tất cả trạng thái' || u.status === statusFilter
+      statusFilter === 'Tất cả trạng thái' ||
+      (statusFilter === 'Đang hoạt động' && u.status === 'Active') ||
+      (statusFilter === 'Tạm ngưng' && u.status === 'Suspended') ||
+      (statusFilter === 'Không hoạt động' && u.status === 'Inactive')
+
     const matchesLocation =
-      locationFilter === 'Tất cả khu vực' || u.location === locationFilter
+      locationFilter === 'Tất cả khu vực' || u.location.includes(locationFilter)
 
     return matchesSearch && matchesRole && matchesStatus && matchesLocation
   })
@@ -147,113 +101,140 @@ export default function StaffDirectoryPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Quản lý nhân sự
+            Quản lý nhân sự & Người dùng
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Quản lý và giám sát toàn bộ nhân sự trên toàn hệ thống.
+            Quản trị danh bạ tài khoản, phân bổ vai trò và trạng thái truy cập của nhân viên.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Search Bar */}
-          <div className="relative flex-1 sm:w-64">
-            <MagnifyingGlass
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Tìm kiếm nhân sự..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b] shadow-xs"
-            />
-          </div>
-
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-[0.98] shrink-0 cursor-pointer"
-          >
-            <Plus size={16} weight="bold" />
-            <span>Thêm nhân sự</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+        >
+          <UserPlus size={18} weight="bold" />
+          <span>Thêm nhân sự mới</span>
+        </button>
       </div>
 
-      {/* Filter Card */}
-      <div className="bg-white border border-[#E8E4E3] rounded-[16px] p-5 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+      {toastMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
+          <CheckCircle size={18} weight="fill" className="text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Filter Card Container */}
+      <div className="bg-white border border-[#E8E4E3] rounded-[16px] p-5 shadow-xs space-y-4">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
+          <Funnel size={14} weight="bold" />
+          <span>Bộ lọc nâng cao</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Role Filter */}
-          <div className="sm:col-span-3">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               Vai trò
             </label>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
             >
               <option value="Tất cả vai trò">Tất cả vai trò</option>
               <option value="Quản trị viên">Quản trị viên</option>
-              <option value="Khảo sát viên">Khảo sát viên</option>
+              <option value="Quản lý vận hành">Quản lý vận hành</option>
               <option value="Kiểm duyệt viên">Kiểm duyệt viên</option>
-              <option value="Tài xế">Tài xế</option>
+              <option value="Hỗ trợ">Hỗ trợ</option>
             </select>
           </div>
 
           {/* Status Filter */}
-          <div className="sm:col-span-3">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               Trạng thái
             </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
             >
               <option value="Tất cả trạng thái">Tất cả trạng thái</option>
-              <option value="Active">Đang hoạt động</option>
-              <option value="Suspended">Tạm ngưng</option>
-              <option value="Inactive">Không hoạt động</option>
+              <option value="Đang hoạt động">Đang hoạt động</option>
+              <option value="Tạm ngưng">Tạm ngưng</option>
+              <option value="Không hoạt động">Không hoạt động</option>
             </select>
           </div>
 
           {/* Location Filter */}
-          <div className="sm:col-span-3">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 font-mono">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
               Khu vực
             </label>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-[#F8F7F7] border border-[#E8E4E3] rounded-lg text-gray-800 focus:outline-none focus:border-[#007b8b] font-medium"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
             >
               <option value="Tất cả khu vực">Tất cả khu vực</option>
               <option value="Hà Nội">Hà Nội</option>
               <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
               <option value="Đà Nẵng">Đà Nẵng</option>
               <option value="Cần Thơ">Cần Thơ</option>
+              <option value="Hải Phòng">Hải Phòng</option>
             </select>
           </div>
 
-          {/* Filter Action Buttons */}
-          <div className="sm:col-span-3 flex items-center gap-2">
+          {/* Action Buttons */}
+          <div className="flex items-end gap-2">
             <button
               type="button"
-              onClick={handleClear}
-              className="flex-1 py-2 px-3 text-xs sm:text-sm font-semibold text-gray-600 bg-white border border-[#E8E4E3] hover:bg-gray-50 rounded-lg transition-colors cursor-pointer text-center"
+              onClick={handleClearFilters}
+              className="flex-1 py-2 px-3 border border-[#E8E4E3] hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer"
             >
               Xóa bộ lọc
             </button>
             <button
               type="button"
-              className="flex-1 py-2 px-3 text-xs sm:text-sm font-semibold text-white bg-[#007b8b] hover:bg-[#00606d] rounded-lg transition-colors shadow-xs inline-flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={handleApplyFilters}
+              className="flex-1 py-2 px-3 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors shadow-xs cursor-pointer"
             >
-              <Funnel size={14} />
-              <span>Áp dụng</span>
+              Áp dụng
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Search & Bulk Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="relative w-full sm:w-72">
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="text"
+            placeholder="Tìm theo tên, email, ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
+          />
+        </div>
+
+        {selectedUserIds.length > 0 && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold text-gray-700">
+              Đã chọn {selectedUserIds.length} nhân sự
+            </span>
+            <button
+              type="button"
+              className="px-3 py-1 bg-red-50 text-red-700 hover:bg-red-100 rounded font-semibold transition-colors"
+            >
+              Khóa hàng loạt
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Users Table */}
@@ -265,95 +246,85 @@ export default function StaffDirectoryPage() {
                 <th className="py-4 px-4 w-10 text-center">
                   <input
                     type="checkbox"
+                    onChange={handleSelectAll}
                     checked={
-                      selectedIds.length === users.length && users.length > 0
+                      filteredUsers.length > 0 &&
+                      selectedUserIds.length === filteredUsers.length
                     }
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded text-[#007b8b] focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded text-[#007b8b] focus:ring-[#007b8b] border-gray-300 cursor-pointer"
                   />
                 </th>
-                <th className="py-4 px-6">Nhân sự</th>
-                <th className="py-4 px-6">Vai trò</th>
-                <th className="py-4 px-6">Trạng thái</th>
-                <th className="py-4 px-6">Khu vực</th>
-                <th className="py-4 px-6">Hoạt động cuối</th>
-                <th className="py-4 px-6 text-right">Thao tác</th>
+                <th className="py-4 px-4">Nhân sự</th>
+                <th className="py-4 px-4">Vai trò</th>
+                <th className="py-4 px-4">Trạng thái</th>
+                <th className="py-4 px-4">Khu vực</th>
+                <th className="py-4 px-4">Hoạt động gần nhất</th>
+                <th className="py-4 px-4 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3]">
-              {filteredUsers.map((user) => {
-                const isSelected = selectedIds.includes(user.id)
+              {filteredUsers.map((u) => {
+                const isChecked = selectedUserIds.includes(u.id)
                 return (
                   <tr
-                    key={user.id}
-                    onClick={() => navigate(`/staff/${user.id}`)}
-                    className={`hover:bg-[#F8F7F7]/50 cursor-pointer transition-colors ${
-                      isSelected ? 'bg-[#d3f7ff]/20' : ''
+                    key={u.id}
+                    className={`hover:bg-[#F8F7F7]/50 transition-colors ${
+                      isChecked ? 'bg-[#d3f7ff]/15' : ''
                     }`}
                   >
-                    {/* Checkbox */}
-                    <td
-                      className="py-4 px-4 text-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <td className="py-4 px-4 text-center">
                       <input
                         type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => toggleSelect(user.id, e as unknown as React.MouseEvent)}
-                        className="w-4 h-4 rounded text-[#007b8b] focus:ring-0 cursor-pointer"
+                        checked={isChecked}
+                        onChange={() => handleSelectOne(u.id)}
+                        className="w-4 h-4 rounded text-[#007b8b] focus:ring-[#007b8b] border-gray-300 cursor-pointer"
                       />
                     </td>
-
-                    {/* User info */}
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <span
-                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${user.avatarBg}`}
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${u.avatarBg}`}
                         >
-                          {user.avatarText}
-                        </span>
+                          {u.initials}
+                        </div>
                         <div>
-                          <p className="font-bold text-gray-900 text-sm">
-                            {user.name}
-                          </p>
-                          <p className="text-xs text-gray-400 font-mono mt-0.5">
-                            {user.email}
+                          <p className="font-bold text-gray-900">{u.name}</p>
+                          <p className="text-xs text-gray-500 font-mono">
+                            {u.email}
                           </p>
                         </div>
                       </div>
                     </td>
-
-                    {/* Role */}
-                    <td className="py-4 px-6 text-xs text-gray-700 font-medium">
-                      {user.role}
+                    <td className="py-4 px-4">
+                      <span className="font-medium text-gray-800">
+                        {u.role}
+                      </span>
                     </td>
-
-                    {/* Status */}
-                    <td className="py-4 px-6">
-                      <StatusDotBadge status={user.status} />
+                    <td className="py-4 px-4">
+                      <StatusDot status={u.status} />
                     </td>
-
-                    {/* Location */}
-                    <td className="py-4 px-6 text-xs text-gray-700">
-                      {user.location}
+                    <td className="py-4 px-4 text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <MapPin size={14} className="text-[#007b8b] shrink-0" />
+                        <span>{u.location}</span>
+                      </div>
                     </td>
-
-                    {/* Last Active */}
-                    <td className="py-4 px-6 text-xs font-mono text-gray-500 whitespace-nowrap">
-                      {user.lastActive}
+                    <td className="py-4 px-4 text-xs font-mono text-gray-500">
+                      {u.lastActive}
                     </td>
-
-                    {/* Actions */}
-                    <td
-                      className="py-4 px-6 text-right space-x-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <td className="py-4 px-4 text-right space-x-2 whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => navigate(`/staff/${user.id}`)}
+                        onClick={() => navigate(`/staff/${u.id}`)}
                         className="text-xs font-semibold text-[#007b8b] hover:underline cursor-pointer"
                       >
-                        Xem chi tiết
+                        Chi tiết
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 cursor-pointer"
+                      >
+                        Sửa
                       </button>
                     </td>
                   </tr>
@@ -363,9 +334,11 @@ export default function StaffDirectoryPage() {
           </table>
         </div>
 
-        {/* Footer Pagination */}
+        {/* Pagination Footer */}
         <div className="py-3.5 px-6 border-t border-[#E8E4E3] flex items-center justify-between text-xs text-gray-500">
-          <span>Hiển thị 1 đến {filteredUsers.length} trong 97 kết quả</span>
+          <span>
+            Hiển thị 1 đến {filteredUsers.length} trong {users.length} tài khoản
+          </span>
 
           <div className="flex items-center gap-1">
             <button
@@ -377,16 +350,6 @@ export default function StaffDirectoryPage() {
             </button>
             <button className="w-7 h-7 flex items-center justify-center rounded bg-[#007b8b] text-white font-bold text-xs">
               1
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded border border-[#E8E4E3] hover:bg-gray-50 text-xs">
-              2
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded border border-[#E8E4E3] hover:bg-gray-50 text-xs">
-              3
-            </button>
-            <span className="px-1 text-gray-400">...</span>
-            <button className="w-7 h-7 flex items-center justify-center rounded border border-[#E8E4E3] hover:bg-gray-50 text-xs">
-              10
             </button>
             <button
               onClick={() => setCurrentPage((p) => p + 1)}
