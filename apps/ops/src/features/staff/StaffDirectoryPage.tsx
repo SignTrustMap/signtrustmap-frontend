@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   MagnifyingGlass,
   UserPlus,
@@ -7,46 +8,71 @@ import {
   CaretRight,
   MapPin,
   Funnel,
-  CheckCircle,
 } from '@phosphor-icons/react'
 import { mockSystemUsers, type SystemUser, type StaffStatus } from '@/data'
 
 function StatusDot({ status }: { status: StaffStatus }) {
+  const { t } = useTranslation('ops')
   switch (status) {
     case 'Active':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#dcfce7] text-[#15803d] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
-          Đang hoạt động
+          {t('staff.status_active')}
         </span>
       )
     case 'Suspended':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
           <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626] dark:bg-[#f87171]" />
-          Tạm ngưng
+          {t('staff.status_suspended')}
         </span>
       )
     case 'Inactive':
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 dark:border dark:border-white/10">
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-          Không hoạt động
+          {t('staff.status_inactive')}
         </span>
       )
   }
 }
 
 export default function StaffDirectoryPage() {
+  const { t } = useTranslation('ops')
   const navigate = useNavigate()
   const [users] = useState<SystemUser[]>(mockSystemUsers)
   const [searchQuery, setSearchQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState('Tất cả vai trò')
-  const [statusFilter, setStatusFilter] = useState('Tất cả trạng thái')
-  const [locationFilter, setLocationFilter] = useState('Tất cả khu vực')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [locationFilter, setLocationFilter] = useState('all')
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  function handleClearFilters() {
+    setRoleFilter('all')
+    setStatusFilter('all')
+    setLocationFilter('all')
+    setSearchQuery('')
+  }
+
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch =
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.location.toLowerCase().includes(searchQuery.toLowerCase())
+
+    let matchesRole = true
+    if (roleFilter !== 'all') matchesRole = u.role === roleFilter
+
+    let matchesStatus = true
+    if (statusFilter !== 'all') matchesStatus = u.status === statusFilter
+
+    let matchesLocation = true
+    if (locationFilter !== 'all') matchesLocation = u.location.includes(locationFilter)
+
+    return matchesSearch && matchesRole && matchesStatus && matchesLocation
+  })
 
   function handleSelectAll(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.checked) {
@@ -62,298 +88,207 @@ export default function StaffDirectoryPage() {
     )
   }
 
-  function handleClearFilters() {
-    setRoleFilter('Tất cả vai trò')
-    setStatusFilter('Tất cả trạng thái')
-    setLocationFilter('Tất cả khu vực')
-    setSearchQuery('')
-  }
-
-  function handleApplyFilters() {
-    setToastMessage('Đã áp dụng các tiêu chí lọc danh sách.')
-    setTimeout(() => setToastMessage(null), 3000)
-  }
-
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.id.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesRole =
-      roleFilter === 'Tất cả vai trò' || u.role === roleFilter
-
-    const matchesStatus =
-      statusFilter === 'Tất cả trạng thái' ||
-      (statusFilter === 'Đang hoạt động' && u.status === 'Active') ||
-      (statusFilter === 'Tạm ngưng' && u.status === 'Suspended') ||
-      (statusFilter === 'Không hoạt động' && u.status === 'Inactive')
-
-    const matchesLocation =
-      locationFilter === 'Tất cả khu vực' || u.location.includes(locationFilter)
-
-    return matchesSearch && matchesRole && matchesStatus && matchesLocation
-  })
-
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Quản lý nhân sự & Người dùng
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            {t('staff.title')}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Quản trị danh bạ tài khoản, phân bổ vai trò và trạng thái truy cập của nhân viên.
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {t('staff.subtitle')}
           </p>
         </div>
 
         <button
           type="button"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+          onClick={() => navigate('/staff/new')}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
         >
-          <UserPlus size={18} weight="bold" />
-          <span>Thêm nhân sự mới</span>
+          <UserPlus size={16} weight="bold" />
+          <span>{t('staff.btn_add_user')}</span>
         </button>
       </div>
 
-      {toastMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Filter Bar */}
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-5 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+          {/* Search */}
+          <div className="sm:col-span-4 relative">
+            <MagnifyingGlass
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              placeholder={t('staff.search_placeholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
+            />
+          </div>
 
-      {/* Filter Card Container */}
-      <div className="bg-white border border-[#E8E4E3] rounded-[16px] p-5 shadow-xs space-y-4">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
-          <Funnel size={14} weight="bold" />
-          <span>Bộ lọc nâng cao</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Role Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Vai trò
-            </label>
+          <div className="sm:col-span-3">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
             >
-              <option value="Tất cả vai trò">Tất cả vai trò</option>
-              <option value="Quản trị viên">Quản trị viên</option>
-              <option value="Quản lý vận hành">Quản lý vận hành</option>
-              <option value="Kiểm duyệt viên">Kiểm duyệt viên</option>
-              <option value="Hỗ trợ">Hỗ trợ</option>
+              <option value="all">{t('staff.role_all')}</option>
+              <option value="Admin">Admin</option>
+              <option value="Reviewer">Reviewer</option>
+              <option value="Surveyor">Surveyor</option>
+              <option value="Driver">Driver</option>
             </select>
           </div>
 
           {/* Status Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Trạng thái
-            </label>
+          <div className="sm:col-span-3">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
             >
-              <option value="Tất cả trạng thái">Tất cả trạng thái</option>
-              <option value="Đang hoạt động">Đang hoạt động</option>
-              <option value="Tạm ngưng">Tạm ngưng</option>
-              <option value="Không hoạt động">Không hoạt động</option>
+              <option value="all">{t('staff.status_all')}</option>
+              <option value="Active">{t('staff.status_active')}</option>
+              <option value="Suspended">{t('staff.status_suspended')}</option>
+              <option value="Inactive">{t('staff.status_inactive')}</option>
             </select>
           </div>
 
-          {/* Location Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Khu vực
-            </label>
-            <select
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
-            >
-              <option value="Tất cả khu vực">Tất cả khu vực</option>
-              <option value="Hà Nội">Hà Nội</option>
-              <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-              <option value="Đà Nẵng">Đà Nẵng</option>
-              <option value="Cần Thơ">Cần Thơ</option>
-              <option value="Hải Phòng">Hải Phòng</option>
-            </select>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-end gap-2">
+          {/* Clear button */}
+          <div className="sm:col-span-2 flex justify-end">
             <button
               type="button"
               onClick={handleClearFilters}
-              className="flex-1 py-2 px-3 border border-[#E8E4E3] hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg transition-colors cursor-pointer"
+              className="w-full py-2 px-3 border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
             >
-              Xóa bộ lọc
-            </button>
-            <button
-              type="button"
-              onClick={handleApplyFilters}
-              className="flex-1 py-2 px-3 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors shadow-xs cursor-pointer"
-            >
-              Áp dụng
+              <Funnel size={14} />
+              <span>{t('staff.btn_clear_filter')}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Search & Bulk Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
-          <MagnifyingGlass
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            placeholder="Tìm theo tên, email, ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b]"
-          />
-        </div>
-
-        {selectedUserIds.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold text-gray-700">
-              Đã chọn {selectedUserIds.length} nhân sự
-            </span>
-            <button
-              type="button"
-              className="px-3 py-1 bg-red-50 text-red-700 hover:bg-red-100 rounded font-semibold transition-colors"
-            >
-              Khóa hàng loạt
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Users Table */}
-      <div className="bg-white border border-[#E8E4E3] rounded-[16px] shadow-xs overflow-hidden">
+      {/* Table */}
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-[#E8E4E3] bg-[#F8F7F7]/60 text-[11px] font-bold uppercase tracking-wider text-gray-500 font-mono">
-                <th className="py-4 px-4 w-10 text-center">
+              <tr className="border-b border-[#E8E4E3] dark:border-white/10 bg-[#F8F7F7]/60 dark:bg-[#061014] text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-mono">
+                <th className="py-4 px-6 w-10">
                   <input
                     type="checkbox"
-                    onChange={handleSelectAll}
                     checked={
-                      filteredUsers.length > 0 &&
-                      selectedUserIds.length === filteredUsers.length
+                      selectedUserIds.length === filteredUsers.length &&
+                      filteredUsers.length > 0
                     }
-                    className="w-4 h-4 rounded text-[#007b8b] focus:ring-[#007b8b] border-gray-300 cursor-pointer"
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300"
                   />
                 </th>
-                <th className="py-4 px-4">Nhân sự</th>
-                <th className="py-4 px-4">Vai trò</th>
-                <th className="py-4 px-4">Trạng thái</th>
-                <th className="py-4 px-4">Khu vực</th>
-                <th className="py-4 px-4">Hoạt động gần nhất</th>
-                <th className="py-4 px-4 text-right">Hành động</th>
+                <th className="py-4 px-6">{t('staff.th_user')}</th>
+                <th className="py-4 px-6">{t('staff.th_role')}</th>
+                <th className="py-4 px-6">{t('staff.th_status')}</th>
+                <th className="py-4 px-6">{t('staff.th_location')}</th>
+                <th className="py-4 px-6">{t('staff.th_last_active')}</th>
+                <th className="py-4 px-6 text-right">{t('staff.th_actions')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E8E4E3]">
-              {filteredUsers.map((u) => {
-                const isChecked = selectedUserIds.includes(u.id)
-                return (
-                  <tr
-                    key={u.id}
-                    className={`hover:bg-[#F8F7F7]/50 transition-colors ${
-                      isChecked ? 'bg-[#d3f7ff]/15' : ''
-                    }`}
+            <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10">
+              {filteredUsers.map((user) => (
+                <tr
+                  key={user.id}
+                  className="hover:bg-[#F8F7F7]/50 dark:hover:bg-white/5 transition-colors group cursor-pointer"
+                  onClick={() => navigate(`/staff/${user.id}`)}
+                >
+                  <td
+                    className="py-4 px-6"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                    }}
                   >
-                    <td className="py-4 px-4 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleSelectOne(u.id)}
-                        className="w-4 h-4 rounded text-[#007b8b] focus:ring-[#007b8b] border-gray-300 cursor-pointer"
-                      />
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${u.avatarBg}`}
-                        >
-                          {u.initials}
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-900">{u.name}</p>
-                          <p className="text-xs text-gray-500 font-mono">
-                            {u.email}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="font-medium text-gray-800">
-                        {u.role}
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(user.id)}
+                      onChange={() => handleSelectOne(user.id)}
+                      className="rounded border-gray-300"
+                    />
+                  </td>
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${user.avatarBg}`}
+                      >
+                        {user.initials}
                       </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <StatusDot status={u.status} />
-                    </td>
-                    <td className="py-4 px-4 text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <MapPin size={14} className="text-[#007b8b] shrink-0" />
-                        <span>{u.location}</span>
+                      <div>
+                        <p className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
+                          {user.name}
+                        </p>
+                        <p className="text-[11px] text-gray-400 font-mono">
+                          {user.email}
+                        </p>
                       </div>
-                    </td>
-                    <td className="py-4 px-4 text-xs font-mono text-gray-500">
-                      {u.lastActive}
-                    </td>
-                    <td className="py-4 px-4 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/staff/${u.id}`)}
-                        className="text-xs font-semibold text-[#007b8b] hover:underline cursor-pointer"
-                      >
-                        Chi tiết
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs font-semibold text-gray-500 hover:text-gray-900 cursor-pointer"
-                      >
-                        Sửa
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
+                    </div>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6">
+                    <StatusDot status={user.status} />
+                  </td>
+                  <td className="py-4 px-6 text-gray-700 dark:text-gray-300">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <MapPin size={14} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
+                      <span>{user.location}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-6 text-xs text-gray-500 dark:text-gray-400 font-mono">
+                    {user.lastActive}
+                  </td>
+                  <td
+                    className="py-4 px-6 text-right"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/staff/${user.id}`)}
+                      className="px-3 py-1.5 rounded-lg bg-[#007b8b]/10 dark:bg-[#00c4de]/15 border border-[#007b8b]/25 dark:border-[#00c4de]/30 text-xs font-semibold text-[#007b8b] dark:text-[#00c4de] hover:bg-[#007b8b] hover:text-white dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
+                    >
+                      Chi tiết
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div className="py-3.5 px-6 border-t border-[#E8E4E3] flex items-center justify-between text-xs text-gray-500">
+        {/* Footer pagination */}
+        <div className="py-3.5 px-6 border-t border-[#E8E4E3] dark:border-white/10 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>
-            Hiển thị 1 đến {filteredUsers.length} trong {users.length} tài khoản
+            {t('staff.showing_results', { count: filteredUsers.length, total: users.length })}
           </span>
 
           <div className="flex items-center gap-1">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center rounded border border-[#E8E4E3] hover:bg-gray-50 disabled:opacity-40"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40"
             >
               <CaretLeft size={14} />
             </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded bg-[#007b8b] text-white font-bold text-xs">
+            <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#007b8b] text-white font-bold text-xs">
               1
             </button>
             <button
               onClick={() => setCurrentPage((p) => p + 1)}
-              className="w-7 h-7 flex items-center justify-center rounded border border-[#E8E4E3] hover:bg-gray-50"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10"
             >
               <CaretRight size={14} />
             </button>
