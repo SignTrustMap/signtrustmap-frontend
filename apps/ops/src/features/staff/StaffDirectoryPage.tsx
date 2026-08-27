@@ -15,21 +15,21 @@ function StatusDot({ status }: { status: StaffStatus }) {
   switch (status) {
     case 'Active':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#dcfce7] text-[#15803d]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#dcfce7] text-[#15803d] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80]" />
           Đang hoạt động
         </span>
       )
     case 'Suspended':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#fee2e2] text-[#b91c1c]">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626]" />
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626] dark:bg-[#f87171]" />
           Tạm ngưng
         </span>
       )
     case 'Inactive':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300 dark:border dark:border-white/10">
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
           Không hoạt động
         </span>

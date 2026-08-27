@@ -36,10 +36,10 @@ export default function CreditsApprovalPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             Duyệt thưởng & Điểm đóng góp
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Kiểm soát chi trả điểm thưởng đóng góp của khảo sát viên và reviewer, phát hiện gian lận và farm điểm.
           </p>
         </div>
@@ -54,37 +54,37 @@ export default function CreditsApprovalPage() {
             placeholder="Tìm theo tên, email hoặc mã..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg focus:outline-none focus:border-[#007b8b] shadow-xs"
+            className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de] shadow-xs"
           />
         </div>
       </div>
 
       {toast && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600" />
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
+          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400" />
           <span>{toast}</span>
         </div>
       )}
 
       {/* Table */}
-      <div className="bg-white border border-[#E8E4E3] rounded-[16px] shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-[#E8E4E3] bg-[#F8F7F7]/60 text-[11px] font-bold uppercase tracking-wider text-gray-500 font-mono">
+              <tr className="border-b border-[#E8E4E3] dark:border-white/10 bg-[#F8F7F7]/60 dark:bg-[#061014] text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 font-mono">
                 <th className="py-4 px-6">Mã giao dịch</th>
                 <th className="py-4 px-6">Người nhận thưởng</th>
                 <th className="py-4 px-6">Hoạt động đóng góp</th>
                 <th className="py-4 px-6 text-center">Điểm yêu cầu</th>
-                <th className="py-4 px-6">Mức độ rủi ro</th>
+                <th className="py-4 px-6 text-center">Mức độ rủi ro</th>
                 <th className="py-4 px-6">Bằng chứng & Đánh giá</th>
                 <th className="py-4 px-6 text-right">Quyết định</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E8E4E3]">
+            <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10">
               {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-[#F8F7F7]/50 transition-colors">
-                  <td className="py-4 px-6 font-bold text-gray-900 font-mono text-xs">
+                <tr key={item.id} className="hover:bg-[#F8F7F7]/50 dark:hover:bg-white/5 transition-colors">
+                  <td className="py-4 px-6 font-bold text-gray-900 dark:text-white font-mono text-xs">
                     {item.id}
                   </td>
                   <td className="py-4 px-6">
@@ -95,36 +95,36 @@ export default function CreditsApprovalPage() {
                         {item.user.name.slice(0, 2).toUpperCase()}
                       </span>
                       <div>
-                        <p className="font-bold text-gray-900 text-xs">{item.user.name}</p>
+                        <p className="font-bold text-gray-900 dark:text-white text-xs">{item.user.name}</p>
                         <p className="text-[11px] text-gray-400 font-mono">{item.user.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-xs text-gray-700 font-medium">
+                  <td className="py-4 px-6 text-xs text-gray-700 dark:text-gray-300 font-medium">
                     {item.activityType}
                   </td>
-                  <td className="py-4 px-6 text-center font-bold font-mono text-emerald-700">
+                  <td className="py-4 px-6 text-center font-bold font-mono text-emerald-600 dark:text-emerald-400">
                     +{item.amount}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-4 px-6 text-center">
                     {item.riskLevel === 'Thấp' && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#dcfce7] text-[#15803d]">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#dcfce7] text-[#15803d] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/30">
                         An toàn
                       </span>
                     )}
                     {item.riskLevel === 'Cảnh báo gian lận' && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#fee2e2] text-[#b91c1c] flex items-center gap-1 w-fit">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
                         <ShieldWarning size={13} weight="bold" />
                         Gian lận
                       </span>
                     )}
                     {item.riskLevel === 'Nghi vấn' && (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#fef3c7] text-[#b45309]">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fef3c7] text-[#b45309] dark:bg-amber-500/15 dark:text-amber-400 dark:border dark:border-amber-500/30">
                         Nghi vấn
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-6 text-xs text-gray-600 max-w-xs">
+                  <td className="py-4 px-6 text-xs text-gray-600 dark:text-gray-300 max-w-xs">
                     <p className="truncate">{item.evidenceSummary}</p>
                     <p className="text-[10px] text-gray-400 font-mono mt-0.5">{item.createdAt}</p>
                   </td>
@@ -134,20 +134,24 @@ export default function CreditsApprovalPage() {
                         <button
                           type="button"
                           onClick={() => handleDecision(item.id, 'Approved')}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md transition-colors cursor-pointer text-xs"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer text-xs"
                         >
                           Phê duyệt
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDecision(item.id, 'Rejected')}
-                          className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-md transition-colors cursor-pointer text-xs"
+                          className="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-500/15 dark:hover:bg-red-500/25 text-red-700 dark:text-red-400 border border-transparent dark:border-red-500/30 font-semibold rounded-lg transition-all active:scale-95 cursor-pointer text-xs"
                         >
                           Từ chối
                         </button>
                       </>
                     ) : (
-                      <span className={`text-xs font-bold ${item.status === 'Approved' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        item.status === 'Approved'
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border dark:border-emerald-500/30'
+                          : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border dark:border-red-500/30'
+                      }`}>
                         {item.status === 'Approved' ? '✓ Đã duyệt' : '✕ Đã từ chối'}
                       </span>
                     )}

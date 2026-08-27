@@ -28,7 +28,7 @@ const staffNavItems: NavItem[] = [
   { icon: <Flag size={18} weight="duotone" />, label: 'Sự cố biển báo', href: '/reports', badge: 3 },
   { icon: <CheckSquare size={18} weight="duotone" />, label: 'Vùng khảo sát & Tái xác thực', href: '/tasks', badge: 3 },
   { icon: <CurrencyCircleDollar size={18} weight="duotone" />, label: 'Duyệt điểm thưởng', href: '/credits' },
-  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ biển báo GIS', href: '/map' },
+  { icon: <MapTrifold size={18} weight="duotone" />, label: 'Bản đồ biển báo', href: '/map' },
 ]
 
 // ─── Admin Only Navigation Items ──────────────────────────────────

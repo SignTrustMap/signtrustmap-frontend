@@ -27,7 +27,7 @@ export const adminKpisData: KpiItem[] = [
     change: '+12.5%',
     changeText: 'so với tháng trước',
     isPositive: true,
-    iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
+    iconBg: 'bg-[#d3f7ff] text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] dark:border dark:border-[#00c4de]/40 dark:shadow-[0_0_15px_rgba(0,196,222,0.25)]',
   },
   {
     label: 'Tài khoản nhân sự & KSV',
@@ -35,7 +35,7 @@ export const adminKpisData: KpiItem[] = [
     change: '+4',
     changeText: 'mới kích hoạt',
     isPositive: true,
-    iconBg: 'bg-indigo-100 text-indigo-700',
+    iconBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border dark:border-indigo-500/40 dark:shadow-[0_0_15px_rgba(99,102,241,0.25)]',
   },
   {
     label: 'Sự kiện kiểm toán (Audit)',
@@ -43,7 +43,7 @@ export const adminKpisData: KpiItem[] = [
     change: '+8.1%',
     changeText: 'hoạt động ghi nhận',
     isNeutral: true,
-    iconBg: 'bg-emerald-100 text-emerald-700',
+    iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border dark:border-emerald-500/40 dark:shadow-[0_0_15px_rgba(34,197,94,0.25)]',
   },
   {
     label: 'Cảnh báo an ninh',
@@ -51,7 +51,7 @@ export const adminKpisData: KpiItem[] = [
     change: '-50%',
     changeText: 'so với tuần trước',
     isPositive: true,
-    iconBg: 'bg-amber-100 text-amber-700',
+    iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 dark:border dark:border-amber-500/40 dark:shadow-[0_0_15px_rgba(245,158,11,0.25)]',
   },
 ]
 
@@ -62,7 +62,7 @@ export const staffKpisData: KpiItem[] = [
     change: '+12',
     changeText: 'hồ sơ mới hôm nay',
     isWarning: true,
-    iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
+    iconBg: 'bg-[#d3f7ff] text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] dark:border dark:border-[#00c4de]/40 dark:shadow-[0_0_15px_rgba(0,196,222,0.25)]',
   },
   {
     label: 'Sự cố biển báo tiếp nhận',
@@ -70,7 +70,7 @@ export const staffKpisData: KpiItem[] = [
     change: '3',
     changeText: 'chờ xử lý gấp',
     isWarning: true,
-    iconBg: 'bg-red-100 text-red-600',
+    iconBg: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 dark:border dark:border-red-500/40 dark:shadow-[0_0_15px_rgba(239,68,68,0.25)]',
   },
   {
     label: 'Nhiệm vụ tái xác thực (Stale)',
@@ -78,7 +78,7 @@ export const staffKpisData: KpiItem[] = [
     change: '+5',
     changeText: 'có bằng chứng mới',
     isPositive: true,
-    iconBg: 'bg-amber-100 text-amber-700',
+    iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 dark:border dark:border-amber-500/40 dark:shadow-[0_0_15px_rgba(245,158,11,0.25)]',
   },
   {
     label: 'Điểm thưởng chờ thẩm định',
@@ -86,7 +86,7 @@ export const staffKpisData: KpiItem[] = [
     change: '3',
     changeText: 'giao dịch nghi vấn',
     isNeutral: true,
-    iconBg: 'bg-emerald-100 text-emerald-700',
+    iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border dark:border-emerald-500/40 dark:shadow-[0_0_15px_rgba(34,197,94,0.25)]',
   },
 ]
 

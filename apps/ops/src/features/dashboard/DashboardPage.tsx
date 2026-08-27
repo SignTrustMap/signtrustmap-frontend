@@ -52,10 +52,10 @@ export default function DashboardPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {isAdmin ? 'Tổng quan Quản trị Hệ thống' : 'Tổng quan Nghiệp vụ Vận hành'}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {isAdmin
               ? 'Theo dõi trạng thái tài khoản, an ninh, tham số hệ thống và phân quyền.'
               : 'Theo dõi tiến độ kiểm duyệt hồ sơ, sự cố biển báo và nhiệm vụ tái xác thực.'}
@@ -68,7 +68,7 @@ export default function DashboardPage() {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white border border-[#E8E4E3] rounded-lg font-semibold text-gray-700 focus:outline-none focus:border-[#007b8b] shadow-xs cursor-pointer"
+              className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg font-semibold text-gray-700 dark:text-gray-200 focus:outline-none focus:border-[#00c4de] shadow-xs cursor-pointer"
             >
               <option value="7 ngày qua">7 ngày qua</option>
               <option value="30 ngày qua">30 ngày qua</option>
@@ -83,7 +83,7 @@ export default function DashboardPage() {
           {/* Export Button */}
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] bg-white hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
           >
             <DownloadSimple size={16} />
             <span>Xuất báo cáo</span>
@@ -96,17 +96,17 @@ export default function DashboardPage() {
         {currentKpis.map((kpi, idx) => (
           <div
             key={kpi.label}
-            className="bg-white border border-[#E8E4E3] rounded-[18px] p-5 shadow-xs flex flex-col justify-between hover:border-[#007b8b]/40 transition-all group"
+            className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-5 shadow-sm flex flex-col justify-between hover:border-[#00c4de]/50 hover:shadow-md transition-all group"
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-semibold text-gray-500">{kpi.label}</p>
-                <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 mt-1 font-mono tracking-tight">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{kpi.label}</p>
+                <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mt-1.5 font-mono tracking-tight">
                   {kpi.value}
                 </p>
               </div>
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${kpi.iconBg}`}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs transition-transform group-hover:scale-105 ${kpi.iconBg}`}
               >
                 {currentIcons[idx]}
               </div>
@@ -114,19 +114,19 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-1.5 mt-4 text-xs font-semibold">
               {kpi.isPositive && (
-                <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold inline-flex items-center">
+                <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border dark:border-emerald-500/30 px-2 py-0.5 rounded font-bold inline-flex items-center gap-0.5">
                   <ArrowUpRight size={13} weight="bold" />
                   {kpi.change}
                 </span>
               )}
               {kpi.isWarning && (
-                <span className="text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-bold inline-flex items-center">
+                <span className="text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border dark:border-red-500/30 px-2 py-0.5 rounded font-bold inline-flex items-center gap-0.5">
                   <ArrowUpRight size={13} weight="bold" />
                   {kpi.change}
                 </span>
               )}
               {kpi.isNeutral && (
-                <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                <span className="text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/10 border dark:border-white/10 px-2 py-0.5 rounded font-bold">
                   {kpi.change}
                 </span>
               )}
@@ -139,26 +139,47 @@ export default function DashboardPage() {
       {/* Charts 2-Column Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Growth / Workflow Pipeline Area Chart (8 cols) */}
-        <div className="lg:col-span-8 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-base font-bold text-gray-900">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
                 {isAdmin ? 'Tăng trưởng người dùng & Lưu lượng' : 'Tiến độ xử lý hồ sơ & Báo cáo'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
                 {isAdmin ? 'Đăng ký mới so với tài khoản kích hoạt' : 'Hồ sơ tiếp nhận so với đã xử lý xong'}
               </p>
             </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="inline-flex items-center gap-1.5 text-gray-600">
-                <span className="w-2.5 h-2.5 rounded-full border-2 border-[#007b8b] bg-white" />
-                {isAdmin ? 'Đăng ký mới' : 'Hồ sơ tiếp nhận'}
+            <div className="flex items-center gap-5 text-xs sm:text-sm">
+              <span className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16">
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="5.5"
+                    fill="none"
+                    className="stroke-[#007b8b] dark:stroke-[#00c4de]"
+                    strokeWidth="2.5"
+                  />
+                </svg>
+                <span>{isAdmin ? 'Đăng ký mới' : 'Hồ sơ tiếp nhận'}</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-gray-600">
-                <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-gray-500 bg-white" />
-                {isAdmin ? 'Đang hoạt động' : 'Đã hoàn tất'}
+
+              <span className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16">
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="5.5"
+                    fill="none"
+                    className="stroke-slate-500 dark:stroke-slate-300"
+                    strokeWidth="2"
+                    strokeDasharray="2.5 2"
+                  />
+                </svg>
+                <span>{isAdmin ? 'Đang hoạt động' : 'Đã hoàn tất'}</span>
               </span>
-              <button className="text-gray-400 hover:text-gray-700 p-1">
+
+              <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 cursor-pointer">
                 <DotsThreeVertical size={18} weight="bold" />
               </button>
             </div>
@@ -173,8 +194,8 @@ export default function DashboardPage() {
             >
               <defs>
                 <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#007b8b" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#007b8b" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="#00c4de" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#00c4de" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
@@ -186,18 +207,19 @@ export default function DashboardPage() {
                   y1={y}
                   x2="690"
                   y2={y}
-                  stroke="#E8E4E3"
+                  stroke="currentColor"
+                  className="text-gray-200 dark:text-white/10"
                   strokeDasharray="4 4"
                   strokeWidth="1"
                 />
               ))}
 
               {/* Y Axis Labels */}
-              <text x="5" y="10" fill="#9ca3af" fontSize="10" fontFamily="monospace">3,000</text>
-              <text x="5" y="60" fill="#9ca3af" fontSize="10" fontFamily="monospace">2,000</text>
-              <text x="5" y="110" fill="#9ca3af" fontSize="10" fontFamily="monospace">1,500</text>
-              <text x="5" y="160" fill="#9ca3af" fontSize="10" fontFamily="monospace">500</text>
-              <text x="25" y="205" fill="#9ca3af" fontSize="10" fontFamily="monospace">0</text>
+              <text x="5" y="10" className="fill-gray-400 text-[10px] font-mono">3,000</text>
+              <text x="5" y="60" className="fill-gray-400 text-[10px] font-mono">2,000</text>
+              <text x="5" y="110" className="fill-gray-400 text-[10px] font-mono">1,500</text>
+              <text x="5" y="160" className="fill-gray-400 text-[10px] font-mono">500</text>
+              <text x="25" y="205" className="fill-gray-400 text-[10px] font-mono">0</text>
 
               {/* Area Under Curve 1 */}
               <path
@@ -205,12 +227,12 @@ export default function DashboardPage() {
                 fill="url(#growthGradient)"
               />
 
-              {/* Line 1 (Solid Teal) */}
+              {/* Line 1 (Solid Cyan/Teal) */}
               <path
                 d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45"
                 fill="none"
-                stroke="#007b8b"
-                strokeWidth="2.5"
+                stroke="#00c4de"
+                strokeWidth="3"
               />
 
               {/* Points on Line 1 */}
@@ -219,20 +241,20 @@ export default function DashboardPage() {
                   key={i}
                   cx={cx}
                   cy={cy}
-                  r="4"
+                  r="4.5"
                   fill="#ffffff"
                   stroke="#007b8b"
-                  strokeWidth="2"
+                  strokeWidth="2.5"
                 />
               ))}
 
-              {/* Line 2 (Dashed Blue-Gray) */}
+              {/* Line 2 (Dashed Slate) */}
               <path
                 d="M 50 170 C 130 160, 180 150, 210 150 C 270 150, 320 165, 360 160 C 420 155, 480 135, 520 130 C 580 125, 630 105, 670 100"
                 fill="none"
-                stroke="#64748b"
+                stroke="#94a3b8"
                 strokeWidth="2"
-                strokeDasharray="4 4"
+                strokeDasharray="5 5"
               />
 
               {/* Points on Line 2 */}
@@ -261,17 +283,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Right: Category Donut Chart (4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <h2 className="text-base font-bold text-gray-900">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
                 {isAdmin ? 'Phân loại tài khoản' : 'Phân loại vi phạm nghiệp vụ'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
                 {isAdmin ? 'Theo nhóm vai trò' : 'Theo mức độ nghiêm trọng'}
               </p>
             </div>
-            <button className="text-gray-400 hover:text-gray-700 p-1">
+            <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1">
               <DotsThreeVertical size={18} weight="bold" />
             </button>
           </div>
@@ -279,30 +301,34 @@ export default function DashboardPage() {
           {/* SVG Donut */}
           <div className="relative flex items-center justify-center my-4">
             <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
+              {/* Background Track Ring */}
               <circle
                 cx="90"
                 cy="90"
                 r="70"
-                stroke="#f1f5f9"
+                stroke="currentColor"
+                className="text-gray-100 dark:text-white/10"
                 strokeWidth="22"
                 fill="transparent"
               />
+              {/* Ring 1 - Cyan */}
               <circle
                 cx="90"
                 cy="90"
                 r="70"
-                stroke="#007b8b"
+                stroke="#00c4de"
                 strokeWidth="22"
                 fill="transparent"
                 strokeDasharray="440"
                 strokeDashoffset="264"
                 strokeLinecap="round"
               />
+              {/* Ring 2 - Red */}
               <circle
                 cx="90"
                 cy="90"
                 r="70"
-                stroke="#dc2626"
+                stroke="#ef4444"
                 strokeWidth="22"
                 fill="transparent"
                 strokeDasharray="440"
@@ -310,11 +336,12 @@ export default function DashboardPage() {
                 strokeLinecap="round"
                 className="transform rotate-144 origin-center"
               />
+              {/* Ring 3 - Amber */}
               <circle
                 cx="90"
                 cy="90"
                 r="70"
-                stroke="#d97706"
+                stroke="#f59e0b"
                 strokeWidth="22"
                 fill="transparent"
                 strokeDasharray="440"
@@ -326,32 +353,32 @@ export default function DashboardPage() {
           </div>
 
           {/* Donut Legend */}
-          <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3]">
+          <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3] dark:border-white/10">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#007b8b] shrink-0" />
-              <span className="text-gray-700 truncate">{isAdmin ? 'Tài xế / Driver' : 'Sai lệch thông tin'}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#00c4de] shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Tài xế / Driver' : 'Sai lệch thông tin'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] shrink-0" />
-              <span className="text-gray-700 truncate">{isAdmin ? 'Tài khoản vi phạm' : 'Lo ngại an toàn'}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Tài khoản vi phạm' : 'Lo ngại an toàn'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#d97706] shrink-0" />
-              <span className="text-gray-700 truncate">{isAdmin ? 'Khảo sát viên' : 'Chất lượng kém'}</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300 truncate">{isAdmin ? 'Khảo sát viên' : 'Chất lượng kém'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" />
-              <span className="text-gray-700 truncate">Khác</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-white/20 shrink-0" />
+              <span className="text-gray-700 dark:text-gray-300 truncate">Khác</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Bottom: Recent Activity Feed */}
-      <div className="bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs">
-        <div className="flex items-center justify-between border-b border-[#E8E4E3] pb-4 mb-4">
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs">
+        <div className="flex items-center justify-between border-b border-[#E8E4E3] dark:border-white/10 pb-4 mb-4">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-gray-900">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">
               Nhật ký hoạt động gần đây
             </h2>
           </div>
@@ -359,7 +386,7 @@ export default function DashboardPage() {
           <select
             value={feedFilter}
             onChange={(e) => setFeedFilter(e.target.value)}
-            className="text-xs border border-[#E8E4E3] rounded-lg px-3 py-1.5 bg-[#F8F7F7] text-gray-700 font-semibold focus:outline-none focus:border-[#007b8b]"
+            className="text-xs border border-[#E8E4E3] dark:border-white/15 rounded-lg px-3 py-1.5 bg-[#F8F7F7] dark:bg-[#061115] text-gray-700 dark:text-gray-200 font-semibold focus:outline-none focus:border-[#00c4de]"
           >
             <option value="Tất cả sự kiện">Tất cả sự kiện</option>
             <option value="Chỉ cảnh báo nghiêm trọng">Chỉ cảnh báo nghiêm trọng</option>
@@ -367,20 +394,20 @@ export default function DashboardPage() {
           </select>
         </div>
 
-        {/* Activity Feed Table */}
-        <div className="divide-y divide-[#E8E4E3]">
+        {/* Activity Feed List (Clean, No horizontal divider lines) */}
+        <div className="space-y-1.5 pt-1">
           {recentActivities.map((act) => (
             <div
               key={act.id}
-              className="py-3.5 flex items-center justify-between gap-4 hover:bg-[#F8F7F7]/50 rounded-lg px-2 transition-colors"
+              className="p-3.5 flex items-center justify-between gap-4 hover:bg-gray-100/70 dark:hover:bg-white/5 rounded-xl transition-all cursor-default"
             >
               <div className="flex items-center gap-3.5 min-w-0">
                 <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${act.dotColor}`} />
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                  <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
                     {act.title}
                   </p>
-                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                     {act.desc}
                   </p>
                 </div>
@@ -389,11 +416,11 @@ export default function DashboardPage() {
               <div className="flex items-center gap-6 shrink-0 text-xs">
                 <div className="flex items-center gap-2">
                   {act.avatar ? (
-                    <span className="w-6 h-6 rounded-full bg-[#d3f7ff] text-[#007b8b] font-bold text-[10px] flex items-center justify-center">
+                    <span className="w-6 h-6 rounded-full bg-[#d3f7ff] dark:bg-[#00c4de]/20 text-[#007b8b] dark:text-[#00c4de] font-bold text-[10px] flex items-center justify-center">
                       {act.avatar}
                     </span>
                   ) : null}
-                  <span className="font-semibold text-gray-700">{act.user}</span>
+                  <span className="font-semibold text-gray-700 dark:text-gray-300">{act.user}</span>
                 </div>
                 <span className="font-mono text-gray-400 w-16 text-right">
                   {act.time}

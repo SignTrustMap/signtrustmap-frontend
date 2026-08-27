@@ -12,31 +12,31 @@ function EventTypeBadge({ type }: { type: EventType }) {
   switch (type) {
     case 'Permission':
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ffedd5] text-[#c2410c]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#ffedd5] text-[#c2410c] dark:bg-amber-500/15 dark:text-amber-400 dark:border dark:border-amber-500/30">
           Phân quyền
         </span>
       )
     case 'Config':
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#e0f2fe] text-[#0369a1]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#e0f2fe] text-[#0369a1] dark:bg-cyan-500/15 dark:text-[#00c4de] dark:border dark:border-cyan-500/30">
           Cấu hình
         </span>
       )
     case 'Login':
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#e0f2fe]/70 text-[#0284c7]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#e0f2fe]/70 text-[#0284c7] dark:bg-blue-500/15 dark:text-blue-400 dark:border dark:border-blue-500/30">
           Đăng nhập
         </span>
       )
     case 'Alert':
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#fee2e2] text-[#dc2626]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#fee2e2] text-[#dc2626] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30">
           Cảnh báo
         </span>
       )
     case 'Data Access':
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#ffedd5]/80 text-[#9a3412]">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#ffedd5]/80 text-[#9a3412] dark:bg-amber-500/15 dark:text-amber-400 dark:border dark:border-amber-500/30">
           Truy cập dữ liệu
         </span>
       )

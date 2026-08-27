@@ -13,7 +13,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/tasks': 'Vùng khảo sát & Tái xác thực',
   '/credits': 'Duyệt điểm thưởng',
   '/audit-logs': 'Nhật ký hoạt động',
-  '/map': 'Bản đồ biển báo GIS',
+  '/map': 'Bản đồ biển báo',
   '/settings': 'Cài đặt hệ thống',
 }
 
