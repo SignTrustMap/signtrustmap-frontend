@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { LANG_STORAGE_KEY } from '@/i18n'
+import { communityPortalUrl } from '@/config/env'
 import {
   Eye,
   EyeSlash,
@@ -51,10 +52,6 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
     }
   }
-
-  const communityPortalUrl =
-    import.meta.env.VITE_WEB_URL ||
-    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://signtrustmap.site')
 
   return (
     <div
