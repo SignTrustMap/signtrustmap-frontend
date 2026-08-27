@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
@@ -7,6 +8,7 @@ import { AnnouncementBar } from '@/components/layout/AnnouncementBar'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollToTop } from '@/components/common/ScrollToTop'
+import { opsPortalUrl } from '@/config/env'
 import Home from '@/pages/Home'
 import ProductMap from '@/pages/ProductMap'
 import ProductApp from '@/pages/ProductApp'
@@ -23,12 +25,43 @@ function PlaceholderPage({ titleKey }: { titleKey: string }) {
   )
 }
 
+/**
+ * Automatically redirect any Ops Portal specific routes (e.g. /reports, /tasks, /candidates...)
+ * to the Ops Portal subdomain in case user types or deletes the "ops." prefix.
+ */
+function OpsRouteRedirectHandler() {
+  const { pathname, search } = useLocation()
+
+  useEffect(() => {
+    const opsPrefixes = [
+      '/reports',
+      '/tasks',
+      '/candidates',
+      '/credits',
+      '/audit-logs',
+      '/settings',
+      '/roles',
+      '/staff',
+    ]
+
+    const isOpsRoute = opsPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+
+    if (isOpsRoute) {
+      const destination = `${opsPortalUrl}${pathname}${search}`
+      window.location.replace(destination)
+    }
+  }, [pathname, search])
+
+  return null
+}
+
 export default function App() {
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
         <I18nProvider>
           <BrowserRouter>
+            <OpsRouteRedirectHandler />
             <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
               <div className="sticky top-0 z-40 w-full">
                 <AnnouncementBar />
