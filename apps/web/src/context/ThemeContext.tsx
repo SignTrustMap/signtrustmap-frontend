@@ -5,7 +5,7 @@ export type Theme = 'dark' | 'light'
 interface ThemeContextType {
   theme: Theme
   isDark: boolean
-  toggleTheme: () => void
+  toggleTheme: (e?: React.MouseEvent) => void
   setTheme: (theme: Theme) => void
 }
 
@@ -34,8 +34,50 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  const toggleTheme = (e?: React.MouseEvent) => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+
+    // Fallback if View Transitions API is not supported or user prefers reduced motion
+    if (
+      typeof document === 'undefined' ||
+      !('startViewTransition' in document) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      setThemeState(nextTheme)
+      return
+    }
+
+    // Get click coordinates (center on button or cursor), fallback to screen center
+    const x = e?.clientX ?? window.innerWidth / 2
+    const y = e?.clientY ?? window.innerHeight / 2
+
+    // Maximum distance from click point to furthest viewport corner
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    )
+
+    const transition = (document as unknown as {
+      startViewTransition: (cb: () => void) => { ready: Promise<void> }
+    }).startViewTransition(() => {
+      setThemeState(nextTheme)
+    })
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${endRadius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 500,
+          easing: 'ease-in-out',
+          pseudoElement: '::view-transition-new(root)',
+        }
+      )
+    })
   }
 
   const setTheme = (newTheme: Theme) => {
