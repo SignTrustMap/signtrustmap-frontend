@@ -16,7 +16,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-// ─── AdminGuard: requires admin role ─────────────────────────────
+// ─── AdminGuard: strictly requires admin role ─────────────────────
 export function AdminGuard({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth()
 
@@ -26,8 +26,27 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
+  // If logged in as staff, redirect away from Admin module
   if (user?.role !== 'admin') {
-    return <Navigate to="/403" replace />
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
+
+// ─── StaffGuard: strictly requires staff role ─────────────────────
+export function StaffGuard({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated, isLoading } = useAuth()
+
+  if (isLoading) return <div className="min-h-screen bg-[#F8F7F7]" />
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  // If logged in as admin, redirect away from Staff operations
+  if (user?.role !== 'staff') {
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>

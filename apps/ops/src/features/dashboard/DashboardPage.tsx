@@ -1,22 +1,42 @@
 import { useState } from 'react'
+import { useAuth } from '@/features/auth/AuthContext'
 import {
   Users,
-  Truck,
   WarningCircle,
   FolderSimple,
   ArrowUpRight,
   DotsThreeVertical,
   DownloadSimple,
   CalendarBlank,
+  ShieldCheck,
+  HardDrives,
+  CheckSquare,
+  Flag,
 } from '@phosphor-icons/react'
 
+interface KpiItem {
+  label: string
+  value: string
+  change: string
+  changeText: string
+  isPositive?: boolean
+  isWarning?: boolean
+  isNeutral?: boolean
+  icon: React.ReactNode
+  iconBg: string
+}
+
 export default function DashboardPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [timeRange, setTimeRange] = useState('30 ngày qua')
   const [feedFilter, setFeedFilter] = useState('Tất cả sự kiện')
 
-  const kpis = [
+  // ─── Admin KPIs ──────────────────────────────────────────────────
+  const adminKpis: KpiItem[] = [
     {
-      label: 'Tổng người dùng',
+      label: 'Tổng người dùng hệ thống',
       value: '142.8k',
       change: '+12.5%',
       changeText: 'so với tháng trước',
@@ -25,66 +45,141 @@ export default function DashboardPage() {
       iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
     },
     {
-      label: 'Khảo sát viên / Tài xế',
-      value: '45.2k',
-      change: '+8.2%',
-      changeText: 'so với tháng trước',
+      label: 'Tài khoản nhân sự & KSV',
+      value: '248',
+      change: '+4',
+      changeText: 'mới kích hoạt',
       isPositive: true,
-      icon: <Truck size={22} weight="bold" />,
+      icon: <ShieldCheck size={22} weight="bold" />,
+      iconBg: 'bg-indigo-100 text-indigo-700',
+    },
+    {
+      label: 'Sự kiện kiểm toán (Audit)',
+      value: '12.4k',
+      change: '+8.1%',
+      changeText: 'hoạt động ghi nhận',
+      isNeutral: true,
+      icon: <HardDrives size={22} weight="bold" />,
       iconBg: 'bg-emerald-100 text-emerald-700',
     },
     {
-      label: 'Hồ sơ gắn cờ cảnh báo',
-      value: '324',
-      change: '+4.1%',
-      changeText: 'Cần chú ý',
-      isWarning: true,
+      label: 'Cảnh báo an ninh',
+      value: '2',
+      change: '-50%',
+      changeText: 'so với tuần trước',
+      isPositive: true,
       icon: <WarningCircle size={22} weight="bold" />,
-      iconBg: 'bg-red-100 text-red-600',
-    },
-    {
-      label: 'Đang chờ xét duyệt',
-      value: '1,845',
-      change: '0.0%',
-      changeText: 'Khối lượng ổn định',
-      isNeutral: true,
-      icon: <FolderSimple size={22} weight="bold" />,
       iconBg: 'bg-amber-100 text-amber-700',
     },
   ]
 
-  const recentActivities = [
+  // ─── Staff KPIs ──────────────────────────────────────────────────
+  const staffKpis: KpiItem[] = [
     {
-      id: '1',
-      type: 'critical',
-      dotColor: 'bg-red-500',
-      title: 'Báo cáo an toàn mức nghiêm trọng được gắn cờ',
-      desc: 'Hệ thống tự động phát hiện mẫu hành vi kiểm tra bất thường.',
-      user: 'SYS-AUTO',
-      avatar: null,
-      time: '10:42 SA',
+      label: 'Hồ sơ biển báo cần duyệt',
+      value: '124',
+      change: '+12',
+      changeText: 'hồ sơ mới hôm nay',
+      isWarning: true,
+      icon: <FolderSimple size={22} weight="bold" />,
+      iconBg: 'bg-[#d3f7ff] text-[#007b8b]',
     },
     {
-      id: '2',
-      type: 'success',
-      dotColor: 'bg-emerald-500',
-      title: 'Danh tính ứng viên đã được xác minh',
-      desc: 'Quản trị viên đã phê duyệt thủ công cho hồ sơ đang chờ kiểm tra.',
-      user: 'Sarah Jenkins',
-      avatar: 'SJ',
-      time: '09:15 SA',
+      label: 'Sự cố biển báo tiếp nhận',
+      value: '24',
+      change: '3',
+      changeText: 'chờ xử lý gấp',
+      isWarning: true,
+      icon: <Flag size={22} weight="bold" />,
+      iconBg: 'bg-red-100 text-red-600',
     },
     {
-      id: '3',
-      type: 'info',
-      dotColor: 'bg-blue-500',
-      title: 'Đã phân bổ loạt nhiệm vụ khảo sát mới',
-      desc: '12 mục tiêu kiểm tra lại được giao cho đội ngũ khảo sát Khu vực 1.',
-      user: 'Marcus Rodriguez',
-      avatar: 'MR',
-      time: '08:30 SA',
+      label: 'Nhiệm vụ tái xác thực (Stale)',
+      value: '58',
+      change: '+5',
+      changeText: 'có bằng chứng mới',
+      isPositive: true,
+      icon: <CheckSquare size={22} weight="bold" />,
+      iconBg: 'bg-amber-100 text-amber-700',
+    },
+    {
+      label: 'Điểm thưởng chờ thẩm định',
+      value: '15',
+      change: '3',
+      changeText: 'giao dịch nghi vấn',
+      isNeutral: true,
+      icon: <Users size={22} weight="bold" />,
+      iconBg: 'bg-emerald-100 text-emerald-700',
     },
   ]
+
+  const currentKpis = isAdmin ? adminKpis : staffKpis
+
+  const recentActivities = isAdmin
+    ? [
+        {
+          id: '1',
+          type: 'critical',
+          dotColor: 'bg-red-500',
+          title: 'Phát hiện đăng nhập thất bại liên tiếp',
+          desc: 'Tài khoản USR-1022 nhập sai mật khẩu 5 lần từ IP 198.51.100.22.',
+          user: 'HỆ THỐNG',
+          avatar: 'HT',
+          time: '10:42 SA',
+        },
+        {
+          id: '2',
+          type: 'success',
+          dotColor: 'bg-emerald-500',
+          title: 'Thay đổi quyền hạn vai trò Kiểm duyệt viên',
+          desc: 'Quản trị viên đã cấp thêm quyền duyệt điểm thưởng cho vai trò Reviewer.',
+          user: 'Admin',
+          avatar: 'AD',
+          time: '09:15 SA',
+        },
+        {
+          id: '3',
+          type: 'info',
+          dotColor: 'bg-blue-500',
+          title: 'Sao lưu cơ sở dữ liệu định kỳ hoàn tất',
+          desc: 'Tạo bản sao lưu không gian PostGIS dung lượng 4.2GB thành công.',
+          user: 'SYS-BACKUP',
+          avatar: null,
+          time: '04:00 SA',
+        },
+      ]
+    : [
+        {
+          id: '1',
+          type: 'critical',
+          dotColor: 'bg-red-500',
+          title: 'Gắn cờ hồ sơ nghi vấn gian lận GPS',
+          desc: 'Ứng viên CD-99012-XT gửi dữ liệu tọa độ không khớp với hành trình.',
+          user: 'Kiểm duyệt tự động',
+          avatar: 'BOT',
+          time: '10:42 SA',
+        },
+        {
+          id: '2',
+          type: 'success',
+          dotColor: 'bg-emerald-500',
+          title: 'Đã xử lý sự cố biển báo #REP-2045',
+          desc: 'Biển báo cấm ngược chiều tại Cầu Rồng đã được xác minh cập nhật.',
+          user: 'Lê Hoàng Nam',
+          avatar: 'LN',
+          time: '09:15 SA',
+        },
+        {
+          id: '3',
+          type: 'info',
+          dotColor: 'bg-blue-500',
+          title: 'Bằng chứng tái xác thực mới được gửi',
+          desc: 'Khảo sát viên gửi ảnh mới cho biển P.102 tại Ba Đình, Hà Nội.',
+          user: 'Nguyễn Văn Hùng',
+          avatar: 'NH',
+          time: '08:30 SA',
+        },
+      ]
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
@@ -92,10 +187,12 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Tổng quan hệ thống
+            {isAdmin ? 'Tổng quan Quản trị Hệ thống' : 'Tổng quan Nghiệp vụ Vận hành'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Chỉ số vận hành và trạng thái hệ thống trong 30 ngày qua.
+            {isAdmin
+              ? 'Theo dõi trạng thái tài khoản, an ninh, tham số hệ thống và phân quyền.'
+              : 'Theo dõi tiến độ kiểm duyệt hồ sơ, sự cố biển báo và nhiệm vụ tái xác thực.'}
           </p>
         </div>
 
@@ -130,7 +227,7 @@ export default function DashboardPage() {
 
       {/* 4 KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {kpis.map((kpi) => (
+        {currentKpis.map((kpi) => (
           <div
             key={kpi.label}
             className="bg-white border border-[#E8E4E3] rounded-[18px] p-5 shadow-xs flex flex-col justify-between hover:border-[#007b8b]/40 transition-all group"
@@ -175,25 +272,25 @@ export default function DashboardPage() {
 
       {/* Charts 2-Column Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: User Growth Pipeline Area Chart (8 cols) */}
+        {/* Left: Growth / Workflow Pipeline Area Chart (8 cols) */}
         <div className="lg:col-span-8 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900">
-                Tiến trình tăng trưởng người dùng
+                {isAdmin ? 'Tăng trưởng người dùng & Lưu lượng' : 'Tiến độ xử lý hồ sơ & Báo cáo'}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                Đăng ký mới so với khảo sát viên hoạt động theo tuần
+                {isAdmin ? 'Đăng ký mới so với tài khoản kích hoạt' : 'Hồ sơ tiếp nhận so với đã xử lý xong'}
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-[#007b8b] bg-white" />
-                Đăng ký mới
+                {isAdmin ? 'Đăng ký mới' : 'Hồ sơ tiếp nhận'}
               </span>
               <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-gray-500 bg-white" />
-                Khảo sát viên
+                {isAdmin ? 'Đang hoạt động' : 'Đã hoàn tất'}
               </span>
               <button className="text-gray-400 hover:text-gray-700 p-1">
                 <DotsThreeVertical size={18} weight="bold" />
@@ -236,13 +333,13 @@ export default function DashboardPage() {
               <text x="5" y="160" fill="#9ca3af" fontSize="10" fontFamily="monospace">500</text>
               <text x="25" y="205" fill="#9ca3af" fontSize="10" fontFamily="monospace">0</text>
 
-              {/* Area Under Curve 1 (New Registrations) */}
+              {/* Area Under Curve 1 */}
               <path
                 d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45 L 670 200 L 50 200 Z"
                 fill="url(#growthGradient)"
               />
 
-              {/* Line 1: New Registrations (Solid Teal) */}
+              {/* Line 1 (Solid Teal) */}
               <path
                 d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45"
                 fill="none"
@@ -263,7 +360,7 @@ export default function DashboardPage() {
                 />
               ))}
 
-              {/* Line 2: Active Drivers (Dashed Blue-Gray) */}
+              {/* Line 2 (Dashed Blue-Gray) */}
               <path
                 d="M 50 170 C 130 160, 180 150, 210 150 C 270 150, 320 165, 360 160 C 420 155, 480 135, 520 130 C 580 125, 630 105, 670 100"
                 fill="none"
@@ -297,14 +394,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right: Reported Categories Donut Chart (4 cols) */}
+        {/* Right: Category Donut Chart (4 cols) */}
         <div className="lg:col-span-4 bg-white border border-[#E8E4E3] rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-base font-bold text-gray-900">
-                Phân loại vi phạm
+                {isAdmin ? 'Phân loại tài khoản' : 'Phân loại vi phạm nghiệp vụ'}
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">Theo mức độ nghiêm trọng</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {isAdmin ? 'Theo nhóm vai trò' : 'Theo mức độ nghiêm trọng'}
+              </p>
             </div>
             <button className="text-gray-400 hover:text-gray-700 p-1">
               <DotsThreeVertical size={18} weight="bold" />
@@ -314,7 +413,6 @@ export default function DashboardPage() {
           {/* SVG Donut */}
           <div className="relative flex items-center justify-center my-4">
             <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
-              {/* Background ring */}
               <circle
                 cx="90"
                 cy="90"
@@ -323,7 +421,6 @@ export default function DashboardPage() {
                 strokeWidth="22"
                 fill="transparent"
               />
-              {/* Identity Mismatch (Blue 40%) */}
               <circle
                 cx="90"
                 cy="90"
@@ -335,7 +432,6 @@ export default function DashboardPage() {
                 strokeDashoffset="264"
                 strokeLinecap="round"
               />
-              {/* Safety Concerns (Red 28%) */}
               <circle
                 cx="90"
                 cy="90"
@@ -348,7 +444,6 @@ export default function DashboardPage() {
                 strokeLinecap="round"
                 className="transform rotate-144 origin-center"
               />
-              {/* Performance (Orange 18%) */}
               <circle
                 cx="90"
                 cy="90"
@@ -368,15 +463,15 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#E8E4E3]">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#007b8b] shrink-0" />
-              <span className="text-gray-700 truncate">Sai lệch thông tin</span>
+              <span className="text-gray-700 truncate">{isAdmin ? 'Tài xế / Driver' : 'Sai lệch thông tin'}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] shrink-0" />
-              <span className="text-gray-700 truncate">Lo ngại an toàn</span>
+              <span className="text-gray-700 truncate">{isAdmin ? 'Tài khoản vi phạm' : 'Lo ngại an toàn'}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#d97706] shrink-0" />
-              <span className="text-gray-700 truncate">Chất lượng dữ liệu</span>
+              <span className="text-gray-700 truncate">{isAdmin ? 'Khảo sát viên' : 'Chất lượng kém'}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-gray-300 shrink-0" />
@@ -402,7 +497,7 @@ export default function DashboardPage() {
           >
             <option value="Tất cả sự kiện">Tất cả sự kiện</option>
             <option value="Chỉ cảnh báo nghiêm trọng">Chỉ cảnh báo nghiêm trọng</option>
-            <option value="Chỉ xác minh danh tính">Chỉ xác minh danh tính</option>
+            <option value="Chỉ hoạt động người dùng">Chỉ hoạt động người dùng</option>
           </select>
         </div>
 
