@@ -81,11 +81,14 @@ export default function Login() {
               />
             </Link>
             <h1
-              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans ${
+              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              {t('auth.login.title')}
+              <span>{t('auth.login.title_action')}</span>
+              <span>
+                Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
+              </span>
             </h1>
             <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               {t('auth.login.subtitle')}

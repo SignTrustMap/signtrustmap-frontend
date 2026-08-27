@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeSlash, CircleNotch, CheckCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function Signup() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('common')
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -17,7 +19,7 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!agreeTerms) {
-      setError('Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật để tiếp tục.')
+      setError(t('auth.signup.terms_error'))
       return
     }
     setError('')
@@ -26,7 +28,7 @@ export default function Signup() {
       await new Promise((r) => setTimeout(r, 600))
       navigate('/product/app', { replace: true })
     } catch {
-      setError('Đăng ký không thành công. Vui lòng thử lại.')
+      setError(t('auth.signup.error_default'))
     } finally {
       setIsLoading(false)
     }
@@ -65,7 +67,6 @@ export default function Signup() {
         />
       </div>
 
-
       {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
@@ -85,14 +86,17 @@ export default function Signup() {
               />
             </Link>
             <h1
-              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans ${
+              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              Tạo tài khoản Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
+              <span>{t('auth.signup.title_action')}</span>
+              <span>
+                Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
+              </span>
             </h1>
             <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Bắt đầu tham gia đóng góp và trải nghiệm bản đồ biển báo tin cậy
+              {t('auth.signup.subtitle')}
             </p>
           </div>
 
@@ -106,7 +110,7 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                Họ và tên
+                {t('auth.signup.name_label')}
               </label>
               <input
                 id="signup-name"
@@ -115,7 +119,7 @@ export default function Signup() {
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Nguyễn Văn A"
+                placeholder={t('auth.signup.name_placeholder')}
                 className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all ${
                   isDark
                     ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
@@ -132,7 +136,7 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                Email
+                {t('auth.signup.email_label')}
               </label>
               <input
                 id="signup-email"
@@ -158,7 +162,7 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                Mật khẩu
+                {t('auth.signup.password_label')}
               </label>
               <div className="relative">
                 <input
@@ -168,7 +172,7 @@ export default function Signup() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Tối thiểu 8 ký tự"
+                  placeholder={t('auth.signup.password_placeholder')}
                   className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all ${
                     isDark
                       ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
@@ -181,7 +185,7 @@ export default function Signup() {
                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
                     isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-800'
                   }`}
-                  aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  aria-label={showPw ? t('auth.signup.hide_pw') : t('auth.signup.show_pw')}
                 >
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
@@ -197,7 +201,11 @@ export default function Signup() {
               }`}
             >
               <CheckCircle size={18} weight="fill" className={isDark ? 'text-[#00c4de] shrink-0' : 'text-[#007b8b] shrink-0'} />
-              <span>Tặng ngay <strong>50 Credits</strong> khi kích hoạt tài khoản</span>
+              <span>
+                {t('auth.signup.credits_bonus_prefix')}
+                <strong>{t('auth.signup.credits_bonus_highlight')}</strong>
+                {t('auth.signup.credits_bonus_suffix')}
+              </span>
             </div>
 
             {/* Terms checkbox */}
@@ -217,15 +225,15 @@ export default function Signup() {
                   isDark ? 'text-gray-400' : 'text-gray-600'
                 }`}
               >
-                Bằng việc đăng ký bên dưới, tôi đồng ý với{' '}
+                {t('auth.signup.terms_agree_prefix')}
                 <Link to="/terms" className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-medium'}`}>
-                  Điều khoản dịch vụ
-                </Link>{' '}
-                và{' '}
+                  {t('auth.signup.terms_service')}
+                </Link>
+                {t('auth.signup.and')}
                 <Link to="/privacy" className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-medium'}`}>
-                  Chính sách bảo mật
-                </Link>{' '}
-                của SignTrustMap.
+                  {t('auth.signup.terms_privacy')}
+                </Link>
+                {t('auth.signup.terms_of')}
               </label>
             </div>
 
@@ -254,10 +262,10 @@ export default function Signup() {
               {isLoading ? (
                 <>
                   <CircleNotch size={18} className="animate-spin" />
-                  <span>Đang tạo tài khoản...</span>
+                  <span>{t('auth.signup.submitting')}</span>
                 </>
               ) : (
-                <span>Đăng ký với Email</span>
+                <span>{t('auth.signup.submit')}</span>
               )}
             </button>
 
@@ -272,7 +280,7 @@ export default function Signup() {
                     isDark ? 'bg-[#061417] text-gray-400' : 'bg-white text-gray-400'
                   }`}
                 >
-                  HOẶC
+                  {t('auth.signup.or')}
                 </span>
               </div>
             </div>
@@ -292,7 +300,7 @@ export default function Signup() {
               }`}
             >
               <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
-              <span>Đăng ký với Google</span>
+              <span>{t('auth.signup.google')}</span>
             </button>
           </form>
 
@@ -302,14 +310,14 @@ export default function Signup() {
               isDark ? 'text-gray-400 border-white/10' : 'text-gray-600 border-gray-100'
             }`}
           >
-            <span>Đã có tài khoản? </span>
+            <span>{t('auth.signup.has_account')} </span>
             <Link
               to="/login"
               className={`font-bold hover:underline ${
                 isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
               }`}
             >
-              Đăng nhập ngay
+              {t('auth.signup.go_login')}
             </Link>
           </div>
         </div>
