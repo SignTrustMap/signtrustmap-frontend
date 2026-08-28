@@ -70,9 +70,9 @@ export function SurveyRecordDetailsScreen() {
   const parsedLongitude = longitude ? Number(longitude) : Number.NaN;
   const imageCoordinate: MapCoordinate | undefined =
     Number.isFinite(parsedLatitude) &&
-    Number.isFinite(parsedLongitude) &&
-    Math.abs(parsedLatitude) <= 90 &&
-    Math.abs(parsedLongitude) <= 180
+      Number.isFinite(parsedLongitude) &&
+      Math.abs(parsedLatitude) <= 90 &&
+      Math.abs(parsedLongitude) <= 180
       ? [parsedLongitude, parsedLatitude]
       : undefined;
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
@@ -262,7 +262,10 @@ export function SurveyRecordDetailsScreen() {
             />
           </View>
 
-          <AppButton label="Submit" onPress={() => undefined} style={styles.submitButton} />
+          <AppButton
+            label="Submit"
+            onPress={() => router.replace('/work/survey-finish')}
+            style={styles.submitButton} />
         </ScrollView>
       </SafeAreaView>
     </View>

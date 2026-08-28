@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,6 +22,8 @@ const roleLabels: Record<AccountRole, string> = {
   reviewer: 'Reviewer',
   surveyor: 'Surveyor',
 };
+
+type CurrentRole = 'driver' | 'surveyor' | 'reviewer';
 
 const roleDescriptions: Record<AccountRole, string> = {
   driver: 'Complete driving jobs and verify signs along your assigned route.',
@@ -56,16 +58,21 @@ const demoWork: Record<AccountRole, WorkItem[]> = {
   ],
 };
 
-export function WorkScreen() {
+export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const router = useRouter();
   const { session } = useSession();
   const theme = useTheme();
   const availableRoles = session
     ? ACCOUNT_ROLES.filter((role) => session.account.roles.includes(role))
     : driverOnlyRoles;
-  const [activeRole, setActiveRole] = useState<AccountRole>('driver');
+  const [activeRole, setActiveRole] = useState<AccountRole>(currentRole);
   const selectedRole = availableRoles.includes(activeRole) ? activeRole : 'driver';
   const workItems = demoWork[selectedRole];
+
+  useEffect(() => {
+    // might be redundant, but ensures that the active role is updated if the currentRole prop changes
+    setActiveRole(currentRole);
+  }, [currentRole]);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>

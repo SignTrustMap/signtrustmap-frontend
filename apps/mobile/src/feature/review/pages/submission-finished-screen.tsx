@@ -5,12 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useBackButton } from '@/hooks/use-back-button';
+import { useWorkRoute } from '@/hooks/use-work-route';
 
 export function SubmissionFinishedScreen({ reviewedCount }: { reviewedCount: number }) {
   const router = useRouter();
   const theme = useTheme();
+  const reviewerWorkRoute = useWorkRoute('/work', { currentRole: 'reviewer' });
 
-
+  useBackButton(reviewerWorkRoute);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -29,7 +32,7 @@ export function SubmissionFinishedScreen({ reviewedCount }: { reviewedCount: num
           <View style={styles.actionFooter}>
             <AppButton
               label="Return to home"
-              onPress={() => router.replace('/work')}
+              onPress={() => router.replace(reviewerWorkRoute)}
               style={styles.action}
               variant='surface'
             />
