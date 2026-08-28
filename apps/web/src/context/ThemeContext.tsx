@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 
 export type Theme = 'dark' | 'light'
 
@@ -13,63 +14,86 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 const THEME_STORAGE_KEY = 'signtrustmap_theme'
 
+function updateDOMTheme(theme: Theme) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
+  root.classList.remove('dark', 'light')
+  root.classList.add(theme)
+  root.setAttribute('data-theme', theme)
+  root.style.colorScheme = theme
+  localStorage.setItem(THEME_STORAGE_KEY, theme)
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Check saved theme in localStorage
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
       if (savedTheme === 'dark' || savedTheme === 'light') {
         return savedTheme
       }
     }
-    return 'dark' // Default to dark mode
+    return 'dark'
   })
 
   useEffect(() => {
-    const root = document.documentElement
-    root.classList.remove('dark', 'light')
-    root.classList.add(theme)
-    root.setAttribute('data-theme', theme)
-    root.style.colorScheme = theme
-    localStorage.setItem(THEME_STORAGE_KEY, theme)
+    updateDOMTheme(theme)
   }, [theme])
 
   const toggleTheme = (e?: React.MouseEvent) => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
 
-    // Fallback if View Transitions API is not supported or user prefers reduced motion
     if (
       typeof document === 'undefined' ||
       !('startViewTransition' in document) ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
     ) {
+      updateDOMTheme(nextTheme)
       setThemeState(nextTheme)
       return
     }
 
-    // Get click coordinates (center on button or cursor), fallback to screen center
-    const x = e?.clientX ?? window.innerWidth / 2
-    const y = e?.clientY ?? window.innerHeight / 2
+    let x = window.innerWidth / 2
+    let y = window.innerHeight / 2
 
-    // Maximum distance from click point to furthest viewport corner
+    if (e) {
+      const targetEl = (e.currentTarget || e.target) as HTMLElement | null
+      if (targetEl && typeof targetEl.getBoundingClientRect === 'function') {
+        const rect = targetEl.getBoundingClientRect()
+        x = rect.left + rect.width / 2
+        y = rect.top + rect.height / 2
+      } else if (typeof e.clientX === 'number' && (e.clientX !== 0 || e.clientY !== 0)) {
+        x = e.clientX
+        y = e.clientY
+      } else if (e.nativeEvent && typeof (e.nativeEvent as MouseEvent).clientX === 'number') {
+        x = (e.nativeEvent as MouseEvent).clientX
+        y = (e.nativeEvent as MouseEvent).clientY
+      }
+    }
+
     const endRadius = Math.hypot(
       Math.max(x, window.innerWidth - x),
       Math.max(y, window.innerHeight - y)
     )
 
+    const xPercent = (x / window.innerWidth) * 100
+    const yPercent = (y / window.innerHeight) * 100
+
+    const clipFrom = `circle(0px at ${xPercent}% ${yPercent}%)`
+    const clipTo = `circle(${endRadius}px at ${xPercent}% ${yPercent}%)`
+
     const transition = (document as unknown as {
       startViewTransition: (cb: () => void) => { ready: Promise<void> }
     }).startViewTransition(() => {
-      setThemeState(nextTheme)
+      updateDOMTheme(nextTheme)
+      flushSync(() => {
+        setThemeState(nextTheme)
+      })
     })
 
     transition.ready.then(() => {
       document.documentElement.animate(
         {
-          clipPath: [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${endRadius}px at ${x}px ${y}px)`,
-          ],
+          clipPath: [clipFrom, clipTo],
         },
         {
           duration: 500,
@@ -81,6 +105,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
 
   const setTheme = (newTheme: Theme) => {
+    updateDOMTheme(newTheme)
     setThemeState(newTheme)
   }
 
