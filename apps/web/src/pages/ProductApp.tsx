@@ -8,33 +8,65 @@ import {
   Coins,
   ArrowsClockwise,
 } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/context/ThemeContext'
-
-const keyFeatures = [
-  {
-    icon: <VideoCamera size={26} weight="duotone" />,
-    title: 'Ghi Nhận Chuyến Đi (Video + GPX)',
-    desc: 'Đồng bộ hóa video camera hành trình và vệt quỹ đạo GPX thực địa để hệ thống AI tự động bóc tách biển báo.',
-  },
-  {
-    icon: <NavigationArrow size={26} weight="duotone" />,
-    title: 'Cảnh Báo Đúng Hướng Di Chuyển',
-    desc: 'Nhận diện chiều xe chạy và chỉ phát cảnh báo âm thanh/hình ảnh đối với các biển báo có hiệu lực theo làn đường.',
-  },
-  {
-    icon: <Coins size={26} weight="duotone" />,
-    title: 'Thưởng Tín Dụng (Credit Economy)',
-    desc: 'Tích lũy điểm thưởng tín dụng minh bạch khi chuyến đi hoặc hình ảnh đóng góp được cộng đồng kiểm duyệt thông qua.',
-  },
-  {
-    icon: <ArrowsClockwise size={26} weight="duotone" />,
-    title: 'Nhiệm Vụ Tái Thẩm Định Thực Địa',
-    desc: 'Nhận các nhiệm vụ kiểm tra lại biển báo cũ (Stale Signs) xung quanh vị trí của bạn để nhận thêm phần thưởng lớn.',
-  },
-]
 
 export default function ProductApp() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('product')
+
+  const keyFeatures = [
+    {
+      icon: <VideoCamera size={26} weight="duotone" />,
+      title: t('app_page.feature_1_title'),
+      desc: t('app_page.feature_1_desc'),
+    },
+    {
+      icon: <NavigationArrow size={26} weight="duotone" />,
+      title: t('app_page.feature_2_title'),
+      desc: t('app_page.feature_2_desc'),
+    },
+    {
+      icon: <Coins size={26} weight="duotone" />,
+      title: t('app_page.feature_3_title'),
+      desc: t('app_page.feature_3_desc'),
+    },
+    {
+      icon: <ArrowsClockwise size={26} weight="duotone" />,
+      title: t('app_page.feature_4_title'),
+      desc: t('app_page.feature_4_desc'),
+    },
+  ]
+
+  const checklistItems = [
+    t('app_page.checklist_1'),
+    t('app_page.checklist_2'),
+    t('app_page.checklist_3'),
+    t('app_page.checklist_4'),
+  ]
+
+  const workflowSteps = [
+    {
+      step: '01',
+      title: t('app_page.step_1_title'),
+      desc: t('app_page.step_1_desc'),
+    },
+    {
+      step: '02',
+      title: t('app_page.step_2_title'),
+      desc: t('app_page.step_2_desc'),
+    },
+    {
+      step: '03',
+      title: t('app_page.step_3_title'),
+      desc: t('app_page.step_3_desc'),
+    },
+    {
+      step: '04',
+      title: t('app_page.step_4_title'),
+      desc: t('app_page.step_4_desc'),
+    },
+  ]
 
   return (
     <div
@@ -70,7 +102,7 @@ export default function ProductApp() {
                 }`}
               >
                 <DeviceMobile size={16} weight="bold" />
-                <span>Ứng dụng di động SignTrustMap • iOS & Android</span>
+                <span>{t('app_page.eyebrow')}</span>
               </div>
 
               {/* H1 Heading */}
@@ -79,7 +111,7 @@ export default function ProductApp() {
                   isDark ? 'text-white' : 'text-gray-900'
                 }`}
               >
-                Ứng Dụng Khảo Sát &{' '}
+                {t('app_page.title')}{' '}
                 <span
                   className={`text-transparent bg-clip-text ${
                     isDark
@@ -87,7 +119,7 @@ export default function ProductApp() {
                       : 'bg-gradient-to-r from-[#007b8b] to-[#00c4de]'
                   }`}
                 >
-                  Dẫn Đường Cảnh Báo
+                  {t('app_page.title_highlight')}
                 </span>
               </h1>
 
@@ -97,17 +129,12 @@ export default function ProductApp() {
                   isDark ? 'text-gray-300' : 'text-gray-600'
                 }`}
               >
-                Biến điện thoại di động hoặc camera hành trình thành công cụ số hóa hạ tầng giao thông. Nhận cảnh báo biển báo thông minh theo đúng chiều di chuyển và tích lũy điểm thưởng tín dụng giá trị.
+                {t('app_page.subtitle')}
               </p>
 
               {/* Checklist */}
               <ul className="flex flex-col gap-3 mb-9">
-                {[
-                  'Tự động ghi và đồng bộ Video hành trình với vệt GPS/GPX',
-                  'Cảnh báo bằng giọng nói & hình ảnh trước khi đến biển báo 150m',
-                  'Nhận nhiệm vụ khảo sát các cung đường chưa có dữ liệu',
-                  'Ví tín dụng minh bạch, đổi quyền lợi và tính năng nâng cao',
-                ].map((item) => (
+                {checklistItems.map((item) => (
                   <li
                     key={item}
                     className={`flex items-start gap-3 text-sm ${
@@ -136,8 +163,8 @@ export default function ProductApp() {
                 >
                   <AppleLogo size={26} weight="fill" className={`transition-transform group-hover:scale-105 ${isDark ? 'text-white' : 'text-gray-900'}`} />
                   <div className="text-left">
-                    <p className={`text-[10px] leading-none mb-1 uppercase font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Tải về trên</p>
-                    <p className={`text-sm font-bold leading-none ${isDark ? 'text-white' : 'text-gray-900'}`}>App Store</p>
+                    <p className={`text-[10px] leading-none mb-1 uppercase font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t('app_page.download_on')}</p>
+                    <p className={`text-sm font-bold leading-none ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('app_page.download_ios')}</p>
                   </div>
                 </a>
                 <a
@@ -150,8 +177,8 @@ export default function ProductApp() {
                 >
                   <GooglePlayLogo size={26} weight="fill" className={`transition-transform group-hover:scale-105 ${isDark ? 'text-white' : 'text-gray-900'}`} />
                   <div className="text-left">
-                    <p className={`text-[10px] leading-none mb-1 uppercase font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Tải về trên</p>
-                    <p className={`text-sm font-bold leading-none ${isDark ? 'text-white' : 'text-gray-900'}`}>Google Play</p>
+                    <p className={`text-[10px] leading-none mb-1 uppercase font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t('app_page.download_on')}</p>
+                    <p className={`text-sm font-bold leading-none ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('app_page.download_android')}</p>
                   </div>
                 </a>
               </div>
@@ -183,7 +210,7 @@ export default function ProductApp() {
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
                         <span className={`text-[11px] font-mono font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                          GPS LIVE • 50 KM/H
+                          {t('app_page.phone_live_gps')}
                         </span>
                       </div>
                       <span
@@ -193,13 +220,13 @@ export default function ProductApp() {
                             : 'bg-teal-100 text-[#007b8b] border-teal-300 font-bold'
                         }`}
                       >
-                        +50 CREDITS
+                        {t('app_page.phone_credits')}
                       </span>
                     </div>
 
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Đang lưu thông trên:</p>
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t('app_page.phone_driving_on')}</p>
                     <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      Đường Nguyễn Huệ, Quận 1
+                      {t('app_page.phone_road_name')}
                     </p>
                   </div>
 
@@ -213,12 +240,12 @@ export default function ProductApp() {
                   >
                     <div className="flex items-center justify-between text-[10px] mb-1.5 font-mono">
                       <span className={`font-bold ${isDark ? 'text-[#00c4de]' : 'text-red-700'}`}>
-                        CẢNH BÁO THEO HƯỚNG XE
+                        {t('app_page.phone_warning_heading')}
                       </span>
                       <span className={`px-1.5 py-0.5 rounded ${
                         isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700 border border-red-200 font-bold'
                       }`}>
-                        CÁCH 150M
+                        {t('app_page.phone_warning_distance')}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -227,10 +254,10 @@ export default function ProductApp() {
                       </div>
                       <div>
                         <h4 className={`text-xs font-bold leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                          P.102 Cấm đi ngược chiều
+                          {t('app_page.phone_sign_name')}
                         </h4>
                         <p className={`text-[10px] font-mono mt-0.5 ${isDark ? 'text-emerald-400' : 'text-emerald-700 font-semibold'}`}>
-                          Độ tin cậy: 99.4% • QCVN 41
+                          {t('app_page.phone_sign_trust')}
                         </p>
                       </div>
                     </div>
@@ -245,9 +272,9 @@ export default function ProductApp() {
                     }`}
                   >
                     <div>
-                      <p className={`text-[10px] font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>CHUYẾN ĐI HIỆN TẠI</p>
+                      <p className={`text-[10px] font-mono ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t('app_page.phone_trip_title')}</p>
                       <p className={`font-bold font-mono ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        12.4 km • 18 Biển báo
+                        {t('app_page.phone_trip_stat')}
                       </p>
                     </div>
                     <div
@@ -260,8 +287,6 @@ export default function ProductApp() {
                       REC
                     </div>
                   </div>
-
-
                 </div>
               </div>
             </div>
@@ -276,14 +301,14 @@ export default function ProductApp() {
                 isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
               }`}
             >
-              // TÍNH NĂNG TOÀN DIỆN
+              {t('app_page.section_features_eyebrow')}
             </span>
             <h2
               className={`text-2xl sm:text-4xl font-bold tracking-tight leading-tight ${
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              Công nghệ tiên tiến hỗ trợ lái xe & khảo sát
+              {t('app_page.section_features_title')}
             </h2>
           </div>
 
@@ -335,36 +360,15 @@ export default function ProductApp() {
                 isDark ? 'text-white' : 'text-gray-900'
               }`}
             >
-              Quy trình hoạt động 4 bước đơn giản
+              {t('app_page.section_steps_title')}
             </h2>
             <p className={`text-xs sm:text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Dễ dàng tham gia đóng góp và nhận giá trị cho cộng đồng người lái xe
+              {t('app_page.section_steps_subtitle')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                step: '01',
-                title: 'Bật ứng dụng khi lái xe',
-                desc: 'Đặt điện thoại lên giá đỡ hoặc kết nối camera hành trình để ghi hình và vệt GPX.',
-              },
-              {
-                step: '02',
-                title: 'Trích xuất tự động qua AI',
-                desc: 'Mô hình YOLO12 & CLIP phát hiện biển báo, lọc trùng lặp và tính toán tọa độ thực địa.',
-              },
-              {
-                step: '03',
-                title: 'Cộng đồng xác thực',
-                desc: 'Mạng lưới kiểm duyệt viên độc lập đối chiếu và chấm điểm tin cậy Weighted Consensus.',
-              },
-              {
-                step: '04',
-                title: 'Nhận thưởng tín dụng',
-                desc: 'Dữ liệu xuất bản chính thức lên bản đồ và tài khoản nhận thưởng Credit tức thì.',
-              },
-            ].map((s) => (
+            {workflowSteps.map((s) => (
               <div
                 key={s.step}
                 className={`p-5 rounded-xl border flex flex-col transition-all ${

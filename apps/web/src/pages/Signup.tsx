@@ -11,18 +11,32 @@ export default function Signup() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [agreeTerms, setAgreeTerms] = useState(true)
   const [showPw, setShowPw] = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError('')
+
+    if (password.length < 8) {
+      setError(t('auth.signup.password_too_short'))
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError(t('auth.signup.password_mismatch'))
+      return
+    }
+
     if (!agreeTerms) {
       setError(t('auth.signup.terms_error'))
       return
     }
-    setError('')
+
     setIsLoading(true)
     try {
       await new Promise((r) => setTimeout(r, 600))
@@ -192,6 +206,44 @@ export default function Signup() {
               </div>
             </div>
 
+            {/* Confirm Password field */}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="signup-confirm-pw"
+                className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
+              >
+                {t('auth.signup.confirm_password_label')}
+              </label>
+              <div className="relative">
+                <input
+                  id="signup-confirm-pw"
+                  type={showConfirmPw ? 'text' : 'password'}
+                  required
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder={t('auth.signup.confirm_password_placeholder')}
+                  className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all ${
+                    isDark
+                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPw(!showConfirmPw)}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
+                    isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-800'
+                  }`}
+                  aria-label={showConfirmPw ? t('auth.signup.hide_pw') : t('auth.signup.show_pw')}
+                >
+                  {showConfirmPw ? <EyeSlash size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
             {/* Credit Welcome Bonus Pill */}
             <div
               className={`flex items-center gap-2 text-xs rounded-xl p-2.5 border transition-colors ${
@@ -252,7 +304,7 @@ export default function Signup() {
             {/* Primary Submit button */}
             <button
               type="submit"
-              disabled={isLoading || !name || !email || !password}
+              disabled={isLoading || !name || !email || !password || !confirmPassword}
               className={`w-full py-3.5 font-bold text-sm rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 isDark
                   ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/25'
@@ -292,6 +344,7 @@ export default function Signup() {
                 setName('Nguyễn Văn A')
                 setEmail('user@gmail.com')
                 setPassword('oauth-password')
+                setConfirmPassword('oauth-password')
               }}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                 isDark

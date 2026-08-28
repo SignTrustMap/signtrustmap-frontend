@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { ArrowSquareOut, Stack } from '@phosphor-icons/react'
@@ -16,6 +17,7 @@ L.Icon.Default.mergeOptions({
 
 export function HomeMiniMap() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('product')
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
@@ -80,12 +82,12 @@ export function HomeMiniMap() {
         <div style="font-family: 'Geist', sans-serif; padding: 2px; color: #111827; min-width: 200px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <strong style="background: ${bgHex}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace;">${sign.code}</strong>
-            <span style="color: #059669; font-size: 10px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% Trust</span>
+            <span style="color: #059669; font-size: 10px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% ${t('mini_map.popup_trust', { defaultValue: 'Trust' })}</span>
           </div>
           <p style="font-size: 12px; font-weight: 700; margin: 3px 0 2px 0; line-height: 1.3;">${sign.name}</p>
           <p style="font-size: 10px; color: #4b5563; margin: 0 0 4px 0;">${sign.location}</p>
           <div style="font-size: 9px; color: #6b7280; font-family: monospace; border-top: 1px solid #e5e7eb; padding-top: 4px;">
-            Hướng xe: ${sign.heading}° • QCVN 41
+            ${t('mini_map.popup_heading', { defaultValue: 'Hướng xe:' })} ${sign.heading}° • QCVN 41
           </div>
         </div>
       `
@@ -103,7 +105,7 @@ export function HomeMiniMap() {
       map.remove()
       mapInstanceRef.current = null
     }
-  }, [])
+  }, [t])
 
   // Switch Tile Layer
   useEffect(() => {
@@ -143,13 +145,12 @@ export function HomeMiniMap() {
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className={`text-xs font-mono font-semibold ${isDark ? 'text-gray-300' : 'text-gray-800'}`}>
-            OPENSTREETMAP LIVE VIEW
+            {t('mini_map.live_view')}
           </span>
           <span className={`hidden sm:inline ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>•</span>
           <span className={`text-[11px] font-mono hidden sm:inline ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             QCVN 41:2019
           </span>
-
         </div>
 
         <div className="flex items-center gap-2">
@@ -164,7 +165,7 @@ export function HomeMiniMap() {
             title="Đổi lớp bản đồ"
           >
             <Stack size={13} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
-            <span>{tileMode === 'osm' ? 'OSM Standard' : 'Voyager'}</span>
+            <span>{tileMode === 'osm' ? t('mini_map.osm_standard') : t('mini_map.voyager')}</span>
           </button>
           <Link
             to="/product/map"
@@ -194,19 +195,19 @@ export function HomeMiniMap() {
         >
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500" />
-            <span>Cấm (P)</span>
+            <span>{t('mini_map.legend_p')}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#007b8b]" />
-            <span>Hiệu lệnh (R)</span>
+            <span>{t('mini_map.legend_r')}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500" />
-            <span>Cảnh báo (W)</span>
+            <span>{t('mini_map.legend_w')}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#00c4de]" />
-            <span>Chỉ dẫn (I)</span>
+            <span>{t('mini_map.legend_i')}</span>
           </div>
         </div>
       </div>

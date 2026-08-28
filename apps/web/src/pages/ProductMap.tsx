@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
@@ -21,6 +22,7 @@ L.Icon.Default.mergeOptions({
 
 export default function ProductMap() {
   const { isDark } = useTheme()
+  const { t } = useTranslation('product')
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
@@ -138,12 +140,12 @@ export default function ProductMap() {
         <div style="font-family: 'Geist', sans-serif; padding: 4px; color: #111827; min-width: 220px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
             <strong style="background: ${bgHex}; color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-family: monospace;">${sign.code}</strong>
-            <span style="color: #059669; font-size: 11px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% Trust</span>
+            <span style="color: #059669; font-size: 11px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% ${t('mini_map.popup_trust', { defaultValue: 'Trust' })}</span>
           </div>
           <p style="font-size: 13px; font-weight: 700; margin: 4px 0 3px 0; line-height: 1.3;">${sign.name}</p>
           <p style="font-size: 11px; color: #4b5563; margin: 0 0 6px 0;">${sign.location}</p>
           <div style="display: flex; justify-content: space-between; font-size: 10px; color: #6b7280; font-family: monospace; border-top: 1px solid #e5e7eb; padding-top: 5px;">
-            <span>Hướng xe: ${sign.heading}°</span>
+            <span>${t('mini_map.popup_heading', { defaultValue: 'Hướng xe:' })} ${sign.heading}°</span>
             <span>GPS: ${sign.lat.toFixed(4)}, ${sign.lng.toFixed(4)}</span>
           </div>
         </div>
@@ -152,7 +154,7 @@ export default function ProductMap() {
       marker.bindPopup(popupContent)
       markersLayerRef.current?.addLayer(marker)
     })
-  }, [selectedCategory, searchQuery])
+  }, [selectedCategory, searchQuery, t])
 
   const filteredCount = mockSigns.filter((sign) => {
     const matchCat = selectedCategory === 'ALL' || sign.category === selectedCategory
@@ -180,21 +182,21 @@ export default function ProductMap() {
             }`}
           >
             <Compass size={16} weight="duotone" />
-            <span>HẠ TẦNG BẢN ĐỒ GIS • CHUẨN QCVN 41:2019/BGTVT</span>
+            <span>{t('map_page.eyebrow')}</span>
           </div>
           <h1
             className={`text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight ${
               isDark ? 'text-white' : 'text-gray-900'
             }`}
           >
-            Bản Đồ Không Gian Biển Báo Giao Thông
+            {t('map_page.title')}
           </h1>
           <p
             className={`text-xs sm:text-sm mt-1 max-w-3xl leading-relaxed ${
               isDark ? 'text-gray-400' : 'text-gray-600'
             }`}
           >
-            Tra cứu, kiểm tra vị trí và dữ liệu góc hướng áp dụng của biển báo trên nền tảng OpenStreetMap.
+            {t('map_page.subtitle')}
           </p>
         </div>
 
@@ -218,7 +220,7 @@ export default function ProductMap() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo mã biển báo (P.102, R.301...), tên biển hoặc tuyến đường..."
+              placeholder={t('map_page.search_placeholder')}
               className={`w-full pl-10 pr-9 py-2.5 text-xs sm:text-sm rounded-xl border focus:outline-none transition-all ${
                 isDark
                   ? 'bg-black/60 border-white/10 text-white placeholder:text-gray-400 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
@@ -232,7 +234,7 @@ export default function ProductMap() {
                 className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
                   isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-900'
                 }`}
-                title="Xóa tìm kiếm"
+                title="Clear search"
               >
                 <X size={15} />
               </button>
@@ -247,10 +249,11 @@ export default function ProductMap() {
               }`}
             >
               <FunnelSimple size={14} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
-              <span>Nhóm:</span>
+              <span>{t('map_page.group_label')}</span>
             </div>
             {signCategories.map((cat) => {
               const active = selectedCategory === cat.id
+              const localizedLabel = t(`map_page.groups.${cat.id}`, { defaultValue: cat.label })
               return (
                 <button
                   key={cat.id}
@@ -266,7 +269,7 @@ export default function ProductMap() {
                         : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200'
                   }`}
                 >
-                  {cat.label}
+                  {localizedLabel}
                 </button>
               )
             })}
@@ -281,11 +284,11 @@ export default function ProductMap() {
             <span
               className={`text-xs font-mono ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
             >
-              Hiển thị:{' '}
+              {t('map_page.showing_count')}{' '}
               <strong className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 {filteredCount}
               </strong>{' '}
-              biển
+              {t('map_page.signs_unit')}
             </span>
 
             <button
@@ -299,7 +302,7 @@ export default function ProductMap() {
               title="Đổi kiểu hiển thị bản đồ"
             >
               <Stack size={16} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
-              <span>{tileMode === 'osm' ? 'OpenStreetMap' : 'OSM Voyager'}</span>
+              <span>{tileMode === 'osm' ? t('map_page.tile_osm') : t('map_page.tile_voyager')}</span>
             </button>
           </div>
         </div>
@@ -322,9 +325,9 @@ export default function ProductMap() {
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono text-emerald-600 font-bold">OPENSTREETMAP LIVE</span>
+            <span className="font-mono text-emerald-600 font-bold">{t('map_page.telemetry_live')}</span>
             <span className="text-gray-400">•</span>
-            <span className="font-mono text-[11px]">WGS 84 • QCVN 41:2019</span>
+            <span className="font-mono text-[11px]">{t('map_page.telemetry_standard')}</span>
           </div>
         </div>
       </div>
