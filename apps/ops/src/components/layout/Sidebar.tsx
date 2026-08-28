@@ -112,8 +112,8 @@ export function Sidebar() {
   const linkClass = (isActive: boolean) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-colors ${
       isActive
-        ? 'bg-[#d3f7ff] text-[#007b8b] font-bold shadow-xs'
-        : 'text-gray-600 hover:bg-[#F8F7F7] hover:text-gray-900'
+        ? 'bg-[#d3f7ff] text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-xs'
+        : 'text-gray-600 dark:text-gray-400 hover:bg-[#F8F7F7] dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
     }`
 
   function handleLogout() {
@@ -122,19 +122,18 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] bg-white h-full shadow-xs transition-colors">
-      {/* ─── Top Brand Header ────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E8E4E3]">
+    <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] h-full shadow-xs transition-colors">
+      <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E8E4E3] dark:border-white/10">
         <img
           src="/brand/brand_logo_nobg.svg"
           alt="SignTrustMap Logo"
           className="w-8 h-8 object-contain shrink-0"
         />
         <div className="leading-tight min-w-0">
-          <p className="text-sm font-bold text-gray-900 truncate font-brand">
-            Sign<span className="text-[#007b8b]">Trust</span>Map
+          <p className="text-sm font-bold text-gray-900 dark:text-white truncate font-brand">
+            Sign<span className="text-[#007b8b] dark:text-[#00c4de]">Trust</span>Map
           </p>
-          <p className="text-[11px] text-gray-500 truncate font-mono">
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate font-mono">
             {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
           </p>
         </div>
