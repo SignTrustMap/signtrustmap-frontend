@@ -38,6 +38,8 @@ export function AppButton({
     },
     surface: {
       backgroundColor: theme.backgroundElement,
+      borderColor: theme.tertiary,
+      borderWidth: 1,
     },
     ghost: {
       backgroundColor: 'transparent',

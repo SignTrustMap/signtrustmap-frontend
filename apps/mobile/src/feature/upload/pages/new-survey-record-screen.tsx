@@ -244,9 +244,9 @@ export function NewSurveyRecordScreen() {
       const exifCoordinates = extractImageGpsCoordinates(exif);
       const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
         ? {
-            latitude: assetInfo.location.latitude,
-            longitude: assetInfo.location.longitude,
-          }
+          latitude: assetInfo.location.latitude,
+          longitude: assetInfo.location.longitude,
+        }
         : exifCoordinates;
 
       console.log('[Surveyor] Selected MediaStore asset:', {
@@ -314,6 +314,7 @@ export function NewSurveyRecordScreen() {
           ? 'Gallery support requires a rebuilt development app.'
           : 'Unable to open your photo library. Please try again.',
       );
+      console.log('[Surveyor] Unable to open image picker:', error);
     } finally {
       setIsOpeningGallery(false);
     }
