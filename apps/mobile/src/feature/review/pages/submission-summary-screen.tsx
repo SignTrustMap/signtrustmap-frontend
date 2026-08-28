@@ -93,7 +93,7 @@ function ReviewedSignRow({ review }: { review: CompletedReview }) {
   );
 }
 
-export function SubmissionCompleteScreen() {
+export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
@@ -146,7 +146,7 @@ export function SubmissionCompleteScreen() {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();
                 router.replace({
-                  pathname: '/work/submission-complete',
+                  pathname: '/work/submission-finish',
                   params: { count: String(reviewedCount) },
                 });
               }}
