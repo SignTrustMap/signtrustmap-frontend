@@ -11,151 +11,143 @@ import {
   Coins,
 } from '@phosphor-icons/react'
 import { TopographicContour } from '@/components/common/TopographicContour'
+import { useTheme } from '@/context/ThemeContext'
+import { useTranslation } from 'react-i18next'
+import { sponsorList } from '@/data'
 
-/* ─── 1. AI & TECH ECOSYSTEM LOGO MARQUEE (Infinite Loop, Enlarged) ─── */
-const sponsorList = [
-  {
-    name: 'Cursor',
-    label: 'Cursor AI',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2L2 19.5h20L12 2zm0 3.8l6.5 11.4H5.5L12 5.8z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Claude',
-    label: 'Anthropic Claude',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M13.5 3h-3L4 21h3.5l1.5-4.5h6l1.5 4.5H20L13.5 3zm-3.3 10.5L12 7.8l1.8 5.7h-3.6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Gemini',
-    label: 'Google Gemini',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2C12 7.5 7.5 12 2 12c5.5 0 10 4.5 10 10 0-5.5 4.5-10 10-10-5.5 0-10-4.5-10-10z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'OpenAI',
-    label: 'OpenAI / ChatGPT',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M22.28 10.55a6.03 6.03 0 00-.51-4.88 6.13 6.13 0 00-5.9-3.05 6.06 6.06 0 00-4.66-2.12c-3.15 0-5.74 2.37-6.08 5.48a6.05 6.05 0 00-4.04 2.92 6.13 6.13 0 00.75 6.58 6.03 6.03 0 00.51 4.88 6.13 6.13 0 005.9 3.05 6.05 6.05 0 004.66 2.12c3.15 0 5.74-2.37 6.08-5.48a6.05 6.05 0 004.04-2.92 6.13 6.13 0 00-.75-6.58zm-7.6 10.4a4.42 4.42 0 01-2.68.9 4.5 4.5 0 01-4.43-3.66l.08-.04 4.36-2.52a.8.8 0 00.4-.69v-6.17l1.85 1.07a.08.08 0 01.04.07v6.86a4.43 4.43 0 01.38 4.18z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'v0',
-    label: 'v0 by Vercel',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13H5.5L12 6.5z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Windsurf',
-    label: 'Windsurf AI',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M3 17h18c-2-4-5-8-9-8s-7 4-9 8zm0-6h18c-1-3-4-6-9-6s-8 3-9 6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Copilot',
-    label: 'GitHub Copilot',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Hugging Face',
-    label: 'Hugging Face',
-    svg: (
-      <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current shrink-0" aria-hidden="true">
-        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-3 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm6 0a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3 8c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z" />
-      </svg>
-    ),
-  },
-]
-
+/* ─── 1. AI & TECH ECOSYSTEM LOGO MARQUEE (Infinite Loop) ─────────── */
 function AiMarqueeLogos() {
+  const { isDark } = useTheme()
+  const { t } = useTranslation('home')
+
   return (
     <div className="w-full pt-8 pb-6 overflow-hidden">
-      <p className="text-center text-xs sm:text-sm text-gray-300 font-medium tracking-wide mb-6">
-        Tương thích và hỗ trợ phát triển bởi các mô hình AI & công cụ lập trình hàng đầu
+      <p
+        className={`text-center text-xs sm:text-sm font-medium tracking-wide mb-6 ${
+          isDark ? 'text-gray-300' : 'text-gray-600'
+        }`}
+      >
+        {t('hero.marquee_label')}
       </p>
 
       {/* Infinite Scrolling Track with Soft Gradient Fade Mask */}
       <div className="relative w-full overflow-hidden marquee-mask">
         <div className="animate-marquee flex items-center gap-12 sm:gap-16 py-2">
           {/* First set of logos */}
-          {sponsorList.map((s, i) => (
+          {sponsorList.map((s) => (
             <div
-              key={`logo-1-${i}`}
-              className="flex items-center gap-3 text-gray-300 hover:text-[#00c4de] transition-colors cursor-default shrink-0 group"
+              key={`logo-1-${s.id}`}
+              className={`flex items-center gap-3 transition-colors cursor-default shrink-0 group ${
+                isDark ? 'text-gray-300 hover:text-[#00c4de]' : 'text-gray-700 hover:text-[#007b8b]'
+              }`}
               title={s.label}
             >
-              <div className="text-gray-400 group-hover:text-[#00c4de] transition-colors">
-                {s.svg}
-              </div>
-              <span className="text-base sm:text-lg font-bold tracking-wide font-sans text-white group-hover:text-[#00c4de] transition-colors">
+              <img
+                src={s.logoUrl}
+                alt={s.name}
+                className={`w-8 h-8 object-contain transition-all group-hover:scale-110 ${
+                  isDark
+                    ? 'brightness-90 group-hover:brightness-100'
+                    : 'brightness-0 opacity-85 group-hover:opacity-100'
+                }`}
+              />
+              <span
+                className={`text-base sm:text-lg font-bold tracking-wide font-sans transition-colors ${
+                  isDark
+                    ? 'text-white group-hover:text-[#00c4de]'
+                    : 'text-gray-900 group-hover:text-[#007b8b]'
+                }`}
+              >
                 {s.name}
               </span>
             </div>
           ))}
 
           {/* Duplicate set of logos for seamless infinite loop */}
-          {sponsorList.map((s, i) => (
+          {sponsorList.map((s) => (
             <div
-              key={`logo-2-${i}`}
-              className="flex items-center gap-3 text-gray-300 hover:text-[#00c4de] transition-colors cursor-default shrink-0 group"
+              key={`logo-2-${s.id}`}
+              className={`flex items-center gap-3 transition-colors cursor-default shrink-0 group ${
+                isDark ? 'text-gray-300 hover:text-[#00c4de]' : 'text-gray-700 hover:text-[#007b8b]'
+              }`}
               title={s.label}
             >
-              <div className="text-gray-400 group-hover:text-[#00c4de] transition-colors">
-                {s.svg}
-              </div>
-              <span className="text-base sm:text-lg font-bold tracking-wide font-sans text-white group-hover:text-[#00c4de] transition-colors">
+              <img
+                src={s.logoUrl}
+                alt={s.name}
+                className={`w-8 h-8 object-contain transition-all group-hover:scale-110 ${
+                  isDark
+                    ? 'brightness-90 group-hover:brightness-100'
+                    : 'brightness-0 opacity-85 group-hover:opacity-100'
+                }`}
+              />
+              <span
+                className={`text-base sm:text-lg font-bold tracking-wide font-sans transition-colors ${
+                  isDark
+                    ? 'text-white group-hover:text-[#00c4de]'
+                    : 'text-gray-900 group-hover:text-[#007b8b]'
+                }`}
+              >
                 {s.name}
               </span>
             </div>
           ))}
+
         </div>
       </div>
     </div>
   )
 }
 
-/* ─── 2. HERO SECTION (Breathable, Spacious DigitalOcean Vibe) ─────── */
+/* ─── 2. HERO SECTION ─────────────────────────────────────────────── */
 function HeroSection() {
+  const { isDark } = useTheme()
+  const { t } = useTranslation('home')
+
   return (
-    <section className="relative overflow-hidden bg-[#030708] pt-16 sm:pt-24 pb-20 sm:pb-28">
+    <section
+      className={`relative overflow-hidden pt-16 sm:pt-24 pb-10 sm:pb-12 transition-colors ${
+        isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
+      }`}
+    >
       {/* 3D Wireframe Terrain Background Asset */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
           src="/images/hero-wireframe.jpg"
           alt="3D Wireframe Terrain Mesh"
-          className="w-full h-full object-cover object-bottom opacity-50 brightness-[0.75] contrast-[1.2] mix-blend-screen"
+          className={`w-full h-full object-cover object-bottom transition-all ${
+            isDark
+              ? 'opacity-50 brightness-[0.75] contrast-[1.2] mix-blend-screen'
+              : 'opacity-35 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-125'
+          }`}
         />
 
-        {/* Overhead spotlight beam with soft cyan glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[750px] h-[420px] bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent blur-[140px]" />
+        {/* Overhead spotlight beam with soft glow */}
+        <div
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[450px] blur-[130px] ${
+            isDark
+              ? 'bg-gradient-to-b from-[#00c4de]/15 via-[#007b8b]/6 to-transparent'
+              : 'bg-gradient-to-b from-[#007b8b]/15 via-[#d3f7ff]/30 to-transparent'
+          }`}
+        />
 
         {/* Soft radial scrim behind text */}
-        <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[520px] bg-[#030708]/60 rounded-full blur-[110px]" />
+        <div
+          className={`absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[520px] rounded-full blur-[110px] ${
+            isDark ? 'bg-[#030708]/60' : 'bg-[#F8F7F7]/60'
+          }`}
+        />
 
-        {/* Top and bottom dark fades */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#030708] via-transparent to-[#030708]" />
+        {/* Top and bottom gradient fades */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-b ${
+            isDark
+              ? 'from-[#030708] via-transparent to-[#030708]'
+              : 'from-[#F8F7F7]/80 via-transparent to-[#F8F7F7]'
+          }`}
+        />
       </div>
+
 
       {/* Main Hero Content */}
       <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
@@ -164,14 +156,18 @@ function HeroSection() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#007b8b]/20 border border-[#00c4de]/30 text-xs sm:text-sm font-medium text-[#d3f7ff] mb-8 backdrop-blur-md shadow-lg shadow-[#00c4de]/10"
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-medium mb-8 backdrop-blur-md shadow-lg transition-colors ${
+            isDark
+              ? 'bg-[#007b8b]/20 border border-[#00c4de]/30 text-[#d3f7ff] shadow-[#00c4de]/10'
+              : 'bg-white border border-[#007b8b]/25 text-[#007b8b] shadow-gray-200'
+          }`}
         >
-          <span className="w-2 h-2 rounded-full bg-[#00c4de] animate-ping" />
-          <span className="text-xs uppercase tracking-wider font-semibold text-[#00c4de]">
-            Nền tảng Crowd-AI & GIS
+          <span className={`w-2 h-2 rounded-full animate-ping ${isDark ? 'bg-[#00c4de]' : 'bg-[#007b8b]'}`} />
+          <span className={`text-xs uppercase tracking-wider font-semibold ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}`}>
+            {t('hero.badge_ai')}
           </span>
-          <span className="text-gray-400">•</span>
-          <span>Chuẩn QCVN 41:2019/BGTVT</span>
+          <span className={isDark ? 'text-gray-400' : 'text-gray-300'}>•</span>
+          <span className={isDark ? 'text-gray-200' : 'text-gray-700 font-medium'}>{t('hero.badge_standard')}</span>
         </motion.div>
 
         {/* H1 Title: Project Name */}
@@ -179,9 +175,21 @@ function HeroSection() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-          className="text-5xl sm:text-7xl lg:text-8xl font-extrabold tracking-tight text-white leading-[1.05] mb-7"
+          className={`text-5xl sm:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[1.05] mb-7 ${
+            isDark ? 'text-white' : 'text-gray-900'
+          }`}
         >
-          Sign<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00c4de] via-[#d3f7ff] to-[#007b8b] glow-cyan">Trust</span>Map
+          Sign
+          <span
+            className={`text-transparent bg-clip-text ${
+              isDark
+                ? 'bg-gradient-to-r from-[#00c4de] via-[#d3f7ff] to-[#007b8b] glow-cyan'
+                : 'bg-gradient-to-r from-[#007b8b] to-[#00c4de]'
+            }`}
+          >
+            Trust
+          </span>
+          Map
         </motion.h1>
 
         {/* H2 / Subtitle */}
@@ -189,9 +197,11 @@ function HeroSection() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
-          className="text-lg sm:text-xl md:text-2xl text-gray-200 font-medium max-w-3xl mx-auto leading-relaxed mb-10"
+          className={`text-lg sm:text-xl md:text-2xl font-medium max-w-3xl mx-auto leading-relaxed mb-10 ${
+            isDark ? 'text-gray-200' : 'text-gray-700'
+          }`}
         >
-          Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.
+          {t('hero.subtitle')}
         </motion.h2>
 
         {/* CTA Buttons */}
@@ -203,17 +213,25 @@ function HeroSection() {
         >
           <Link
             to="/product/map"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-base text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-xl shadow-[#00c4de]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
+            className={`w-full sm:w-auto px-8 py-3.5 rounded-full font-bold text-base shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 group ${
+              isDark
+                ? 'text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-[#00c4de]/25'
+                : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20'
+            }`}
           >
-            <span>Khám phá bản đồ GIS</span>
+            <span>{t('hero.cta_map')}</span>
             <ArrowRight size={18} weight="bold" className="group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
             to="/product/app"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-full font-medium text-base text-white bg-white/5 hover:bg-white/10 border border-white/15 backdrop-blur-md transition-all flex items-center justify-center gap-2"
+            className={`w-full sm:w-auto px-8 py-3.5 rounded-full font-medium text-base backdrop-blur-md transition-all flex items-center justify-center gap-2 ${
+              isDark
+                ? 'text-white bg-white/5 hover:bg-white/10 border border-white/15'
+                : 'text-gray-800 bg-white hover:bg-gray-100 border border-gray-300 shadow-sm'
+            }`}
           >
             <DeviceMobile size={18} />
-            <span>Tải ứng dụng mobile</span>
+            <span>{t('hero.cta_app')}</span>
           </Link>
         </motion.div>
 
@@ -233,19 +251,19 @@ function HeroSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {[
             {
-              stat: 'YOLO12 + CLIP',
-              title: 'Trích Xuất AI & Vector Search',
-              desc: 'Tự động phát hiện biển báo từ video Dashcam, theo dõi đa vật thể BoT-SORT và phân loại vector pgvector.',
+              stat: t('hero.stats.s1_stat'),
+              title: t('hero.stats.s1_title'),
+              desc: t('hero.stats.s1_desc'),
             },
             {
-              stat: 'Weighted Consensus',
-              title: 'Xác Thực Đồng Thuận Trọng Số',
-              desc: 'Đánh giá độ tin cậy của Reviewer độc lập trước khi xuất bản bản ghi biển báo chính thức lên bản đồ GIS.',
+              stat: t('hero.stats.s2_stat'),
+              title: t('hero.stats.s2_title'),
+              desc: t('hero.stats.s2_desc'),
             },
             {
-              stat: 'Direction-Aware',
-              title: 'Dẫn Đường Đúng Chiều Xe Chạy',
-              desc: 'Ước tính toạ độ và hướng áp dụng của biển báo từ quỹ đạo GPX, camera geometry và hướng phương tiện.',
+              stat: t('hero.stats.s3_stat'),
+              title: t('hero.stats.s3_title'),
+              desc: t('hero.stats.s3_desc'),
             },
           ].map((item, idx) => (
             <motion.div
@@ -253,14 +271,26 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.35 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
-              className="glass-card rounded-[18px] p-7 text-left relative overflow-hidden group"
+              className={`rounded-[18px] p-7 text-left relative overflow-hidden group transition-all ${
+                isDark
+                  ? 'glass-card'
+                  : 'bg-white border border-[#E8E4E3] shadow-md hover:border-[#007b8b]/50 hover:shadow-xl'
+              }`}
             >
               <div className="absolute top-0 right-0 w-28 h-28 bg-[#00c4de]/10 rounded-full blur-2xl group-hover:bg-[#00c4de]/20 transition-all pointer-events-none" />
-              <p className="text-2xl sm:text-3xl font-extrabold text-[#00c4de] tracking-tight mb-2 font-mono">
+              <p
+                className={`text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 font-mono ${
+                  isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
+                }`}
+              >
                 {item.stat}
               </p>
-              <h3 className="text-base font-bold text-white mb-2">{item.title}</h3>
-              <p className="text-sm text-gray-300 leading-relaxed">{item.desc}</p>
+              <h3 className={`text-base font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {item.title}
+              </h3>
+              <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                {item.desc}
+              </p>
             </motion.div>
           ))}
         </div>
@@ -271,23 +301,34 @@ function HeroSection() {
 
 /* ─── 3. TOPOGRAPHIC TRANSITION ───────────────────────────────────── */
 function TopographicTransitionSection() {
+  const { isDark } = useTheme()
+  const { t } = useTranslation('home')
+
   return (
-    <section className="relative bg-[#030708] py-20 sm:py-24 overflow-hidden border-t border-white/5">
+    <section
+      className={`relative py-10 sm:py-12 overflow-hidden border-t transition-colors ${
+        isDark ? 'bg-[#030708] border-white/5 text-white' : 'bg-white border-[#E8E4E3] text-gray-900'
+      }`}
+    >
       {/* Background Contour SVG */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-25">
+      <div className={`absolute inset-0 pointer-events-none overflow-hidden ${isDark ? 'opacity-25' : 'opacity-10'}`}>
         <TopographicContour className="w-full h-full" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-14">
-          <p className="text-xs font-mono uppercase tracking-widest text-[#00c4de] mb-3">
-            // VÒNG ĐỜI DỮ LIỆU KHÉP KÍN
+          <p
+            className={`text-xs font-mono uppercase tracking-widest mb-3 ${
+              isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
+            }`}
+          >
+            {t('topo.eyebrow')}
           </p>
-          <h2 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
-            Từ camera thực địa đến bản đồ dẫn đường tin cậy
+          <h2 className={`text-3xl sm:text-5xl font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {t('topo.title')}
           </h2>
-          <p className="text-base sm:text-lg text-gray-300 mt-4 leading-relaxed">
-            Quy trình toàn diện giải quyết bài toán độ trễ và sự thay đổi liên tục của biển báo giao thông tại Việt Nam.
+          <p className={`text-base sm:text-lg mt-4 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+            {t('topo.subtitle')}
           </p>
         </div>
 
@@ -295,41 +336,61 @@ function TopographicTransitionSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
           {[
             {
-              icon: <Brain size={28} weight="duotone" className="text-[#00c4de]" />,
-              tag: 'Pipeline AI Tự Động',
-              title: 'Trích xuất & Ước tính tọa độ',
-              body: 'Mô hình YOLO12 kết hợp BoT-SORT bóc tách khung hình tối ưu, khử trùng lặp và tính toán tọa độ địa lý thực tế cùng hướng áp dụng từ vệt GPX.',
+              icon: <Brain size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
+              tag: t('topo.cards.c1_tag'),
+              title: t('topo.cards.c1_title'),
+              body: t('topo.cards.c1_body'),
             },
             {
-              icon: <ShieldCheck size={28} weight="duotone" className="text-[#00c4de]" />,
-              tag: 'Xác Thực Cộng Đồng',
-              title: 'Reviewer & Đồng thuận trọng số',
-              body: 'Cộng đồng tham gia kiểm duyệt chéo, gán nhãn chuẩn QCVN 41 và tính điểm tin cậy Reviewer Reliability trước khi chính thức đưa lên bản đồ.',
+              icon: <ShieldCheck size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
+              tag: t('topo.cards.c2_tag'),
+              title: t('topo.cards.c2_title'),
+              body: t('topo.cards.c2_body'),
             },
             {
-              icon: <ArrowsClockwise size={28} weight="duotone" className="text-[#00c4de]" />,
-              tag: 'MLOps & Revalidation',
-              title: 'Tái thẩm định & Tái huấn luyện AI',
-              body: 'Tự động tạo nhiệm vụ làm mới các biển báo cũ (Stale Signs) và nạp dữ liệu đã được người kiểm duyệt xác nhận vào vòng lặp Active Learning.',
+              icon: <ArrowsClockwise size={28} weight="duotone" className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />,
+              tag: t('topo.cards.c3_tag'),
+              title: t('topo.cards.c3_title'),
+              body: t('topo.cards.c3_body'),
             },
           ].map((card) => (
             <div
               key={card.title}
-              className="glass-panel rounded-[18px] p-7 flex flex-col justify-between group hover:border-[#00c4de]/40 transition-all"
+              className={`rounded-[18px] p-7 flex flex-col justify-between group transition-all text-left ${
+                isDark
+                  ? 'glass-panel hover:border-[#00c4de]/40'
+                  : 'bg-[#F8F7F7] border border-[#E8E4E3] hover:border-[#007b8b]/50 shadow-sm hover:shadow-lg'
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-[12px] bg-[#007b8b]/20 flex items-center justify-center">
+                  <div
+                    className={`w-12 h-12 rounded-[12px] flex items-center justify-center ${
+                      isDark ? 'bg-[#007b8b]/20' : 'bg-teal-100/60'
+                    }`}
+                  >
                     {card.icon}
                   </div>
-                  <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10">
+                  <span
+                    className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-full border ${
+                      isDark
+                        ? 'bg-white/5 text-gray-300 border-white/10'
+                        : 'bg-white text-gray-700 border-gray-200 shadow-xs'
+                    }`}
+                  >
                     {card.tag}
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-white group-hover:text-[#00c4de] transition-colors mb-2.5">
+                <h3
+                  className={`text-lg font-bold mb-2.5 transition-colors ${
+                    isDark ? 'text-white group-hover:text-[#00c4de]' : 'text-gray-900 group-hover:text-[#007b8b]'
+                  }`}
+                >
                   {card.title}
                 </h3>
-                <p className="text-sm text-gray-300 leading-relaxed">{card.body}</p>
+                <p className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {card.body}
+                </p>
               </div>
             </div>
           ))}
@@ -341,30 +402,50 @@ function TopographicTransitionSection() {
 
 /* ─── 4. GIS MAP PREVIEW SECTION ──────────────────────────────────── */
 function MapPreviewSection() {
+  const { isDark } = useTheme()
+  const { t } = useTranslation('home')
+
   return (
-    <section className="py-20 sm:py-24 bg-[#050e11] border-t border-white/5">
+    <section
+      className={`py-10 sm:py-12 border-t transition-colors ${
+        isDark ? 'bg-[#050e11] border-white/5 text-white' : 'bg-[#F8F7F7] border-[#E8E4E3] text-gray-900'
+      }`}
+    >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           {/* Left Description */}
           <div className="lg:col-span-5 text-left">
-            <span className="text-xs font-mono uppercase tracking-widest text-[#00c4de] mb-2 block">
-              // BẢN ĐỒ GIS TƯƠNG TÁC
+            <span
+              className={`text-xs font-mono uppercase tracking-widest mb-2 block ${
+                isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
+              }`}
+            >
+              {t('map_preview.eyebrow')}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight mb-4">
-              Tra cứu & phân loại biển báo chuẩn QCVN 41
+            <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              {t('map_preview.title')}
             </h2>
-            <p className="text-base text-gray-300 leading-relaxed mb-6">
-              Truy cập bản đồ không gian tương tác hỗ trợ tìm kiếm, lọc phân cụm, kiểm tra lịch sử tái thẩm định và hình ảnh bằng chứng thực địa.
+            <p className={`text-base leading-relaxed mb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              {t('map_preview.subtitle')}
             </p>
 
             <ul className="flex flex-col gap-3.5 mb-8">
               {[
-                'Phân loại 5 nhóm: Biển cấm (P), Hiệu lệnh (R), Cảnh báo (W), Chỉ dẫn (I), Biển phụ (S)',
-                'Hiển thị hướng áp dụng giao thông (Traffic Direction Metadata)',
-                'Xem điểm tin cậy (Trust Score) và nguồn dữ liệu cộng đồng',
+                t('map_preview.feature_1'),
+                t('map_preview.feature_2'),
+                t('map_preview.feature_3'),
               ].map((item) => (
-                <li key={item} className="flex items-start gap-3 text-sm text-gray-300">
-                  <CheckCircle size={18} weight="fill" className="text-[#00c4de] shrink-0 mt-0.5" />
+                <li
+                  key={item}
+                  className={`flex items-start gap-3 text-sm ${
+                    isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}
+                >
+                  <CheckCircle
+                    size={18}
+                    weight="fill"
+                    className={`shrink-0 mt-0.5 ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}`}
+                  />
                   <span>{item}</span>
                 </li>
               ))}
@@ -372,9 +453,13 @@ function MapPreviewSection() {
 
             <Link
               to="/product/map"
-              className="inline-flex items-center gap-2 px-7 py-3 rounded-full text-sm font-bold text-black bg-[#00c4de] hover:bg-[#38dbf1] transition-all shadow-lg shadow-[#00c4de]/20"
+              className={`inline-flex items-center gap-2 px-7 py-3 rounded-full text-sm font-bold shadow-lg transition-all ${
+                isDark
+                  ? 'text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-[#00c4de]/20'
+                  : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20'
+              }`}
             >
-              <span>Mở bản đồ toàn màn hình</span>
+              <span>{t('map_preview.cta')}</span>
               <ArrowRight size={16} weight="bold" />
             </Link>
           </div>
@@ -389,39 +474,63 @@ function MapPreviewSection() {
   )
 }
 
-
 /* ─── 5. MOBILE APP & CREDIT INCENTIVE CTA ────────────────────────── */
 function MobileDownloadSection() {
+  const { isDark } = useTheme()
+  const { t } = useTranslation('home')
+
   return (
-    <section className="py-20 sm:py-24 bg-[#030708] border-t border-white/5 relative overflow-hidden">
+    <section
+      className={`py-10 sm:py-12 border-t relative overflow-hidden transition-colors ${
+        isDark ? 'bg-[#030708] border-white/5 text-white' : 'bg-white border-[#E8E4E3] text-gray-900'
+      }`}
+    >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="glass-panel rounded-[24px] p-8 sm:p-14 relative overflow-hidden border border-[#00c4de]/20 bg-gradient-to-br from-[#061519] to-[#030a0c]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+        <div
+          className={`rounded-[24px] p-8 sm:p-14 relative overflow-hidden border shadow-xl transition-all ${
+            isDark
+              ? 'glass-panel border-[#00c4de]/20 bg-gradient-to-br from-[#061519] to-[#030a0c]'
+              : 'bg-gradient-to-br from-teal-50/80 via-[#F8F7F7] to-white border-[#007b8b]/25 shadow-gray-200/60'
+          }`}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center text-left">
             <div>
-              <span className="text-xs font-mono uppercase tracking-widest text-[#00c4de] mb-2 block">
-                // ĐÓNG GÓP & NHẬN THƯỞNG
+              <span
+                className={`text-xs font-mono uppercase tracking-widest mb-2 block ${
+                  isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-bold'
+                }`}
+              >
+                {t('mobile_cta.eyebrow')}
               </span>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight leading-tight mb-4">
-                Khảo sát thực địa, nhận thưởng tín dụng Credit
+              <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {t('mobile_cta.title')}
               </h2>
-              <p className="text-base text-gray-300 leading-relaxed mb-8">
-                Sử dụng ứng dụng SignTrustMap để ghi lại chuyến đi (Video + GPX) hoặc chụp ảnh biển báo mới. Nhận điểm thưởng tín dụng minh bạch khi đóng góp được cộng đồng kiểm duyệt thông qua.
+              <p className={`text-base leading-relaxed mb-8 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                {t('mobile_cta.subtitle')}
               </p>
 
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                 <Link
                   to="/product/app"
-                  className="px-7 py-3.5 rounded-full font-bold text-sm text-black bg-[#00c4de] hover:bg-[#38dbf1] transition-all flex items-center gap-2 shadow-lg shadow-[#00c4de]/20"
+                  className={`px-5 sm:px-6 py-3 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-lg whitespace-nowrap active:scale-[0.98] ${
+                    isDark
+                      ? 'text-black bg-[#00c4de] hover:bg-[#38dbf1] shadow-[#00c4de]/20'
+                      : 'text-white bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/20'
+                  }`}
                 >
                   <DeviceMobile size={18} />
-                  <span>Tải ứng dụng mobile</span>
+                  <span>{t('mobile_cta.cta_app')}</span>
                 </Link>
                 <Link
                   to="/docs"
-                  className="px-7 py-3.5 rounded-full font-medium text-sm text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center gap-2"
+                  className={`px-5 sm:px-6 py-3 sm:py-3.5 rounded-full font-medium text-xs sm:text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap active:scale-[0.98] ${
+                    isDark
+                      ? 'text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10'
+                      : 'text-gray-800 hover:text-black bg-white hover:bg-gray-100 border border-gray-300 shadow-xs'
+                  }`}
                 >
-                  <Coins size={18} className="text-[#00c4de]" />
-                  <span>Cơ chế kinh tế tín dụng →</span>
+                  <Coins size={18} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
+                  <span>{t('mobile_cta.cta_credit')}</span>
                 </Link>
               </div>
             </div>
@@ -429,17 +538,23 @@ function MobileDownloadSection() {
             {/* Right Mini Spec Badges */}
             <div className="grid grid-cols-2 gap-3.5">
               {[
-                { title: 'Video & GPX Sync', desc: 'Đồng bộ vệt quỹ đạo hành trình chính xác' },
-                { title: 'Direction Alerts', desc: 'Cảnh báo biển báo đúng chiều di chuyển' },
-                { title: 'Revalidation Tasks', desc: 'Nhận nhiệm vụ làm mới biển báo cũ' },
-                { title: 'Credit Wallet', desc: 'Ví tín dụng và lịch sử thưởng minh bạch' },
+                { title: t('mobile_cta.badge_1_title'), desc: t('mobile_cta.badge_1_desc') },
+                { title: t('mobile_cta.badge_2_title'), desc: t('mobile_cta.badge_2_desc') },
+                { title: t('mobile_cta.badge_3_title'), desc: t('mobile_cta.badge_3_desc') },
+                { title: t('mobile_cta.badge_4_title'), desc: t('mobile_cta.badge_4_desc') },
               ].map((b) => (
                 <div
                   key={b.title}
-                  className="p-4 rounded-[14px] bg-white/[0.03] border border-white/10 flex flex-col justify-center"
+                  className={`p-4 rounded-[14px] flex flex-col justify-center border transition-all ${
+                    isDark
+                      ? 'bg-white/[0.03] border-white/10'
+                      : 'bg-white border-gray-200 shadow-sm'
+                  }`}
                 >
-                  <h4 className="text-sm font-bold text-[#00c4de] mb-1">{b.title}</h4>
-                  <p className="text-xs text-gray-400">{b.desc}</p>
+                  <h4 className={`text-sm font-bold mb-1 ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}`}>
+                    {b.title}
+                  </h4>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{b.desc}</p>
                 </div>
               ))}
             </div>
@@ -452,8 +567,10 @@ function MobileDownloadSection() {
 
 /* ─── HOME MAIN COMPONENT ─────────────────────────────────────────── */
 export default function Home() {
+  const { isDark } = useTheme()
+
   return (
-    <div className="flex flex-col min-h-screen bg-[#030708] text-white">
+    <div className={`flex flex-col min-h-screen transition-colors ${isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'}`}>
       <HeroSection />
       <TopographicTransitionSection />
       <MapPreviewSection />

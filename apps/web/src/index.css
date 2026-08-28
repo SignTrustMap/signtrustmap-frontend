@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Arvo:wght@400;700&display=swap');
 @import "tailwindcss";
 
-/* ─── SignTrustMap Dark Tech Design Tokens (Geist & DESIGN.md) ──── */
+/* ─── SignTrustMap Theme Tokens (Geist & DESIGN.md) ──────────────── */
 @theme {
   --color-brand-cyan:    #00c4de;
   --color-brand-teal:    #007b8b;
@@ -30,7 +30,7 @@
   --radius-pill: 9999px;
 }
 
-/* ─── Base reset & Theme Lock ───────────────────────────────────── */
+/* ─── Base Reset & Theme Defaults ───────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -41,6 +41,7 @@ html {
   scroll-behavior: smooth;
   background-color: #030708;
   color: #f3f4f6;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -50,6 +51,41 @@ body {
   color: #f3f4f6;
   line-height: 1.6;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Light Mode Overrides (Strictly based on DESIGN.md: #F8F7F7) ─ */
+html.light, html.light body {
+  background-color: #F8F7F7;
+  color: #111827;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-bottom-color: #E8E4E3 !important;
+}
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: #E8E4E3;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+html.light .glass-card {
+  background: #FFFFFF;
+  border-color: #E8E4E3;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+html.light .glass-card:hover {
+  border-color: #007b8b;
+  box-shadow: 0 12px 28px rgba(0, 123, 139, 0.12);
+}
+
+html.light footer {
+  background-color: #FFFFFF !important;
+  border-top-color: #E8E4E3 !important;
+  color: #4B5563 !important;
 }
 
 /* ─── Custom Scrollbar ───────────────────────────────────────────── */
@@ -60,9 +96,15 @@ body {
 ::-webkit-scrollbar-track {
   background: #030708;
 }
+html.light ::-webkit-scrollbar-track {
+  background: #F8F7F7;
+}
 ::-webkit-scrollbar-thumb {
   background: #1a2f35;
   border-radius: 99px;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #007b8b;
@@ -123,4 +165,19 @@ body {
 .marquee-mask {
   mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+/* ─── Circular View Transition (Theme Switcher Ripple Animation) ──── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2147483646;
 }
