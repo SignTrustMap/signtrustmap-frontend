@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               className={`w-full h-full object-cover object-bottom transition-all duration-500 ${
                 isDark
                   ? 'opacity-30 brightness-[0.8] contrast-[1.2] mix-blend-screen'
-                  : 'opacity-10 mix-blend-multiply filter invert hue-rotate-180 brightness-95'
+                  : 'opacity-30 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-125'
               }`}
             />
 
