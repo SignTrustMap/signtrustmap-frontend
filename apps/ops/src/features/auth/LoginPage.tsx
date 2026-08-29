@@ -64,10 +64,10 @@ export default function LoginPage() {
         <img
           src="/images/hero-wireframe.jpg"
           alt="3D Wireframe Terrain Mesh"
-          className={`w-full h-full object-cover object-bottom transition-opacity duration-500 ${
+          className={`w-full h-full object-cover object-bottom transition-all duration-500 ${
             isDark
-              ? 'opacity-35 mix-blend-screen brightness-110 contrast-125'
-              : 'opacity-10 mix-blend-multiply brightness-90 contrast-125'
+              ? 'opacity-45 brightness-[0.75] contrast-[1.2] mix-blend-screen'
+              : 'opacity-35 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-125'
           }`}
         />
 

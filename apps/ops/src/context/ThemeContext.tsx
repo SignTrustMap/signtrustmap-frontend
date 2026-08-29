@@ -70,16 +70,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y)
-    )
-
     const xPercent = (x / window.innerWidth) * 100
     const yPercent = (y / window.innerHeight) * 100
 
+    const maxDistanceX = Math.max(x, window.innerWidth - x)
+    const maxDistanceY = Math.max(y, window.innerHeight - y)
+    const maxRadius = Math.hypot(maxDistanceX, maxDistanceY)
+
+    // Kháng lỗi HiDPI & màn hình scale (DPR) bằng cách nhân devicePixelRatio và thêm 5% buffer
+    const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
+    const exactEndRadius = Math.ceil(maxRadius * Math.max(dpr, 1) * 1.05)
+
     const clipFrom = `circle(0px at ${xPercent}% ${yPercent}%)`
-    const clipTo = `circle(${endRadius}px at ${xPercent}% ${yPercent}%)`
+    const clipTo = `circle(${exactEndRadius}px at ${xPercent}% ${yPercent}%)`
 
     const transition = (document as unknown as {
       startViewTransition: (cb: () => void) => { ready: Promise<void>; finished: Promise<void> }
@@ -96,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           clipPath: [clipFrom, clipTo],
         },
         {
-          duration: 500,
+          duration: 750,
           easing: 'ease-in-out',
           pseudoElement: '::view-transition-new(root)',
         }

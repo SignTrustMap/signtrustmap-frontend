@@ -293,5 +293,13 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 ::view-transition-new(root) {
-  z-index: 2147483646;
+  z-index: 9999;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
