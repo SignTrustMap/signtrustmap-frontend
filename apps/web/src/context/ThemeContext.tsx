@@ -84,14 +84,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const clipFrom = `circle(0px at ${xPercent}% ${yPercent}%)`
     const clipTo = `circle(${exactEndRadius}px at ${xPercent}% ${yPercent}%)`
 
-    const startTime = performance.now()
-    console.group(`[ThemeTransition] Switch to ${nextTheme}`)
-    console.log(
-      `[ThemeTransition] Origin: (${Math.round(x)}px, ${Math.round(y)}px) => (${xPercent.toFixed(1)}%, ${yPercent.toFixed(1)}%) | DPR: ${dpr} | Radius: ${exactEndRadius}px`
-    )
-
     const transition = (document as unknown as {
-      startViewTransition: (cb: () => void) => { ready: Promise<void>; finished?: Promise<void> }
+      startViewTransition: (cb: () => void) => { ready: Promise<void> }
     }).startViewTransition(() => {
       updateDOMTheme(nextTheme)
       flushSync(() => {
@@ -99,32 +93,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       })
     })
 
-    transition.ready
-      .then(() => {
-        const readyElapsed = performance.now() - startTime
-        console.log(`[ThemeTransition] transition.ready in: ${readyElapsed.toFixed(1)}ms`)
-
-        const anim = document.documentElement.animate(
-          {
-            clipPath: [clipFrom, clipTo],
-          },
-          {
-            duration: 750,
-            easing: 'ease-in-out',
-            pseudoElement: '::view-transition-new(root)',
-          }
-        )
-        return anim.finished
-      })
-      .then(() => {
-        const totalElapsed = performance.now() - startTime
-        console.log(`[ThemeTransition] Animation completed in: ${totalElapsed.toFixed(1)}ms`)
-        console.groupEnd()
-      })
-      .catch((err) => {
-        console.warn(`[ThemeTransition] Transition error:`, err)
-        console.groupEnd()
-      })
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [clipFrom, clipTo],
+        },
+        {
+          duration: 750,
+          easing: 'ease-in-out',
+          pseudoElement: '::view-transition-new(root)',
+        }
+      )
+    })
   }
 
   const setTheme = (newTheme: Theme) => {
