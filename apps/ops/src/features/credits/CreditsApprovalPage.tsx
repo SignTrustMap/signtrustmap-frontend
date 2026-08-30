@@ -8,7 +8,7 @@ import {
 import { mockCreditApprovals, type CreditApprovalItem } from '@/data'
 
 export default function CreditsApprovalPage() {
-  const { t } = useTranslation('ops')
+  const { t, i18n } = useTranslation('ops')
   const [items, setItems] = useState<CreditApprovalItem[]>(mockCreditApprovals)
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -17,10 +17,11 @@ export default function CreditsApprovalPage() {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status: decision } : item))
     )
+    const isEn = i18n.language.startsWith('en')
     setToast(
       decision === 'Approved'
-        ? `Đã phê duyệt cộng điểm thưởng cho giao dịch ${id}.`
-        : `Đã từ chối cấp thưởng cho giao dịch ${id}.`
+        ? (isEn ? `Approved credit rewards for transaction ${id}.` : `Đã phê duyệt cộng điểm thưởng cho giao dịch ${id}.`)
+        : (isEn ? `Rejected credit rewards for transaction ${id}.` : `Đã từ chối cấp thưởng cho giao dịch ${id}.`)
     )
     setTimeout(() => setToast(null), 3000)
   }
@@ -62,9 +63,14 @@ export default function CreditsApprovalPage() {
       </div>
 
       {toast && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400" />
+        <div
+          onClick={() => setToast(null)}
+          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
+          title="Bấm để đóng thông báo"
+        >
+          <CheckCircle size={16} weight="bold" />
           <span>{toast}</span>
+          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
         </div>
       )}
 

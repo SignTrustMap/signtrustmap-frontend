@@ -138,6 +138,7 @@ export default function StaffDirectoryPage() {
             >
               <option value="all">{t('staff.role_all')}</option>
               <option value="Admin">Admin</option>
+              <option value="Staff">Staff</option>
               <option value="Reviewer">Reviewer</option>
               <option value="Surveyor">Surveyor</option>
               <option value="Driver">Driver</option>

@@ -1,7 +1,7 @@
 export interface RoleDefinition {
   id: string
-  name: string
-  desc: string
+  name: { vi: string; en: string }
+  desc: { vi: string; en: string }
   isSystemDefault?: boolean
   permissions: {
     userMgt: { read: boolean; create: boolean; update: boolean; delete: boolean }
@@ -14,47 +14,58 @@ export interface RoleDefinition {
 export const mockRoles: RoleDefinition[] = [
   {
     id: 'admin',
-    name: 'Quản trị viên cấp cao',
-    desc: 'Toàn quyền truy cập hệ thống',
+    name: { vi: 'Admin', en: 'Admin' },
+    desc: { vi: 'Toàn quyền quản trị nền tảng, AI MLOps và cấu hình hệ thống', en: 'Full platform governance, AI MLOps, and system configuration' },
     isSystemDefault: true,
     permissions: {
       userMgt: { read: true, create: true, update: true, delete: true },
+      taskApproval: { read: true, create: true, update: true, delete: true },
+      financials: { read: true, create: true, update: true, delete: true },
+      systemLogs: { read: true, create: true, update: true, delete: true },
+    },
+  },
+  {
+    id: 'staff',
+    name: { vi: 'Staff', en: 'Staff' },
+    desc: { vi: 'Kiểm duyệt hồ sơ vi phạm, xác minh sự cố và xử lý tái kiểm định', en: 'Moderate candidate violations, verify reports, and handle revalidation' },
+    permissions: {
+      userMgt: { read: true, create: true, update: true, delete: false },
       taskApproval: { read: true, create: true, update: true, delete: false },
       financials: { read: true, create: false, update: false, delete: false },
       systemLogs: { read: true, create: false, update: false, delete: false },
     },
   },
   {
-    id: 'staff_mgr',
-    name: 'Quản lý vận hành',
-    desc: 'Quản lý nhân sự và lịch trình',
-    permissions: {
-      userMgt: { read: true, create: true, update: true, delete: false },
-      taskApproval: { read: true, create: true, update: true, delete: false },
-      financials: { read: false, create: false, update: false, delete: false },
-      systemLogs: { read: true, create: false, update: false, delete: false },
-    },
-  },
-  {
     id: 'reviewer',
-    name: 'Kiểm duyệt viên',
-    desc: 'Quyền xem và duyệt kiểm toán',
+    name: { vi: 'Reviewer', en: 'Reviewer' },
+    desc: { vi: 'Bỏ phiếu đồng thuận xác thực biển báo và nhận điểm tin cậy', en: 'Consensus voting on traffic sign candidates with reliability scoring' },
     permissions: {
-      userMgt: { read: true, create: false, update: false, delete: false },
-      taskApproval: { read: true, create: false, update: false, delete: false },
-      financials: { read: false, create: false, update: false, delete: false },
-      systemLogs: { read: true, create: false, update: false, delete: false },
+      userMgt: { read: false, create: false, update: false, delete: false },
+      taskApproval: { read: true, create: true, update: false, delete: false },
+      financials: { read: true, create: false, update: false, delete: false },
+      systemLogs: { read: false, create: false, update: false, delete: false },
     },
   },
   {
-    id: 'support',
-    name: 'Nhân viên hỗ trợ',
-    desc: 'Tiếp nhận phản ánh & nhật ký cơ bản',
+    id: 'surveyor',
+    name: { vi: 'Surveyor', en: 'Surveyor' },
+    desc: { vi: 'Tải lên video hành trình, tạo hành trình và nhận thưởng khảo sát', en: 'Upload dashcam trip footage, submit surveys, and earn rewards' },
     permissions: {
-      userMgt: { read: true, create: false, update: false, delete: false },
+      userMgt: { read: false, create: false, update: false, delete: false },
+      taskApproval: { read: true, create: false, update: false, delete: false },
+      financials: { read: true, create: false, update: false, delete: false },
+      systemLogs: { read: false, create: false, update: false, delete: false },
+    },
+  },
+  {
+    id: 'driver',
+    name: { vi: 'Driver', en: 'Driver' },
+    desc: { vi: 'Dẫn đường cảnh báo biển báo thực tế và nộp báo cáo sự cố', en: 'Live road sign navigation and submit road hazard reports' },
+    permissions: {
+      userMgt: { read: false, create: false, update: false, delete: false },
       taskApproval: { read: false, create: false, update: false, delete: false },
-      financials: { read: false, create: false, update: false, delete: false },
-      systemLogs: { read: true, create: false, update: false, delete: false },
+      financials: { read: true, create: false, update: false, delete: false },
+      systemLogs: { read: false, create: false, update: false, delete: false },
     },
   },
 ]

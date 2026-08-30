@@ -5,47 +5,52 @@ import {
   CheckCircle,
   SlidersHorizontal,
   ShieldCheck,
-  Coins,
   Cpu,
+  ArrowsClockwise,
+  WarningOctagon,
 } from '@phosphor-icons/react'
 
 export default function SystemSettingsPage() {
   const { t } = useTranslation('ops')
-  const [activeTab, setActiveTab] = useState<'general' | 'tasks' | 'credits' | 'api'>('general')
+
+  const [activeTab, setActiveTab] = useState<'parameters' | 'consensus' | 'freshness' | 'moderation'>('parameters')
   const [maintenanceMode, setMaintenanceMode] = useState(false)
-  const [currency, setCurrency] = useState('VND (₫)')
-  const [maxDailyCredits, setMaxDailyCredits] = useState(500)
-  const [reviewTimeout, setReviewTimeout] = useState(15)
-  const [autoArchiveDays, setAutoArchiveDays] = useState(90)
+  
+  // Upload & Processing parameters
+  const [maxVideoSizeMb, setMaxVideoSizeMb] = useState(1024)
+  const [chunkSizeMb, setChunkSizeMb] = useState(25)
+  const [workerConcurrency, setWorkerConcurrency] = useState(4)
+
+  // Consensus & Reliability rules
+  const [consensusApprovalThreshold, setConsensusApprovalThreshold] = useState(0.75)
+  const [minReviewerVotes, setMinReviewerVotes] = useState(3)
+  const [alphaSmoothingFactor, setAlphaSmoothingFactor] = useState(0.1)
+  const [reliabilityPenalty, setReliabilityPenalty] = useState(0.05)
+
+  // Freshness & Task Limits
+  const [freshnessThresholdDays, setFreshnessThresholdDays] = useState(180)
+  const [maxDailyTasksPerUser, setMaxDailyTasksPerUser] = useState(20)
+
+  // Moderation rules
+  const [autoEscalateTieVotes, setAutoEscalateTieVotes] = useState(true)
+  const [gpsAnomalySpeedLimitKmh, setGpsAnomalySpeedLimitKmh] = useState(150)
+
   const [toast, setToast] = useState<string | null>(null)
 
   function handleSave() {
-    setToast(t('settings.btn_saved', { defaultValue: 'Cài đặt hệ thống đã được lưu thành công.' }))
+    setToast(t('settings.toast_saved'))
     setTimeout(() => setToast(null), 3000)
   }
 
-  function handleReset() {
-    setMaintenanceMode(false)
-    setCurrency('VND (₫)')
-    setMaxDailyCredits(500)
-    setReviewTimeout(15)
-    setAutoArchiveDays(90)
-    setToast(t('settings.btn_reset_notice', { defaultValue: 'Đã khôi phục cài đặt về mặc định của hệ thống.' }))
-    setTimeout(() => setToast(null), 2500)
-  }
-
-  const tabItems = [
-    { id: 'general', label: t('settings.tab_general'), icon: <SlidersHorizontal size={18} /> },
-    { id: 'tasks', label: t('settings.tab_tasks'), icon: <ShieldCheck size={18} /> },
-    { id: 'credits', label: t('settings.tab_credits'), icon: <Coins size={18} /> },
-    { id: 'api', label: t('settings.tab_api'), icon: <Cpu size={18} /> },
-  ] as const
-
   return (
     <div className="p-6 sm:p-8 w-full max-w-7xl mx-auto space-y-6">
-      {/* Top Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#E8E4E3] dark:border-white/10 pb-5">
         <div>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de] uppercase tracking-wider mb-1">
+            <SlidersHorizontal size={16} weight="bold" />
+            <span>{t('settings.tag')}</span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t('settings.title')}
           </h1>
@@ -54,236 +59,270 @@ export default function SystemSettingsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="px-4 py-2 border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 rounded-lg transition-colors cursor-pointer"
-          >
-            {t('settings.btn_reset')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer active:scale-95"
-          >
-            <FloppyDisk size={16} />
-            <span>{t('settings.btn_save')}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all cursor-pointer active:scale-95"
+        >
+          <FloppyDisk size={18} />
+          <span>{t('settings.btn_save')}</span>
+        </button>
       </div>
 
       {toast && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <div
+          onClick={() => setToast(null)}
+          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
+          title="Bấm để đóng thông báo"
+        >
+          <CheckCircle size={16} weight="bold" />
           <span>{toast}</span>
+          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
         </div>
       )}
 
-      {/* Main 2-Column Wide Grid Layout */}
+      {/* Tabs Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Side: Navigation Tabs Menu (3.5 cols) */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-4 shadow-xs">
-          <div className="space-y-1.5">
-            {tabItems.map((item) => {
-              const isActive = activeTab === item.id
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#007b8b] dark:bg-[#00c4de] text-white dark:text-black shadow-sm font-bold'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
-                  }`}
-                >
-                  <span className={isActive ? 'text-current' : 'text-[#007b8b] dark:text-[#00c4de]'}>
-                    {item.icon}
-                  </span>
-                  <span>{item.label}</span>
-                </button>
-              )
-            })}
-          </div>
+        {/* Left Side: Navigation Tabs Menu (4 cols) */}
+        <div className="lg:col-span-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 shadow-xs space-y-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('parameters')}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'parameters'
+                ? 'bg-[#007b8b] text-white shadow-sm font-bold'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
+            }`}
+          >
+            <Cpu size={18} />
+            <span>{t('settings.tab_ingestion')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('consensus')}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'consensus'
+                ? 'bg-[#007b8b] text-white shadow-sm font-bold'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
+            }`}
+          >
+            <ShieldCheck size={18} />
+            <span>{t('settings.tab_consensus')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('freshness')}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'freshness'
+                ? 'bg-[#007b8b] text-white shadow-sm font-bold'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
+            }`}
+          >
+            <ArrowsClockwise size={18} />
+            <span>{t('settings.tab_freshness')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('moderation')}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer ${
+              activeTab === 'moderation'
+                ? 'bg-[#007b8b] text-white shadow-sm font-bold'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
+            }`}
+          >
+            <WarningOctagon size={18} />
+            <span>{t('settings.tab_moderation')}</span>
+          </button>
         </div>
 
-        {/* Right Side: Settings Content Card (8.5 cols) */}
-        <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 sm:p-8 shadow-xs">
-          {activeTab === 'general' && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-100 dark:border-white/10 pb-4 mb-2">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {t('settings.tab_general')}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Thiết lập trạng thái hoạt động và cấu hình chung trên toàn nền tảng.
-                </p>
-              </div>
-
-              {/* Setting 1: Maintenance Mode */}
-              <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-white/10">
-                <div className="max-w-xl pr-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">
-                    {t('settings.setting_maintenance_title')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {t('settings.setting_maintenance_desc')}
-                  </p>
+        {/* Right Side: Tab Contents (8 cols) */}
+        <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-6">
+          {activeTab === 'parameters' && (
+            <div className="space-y-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {t('settings.sec_ingestion')}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_video_size')}
+                  </label>
+                  <input
+                    type="number"
+                    value={maxVideoSizeMb}
+                    onChange={(e) => setMaxVideoSizeMb(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer select-none">
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_chunk_size')}
+                  </label>
+                  <input
+                    type="number"
+                    value={chunkSizeMb}
+                    onChange={(e) => setChunkSizeMb(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1 sm:col-span-2">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_concurrency')}
+                  </label>
+                  <input
+                    type="number"
+                    value={workerConcurrency}
+                    onChange={(e) => setWorkerConcurrency(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'consensus' && (
+            <div className="space-y-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {t('settings.sec_consensus')}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_consensus_threshold')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.5"
+                    max="0.95"
+                    value={consensusApprovalThreshold}
+                    onChange={(e) => setConsensusApprovalThreshold(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_min_votes')}
+                  </label>
+                  <input
+                    type="number"
+                    value={minReviewerVotes}
+                    onChange={(e) => setMinReviewerVotes(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_alpha')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={alphaSmoothingFactor}
+                    onChange={(e) => setAlphaSmoothingFactor(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_bounds')}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={reliabilityPenalty}
+                    onChange={(e) => setReliabilityPenalty(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'freshness' && (
+            <div className="space-y-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {t('settings.sec_freshness')}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_freshness_days')}
+                  </label>
+                  <input
+                    type="number"
+                    value={freshnessThresholdDays}
+                    onChange={(e) => setFreshnessThresholdDays(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_daily_tasks')}
+                  </label>
+                  <input
+                    type="number"
+                    value={maxDailyTasksPerUser}
+                    onChange={(e) => setMaxDailyTasksPerUser(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'moderation' && (
+            <div className="space-y-4">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {t('settings.sec_moderation')}
+              </h2>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-gray-900 dark:text-white">
+                      {t('settings.lbl_auto_escalate')}
+                    </p>
+                    <p className="text-gray-400 text-[11px]">
+                      {t('settings.desc_auto_escalate')}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={autoEscalateTieVotes}
+                    onChange={(e) => setAutoEscalateTieVotes(e.target.checked)}
+                    className="w-4 h-4 accent-[#007b8b]"
+                  />
+                </div>
+
+                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
+                  <label className="font-mono font-bold text-gray-400 uppercase">
+                    {t('settings.lbl_speed_anomaly')}
+                  </label>
+                  <input
+                    type="number"
+                    value={gpsAnomalySpeedLimitKmh}
+                    onChange={(e) => setGpsAnomalySpeedLimitKmh(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                  />
+                </div>
+
+                <div className="p-4 bg-red-50/40 dark:bg-red-950/20 border border-red-200 dark:border-red-500/30 rounded-xl flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-red-600">
+                      {t('settings.lbl_maintenance')}
+                    </p>
+                    <p className="text-red-500/80 text-[11px]">
+                      {t('settings.desc_maintenance')}
+                    </p>
+                  </div>
                   <input
                     type="checkbox"
                     checked={maintenanceMode}
                     onChange={(e) => setMaintenanceMode(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 dark:bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#007b8b] dark:peer-checked:bg-[#00c4de]" />
-                </label>
-              </div>
-
-              {/* Setting 2: Currency */}
-              <div className="flex items-center justify-between py-4">
-                <div className="max-w-xl pr-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">
-                    {t('settings.setting_currency_title')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {t('settings.setting_currency_desc')}
-                  </p>
-                </div>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="px-4 py-2 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-[#061115] text-gray-900 dark:text-white font-mono font-semibold focus:outline-none focus:border-[#00c4de]"
-                >
-                  <option value="VND (₫)">VND (₫)</option>
-                  <option value="USD ($)">USD ($)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'tasks' && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-100 dark:border-white/10 pb-4 mb-2">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {t('settings.tab_tasks')}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Cấu hình thời gian hết hạn độ tươi mới (Sign Freshness) và quy tắc lưu trữ dữ liệu.
-                </p>
-              </div>
-
-              {/* Setting 1: Review Timeout */}
-              <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-white/10">
-                <div className="max-w-xl pr-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">
-                    {t('settings.setting_review_timeout_title')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {t('settings.setting_review_timeout_desc')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={reviewTimeout}
-                    onChange={(e) => setReviewTimeout(Number(e.target.value))}
-                    className="w-24 px-3.5 py-2 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-[#061115] text-gray-900 dark:text-white font-mono font-bold text-right focus:outline-none focus:border-[#00c4de]"
-                  />
-                  <span className="text-xs text-gray-400 font-mono">ngày</span>
-                </div>
-              </div>
-
-              {/* Setting 2: Auto-Archive */}
-              <div className="flex items-center justify-between py-4">
-                <div className="max-w-xl pr-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">
-                    {t('settings.setting_auto_archive_title')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {t('settings.setting_auto_archive_desc')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={autoArchiveDays}
-                    onChange={(e) => setAutoArchiveDays(Number(e.target.value))}
-                    className="w-24 px-3.5 py-2 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-[#061115] text-gray-900 dark:text-white font-mono font-bold text-right focus:outline-none focus:border-[#00c4de]"
-                  />
-                  <span className="text-xs text-gray-400 font-mono">ngày</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'credits' && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-100 dark:border-white/10 pb-4 mb-2">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {t('settings.tab_credits')}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Kiểm soát chính sách chi trả điểm thưởng và phòng chống gian lận hệ thống.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between py-4">
-                <div className="max-w-xl pr-4">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">
-                    {t('settings.setting_max_credits_title')}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {t('settings.setting_max_credits_desc')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={maxDailyCredits}
-                    onChange={(e) => setMaxDailyCredits(Number(e.target.value))}
-                    className="w-28 px-3.5 py-2 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-[#061115] text-gray-900 dark:text-white font-mono font-bold text-right focus:outline-none focus:border-[#00c4de]"
-                  />
-                  <span className="text-xs text-gray-400 font-mono">pts</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'api' && (
-            <div className="space-y-6">
-              <div className="border-b border-gray-100 dark:border-white/10 pb-4 mb-2">
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {t('settings.tab_api')}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Cổng kết nối dịch vụ bản đồ vệ tinh và mô hình học sâu AI.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-bold font-mono text-gray-700 dark:text-gray-300 uppercase mb-1.5">
-                    OpenStreetMap Tile Server URL
-                  </p>
-                  <input
-                    type="text"
-                    readOnly
-                    value="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-gray-50 dark:bg-white/5 font-mono text-gray-600 dark:text-gray-300"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-bold font-mono text-gray-700 dark:text-gray-300 uppercase mb-1.5">
-                    YOLO12 AI Inference Endpoint
-                  </p>
-                  <input
-                    type="text"
-                    readOnly
-                    value="https://api.signtrustmap.site/v1/models/yolo12-traffic"
-                    className="w-full px-4 py-2.5 text-xs rounded-xl border border-[#E8E4E3] dark:border-white/15 bg-gray-50 dark:bg-white/5 font-mono text-gray-600 dark:text-gray-300"
+                    className="w-4 h-4 accent-red-600"
                   />
                 </div>
               </div>

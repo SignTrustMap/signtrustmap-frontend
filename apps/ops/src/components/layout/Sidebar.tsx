@@ -4,22 +4,29 @@ import { useTranslation } from 'react-i18next'
 import {
   MapTrifold,
   SquaresFour,
-  Warning,
   Users,
   ShieldCheck,
   ClipboardText,
-  GearSix,
   SignOut,
-  Flag,
+  Coins,
   CurrencyCircleDollar,
   CheckSquare,
+  BookOpen,
+  Question,
+  Brain,
+  DownloadSimple,
+  ShieldWarning,
+  SlidersHorizontal,
 } from '@phosphor-icons/react'
 
-interface NavItem {
-  icon: React.ReactNode
-  label: string
-  href: string
-  badge?: number
+interface NavSection {
+  title: string
+  items: {
+    icon: React.ReactNode
+    label: string
+    href: string
+    badge?: number
+  }[]
 }
 
 export function Sidebar() {
@@ -39,78 +46,159 @@ export function Sidebar() {
     ? 'AD'
     : 'MN'
 
-  const displayName = user?.name || (isAdmin ? 'Admin' : 'Minh Nhật')
+  const displayName = user?.name || (isAdmin ? 'Governance Admin' : 'Minh Nhật')
 
-  // Staff Only Navigation Items
-  const staffNavItems: NavItem[] = [
+  // Comprehensive Admin Sections matching registered scope
+  const adminNavSections: NavSection[] = [
     {
-      icon: <SquaresFour size={18} weight="duotone" />,
-      label: t('nav.dashboard_ops'),
-      href: '/',
+      title: t('nav.overview'),
+      items: [
+        {
+          icon: <SquaresFour size={18} weight="duotone" />,
+          label: t('nav.dashboard'),
+          href: '/',
+        },
+      ],
     },
     {
-      icon: <Warning size={18} weight="duotone" />,
-      label: t('nav.candidates'),
-      href: '/candidates',
-      badge: 4,
+      title: t('nav.identity_access'),
+      items: [
+        {
+          icon: <Users size={18} weight="duotone" />,
+          label: t('nav.users'),
+          href: '/users',
+        },
+        {
+          icon: <ShieldCheck size={18} weight="duotone" />,
+          label: t('nav.roles'),
+          href: '/roles',
+        },
+      ],
     },
     {
-      icon: <Flag size={18} weight="duotone" />,
-      label: t('nav.reports'),
-      href: '/reports',
-      badge: 3,
+      title: t('nav.governance'),
+      items: [
+        {
+          icon: <BookOpen size={18} weight="duotone" />,
+          label: t('nav.catalog'),
+          href: '/catalog',
+        },
+        {
+          icon: <Question size={18} weight="duotone" />,
+          label: t('nav.missing_types'),
+          href: '/catalog/missing-types',
+          badge: 2,
+        },
+        {
+          icon: <MapTrifold size={18} weight="duotone" />,
+          label: t('nav.spatial_data'),
+          href: '/spatial-data',
+        },
+        {
+          icon: <ShieldWarning size={18} weight="duotone" />,
+          label: t('nav.escalations'),
+          href: '/escalations',
+          badge: 2,
+        },
+      ],
     },
     {
-      icon: <CheckSquare size={18} weight="duotone" />,
-      label: t('nav.tasks'),
-      href: '/tasks',
-      badge: 3,
+      title: t('nav.economy'),
+      items: [
+        {
+          icon: <Coins size={18} weight="duotone" />,
+          label: t('nav.credit_rules'),
+          href: '/credits/rules',
+        },
+        {
+          icon: <CurrencyCircleDollar size={18} weight="duotone" />,
+          label: t('nav.payments'),
+          href: '/credits/payments',
+        },
+      ],
     },
     {
-      icon: <CurrencyCircleDollar size={18} weight="duotone" />,
-      label: t('nav.credits'),
-      href: '/credits',
+      title: t('nav.ai_mlops'),
+      items: [
+        {
+          icon: <Brain size={18} weight="duotone" />,
+          label: t('nav.mlops'),
+          href: '/mlops',
+        },
+      ],
     },
     {
-      icon: <MapTrifold size={18} weight="duotone" />,
-      label: t('nav.map'),
-      href: '/map',
+      title: t('nav.data'),
+      items: [
+        {
+          icon: <DownloadSimple size={18} weight="duotone" />,
+          label: t('nav.exports'),
+          href: '/exports',
+        },
+      ],
+    },
+    {
+      title: t('nav.system'),
+      items: [
+        {
+          icon: <SlidersHorizontal size={18} weight="duotone" />,
+          label: t('nav.settings'),
+          href: '/settings',
+        },
+        {
+          icon: <ClipboardText size={18} weight="duotone" />,
+          label: t('nav.audit'),
+          href: '/audit-logs',
+        },
+      ],
     },
   ]
 
-  // Admin Only Navigation Items
-  const adminNavItems: NavItem[] = [
+  // Staff Sections
+  const staffNavSections: NavSection[] = [
     {
-      icon: <SquaresFour size={18} weight="duotone" />,
-      label: t('nav.dashboard_admin'),
-      href: '/',
-    },
-    {
-      icon: <Users size={18} weight="duotone" />,
-      label: t('nav.staff'),
-      href: '/staff',
-    },
-    {
-      icon: <ShieldCheck size={18} weight="duotone" />,
-      label: t('nav.roles'),
-      href: '/roles',
-    },
-    {
-      icon: <GearSix size={18} weight="duotone" />,
-      label: t('nav.settings'),
-      href: '/settings',
-    },
-    {
-      icon: <ClipboardText size={18} weight="duotone" />,
-      label: t('nav.audit'),
-      href: '/audit-logs',
+      title: t('nav.overview'),
+      items: [
+        {
+          icon: <SquaresFour size={18} weight="duotone" />,
+          label: t('nav.dashboard_ops'),
+          href: '/',
+        },
+        {
+          icon: <ShieldWarning size={18} weight="duotone" />,
+          label: t('nav.candidates'),
+          href: '/candidates',
+          badge: 4,
+        },
+        {
+          icon: <MapTrifold size={18} weight="duotone" />,
+          label: t('nav.map'),
+          href: '/map',
+        },
+        {
+          icon: <CheckSquare size={18} weight="duotone" />,
+          label: t('nav.tasks'),
+          href: '/tasks',
+          badge: 3,
+        },
+        {
+          icon: <BookOpen size={18} weight="duotone" />,
+          label: t('nav.catalog'),
+          href: '/catalog',
+        },
+        {
+          icon: <CurrencyCircleDollar size={18} weight="duotone" />,
+          label: t('nav.credits'),
+          href: '/credits',
+        },
+      ],
     },
   ]
 
-  const currentNavItems = isAdmin ? adminNavItems : staffNavItems
+  const currentSections = isAdmin ? adminNavSections : staffNavSections
 
   const linkClass = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-colors ${
+    `flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs sm:text-[13px] font-medium transition-colors ${
       isActive
         ? 'bg-[#d3f7ff] text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-xs'
         : 'text-gray-600 dark:text-gray-400 hover:bg-[#F8F7F7] dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
@@ -123,6 +211,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] h-full shadow-xs transition-colors">
+      {/* Brand Header */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E8E4E3] dark:border-white/10">
         <img
           src="/brand/brand_logo_nobg.svg"
@@ -140,57 +229,57 @@ export function Sidebar() {
       </div>
 
       {/* ─── Nav List ────────────────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1">
-        <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 font-mono">
-          {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
-        </p>
-
-        {currentNavItems.map((item) => (
-          <NavLink
-            key={item.href}
-            to={item.href}
-            end={item.href === '/'}
-            className={({ isActive }) => linkClass(isActive)}
-          >
-            <span className="text-current shrink-0">{item.icon}</span>
-            <span className="flex-1 truncate">{item.label}</span>
-            {item.badge ? (
-              <span className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#007b8b] text-white text-[10px] font-bold px-1">
-                {item.badge}
-              </span>
-            ) : null}
-          </NavLink>
+      <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-4">
+        {currentSections.map((section) => (
+          <div key={section.title} className="space-y-1">
+            <p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 font-mono">
+              {section.title}
+            </p>
+            {section.items.map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                end
+                className={({ isActive }) => linkClass(isActive)}
+              >
+                <span className="text-current shrink-0">{item.icon}</span>
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badge ? (
+                  <span className="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#007b8b] text-white text-[10px] font-bold px-1">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
-      {/* ─── Bottom User Profile & Full-Width Sign Out Card ──────── */}
+      {/* ─── Bottom User Profile & Sign Out ─────────────────────── */}
       <div className="p-3 border-t border-[#E8E4E3] dark:border-white/10">
         <div className="p-3 rounded-2xl bg-[#F4F4F4] dark:bg-[#0C1D23] border border-transparent dark:border-white/10 transition-colors flex flex-col gap-2.5">
-          {/* Top: Avatar + Full Name + Role Subtitle */}
           <div className="flex items-center gap-3 min-w-0">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${
-                isAdmin ? 'bg-[#7c3aed]' : 'bg-[#9333ea]'
+              className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${
+                isAdmin ? 'bg-[#7c3aed]' : 'bg-[#007b8b]'
               }`}
             >
               {userInitials}
             </div>
             <div className="min-w-0 flex-1 leading-snug">
-              <p className="text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
+              <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
                 {displayName}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                {isAdmin ? 'Admin' : 'Staff'}
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono mt-0.5">
+                {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
               </p>
             </div>
           </div>
 
-          {/* Bottom: Full-Width Sign Out Button */}
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full py-2 px-3 rounded-xl bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/15 border border-gray-200/80 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-500/30 transition-all shadow-2xs active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
-            title={t('nav.logout')}
+            className="w-full py-1.5 px-3 rounded-xl bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/15 border border-gray-200/80 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
             <SignOut size={14} weight="bold" />
             <span>{t('nav.logout')}</span>
