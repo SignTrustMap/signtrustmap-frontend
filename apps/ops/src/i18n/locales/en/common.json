@@ -2,8 +2,8 @@
   "nav": {
     "overview": "Overview",
     "dashboard": "Dashboard",
-    "dashboard_ops": "Staff Dashboard",
-    "dashboard_admin": "Admin Dashboard",
+    "dashboard_ops": "Dashboard",
+    "dashboard_admin": "Dashboard",
     "identity_access": "Identity & Access",
     "users": "User Management",
     "roles": "Roles & Permissions",
@@ -33,7 +33,10 @@
     "role_staff": "Staff",
     "admin_portal": "Admin Portal",
     "ops_portal": "Staff Portal",
-    "community_portal": "Community Portal"
+    "community_portal": "Community Portal",
+    "moderation_section": "Moderation & Exceptions",
+    "spatial_maintenance_section": "Spatial & Maintenance",
+    "economy_catalog_section": "Economy & Catalog"
   },
   "common": {
     "search": "Search",

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   MagnifyingGlass,
   UserPlus,
@@ -131,32 +132,36 @@ export default function StaffDirectoryPage() {
 
           {/* Role Filter */}
           <div className="sm:col-span-3">
-            <select
+            <CustomSelect
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            >
-              <option value="all">{t('staff.role_all')}</option>
-              <option value="Admin">Admin</option>
-              <option value="Staff">Staff</option>
-              <option value="Reviewer">Reviewer</option>
-              <option value="Surveyor">Surveyor</option>
-              <option value="Driver">Driver</option>
-            </select>
+              onChange={setRoleFilter}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('staff.role_all') },
+                { value: 'Admin', label: 'Admin' },
+                { value: 'Staff', label: 'Staff' },
+                { value: 'Reviewer', label: 'Reviewer' },
+                { value: 'Surveyor', label: 'Surveyor' },
+                { value: 'Driver', label: 'Driver' },
+              ]}
+            />
           </div>
 
           {/* Status Filter */}
           <div className="sm:col-span-3">
-            <select
+            <CustomSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            >
-              <option value="all">{t('staff.status_all')}</option>
-              <option value="Active">{t('staff.status_active')}</option>
-              <option value="Suspended">{t('staff.status_suspended')}</option>
-              <option value="Inactive">{t('staff.status_inactive')}</option>
-            </select>
+              onChange={setStatusFilter}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('staff.status_all') },
+                { value: 'Active', label: t('staff.status_active') },
+                { value: 'Suspended', label: t('staff.status_suspended') },
+                { value: 'Inactive', label: t('staff.status_inactive') },
+              ]}
+            />
           </div>
 
           {/* Clear button */}

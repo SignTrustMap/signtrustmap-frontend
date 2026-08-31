@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   BookOpen,
   PlusCircle,
@@ -108,18 +109,19 @@ export default function CatalogPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Funnel size={14} className="text-gray-400" />
-          <select
+          <CustomSelect
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="text-xs font-mono font-bold bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 cursor-pointer focus:outline-none"
-          >
-            <option value="all">{t('catalog.cat_all')}</option>
-            <option value="prohibition">{t('catalog.cat_prohibition')}</option>
-            <option value="warning">{t('catalog.cat_warning')}</option>
-            <option value="mandatory">{t('catalog.cat_mandatory')}</option>
-            <option value="information">{t('catalog.cat_information')}</option>
-          </select>
+            onChange={setCategoryFilter}
+            size="sm"
+            leftIcon={<Funnel size={14} />}
+            options={[
+              { value: 'all', label: t('catalog.cat_all') },
+              { value: 'prohibition', label: t('catalog.cat_prohibition') },
+              { value: 'warning', label: t('catalog.cat_warning') },
+              { value: 'mandatory', label: t('catalog.cat_mandatory') },
+              { value: 'information', label: t('catalog.cat_information') },
+            ]}
+          />
         </div>
       </div>
 
@@ -194,16 +196,18 @@ export default function CatalogPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_category')}</label>
-                  <select
+                  <CustomSelect
                     value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                  >
-                    <option value="prohibition">{t('catalog.cat_prohibition')}</option>
-                    <option value="warning">{t('catalog.cat_warning')}</option>
-                    <option value="mandatory">{t('catalog.cat_mandatory')}</option>
-                    <option value="information">{t('catalog.cat_information')}</option>
-                  </select>
+                    onChange={(val) => setNewCategory(val as any)}
+                    className="w-full"
+                    buttonClassName="w-full"
+                    options={[
+                      { value: 'prohibition', label: t('catalog.cat_prohibition') },
+                      { value: 'warning', label: t('catalog.cat_warning') },
+                      { value: 'mandatory', label: t('catalog.cat_mandatory') },
+                      { value: 'information', label: t('catalog.cat_information') },
+                    ]}
+                  />
                 </div>
               </div>
 

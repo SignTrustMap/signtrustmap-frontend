@@ -154,22 +154,38 @@ export function Sidebar() {
     },
   ]
 
-  // Staff Sections
+  // Staff Sections (Structured Information Architecture)
   const staffNavSections: NavSection[] = [
     {
       title: t('nav.overview'),
       items: [
         {
           icon: <SquaresFour size={18} weight="duotone" />,
-          label: t('nav.dashboard_ops'),
+          label: t('nav.dashboard'),
           href: '/',
         },
+      ],
+    },
+    {
+      title: t('nav.moderation_section'),
+      items: [
         {
           icon: <ShieldWarning size={18} weight="duotone" />,
           label: t('nav.candidates'),
           href: '/candidates',
           badge: 4,
         },
+        {
+          icon: <Question size={18} weight="duotone" />,
+          label: t('nav.missing_types'),
+          href: '/catalog/missing-types',
+          badge: 2,
+        },
+      ],
+    },
+    {
+      title: t('nav.spatial_maintenance_section'),
+      items: [
         {
           icon: <MapTrifold size={18} weight="duotone" />,
           label: t('nav.map'),
@@ -181,15 +197,20 @@ export function Sidebar() {
           href: '/tasks',
           badge: 3,
         },
+      ],
+    },
+    {
+      title: t('nav.economy_catalog_section'),
+      items: [
+        {
+          icon: <CurrencyCircleDollar size={18} weight="duotone" />,
+          label: t('nav.credits'),
+          href: '/credits/payments',
+        },
         {
           icon: <BookOpen size={18} weight="duotone" />,
           label: t('nav.catalog'),
           href: '/catalog',
-        },
-        {
-          icon: <CurrencyCircleDollar size={18} weight="duotone" />,
-          label: t('nav.credits'),
-          href: '/credits',
         },
       ],
     },

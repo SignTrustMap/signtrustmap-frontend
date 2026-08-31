@@ -27,6 +27,23 @@ export interface MissingSignTypeReport {
   status: 'Open' | 'Approved' | 'Rejected' | 'Merged'
 }
 
+export interface AvailableSignOption {
+  code: string
+  nameKey: string
+  codeTitle: string
+}
+
+export const availableCatalogSigns: AvailableSignOption[] = [
+  { code: 'P.102', nameKey: 'cat_prohibition', codeTitle: 'P.102 - Cấm đi ngược chiều' },
+  { code: 'P.103a', nameKey: 'cat_prohibition', codeTitle: 'P.103a - Cấm ô tô' },
+  { code: 'P.127', nameKey: 'cat_prohibition', codeTitle: 'P.127 - Tốc độ tối đa cho phép (50 km/h)' },
+  { code: 'R.301a', nameKey: 'cat_mandatory', codeTitle: 'R.301a - Hướng đi phải theo (Đi thẳng)' },
+  { code: 'R.302a', nameKey: 'cat_mandatory', codeTitle: 'R.302a - Hướng phải đi vòng chướng ngại vật' },
+  { code: 'W.201a', nameKey: 'cat_warning', codeTitle: 'W.201a - Chỗ ngoặt nguy hiểm vòng bên trái' },
+  { code: 'W.207a', nameKey: 'cat_warning', codeTitle: 'W.207a - Giao nhau với đường không ưu tiên' },
+  { code: 'I.401', nameKey: 'cat_information', codeTitle: 'I.401 - Bắt đầu đường ưu tiên' },
+]
+
 export const mockCatalogData: CatalogEntry[] = [
   {
     id: 'CAT-P102',

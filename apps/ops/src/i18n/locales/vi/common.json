@@ -2,8 +2,8 @@
   "nav": {
     "overview": "Tổng quan",
     "dashboard": "Bảng điều khiển",
-    "dashboard_ops": "Bảng điều khiển Staff",
-    "dashboard_admin": "Bảng điều khiển Admin",
+    "dashboard_ops": "Bảng điều khiển",
+    "dashboard_admin": "Bảng điều khiển",
     "identity_access": "Tài khoản & Phân quyền",
     "users": "Quản lý Người dùng",
     "roles": "Phân quyền Hệ thống",
@@ -33,7 +33,10 @@
     "role_staff": "Staff",
     "admin_portal": "Cổng Admin",
     "ops_portal": "Cổng Staff",
-    "community_portal": "Cổng Cộng đồng"
+    "community_portal": "Cổng Cộng đồng",
+    "moderation_section": "Kiểm duyệt & Ngoại lệ",
+    "spatial_maintenance_section": "Không gian & Bảo trì",
+    "economy_catalog_section": "Kinh tế & Danh mục"
   },
   "common": {
     "search": "Tìm kiếm",

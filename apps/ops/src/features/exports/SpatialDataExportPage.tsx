@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   DownloadSimple,
   CheckCircle,
@@ -11,8 +12,7 @@ import {
 import { mockExportHistory, type ExportHistoryRecord } from '@/data/adminGovernanceData'
 
 export default function SpatialDataExportPage() {
-  const { t, i18n } = useTranslation('ops')
-  const isEn = i18n.language.startsWith('en')
+  const { t } = useTranslation('ops')
 
   const [exportFormat, setExportFormat] = useState<'geojson' | 'shapefile' | 'csv' | 'osm'>('geojson')
   const [selectedCity, setSelectedCity] = useState('all')
@@ -39,11 +39,11 @@ export default function SpatialDataExportPage() {
       const newHistoryItem: ExportHistoryRecord = {
         id: `EXP-2026-0${history.length + 9}`,
         format: fmtLabelMap[exportFormat],
-        region: selectedCity === 'all' ? (isEn ? 'Nationwide' : 'Toàn quốc') : selectedCity,
+        region: selectedCity === 'all' ? t('exports.region_nationwide') : selectedCity,
         totalFeatures: 2450,
         fileSize: '4.2 MB',
         exportedBy: 'admin@signtrustmap.site',
-        createdAt: isEn ? 'Just now' : 'Vừa xong',
+        createdAt: t('exports.just_now'),
       }
       setHistory([newHistoryItem, ...history])
       setIsExporting(false)
@@ -90,31 +90,35 @@ export default function SpatialDataExportPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
           <div className="space-y-2">
             <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('exports.lbl_boundary')}</label>
-            <select
+            <CustomSelect
               value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-            >
-              <option value="all">{t('exports.boundary_all')}</option>
-              <option value="Hà Nội">Hà Nội</option>
-              <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-              <option value="Đà Nẵng">Đà Nẵng</option>
-              <option value="Hải Phòng">Hải Phòng</option>
-            </select>
+              onChange={setSelectedCity}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('exports.boundary_all') },
+                { value: 'Hà Nội', label: 'Hà Nội' },
+                { value: 'TP. Hồ Chí Minh', label: 'TP. Hồ Chí Minh' },
+                { value: 'Đà Nẵng', label: 'Đà Nẵng' },
+                { value: 'Hải Phòng', label: 'Hải Phòng' },
+              ]}
+            />
           </div>
 
           <div className="space-y-2">
             <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('exports.lbl_category')}</label>
-            <select
+            <CustomSelect
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-            >
-              <option value="all">{t('exports.cat_all')}</option>
-              <option value="prohibition">{t('exports.cat_prohibition')}</option>
-              <option value="warning">{t('exports.cat_warning')}</option>
-              <option value="mandatory">{t('exports.cat_mandatory')}</option>
-            </select>
+              onChange={setSelectedCategory}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('exports.cat_all') },
+                { value: 'prohibition', label: t('exports.cat_prohibition') },
+                { value: 'warning', label: t('exports.cat_warning') },
+                { value: 'mandatory', label: t('exports.cat_mandatory') },
+              ]}
+            />
           </div>
         </div>
 
@@ -125,10 +129,10 @@ export default function SpatialDataExportPage() {
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { id: 'geojson', name: 'GeoJSON (RFC 7946)', icon: <FileCode size={20} className="text-[#007b8b]" />, desc: isEn ? 'Standard spatial JSON' : 'Chuẩn web GIS phổ biến' },
-              { id: 'shapefile', name: 'ESRI Shapefile (.shp)', icon: <MapPin size={20} className="text-purple-600" />, desc: isEn ? 'QGIS / ArcGIS zip' : 'Nén zip cho ArcGIS/QGIS' },
-              { id: 'csv', name: 'Flat CSV (WGS84)', icon: <FileCsv size={20} className="text-emerald-600" />, desc: isEn ? 'Tabular GPS rows' : 'Bảng tọa độ và thuộc tính' },
-              { id: 'osm', name: 'OpenStreetMap XML', icon: <FileCode size={20} className="text-amber-600" />, desc: isEn ? 'OSM XML Nodes' : 'Tệp Node OSM tag' },
+              { id: 'geojson', name: 'GeoJSON (RFC 7946)', icon: <FileCode size={20} className="text-[#007b8b]" />, desc: t('exports.desc_geojson') },
+              { id: 'shapefile', name: 'ESRI Shapefile (.shp)', icon: <MapPin size={20} className="text-purple-600" />, desc: t('exports.desc_shapefile') },
+              { id: 'csv', name: 'Flat CSV (WGS84)', icon: <FileCsv size={20} className="text-emerald-600" />, desc: t('exports.desc_csv') },
+              { id: 'osm', name: 'OpenStreetMap XML', icon: <FileCode size={20} className="text-amber-600" />, desc: t('exports.desc_osm') },
             ].map((fmt) => (
               <button
                 key={fmt.id}

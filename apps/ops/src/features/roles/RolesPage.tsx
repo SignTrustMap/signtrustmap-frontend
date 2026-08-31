@@ -5,44 +5,13 @@ import {
   FloppyDisk,
   Check,
 } from '@phosphor-icons/react'
-import { mockRoles, type RoleDefinition } from '@/data/roles'
-
-type PermModuleKey = 'userMgt' | 'taskApproval' | 'financials' | 'systemLogs'
-type PermActionKey = 'read' | 'create' | 'update' | 'delete'
-
-interface PermCategory {
-  key: string
-  module: PermModuleKey
-  nameKey: string
-  actions: PermActionKey[]
-}
-
-const PERMISSION_CATEGORIES: PermCategory[] = [
-  {
-    key: 'cat_userMgt',
-    module: 'userMgt',
-    nameKey: 'roles.cat_userMgt',
-    actions: ['read', 'create', 'update', 'delete'],
-  },
-  {
-    key: 'cat_taskApproval',
-    module: 'taskApproval',
-    nameKey: 'roles.cat_taskApproval',
-    actions: ['read', 'create', 'update', 'delete'],
-  },
-  {
-    key: 'cat_financials',
-    module: 'financials',
-    nameKey: 'roles.cat_financials',
-    actions: ['read', 'create', 'update', 'delete'],
-  },
-  {
-    key: 'cat_systemLogs',
-    module: 'systemLogs',
-    nameKey: 'roles.cat_systemLogs',
-    actions: ['read', 'create', 'update', 'delete'],
-  },
-]
+import {
+  mockRoles,
+  PERMISSION_CATEGORIES,
+  type RoleDefinition,
+  type PermModuleKey,
+  type PermActionKey,
+} from '@/data'
 
 export default function RolesPage() {
   const { t, i18n } = useTranslation('ops')

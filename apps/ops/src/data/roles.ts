@@ -11,6 +11,43 @@ export interface RoleDefinition {
   }
 }
 
+export type PermModuleKey = 'userMgt' | 'taskApproval' | 'financials' | 'systemLogs'
+export type PermActionKey = 'read' | 'create' | 'update' | 'delete'
+
+export interface PermCategory {
+  key: string
+  module: PermModuleKey
+  nameKey: string
+  actions: PermActionKey[]
+}
+
+export const PERMISSION_CATEGORIES: PermCategory[] = [
+  {
+    key: 'cat_userMgt',
+    module: 'userMgt',
+    nameKey: 'roles.cat_userMgt',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
+  {
+    key: 'cat_taskApproval',
+    module: 'taskApproval',
+    nameKey: 'roles.cat_taskApproval',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
+  {
+    key: 'cat_financials',
+    module: 'financials',
+    nameKey: 'roles.cat_financials',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
+  {
+    key: 'cat_systemLogs',
+    module: 'systemLogs',
+    nameKey: 'roles.cat_systemLogs',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
+]
+
 export const mockRoles: RoleDefinition[] = [
   {
     id: 'admin',

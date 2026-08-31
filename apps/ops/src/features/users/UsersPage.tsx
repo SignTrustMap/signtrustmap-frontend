@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   Users,
   MagnifyingGlass,
@@ -113,29 +114,31 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Funnel size={14} className="text-gray-400" />
-          <select
+          <CustomSelect
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="text-xs font-mono font-bold bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 cursor-pointer focus:outline-none"
-          >
-            <option value="all">{t('users.role_all')}</option>
-            <option value="admin">Admin</option>
-            <option value="staff">Staff</option>
-            <option value="reviewer">Reviewer</option>
-            <option value="surveyor">Surveyor</option>
-            <option value="driver">Driver</option>
-          </select>
+            onChange={setRoleFilter}
+            size="sm"
+            leftIcon={<Funnel size={14} />}
+            options={[
+              { value: 'all', label: t('users.role_all') },
+              { value: 'admin', label: 'Admin' },
+              { value: 'staff', label: 'Staff' },
+              { value: 'reviewer', label: 'Reviewer' },
+              { value: 'surveyor', label: 'Surveyor' },
+              { value: 'driver', label: 'Driver' },
+            ]}
+          />
 
-          <select
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs font-mono font-bold bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 cursor-pointer focus:outline-none"
-          >
-            <option value="all">{t('users.status_all')}</option>
-            <option value="Active">{t('users.status_active')}</option>
-            <option value="Suspended">{t('users.status_locked')}</option>
-          </select>
+            onChange={setStatusFilter}
+            size="sm"
+            options={[
+              { value: 'all', label: t('users.status_all') },
+              { value: 'Active', label: t('users.status_active') },
+              { value: 'Suspended', label: t('users.status_locked') },
+            ]}
+          />
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import {
 import { mockCreditApprovals, type CreditApprovalItem } from '@/data'
 
 export default function CreditsApprovalPage() {
-  const { t, i18n } = useTranslation('ops')
+  const { t } = useTranslation('ops')
   const [items, setItems] = useState<CreditApprovalItem[]>(mockCreditApprovals)
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -17,11 +17,10 @@ export default function CreditsApprovalPage() {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status: decision } : item))
     )
-    const isEn = i18n.language.startsWith('en')
     setToast(
       decision === 'Approved'
-        ? (isEn ? `Approved credit rewards for transaction ${id}.` : `Đã phê duyệt cộng điểm thưởng cho giao dịch ${id}.`)
-        : (isEn ? `Rejected credit rewards for transaction ${id}.` : `Đã từ chối cấp thưởng cho giao dịch ${id}.`)
+        ? t('credits.toast_approved', { id })
+        : t('credits.toast_rejected', { id })
     )
     setTimeout(() => setToast(null), 3000)
   }

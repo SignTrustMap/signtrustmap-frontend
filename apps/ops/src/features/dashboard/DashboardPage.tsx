@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   Users,
   WarningCircle,
@@ -13,6 +14,7 @@ import {
   HardDrives,
   CheckSquare,
   Flag,
+  Funnel,
 } from '@phosphor-icons/react'
 import {
   adminKpisData,
@@ -119,22 +121,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Time Range Dropdown */}
-          <div className="relative">
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="appearance-none pl-9 pr-8 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg font-semibold text-gray-700 dark:text-gray-200 focus:outline-none focus:border-[#00c4de] shadow-xs cursor-pointer"
-            >
-              <option value="7 ngày qua">{t('dashboard.time_range_7')}</option>
-              <option value="30 ngày qua">{t('dashboard.time_range_30')}</option>
-              <option value="90 ngày qua">{t('dashboard.time_range_90')}</option>
-            </select>
-            <CalendarBlank
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            />
-          </div>
+          {/* Time Range Custom Dropdown */}
+          <CustomSelect
+            value={timeRange}
+            onChange={setTimeRange}
+            leftIcon={<CalendarBlank size={16} />}
+            options={[
+              { value: '7 ngày qua', label: t('dashboard.time_range_7') },
+              { value: '30 ngày qua', label: t('dashboard.time_range_30') },
+              { value: '90 ngày qua', label: t('dashboard.time_range_90') },
+            ]}
+          />
 
           {/* Export Button */}
           <button
@@ -439,15 +436,17 @@ export default function DashboardPage() {
             </h2>
           </div>
 
-          <select
+          <CustomSelect
             value={feedFilter}
-            onChange={(e) => setFeedFilter(e.target.value)}
-            className="text-xs border border-[#E8E4E3] dark:border-white/15 rounded-lg px-3 py-1.5 bg-[#F8F7F7] dark:bg-[#061115] text-gray-700 dark:text-gray-200 font-semibold focus:outline-none focus:border-[#00c4de]"
-          >
-            <option value="all">{t('dashboard.filter_all_events')}</option>
-            <option value="critical">{t('dashboard.filter_critical_only')}</option>
-            <option value="user">{t('dashboard.filter_user_only')}</option>
-          </select>
+            onChange={setFeedFilter}
+            size="sm"
+            leftIcon={<Funnel size={14} />}
+            options={[
+              { value: 'all', label: t('dashboard.filter_all_events') },
+              { value: 'critical', label: t('dashboard.filter_critical_only') },
+              { value: 'user', label: t('dashboard.filter_user_only') },
+            ]}
+          />
         </div>
 
         {/* Activity Feed List */}
