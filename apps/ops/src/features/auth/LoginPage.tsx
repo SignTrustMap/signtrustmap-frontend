@@ -109,7 +109,7 @@ export default function LoginPage() {
         {/* Brand Logo */}
         <a
           href="/"
-          className="flex items-center gap-3 font-brand font-bold text-xl group"
+          className="flex items-center gap-3 font-sans font-bold text-xl group"
         >
           <img
             src="/brand/brand_logo_nobg.svg"

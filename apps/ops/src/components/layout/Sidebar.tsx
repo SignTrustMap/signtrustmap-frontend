@@ -219,7 +219,7 @@ export function Sidebar() {
           className="w-8 h-8 object-contain shrink-0"
         />
         <div className="leading-tight min-w-0">
-          <p className="text-sm font-bold text-gray-900 dark:text-white truncate font-brand">
+          <p className="text-sm font-bold text-gray-900 dark:text-white truncate font-sans tracking-tight">
             Sign<span className="text-[#007b8b] dark:text-[#00c4de]">Trust</span>Map
           </p>
           <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate font-mono">

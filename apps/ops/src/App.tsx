@@ -23,8 +23,8 @@ import AdminEscalationsPage from '@/features/escalations/AdminEscalationsPage'
 import CreditRulesPage from '@/features/economy/CreditRulesPage'
 import CreditsApprovalPage from '@/features/credits/CreditsApprovalPage'
 
-// AI & Processing (MLOps)
-import MlopsPage from '@/features/mlops/MlopsPage'
+// AI & Processing (AIOps)
+import AiopsPage from '@/features/aiops/AiopsPage'
 
 // Data
 import SpatialDataExportPage from '@/features/exports/SpatialDataExportPage'
@@ -103,12 +103,20 @@ function ProtectedLayout() {
             element={<CreditsApprovalPage />}
           />
 
-          {/* ─── AI & Processing (MLOps) ───────────────────────────── */}
+          {/* ─── AI Pipeline & AIOps ─────────────────────────────── */}
+          <Route
+            path="/aiops"
+            element={
+              <AdminGuard>
+                <AiopsPage />
+              </AdminGuard>
+            }
+          />
           <Route
             path="/mlops"
             element={
               <AdminGuard>
-                <MlopsPage />
+                <AiopsPage />
               </AdminGuard>
             }
           />

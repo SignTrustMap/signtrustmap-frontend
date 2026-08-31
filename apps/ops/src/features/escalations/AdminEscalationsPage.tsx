@@ -35,19 +35,21 @@ export default function AdminEscalationsPage() {
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 text-xs font-mono font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">
-          <ShieldWarning size={16} weight="bold" />
-          <span>{t('escalations.tag')}</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8E4E3] dark:border-white/10 pb-5">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">
+            <ShieldWarning size={16} weight="bold" />
+            <span>{t('escalations.tag')}</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            {t('escalations.title')}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {t('escalations.subtitle')}
+          </p>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-          {t('escalations.title')}
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {t('escalations.subtitle')}
-        </p>
       </div>
 
       {toastMsg && (
