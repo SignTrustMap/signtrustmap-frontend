@@ -83,51 +83,51 @@ export default function CreditRulesPage() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1">
-              <label className="font-mono font-bold text-gray-400 uppercase">
+            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2.5">
+              <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 {t('economy.lbl_survey')}
               </label>
               <input
                 type="number"
                 value={surveyReward}
                 onChange={(e) => setSurveyReward(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
               />
             </div>
 
-            <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1">
-              <label className="font-mono font-bold text-gray-400 uppercase">
+            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2.5">
+              <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 {t('economy.lbl_review')}
               </label>
               <input
                 type="number"
                 value={reviewReward}
                 onChange={(e) => setReviewReward(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
               />
             </div>
 
-            <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1">
-              <label className="font-mono font-bold text-gray-400 uppercase">
+            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2.5">
+              <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 {t('economy.lbl_revalidation')}
               </label>
               <input
                 type="number"
                 value={revalidationBounty}
                 onChange={(e) => setRevalidationBounty(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
               />
             </div>
 
-            <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1">
-              <label className="font-mono font-bold text-gray-400 uppercase">
+            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2.5">
+              <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 {t('economy.lbl_daily')}
               </label>
               <input
                 type="number"
                 value={dailyTaskBonus}
                 onChange={(e) => setDailyTaskBonus(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
               />
             </div>
           </div>
@@ -140,15 +140,15 @@ export default function CreditRulesPage() {
             <span>{t('economy.sec_nav_pricing')}</span>
           </h2>
 
-          <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1 max-w-md text-xs">
-            <label className="font-mono font-bold text-gray-400 uppercase">
+          <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2.5 max-w-md text-xs">
+            <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               {t('economy.lbl_nav_rate')}
             </label>
             <input
               type="number"
               value={navConsumptionRate}
               onChange={(e) => setNavConsumptionRate(Number(e.target.value))}
-              className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+              className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
             />
           </div>
         </div>

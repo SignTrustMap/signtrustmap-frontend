@@ -375,48 +375,46 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Dev Quick Logins */}
-          {import.meta.env.DEV && (
-            <div
-              className={`mt-6 pt-5 border-t text-left ${
-                isDark ? 'border-white/10' : 'border-gray-100'
-              }`}
-            >
-              <p className="text-[10px] font-mono uppercase text-gray-400 mb-2">
-                {t('login.dev_quick')}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('staff@example.com')
-                    setPassword('password')
-                  }}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-                    isDark
-                      ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
-                      : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
-                  }`}
-                >
-                  {t('login.staff_portal')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@example.com')
-                    setPassword('password')
-                  }}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-                    isDark
-                      ? 'bg-[#00c4de]/15 hover:bg-[#00c4de]/25 border-[#00c4de]/40 text-[#00c4de]'
-                      : 'bg-[#007b8b]/10 hover:bg-[#007b8b]/20 border-[#007b8b]/30 text-[#007b8b]'
-                  }`}
-                >
-                  {t('login.admin_portal')}
-                </button>
-              </div>
+          {/* Quick Demo Logins (Always visible for convenience) */}
+          <div
+            className={`mt-6 pt-5 border-t text-left ${
+              isDark ? 'border-white/10' : 'border-gray-100'
+            }`}
+          >
+            <p className="text-[10px] font-mono uppercase text-gray-400 mb-2">
+              {t('login.dev_quick')}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('staff@example.com')
+                  setPassword('password')
+                }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
+                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                }`}
+              >
+                {t('login.staff_portal')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('admin@example.com')
+                  setPassword('password')
+                }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
+                  isDark
+                    ? 'bg-[#00c4de]/15 hover:bg-[#00c4de]/25 border-[#00c4de]/40 text-[#00c4de]'
+                    : 'bg-[#007b8b]/10 hover:bg-[#007b8b]/20 border-[#007b8b]/30 text-[#007b8b]'
+                }`}
+              >
+                {t('login.admin_portal')}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </main>
 

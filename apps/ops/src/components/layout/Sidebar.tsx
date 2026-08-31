@@ -223,7 +223,7 @@ export function Sidebar() {
             Sign<span className="text-[#007b8b] dark:text-[#00c4de]">Trust</span>Map
           </p>
           <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate font-mono">
-            {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
+            {isAdmin ? t('nav.page_for_admin') : t('nav.page_for_staff')}
           </p>
         </div>
       </div>
@@ -270,8 +270,8 @@ export function Sidebar() {
               <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
                 {displayName}
               </p>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                {isAdmin ? t('nav.admin_portal') : t('nav.ops_portal')}
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono mt-0.5 font-semibold">
+                {isAdmin ? t('nav.role_admin') : t('nav.role_staff')}
               </p>
             </div>
           </div>

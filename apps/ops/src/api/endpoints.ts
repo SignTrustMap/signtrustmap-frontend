@@ -2,6 +2,14 @@
  * Centralized API Endpoints registry for SignTrustMap Ops & Admin workspace
  */
 
+/**
+ * Base URL for the Jetson Orin Edge AI Node runtime (AIOps).
+ * Pulled dynamically from environment variables (VITE_AIOPS_EDGE_URL) with fallback.
+ */
+export const AIOPS_BASE_URL: string = (
+  import.meta.env.VITE_AIOPS_EDGE_URL || 'https://drum-valid-randomly.ngrok-free.app'
+).replace(/\/$/, '')
+
 export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/api/v1/auth/login',
@@ -52,7 +60,13 @@ export const API_ENDPOINTS = {
     },
   },
   AIOPS: {
-    STREAM: 'https://drum-valid-randomly.ngrok-free.app/api/v1/system/stream',
+    BASE: AIOPS_BASE_URL,
+    HEALTH: `${AIOPS_BASE_URL}/api/v1/system/health`,
+    STREAM: `${AIOPS_BASE_URL}/api/v1/system/stream`,
+    MODELS: `${AIOPS_BASE_URL}/api/v1/models`,
+    STRATEGIES: `${AIOPS_BASE_URL}/api/v1/active-learning/strategies`,
+    CLASSES: `${AIOPS_BASE_URL}/api/v1/classes`,
+    CONFIG: `${AIOPS_BASE_URL}/api/v1/config`,
     PIPELINE_STATUS: '/api/v1/mlops/pipeline/status',
     RETRAINING_RUNS: '/api/v1/mlops/retraining-runs',
     TRIGGER_RUN: '/api/v1/mlops/retraining-runs/trigger',

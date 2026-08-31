@@ -87,13 +87,13 @@ export default function SpatialDataExportPage() {
           {t('exports.sec_filters')}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="space-y-1">
-            <label className="font-mono font-bold text-gray-500 uppercase">{t('exports.lbl_boundary')}</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+          <div className="space-y-2">
+            <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('exports.lbl_boundary')}</label>
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer"
+              className="w-full px-3.5 py-2.5 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
             >
               <option value="all">{t('exports.boundary_all')}</option>
               <option value="Hà Nội">Hà Nội</option>
@@ -103,12 +103,12 @@ export default function SpatialDataExportPage() {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="font-mono font-bold text-gray-500 uppercase">{t('exports.lbl_category')}</label>
+          <div className="space-y-2">
+            <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('exports.lbl_category')}</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer"
+              className="w-full px-3.5 py-2.5 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
             >
               <option value="all">{t('exports.cat_all')}</option>
               <option value="prohibition">{t('exports.cat_prohibition')}</option>

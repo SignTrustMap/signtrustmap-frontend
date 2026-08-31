@@ -27,8 +27,13 @@
     "tasks": "Tái kiểm định",
     "credits": "Khiếu nại Credits",
     "logout": "Đăng xuất",
+    "page_for_admin": "Trang dành cho Admin",
+    "page_for_staff": "Trang dành cho Staff",
+    "role_admin": "Admin",
+    "role_staff": "Staff",
     "admin_portal": "Cổng Admin",
-    "ops_portal": "Cổng Staff"
+    "ops_portal": "Cổng Staff",
+    "community_portal": "Cổng Cộng đồng"
   },
   "common": {
     "search": "Tìm kiếm",
@@ -71,7 +76,7 @@
     "submitting": "Đang đăng nhập...",
     "or": "HOẶC",
     "google_login": "Đăng nhập với Google",
-    "dev_quick": "Đăng nhập nhanh môi trường Dev:",
+    "dev_quick": "Đăng nhập nhanh tài khoản mẫu:",
     "staff_portal": "👤 Cổng Staff",
     "admin_portal": "⚡ Cổng Admin",
     "footer": "© {{year}} SignTrustMap Ops Portal • Hệ thống quản trị nội bộ"

@@ -179,25 +179,25 @@ export default function CatalogPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateEntry} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-mono font-bold text-gray-500">{t('catalog.field_code')}</label>
+            <form onSubmit={handleCreateEntry} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_code')}</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. P.102a"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="font-mono font-bold text-gray-500">{t('catalog.field_category')}</label>
+                <div className="space-y-2">
+                  <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_category')}</label>
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   >
                     <option value="prohibition">{t('catalog.cat_prohibition')}</option>
                     <option value="warning">{t('catalog.cat_warning')}</option>
@@ -207,37 +207,37 @@ export default function CatalogPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-mono font-bold text-gray-500">{t('catalog.field_name')}</label>
+              <div className="space-y-2">
+                <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_name')}</label>
                 <input
                   type="text"
                   required
                   placeholder={t('catalog.field_name_placeholder')}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-mono font-bold text-gray-500">{t('catalog.field_ai_prompt')}</label>
+              <div className="space-y-2">
+                <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_ai_prompt')}</label>
                 <textarea
                   rows={2}
                   placeholder="Red circular sign with horizontal white bar in center"
                   value={newAiPrompt}
                   onChange={(e) => setNewAiPrompt(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px]"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-mono font-bold text-gray-500">{t('catalog.field_osm_mapping')}</label>
+              <div className="space-y-2">
+                <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide">{t('catalog.field_osm_mapping')}</label>
                 <input
                   type="text"
                   placeholder="traffic_sign=VN:P.102; access=no"
                   value={newOsmMapping}
                   onChange={(e) => setNewOsmMapping(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px]"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
 

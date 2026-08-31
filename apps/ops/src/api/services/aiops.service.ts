@@ -1,5 +1,6 @@
 import { http, type ApiResponse } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import { edgeFetch } from '../edgeClient'
 import type { ModelRetrainingRun } from '@/data/adminGovernanceData'
 
 export interface SystemHardwareMetrics {
@@ -70,7 +71,135 @@ export interface ActiveLearningConfig {
   minSamplesForAutoRetrain: number
 }
 
+export interface SystemHealthResponse {
+  status: 'healthy' | 'unhealthy' | 'degraded' | string
+  dependencies: {
+    cuda: {
+      status: string
+      available: boolean
+      device: string
+      error: string | null
+    }
+    tensorrt: {
+      status: string
+      available: boolean
+      version: string
+      trtexec_available: boolean
+      error: string | null
+    }
+    minio: {
+      status: string
+      error: string | null
+    }
+  }
+}
+
+export interface ModelArtifactItem {
+  filename: string
+  format: 'engine' | 'onnx' | 'pt' | string
+  size_bytes: number
+  size_human: string
+  modified_at: string
+  is_loaded: boolean
+}
+
+export interface ModelsResponse {
+  total_detectors: number
+  total_classifiers: number
+  loaded_detector: string | null
+  loaded_classifier: string | null
+  detectors: ModelArtifactItem[]
+  classifiers: ModelArtifactItem[]
+}
+
+export interface ActiveLearningStrategiesResponse {
+  strategies: string[]
+  aggregation_methods: string[]
+  default_strategy: string
+  default_aggregation: string
+  default_top_k: number
+}
+
+export interface AiClassItem {
+  class_id: number
+  class_name: string
+  human_readable_name: string
+  prompt: string
+}
+
+export interface ClassesResponse {
+  total: number
+  classes: AiClassItem[]
+}
+
+export interface SystemConfigResponse {
+  active_learning: {
+    default_top_k: number
+    default_strategy: string
+    default_aggregation: string
+    no_detection_score: number
+    min_batch_size_detector: number
+    min_batch_size_classifier: number
+    discrepancy_threshold: number
+    auto_trigger_training: boolean
+    dataset_store_path: string
+  }
+  detector: {
+    active_model: string
+    default_conf: number
+  }
+  classifier: {
+    active_model: string
+    default_conf: number
+    prompt_template: string
+  }
+  system: {
+    default_device: number
+    model_idle_timeout_seconds: number
+    log_level: string
+  }
+  storage: {
+    minio_endpoint: string
+    minio_bucket: string
+  }
+}
+
 export class AiopsService {
+  /**
+   * Fetch one-time infrastructure health snapshot (CUDA, TensorRT, MinIO)
+   */
+  static async getSystemHealth(): Promise<SystemHealthResponse> {
+    return edgeFetch<SystemHealthResponse>(API_ENDPOINTS.AIOPS.HEALTH)
+  }
+
+  /**
+   * Fetch full AI Runtime & Subsystems Configuration Tree (/api/v1/config)
+   */
+  static async getConfig(): Promise<SystemConfigResponse> {
+    return edgeFetch<SystemConfigResponse>(API_ENDPOINTS.AIOPS.CONFIG)
+  }
+
+  /**
+   * Fetch all AI Model Weights & Engines on NVIDIA Edge Node
+   */
+  static async getModels(): Promise<ModelsResponse> {
+    return edgeFetch<ModelsResponse>(API_ENDPOINTS.AIOPS.MODELS)
+  }
+
+  /**
+   * Fetch available Active Learning Strategies & Aggregation Config
+   */
+  static async getStrategies(): Promise<ActiveLearningStrategiesResponse> {
+    return edgeFetch<ActiveLearningStrategiesResponse>(API_ENDPOINTS.AIOPS.STRATEGIES)
+  }
+
+  /**
+   * Fetch 100 AI Recognition Classes (VTSDB100)
+   */
+  static async getClasses(): Promise<ClassesResponse> {
+    return edgeFetch<ClassesResponse>(API_ENDPOINTS.AIOPS.CLASSES)
+  }
+
   /**
    * Subscribe to live SSE Stream of NVIDIA Jetson Orin Hardware & AI Telemetry
    * Uses modern Fetch ReadableStream with custom headers to completely bypass Ngrok warnings and CORS issues

@@ -25,10 +25,15 @@
     "candidates": "Moderation Queue",
     "map": "Traffic Signs Map",
     "tasks": "Revalidation Tasks",
-    "credits": "Credit Discrepancies",
-    "logout": "Sign Out",
+    "credits": "Credit Disputes",
+    "logout": "Sign out",
+    "page_for_admin": "Admin Workspace",
+    "page_for_staff": "Staff Workspace",
+    "role_admin": "Admin",
+    "role_staff": "Staff",
     "admin_portal": "Admin Portal",
-    "ops_portal": "Staff Portal"
+    "ops_portal": "Staff Portal",
+    "community_portal": "Community Portal"
   },
   "common": {
     "search": "Search",
@@ -71,7 +76,7 @@
     "submitting": "Signing in...",
     "or": "OR",
     "google_login": "Sign in with Google",
-    "dev_quick": "Dev Quick Logins:",
+    "dev_quick": "Quick Access Demo Accounts:",
     "staff_portal": "👤 Staff Portal",
     "admin_portal": "⚡ Admin Portal",
     "footer": "© {{year}} SignTrustMap Ops Portal • Secure Internal System"

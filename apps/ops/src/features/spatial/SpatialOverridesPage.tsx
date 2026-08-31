@@ -182,33 +182,33 @@ export default function SpatialOverridesPage() {
                 <span className="font-bold text-gray-900 dark:text-white">{selectedSign.id} • {selectedSign.signName}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-mono font-bold text-gray-500">{t('spatial.lbl_lat')}</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide text-xs">{t('spatial.lbl_lat')}</label>
                   <input
                     type="number"
                     step="0.00001"
                     required
                     value={newLat}
                     onChange={(e) => setNewLat(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="font-mono font-bold text-gray-500">{t('spatial.lbl_lng')}</label>
+                <div className="space-y-2">
+                  <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide text-xs">{t('spatial.lbl_lng')}</label>
                   <input
                     type="number"
                     step="0.00001"
                     required
                     value={newLng}
                     onChange={(e) => setNewLng(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono"
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="font-mono font-bold text-gray-500">{t('spatial.lbl_heading')}</label>
+              <div className="space-y-2">
+                <label className="block font-mono font-bold text-gray-500 uppercase tracking-wide text-xs">{t('spatial.lbl_heading')}</label>
                 <input
                   type="number"
                   min={0}
@@ -216,19 +216,19 @@ export default function SpatialOverridesPage() {
                   required
                   value={newHeading}
                   onChange={(e) => setNewHeading(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-mono font-bold text-red-500 uppercase">{t('spatial.lbl_justification')}</label>
+              <div className="space-y-2">
+                <label className="block font-mono font-bold text-red-500 uppercase tracking-wide text-xs">{t('spatial.lbl_justification')}</label>
                 <textarea
                   required
                   rows={2}
                   placeholder={t('spatial.placeholder_justification')}
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
 

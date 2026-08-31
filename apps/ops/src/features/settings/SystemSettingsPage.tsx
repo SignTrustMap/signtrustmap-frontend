@@ -146,37 +146,37 @@ export default function SystemSettingsPage() {
                 {t('settings.sec_ingestion')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_video_size')}
                   </label>
                   <input
                     type="number"
                     value={maxVideoSizeMb}
                     onChange={(e) => setMaxVideoSizeMb(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_chunk_size')}
                   </label>
                   <input
                     type="number"
                     value={chunkSizeMb}
                     onChange={(e) => setChunkSizeMb(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1 sm:col-span-2">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5 sm:col-span-2">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_concurrency')}
                   </label>
                   <input
                     type="number"
                     value={workerConcurrency}
                     onChange={(e) => setWorkerConcurrency(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
               </div>
@@ -189,8 +189,8 @@ export default function SystemSettingsPage() {
                 {t('settings.sec_consensus')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_consensus_threshold')}
                   </label>
                   <input
@@ -200,22 +200,22 @@ export default function SystemSettingsPage() {
                     max="0.95"
                     value={consensusApprovalThreshold}
                     onChange={(e) => setConsensusApprovalThreshold(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_min_votes')}
                   </label>
                   <input
                     type="number"
                     value={minReviewerVotes}
                     onChange={(e) => setMinReviewerVotes(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_alpha')}
                   </label>
                   <input
@@ -223,11 +223,11 @@ export default function SystemSettingsPage() {
                     step="0.01"
                     value={alphaSmoothingFactor}
                     onChange={(e) => setAlphaSmoothingFactor(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_bounds')}
                   </label>
                   <input
@@ -235,7 +235,7 @@ export default function SystemSettingsPage() {
                     step="0.01"
                     value={reliabilityPenalty}
                     onChange={(e) => setReliabilityPenalty(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
               </div>
@@ -248,26 +248,26 @@ export default function SystemSettingsPage() {
                 {t('settings.sec_freshness')}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_freshness_days')}
                   </label>
                   <input
                     type="number"
                     value={freshnessThresholdDays}
                     onChange={(e) => setFreshnessThresholdDays(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_daily_tasks')}
                   </label>
                   <input
                     type="number"
                     value={maxDailyTasksPerUser}
                     onChange={(e) => setMaxDailyTasksPerUser(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
               </div>
@@ -297,15 +297,15 @@ export default function SystemSettingsPage() {
                   />
                 </div>
 
-                <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
-                  <label className="font-mono font-bold text-gray-400 uppercase">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5">
+                  <label className="block font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     {t('settings.lbl_speed_anomaly')}
                   </label>
                   <input
                     type="number"
                     value={gpsAnomalySpeedLimitKmh}
                     onChange={(e) => setGpsAnomalySpeedLimitKmh(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg"
+                    className="w-full px-3.5 py-2.5 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                   />
                 </div>
 
