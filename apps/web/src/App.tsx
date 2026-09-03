@@ -1,20 +1,31 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { I18nProvider } from '@/context/I18nContext'
+import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { AnnouncementBar } from '@/components/layout/AnnouncementBar'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollToTop } from '@/components/common/ScrollToTop'
 import { opsPortalUrl } from '@/config/env'
-import Home from '@/pages/Home'
-import ProductMap from '@/pages/ProductMap'
-import ProductApp from '@/pages/ProductApp'
-import Login from '@/pages/Login'
-import Signup from '@/pages/Signup'
-import Docs from '@/pages/Docs'
+import {
+  Home,
+  ProductMap,
+  ProductApp,
+  Login,
+  Signup,
+  Docs,
+  SurveyStudioPage,
+  SurveyHistoryPage,
+  ReviewerWorkspacePage,
+  WalletPage,
+  CatalogPage,
+  TermsPage,
+  PrivacyPage,
+  ProfilePage,
+} from '@/pages'
 
 function PlaceholderPage({ titleKey }: { titleKey: string }) {
   const { t } = useTranslation('common')
@@ -23,6 +34,34 @@ function PlaceholderPage({ titleKey }: { titleKey: string }) {
       <p className="text-gray-400 text-sm">{t(titleKey)} - {t('placeholder.coming_soon')}</p>
     </div>
   )
+}
+
+/**
+ * Route guard for authenticated users only.
+ * Redirects unauthenticated users to /login with return target.
+ */
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
+
+  if (isLoading) return null
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  }
+  return <>{children}</>
+}
+
+/**
+ * Route guard for guests only (unauthenticated).
+ * If user is already logged in, redirects them immediately to Home '/'.
+ */
+function GuestOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) return null
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
 }
 
 /**
@@ -60,28 +99,100 @@ export default function App() {
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
         <I18nProvider>
-          <BrowserRouter>
-            <OpsRouteRedirectHandler />
-            <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
-              <div className="sticky top-0 z-40 w-full">
-                <AnnouncementBar />
-                <Navbar />
+          <AuthProvider>
+            <BrowserRouter>
+              <OpsRouteRedirectHandler />
+              <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
+                <div className="sticky top-0 z-40 w-full">
+                  <AnnouncementBar />
+                  <Navbar />
+                </div>
+                <main className="flex-1 w-full flex flex-col">
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/product/map" element={<ProductMap />} />
+                    <Route path="/product/app" element={<ProductApp />} />
+
+                    {/* Guest-only routes: Logged in users are automatically redirected to '/' */}
+                    <Route
+                      path="/login"
+                      element={
+                        <GuestOnlyRoute>
+                          <Login />
+                        </GuestOnlyRoute>
+                      }
+                    />
+                    <Route
+                      path="/signup"
+                      element={
+                        <GuestOnlyRoute>
+                          <Signup />
+                        </GuestOnlyRoute>
+                      }
+                    />
+
+                    <Route path="/docs" element={<Docs />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/about" element={<PlaceholderPage titleKey="placeholder.about" />} />
+
+                    {/* Role-specific accessible workspaces with Route Guards */}
+                    <Route
+                      path="/survey"
+                      element={
+                        <ProtectedRoute>
+                          <SurveyStudioPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/survey/history"
+                      element={
+                        <ProtectedRoute>
+                          <SurveyHistoryPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/review"
+                      element={
+                        <ProtectedRoute>
+                          <ReviewerWorkspacePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/wallet"
+                      element={
+                        <ProtectedRoute>
+                          <WalletPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <ProfilePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/account"
+                      element={
+                        <ProtectedRoute>
+                          <ProfilePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                  </Routes>
+                </main>
+                <Footer />
+                <ScrollToTop />
               </div>
-              <main className="flex-1 w-full flex flex-col">
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/product/map" element={<ProductMap />} />
-                  <Route path="/product/app" element={<ProductApp />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Signup />} />
-                  <Route path="/docs" element={<Docs />} />
-                  <Route path="/about" element={<PlaceholderPage titleKey="placeholder.about" />} />
-                </Routes>
-              </main>
-              <Footer />
-              <ScrollToTop />
-            </div>
-          </BrowserRouter>
+            </BrowserRouter>
+          </AuthProvider>
         </I18nProvider>
       </ThemeProvider>
     </I18nextProvider>

@@ -1,18 +1,27 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeSlash, CircleNotch, CheckCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/context/AuthContext'
 
 export default function Signup() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
+  const { login, updateProfile } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Sanitize redirect target: if coming from /login or /signup, always fallback to home '/'
+  const rawFrom = (location.state as { from?: string })?.from || '/'
+  const authPaths = ['/login', '/signup', '/register']
+  const from = authPaths.includes(rawFrom) ? '/' : rawFrom
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [agreeTerms, setAgreeTerms] = useState(true)
+  const [agreeTerms, setAgreeTerms] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -39,8 +48,11 @@ export default function Signup() {
 
     setIsLoading(true)
     try {
-      await new Promise((r) => setTimeout(r, 600))
-      navigate('/product/app', { replace: true })
+      await login(email, password)
+      if (name.trim()) {
+        updateProfile({ name: name.trim() })
+      }
+      navigate(from, { replace: true })
     } catch {
       setError(t('auth.signup.error_default'))
     } finally {
@@ -50,7 +62,7 @@ export default function Signup() {
 
   return (
     <div
-      className={`w-full flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-16 relative overflow-hidden transition-colors ${
+      className={`w-full flex-1 flex flex-col items-center justify-center px-4 pt-6 sm:pt-8 pb-12 relative overflow-hidden transition-colors ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
@@ -278,11 +290,21 @@ export default function Signup() {
                 }`}
               >
                 {t('auth.signup.terms_agree_prefix')}
-                <Link to="/terms" className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-medium'}`}>
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-semibold'}`}
+                >
                   {t('auth.signup.terms_service')}
                 </Link>
                 {t('auth.signup.and')}
-                <Link to="/privacy" className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-medium'}`}>
+                <Link
+                  to="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b] font-semibold'}`}
+                >
                   {t('auth.signup.terms_privacy')}
                 </Link>
                 {t('auth.signup.terms_of')}

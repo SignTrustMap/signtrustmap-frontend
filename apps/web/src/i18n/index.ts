@@ -7,12 +7,14 @@ import viCommon from './locales/vi/common.json'
 import viHome from './locales/vi/home.json'
 import viProduct from './locales/vi/product.json'
 import viDocs from './locales/vi/docs.json'
+import viLegal from './locales/vi/legal.json'
 
 // EN locales
 import enCommon from './locales/en/common.json'
 import enHome from './locales/en/home.json'
 import enProduct from './locales/en/product.json'
 import enDocs from './locales/en/docs.json'
+import enLegal from './locales/en/legal.json'
 
 export const SUPPORTED_LANGS = ['vi', 'en'] as const
 export type SupportedLang = (typeof SUPPORTED_LANGS)[number]
@@ -29,18 +31,20 @@ i18n
         home: viHome,
         product: viProduct,
         docs: viDocs,
+        legal: viLegal,
       },
       en: {
         common: enCommon,
         home: enHome,
         product: enProduct,
         docs: enDocs,
+        legal: enLegal,
       },
     },
     lng: localStorage.getItem(LANG_STORAGE_KEY) ?? 'vi',
     fallbackLng: 'vi',
     defaultNS: 'common',
-    ns: ['common', 'home', 'product', 'docs'],
+    ns: ['common', 'home', 'product', 'docs', 'legal'],
     interpolation: {
       escapeValue: false, // React already escapes
     },

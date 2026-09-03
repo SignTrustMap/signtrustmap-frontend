@@ -1,36 +1,54 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/context/AuthContext'
+import { mockDemoAccounts } from '@/data'
 
 export default function Login() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
+  const { login } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Sanitize redirect target: if coming from /login or /signup, always fallback to home '/'
+  const rawFrom = (location.state as { from?: string })?.from || '/'
+  const authPaths = ['/login', '/signup', '/register']
+  const from = authPaths.includes(rawFrom) ? '/' : rawFrom
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function performLogin(targetEmail: string, targetPw: string) {
     setError('')
     setIsLoading(true)
     try {
-      await new Promise((r) => setTimeout(r, 600))
-      navigate('/product/map', { replace: true })
+      await login(targetEmail, targetPw)
+      navigate(from, { replace: true })
     } catch {
-      setError(t('auth.login.error_default'))
+      setError(t('auth.login.error_default') || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email hoặc mật khẩu.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) {
+      setError('Vui lòng nhập địa chỉ Email.')
+      return
+    }
+    await performLogin(email, password)
+  }
+
   return (
     <div
-      className={`w-full flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-16 relative overflow-hidden transition-colors ${
+      className={`w-full flex-1 flex flex-col items-center justify-center px-4 pt-6 sm:pt-8 pb-12 relative overflow-hidden transition-colors ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
@@ -61,7 +79,6 @@ export default function Login() {
         />
       </div>
 
-
       {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
@@ -80,30 +97,28 @@ export default function Login() {
                 className="w-12 h-12 object-contain"
               />
             </Link>
-            <h1
-              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${
-                isDark ? 'text-white' : 'text-gray-900'
-              }`}
-            >
-              <span>{t('auth.login.title_action')}</span>
-              <span>
-                Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
-              </span>
+            <h1 className="text-2xl font-bold font-sans tracking-tight">
+              {t('auth.login.title_action')}
             </h1>
-            <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className="text-xs text-gray-400 mt-1 max-w-xs">
               {t('auth.login.subtitle')}
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-            {/* Email field */}
-            <div className="flex flex-col gap-1.5">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Email Field */}
+            <div>
               <label
                 htmlFor="login-email"
-                className={`text-xs font-bold uppercase tracking-wide font-mono ${
-                  isDark ? 'text-gray-300' : 'text-gray-700'
-                }`}
+                className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5"
               >
                 {t('auth.login.email_label')}
               </label>
@@ -111,86 +126,69 @@ export default function Login() {
                 id="login-email"
                 type="email"
                 required
-                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className={`w-full px-4 py-3 text-sm rounded-xl border transition-all ${
+                placeholder="name@company.com"
+                className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${
                   isDark
-                    ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                    : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                    ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                    : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
                 }`}
               />
             </div>
 
-            {/* Password field */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
+            {/* Password Field */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
                 <label
-                  htmlFor="login-pw"
-                  className={`text-xs font-bold uppercase tracking-wide font-mono ${
-                    isDark ? 'text-gray-300' : 'text-gray-700'
-                  }`}
+                  htmlFor="login-password"
+                  className="block text-xs font-semibold uppercase tracking-wider text-gray-400"
                 >
                   {t('auth.login.password_label')}
                 </label>
-                <a
-                  href="#"
-                  className={`text-[11px] hover:underline ${
+                <Link
+                  to="#"
+                  className={`text-xs hover:underline ${
                     isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                   }`}
                 >
                   {t('auth.login.forgot_password')}
-                </a>
+                </Link>
               </div>
+
               <div className="relative">
                 <input
-                  id="login-pw"
+                  id="login-password"
                   type={showPw ? 'text' : 'password'}
                   required
-                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-3 pr-10 text-sm rounded-xl border transition-all ${
+                  className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${
                     isDark
-                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 cursor-pointer transition-colors ${
-                    isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-800'
-                  }`}
                   aria-label={showPw ? t('auth.login.hide_pw') : t('auth.login.show_pw')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors cursor-pointer"
                 >
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            {error && (
-              <p
-                className={`text-xs rounded-xl p-3 border ${
-                  isDark
-                    ? 'text-red-400 bg-red-950/40 border-red-800/60'
-                    : 'text-red-600 bg-red-50 border-red-200'
-                }`}
-              >
-                {error}
-              </p>
-            )}
-
-            {/* Primary Submit button */}
+            {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !email || !password}
-              className={`mt-1 w-full py-3.5 font-bold text-sm rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              disabled={isLoading}
+              className={`w-full py-3.5 px-4 rounded-full font-bold text-sm tracking-wide transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 isDark
                   ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/25'
-                  : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/25'
+                  : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
               }`}
             >
               {isLoading ? (
@@ -203,8 +201,8 @@ export default function Login() {
               )}
             </button>
 
-            {/* Centered Divider */}
-            <div className="relative flex items-center justify-center my-2 w-full">
+            {/* Divider */}
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className={`w-full border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`} />
               </div>
@@ -222,10 +220,7 @@ export default function Login() {
             {/* Google Sign In button */}
             <button
               type="button"
-              onClick={() => {
-                setEmail('user@gmail.com')
-                setPassword('oauth-password')
-              }}
+              onClick={() => performLogin('driver@signtrustmap.com', 'password123')}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                 isDark
                   ? 'border-white/15 bg-white/5 hover:bg-white/10 text-white'
@@ -235,6 +230,42 @@ export default function Login() {
               <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
               <span>{t('auth.login.google')}</span>
             </button>
+
+            {/* Quick Demo Logins (Fills in credentials like in Ops) */}
+            <div
+              className={`mt-4 pt-4 border-t text-left ${
+                isDark ? 'border-white/10' : 'border-gray-100'
+              }`}
+            >
+              <p className="text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-2">
+                {t('auth.login.dev_quick')}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {mockDemoAccounts.map((acc) => (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => {
+                      setEmail(acc.email)
+                      setPassword(acc.password)
+                      setError('')
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer active:scale-95 ${
+                      email === acc.email
+                        ? isDark
+                          ? 'bg-[#00c4de]/20 border-[#00c4de]/60 text-[#00c4de]'
+                          : 'bg-[#007b8b]/15 border-[#007b8b]/50 text-[#007b8b]'
+                        : isDark
+                        ? 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-200'
+                        : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    <span>{acc.icon}</span>
+                    <span>{acc.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </form>
 
           {/* Footer switch link */}

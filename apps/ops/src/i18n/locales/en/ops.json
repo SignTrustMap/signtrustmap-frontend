@@ -59,9 +59,9 @@
     "toast_published": "New catalog version published and synced with AI CLIP model!"
   },
   "missing_signs": {
-    "title": "Missing Sign Proposals",
+    "title": "New Sign Proposals",
     "subtitle": "Review and triage field reports of uncataloged road signs submitted by community surveyors.",
-    "tag": "Missing Type Triage",
+    "tag": "New Sign Proposal Triage",
     "search_placeholder": "Search code, title or reporter...",
     "tab_all": "All",
     "tab_open": "Pending Staff Review",
@@ -80,7 +80,7 @@
     "modal_escalate_title": "Escalate to Admin for Catalog Addition",
     "modal_escalate_desc": "Forward this report to Admin for consideration in the next catalog release and AI model synchronization.",
     "lbl_staff_notes": "Staff Recommendations & Notes:",
-    "modal_reject_title": "Reject Missing Sign Proposal",
+    "modal_reject_title": "Reject New Sign Proposal",
     "lbl_reject_reason": "Rejection Reason:",
     "reason_not_sign": "Not a valid traffic sign (billboard, obstruction, tree...)",
     "reason_blurred": "Blurred image or taken too far away",

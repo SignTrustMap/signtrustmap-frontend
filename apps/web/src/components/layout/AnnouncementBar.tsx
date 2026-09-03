@@ -102,7 +102,7 @@ export function AnnouncementBar() {
                 ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200 hover:text-white'
                 : 'bg-white hover:bg-gray-100 border-[#E8E4E3] text-gray-800 hover:text-black'
             }`}
-            title={lang === 'vi' ? t('lang.toggle_to_en') : t('lang.toggle_to_vi')}
+            title={t('lang.toggle_label')}
             aria-label={t('lang.toggle_label')}
           >
             <Globe size={13} weight="bold" className={isDark ? 'text-gray-300' : 'text-gray-600'} />

@@ -16,7 +16,7 @@ export default function Docs() {
 
   return (
     <div
-      className={`w-full min-h-screen py-12 sm:py-16 transition-colors ${
+      className={`w-full min-h-screen pt-6 sm:pt-8 pb-16 transition-colors ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
@@ -24,10 +24,10 @@ export default function Docs() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
 
           {/* Left TOC */}
-          <aside className="lg:col-span-3 lg:sticky lg:top-24">
+          <aside className="lg:col-span-3 lg:sticky lg:top-[120px] self-start z-20">
             <div
-              className={`rounded-[18px] p-5 border ${
-                isDark ? 'bg-[#061417]/80 border-white/10' : 'bg-white border-[#E8E4E3] shadow-sm'
+              className={`rounded-[18px] p-5 border max-h-[calc(100vh-140px)] overflow-y-auto ${
+                isDark ? 'bg-[#061417]/95 border-white/10' : 'bg-white/95 border-[#E8E4E3] shadow-sm'
               }`}
             >
               <p

@@ -167,7 +167,7 @@ export default function ProductMap() {
 
   return (
     <div
-      className={`w-full min-h-screen py-8 sm:py-12 transition-colors ${
+      className={`w-full min-h-screen pt-6 sm:pt-8 pb-12 transition-colors ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >

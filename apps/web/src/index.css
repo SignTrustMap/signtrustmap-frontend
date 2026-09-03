@@ -19,11 +19,6 @@
   --font-brand: 'Arvo', ui-serif, Georgia, serif;
   --font-mono: 'Geist Mono', monospace;
 
-  /* Spacing Scale (DESIGN.md: sm 8px, md 16px, lg 24px) */
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-
   /* Corner Radius Scale (DESIGN.md: sm 4px, md 8px, lg 12px) */
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -43,7 +38,6 @@ html {
   scroll-behavior: smooth;
   background-color: #030708;
   color: #f3f4f6;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
@@ -52,8 +46,14 @@ body {
   background-color: #030708;
   color: #f3f4f6;
   line-height: 1.6;
-  overflow-x: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: clip;
+}
+
+/* Prevent double-transitions and snapshot color ghosting during theme toggle */
+html.disable-transitions *,
+html.disable-transitions *::before,
+html.disable-transitions *::after {
+  transition: none !important;
 }
 
 /* ─── Light Mode Overrides (Strictly based on DESIGN.md: #F8F7F7) ─ */
@@ -169,11 +169,43 @@ html.light ::-webkit-scrollbar-thumb {
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
+/* ─── Modal & Popover Animations ───────────────────────────────── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* ─── Circular View Transition (Theme Switcher Ripple Animation) ──── */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 ::view-transition-old(root) {

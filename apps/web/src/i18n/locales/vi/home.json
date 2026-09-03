@@ -39,9 +39,9 @@
     "eyebrow": "// BẢN ĐỒ GIS TƯƠNG TÁC",
     "title": "Tra cứu & phân loại biển báo chuẩn QCVN 41",
     "subtitle": "Truy cập bản đồ không gian tương tác hỗ trợ tìm kiếm, lọc phân cụm, kiểm tra lịch sử tái thẩm định và hình ảnh bằng chứng thực địa.",
-    "feature_1": "Phân loại 5 nhóm: Biển cấm (P), Hiệu lệnh (R), Cảnh báo (W), Chỉ dẫn (I), Biển phụ (S)",
-    "feature_2": "Hiển thị hướng áp dụng giao thông (Traffic Direction Metadata)",
-    "feature_3": "Xem điểm tin cậy (Trust Score) và nguồn dữ liệu cộng đồng",
+    "feature_1": "Phân loại 5 nhóm: Biển cấm, Biển hiệu lệnh, Biển cảnh báo, Biển chỉ dẫn, Biển phụ",
+    "feature_2": "Hiển thị góc hướng áp dụng lưu thông chi tiết",
+    "feature_3": "Xem điểm tin cậy và nguồn dữ liệu cộng đồng",
     "cta": "Mở bản đồ toàn màn hình"
   },
   "mobile_cta": {

@@ -23,11 +23,11 @@ export interface SignCategory {
 
 export const signCategories: SignCategory[] = [
   { id: 'ALL', label: 'Tất cả', color: '#ffffff', bgHex: '#00c4de' },
-  { id: 'P', label: 'Biển Cấm (P)', color: '#ef4444', bgHex: '#ef4444' },
-  { id: 'R', label: 'Hiệu Lệnh (R)', color: '#007b8b', bgHex: '#007b8b' },
-  { id: 'W', label: 'Cảnh Báo (W)', color: '#f59e0b', bgHex: '#f59e0b' },
-  { id: 'I', label: 'Chỉ Dẫn (I)', color: '#00c4de', bgHex: '#00c4de' },
-  { id: 'S', label: 'Biển Phụ (S)', color: '#6b7280', bgHex: '#6b7280' },
+  { id: 'P', label: 'Biển Cấm', color: '#ef4444', bgHex: '#ef4444' },
+  { id: 'R', label: 'Biển Hiệu Lệnh', color: '#007b8b', bgHex: '#007b8b' },
+  { id: 'W', label: 'Biển Cảnh Báo', color: '#f59e0b', bgHex: '#f59e0b' },
+  { id: 'I', label: 'Biển Chỉ Dẫn', color: '#00c4de', bgHex: '#00c4de' },
+  { id: 'S', label: 'Biển Phụ', color: '#6b7280', bgHex: '#6b7280' },
 ]
 
 export const mockSigns: SignItem[] = [
@@ -48,7 +48,7 @@ export const mockSigns: SignItem[] = [
   {
     id: 'sgn-02',
     code: 'P.127',
-    name: 'Tốc độ tối đa cho phép (50 km/h)',
+    name: 'Tốc độ tối đa cho phép 50 km/h',
     category: 'P',
     lat: 10.7725,
     lng: 106.698,
@@ -62,7 +62,7 @@ export const mockSigns: SignItem[] = [
   {
     id: 'sgn-03',
     code: 'R.301a',
-    name: 'Hướng đi phải theo (Đi thẳng)',
+    name: 'Hướng đi phải theo - Đi thẳng',
     category: 'R',
     lat: 10.7798,
     lng: 106.6995,
