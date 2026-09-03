@@ -20,6 +20,7 @@ type NavigationMapViewProps = {
   routeStart?: MapCoordinate;
   routeStopCoordinates?: MapCoordinate[];
   showCurrentLocation?: boolean;
+  isNavigatingFeature?: boolean;
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
@@ -71,6 +72,7 @@ export function NavigationMapView({
   routeStart,
   routeStopCoordinates = [],
   showCurrentLocation = true,
+  isNavigatingFeature = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapLibre = loadMapLibre();
@@ -190,9 +192,21 @@ export function NavigationMapView({
           id="current-location"
           lngLat={focusCoordinate ?? currentLocation.coordinate}
         >
-          <View style={styles.currentLocationHalo}>
-            <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
-          </View>
+          <>
+            <View style={styles.currentLocationHalo}>
+              <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
+            </View>
+            {(!destination || !routeStart) ? (
+              <View style={styles.stopSignMarker}>
+                <Image
+                  accessibilityLabel="Stop sign"
+                  source={stopSignImage}
+                  resizeMode='contain'
+                  style={styles.stopSignImage}
+                />
+              </View>
+            ) : null}
+          </>
         </Marker>
       ) : null}
 

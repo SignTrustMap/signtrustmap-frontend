@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { NavigationManeuverBanner } from '@/components/navigation-maneuver-banner';
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   previousLocations,
   startLocations,
@@ -18,6 +19,7 @@ import { NavigationMapView } from '../components/navigation-map-view';
 import { getDrivingRoute, type OsrmRouteStep } from '../services/osrm';
 import { getRouteProgressMeters } from '../utils/route-progress';
 import { getRouteStopCoordinates } from '../utils/route-stop-markers';
+import { Divider } from '@/components/ui/divider';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
@@ -450,16 +452,27 @@ export function NavigationMapScreen() {
                   </AppButton>
                 </View>
               ) : (
-                <AppButton
-                  accessibilityLabel="Search destination"
-                  onPress={() => router.push('/home/search')}
-                  style={styles.searchButton}
-                  variant="surface"
-                >
-                  <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
-                    Search here...
-                  </Text>
-                </AppButton>
+                <View >
+                  <AppButton
+                    accessibilityLabel="Search destination"
+                    onPress={() => router.push('/home/search')}
+                    style={styles.searchButton}
+                    variant="surface"
+                  >
+                    <Image
+                      accessibilityLabel='App logo'
+                      source={require('@/assets/images/app-logo.svg')}
+                      style={styles.appLogo}
+                    />
+                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
+                      Search here...
+                    </Text>
+                  </AppButton>
+
+                  <TouchableOpacity style={styles.creditContainer} onPress={() => router.push('/(authenticated)/(tabs)/credits')}>
+                    <Text style={{ textDecorationLine: 'underline' }}>Credits: 24</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
             {!selectedDestination ? (
@@ -498,101 +511,105 @@ export function NavigationMapScreen() {
         ) : null}
       </View>
 
-      {selectedDestination ? (
-        <View
-          style={[
-            styles.destinationSheet,
-            routeStart ? styles.routeDestinationSheet : undefined,
-            { backgroundColor: theme.backgroundElement },
-          ]}
-        >
-          <View style={styles.destinationSheetHandle} />
-          <Text
-            numberOfLines={1}
-            style={[styles.destinationTitle, { color: theme.text }]}
+      {
+        selectedDestination ? (
+          <View
+            style={[
+              styles.destinationSheet,
+              routeStart ? styles.routeDestinationSheet : undefined,
+              { backgroundColor: theme.backgroundElement },
+            ]}
           >
-            {selectedDestination.title}
-          </Text>
-          {navigationError ? (
-            <Text accessibilityRole="alert" style={styles.navigationError}>
-              {navigationError}
+            <View style={styles.destinationSheetHandle} />
+            <Text
+              numberOfLines={1}
+              style={[styles.destinationTitle, { color: theme.text }]}
+            >
+              {selectedDestination.title}
             </Text>
-          ) : null}
-          {routeStart ? (
-            <View style={styles.directionsSection}>
-              {routeDuration !== undefined && routeDistance !== undefined ? (
-                <Text style={[styles.routeSummary, { color: theme.text }]}>
-                  ETA {formatRouteDuration(routeDuration)} (
-                  {formatRouteDistanceInKilometers(routeDistance)})
-                </Text>
-              ) : (
-                <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
-                  Calculating ETA...
-                </Text>
-              )}
-              <Text style={[styles.directionsHeading, { color: theme.text }]}>Sections:</Text>
-              {routeSteps ? (
-                routeSteps.length > 0 ? (
-                  <ScrollView
-                    contentContainerStyle={styles.directionsList}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                    style={styles.directionsScroll}
-                  >
-                    {routeSteps.map((step, index) => (
-                      <View
-                        key={`${index}-${step.maneuver.type}-${step.name}`}
-                        style={styles.directionRow}
-                      >
-                        <Text style={[styles.directionNumber, { color: theme.tertiary }]}>
-                          {index + 1}
-                        </Text>
-                        <View style={styles.directionCopy}>
-                          <Text style={[styles.directionInstruction, { color: theme.text }]}>
-                            {formatRouteInstruction(step)}
+            {navigationError ? (
+              <Text accessibilityRole="alert" style={styles.navigationError}>
+                {navigationError}
+              </Text>
+            ) : null}
+            {routeStart ? (
+              <View style={styles.directionsSection}>
+                {routeDuration !== undefined && routeDistance !== undefined ? (
+                  <Text style={[styles.routeSummary, { color: theme.text }]}>
+                    ETA {formatRouteDuration(routeDuration)} (
+                    {formatRouteDistanceInKilometers(routeDistance)})
+                  </Text>
+                ) : (
+                  <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
+                    Calculating ETA...
+                  </Text>
+                )}
+                <Text style={[styles.directionsHeading, { color: theme.text }]}>Sections:</Text>
+                {routeSteps ? (
+                  routeSteps.length > 0 ? (
+                    <ScrollView
+                      contentContainerStyle={styles.directionsList}
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator
+                      style={styles.directionsScroll}
+                    >
+                      {routeSteps.map((step, index) => (
+                        <View
+                          key={`${index}-${step.maneuver.type}-${step.name}`}
+                          style={styles.directionRow}
+                        >
+                          <Text style={[styles.directionNumber, { color: theme.tertiary }]}>
+                            {index + 1}
                           </Text>
-                          <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
-                            {formatRouteDistance(step.distance)}
-                          </Text>
+                          <View style={styles.directionCopy}>
+                            <Text style={[styles.directionInstruction, { color: theme.text }]}>
+                              {formatRouteInstruction(step)}
+                            </Text>
+                            <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
+                              {formatRouteDistance(step.distance)}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    ))}
-                  </ScrollView>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
+                      No turn-by-turn directions are available for this route.
+                    </Text>
+                  )
                 ) : (
                   <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                    No turn-by-turn directions are available for this route.
+                    Loading directions...
                   </Text>
-                )
-              ) : (
-                <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                  Loading directions...
-                </Text>
-              )}
-            </View>
-          ) : null}
-          <AppButton
-            accessibilityLabel={
-              isNavigating
-                ? 'Navigation active'
-                : routeStart
-                  ? 'Begin navigation'
-                  : 'Start route'
-            }
-            disabled={isNavigating || isStartingNavigation}
-            label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
-            onPress={routeStart ? handleBeginNavigation : handleGo}
-            style={styles.goButton}
+                )}
+              </View>
+            ) : null}
+            <AppButton
+              accessibilityLabel={
+                isNavigating
+                  ? 'Navigation active'
+                  : routeStart
+                    ? 'Begin navigation'
+                    : 'Start route'
+              }
+              disabled={isNavigating || isStartingNavigation}
+              label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
+              onPress={routeStart ? handleBeginNavigation : handleGo}
+              style={styles.goButton}
+            />
+          </View>
+        ) : null
+      }
+      {
+        locationToast ? (
+          <AppToast
+            key={locationToast.id}
+            message={locationToast.message}
+            onDismiss={() => setLocationToast(undefined)}
           />
-        </View>
-      ) : null}
-      {locationToast ? (
-        <AppToast
-          key={locationToast.id}
-          message={locationToast.message}
-          onDismiss={() => setLocationToast(undefined)}
-        />
-      ) : null}
-    </View>
+        ) : null
+      }
+    </View >
   );
 }
 
@@ -744,13 +761,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 700,
   },
+  appLogo: {
+    width: 26,
+    height: 26,
+    objectFit: 'cover',
+  },
   searchButton: {
     minHeight: 42,
-    borderRadius: Rounded.md,
+    borderRadius: Rounded.round,
+    borderColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  creditContainer: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Rounded.lg,
+    gap: Spacing.one,
+    padding: Spacing.two * 120 / 100,
+    marginTop: Spacing.one,
+    marginLeft: 'auto',
+    backgroundColor: Colors.surface,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,

@@ -17,6 +17,7 @@ export const Colors = {
   textSecondary: '#007b8b',
   placeholder: '#888888',
   danger: '#FF0000',
+  grey: '#888888',
 } as const;
 
 export type ThemeColor = keyof typeof Colors;
@@ -65,6 +66,8 @@ export const Rounded = {
   sm: 4,
   md: 8,
   lg: 12,
+  xlg: 16,
+  round: 9999,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

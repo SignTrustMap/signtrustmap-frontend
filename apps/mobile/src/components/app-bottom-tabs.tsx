@@ -26,12 +26,6 @@ const tabs: AppTab[] = [
     symbol: { android: 'task', web: 'task' },
   },
   {
-    fallbackLabel: 'C',
-    label: 'Credits',
-    route: '/credits',
-    symbol: { android: 'credit_card', web: 'credit_card' },
-  },
-  {
     fallbackLabel: 'P',
     label: 'Profile',
     route: '/profile',
@@ -79,7 +73,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
                 size={18}
                 tintColor={isActive ? theme.tertiary : theme.text}
               />
-              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}> 
+              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
                 {tab.label}
               </Text>
               <View

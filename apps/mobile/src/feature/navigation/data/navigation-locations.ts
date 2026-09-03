@@ -79,7 +79,15 @@ export const startLocations: StartLocation[] = [
   },
 ];
 
+// route from fpt university to nha van hoa sinh vien
 export const mapSignMarkers: MapSignMarker[] = [
+  { id: 'bien-bao-182', coordinate: [106.8048, 10.8482], top: '29%', left: '24%' },
+  { id: 'bien-bao-219', coordinate: [106.8112, 10.846], top: '41%', left: '66%' },
+  { id: 'bien-bao-277', coordinate: [106.814, 10.8428], top: '53%', left: '82%' },
+  { id: 'bien-bao-304', coordinate: [106.8061, 10.8399], top: '70%', left: '44%' },
+];
+
+export const initSigns: MapSignMarker[] = [
   { id: 'bien-bao-182', coordinate: [106.8048, 10.8482], top: '29%', left: '24%' },
   { id: 'bien-bao-219', coordinate: [106.8112, 10.846], top: '41%', left: '66%' },
   { id: 'bien-bao-277', coordinate: [106.814, 10.8428], top: '53%', left: '82%' },

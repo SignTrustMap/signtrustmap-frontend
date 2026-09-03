@@ -194,6 +194,7 @@ export function SurveyRecordDetailsScreen() {
                   focusCoordinate={selectedCoordinate}
                   focusRequestId={focusRequestId}
                   showCurrentLocation
+                  isNavigatingFeature
                 />
               ) : (
                 <View style={styles.mapEmptyState}>
