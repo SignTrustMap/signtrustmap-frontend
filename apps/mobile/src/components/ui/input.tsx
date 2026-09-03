@@ -7,6 +7,8 @@ import {
   type KeyboardTypeOptions,
   type TextInputProps,
   View,
+  StyleProp,
+  ViewStyle
 } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
@@ -14,11 +16,16 @@ import { useTheme } from '@/hooks/use-theme';
 
 type AppInputKind = 'email' | 'password' | 'text';
 
-type AppInputProps = Omit<TextInputProps, 'keyboardType' | 'secureTextEntry' | 'textContentType'> & {
-  error?: string;
-  label: string;
-  type?: AppInputKind;
-};
+
+type AppInputProps =
+  Omit<TextInputProps, 'keyboardType' | 'secureTextEntry' | 'textContentType'> & {
+    containerStyle?: StyleProp<ViewStyle>;
+    error?: string;
+    label?: string;
+    type?: AppInputKind;
+    leadingIcon?: React.ReactNode;
+    callback?: (text: string) => void;
+  };
 
 function getInputConfig(type: AppInputKind): {
   autoCapitalize: TextInputProps['autoCapitalize'];
@@ -47,14 +54,22 @@ function getInputConfig(type: AppInputKind): {
       return {
         autoCapitalize: 'sentences',
         autoComplete: 'off',
-        icon: 'T',
         keyboardType: 'default',
         textContentType: 'none',
       };
   }
 }
 
-export function AppInput({ error, label, style, type = 'text', ...inputProps }: AppInputProps) {
+export function AppInput({
+  error,
+  label,
+  containerStyle,
+  style,
+  leadingIcon,
+  type = 'text',
+  callback,
+  ...inputProps
+}: AppInputProps) {
   const theme = useTheme();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const config = useMemo(() => getInputConfig(type), [type]);
@@ -62,7 +77,7 @@ export function AppInput({ error, label, style, type = 'text', ...inputProps }: 
 
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
+      {label && <Text style={[styles.label, { color: theme.text }]}>{label}</Text>}
       <View
         style={[
           styles.inputShell,
@@ -70,10 +85,14 @@ export function AppInput({ error, label, style, type = 'text', ...inputProps }: 
             backgroundColor: theme.background,
             borderColor: error ? styles.errorText.color : theme.border,
           },
+          containerStyle
         ]}
       >
         {config.icon ? (
           <Text style={[styles.leadingIcon, { color: theme.textSecondary }]}>{config.icon}</Text>
+        ) : null}
+        {leadingIcon ? (
+          <>{leadingIcon}</>
         ) : null}
         <TextInput
           autoCapitalize={config.autoCapitalize}
@@ -83,6 +102,7 @@ export function AppInput({ error, label, style, type = 'text', ...inputProps }: 
           secureTextEntry={isPassword && !passwordVisible}
           style={[styles.input, { color: theme.text }, style]}
           textContentType={config.textContentType}
+          onChangeText={(e) => callback?.(e)}
           {...inputProps}
         />
         {isPassword ? (

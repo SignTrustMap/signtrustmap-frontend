@@ -1,12 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDebounce } from '@/hooks/use-debounce';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   previousLocations,
   startLocations,
@@ -15,6 +17,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
+import { AppInput } from '@/components/ui/input';
 
 const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
 export function RouteSearchScreen() {
@@ -25,6 +28,11 @@ export function RouteSearchScreen() {
     startLat?: string;
     startLng?: string;
   }>();
+
+  const [searchText, setSearchText] = useState('');
+  const debouncedSearchText = useDebounce(searchText, 500);
+  const [searchResults, setSearchResults] = useState<typeof previousLocations>(previousLocations);
+
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
@@ -54,20 +62,47 @@ export function RouteSearchScreen() {
     });
   };
 
+  useEffect(() => {
+    if (debouncedSearchText) {
+      setTimeout(() => {
+        const results = previousLocations.filter((location) =>
+          location.title.toLowerCase().includes(debouncedSearchText.toLowerCase())
+        );
+        setSearchResults(results);
+      }, 500);
+    }
+
+    return () => {
+      setSearchResults([]);
+    };
+  }, [debouncedSearchText]);
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
-        <AppButton
-          accessibilityLabel="Go back"
-          hitSlop={Spacing.one}
-          onPress={() => router.back()}
-          pressedOpacity={0.7}
-          style={styles.backButton}
-          variant="ghost"
-        >
-          <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
-        </AppButton>
-        <Text style={[styles.searchPrompt, { color: theme.text }]}>Where to?</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppInput
+            placeholder="Where to?"
+            style={[styles.searchPrompt, { color: theme.primary }]}
+            containerStyle={{ backgroundColor: theme.background, borderRadius: Rounded.round, borderColor: 'transparent' }}
+            leadingIcon={
+              <AppButton
+                accessibilityLabel="Go back"
+                hitSlop={Spacing.one}
+                onPress={() => router.back()}
+                pressedOpacity={0.7}
+                style={styles.backButton}
+                variant="ghost"
+              >
+                <AntDesign
+                  name="arrow-left"
+                  style={[styles.backIcon, { color: theme.primary }]}
+                />
+              </AppButton>
+            }
+            callback={setSearchText}
+          />
+        </View>
       </View>
 
       <ScrollView
@@ -76,7 +111,7 @@ export function RouteSearchScreen() {
         style={styles.list}
       >
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>RECENT</Text>
-        {previousLocations.map((location) => (
+        {searchResults.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
             key={location.id}
@@ -141,7 +176,8 @@ const styles = StyleSheet.create({
   searchPrompt: {
     fontFamily: Fonts.body,
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 600,
+    paddingHorizontal: Spacing.one
   },
   filterRow: {
     flexDirection: 'row',
