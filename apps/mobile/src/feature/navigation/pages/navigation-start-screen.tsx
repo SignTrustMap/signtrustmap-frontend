@@ -2,10 +2,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   currentLocation,
   previousLocations,
@@ -73,31 +74,87 @@ export function NavigationStartScreen() {
     });
   };
 
+  const handleSwapRoutePoints = () => {
+    if (!destination) return;
+
+    const [longitude, latitude] = destination.coordinate;
+
+    router.replace({
+      pathname: '/home/search',
+      params: {
+        startLat: String(latitude),
+        startLng: String(longitude),
+      },
+    });
+  };
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
-      <View style={styles.header}>
-        <AppButton
-          accessibilityLabel="Go back"
-          hitSlop={Spacing.one}
-          onPress={() => handleBack()}
-          pressedOpacity={0.7}
-          style={styles.backButton}
-          variant="ghost"
-        >
-          <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
-        </AppButton>
-        <Text numberOfLines={1} style={[styles.searchPrompt, { color: theme.placeholder }]}>
-          Your starting point...
-        </Text>
-      </View>
+      <View style={styles.routeSelector}>
+        <View style={styles.routeFields}>
+          <View
+            style={[
+              styles.startInputContainer,
+              { backgroundColor: theme.background, borderColor: theme.tertiary, borderWidth: 1 },
+            ]}
+          >
+            <AntDesign
+              color={theme.tertiary}
+              name="pushpin"
+              size={17}
+            />
+            <Text numberOfLines={1} style={[styles.searchPrompt, { color: theme.placeholder }]}>
+              Your starting point...
+            </Text>
+          </View>
 
-      {destination ? (
-        <View style={styles.destinationRow}>
-          <Text numberOfLines={1} style={[styles.destinationText, { color: theme.text }]}>
-            {destination.title}
-          </Text>
+          {destination ? (
+            <>
+              <View pointerEvents="none" style={styles.inputConnector}>
+                <View style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
+                <View style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
+                <View style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
+              </View>
+              <View
+                style={[
+                  styles.destinationRow,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: 'transparent',
+                  },
+                ]}
+              >
+                <AntDesign
+                  color={theme.tertiary}
+                  name="pushpin"
+                  size={17}
+                />
+                <Text numberOfLines={1} style={[styles.destinationText, { color: theme.text }]}>
+                  {destination.title}
+                </Text>
+              </View>
+            </>
+          ) : null}
         </View>
-      ) : null}
+
+        {destination ? (
+          <AppButton
+            accessibilityLabel="Swap starting point and destination"
+            hitSlop={Spacing.one}
+            onPress={handleSwapRoutePoints}
+            pressedOpacity={0.68}
+            style={styles.swapButton}
+            variant="ghost"
+          >
+            <AntDesign
+              color={theme.textSecondary}
+              name="swap"
+              size={22}
+              style={styles.swapIcon}
+            />
+          </AppButton>
+        ) : null}
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.listContent}
@@ -164,12 +221,31 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  header: {
-    minHeight: 58,
+  routeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: 5,
+  },
+  routeFields: {
+    flex: 1,
+    minWidth: 0,
+  },
+  startInputContainer: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingLeft: Spacing.four,
+    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
   },
   backButton: {
     width: 36,
@@ -181,8 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   backIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 700,
   },
   searchPrompt: {
@@ -192,11 +267,43 @@ const styles = StyleSheet.create({
     fontWeight: 700,
   },
   destinationRow: {
-    minHeight: 44,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: Spacing.four + 36 + Spacing.two,
-    paddingRight: Spacing.four,
+    gap: Spacing.two,
+    paddingLeft: Spacing.four,
+    paddingRight: Spacing.three,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  inputConnector: {
+    width: 16,
+    height: Spacing.five,
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    marginLeft: Spacing.four,
+    paddingVertical: 2,
+  },
+  inputConnectorDot: {
+    width: 2,
+    height: 2,
+    borderRadius: Rounded.round,
+  },
+  swapButton: {
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    borderRadius: Rounded.round,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  swapIcon: {
+    transform: [{ rotate: '90deg' }],
   },
   destinationText: {
     flex: 1,

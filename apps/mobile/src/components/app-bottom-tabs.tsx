@@ -43,7 +43,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
       style={[
         styles.safeArea,
         {
-          backgroundColor: theme.backgroundElement,
+          backgroundColor: '#eee',
           borderColor: theme.border,
         },
       ]}

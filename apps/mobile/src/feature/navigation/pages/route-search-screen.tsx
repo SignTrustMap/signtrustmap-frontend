@@ -18,8 +18,9 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
 import { AppInput } from '@/components/ui/input';
+import { SAME_LOCATION_MESSAGE } from '@/constants/message';
 
-const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
+
 export function RouteSearchScreen() {
   const router = useRouter();
   const theme = useTheme();
@@ -84,7 +85,13 @@ export function RouteSearchScreen() {
           <AppInput
             placeholder="Where to?"
             style={[styles.searchPrompt, { color: theme.primary }]}
-            containerStyle={{ backgroundColor: theme.background, borderRadius: Rounded.round, borderColor: 'transparent' }}
+            containerStyle={[
+              styles.searchInputContainer,
+              {
+                backgroundColor: theme.background,
+                borderColor: 'transparent',
+              },
+            ]}
             leadingIcon={
               <AppButton
                 accessibilityLabel="Go back"
@@ -170,14 +177,22 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontFamily: Fonts.body,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 700,
   },
   searchPrompt: {
     fontFamily: Fonts.body,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: 600,
     paddingHorizontal: Spacing.one
+  },
+  searchInputContainer: {
+    borderRadius: Rounded.round,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
   },
   filterRow: {
     flexDirection: 'row',
