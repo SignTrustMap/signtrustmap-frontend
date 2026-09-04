@@ -43,7 +43,9 @@ function RootNavigation() {
         contentStyle: {
           backgroundColor: Colors.background,
         },
+        animation: 'slide_from_right',
       }}
+
     >
       <Stack.Protected guard={!hasValidSession}>
         <Stack.Screen name="(public)/login" />

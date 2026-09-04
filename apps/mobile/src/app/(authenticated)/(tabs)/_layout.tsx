@@ -3,10 +3,9 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppBottomTabs } from '@/components/app-bottom-tabs';
 
-type AppTabRoute = '/home' | '/work' | '/credits' | '/profile';
+type AppTabRoute = '/home' | '/work' | '/profile';
 
 const tabRoutes = {
-  credits: '/credits',
   home: '/home',
   profile: '/profile',
   work: '/work',
