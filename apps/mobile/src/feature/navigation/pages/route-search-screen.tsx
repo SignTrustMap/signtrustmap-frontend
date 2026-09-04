@@ -74,15 +74,17 @@ export function RouteSearchScreen() {
     }
 
     return () => {
-      setSearchResults([]);
+      setSearchResults(previousLocations);
     };
   }, [debouncedSearchText]);
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flex: 1, minWidth: 0, marginTop: Spacing.one }}>
           <AppInput
+            accessibilityLabel='Search for your destination'
+            autoFocus
             placeholder="Where to?"
             style={[styles.searchPrompt, { color: theme.primary }]}
             containerStyle={[
@@ -131,16 +133,15 @@ export function RouteSearchScreen() {
               <SymbolView
                 name={{ android: 'history', ios: 'clock', web: 'history' }}
                 size={17}
-                tintColor={theme.textSecondary}
+                tintColor={theme.primary}
               />
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+              <Text style={[styles.locationSubtitle, { color: theme.grey }]}>
                 {location.subtitle}
               </Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>/</Text>
           </AppButton>
         ))}
       </ScrollView>
@@ -165,6 +166,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
+    marginBottom: Spacing.four,
+    marginTop: Spacing.three,
   },
   backButton: {
     width: 36,
@@ -194,32 +197,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-  },
-  filterPill: {
-    minHeight: 36,
-    borderWidth: 1,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.half,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 0,
-  },
-  filterIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  filterText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
-  },
   list: {
     flex: 1,
   },
@@ -238,13 +215,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.three,
     paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: Spacing.three,
   },
   recentIconCircle: {
-    width: 32,
-    height: 32,
+    padding: Spacing.one * 1.2,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -256,16 +232,12 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontFamily: Fonts.body,
     fontSize: 16,
-    fontWeight: 900,
+    fontWeight: 600,
   },
   locationSubtitle: {
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 600,
-  },
-  arrowIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 700,
+    paddingTop: Spacing.half,
   },
 });

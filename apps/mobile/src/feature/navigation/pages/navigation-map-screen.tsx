@@ -543,7 +543,7 @@ export function NavigationMapScreen() {
                       source={require('@/assets/images/app-logo.svg')}
                       style={styles.appLogo}
                     />
-                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
+                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
                       Search here...
                     </Text>
                   </AppButton>
@@ -906,7 +906,7 @@ const styles = StyleSheet.create({
     objectFit: 'cover',
   },
   searchBar: {
-    minHeight: 48,
+    minHeight: 58,
     borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
@@ -968,7 +968,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Fonts.body,
     fontSize: 14,
-    fontWeight: 700,
   },
   routeInput: {
     minHeight: 44,

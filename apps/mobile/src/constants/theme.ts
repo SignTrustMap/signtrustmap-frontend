@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 export const Colors = {
   primary: '#000000',
   secondary: '#d3f7ff',
-  tertiary: '#148594',
+  tertiary: '#0671eb',
   neutral: '#F8F7F7',
   surface: '#FFFFFF',
   onTertiary: '#FFFFFF',
@@ -13,7 +13,7 @@ export const Colors = {
   text: '#000000',
   background: '#F8F7F7',
   backgroundElement: '#FFFFFF',
-  backgroundSelected: '#d3f7ff',
+  backgroundSelected: '#E7F1FD',
   textSecondary: '#007b8b',
   placeholder: '#888888',
   danger: '#FF0000',
