@@ -3,12 +3,11 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 export const Colors = {
-  primary: '#000000',
+  primary: '#0671eb',
   secondary: '#d3f7ff',
-  tertiary: '#0671eb',
   neutral: '#F8F7F7',
   surface: '#FFFFFF',
-  onTertiary: '#FFFFFF',
+  onPrimary: '#FFFFFF',
   border: '#E8E4E3',
   text: '#000000',
   background: '#F8F7F7',

@@ -242,7 +242,7 @@ function ReviewBottomSheet({
                           styles.reasonOption,
                           {
                             backgroundColor: selected ? theme.backgroundSelected : theme.surface,
-                            borderColor: selected ? theme.tertiary : theme.border,
+                            borderColor: selected ? theme.primary : theme.border,
                           },
                         ]}
                       >
@@ -250,10 +250,10 @@ function ReviewBottomSheet({
                         <View
                           style={[
                             styles.radio,
-                            { borderColor: selected ? theme.tertiary : theme.placeholder },
+                            { borderColor: selected ? theme.primary : theme.placeholder },
                           ]}
                         >
-                          {selected ? <View style={[styles.radioDot, { backgroundColor: theme.tertiary }]} /> : null}
+                          {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
                         </View>
                       </Pressable>
                     );
@@ -299,7 +299,7 @@ function ReviewBottomSheet({
                 onPress={onConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: isDecline ? Colors.danger : theme.tertiary },
+                  { backgroundColor: isDecline ? Colors.danger : theme.primary },
                 ]}
               />
             </View>
@@ -468,7 +468,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             style={[
               styles.progressFill,
               {
-                backgroundColor: Colors.tertiary,
+                backgroundColor: Colors.primary,
                 width: `${(reviewPosition / sampleReviewSubmissions.length) * 100}%`,
               },
             ]}
@@ -640,7 +640,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <>
                 <View style={styles.primaryActions}>
                   <ReviewAction
-                    color={theme.tertiary}
+                    color={theme.primary}
                     label="Approve"
                     onPress={() => completeReview('approved')}
                     symbol="✓"
@@ -684,7 +684,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         ) : (
           <View style={styles.completeState}>
             <View style={[styles.completeIcon, { backgroundColor: theme.backgroundSelected }]}>
-              <Text style={[styles.completeIconLabel, { color: theme.tertiary }]}>✓</Text>
+              <Text style={[styles.completeIconLabel, { color: theme.primary }]}>✓</Text>
             </View>
             <Text style={[styles.completeTitle, { color: theme.text }]}>All reviews completed</Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.tertiary,
+    borderBottomColor: Colors.primary,
   },
   counter: {
     fontFamily: Fonts.body,

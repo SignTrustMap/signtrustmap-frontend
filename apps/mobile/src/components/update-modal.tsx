@@ -84,7 +84,7 @@ export function UpdateModal({
         >
           {status === 'checking' && (
             <View style={styles.checkingBox}>
-              <ActivityIndicator color={theme.tertiary} size="large" />
+              <ActivityIndicator color={theme.primary} size="large" />
               <Text style={[styles.checkingText, { color: theme.text }]}>
                 Checking for updates...
               </Text>
@@ -98,7 +98,7 @@ export function UpdateModal({
                   <View style={styles.titleGroup}>
                     <Text style={[styles.title, { color: theme.text }]}>{displayTitle}</Text>
                     <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
-                      <Text style={[styles.newBadgeText, { color: theme.tertiary }]}>NEW</Text>
+                      <Text style={[styles.newBadgeText, { color: theme.primary }]}>NEW</Text>
                     </View>
                   </View>
 
@@ -146,7 +146,7 @@ export function UpdateModal({
             <View style={styles.content}>
               <View style={styles.header}>
                 <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
-                  <Text style={[styles.newBadgeText, { color: theme.tertiary }]}>UP TO DATE</Text>
+                  <Text style={[styles.newBadgeText, { color: theme.primary }]}>UP TO DATE</Text>
                 </View>
                 <Text style={[styles.title, { color: theme.text }]}>You&apos;re up to date!</Text>
                 <Text style={[styles.metaText, { color: theme.placeholder }]}>

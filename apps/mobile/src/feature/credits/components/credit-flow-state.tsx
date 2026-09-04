@@ -39,10 +39,10 @@ export function CreditFlowState({
       ]}
     >
       {variant === 'loading' ? (
-        <ActivityIndicator color={theme.tertiary} size="large" />
+        <ActivityIndicator color={theme.primary} size="large" />
       ) : (
         <View style={[styles.successIcon, { backgroundColor: theme.backgroundSelected }]}>
-          <Text style={[styles.successSymbol, { color: theme.tertiary }]}>{successSymbol}</Text>
+          <Text style={[styles.successSymbol, { color: theme.primary }]}>{successSymbol}</Text>
         </View>
       )}
       <Text style={[styles.title, { color: theme.text }]}>{title}</Text>

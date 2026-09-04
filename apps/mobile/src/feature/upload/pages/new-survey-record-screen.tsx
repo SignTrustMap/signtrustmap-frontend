@@ -362,7 +362,7 @@ export function NewSurveyRecordScreen() {
             ListEmptyComponent={
               <View style={styles.galleryEmptyState}>
                 {isAndroidGalleryLoading ? (
-                  <ActivityIndicator color={theme.tertiary} size="large" />
+                  <ActivityIndicator color={theme.primary} size="large" />
                 ) : null}
                 <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
                   {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
@@ -371,7 +371,7 @@ export function NewSurveyRecordScreen() {
             }
             ListFooterComponent={
               androidGalleryHasNextPage ? (
-                <ActivityIndicator color={theme.tertiary} style={styles.galleryFooterLoader} />
+                <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
               ) : null
             }
             numColumns={3}

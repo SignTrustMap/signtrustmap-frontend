@@ -41,7 +41,7 @@ export function ProfileScreen() {
 
           <View style={[styles.accountPanel, { backgroundColor: theme.backgroundElement }]}>
             <View style={[styles.avatar, { backgroundColor: theme.backgroundSelected }]}>
-              <Text style={[styles.avatarText, { color: theme.tertiary }]}>DF</Text>
+              <Text style={[styles.avatarText, { color: theme.primary }]}>DF</Text>
             </View>
             <View style={styles.accountCopy}>
               <Text style={[styles.name, { color: theme.text }]}>{session?.account.displayName}</Text>
@@ -67,7 +67,7 @@ export function ProfileScreen() {
                     <Text
                       style={[
                         styles.roleStatus,
-                        { color: isEnabled ? theme.tertiary : theme.placeholder },
+                        { color: isEnabled ? theme.primary : theme.placeholder },
                       ]}
                     >
                       {isEnabled ? 'Enabled' : 'Disabled'}

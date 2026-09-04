@@ -102,9 +102,9 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   onPress={() => setActiveRole(role)}
                   style={[
                     styles.roleButton,
-                    isActive ? { backgroundColor: theme.tertiary } : undefined,
+                    isActive ? { backgroundColor: theme.primary } : undefined,
                   ]}
-                  textStyle={{ color: isActive ? theme.onTertiary : theme.text }}
+                  textStyle={{ color: isActive ? theme.onPrimary : theme.text }}
                   variant="ghost"
                 />
               );
@@ -146,10 +146,10 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             style={styles.floatingAction}
           >
             <SymbolView
-              fallback={<Text style={[styles.floatingActionFallback, { color: theme.onTertiary }]}>+</Text>}
+              fallback={<Text style={[styles.floatingActionFallback, { color: theme.onPrimary }]}>+</Text>}
               name={{ android: 'add', ios: 'plus', web: 'add' }}
               size={26}
-              tintColor={theme.onTertiary}
+              tintColor={theme.onPrimary}
             />
           </AppButton>
         ) : null}

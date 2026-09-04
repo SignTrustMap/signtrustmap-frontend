@@ -228,9 +228,9 @@ export function SurveyRecordDetailsScreen() {
               <SymbolView
                 name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
                 size={16}
-                tintColor={theme.onTertiary}
+                tintColor={theme.onPrimary}
               />
-              <Text style={[styles.locationButtonText, { color: theme.onTertiary }]}>
+              <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
                 {isLocating ? 'Getting location...' : 'Use current location'}
               </Text>
             </AppButton>

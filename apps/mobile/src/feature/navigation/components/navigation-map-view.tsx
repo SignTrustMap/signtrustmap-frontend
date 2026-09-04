@@ -163,7 +163,7 @@ export function NavigationMapView({
             type="line"
             style={{
               lineCap: 'round',
-              lineColor: theme.tertiary,
+              lineColor: theme.primary,
               lineJoin: 'round',
               lineWidth: 5,
             }}
@@ -194,7 +194,7 @@ export function NavigationMapView({
         >
           <>
             <View style={styles.currentLocationHalo}>
-              <View style={[styles.currentLocationDot, { backgroundColor: theme.tertiary }]} />
+              <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
             </View>
             {(!destination || !routeStart) ? (
               <View style={styles.stopSignMarker}>

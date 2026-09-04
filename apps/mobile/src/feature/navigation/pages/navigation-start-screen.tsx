@@ -95,11 +95,11 @@ export function NavigationStartScreen() {
           <View
             style={[
               styles.startInputContainer,
-              { backgroundColor: theme.background, borderColor: theme.tertiary, borderWidth: 1 },
+              { backgroundColor: theme.background, borderColor: theme.primary, borderWidth: 1 },
             ]}
           >
             <AntDesign
-              color={theme.tertiary}
+              color={theme.primary}
               name="pushpin"
               size={17}
             />
@@ -125,7 +125,7 @@ export function NavigationStartScreen() {
                 ]}
               >
                 <AntDesign
-                  color={theme.tertiary}
+                  color={theme.primary}
                   name="pushpin"
                   size={17}
                 />
@@ -169,7 +169,7 @@ export function NavigationStartScreen() {
           variant="ghost"
         >
           <View style={[styles.currentIconCircle, { backgroundColor: theme.backgroundSelected }]}>
-            <Text style={[styles.currentIcon, { color: theme.tertiary }]}>G</Text>
+            <Text style={[styles.currentIcon, { color: theme.primary }]}>G</Text>
           </View>
           <View style={styles.locationCopy}>
             <Text style={[styles.locationTitle, { color: theme.text }]}>Current Location</Text>
@@ -177,7 +177,7 @@ export function NavigationStartScreen() {
               Using GPS accuracy
             </Text>
           </View>
-          <Text style={[styles.arrowIcon, { color: theme.tertiary }]}>{'>'}</Text>
+          <Text style={[styles.arrowIcon, { color: theme.primary }]}>{'>'}</Text>
         </AppButton>
 
         <View style={styles.sectionHeader}>

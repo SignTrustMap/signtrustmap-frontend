@@ -49,7 +49,7 @@ export function TopUpScreen() {
                   styles.amountButton,
                   {
                     backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
-                    borderColor: selected ? theme.tertiary : theme.border,
+                    borderColor: selected ? theme.primary : theme.border,
                   },
                 ]}
                 textStyle={{ color: theme.text }}
@@ -63,7 +63,7 @@ export function TopUpScreen() {
           style={[styles.customAmountButton, { borderColor: theme.border }]}
           variant="surface"
         >
-          <Text style={[styles.customAmountIcon, { color: theme.tertiary }]}>＋</Text>
+          <Text style={[styles.customAmountIcon, { color: theme.primary }]}>＋</Text>
           <Text style={[styles.customAmountText, { color: theme.text }]}>Enter custom amount</Text>
         </AppButton>
 
@@ -83,7 +83,7 @@ export function TopUpScreen() {
                 variant="ghost"
               >
                 <View style={[styles.methodIcon, { backgroundColor: theme.backgroundSelected }]}>
-                  <Text style={[styles.methodSymbol, { color: theme.tertiary }]}>{method.symbol}</Text>
+                  <Text style={[styles.methodSymbol, { color: theme.primary }]}>{method.symbol}</Text>
                 </View>
                 <View style={styles.methodCopy}>
                   <Text style={[styles.methodLabel, { color: theme.text }]}>{method.label}</Text>
@@ -91,8 +91,8 @@ export function TopUpScreen() {
                     <Text style={[styles.methodDetail, { color: theme.placeholder }]}>{method.detail}</Text>
                   ) : null}
                 </View>
-                <View style={[styles.radio, { borderColor: selected ? theme.tertiary : theme.border }]}>
-                  {selected ? <View style={[styles.radioDot, { backgroundColor: theme.tertiary }]} /> : null}
+                <View style={[styles.radio, { borderColor: selected ? theme.primary : theme.border }]}>
+                  {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
                 </View>
               </AppButton>
             );
@@ -101,7 +101,7 @@ export function TopUpScreen() {
             label="＋  Add new payment method"
             onPress={() => router.push('/credits/add-card')}
             style={styles.addMethodButton}
-            textStyle={{ color: theme.tertiary }}
+            textStyle={{ color: theme.primary }}
             variant="ghost"
           />
         </View>

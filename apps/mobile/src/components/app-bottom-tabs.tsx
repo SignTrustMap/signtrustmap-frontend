@@ -65,21 +65,21 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
             >
               <SymbolView
                 fallback={
-                  <Text style={[styles.iconFallback, { color: isActive ? theme.tertiary : theme.text }]}>
+                  <Text style={[styles.iconFallback, { color: isActive ? theme.primary : theme.text }]}>
                     {tab.fallbackLabel}
                   </Text>
                 }
                 name={tab.symbol}
                 size={18}
-                tintColor={isActive ? theme.tertiary : theme.text}
+                tintColor={isActive ? theme.primary : theme.text}
               />
-              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
+              <Text style={[styles.label, { color: isActive ? theme.primary : theme.text }]}>
                 {tab.label}
               </Text>
               <View
                 style={[
                   styles.activeIndicator,
-                  { backgroundColor: isActive ? theme.tertiary : 'transparent' },
+                  { backgroundColor: isActive ? theme.primary : 'transparent' },
                 ]}
               />
             </AppButton>

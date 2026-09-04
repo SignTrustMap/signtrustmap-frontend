@@ -32,10 +32,10 @@ export function WorkActionCard({ count, label, onPress, symbol }: WorkActionCard
       ]}
       variant="surface"
     >
-      <View style={[styles.badge, { backgroundColor: theme.tertiary }]}>
-        <Text style={[styles.badgeText, { color: theme.onTertiary }]}>{count}</Text>
+      <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+        <Text style={[styles.badgeText, { color: theme.onPrimary }]}>{count}</Text>
       </View>
-      <SymbolView name={symbol} size={27} tintColor={theme.tertiary} />
+      <SymbolView name={symbol} size={27} tintColor={theme.primary} />
       <Text style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
     </AppButton>
   );

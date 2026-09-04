@@ -467,7 +467,7 @@ export function NavigationMapScreen() {
                       <AntDesign
                         name="pushpin"
                         size={17}
-                        color={theme.tertiary}
+                        color={theme.primary}
                       />
                       <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
                         {routeStartTitle}
@@ -477,7 +477,7 @@ export function NavigationMapScreen() {
                   <View
                     style={[
                       styles.selectedDestinationInput,
-                      { backgroundColor: theme.background, borderColor: theme.tertiary },
+                      { backgroundColor: theme.background, borderColor: theme.primary },
                     ]}
                   >
 
@@ -488,7 +488,7 @@ export function NavigationMapScreen() {
                       variant="ghost"
                     >
                       <AntDesign
-                        color={theme.tertiary}
+                        color={theme.primary}
                         name="pushpin"
                         size={17}
                       />
@@ -506,7 +506,7 @@ export function NavigationMapScreen() {
                 <View
                   style={[
                     styles.selectedDestinationInput,
-                    { backgroundColor: theme.background, borderColor: theme.primary },
+                    { backgroundColor: theme.background, borderColor: theme.text },
                   ]}
                 >
                   <AppButton
@@ -556,8 +556,8 @@ export function NavigationMapScreen() {
                     variant="ghost"
                   >
                     <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
-                    <View style={[styles.addCreditIcon, { backgroundColor: theme.tertiary }]}>
-                      <Text style={[styles.addCreditGlyph, { color: theme.onTertiary }]}>+</Text>
+                    <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                      <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
                     </View>
                   </AppButton>
                 </View>
@@ -579,7 +579,7 @@ export function NavigationMapScreen() {
                   <SymbolView
                     name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
                     size={22}
-                    tintColor={theme.tertiary}
+                    tintColor={theme.primary}
                   />
                 </AppButton>
                 <AppButton
@@ -590,7 +590,7 @@ export function NavigationMapScreen() {
                   <SymbolView
                     name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
                     size={22}
-                    tintColor={theme.onTertiary}
+                    tintColor={theme.onPrimary}
                   />
                 </AppButton>
               </View>
@@ -662,7 +662,7 @@ export function NavigationMapScreen() {
                             key={`${index}-${step.maneuver.type}-${step.name}`}
                             style={styles.directionRow}
                           >
-                            <Text style={[styles.directionNumber, { color: theme.tertiary }]}>
+                            <Text style={[styles.directionNumber, { color: theme.primary }]}>
                               {index + 1}
                             </Text>
                             <View style={styles.directionCopy}>

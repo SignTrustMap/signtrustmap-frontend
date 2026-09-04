@@ -86,7 +86,7 @@ export function RouteSearchScreen() {
             accessibilityLabel='Search for your destination'
             autoFocus
             placeholder="Where to?"
-            style={[styles.searchPrompt, { color: theme.primary }]}
+            style={[styles.searchPrompt, { color: theme.text }]}
             containerStyle={[
               styles.searchInputContainer,
               {
@@ -105,7 +105,7 @@ export function RouteSearchScreen() {
               >
                 <AntDesign
                   name="arrow-left"
-                  style={[styles.backIcon, { color: theme.primary }]}
+                  style={[styles.backIcon, { color: theme.text }]}
                 />
               </AppButton>
             }
@@ -133,7 +133,7 @@ export function RouteSearchScreen() {
               <SymbolView
                 name={{ android: 'history', ios: 'clock', web: 'history' }}
                 size={17}
-                tintColor={theme.primary}
+                tintColor={theme.text}
               />
             </View>
             <View style={styles.locationCopy}>

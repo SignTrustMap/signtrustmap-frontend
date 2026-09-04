@@ -47,9 +47,9 @@ export default function LoginScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedView style={styles.content}>
-          <View style={[styles.imagePlaceholder, { backgroundColor: theme.tertiary }]}>
-            <View style={[styles.imageGlyph, { borderColor: theme.onTertiary }]}>
-              <View style={[styles.imageMountain, { borderColor: theme.onTertiary }]} />
+          <View style={[styles.imagePlaceholder, { backgroundColor: theme.primary }]}>
+            <View style={[styles.imageGlyph, { borderColor: theme.onPrimary }]}>
+              <View style={[styles.imageMountain, { borderColor: theme.onPrimary }]} />
             </View>
           </View>
 
@@ -83,7 +83,7 @@ export default function LoginScreen() {
               value={password}
             />
             <Pressable accessibilityRole="button" style={styles.forgotPassword}>
-              <Text style={[styles.linkText, { color: theme.tertiary }]}>Forgot Password?</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}>Forgot Password?</Text>
             </Pressable>
             <AppButton label="Login" onPress={handleLogIn} style={styles.loginButton} />
             <View style={styles.dividerRow}>
@@ -111,7 +111,7 @@ export default function LoginScreen() {
           <View style={styles.signupRow}>
             <Text style={[styles.footerText, { color: theme.text }]}>Don&apos;t have an account?</Text>
             <Pressable accessibilityRole="button">
-              <Text style={[styles.linkText, { color: theme.tertiary }]}> Sign Up</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}> Sign Up</Text>
             </Pressable>
           </View>
         </ThemedView>

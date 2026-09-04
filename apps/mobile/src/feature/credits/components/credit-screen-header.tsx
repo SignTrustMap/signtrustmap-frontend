@@ -29,7 +29,7 @@ export function CreditScreenHeader({ onBack, rightContent, title }: CreditScreen
               style={styles.backButton}
               variant="ghost"
             >
-              <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'‹'}</Text>
+              <Text style={[styles.backIcon, { color: theme.primary }]}>{'‹'}</Text>
             </AppButton>
           ) : null}
         </View>

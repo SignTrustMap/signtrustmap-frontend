@@ -52,12 +52,12 @@ export function ReviewBottomTabs({ activeTab }: { activeTab: ReviewTab }) {
               <SymbolView
                 name={tab.symbol}
                 size={20}
-                tintColor={isActive ? theme.tertiary : theme.placeholder}
+                tintColor={isActive ? theme.primary : theme.placeholder}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isActive ? theme.tertiary : theme.placeholder },
+                  { color: isActive ? theme.primary : theme.placeholder },
                 ]}
               >
                 {tab.label}
@@ -65,7 +65,7 @@ export function ReviewBottomTabs({ activeTab }: { activeTab: ReviewTab }) {
               <View
                 style={[
                   styles.activeIndicator,
-                  { backgroundColor: isActive ? theme.tertiary : 'transparent' },
+                  { backgroundColor: isActive ? theme.primary : 'transparent' },
                 ]}
               />
             </AppButton>
