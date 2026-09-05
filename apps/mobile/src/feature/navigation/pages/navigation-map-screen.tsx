@@ -95,6 +95,7 @@ export function NavigationMapScreen() {
   const [mapFocus, setMapFocus] = useState<{ coordinate: MapCoordinate; requestId: number }>();
   const [navigationError, setNavigationError] = useState<string>();
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
   const routeDistance = routeResult && routeResult.key === routeKey ? routeResult.distance : undefined;
@@ -310,7 +311,7 @@ export function NavigationMapScreen() {
     }
   };
 
-  const handleUseCurrentLocation = async () => {
+  const handleCurrentLocation = async () => {
     if (isLocating) return;
 
     setIsLocating(true);
@@ -348,6 +349,10 @@ export function NavigationMapScreen() {
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleTurnOnSpeaker = async () => {
+    setIsSpeakerOn((current) => !current);
   };
 
 
@@ -579,29 +584,36 @@ export function NavigationMapScreen() {
             {!selectedDestination ? (
               <View style={styles.mapActions}>
                 <AppButton
-                  accessibilityLabel={isLocating ? 'Getting current location' : 'Use current location'}
-                  disabled={isLocating}
-                  onPress={handleUseCurrentLocation}
+                  accessibilityLabel={isSpeakerOn ? 'Turn on speaker' : 'Turn off speaker'}
+                  onPress={handleTurnOnSpeaker}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    { backgroundColor: isSpeakerOn ? theme.backgroundElement : '#ddd', borderColor: theme.border },
                   ]}
                   variant="surface"
                 >
-                  <SymbolView
-                    name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                    size={22}
-                    tintColor={theme.primary}
-                  />
+                  {isSpeakerOn ? (
+                    <AntDesign
+                      name='audio'
+                      size={22}
+                      tintColor={theme.primary}
+                    />
+                  ) : (
+                    <AntDesign
+                      name='audio-muted'
+                      size={22}
+                      tintColor={theme.primary}
+                    />
+                  )}
                 </AppButton>
                 <AppButton
                   accessibilityLabel="Search destination"
-                  onPress={() => router.push('/home/search')}
+                  onPress={handleCurrentLocation}
                   style={styles.mapActionButton}
                 >
                   <SymbolView
-                    name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
+                    name={{ android: 'my_location', ios: 'location.fill' }}
                     size={22}
                     tintColor={theme.onPrimary}
                   />

@@ -31,15 +31,6 @@ export function NavigationStartScreen() {
     }));
   };
 
-  const handleBack = () => {
-    if (destinationId) {
-      router.replace({
-        pathname: '/home',
-        params: {},
-      })
-    }
-  }
-
   const handleSelectCurrentLocation = () => {
     if (!destinationId) return;
 
@@ -84,13 +75,23 @@ export function NavigationStartScreen() {
       params: {
         startLat: String(latitude),
         startLng: String(longitude),
+
       },
     });
   };
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement, marginTop: Spacing.three }]}>
       <View style={styles.routeSelector}>
+        <View style={styles.backButtonContainer}>
+          <AntDesign
+            name='arrow-left'
+            size={20}
+            color={theme.primary}
+            onPress={() => router.back()}
+            style={[styles.backButton, { marginTop: Spacing.two, marginLeft: Spacing.one }]}
+          />
+        </View>
         <View style={styles.routeFields}>
           <View
             style={[
@@ -99,7 +100,7 @@ export function NavigationStartScreen() {
             ]}
           >
             <AntDesign
-              color={theme.primary}
+              color={theme.text}
               name="pushpin"
               size={17}
             />
@@ -125,7 +126,7 @@ export function NavigationStartScreen() {
                 ]}
               >
                 <AntDesign
-                  color={theme.primary}
+                  color={theme.danger}
                   name="pushpin"
                   size={17}
                 />
@@ -136,24 +137,15 @@ export function NavigationStartScreen() {
             </>
           ) : null}
         </View>
-
-        {destination ? (
-          <AppButton
-            accessibilityLabel="Swap starting point and destination"
-            hitSlop={Spacing.one}
+        <View>
+          <AntDesign
+            name='swap'
+            size={18}
+            color={theme.primary}
             onPress={handleSwapRoutePoints}
-            pressedOpacity={0.68}
-            style={styles.swapButton}
-            variant="ghost"
-          >
-            <AntDesign
-              color={theme.textSecondary}
-              name="swap"
-              size={22}
-              style={styles.swapIcon}
-            />
-          </AppButton>
-        ) : null}
+            style={[styles.backButton, { marginTop: Spacing.two, marginRight: Spacing.one, transform: [{ rotate: '90deg' }] }]}
+          />
+        </View>
       </View>
 
       <ScrollView
@@ -169,7 +161,11 @@ export function NavigationStartScreen() {
           variant="ghost"
         >
           <View style={[styles.currentIconCircle, { backgroundColor: theme.backgroundSelected }]}>
-            <Text style={[styles.currentIcon, { color: theme.primary }]}>G</Text>
+            <AntDesign
+              name='usb'
+              size={22}
+              color={theme.primary}
+            />
           </View>
           <View style={styles.locationCopy}>
             <Text style={[styles.locationTitle, { color: theme.text }]}>Current Location</Text>
@@ -177,11 +173,15 @@ export function NavigationStartScreen() {
               Using GPS accuracy
             </Text>
           </View>
-          <Text style={[styles.arrowIcon, { color: theme.primary }]}>{'>'}</Text>
+          <AntDesign
+            name='arrow-right'
+            size={18}
+            color={theme.primary}
+          />
         </AppButton>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionLabel, { color: theme.text }]}>Recent History</Text>
+          <Text style={[styles.sectionLabel, { color: theme.primary }]}>Recents</Text>
         </View>
 
         {startLocations.map((location) => (
@@ -194,15 +194,18 @@ export function NavigationStartScreen() {
             variant="ghost"
           >
             <View style={[styles.recentIconCircle, { backgroundColor: theme.background }]}>
-              <Text style={[styles.recentIcon, { color: theme.textSecondary }]}>R</Text>
+              <AntDesign
+                name='clock-circle'
+                size={18}
+                color={theme.text}
+              />
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text numberOfLines={1} style={[styles.locationSubtitle, { color: theme.text }]}>
+              <Text numberOfLines={1} style={[styles.locationSubtitle, { color: theme.placeholder }]}>
                 {location.subtitle}
               </Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.border }]}>/</Text>
           </AppButton>
         ))}
       </ScrollView>
@@ -228,6 +231,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingVertical: 5,
   },
+  backButtonContainer: {
+    width: 36,
+    height: 36,
+    minHeight: 36,
+    alignSelf: 'flex-start',
+  },
   routeFields: {
     flex: 1,
     minWidth: 0,
@@ -237,7 +246,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 48,
     paddingLeft: Spacing.four,
-    borderRadius: Rounded.round,
+    borderRadius: Rounded.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
@@ -269,7 +278,7 @@ const styles = StyleSheet.create({
   destinationRow: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: Rounded.round,
+    borderRadius: Rounded.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
@@ -293,17 +302,6 @@ const styles = StyleSheet.create({
     width: 2,
     height: 2,
     borderRadius: Rounded.round,
-  },
-  swapButton: {
-    width: 44,
-    height: 44,
-    minHeight: 44,
-    borderRadius: Rounded.round,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  swapIcon: {
-    transform: [{ rotate: '90deg' }],
   },
   destinationText: {
     flex: 1,
@@ -351,7 +349,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: Spacing.two,
   },
   currentIconCircle: {
     width: 38,
@@ -362,7 +360,7 @@ const styles = StyleSheet.create({
   },
   currentIcon: {
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 900,
   },
   sectionHeader: {
@@ -388,7 +386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: Spacing.two * 1.1,
   },
   recentIconCircle: {
     width: 38,
@@ -405,11 +403,12 @@ const styles = StyleSheet.create({
   locationCopy: {
     flex: 1,
     minWidth: 0,
+    gap: Spacing.half,
   },
   locationTitle: {
     fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 900,
+    fontSize: 16,
+    fontWeight: 600,
   },
   locationSubtitle: {
     fontFamily: Fonts.body,
@@ -419,6 +418,6 @@ const styles = StyleSheet.create({
   arrowIcon: {
     fontFamily: Fonts.body,
     fontSize: 16,
-    fontWeight: 900,
+    fontWeight: 600,
   },
 });
