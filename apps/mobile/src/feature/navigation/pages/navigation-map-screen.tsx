@@ -1,10 +1,9 @@
-import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
   PanResponder,
   Platform,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -32,9 +31,12 @@ import { NavigationMapView } from '../components/navigation-map-view';
 import { getDrivingRoute, type OsrmRouteStep } from '../services/osrm';
 import { getRouteProgressMeters } from '../utils/route-progress';
 import { getRouteStopCoordinates } from '../utils/route-stop-markers';
-import { useBackButton } from '@/hooks/use-back-button';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
+
+const SHEET_DRAG_ACTIVATION_DISTANCE = 6;
+const SHEET_DRAG_SETTLE_DISTANCE = 72;
+const SHEET_FLING_VELOCITY = 0.45;
 
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   try {
@@ -107,6 +109,7 @@ export function NavigationMapScreen() {
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const sheetExpandedRef = useRef(false);
   const sheetGestureStart = useRef(0);
+  const sheetGestureStartedExpanded = useRef(false);
   const collapsedRouteSheetHeight = Math.max(200, Math.min(230, windowHeight * 0.28));
   const expandedRouteSheetHeight = Math.max(
     collapsedRouteSheetHeight,
@@ -133,32 +136,42 @@ export function NavigationMapScreen() {
   }, [sheetProgress]);
   const routeSheetPanResponder = useMemo(
     () => PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dy) > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      // Own the handle gesture from touch-down. Pressable otherwise keeps the
+      // responder and turns a drag into a tap on some native platforms.
+      onStartShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
+        sheetGestureStartedExpanded.current = sheetExpandedRef.current;
         sheetGestureStart.current = sheetExpandedRef.current ? 1 : 0;
-        sheetProgress.stopAnimation();
+        sheetProgress.stopAnimation((progress) => {
+          sheetGestureStart.current = progress;
+        });
       },
       onPanResponderMove: (_, gesture) => {
         const nextProgress = sheetGestureStart.current - gesture.dy / routeSheetTravel;
         sheetProgress.setValue(Math.max(0, Math.min(1, nextProgress)));
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.vy < -0.35) {
-          animateRouteSheet(true);
+        const isTap =
+          Math.abs(gesture.dx) < SHEET_DRAG_ACTIVATION_DISTANCE &&
+          Math.abs(gesture.dy) < SHEET_DRAG_ACTIVATION_DISTANCE;
+
+        if (isTap) {
+          animateRouteSheet(!sheetGestureStartedExpanded.current);
           return;
         }
 
-        if (gesture.vy > 0.35) {
-          animateRouteSheet(false);
+        const passedDistanceThreshold = Math.abs(gesture.dy) >= SHEET_DRAG_SETTLE_DISTANCE;
+        const passedVelocityThreshold = Math.abs(gesture.vy) >= SHEET_FLING_VELOCITY;
+
+        if (passedDistanceThreshold || passedVelocityThreshold) {
+          animateRouteSheet(passedVelocityThreshold ? gesture.vy < 0 : gesture.dy < 0);
           return;
         }
 
-        const progress = sheetGestureStart.current - gesture.dy / routeSheetTravel;
-        animateRouteSheet(progress >= 0.5);
+        animateRouteSheet(sheetGestureStartedExpanded.current);
       },
       onPanResponderTerminate: () => {
-        animateRouteSheet(sheetExpandedRef.current);
+        animateRouteSheet(sheetGestureStartedExpanded.current);
       },
     }),
     [animateRouteSheet, routeSheetTravel, sheetProgress],
@@ -609,20 +622,25 @@ export function NavigationMapScreen() {
               { backgroundColor: theme.backgroundElement },
             ]}
           >
-            <Pressable
+            <View
+              accessibilityActions={routeStart ? [{ name: 'activate' }] : undefined}
               accessibilityHint={
                 routeStart ? 'Drag or tap to expand and collapse route directions' : undefined
               }
               accessibilityLabel={isSheetExpanded ? 'Collapse route details' : 'Expand route details'}
               accessibilityRole="button"
-              disabled={!routeStart}
+              accessible={Boolean(routeStart)}
               hitSlop={Spacing.one}
-              onPress={() => animateRouteSheet(!sheetExpandedRef.current)}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'activate') {
+                  animateRouteSheet(!sheetExpandedRef.current);
+                }
+              }}
               style={styles.destinationSheetHandleButton}
               {...(routeStart ? routeSheetPanResponder.panHandlers : {})}
             >
               <View style={styles.destinationSheetHandle} />
-            </Pressable>
+            </View>
             {routeStart ? (
               <>
                 <Text
@@ -647,7 +665,7 @@ export function NavigationMapScreen() {
                       Calculating ETA...
                     </Text>
                   )}
-                  <Text style={[styles.directionsHeading, { color: theme.text }]}>Sections:</Text>
+                  <Text style={[styles.directionsHeading, { color: theme.text }]}>instructions:</Text>
                   {routeSteps ? (
                     routeSteps.length > 0 ? (
                       <ScrollView

@@ -1,8 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
 import { UpdateModal } from '@/components/update-modal';
+import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   ACCOUNT_ROLES,
@@ -13,11 +15,30 @@ import {
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { useTheme } from '@/hooks/use-theme';
 
+type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+
 const roleLabels: Record<AccountRole, string> = {
   driver: 'Driver',
   reviewer: 'Reviewer',
   surveyor: 'Surveyor',
 };
+
+const roleIcons: Record<AccountRole, MaterialIconName> = {
+  driver: 'car-outline',
+  reviewer: 'shield-check-outline',
+  surveyor: 'map-marker-path',
+};
+
+function getInitials(displayName?: string) {
+  if (!displayName) return 'ST';
+
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
 
 export function ProfileScreen() {
   const { logOut, session, setRoleEnabled } = useSession();
@@ -32,52 +53,125 @@ export function ProfileScreen() {
     releaseInfo,
     status,
   } = useAppUpdate();
+  const displayName = session?.account.displayName ?? 'SignTrustMap user';
+  const email = session?.account.email ?? '';
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.content}>
-          <Text style={[styles.title, { color: theme.text }]}>Profile</Text>
+    <View style={[styles.screen, { backgroundColor: theme.primary }]}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={[styles.hero, { backgroundColor: theme.primary }]}>
+          <View
+            pointerEvents="none"
+            style={[styles.heroShapeLarge, { backgroundColor: theme.backgroundSelected }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.heroShapeSmall, { backgroundColor: theme.secondary }]}
+          />
 
-          <View style={[styles.accountPanel, { backgroundColor: theme.backgroundElement }]}>
-            <View style={[styles.avatar, { backgroundColor: theme.backgroundSelected }]}>
-              <Text style={[styles.avatarText, { color: theme.primary }]}>DF</Text>
-            </View>
-            <View style={styles.accountCopy}>
-              <Text style={[styles.name, { color: theme.text }]}>{session?.account.displayName}</Text>
-              <Text style={[styles.email, { color: theme.textSecondary }]}>{session?.account.email}</Text>
-            </View>
-          </View>
+          <SafeAreaView edges={['top']} style={styles.heroSafeArea}>
+            <Text style={[styles.title, { color: theme.onPrimary }]}>Profile</Text>
 
-          <View style={styles.rolesSection}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Account roles</Text>
-            <Text style={[styles.rolesDescription, { color: theme.textSecondary }]}>
-              Driver access is included with every account.
-            </Text>
+            <View style={styles.identity}>
+              <View
+                accessibilityLabel={`${displayName} profile picture`}
+                style={[
+                  styles.avatar,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.onPrimary },
+                ]}
+              >
+                <Text style={[styles.avatarText, { color: theme.primary }]}>
+                  {getInitials(displayName)}
+                </Text>
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.avatarBadge,
+                    { backgroundColor: theme.secondary, borderColor: theme.primary },
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.primary} name="account" size={15} />
+                </View>
+              </View>
+
+              <Text numberOfLines={1} style={[styles.name, { color: theme.onPrimary }]}>
+                {displayName}
+              </Text>
+              <Text numberOfLines={1} style={[styles.email, { color: theme.onPrimary }]}>
+                {email}
+              </Text>
+            </View>
+          </SafeAreaView>
+        </View>
+
+        <View style={[styles.overviewPanel, { backgroundColor: theme.backgroundElement }]}>
+          <View style={styles.panelContent}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Account overview</Text>
+
+            <View style={styles.profileSummaryRow}>
+              <View style={[styles.iconTile, { backgroundColor: theme.backgroundSelected }]}>
+                <MaterialCommunityIcons color={theme.primary} name="account-outline" size={22} />
+              </View>
+              <View style={styles.rowCopy}>
+                <Text style={[styles.rowTitle, { color: theme.text }]}>My profile</Text>
+                <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary }]}>
+                  {email}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            <View style={styles.sectionHeadingRow}>
+              <Text style={[styles.subsectionTitle, { color: theme.text }]}>Account roles</Text>
+              <Text style={[styles.subsectionDescription, { color: theme.textSecondary }]}>
+                Driver access is always included
+              </Text>
+            </View>
+
             <View style={styles.roleList}>
               {ACCOUNT_ROLES.map((role) => {
                 const isEnabled = session?.account.roles.includes(role) ?? role === 'driver';
-                const rowStyle = [
-                  styles.roleRow,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ];
                 const rowContent = (
                   <>
-                    <Text style={[styles.roleName, { color: theme.text }]}>{roleLabels[role]}</Text>
-                    <Text
+                    <View style={[styles.iconTile, { backgroundColor: theme.backgroundSelected }]}>
+                      <MaterialCommunityIcons
+                        color={theme.primary}
+                        name={roleIcons[role]}
+                        size={22}
+                      />
+                    </View>
+                    <View style={styles.rowCopy}>
+                      <Text style={[styles.rowTitle, { color: theme.text }]}>{roleLabels[role]}</Text>
+                      <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
+                        {role === 'driver' ? 'Navigation access' : `${roleLabels[role]} tools`}
+                      </Text>
+                    </View>
+                    <View
                       style={[
-                        styles.roleStatus,
-                        { color: isEnabled ? theme.primary : theme.placeholder },
+                        styles.statusPill,
+                        {
+                          backgroundColor: isEnabled ? theme.backgroundSelected : theme.background,
+                          borderColor: isEnabled ? theme.primary : theme.border,
+                        },
                       ]}
                     >
-                      {isEnabled ? 'Enabled' : 'Disabled'}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: isEnabled ? theme.primary : theme.placeholder },
+                        ]}
+                      >
+                        {isEnabled ? 'On' : 'Off'}
+                      </Text>
+                    </View>
                   </>
                 );
 
                 if (role === 'driver') {
                   return (
-                    <View key={role} style={rowStyle}>
+                    <View key={role} style={styles.overviewRow}>
                       {rowContent}
                     </View>
                   );
@@ -90,44 +184,57 @@ export function ProfileScreen() {
                     accessibilityState={{ checked: isEnabled }}
                     key={role}
                     onPress={() => setRoleEnabled(role as OptionalAccountRole, !isEnabled)}
-                    style={rowStyle}
-                    variant="surface"
+                    style={styles.overviewRow}
+                    variant="ghost"
                   >
                     {rowContent}
                   </AppButton>
                 );
               })}
             </View>
-          </View>
 
-          <View style={styles.rolesSection}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Application</Text>
-            <View
-              style={[
-                styles.appInfoCard,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            <Text style={[styles.subsectionTitle, { color: theme.text }]}>Application</Text>
+            <AppButton
+              accessibilityLabel="Check for application updates"
+              disabled={status === 'checking'}
+              onPress={checkForUpdates}
+              style={styles.overviewRow}
+              variant="ghost"
             >
-              <View style={styles.appInfoRow}>
-                <Text style={[styles.appInfoLabel, { color: theme.text }]}>Current Version</Text>
-                <Text style={[styles.appInfoValue, { color: theme.textSecondary }]}>
-                  v{currentVersion}
-                  {currentCommit ? ` (${currentCommit.slice(0, 7)})` : ''}
+              <View style={[styles.iconTile, { backgroundColor: theme.backgroundSelected }]}>
+                <MaterialCommunityIcons color={theme.primary} name="cellphone-arrow-down" size={22} />
+              </View>
+              <View style={styles.rowCopy}>
+                <Text style={[styles.rowTitle, { color: theme.text }]}>App updates</Text>
+                <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
+                  {status === 'checking'
+                    ? 'Checking for updates…'
+                    : `Version ${currentVersion}${currentCommit ? ` · ${currentCommit.slice(0, 7)}` : ''}`}
                 </Text>
               </View>
-              <AppButton
-                label={status === 'checking' ? 'Checking for updates...' : 'Check for updates'}
-                disabled={status === 'checking'}
-                onPress={checkForUpdates}
-                style={[styles.updateButton, { borderColor: theme.border }]}
-                variant="surface"
-              />
-            </View>
-          </View>
+              <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
+            </AppButton>
 
-          <AppButton label="Log out" onPress={logOut} style={styles.logoutButton} variant="surface" />
+            <AppButton
+              accessibilityLabel="Log out"
+              onPress={logOut}
+              style={styles.overviewRow}
+              variant="ghost"
+            >
+              <View style={[styles.iconTile, { backgroundColor: theme.background }]}>
+                <MaterialCommunityIcons color={theme.danger} name="logout" size={22} />
+              </View>
+              <View style={styles.rowCopy}>
+                <Text style={[styles.rowTitle, { color: theme.danger }]}>Log out</Text>
+                <Text style={[styles.rowDescription, { color: theme.placeholder }]}>Sign out of this device</Text>
+              </View>
+              <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
+            </AppButton>
+          </View>
         </View>
-      </SafeAreaView>
+      </ScrollView>
 
       <UpdateModal
         currentCommit={currentCommit}
@@ -144,121 +251,144 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  screen: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  hero: { minHeight: 276, overflow: 'hidden' },
+  heroSafeArea: {
     flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  content: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    gap: Spacing.four,
-    padding: Spacing.four,
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.six,
+  },
+  heroShapeLarge: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    right: -52,
+    bottom: -60,
+    borderRadius: Rounded.round,
+    opacity: 0.18,
+  },
+  heroShapeSmall: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    left: -22,
+    top: 74,
+    borderRadius: Rounded.round,
+    opacity: 0.16,
   },
   title: {
     fontFamily: Fonts.title,
     fontSize: 28,
     fontWeight: 700,
     lineHeight: 36,
+    paddingTop: Spacing.two,
   },
-  accountPanel: {
+  identity: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Spacing.one,
+  },
+  avatar: {
+    width: 92,
+    height: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 46,
+    borderWidth: 3,
+    marginBottom: Spacing.two,
+  },
+  avatarText: { fontFamily: Fonts.title, fontSize: 28, fontWeight: 700 },
+  avatarBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: 2,
+    width: 29,
+    height: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Rounded.round,
+    borderWidth: 2,
+  },
+  name: {
+    maxWidth: '90%',
+    fontFamily: Fonts.body,
+    fontSize: 20,
+    fontWeight: 900,
+    lineHeight: 26,
+  },
+  email: {
+    maxWidth: '90%',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 500,
+    lineHeight: 20,
+    opacity: 0.86,
+  },
+  overviewPanel: {
+    flexGrow: 1,
+    marginTop: -26,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: Spacing.five,
+    paddingBottom: Spacing.four,
+  },
+  panelContent: {
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.four,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 18,
+    fontWeight: 700,
+    marginBottom: Spacing.three,
+  },
+  sectionHeadingRow: { paddingTop: Spacing.one, paddingBottom: Spacing.one },
+  subsectionTitle: { fontFamily: Fonts.body, fontSize: 15, fontWeight: 900, lineHeight: 21 },
+  subsectionDescription: { fontFamily: Fonts.body, fontSize: 12, fontWeight: 500, lineHeight: 18 },
+  profileSummaryRow: {
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    borderRadius: Rounded.lg,
-    padding: Spacing.four,
   },
-  avatar: {
-    width: 48,
-    height: 48,
+  roleList: { paddingTop: Spacing.half },
+  overviewRow: {
+    minHeight: 62,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: Spacing.three,
+    borderRadius: Rounded.md,
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.half,
+  },
+  iconTile: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Rounded.lg,
   },
-  avatarText: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 900,
-  },
-  accountCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  name: {
-    fontFamily: Fonts.body,
-    fontSize: 17,
-    fontWeight: 900,
-  },
-  email: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 500,
-  },
-  rolesSection: {
-    gap: Spacing.two,
-  },
-  sectionTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 18,
-    fontWeight: 900,
-  },
-  rolesDescription: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 500,
-    lineHeight: 20,
-  },
-  roleList: {
-    gap: Spacing.one,
-  },
-  roleRow: {
-    minHeight: 48,
-    flexDirection: 'row',
+  rowCopy: { flex: 1, minWidth: 0 },
+  rowTitle: { fontFamily: Fonts.body, fontSize: 15, fontWeight: 700, lineHeight: 21 },
+  rowDescription: { fontFamily: Fonts.body, fontSize: 12, fontWeight: 500, lineHeight: 18 },
+  statusPill: {
+    minWidth: 42,
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.three,
+    borderRadius: Rounded.round,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.half,
   },
-  roleName: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 800,
-  },
-  roleStatus: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  appInfoCard: {
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  appInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  appInfoLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 700,
-  },
-  appInfoValue: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 800,
-  },
-  updateButton: {
-    borderWidth: 1,
-  },
-  logoutButton: {
-    alignSelf: 'stretch',
-    borderWidth: 1,
-  },
+  statusText: { fontFamily: Fonts.body, fontSize: 11, fontWeight: 900 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.three },
 });
