@@ -7,12 +7,6 @@
       "skillPath": "skills/taste-skill/SKILL.md",
       "computedHash": "899b84384f74f540ea5284d9b2e9234e050998b42eacc805410b518d4226c0b3"
     },
-    "gluestack-ui-v5": {
-      "source": "gluestack/agent-skills",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/gluestack-ui-v5/SKILL.md",
-      "computedHash": "b19717e992153a421da7423f0609a39c4864f947c7f50fca67cf5e5b7d4878e4"
-    },
     "image-to-code": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
