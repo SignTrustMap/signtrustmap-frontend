@@ -110,14 +110,21 @@ export function ProfileScreen() {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Account overview</Text>
 
             <View style={styles.profileSummaryRow}>
-              <View style={[styles.iconTile, { backgroundColor: theme.backgroundSelected }]}>
+              <View style={styles.iconTile}>
                 <MaterialCommunityIcons color={theme.primary} name="account-outline" size={22} />
               </View>
               <View style={styles.rowCopy}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>My profile</Text>
-                <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                  {email}
-                </Text>
+                <AppButton
+                  accessibilityLabel="Log out"
+                  onPress={logOut}
+                  style={styles.overviewRow}
+                  variant="ghost"
+                >
+                  <View style={styles.rowCopy}>
+                    <Text style={[styles.rowTitle, { color: theme.text }]}>View profile</Text>
+                  </View>
+                  <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
+                </AppButton>
               </View>
             </View>
 
@@ -135,7 +142,7 @@ export function ProfileScreen() {
                 const isEnabled = session?.account.roles.includes(role) ?? role === 'driver';
                 const rowContent = (
                   <>
-                    <View style={[styles.iconTile, { backgroundColor: theme.backgroundSelected }]}>
+                    <View style={styles.iconTile}>
                       <MaterialCommunityIcons
                         color={theme.primary}
                         name={roleIcons[role]}
@@ -171,7 +178,7 @@ export function ProfileScreen() {
 
                 if (role === 'driver') {
                   return (
-                    <View key={role} style={styles.overviewRow}>
+                    <View key={role} style={[styles.overviewRow, styles.shadowRow]}>
                       {rowContent}
                     </View>
                   );
@@ -184,7 +191,7 @@ export function ProfileScreen() {
                     accessibilityState={{ checked: isEnabled }}
                     key={role}
                     onPress={() => setRoleEnabled(role as OptionalAccountRole, !isEnabled)}
-                    style={styles.overviewRow}
+                    style={[styles.overviewRow, styles.shadowRow]}
                     variant="ghost"
                   >
                     {rowContent}
@@ -357,6 +364,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    boxShadow: '1px 2px 3px 2px rgba(0, 0, 0, 0.1)',
+    padding: Spacing.half,
+    borderRadius: Rounded.md,
   },
   roleList: { paddingTop: Spacing.half },
   overviewRow: {
@@ -369,6 +379,12 @@ const styles = StyleSheet.create({
     borderRadius: Rounded.md,
     paddingHorizontal: 0,
     paddingVertical: Spacing.half,
+    marginBottom: Spacing.two,
+  },
+  shadowRow: {
+    boxShadow: '1px 2px 3px 2px rgba(0, 0, 0, 0.1)',
+    padding: Spacing.half,
+    borderRadius: Rounded.md,
   },
   iconTile: {
     width: 42,
@@ -378,8 +394,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: Rounded.lg,
   },
-  rowCopy: { flex: 1, minWidth: 0 },
-  rowTitle: { fontFamily: Fonts.body, fontSize: 15, fontWeight: 700, lineHeight: 21 },
+  rowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowTitle: { fontFamily: Fonts.body, fontSize: 16, fontWeight: 500, lineHeight: 21 },
   rowDescription: { fontFamily: Fonts.body, fontSize: 12, fontWeight: 500, lineHeight: 18 },
   statusPill: {
     minWidth: 42,
