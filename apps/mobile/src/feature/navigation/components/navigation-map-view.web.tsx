@@ -1,5 +1,6 @@
+import { Asset } from 'expo-asset';
 import { useEffect, useRef } from 'react';
-import { Image as ReactNativeImage, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -8,6 +9,7 @@ import {
   type MapCoordinate,
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
+import type { RouteSign } from '@/feature/navigation/services/navigation-api';
 import { useTheme } from '@/hooks/use-theme';
 
 type NavigationMapViewProps = {
@@ -16,20 +18,22 @@ type NavigationMapViewProps = {
   focusRequestId?: number;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
-  routeStopCoordinates?: MapCoordinate[];
+  routeSigns?: RouteSign[];
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
-const stopSignImageUri = ReactNativeImage.resolveAssetSource(stopSignImage).uri;
+const stopSignImageUri = Asset.fromModule(stopSignImage).uri;
+const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
+  || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
 const openStreetMapStyle: StyleSpecification = {
   version: 8,
   sources: {
     osm: {
       type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tiles: [mapTileUrl],
       tileSize: 256,
-      attribution: 'OpenStreetMap contributors',
+      attribution: 'Esri, HERE, Garmin, USGS, OpenStreetMap contributors, GIS user community',
     },
   },
   layers: [
@@ -41,10 +45,10 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-function createStopSignMarkerElement() {
+function createSignMarkerElement(sign: RouteSign) {
   const marker = document.createElement('img');
-  marker.src = stopSignImageUri;
-  marker.alt = 'Stop sign';
+  marker.src = sign.imageUrl || stopSignImageUri;
+  marker.alt = sign.name || sign.signCode;
   marker.style.width = '36px';
   marker.style.height = '36px';
   marker.style.objectFit = 'contain';
@@ -117,7 +121,7 @@ export function NavigationMapView({
   focusRequestId = 0,
   routeCoordinates,
   routeStart,
-  routeStopCoordinates = [],
+  routeSigns = [],
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const destinationMarkerRef = useRef<Marker | null>(null);
@@ -241,10 +245,10 @@ export function NavigationMapView({
         .setLngLat(routeStart)
         .addTo(map);
 
-      if (routeStopCoordinates.length > 0) {
-        stopSignMarkersRef.current = routeStopCoordinates.map((coordinate) => (
-          new Marker({ element: createStopSignMarkerElement() })
-            .setLngLat(coordinate)
+      if (routeSigns.length > 0) {
+        stopSignMarkersRef.current = routeSigns.map((sign) => (
+          new Marker({ element: createSignMarkerElement(sign) })
+            .setLngLat(sign.coordinate)
             .addTo(map)
         ));
       }
@@ -269,7 +273,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeStart, routeStopCoordinates, theme.tertiary]);
+  }, [destination, routeCoordinates, routeSigns, routeStart, theme.tertiary]);
 
   return (
     <View style={styles.container}>

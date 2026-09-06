@@ -1,17 +1,23 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { Fonts, Spacing } from '@/constants/theme';
+import { useSession } from '@/context/session-provider';
 import {
-  previousLocations,
   startLocations,
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
+import {
+  getUserPlaces,
+  saveRecentPlace,
+  searchPlaces,
+  type ApiPlace,
+} from '@/feature/navigation/services/places-api';
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
@@ -20,12 +26,18 @@ const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
 export function RouteSearchScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { startId, startLat, startLng } = useLocalSearchParams<{
+  const { session } = useSession();
+  const { startId, startLat, startLng, startTitle } = useLocalSearchParams<{
     startId?: string;
     startLat?: string;
     startLng?: string;
+    startTitle?: string;
   }>();
   const [toast, setToast] = useState<{ id: number; message: string }>();
+  const [query, setQuery] = useState('');
+  const [locations, setLocations] = useState<ApiPlace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>();
   const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
     () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
@@ -33,10 +45,48 @@ export function RouteSearchScreen() {
   );
   const routeStart = coordinateStart ?? selectedStart?.coordinate;
 
-  const handleSelectLocation = (locationId: string) => {
-    const destination = previousLocations.find((location) => location.id === locationId);
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    if (query.trim().length >= 2) return;
+    getUserPlaces(session.accessToken)
+      .then((places) => {
+        setLocations(places);
+        setError(undefined);
+      })
+      .catch((cause: unknown) => {
+        setError(cause instanceof Error ? cause.message : 'Unable to load saved destinations.');
+      })
+      .finally(() => setIsLoading(false));
+  }, [query, session?.accessToken]);
 
-    if (areSameLocation(destination?.coordinate, routeStart)) {
+  useEffect(() => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery.length < 2) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      setIsLoading(true);
+      searchPlaces(normalizedQuery, controller.signal)
+        .then((places) => {
+          setLocations(places);
+          setError(undefined);
+        })
+        .catch((cause: unknown) => {
+          if (cause instanceof Error && cause.name === 'AbortError') return;
+          setError(cause instanceof Error ? cause.message : 'Unable to search for destinations.');
+        })
+        .finally(() => setIsLoading(false));
+    }, 350);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [query]);
+
+  const handleSelectLocation = (destination: ApiPlace) => {
+    if (destination.latitude == null || destination.longitude == null) return;
+    const coordinate: MapCoordinate = [destination.longitude, destination.latitude];
+
+    if (areSameLocation(coordinate, routeStart)) {
       setToast((currentToast) => ({
         id: (currentToast?.id ?? 0) + 1,
         message: SAME_LOCATION_MESSAGE,
@@ -44,12 +94,18 @@ export function RouteSearchScreen() {
       return;
     }
 
+    if (session?.accessToken) saveRecentPlace(destination, session.accessToken).catch(() => undefined);
     router.replace({
       pathname: '/home',
       params: {
-        destinationId: locationId,
+        destinationId: destination.id,
+        destinationLat: String(destination.latitude),
+        destinationLng: String(destination.longitude),
+        destinationSubtitle: destination.address ?? '',
+        destinationTitle: destination.title,
         ...(startId ? { startId } : {}),
         ...(startLat && startLng ? { startLat, startLng } : {}),
+        ...(startTitle ? { startTitle } : {}),
       },
     });
   };
@@ -67,7 +123,16 @@ export function RouteSearchScreen() {
         >
           <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
         </AppButton>
-        <Text style={[styles.searchPrompt, { color: theme.text }]}>Where to?</Text>
+        <TextInput
+          accessibilityLabel="Search destination"
+          autoFocus
+          onChangeText={setQuery}
+          placeholder="Where to?"
+          placeholderTextColor={theme.placeholder}
+          returnKeyType="search"
+          style={[styles.searchPrompt, { color: theme.text }]}
+          value={query}
+        />
       </View>
 
       <ScrollView
@@ -75,12 +140,21 @@ export function RouteSearchScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       >
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>RECENT</Text>
-        {previousLocations.map((location) => (
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          {query.trim().length >= 2 ? 'SEARCH RESULTS' : 'SAVED & RECENT'}
+        </Text>
+        {isLoading ? <ActivityIndicator color={theme.tertiary} style={styles.loading} /> : null}
+        {!isLoading && error ? (
+          <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
+        ) : null}
+        {!isLoading && !error && locations.length === 0 ? (
+          <Text style={[styles.error, { color: theme.textSecondary }]}>No destinations found.</Text>
+        ) : null}
+        {!isLoading && locations.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
             key={location.id}
-            onPress={() => handleSelectLocation(location.id)}
+            onPress={() => handleSelectLocation(location)}
             pressedOpacity={0.72}
             style={[styles.locationRow, { borderColor: theme.border }]}
             variant="ghost"
@@ -95,7 +169,7 @@ export function RouteSearchScreen() {
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
               <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
-                {location.subtitle}
+                {location.address}
               </Text>
             </View>
             <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>/</Text>
@@ -139,6 +213,7 @@ const styles = StyleSheet.create({
     fontWeight: 700,
   },
   searchPrompt: {
+    flex: 1,
     fontFamily: Fonts.body,
     fontSize: 15,
     fontWeight: 700,
@@ -181,6 +256,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 900,
     marginBottom: Spacing.one,
+  },
+  loading: { paddingVertical: Spacing.four },
+  error: {
+    paddingVertical: Spacing.four,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   locationRow: {
     minHeight: 64,

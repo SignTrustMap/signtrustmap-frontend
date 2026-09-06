@@ -96,7 +96,12 @@ function ReviewedSignRow({ review }: { review: CompletedReview }) {
 export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
+  const {
+    beginSubmissionCheck,
+    resetReviewWorkflow,
+    reviewHistory,
+    sessionReviewCount,
+  } = useReviewWorkflow();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
     (result, review) => ({ ...result, [review.action]: result[review.action] + 1 }),
     { approved: 0, declined: 0, reported: 0 },
@@ -107,9 +112,9 @@ export function SubmissionSummaryScreen() {
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.heading}>
-            <Text style={[styles.title, { color: theme.text }]}>Submission Summary</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Review History</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Today • {reviewHistory.length} signs reviewed
+              {reviewHistory.length} signs reviewed
             </Text>
           </View>
 
@@ -141,9 +146,9 @@ export function SubmissionSummaryScreen() {
               variant="surface"
             />
             <AppButton
-              label="Submit"
+              label="Finish"
               onPress={() => {
-                const reviewedCount = reviewHistory.length;
+                const reviewedCount = sessionReviewCount;
                 resetReviewWorkflow();
                 router.replace({
                   pathname: '/work/submission-finish',

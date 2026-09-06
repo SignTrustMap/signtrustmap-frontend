@@ -1,20 +1,25 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import {
   currentLocation,
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
+import {
+  submitSurveyImage,
+  type SurveySubmissionAttempt,
+} from '@/feature/upload/services/survey-submission';
 import { useTheme } from '@/hooks/use-theme';
 
-type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
+import { getMapLibre } from '@/services/maplibre';
 
 async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
   if (Platform.OS === 'web') {
@@ -39,9 +44,11 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
     });
   }
 
-  // Guarded require keeps stale development builds from crashing this screen.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+  const mapLibre = getMapLibre();
+  if (!mapLibre) {
+    throw new Error('Location lookup requires a native build.');
+  }
+
   const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
   if (!hasPermission) {
@@ -60,7 +67,10 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
 export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { imageType, imageUri, latitude, longitude } = useLocalSearchParams<{
+  const { session } = useSession();
+  const { imageMimeType, imageName, imageType, imageUri, latitude, longitude } = useLocalSearchParams<{
+    imageMimeType?: string;
+    imageName?: string;
     imageType?: string;
     imageUri?: string;
     latitude?: string;
@@ -80,6 +90,9 @@ export function SurveyRecordDetailsScreen() {
   );
   const [focusRequestId, setFocusRequestId] = useState(1);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string>();
+  const submissionAttempt = useRef<SurveySubmissionAttempt>({});
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
     imageCoordinate ? undefined : 'Image GPS is unavailable. Using the demo current location.',
   );
@@ -105,6 +118,41 @@ export function SurveyRecordDetailsScreen() {
       );
     } finally {
       setIsLocating(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (!imageUri || imageType === 'video') {
+      setSubmitError('Choose a sign image before submitting.');
+      return;
+    }
+    if (!session?.accessToken) {
+      setSubmitError('Your session has expired. Log in again and retry.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(undefined);
+    try {
+      const completed = await submitSurveyImage(
+        { fileName: imageName, mimeType: imageMimeType, uri: imageUri },
+        session.accessToken,
+        submissionAttempt.current,
+      );
+      router.replace({
+        pathname: '/work/survey-finish',
+        params: {
+          submissionId: completed.submissionId,
+          submissionStatus: completed.submissionStatus,
+        },
+      });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'The sign could not be submitted. Please retry.',
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -263,9 +311,16 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
-            label="Submit"
-            onPress={() => router.replace('/work/survey-finish')}
-            style={styles.submitButton} />
+            disabled={isSubmitting || !imageUri || imageType === 'video'}
+            label={isSubmitting ? 'Submitting...' : 'Submit'}
+            onPress={handleSubmit}
+            style={styles.submitButton}
+          />
+          {submitError ? (
+            <Text accessibilityRole="alert" style={styles.submitError}>
+              {submitError}
+            </Text>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -410,5 +465,13 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignSelf: 'stretch',
+  },
+  submitError: {
+    color: '#C62828',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+    marginTop: Spacing.one,
   },
 });

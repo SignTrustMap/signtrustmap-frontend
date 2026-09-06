@@ -8,6 +8,7 @@
     "@maplibre/maplibre-react-native": "^11.3.6",
     "clsx": "^2.1.1",
     "expo": "~57.0.9",
+    "expo-asset": "~57.0.8",
     "expo-clipboard": "^57.0.1",
     "expo-constants": "~57.0.8",
     "expo-device": "~57.0.1",
