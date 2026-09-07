@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg fill="#FFFFFF" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 50 50">
+  <!-- Outer 3D Cube Wireframe -->
+  <polygon style="fill:none;stroke:#FFFFFF;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" points="
+  	25,3.998 42.998,15 42.998,34.998 25,46 7,35 7.002,14.999 "/>
+  
+  <!-- Cursor Pointer Inside Cube (Filled Solid White) -->
+  <polygon style="fill:#FFFFFF;fill-rule:evenodd;clip-rule:evenodd;stroke:#030708;stroke-width:1;" points="8.026,15.5 25.026,25 25.026,44.5 41.526,16 "/>
+  
+  <!-- Cube Wireframe Internal Lines (Crisp White) -->
+  <line style="fill:none;stroke:#FFFFFF;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" x1="7.026" y1="35" x2="25.026" y2="25"/>
+  <line style="fill:none;stroke:#FFFFFF;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" x1="25" y1="3.998" x2="25.002" y2="14.994"/>
+  <line style="fill:none;stroke:#FFFFFF;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;" x1="42.708" y1="34.385" x2="34.5" y2="30"/>
+</svg>

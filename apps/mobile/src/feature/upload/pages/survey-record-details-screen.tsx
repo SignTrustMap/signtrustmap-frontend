@@ -195,6 +195,7 @@ export function SurveyRecordDetailsScreen() {
                   focusCoordinate={selectedCoordinate}
                   focusRequestId={focusRequestId}
                   showCurrentLocation
+                  isNavigatingFeature
                 />
               ) : (
                 <View style={styles.mapEmptyState}>
@@ -228,9 +229,9 @@ export function SurveyRecordDetailsScreen() {
               <SymbolView
                 name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
                 size={16}
-                tintColor={theme.onTertiary}
+                tintColor={theme.onPrimary}
               />
-              <Text style={[styles.locationButtonText, { color: theme.onTertiary }]}>
+              <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
                 {isLocating ? 'Getting location...' : 'Use current location'}
               </Text>
             </AppButton>
@@ -263,7 +264,10 @@ export function SurveyRecordDetailsScreen() {
             />
           </View>
 
-          <AppButton label="Submit" onPress={() => undefined} style={styles.submitButton} />
+          <AppButton
+            label="Submit"
+            onPress={() => router.replace('/work/survey-finish')}
+            style={styles.submitButton} />
         </ScrollView>
       </SafeAreaView>
     </View>

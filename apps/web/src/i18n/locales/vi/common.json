@@ -1,0 +1,107 @@
+{
+  "nav": {
+    "product": "Sản phẩm",
+    "docs": "Tài liệu",
+    "about": "Về chúng tôi",
+    "login": "Đăng nhập",
+    "signup": "Đăng ký",
+    "mobile_product": "Sản phẩm",
+    "mobile_map": "🗺️ Bản Đồ Biển Báo GIS",
+    "mobile_app": "📱 Ứng Dụng Khảo Sát & Dẫn Đường",
+    "close_menu": "Đóng menu",
+    "open_menu": "Mở menu"
+  },
+  "announcement": {
+    "badge": "Mới cập nhật",
+    "message": "SignTrustMap - Nền tảng kết hợp AI và cộng đồng xây dựng cơ sở dữ liệu biển báo tin cậy"
+  },
+  "theme": {
+    "to_light": "Chuyển sang giao diện Sáng",
+    "to_dark": "Chuyển sang giao diện Tối",
+    "toggle_label": "Chuyển đổi giao diện Sáng/Tối"
+  },
+  "lang": {
+    "toggle_to_en": "Switch to English (EN)",
+    "toggle_to_vi": "Chuyển sang Tiếng Việt (VI)",
+    "toggle_label": "Chuyển đổi ngôn ngữ"
+  },
+  "footer": {
+    "description": "Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.",
+    "copyright": "© {{year}} SignTrustMap Project.",
+    "sections": {
+      "product": "Sản phẩm",
+      "solutions": "Giải pháp",
+      "docs_mlops": "Tài liệu & MLOps",
+      "project": "Dự án"
+    },
+    "links": {
+      "gis_map": "Bản đồ biển báo GIS",
+      "mobile_app": "Ứng dụng khảo sát & dẫn đường",
+      "ai_pipeline": "Pipeline AI (YOLO12 + CLIP)",
+      "qcvn_catalog": "Danh mục chuẩn QCVN 41:2019",
+      "for_surveyor": "Dành cho Khảo sát viên (Surveyor)",
+      "for_reviewer": "Dành cho Người kiểm duyệt (Reviewer)",
+      "for_driver": "Dành cho Tài xế & Dẫn đường",
+      "ops_portal": "Cổng Quản trị & Điều hành Ops",
+      "api_docs": "Tài liệu kỹ thuật API",
+      "active_learning": "Quy trình Active Learning",
+      "github": "Mã nguồn GitHub",
+      "about": "Về dự án SignTrustMap",
+      "privacy": "Chính sách bảo mật",
+      "terms": "Điều khoản dịch vụ"
+    }
+  },
+  "auth": {
+    "login": {
+      "title_action": "Đăng nhập",
+      "subtitle": "Truy cập tài khoản cộng đồng để xem và đóng góp biển báo",
+      "email_label": "Email",
+      "password_label": "Mật khẩu",
+      "forgot_password": "Quên mật khẩu?",
+      "submit": "Đăng nhập",
+      "submitting": "Đang đăng nhập...",
+      "google": "Đăng nhập với Google",
+      "or": "HOẶC",
+      "no_account": "Chưa có tài khoản?",
+      "go_signup": "Đăng ký ngay",
+      "error_default": "Đăng nhập thất bại. Vui lòng kiểm tra lại email hoặc mật khẩu.",
+      "hide_pw": "Ẩn mật khẩu",
+      "show_pw": "Hiện mật khẩu"
+    },
+    "signup": {
+      "title_action": "Tạo tài khoản",
+      "subtitle": "Bắt đầu tham gia đóng góp và trải nghiệm bản đồ biển báo tin cậy",
+      "name_label": "Họ và tên",
+      "name_placeholder": "Nguyễn Văn A",
+      "email_label": "Email",
+      "password_label": "Mật khẩu",
+      "password_placeholder": "Tối thiểu 8 ký tự",
+      "confirm_password_label": "Xác nhận mật khẩu",
+      "confirm_password_placeholder": "Nhập lại mật khẩu của bạn",
+      "password_mismatch": "Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.",
+      "password_too_short": "Mật khẩu phải có tối thiểu 8 ký tự.",
+      "credits_bonus_prefix": "Tặng ngay ",
+      "credits_bonus_highlight": "50 Credits",
+      "credits_bonus_suffix": " khi kích hoạt tài khoản",
+      "terms_agree_prefix": "Bằng việc đăng ký bên dưới, tôi đồng ý với ",
+      "terms_service": "Điều khoản dịch vụ",
+      "and": " và ",
+      "terms_privacy": "Chính sách bảo mật",
+      "terms_of": " của SignTrustMap.",
+      "terms_error": "Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật để tiếp tục.",
+      "submit": "Đăng ký với Email",
+      "submitting": "Đang tạo tài khoản...",
+      "google": "Đăng ký với Google",
+      "or": "HOẶC",
+      "has_account": "Đã có tài khoản?",
+      "go_login": "Đăng nhập ngay",
+      "error_default": "Đăng ký không thành công. Vui lòng thử lại.",
+      "hide_pw": "Ẩn mật khẩu",
+      "show_pw": "Hiện mật khẩu"
+    }
+  },
+  "placeholder": {
+    "about": "Về chúng tôi",
+    "coming_soon": "Đang được cập nhật"
+  }
+}

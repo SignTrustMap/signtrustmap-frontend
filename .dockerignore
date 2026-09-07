@@ -4,5 +4,7 @@ node_modules
 README.md
 apps/web/dist
 apps/web/node_modules
+apps/ops/dist
+apps/ops/node_modules
 apps/mobile/node_modules
 apps/mobile/.expo

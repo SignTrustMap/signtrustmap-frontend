@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - apps/mobile/**
+      - packages/**
       - package.json
       - package-lock.json
       - .github/workflows/android-apk.yml
@@ -13,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -23,51 +24,92 @@ jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_APP_COMMIT_SHA: ${{ github.sha }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Set up Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Build APK with EAS
+      - name: Generate Android Native Project
         working-directory: apps/mobile
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Configure ABI Splits
         run: |
-          eas build \
-            --platform android \
-            --profile preview \
-            --non-interactive \
-            --wait \
-            --json > build-result.json
+          sed -i '/android {/a \    splits { abi { enable true; reset(); include "arm64-v8a", "armeabi-v7a", "x86_64"; universalApk false } }' apps/mobile/android/app/build.gradle
 
-      - name: Download APK
-        working-directory: apps/mobile
+      - name: Build APK with Gradle
+        working-directory: apps/mobile/android
         run: |
-          BUILD_URL=$(jq -r '.[0].artifacts.buildUrl' build-result.json)
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
 
-          if [ -z "$BUILD_URL" ] || [ "$BUILD_URL" = "null" ]; then
-            echo "Could not find APK download URL"
-            exit 1
-          fi
+      - name: Prepare APK artifacts
+        run: |
+          OUTPUT_DIR="apps/mobile/android/app/build/outputs/apk/release"
+          cp "${OUTPUT_DIR}/app-arm64-v8a-release.apk" "apps/mobile/signtrustmap-arm64-v8a.apk"
+          cp "${OUTPUT_DIR}/app-armeabi-v7a-release.apk" "apps/mobile/signtrustmap-armeabi-v7a.apk"
+          cp "${OUTPUT_DIR}/app-x86_64-release.apk" "apps/mobile/signtrustmap-x86_64.apk"
 
-          curl --fail --location "$BUILD_URL" --output app-release.apk
-
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: apps/mobile/app-release.apk
+          name: signtrustmap-apks
+          path: |
+            apps/mobile/signtrustmap-arm64-v8a.apk
+            apps/mobile/signtrustmap-armeabi-v7a.apk
+            apps/mobile/signtrustmap-x86_64.apk
           retention-days: 14
+
+      - name: Create or Update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG="build-${SHORT_SHA}"
+          TITLE="Build ${{ github.run_number }}"
+          FILES="apps/mobile/signtrustmap-arm64-v8a.apk apps/mobile/signtrustmap-armeabi-v7a.apk apps/mobile/signtrustmap-x86_64.apk"
+
+          {
+            echo "### Changes in this build"
+            git log -1 --pretty=%B
+            echo ""
+            echo "---"
+            echo "* **Commit:** ${{ github.sha }}"
+            echo "* **Author:** ${{ github.actor }}"
+            echo "* **Triggered by:** ${{ github.event_name }}"
+            echo ""
+            echo "### 📱 Downloads by Architecture"
+            echo "* **[ARM64 (Most modern phones)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-arm64-v8a.apk)**"
+            echo "* **[ARMv7 (Older 32-bit phones)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-armeabi-v7a.apk)**"
+            echo "* **[x86_64 (Emulators / PC)](https://github.com/${{ github.repository }}/releases/download/${TAG}/signtrustmap-x86_64.apk)**"
+          } > release_notes.md
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" $FILES --clobber
+            gh release edit "$TAG" --notes-file release_notes.md --title "$TITLE"
+          else
+            gh release create "$TAG" $FILES \
+              --title "$TITLE" \
+              --notes-file release_notes.md \
+              --target "${{ github.sha }}"
+          fi

@@ -57,24 +57,23 @@ function RootNavigation() {
   }, [isInitializing]);
 
   return (
-    <>
-      {shouldShowSplash ? <AppSplashScreen /> : null}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: Colors.background,
-          },
-        }}
-      >
-        <Stack.Protected guard={!hasValidSession}>
-          <Stack.Screen name="(public)/login" />
-        </Stack.Protected>
-        <Stack.Protected guard={hasValidSession}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(authenticated)" />
-        </Stack.Protected>
-      </Stack>
-    </>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: Colors.background,
+        },
+        animation: 'slide_from_right',
+      }}
+
+    >
+      <Stack.Protected guard={!hasValidSession}>
+        <Stack.Screen name="(public)/login" />
+      </Stack.Protected>
+      <Stack.Protected guard={hasValidSession}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(authenticated)" />
+      </Stack.Protected>
+    </Stack>
   );
 }

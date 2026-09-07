@@ -17,7 +17,7 @@ const actionDetails: Record<
   { color: string; label: string; summary: string; symbol: string }
 > = {
   approved: {
-    color: Colors.tertiary,
+    color: Colors.primary,
     label: 'Approved',
     summary: 'Ready for the trusted sign map.',
     symbol: '✓',
@@ -93,7 +93,7 @@ function ReviewedSignRow({ review }: { review: CompletedReview }) {
   );
 }
 
-export function SubmissionCompleteScreen() {
+export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
@@ -136,8 +136,8 @@ export function SubmissionCompleteScreen() {
                 beginSubmissionCheck();
                 router.replace('/work/submission-review');
               }}
-              style={[styles.checkButton, { borderColor: theme.tertiary }]}
-              textStyle={{ color: theme.tertiary }}
+              style={[styles.checkButton, { borderColor: theme.primary }]}
+              textStyle={{ color: theme.primary }}
               variant="surface"
             />
             <AppButton
@@ -146,7 +146,7 @@ export function SubmissionCompleteScreen() {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();
                 router.replace({
-                  pathname: '/work/submission-complete',
+                  pathname: '/work/submission-finish',
                   params: { count: String(reviewedCount) },
                 });
               }}

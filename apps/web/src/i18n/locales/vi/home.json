@@ -1,0 +1,62 @@
+{
+  "hero": {
+    "badge_ai": "Nền tảng Crowd-AI & GIS",
+    "badge_standard": "Chuẩn QCVN 41:2019/BGTVT",
+    "title": "SignTrustMap",
+    "subtitle": "Nền tảng kết hợp AI và cộng đồng để xây dựng cơ sở dữ liệu biển báo giao thông tin cậy.",
+    "cta_map": "Khám phá bản đồ",
+    "cta_app": "Tải ứng dụng mobile",
+    "marquee_label": "Tương thích và hỗ trợ phát triển bởi các mô hình AI & công cụ lập trình hàng đầu",
+    "stats": {
+      "s1_stat": "Lorem Ipsum",
+      "s1_title": "Dolor Sit Amet Consectetur",
+      "s1_desc": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "s2_stat": "Adipiscing Elit",
+      "s2_title": "Eiusmod Tempor Incididunt",
+      "s2_desc": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat.",
+      "s3_stat": "Magna Aliqua",
+      "s3_title": "Labore Et Dolore Magna",
+      "s3_desc": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit."
+    }
+  },
+  "topo": {
+    "eyebrow": "// VÒNG ĐỜI DỮ LIỆU KHÉP KÍN",
+    "title": "Từ camera thực địa đến bản đồ dẫn đường tin cậy",
+    "subtitle": "Quy trình toàn diện giải quyết bài toán độ trễ và sự thay đổi liên tục của biển báo giao thông tại Việt Nam.",
+    "cards": {
+      "c1_tag": "Lorem Ipsum Tag",
+      "c1_title": "Lorem Ipsum Dolor Sit",
+      "c1_body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.",
+      "c2_tag": "Consectetur Elit",
+      "c2_title": "Adipiscing Eiusmod Tempor",
+      "c2_body": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.",
+      "c3_tag": "Incididunt Labore",
+      "c3_title": "Magna Aliqua Veniam",
+      "c3_body": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris."
+    }
+  },
+  "map_preview": {
+    "eyebrow": "// BẢN ĐỒ GIS TƯƠNG TÁC",
+    "title": "Tra cứu & phân loại biển báo chuẩn QCVN 41",
+    "subtitle": "Truy cập bản đồ không gian tương tác hỗ trợ tìm kiếm, lọc phân cụm, kiểm tra lịch sử tái thẩm định và hình ảnh bằng chứng thực địa.",
+    "feature_1": "Phân loại 5 nhóm: Biển cấm (P), Hiệu lệnh (R), Cảnh báo (W), Chỉ dẫn (I), Biển phụ (S)",
+    "feature_2": "Hiển thị hướng áp dụng giao thông (Traffic Direction Metadata)",
+    "feature_3": "Xem điểm tin cậy (Trust Score) và nguồn dữ liệu cộng đồng",
+    "cta": "Mở bản đồ toàn màn hình"
+  },
+  "mobile_cta": {
+    "eyebrow": "// ĐÓNG GÓP & NHẬN THƯỞNG",
+    "title": "Khảo sát thực địa, nhận thưởng tín dụng Credit",
+    "subtitle": "Sử dụng ứng dụng SignTrustMap để ghi lại chuyến đi (Video + GPX) hoặc chụp ảnh biển báo mới. Nhận điểm thưởng tín dụng minh bạch khi đóng góp được cộng đồng kiểm duyệt thông qua.",
+    "cta_app": "Tải ứng dụng mobile",
+    "cta_credit": "Cơ chế kinh tế tín dụng →",
+    "badge_1_title": "Video & GPX Sync",
+    "badge_1_desc": "Đồng bộ vệt quỹ đạo hành trình chính xác",
+    "badge_2_title": "Direction Alerts",
+    "badge_2_desc": "Cảnh báo biển báo đúng chiều di chuyển",
+    "badge_3_title": "Revalidation Tasks",
+    "badge_3_desc": "Nhận nhiệm vụ làm mới biển báo cũ",
+    "badge_4_title": "Credit Wallet",
+    "badge_4_desc": "Ví tín dụng và lịch sử thưởng minh bạch"
+  }
+}

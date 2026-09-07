@@ -34,16 +34,18 @@ export function AppButton({
   const theme = useTheme();
   const variantStyle = {
     primary: {
-      backgroundColor: theme.tertiary,
+      backgroundColor: theme.primary,
     },
     surface: {
       backgroundColor: theme.backgroundElement,
+      borderColor: theme.primary,
+      borderWidth: 1,
     },
     ghost: {
       backgroundColor: 'transparent',
     },
   }[variant];
-  const textColor = variant === 'primary' ? theme.onTertiary : theme.text;
+  const textColor = variant === 'primary' ? theme.onPrimary : theme.text;
 
   return (
     <Pressable

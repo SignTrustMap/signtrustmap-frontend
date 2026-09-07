@@ -22,14 +22,14 @@ export function NavigationManeuverBanner({
       <View
         accessibilityLiveRegion="polite"
         accessibilityRole="summary"
-        style={[styles.banner, { backgroundColor: theme.tertiary }]}
+        style={[styles.banner, { backgroundColor: theme.primary }]}
       >
         <View style={styles.symbolContainer}>
-          <Text style={[styles.symbol, { color: theme.onTertiary }]}>{symbol}</Text>
+          <Text style={[styles.symbol, { color: theme.onPrimary }]}>{symbol}</Text>
         </View>
         <View style={styles.copy}>
-          <Text style={[styles.distance, { color: theme.onTertiary }]}>{distance}</Text>
-          <Text numberOfLines={2} style={[styles.instruction, { color: theme.onTertiary }]}>
+          <Text style={[styles.distance, { color: theme.onPrimary }]}>{distance}</Text>
+          <Text numberOfLines={2} style={[styles.instruction, { color: theme.onPrimary }]}>
             {instruction}
           </Text>
         </View>

@@ -1,12 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDebounce } from '@/hooks/use-debounce';
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   previousLocations,
   startLocations,
@@ -15,8 +17,10 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
+import { AppInput } from '@/components/ui/input';
+import { SAME_LOCATION_MESSAGE } from '@/constants/message';
 
-const SAME_LOCATION_MESSAGE = "Can't select the same location twice";
+
 export function RouteSearchScreen() {
   const router = useRouter();
   const theme = useTheme();
@@ -25,6 +29,11 @@ export function RouteSearchScreen() {
     startLat?: string;
     startLng?: string;
   }>();
+
+  const [searchText, setSearchText] = useState('');
+  const debouncedSearchText = useDebounce(searchText, 500);
+  const [searchResults, setSearchResults] = useState<typeof previousLocations>(previousLocations);
+
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
@@ -54,20 +63,55 @@ export function RouteSearchScreen() {
     });
   };
 
+  useEffect(() => {
+    if (debouncedSearchText) {
+      setTimeout(() => {
+        const results = previousLocations.filter((location) =>
+          location.title.toLowerCase().includes(debouncedSearchText.toLowerCase())
+        );
+        setSearchResults(results);
+      }, 500);
+    }
+
+    return () => {
+      setSearchResults(previousLocations);
+    };
+  }, [debouncedSearchText]);
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
-        <AppButton
-          accessibilityLabel="Go back"
-          hitSlop={Spacing.one}
-          onPress={() => router.back()}
-          pressedOpacity={0.7}
-          style={styles.backButton}
-          variant="ghost"
-        >
-          <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
-        </AppButton>
-        <Text style={[styles.searchPrompt, { color: theme.text }]}>Where to?</Text>
+        <View style={{ flex: 1, minWidth: 0, marginTop: Spacing.one }}>
+          <AppInput
+            accessibilityLabel='Search for your destination'
+            autoFocus
+            placeholder="Where to?"
+            style={[styles.searchPrompt, { color: theme.text }]}
+            containerStyle={[
+              styles.searchInputContainer,
+              {
+                backgroundColor: theme.background,
+                borderColor: 'transparent',
+              },
+            ]}
+            leadingIcon={
+              <AppButton
+                accessibilityLabel="Go back"
+                hitSlop={Spacing.one}
+                onPress={() => router.back()}
+                pressedOpacity={0.7}
+                style={styles.backButton}
+                variant="ghost"
+              >
+                <AntDesign
+                  name="arrow-left"
+                  style={[styles.backIcon, { color: theme.text }]}
+                />
+              </AppButton>
+            }
+            callback={setSearchText}
+          />
+        </View>
       </View>
 
       <ScrollView
@@ -76,7 +120,7 @@ export function RouteSearchScreen() {
         style={styles.list}
       >
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>RECENT</Text>
-        {previousLocations.map((location) => (
+        {searchResults.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
             key={location.id}
@@ -89,16 +133,15 @@ export function RouteSearchScreen() {
               <SymbolView
                 name={{ android: 'history', ios: 'clock', web: 'history' }}
                 size={17}
-                tintColor={theme.textSecondary}
+                tintColor={theme.text}
               />
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+              <Text style={[styles.locationSubtitle, { color: theme.grey }]}>
                 {location.subtitle}
               </Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.textSecondary }]}>/</Text>
           </AppButton>
         ))}
       </ScrollView>
@@ -123,6 +166,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
+    marginBottom: Spacing.four,
+    marginTop: Spacing.three,
   },
   backButton: {
     width: 36,
@@ -135,39 +180,22 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontFamily: Fonts.body,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 700,
   },
   searchPrompt: {
     fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 700,
+    fontSize: 18,
+    fontWeight: 600,
+    paddingHorizontal: Spacing.one
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-  },
-  filterPill: {
-    minHeight: 36,
-    borderWidth: 1,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.half,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 0,
-  },
-  filterIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  filterText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 800,
+  searchInputContainer: {
+    borderRadius: Rounded.round,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
   },
   list: {
     flex: 1,
@@ -187,13 +215,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.three,
     paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingVertical: Spacing.three,
   },
   recentIconCircle: {
-    width: 32,
-    height: 32,
+    padding: Spacing.one * 1.2,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -205,16 +232,12 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontFamily: Fonts.body,
     fontSize: 16,
-    fontWeight: 900,
+    fontWeight: 600,
   },
   locationSubtitle: {
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 600,
-  },
-  arrowIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 700,
+    paddingTop: Spacing.half,
   },
 });
