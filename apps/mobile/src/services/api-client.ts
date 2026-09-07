@@ -71,6 +71,9 @@ export async function apiRequest<T>(
   try {
     response = await fetch(`${baseUrl}${path}`, { ...options, headers });
   } catch (error) {
+    if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+      throw error;
+    }
     const cause = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to connect to backend at ${baseUrl}: ${cause}`);
   }
@@ -100,6 +103,7 @@ export function jsonApiRequest<T>(
   path: string,
   body: unknown,
   accessToken?: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   return apiRequest<T>(
     path,
@@ -107,6 +111,7 @@ export function jsonApiRequest<T>(
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
       method: "POST",
+      signal,
     },
     accessToken,
   );

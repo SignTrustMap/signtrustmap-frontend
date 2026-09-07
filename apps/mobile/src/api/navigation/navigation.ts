@@ -1,6 +1,6 @@
-import type { MapCoordinate } from "@/feature/navigation/data/navigation-locations";
+import type { MapCoordinate } from "@/types/navigation/navigationType";
 import { apiRequest, jsonApiRequest } from "@/services/api-client";
-import { VehicleMode } from "@/types/navigationType";
+import { VehicleMode } from "@/types/navigation/navigationType";
 import { API_PATHS } from "@/api/api";
 
 
@@ -84,6 +84,8 @@ export async function getNavigationRoute(
             originLatitude: start[1],
             originLongitude: start[0],
         },
+        undefined,
+        signal,
     );
     throwIfAborted(signal);
 
@@ -92,10 +94,16 @@ export async function getNavigationRoute(
     );
     let signs: AlongRouteResponse = { signs: [] };
     try {
-        signs = await jsonApiRequest<AlongRouteResponse>(API_PATHS.SIGNS_ALONG_ROUTE, {
-            geometry: directions.shortestPath.geometry,
-        });
-    } catch {
+        signs = await jsonApiRequest<AlongRouteResponse>(
+            API_PATHS.SIGNS_ALONG_ROUTE,
+            { geometry: directions.shortestPath.geometry },
+            undefined,
+            signal,
+        );
+    } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+            throw error;
+        }
         // If sign querying fails or geometry payload is large, proceed with route calculation
         signs = { signs: [] };
     }

@@ -1,1 +1,0 @@
-export type VehicleMode = { id: "DRIVING"; label: string };
