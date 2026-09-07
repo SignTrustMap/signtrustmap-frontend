@@ -25,7 +25,6 @@ import {
   type ReviewActionType,
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
-import { sampleReviewSubmissions } from '@/feature/review/data/sample-submissions';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -117,6 +116,7 @@ function MetaItem({
 
 function ReviewAction({
   color,
+  disabled,
   label,
   onPress,
   style,
@@ -124,6 +124,7 @@ function ReviewAction({
   variant = 'outline',
 }: {
   color: string;
+  disabled?: boolean;
   label: string;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
@@ -133,6 +134,7 @@ function ReviewAction({
   return (
     <AppButton
       accessibilityLabel={label}
+      disabled={disabled}
       onPress={onPress}
       style={[
         styles.decisionButton,
@@ -353,15 +355,19 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     checkedReviewIndex,
     isCheckingSubmission,
     completeCurrentReview,
+    error,
     finishSubmissionCheck,
     goToNextCheckedReview,
     goToPreviousCheckedReview,
     pendingSubmissions,
+    isLoading,
+    isSubmitting,
     recheckingPreviousAction,
     recheckingReviewIndex,
     isRecheckingSubmission,
     reviewCheckedSubmissionAgain,
     reviewHistory,
+    totalSubmissions,
     undoLastReview,
   } = useReviewWorkflow();
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
@@ -382,14 +388,18 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       ? (recheckingReviewIndex ?? 0) + 1
       : Math.min(
         reviewHistory.length + (submission ? 1 : 0),
-        sampleReviewSubmissions.length,
+        totalSubmissions,
       );
 
-  const completeReview = (action: ReviewActionType) => {
-    if (!submission) return;
-    const completesReviewQueue = !isRecheckingSubmission && pendingSubmissions.length === 1;
+  const completeReview = async (
+    action: ReviewActionType,
+    details?: { declineNote?: string; declineReason?: string },
+  ) => {
+    if (!submission || isSubmitting) return false;
+    const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
 
-    completeCurrentReview(action);
+    const completed = await completeCurrentReview({ action, ...details });
+    if (!completed) return false;
 
     const toastMessages: Record<ReviewActionType, string> = {
       approved: 'Sign approved',
@@ -406,34 +416,39 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     if (completesReviewQueue) {
       router.replace('/work/submission-summary');
     }
+    return true;
   };
 
   const closeSheet = () => setActiveSheet(undefined);
 
-  const confirmDecline = () => {
+  const confirmDecline = async () => {
     const canDecline = declineReason && (declineReason !== 'Other' || declineReasonDetail.trim());
     if (!canDecline) return;
 
-    completeReview('declined');
+    const completed = await completeReview('declined', {
+      declineNote: declineReasonDetail.trim() || undefined,
+      declineReason,
+    });
+    if (!completed) return;
     setDeclineReason(undefined);
     setDeclineReasonDetail('');
     closeSheet();
   };
 
-  const confirmReport = () => {
+  const confirmReport = async () => {
     if (!reportNote.trim()) return;
 
-    completeReview('reported');
+    const completed = await completeReview('reported', { declineNote: reportNote.trim() });
+    if (!completed) return;
     setReportNote('');
     closeSheet();
   };
 
-  const undoLastAction = () => {
+  const undoLastAction = async () => {
     const lastReview = reviewHistory[reviewHistory.length - 1];
     if (!lastReview) return;
 
-    undoLastReview();
-    setToast(undefined);
+    if (await undoLastReview()) setToast(undefined);
   };
 
   return (
@@ -468,8 +483,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             style={[
               styles.progressFill,
               {
-                backgroundColor: Colors.primary,
-                width: `${(reviewPosition / sampleReviewSubmissions.length) * 100}%`,
+                backgroundColor: Colors.tertiary,
+                width: `${totalSubmissions ? (reviewPosition / totalSubmissions) * 100 : 0}%`,
               },
             ]}
           />
@@ -478,11 +493,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           <Text style={[styles.counter, { color: theme.textSecondary }]}>
             {isCheckingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
             {reviewPosition} OF{' '}
-            {sampleReviewSubmissions.length}
+            {totalSubmissions}
           </Text>
         </View>
 
-        {state === 'loading' ? (
+        {state === 'loading' || isLoading ? (
           <SubmissionReviewSkeleton />
         ) : submission ? (
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -506,6 +521,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 />
               </AppButton>
             </View>
+
+            {error ? (
+              <Text accessibilityRole="alert" style={styles.apiError}>{error}</Text>
+            ) : null}
 
             <View
               style={[
@@ -611,7 +630,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                     </Text>
                   </View>
                 </View>
-                <AppButton label="Review again" onPress={reviewCheckedSubmissionAgain} />
+                <AppButton
+                  disabled={isSubmitting}
+                  label={isSubmitting ? 'Updating...' : 'Review again'}
+                  onPress={reviewCheckedSubmissionAgain}
+                />
                 <View style={styles.checkNavigation}>
                   <AppButton
                     disabled={checkedReviewIndex === 0}
@@ -640,7 +663,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <>
                 <View style={styles.primaryActions}>
                   <ReviewAction
-                    color={theme.primary}
+                    color={theme.tertiary}
+                    disabled={isSubmitting}
                     label="Approve"
                     onPress={() => completeReview('approved')}
                     symbol="✓"
@@ -651,6 +675,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 <View style={styles.secondaryActions}>
                   <ReviewAction
                     color={Colors.danger}
+                    disabled={isSubmitting}
                     label="Decline"
                     onPress={() => setActiveSheet('decline')}
                     style={styles.secondaryButton}
@@ -658,6 +683,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   />
                   <AppButton
                     label="⚑  Report"
+                    disabled={isSubmitting}
                     onPress={() => setActiveSheet('report')}
                     style={[styles.secondaryButton, { borderColor: theme.border }]}
                     textStyle={styles.secondaryButtonLabel}
@@ -668,6 +694,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {reviewHistory.length > 0 && !isRecheckingSubmission ? (
                   <AppButton
                     label="↶  Undo Last Action"
+                    disabled={isSubmitting}
                     onPress={undoLastAction}
                     style={[styles.undoButton, { borderColor: theme.border }]}
                     textStyle={styles.undoLabel}
@@ -875,6 +902,13 @@ const styles = StyleSheet.create({
   },
   decisionSymbol: { fontFamily: Fonts.body, fontSize: 19, fontWeight: 800, lineHeight: 21 },
   decisionLabel: { fontFamily: Fonts.body, fontSize: 14, fontWeight: 800 },
+  apiError: {
+    color: Colors.danger,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+    lineHeight: 18,
+  },
   secondaryActions: { flexDirection: 'row', gap: Spacing.one },
   secondaryButton: {
     flex: 1,

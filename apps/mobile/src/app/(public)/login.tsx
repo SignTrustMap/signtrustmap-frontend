@@ -9,7 +9,7 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AppButton } from '@/components/ui/button';
 import { AppInput } from '@/components/ui/input';
 import { useSession } from '@/context/session-provider';
-import { createFakeSession } from '@/feature/auth/data/fake-session';
+import { logInWithPassword } from '@/feature/auth/services/auth-api';
 import { useTheme } from '@/hooks/use-theme';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,6 +21,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string>();
 
   const handleLogIn = async () => {
     const nextErrors = {
@@ -34,13 +36,20 @@ export default function LoginScreen() {
       return;
     }
 
-    await logIn(createFakeSession(email.trim()));
-    router.replace('/');
+    setIsSubmitting(true);
+    setLoginError(undefined);
+    try {
+      await logIn(await logInWithPassword(email.trim(), password));
+      router.replace('/');
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'Unable to log in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleGoogleLogIn = async () => {
-    await logIn(createFakeSession());
-    router.replace('/');
+  const handleGoogleLogIn = () => {
+    setLoginError('Google sign-in is not available in the mobile app yet.');
   };
 
   return (
@@ -67,7 +76,7 @@ export default function LoginScreen() {
                 setEmail(value);
                 setErrors((current) => ({ ...current, email: undefined }));
               }}
-              placeholder="driver@example.com"
+              placeholder="demo@stm.dev"
               type="email"
               value={email}
             />
@@ -85,7 +94,8 @@ export default function LoginScreen() {
             <Pressable accessibilityRole="button" style={styles.forgotPassword}>
               <Text style={[styles.linkText, { color: theme.primary }]}>Forgot Password?</Text>
             </Pressable>
-            <AppButton label="Login" onPress={handleLogIn} style={styles.loginButton} />
+            {loginError ? <Text accessibilityRole="alert" style={styles.errorText}>{loginError}</Text> : null}
+            <AppButton disabled={isSubmitting} label={isSubmitting ? 'Logging in...' : 'Login'} onPress={handleLogIn} style={styles.loginButton} />
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
               <Text style={[styles.dividerText, { color: theme.textSecondary }]}>or</Text>
@@ -106,6 +116,43 @@ export default function LoginScreen() {
               />
               <Text style={[styles.googleText, { color: theme.text }]}>Log in with google</Text>
             </Pressable>
+            {__DEV__ ? (
+              <View style={[styles.devContainer, { borderColor: theme.border }]}>
+                <Text style={[styles.devHeader, { color: theme.textSecondary }]}>DEV QUICK LOGIN</Text>
+                <View style={styles.devButtonsRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.devChip,
+                      { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                    onPress={() => {
+                      setEmail('demo@stm.dev');
+                      setPassword('Demo@123');
+                      setErrors({});
+                      setLoginError(undefined);
+                    }}
+                  >
+                    <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All Roles)</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={({ pressed }) => [
+                      styles.devChip,
+                      { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                    onPress={() => {
+                      setEmail('surveyor@stm.dev');
+                      setPassword('Surveyor@123');
+                      setErrors({});
+                      setLoginError(undefined);
+                    }}
+                  >
+                    <Text style={[styles.devChipText, { color: theme.text }]}>Surveyor</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
           </ThemedView>
 
           <View style={styles.signupRow}>
@@ -186,6 +233,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 700,
   },
+  errorText: {
+    color: '#C62828',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+  },
   loginButton: {
     alignSelf: 'stretch',
   },
@@ -229,5 +283,37 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+  devContainer: {
+    marginTop: Spacing.one,
+    paddingTop: Spacing.three,
+    borderTopWidth: 1,
+    gap: Spacing.two,
+  },
+  devHeader: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  devButtonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  devChip: {
+    flex: 1,
+    minHeight: 40,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
   },
 });

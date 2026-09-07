@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   DownloadSimple,
   CalendarBlank,
@@ -124,18 +125,20 @@ export default function AuditLogsPage() {
 
           {/* Event type filter */}
           <div className="sm:col-span-3">
-            <select
+            <CustomSelect
               value={selectedEventType}
-              onChange={(e) => setSelectedEventType(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            >
-              <option value="all">{t('audit.event_all')}</option>
-              <option value="Permission">{t('audit.type_permission')}</option>
-              <option value="Config">{t('audit.type_config')}</option>
-              <option value="Login">{t('audit.type_login')}</option>
-              <option value="Alert">{t('audit.type_alert')}</option>
-              <option value="Data Access">{t('audit.type_data_access')}</option>
-            </select>
+              onChange={setSelectedEventType}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('audit.event_all') },
+                { value: 'Permission', label: t('audit.type_permission') },
+                { value: 'Config', label: t('audit.type_config') },
+                { value: 'Login', label: t('audit.type_login') },
+                { value: 'Alert', label: t('audit.type_alert') },
+                { value: 'Data Access', label: t('audit.type_data_access') },
+              ]}
+            />
           </div>
 
           {/* Date range picker representation */}

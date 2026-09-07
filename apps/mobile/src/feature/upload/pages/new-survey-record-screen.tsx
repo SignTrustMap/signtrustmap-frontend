@@ -28,7 +28,8 @@ import { useTheme } from '@/hooks/use-theme';
 
 type SelectedSurveyMedia = {
   fileName?: string | null;
-  type: 'image' | 'video';
+  mimeType?: string;
+  type: 'image';
   uri: string;
 };
 
@@ -292,7 +293,7 @@ export function NewSurveyRecordScreen() {
         allowsMultipleSelection: false,
         defaultTab: 'photos',
         exif: true,
-        mediaTypes: ['images', 'videos'],
+        mediaTypes: ['images'],
         presentationStyle: ImagePicker.UIImagePickerPresentationStyle.PAGE_SHEET,
         quality: 1,
       });
@@ -303,7 +304,8 @@ export function NewSurveyRecordScreen() {
 
         setSelectedAsset({
           fileName: asset.fileName,
-          type: asset.type === 'video' ? 'video' : 'image',
+          mimeType: asset.mimeType,
+          type: 'image',
           uri: asset.uri,
         });
         setSelectedGps(gpsCoordinates);
@@ -431,7 +433,7 @@ export function NewSurveyRecordScreen() {
 
           <AppButton
             accessibilityLabel={
-              selectedAsset ? 'Change selected photo or video' : 'Choose a photo or video from gallery'
+              selectedAsset ? 'Change selected photo' : 'Choose a photo from gallery'
             }
             disabled={isOpeningGallery}
             onPress={handleOpenGallery}
@@ -445,7 +447,7 @@ export function NewSurveyRecordScreen() {
             ]}
             variant="surface"
           >
-            {selectedAsset?.type === 'image' ? (
+            {selectedAsset ? (
               <Image
                 accessibilityLabel="Selected survey media"
                 contentFit="cover"
@@ -459,9 +461,9 @@ export function NewSurveyRecordScreen() {
                     <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
                   }
                   name={{
-                    android: selectedAsset ? 'video_library' : 'image',
-                    ios: selectedAsset ? 'video' : 'photo',
-                    web: selectedAsset ? 'video_library' : 'image',
+                    android: 'image',
+                    ios: 'photo',
+                    web: 'image',
                   }}
                   size={38}
                   tintColor={theme.placeholder}
@@ -469,14 +471,14 @@ export function NewSurveyRecordScreen() {
                 <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
                   {isOpeningGallery
                     ? 'Opening gallery...'
-                    : selectedAsset?.fileName ?? 'Upload photo / video'}
+                    : 'Upload photo'}
                 </Text>
               </>
             )}
           </AppButton>
 
           <Text style={[styles.helperText, { color: theme.placeholder }]}>
-            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your image / video here'}
+            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your sign image here'}
           </Text>
 
           {pickerError ? (
@@ -486,6 +488,7 @@ export function NewSurveyRecordScreen() {
           ) : null}
 
           <AppButton
+            disabled={!selectedAsset}
             label="Submit Record"
             onPress={() =>
               router.push({
@@ -494,6 +497,8 @@ export function NewSurveyRecordScreen() {
                   ...(selectedAsset
                     ? {
                       imageType: selectedAsset.type ?? 'image',
+                      imageMimeType: selectedAsset.mimeType,
+                      imageName: selectedAsset.fileName ?? undefined,
                       imageUri: selectedAsset.uri,
                     }
                     : {}),

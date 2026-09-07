@@ -53,7 +53,13 @@ function parseStoredSession(value: string | null): AppSession | null {
   try {
     const parsed = JSON.parse(value) as Partial<AppSession>;
 
-    if (!parsed.accessToken || !parsed.account?.id) return null;
+    if (
+      !parsed.accessToken ||
+      parsed.accessToken === 'fake-session-token' ||
+      !parsed.account?.id
+    ) {
+      return null;
+    }
 
     return {
       accessToken: parsed.accessToken,
@@ -65,6 +71,8 @@ function parseStoredSession(value: string | null): AppSession | null {
       },
     };
   } catch {
+    if (value === 'fake-session-token') return null;
+
     // Upgrade the previous fake token-only session without signing the user out.
     return {
       accessToken: value,

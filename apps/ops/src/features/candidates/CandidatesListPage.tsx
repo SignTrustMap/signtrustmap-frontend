@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   MagnifyingGlass,
   CaretLeft,
@@ -124,32 +125,36 @@ export default function CandidatesListPage() {
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 font-mono uppercase text-[11px]">
               {t('candidates.priority_label')}
             </label>
-            <select
+            <CustomSelect
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            >
-              <option value="all">{t('candidates.priority_all')}</option>
-              <option value="Cao">{t('candidates.priority_high')}</option>
-              <option value="Vừa">{t('candidates.priority_med')}</option>
-              <option value="Thấp">{t('candidates.priority_low')}</option>
-            </select>
+              onChange={setPriorityFilter}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('candidates.priority_all') },
+                { value: 'Cao', label: t('candidates.priority_high') },
+                { value: 'Vừa', label: t('candidates.priority_med') },
+                { value: 'Thấp', label: t('candidates.priority_low') },
+              ]}
+            />
           </div>
 
           <div className="sm:col-span-3">
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 font-mono uppercase text-[11px]">
               {t('candidates.status_label')}
             </label>
-            <select
+            <CustomSelect
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            >
-              <option value="all">{t('candidates.status_all')}</option>
-              <option value="Chưa xử lý">{t('candidates.status_pending')}</option>
-              <option value="Đang xem xét">{t('candidates.status_reviewing')}</option>
-              <option value="Đã giải quyết">{t('candidates.status_resolved')}</option>
-            </select>
+              onChange={setStatusFilter}
+              className="w-full"
+              buttonClassName="w-full"
+              options={[
+                { value: 'all', label: t('candidates.status_all') },
+                { value: 'Chưa xử lý', label: t('candidates.status_pending') },
+                { value: 'Đang xem xét', label: t('candidates.status_reviewing') },
+                { value: 'Đã giải quyết', label: t('candidates.status_resolved') },
+              ]}
+            />
           </div>
         </div>
       </div>

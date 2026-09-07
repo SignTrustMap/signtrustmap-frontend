@@ -7,9 +7,9 @@ import {
   type MapCoordinate,
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
+import type { RouteSign } from '@/feature/navigation/services/navigation-api';
 import { useTheme } from '@/hooks/use-theme';
-
-type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
+import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 
 type NavigationMapViewProps = {
   destination?: PreviousLocation;
@@ -18,12 +18,14 @@ type NavigationMapViewProps = {
   navigationActive?: boolean;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
-  routeStopCoordinates?: MapCoordinate[];
+  routeSigns?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
+const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
+  || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
 function getRouteBounds(start: MapCoordinate, destination: MapCoordinate) {
   return [
@@ -35,13 +37,7 @@ function getRouteBounds(start: MapCoordinate, destination: MapCoordinate) {
 }
 
 function loadMapLibre(): MapLibreModule | null {
-  try {
-    // Guarded require prevents Expo Go or stale native builds from crashing on import.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@maplibre/maplibre-react-native') as MapLibreModule;
-  } catch {
-    return null;
-  }
+  return getMapLibre();
 }
 
 const openStreetMapStyle: StyleSpecification = {
@@ -49,9 +45,9 @@ const openStreetMapStyle: StyleSpecification = {
   sources: {
     osm: {
       type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tiles: [mapTileUrl],
       tileSize: 256,
-      attribution: 'OpenStreetMap contributors',
+      attribution: 'Esri, HERE, Garmin, USGS, OpenStreetMap contributors, GIS user community',
     },
   },
   layers: [
@@ -70,7 +66,7 @@ export function NavigationMapView({
   navigationActive = false,
   routeCoordinates,
   routeStart,
-  routeStopCoordinates = [],
+  routeSigns = [],
   showCurrentLocation = true,
   isNavigatingFeature = false,
 }: NavigationMapViewProps) {
@@ -171,12 +167,12 @@ export function NavigationMapView({
         </GeoJSONSource>
       ) : null}
 
-      {routeStopCoordinates.map((coordinate, index) => (
-        <Marker anchor="center" id={`route-stop-sign-${index + 1}`} key={index} lngLat={coordinate}>
+      {routeSigns.map((sign) => (
+        <Marker anchor="center" id={`route-sign-${sign.id}`} key={sign.id} lngLat={sign.coordinate}>
           <View style={styles.stopSignMarker}>
             <Image
-              accessibilityLabel="Stop sign"
-              source={stopSignImage}
+              accessibilityLabel={sign.name || sign.signCode}
+              source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
               resizeMode="contain"
               style={styles.stopSignImage}
             />

@@ -20,7 +20,7 @@ export const mockAuditLogs: AuditLogItem[] = [
     timestamp: '31/10/2023 14:23:05',
     user: { name: 'john.doe', initials: 'JD', avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]' },
     eventType: 'Permission',
-    action: "Thay đổi quyền hạn: Cấp quyền 'Quản trị viên' cho tài khoản #1042",
+    action: "Thay đổi quyền hạn: Cấp quyền 'Admin' cho tài khoản #1042",
     targetId: 'USR-9942',
     ipAddress: '192.168.1.45',
   },

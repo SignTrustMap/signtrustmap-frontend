@@ -48,6 +48,18 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* Form field baseline spacing & focus normalization */
+label:not(.inline-flex):not(.flex):not([class*="items-center"]) {
+  display: block;
+  margin-bottom: 0.375rem; /* 6px buffer preventing focus ring collision */
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none !important;
+}
+
 /* ─── High-Contrast Premium Dark Mode System (Deep Space Teal) ───── */
 
 /* 1. Page Background */

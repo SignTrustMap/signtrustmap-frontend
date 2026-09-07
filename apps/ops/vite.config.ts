@@ -15,5 +15,16 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    proxy: {
+      '/api/v1/system': {
+        target: 'https://drum-valid-randomly.ngrok-free.app',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          'ngrok-skip-browser-warning': '69420',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        },
+      },
+    },
   },
 })

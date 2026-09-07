@@ -6,7 +6,7 @@ export interface SystemUser {
   email: string
   initials: string
   avatarBg: string
-  role: 'Quản trị viên' | 'Quản lý vận hành' | 'Kiểm duyệt viên' | 'Hỗ trợ'
+  role: 'Admin' | 'Staff' | 'Reviewer' | 'Surveyor' | 'Driver'
   status: StaffStatus
   location: string
   lastActive: string
@@ -19,9 +19,9 @@ export const mockSystemUsers: SystemUser[] = [
     email: 'a.wright@signtrustmap.site',
     initials: 'AW',
     avatarBg: 'bg-[#007b8b] text-white',
-    role: 'Quản trị viên',
+    role: 'Admin',
     status: 'Active',
-    location: 'Hà Nội (Trụ sở chính)',
+    location: 'Hà Nội',
     lastActive: 'Vừa xong',
   },
   {
@@ -30,7 +30,7 @@ export const mockSystemUsers: SystemUser[] = [
     email: 'e.rostova@signtrustmap.site',
     initials: 'ER',
     avatarBg: 'bg-[#ffedd5] text-[#c2410c]',
-    role: 'Quản lý vận hành',
+    role: 'Staff',
     status: 'Active',
     location: 'TP. Hồ Chí Minh',
     lastActive: '12 phút trước',
@@ -41,7 +41,7 @@ export const mockSystemUsers: SystemUser[] = [
     email: 'm.chen@signtrustmap.site',
     initials: 'MC',
     avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]',
-    role: 'Kiểm duyệt viên',
+    role: 'Reviewer',
     status: 'Active',
     location: 'Đà Nẵng',
     lastActive: '2 giờ trước',
@@ -52,7 +52,7 @@ export const mockSystemUsers: SystemUser[] = [
     email: 's.jenkins@signtrustmap.site',
     initials: 'SJ',
     avatarBg: 'bg-gray-200 text-gray-700',
-    role: 'Kiểm duyệt viên',
+    role: 'Surveyor',
     status: 'Inactive',
     location: 'Cần Thơ',
     lastActive: '3 ngày trước',
@@ -63,7 +63,7 @@ export const mockSystemUsers: SystemUser[] = [
     email: 't.almansoor@signtrustmap.site',
     initials: 'TA',
     avatarBg: 'bg-[#fee2e2] text-[#b91c1c]',
-    role: 'Hỗ trợ',
+    role: 'Driver',
     status: 'Suspended',
     location: 'Hải Phòng',
     lastActive: '1 tuần trước',
