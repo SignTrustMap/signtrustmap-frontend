@@ -326,13 +326,25 @@ export function NewSurveyRecordScreen() {
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <Modal
         animationType="slide"
+        transparent
+        statusBarTranslucent
         onRequestClose={() => setIsAndroidGalleryVisible(false)}
         visible={isAndroidGalleryVisible}
       >
+        <View style={styles.galleryModalRoot}>
+          <Pressable
+            accessibilityLabel="Close photo library"
+            accessibilityRole="button"
+            onPress={() => setIsAndroidGalleryVisible(false)}
+            style={styles.galleryBackdrop}
+          />
         <SafeAreaView
-          edges={['top', 'bottom']}
-          style={[styles.galleryScreen, { backgroundColor: theme.background }]}
+          edges={['bottom']}
+          style={[styles.galleryScreen, { backgroundColor: theme.backgroundElement }]}
         >
+          <View style={styles.galleryHandleArea}>
+            <View style={[styles.galleryHandle, { backgroundColor: theme.border }]} />
+          </View>
           <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
             <View style={styles.galleryHeading}>
               <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
@@ -408,6 +420,7 @@ export function NewSurveyRecordScreen() {
             }}
           />
         </SafeAreaView>
+        </View>
       </Modal>
 
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -527,7 +540,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   galleryScreen: {
+    height: '85%',
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    borderTopLeftRadius: Rounded.xlg,
+    borderTopRightRadius: Rounded.xlg,
+    overflow: 'hidden',
+    paddingTop: Spacing.one,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  galleryModalRoot: {
     flex: 1,
+    justifyContent: 'flex-end',
+  },
+  galleryBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(15, 23, 42, 0.48)',
+  },
+  galleryHandleArea: {
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  galleryHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   galleryHeader: {
     minHeight: 72,
@@ -543,10 +587,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   galleryTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 20,
-    fontWeight: 700,
-    lineHeight: 28,
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 29,
   },
   gallerySubtitle: {
     fontFamily: Fonts.body,
@@ -556,6 +600,7 @@ const styles = StyleSheet.create({
   },
   galleryCloseButton: {
     minHeight: 40,
+    borderRadius: Rounded.round,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
   },
@@ -569,7 +614,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   galleryGrid: {
-    padding: 1,
+    padding: Spacing.two,
   },
   galleryEmptyContent: {
     flexGrow: 1,
@@ -590,18 +635,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '33.3333%',
     aspectRatio: 1,
-    padding: 1,
+    padding: Spacing.half,
   },
   galleryImage: {
     width: '100%',
     height: '100%',
+    borderRadius: Rounded.md,
   },
   gallerySelectingOverlay: {
     position: 'absolute',
-    top: 1,
-    right: 1,
-    bottom: 1,
-    left: 1,
+    top: Spacing.half,
+    right: Spacing.half,
+    bottom: Spacing.half,
+    left: Spacing.half,
+    borderRadius: Rounded.md,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)',

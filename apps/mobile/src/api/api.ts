@@ -1,3 +1,4 @@
 export const API_PATHS = {
-    DIRECTIONS: '/routing/directions'
-}
+    AUTH_LOGIN: '/auth/login',
+    DIRECTIONS: '/routing/directions',
+} as const;

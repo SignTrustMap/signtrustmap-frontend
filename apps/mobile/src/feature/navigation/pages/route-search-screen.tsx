@@ -1,14 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useDebounce } from '@/hooks/use-debounce';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { AppInput } from '@/components/ui/input';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {
   startLocations,
@@ -23,7 +23,6 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
-import { AppInput } from '@/components/ui/input';
 import { SAME_LOCATION_MESSAGE } from '@/constants/message';
 
 
@@ -37,10 +36,6 @@ export function RouteSearchScreen() {
     startLng?: string;
     startTitle?: string;
   }>();
-
-  const [searchText, setSearchText] = useState('');
-  const debouncedSearchText = useDebounce(searchText, 500);
-  const [searchResults, setSearchResults] = useState<typeof previousLocations>(previousLocations);
 
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const [query, setQuery] = useState('');
@@ -119,44 +114,39 @@ export function RouteSearchScreen() {
     });
   };
 
-  useEffect(() => {
-    if (debouncedSearchText) {
-      setTimeout(() => {
-        const results = previousLocations.filter((location) =>
-          location.title.toLowerCase().includes(debouncedSearchText.toLowerCase())
-        );
-        setSearchResults(results);
-      }, 500);
-    }
-
-    return () => {
-      setSearchResults(previousLocations);
-    };
-  }, [debouncedSearchText]);
-
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
-        <AppButton
-          accessibilityLabel="Go back"
-          hitSlop={Spacing.one}
-          onPress={() => router.back()}
-          pressedOpacity={0.7}
-          style={styles.backButton}
-          variant="ghost"
-        >
-          <Text style={[styles.backIcon, { color: theme.tertiary }]}>{'<'}</Text>
-        </AppButton>
-        <TextInput
-          accessibilityLabel="Search destination"
-          autoFocus
-          onChangeText={setQuery}
-          placeholder="Where to?"
-          placeholderTextColor={theme.placeholder}
-          returnKeyType="search"
-          style={[styles.searchPrompt, { color: theme.text }]}
-          value={query}
-        />
+        <View style={styles.searchInputWrapper}>
+          <AppInput
+            accessibilityLabel="Search for your destination"
+            autoFocus
+            onChangeText={setQuery}
+            placeholder="Where to?"
+            returnKeyType="search"
+            style={[styles.searchPrompt, { color: theme.text }]}
+            containerStyle={[
+              styles.searchInputContainer,
+              { backgroundColor: theme.background, borderColor: 'transparent' },
+            ]}
+            leadingIcon={
+              <AppButton
+                accessibilityLabel="Go back"
+                hitSlop={Spacing.one}
+                onPress={() => router.back()}
+                pressedOpacity={0.7}
+                style={styles.backButton}
+                variant="ghost"
+              >
+                <AntDesign
+                  name="arrow-left"
+                  style={[styles.backIcon, { color: theme.text }]}
+                />
+              </AppButton>
+            }
+            value={query}
+          />
+        </View>
       </View>
 
       <ScrollView
@@ -167,7 +157,7 @@ export function RouteSearchScreen() {
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           {query.trim().length >= 2 ? 'SEARCH RESULTS' : 'SAVED & RECENT'}
         </Text>
-        {isLoading ? <ActivityIndicator color={theme.tertiary} style={styles.loading} /> : null}
+        {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
         {!isLoading && error ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}
@@ -238,7 +228,6 @@ const styles = StyleSheet.create({
     fontWeight: 700,
   },
   searchPrompt: {
-    flex: 1,
     fontFamily: Fonts.body,
     fontSize: 18,
     fontWeight: 600,
@@ -251,6 +240,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 4,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    minWidth: 0,
+    marginTop: Spacing.one,
   },
   list: {
     flex: 1,

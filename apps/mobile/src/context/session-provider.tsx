@@ -1,4 +1,5 @@
 import { getStorageItemAsync, removeStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
 
 export const ACCOUNT_ROLES = ['driver', 'surveyor', 'reviewer'] as const;
@@ -87,6 +88,7 @@ function parseStoredSession(value: string | null): AppSession | null {
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<AppSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -120,6 +122,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   async function logOut() {
     setSession(null);
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await removeStorageItemAsync('session');
   }
 

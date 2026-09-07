@@ -396,7 +396,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     details?: { declineNote?: string; declineReason?: string },
   ) => {
     if (!submission || isSubmitting) return false;
-    const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
+    const completesReviewQueue = !isRecheckingSubmission && pendingSubmissions.length === 1;
 
     const completed = await completeCurrentReview({ action, ...details });
     if (!completed) return false;
@@ -483,7 +483,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             style={[
               styles.progressFill,
               {
-                backgroundColor: Colors.tertiary,
+                backgroundColor: theme.primary,
                 width: `${totalSubmissions ? (reviewPosition / totalSubmissions) * 100 : 0}%`,
               },
             ]}
@@ -663,7 +663,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <>
                 <View style={styles.primaryActions}>
                   <ReviewAction
-                    color={theme.tertiary}
+                    color={theme.primary}
                     disabled={isSubmitting}
                     label="Approve"
                     onPress={() => completeReview('approved')}

@@ -67,7 +67,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
       style={[
         styles.safeArea,
         {
-          backgroundColor: '#000000',
+          backgroundColor: theme.backgroundElement,
           borderColor: theme.border,
         },
       ]}
@@ -100,17 +100,19 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
               style={styles.tab}
               variant="ghost"
             >
+              <View style={[styles.iconCircle, isActive ? styles.activeIconContent : undefined]}>
               <SymbolView
                 fallback={
-                  <Text style={[styles.iconFallback, { color: isActive ? theme.tertiary : theme.text }]}>
+                  <Text style={[styles.iconFallback, { color: isActive ? theme.onPrimary : theme.text }]}>
                     {tab.fallbackLabel}
                   </Text>
                 }
                 name={tab.symbol}
                 size={18}
-                tintColor={isActive ? theme.tertiary : theme.text}
+                tintColor={isActive ? theme.onPrimary : theme.text}
               />
-              <Text style={[styles.label, { color: isActive ? theme.tertiary : theme.text }]}>
+              </View>
+              <Text style={[styles.label, { color: isActive ? theme.primary : theme.text }]}>
                 {tab.label}
               </Text>
             </AppButton>

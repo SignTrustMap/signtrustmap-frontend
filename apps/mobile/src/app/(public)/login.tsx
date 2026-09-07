@@ -8,23 +8,24 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AppButton } from '@/components/ui/button';
 import { AppInput } from '@/components/ui/input';
-import { useSession } from '@/context/session-provider';
-import { logInWithPassword } from '@/feature/auth/services/auth-api';
+import { useLogin } from '@/feature/auth/hooks/use-login';
 import { useTheme } from '@/hooks/use-theme';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
-  const { logIn } = useSession();
+  const loginMutation = useLogin();
   const router = useRouter();
   const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmitting = loginMutation.isPending;
   const [loginError, setLoginError] = useState<string>();
+  const displayedLoginError = loginError ?? loginMutation.error?.message;
 
   const handleLogIn = async () => {
+    if (isSubmitting) return;
     const nextErrors = {
       email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Must be a valid email address.',
       password: password.length > 1 ? undefined : 'Password must be greater than 1 character.',
@@ -36,15 +37,12 @@ export default function LoginScreen() {
       return;
     }
 
-    setIsSubmitting(true);
     setLoginError(undefined);
     try {
-      await logIn(await logInWithPassword(email.trim(), password));
+      await loginMutation.mutateAsync({ email: email.trim(), password });
       router.replace('/');
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Unable to log in. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // The mutation exposes request and session-storage errors to the form.
     }
   };
 
@@ -74,6 +72,8 @@ export default function LoginScreen() {
               label="Email Address"
               onChangeText={(value) => {
                 setEmail(value);
+                if (!isSubmitting) loginMutation.reset();
+                setLoginError(undefined);
                 setErrors((current) => ({ ...current, email: undefined }));
               }}
               placeholder="demo@stm.dev"
@@ -85,6 +85,8 @@ export default function LoginScreen() {
               label="Password"
               onChangeText={(value) => {
                 setPassword(value);
+                if (!isSubmitting) loginMutation.reset();
+                setLoginError(undefined);
                 setErrors((current) => ({ ...current, password: undefined }));
               }}
               placeholder="Enter your password"
@@ -94,7 +96,7 @@ export default function LoginScreen() {
             <Pressable accessibilityRole="button" style={styles.forgotPassword}>
               <Text style={[styles.linkText, { color: theme.primary }]}>Forgot Password?</Text>
             </Pressable>
-            {loginError ? <Text accessibilityRole="alert" style={styles.errorText}>{loginError}</Text> : null}
+            {displayedLoginError ? <Text accessibilityRole="alert" style={styles.errorText}>{displayedLoginError}</Text> : null}
             <AppButton disabled={isSubmitting} label={isSubmitting ? 'Logging in...' : 'Login'} onPress={handleLogIn} style={styles.loginButton} />
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
@@ -122,12 +124,14 @@ export default function LoginScreen() {
                 <View style={styles.devButtonsRow}>
                   <Pressable
                     accessibilityRole="button"
+                    disabled={isSubmitting}
                     style={({ pressed }) => [
                       styles.devChip,
                       { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
                     ]}
                     onPress={() => {
                       setEmail('demo@stm.dev');
+                      loginMutation.reset();
                       setPassword('Demo@123');
                       setErrors({});
                       setLoginError(undefined);
@@ -137,12 +141,14 @@ export default function LoginScreen() {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
+                    disabled={isSubmitting}
                     style={({ pressed }) => [
                       styles.devChip,
                       { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
                     ]}
                     onPress={() => {
                       setEmail('surveyor@stm.dev');
+                      loginMutation.reset();
                       setPassword('Surveyor@123');
                       setErrors({});
                       setLoginError(undefined);

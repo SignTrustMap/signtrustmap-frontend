@@ -9,11 +9,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SymbolView } from "expo-symbols";
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
-import { Fonts, Spacing } from "@/constants/theme";
+import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import { useSession } from "@/context/session-provider";
 import {
   currentLocation,
@@ -223,23 +223,38 @@ export function NavigationStartScreen() {
 
   const isSearching = query.trim().length >= 2;
 
+  const handleSwapRoutePoints = () => {
+    if (!destination) return;
+    router.replace({
+      pathname: '/home/search',
+      params: {
+        startLat: String(destination.coordinate[1]),
+        startLng: String(destination.coordinate[0]),
+        startTitle: destination.title,
+      },
+    });
+  };
+
   return (
     <SafeAreaView
       style={[styles.screen, { backgroundColor: theme.backgroundElement }]}
     >
-      <View style={styles.header}>
+      <View style={styles.routeSelector}>
         <AppButton
           accessibilityLabel="Go back"
           hitSlop={Spacing.one}
           onPress={handleBack}
           pressedOpacity={0.7}
-          style={styles.backButton}
+          style={[styles.backButton, styles.backButtonContainer]}
           variant="ghost"
         >
-          <Text style={[styles.backIcon, { color: theme.tertiary }]}>
-            {"<"}
-          </Text>
+          <AntDesign name="arrow-left" size={20} color={theme.primary} />
         </AppButton>
+        <View style={styles.routeFields}>
+          <View style={[styles.startInputContainer, {
+            backgroundColor: theme.background, borderColor: theme.primary, borderWidth: 1,
+          }]}>
+            <AntDesign name="pushpin" size={17} color={theme.text} />
         <TextInput
           accessibilityLabel="Search starting point"
           autoCapitalize="none"
@@ -253,13 +268,17 @@ export function NavigationStartScreen() {
           style={[styles.searchPrompt, { color: theme.text }]}
           value={query}
         />
-      </View>
+          </View>
 
       {destination ? (
-        <View style={styles.destinationRow}>
-          <Text style={[styles.destinationLabel, { color: theme.tertiary }]}>
-            To:{" "}
-          </Text>
+        <>
+          <View pointerEvents="none" style={styles.inputConnector}>
+            {[0, 1, 2].map((dot) => (
+              <View key={dot} style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
+            ))}
+          </View>
+        <View style={[styles.destinationRow, { backgroundColor: theme.background, borderColor: 'transparent' }]}>
+          <AntDesign name="pushpin" size={17} color={theme.danger} />
           <Text
             numberOfLines={1}
             style={[styles.destinationText, { color: theme.text }]}
@@ -267,7 +286,19 @@ export function NavigationStartScreen() {
             {destination.title}
           </Text>
         </View>
+        </>
       ) : null}
+        </View>
+        <AppButton
+          accessibilityLabel="Swap starting point and destination"
+          disabled={!destination}
+          onPress={handleSwapRoutePoints}
+          style={styles.backButton}
+          variant="ghost"
+        >
+          <AntDesign name="swap" size={18} color={theme.primary} style={{ transform: [{ rotate: '90deg' }] }} />
+        </AppButton>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.listContent}
@@ -289,9 +320,7 @@ export function NavigationStartScreen() {
                 { backgroundColor: theme.backgroundSelected },
               ]}
             >
-              <Text style={[styles.currentIcon, { color: theme.tertiary }]}>
-                G
-              </Text>
+              <AntDesign name="usb" size={22} color={theme.primary} />
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>
@@ -306,20 +335,18 @@ export function NavigationStartScreen() {
                 Using GPS accuracy
               </Text>
             </View>
-            <Text style={[styles.arrowIcon, { color: theme.tertiary }]}>
-              {">"}
-            </Text>
+            <AntDesign name="arrow-right" size={18} color={theme.primary} />
           </AppButton>
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-            {isSearching ? "SEARCH RESULTS" : "RECENT HISTORY"}
+          <Text style={[styles.sectionLabel, { color: theme.primary }]}>
+            {isSearching ? "Search results" : "Recents"}
           </Text>
         </View>
 
         {isLoading ? (
-          <ActivityIndicator color={theme.tertiary} style={styles.loading} />
+          <ActivityIndicator color={theme.primary} style={styles.loading} />
         ) : null}
         {!isLoading && error ? (
           <Text
@@ -352,15 +379,7 @@ export function NavigationStartScreen() {
                   { backgroundColor: theme.background },
                 ]}
               >
-                <SymbolView
-                  name={{
-                    android: isSearching ? "location_on" : "history",
-                    ios: isSearching ? "mappin" : "clock",
-                    web: isSearching ? "location_on" : "history",
-                  }}
-                  size={17}
-                  tintColor={isSearching ? theme.tertiary : theme.textSecondary}
-                />
+                <AntDesign name="clock-circle" size={18} color={theme.text} />
               </View>
               <View style={styles.locationCopy}>
                 <Text style={[styles.locationTitle, { color: theme.text }]}>
@@ -370,13 +389,12 @@ export function NavigationStartScreen() {
                   numberOfLines={1}
                   style={[
                     styles.locationSubtitle,
-                    { color: theme.textSecondary },
+                    { color: theme.placeholder },
                   ]}
                 >
                   {location.address}
                 </Text>
               </View>
-              <Text style={[styles.arrowIcon, { color: theme.border }]}>/</Text>
             </AppButton>
           ))}
       </ScrollView>
@@ -392,6 +410,52 @@ export function NavigationStartScreen() {
 }
 
 const styles = StyleSheet.create({
+  inputConnectorDot: {
+    width: 2,
+    height: 2,
+    borderRadius: Rounded.round,
+  },
+  inputConnector: {
+    width: 16,
+    height: Spacing.five,
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    marginLeft: Spacing.four,
+    paddingVertical: 2,
+  },
+  startInputContainer: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    paddingLeft: Spacing.four,
+    borderRadius: Rounded.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  routeFields: {
+    flex: 1,
+    minWidth: 0,
+  },
+  backButtonContainer: {
+    width: 36,
+    height: 36,
+    minHeight: 36,
+    alignSelf: 'flex-start',
+  },
+  routeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: 5,
+    marginTop: Spacing.three,
+  },
   screen: {
     flex: 1,
   },
@@ -426,11 +490,19 @@ const styles = StyleSheet.create({
     fontWeight: 700,
   },
   destinationRow: {
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: Spacing.four + 36 + Spacing.two,
-    paddingRight: Spacing.four,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingLeft: Spacing.four,
+    paddingRight: Spacing.three,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 4,
   },
   destinationLabel: {
     fontFamily: Fonts.body,
@@ -453,8 +525,8 @@ const styles = StyleSheet.create({
   currentLocationRow: {
     minHeight: 64,
     borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: 0,
     paddingVertical: Spacing.two,
@@ -463,8 +535,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   currentIcon: {
     fontFamily: Fonts.body,
@@ -473,9 +545,9 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   loading: { paddingVertical: Spacing.four },
   emptyCopy: {
@@ -493,8 +565,8 @@ const styles = StyleSheet.create({
   locationRow: {
     minHeight: 64,
     borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: 0,
     paddingVertical: Spacing.two * 1.1,
@@ -503,8 +575,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationCopy: {
     flex: 1,

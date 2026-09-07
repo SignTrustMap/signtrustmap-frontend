@@ -47,7 +47,7 @@ export function AppSplashScreen() {
         backgroundColor: interpolateColor(
             progress.value,
             [0, 1],
-            [Colors.placeholder, Colors.tertiary],
+            [Colors.placeholder, Colors.primary],
         ),
         transform: [{ scaleX: progress.value }],
     }));

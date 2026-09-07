@@ -20,7 +20,7 @@ export type CompletedReview = {
 type ReviewWorkflowContextValue = {
   beginSubmissionCheck: () => void;
   checkedReviewIndex: number;
-  checkingSubmission: boolean;
+  isCheckingSubmission: boolean;
   completeCurrentReview: (decision: ReviewDecision) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
@@ -32,7 +32,7 @@ type ReviewWorkflowContextValue = {
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
   recheckingReviewIndex?: number;
-  recheckingSubmission: boolean;
+  isRecheckingSubmission: boolean;
   resetReviewWorkflow: () => Promise<void>;
   reviewCheckedSubmissionAgain: () => Promise<boolean>;
   reviewHistory: CompletedReview[];
@@ -111,7 +111,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const resetReviewWorkflow = async () => {
-    setCheckingSubmission(false);
+    setIsCheckingSubmission(false);
     setCheckedReviewIndex(0);
     setIsRecheckingSubmission(false);
     setRecheckingReviewIndex(undefined);
@@ -131,7 +131,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const completeCurrentReview = async (decision: ReviewDecision) => {
     const submission = pendingSubmissions[0];
     if (!submission || !session?.accessToken || isSubmitting) return false;
-    const completedRecheckIndex = recheckingSubmission ? recheckingReviewIndex : undefined;
+    const completedRecheckIndex = isRecheckingSubmission ? recheckingReviewIndex : undefined;
     setIsSubmitting(true);
     setError(undefined);
 
@@ -149,9 +149,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setPendingSubmissions((pending) => pending.slice(1));
       if (completedRecheckIndex !== undefined) {
         setCheckedReviewIndex(completedRecheckIndex);
-        setCheckingSubmission(true);
+        setIsCheckingSubmission(true);
       }
-      setRecheckingSubmission(false);
+      setIsRecheckingSubmission(false);
       setRecheckingReviewIndex(undefined);
       setRecheckingPreviousAction(undefined);
       setSessionReviewCount((count) => count + 1);
@@ -199,8 +199,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setRecheckingPreviousAction(checkedReview.action);
       setRecheckingReviewIndex(checkedReviewIndex);
       setCheckedReviewIndex(0);
-      setCheckingSubmission(false);
-      setRecheckingSubmission(true);
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(true);
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to reopen this review.');

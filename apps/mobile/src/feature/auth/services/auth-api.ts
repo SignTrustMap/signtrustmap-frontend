@@ -1,15 +1,5 @@
 import type { AccountRole, AppSession } from '@/context/session-provider';
-import { jsonApiRequest } from '@/services/api-client';
-
-type LoginResponse = {
-  accessToken: string;
-  user: {
-    email: string;
-    fullName: string;
-    id: string;
-    roles: string[];
-  };
-};
+import { login } from '@/api/auth';
 
 const backendRoleToAccountRole: Record<string, AccountRole> = {
   DRIVER: 'driver',
@@ -18,7 +8,7 @@ const backendRoleToAccountRole: Record<string, AccountRole> = {
 };
 
 export async function logInWithPassword(email: string, password: string): Promise<AppSession> {
-  const response = await jsonApiRequest<LoginResponse>('/auth/login', { email, password });
+  const response = await login({ email, password });
   const roles = response.user.roles
     .map((role) => backendRoleToAccountRole[role.toUpperCase()])
     .filter((role): role is AccountRole => Boolean(role));
