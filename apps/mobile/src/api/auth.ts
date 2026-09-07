@@ -1,5 +1,6 @@
 import { jsonApiRequest } from '@/services/api-client';
 import { API_PATHS } from '@/api/api';
+import type { AccountRole, AppSession } from '@/context/session-provider';
 
 export type LoginRequest = {
   email: string;
@@ -16,6 +17,28 @@ export type LoginResponse = {
   };
 };
 
-export function login(request: LoginRequest): Promise<LoginResponse> {
-  return jsonApiRequest<LoginResponse>(API_PATHS.AUTH_LOGIN, request);
+const backendRoleToAccountRole: Record<string, AccountRole> = {
+  DRIVER: 'driver',
+  REVIEWER: 'reviewer',
+  SURVEYOR: 'surveyor',
+};
+
+export async function login(request: LoginRequest): Promise<AppSession> {
+  const response = await jsonApiRequest<LoginResponse>(API_PATHS.AUTH_LOGIN, {
+    ...request,
+    email: request.email.trim(),
+  });
+  const roles = response.user.roles
+    .map((role) => backendRoleToAccountRole[role.toUpperCase()])
+    .filter((role): role is AccountRole => Boolean(role));
+
+  return {
+    accessToken: response.accessToken,
+    account: {
+      displayName: response.user.fullName,
+      email: response.user.email,
+      id: response.user.id,
+      roles,
+    },
+  };
 }

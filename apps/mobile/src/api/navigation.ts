@@ -1,5 +1,5 @@
-import { apiConfig } from '../config';
-import { API_PATHS } from '../api';
+import { apiConfig } from '@/api/config';
+import { API_PATHS } from '@/api/api';
 
 const sampleData = {
     "originLatitude": 10.7725,
