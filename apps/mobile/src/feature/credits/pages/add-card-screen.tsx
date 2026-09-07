@@ -71,7 +71,7 @@ export function AddCardScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.cardPreview, { backgroundColor: theme.tertiary }]}>
+        <View style={[styles.cardPreview, { backgroundColor: theme.primary }]}>
           <View style={styles.previewTopRow}>
             <Text style={styles.contactless}>)))</Text>
             <Text style={styles.visa}>VISA</Text>
@@ -131,8 +131,8 @@ export function AddCardScreen() {
           </View>
           <Switch
             onValueChange={setIsDefault}
-            thumbColor={theme.onTertiary}
-            trackColor={{ false: theme.border, true: theme.tertiary }}
+            thumbColor={theme.onPrimary}
+            trackColor={{ false: theme.border, true: theme.primary }}
             value={isDefault}
           />
         </View>
@@ -163,7 +163,7 @@ function CardField({ containerStyle, label, style, ...inputProps }: CardFieldPro
       <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>{label}</Text>
       <TextInput
         placeholderTextColor={theme.placeholder}
-        selectionColor={theme.tertiary}
+        selectionColor={theme.primary}
         style={[
           styles.fieldInput,
           { backgroundColor: theme.backgroundElement, borderColor: theme.border, color: theme.text },
@@ -181,7 +181,7 @@ function SavedCardPreview({ isDefault }: { isDefault: boolean }) {
   return (
     <View style={[styles.savedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
       <View style={styles.savedCardTopRow}>
-        <Text style={[styles.savedCardIcon, { color: theme.tertiary }]}>▰</Text>
+        <Text style={[styles.savedCardIcon, { color: theme.primary }]}>▰</Text>
         {isDefault ? (
           <Text style={[styles.defaultBadge, { color: theme.textSecondary, borderColor: theme.border }]}>DEFAULT</Text>
         ) : null}

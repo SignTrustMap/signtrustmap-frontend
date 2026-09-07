@@ -16,7 +16,7 @@ export const sampleReviewSubmissions: ReviewSubmission[] = [
     image: stopSignImage,
     location: 'Junction 4, West Broadway St.',
     surveyorId: 'SRV-8924',
-    title: 'Stop Sign',
+    title: 'Stop Sign 1',
   },
   {
     captured: '10:36 AM Today',
@@ -24,7 +24,7 @@ export const sampleReviewSubmissions: ReviewSubmission[] = [
     image: stopSignImage,
     location: 'Pham Ngu Lao & De Tham St.',
     surveyorId: 'SRV-6741',
-    title: 'Stop Sign',
+    title: 'Stop Sign 2',
   },
   {
     captured: '10:18 AM Today',
@@ -32,7 +32,7 @@ export const sampleReviewSubmissions: ReviewSubmission[] = [
     image: stopSignImage,
     location: 'Le Loi & Pasteur St.',
     surveyorId: 'SRV-3108',
-    title: 'Stop Sign',
+    title: 'Stop Sign 3',
   },
   {
     captured: '9:57 AM Today',
@@ -40,6 +40,6 @@ export const sampleReviewSubmissions: ReviewSubmission[] = [
     image: stopSignImage,
     location: 'Nguyen Hue & Ton Duc Thang St.',
     surveyorId: 'SRV-5562',
-    title: 'Stop Sign',
+    title: 'Stop Sign 4',
   },
 ];

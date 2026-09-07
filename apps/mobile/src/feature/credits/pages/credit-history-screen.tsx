@@ -43,7 +43,7 @@ function DateField({ label, value }: { label: string; value: string }) {
         style={[styles.dateButton, { borderColor: theme.border }]}
         variant="surface"
       >
-        <Text style={[styles.calendarIcon, { color: theme.tertiary }]}>▣</Text>
+        <Text style={[styles.calendarIcon, { color: theme.primary }]}>▣</Text>
         <Text numberOfLines={1} style={[styles.dateValue, { color: theme.text }]}>{value}</Text>
       </AppButton>
     </View>

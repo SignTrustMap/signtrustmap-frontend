@@ -158,15 +158,15 @@ export function SignCatalogScreen() {
                   style={[
                     styles.filterChip,
                     {
-                      backgroundColor: selected ? theme.tertiary : theme.backgroundElement,
-                      borderColor: selected ? theme.tertiary : theme.border,
+                      backgroundColor: selected ? theme.primary : theme.backgroundElement,
+                      borderColor: selected ? theme.primary : theme.border,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.filterLabel,
-                      { color: selected ? theme.onTertiary : theme.text },
+                      { color: selected ? theme.onPrimary : theme.text },
                     ]}
                   >
                     {category}
