@@ -1,5 +1,5 @@
-import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
-import type { RouteSign } from '@/feature/navigation/services/navigation-api';
+import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { RouteSign } from '@/api/navigation/navigation';
 import { apiRequest } from '@/services/api-client';
 
 type BoundsResponse = {
@@ -15,6 +15,7 @@ type BoundsResponse = {
 export async function getSignsInBounds(
     southWest: MapCoordinate,
     northEast: MapCoordinate,
+    signal?: AbortSignal,
 ): Promise<RouteSign[]> {
     const params = new URLSearchParams({
         maxLat: String(northEast[1]),
@@ -22,7 +23,7 @@ export async function getSignsInBounds(
         minLat: String(southWest[1]),
         minLon: String(southWest[0]),
     });
-    const response = await apiRequest<BoundsResponse>(`/signs?${params}`);
+    const response = await apiRequest<BoundsResponse>(`/signs?${params}`, { signal });
     return response.signs.map((sign) => ({
         coordinate: [sign.longitude, sign.latitude],
         id: sign.id,

@@ -9,7 +9,7 @@ import {
   type MapCoordinate,
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
-import type { RouteSign } from '@/feature/navigation/services/navigation-api';
+import type { RouteSign } from '@/api/navigation/navigation';
 import { useTheme } from '@/hooks/use-theme';
 
 type NavigationMapViewProps = {
@@ -273,7 +273,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeSigns, routeStart, theme.tertiary]);
+  }, [destination, routeCoordinates, routeSigns, routeStart, theme.primary]);
 
   return (
     <View style={styles.container}>

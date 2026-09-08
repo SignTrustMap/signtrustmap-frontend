@@ -1,6 +1,5 @@
-import type { MapCoordinate } from "@/types/navigation/navigationType";
+import type { MapCoordinate, VehicleMode } from "@/types/navigation/navigationType";
 import { apiRequest, jsonApiRequest } from "@/services/api-client";
-import { VehicleMode } from "@/types/navigation/navigationType";
 import { API_PATHS } from "@/api/api";
 
 
@@ -58,13 +57,17 @@ function throwIfAborted(signal?: AbortSignal) {
     throw error;
 }
 
-export async function getVehicleModes(): Promise<VehicleMode[]> {
+export async function getVehicleModes(signal?: AbortSignal): Promise<VehicleMode[]> {
     try {
         const response = await apiRequest<{ modes: VehicleMode[] }>(
             API_PATHS.VEHICLE_MODES,
+            { signal },
         );
         return response.modes;
-    } catch {
+    } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+            throw error;
+        }
         return [{ id: "DRIVING", label: "Driving" }];
     }
 }

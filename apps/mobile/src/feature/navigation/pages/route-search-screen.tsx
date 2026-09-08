@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,17 +14,12 @@ import {
   startLocations,
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
-import {
-  getUserPlaces,
-  saveRecentPlace,
-  searchPlaces,
-  type ApiPlace,
-} from '@/feature/navigation/services/places-api';
+import type { ApiPlace } from '@/api/navigation/places';
+import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
 import { SAME_LOCATION_MESSAGE } from '@/constants/message';
-
 
 export function RouteSearchScreen() {
   const router = useRouter();
@@ -39,52 +34,14 @@ export function RouteSearchScreen() {
 
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const [query, setQuery] = useState('');
-  const [locations, setLocations] = useState<ApiPlace[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>();
+  const { data: locations, isLoading, error } = usePlaceSuggestions(query);
+  const { mutate: saveRecent } = useSaveRecentPlace();
   const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
     () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
     [startLat, startLng],
   );
   const routeStart = coordinateStart ?? selectedStart?.coordinate;
-
-  useEffect(() => {
-    if (!session?.accessToken) return;
-    if (query.trim().length >= 2) return;
-    getUserPlaces(session.accessToken)
-      .then((places) => {
-        setLocations(places);
-        setError(undefined);
-      })
-      .catch((cause: unknown) => {
-        setError(cause instanceof Error ? cause.message : 'Unable to load saved destinations.');
-      })
-      .finally(() => setIsLoading(false));
-  }, [query, session?.accessToken]);
-
-  useEffect(() => {
-    const normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) return;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      setIsLoading(true);
-      searchPlaces(normalizedQuery, controller.signal)
-        .then((places) => {
-          setLocations(places);
-          setError(undefined);
-        })
-        .catch((cause: unknown) => {
-          if (cause instanceof Error && cause.name === 'AbortError') return;
-          setError(cause instanceof Error ? cause.message : 'Unable to search for destinations.');
-        })
-        .finally(() => setIsLoading(false));
-    }, 350);
-    return () => {
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [query]);
 
   const handleSelectLocation = (destination: ApiPlace) => {
     if (destination.latitude == null || destination.longitude == null) return;
@@ -98,7 +55,7 @@ export function RouteSearchScreen() {
       return;
     }
 
-    if (session?.accessToken) saveRecentPlace(destination, session.accessToken).catch(() => undefined);
+    if (session?.accessToken) saveRecent(destination);
     router.replace({
       pathname: '/home',
       params: {

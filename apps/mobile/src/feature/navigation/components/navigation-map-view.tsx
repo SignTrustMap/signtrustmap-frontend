@@ -7,7 +7,7 @@ import {
   type MapCoordinate,
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
-import type { RouteSign } from '@/feature/navigation/services/navigation-api';
+import type { RouteSign } from '@/api/navigation/navigation';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 

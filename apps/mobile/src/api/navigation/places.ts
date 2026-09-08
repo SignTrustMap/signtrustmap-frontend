@@ -35,10 +35,10 @@ type GeocodingResponse = {
     }[];
 };
 
-export async function getUserPlaces(accessToken: string): Promise<ApiPlace[]> {
+export async function getUserPlaces(accessToken: string, signal?: AbortSignal): Promise<ApiPlace[]> {
     const [saved, recent] = await Promise.all([
-        apiRequest<SavedPlace[]>('/places/saved', {}, accessToken),
-        apiRequest<RecentSearch[]>('/places/recent-searches?limit=20', {}, accessToken),
+        apiRequest<SavedPlace[]>('/places/saved', { signal }, accessToken),
+        apiRequest<RecentSearch[]>('/places/recent-searches?limit=20', { signal }, accessToken),
     ]);
     return [
         ...saved.map((place): ApiPlace => ({

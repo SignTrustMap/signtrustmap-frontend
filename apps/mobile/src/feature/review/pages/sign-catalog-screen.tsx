@@ -203,7 +203,7 @@ export function SignCatalogScreen() {
           </ScrollView>
 
           {isLoading ? (
-            <ActivityIndicator color={theme.tertiary} size="large" style={styles.loading} />
+            <ActivityIndicator color={theme.primary} size="large" style={styles.loading} />
           ) : error ? (
             <View style={styles.emptyState}>
               <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>Catalog unavailable</Text>
@@ -218,7 +218,7 @@ export function SignCatalogScreen() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>No signs found</Text>
-              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}> 
+              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
                 Try another English name, description, or category.
               </Text>
             </View>

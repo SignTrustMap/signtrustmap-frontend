@@ -18,14 +18,10 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 
 import { NavigationMapView } from "../components/navigation-map-view";
-import {
-  getNavigationRoute,
-  getVehicleModes,
-  type NavigationStep,
-  type RouteSign,
-  type VehicleMode,
-} from "../services/navigation-api";
-import { getSignsInBounds } from "../services/signs-api";
+import type { NavigationStep } from '@/api/navigation/navigation';
+import type { VehicleMode } from '@/types/navigation/navigationType';
+import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
+import { useGetSignsInBounds } from '../hooks/use-signs';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { getMapLibre } from "@/services/maplibre";
 
@@ -169,28 +165,18 @@ export function NavigationMapScreen() {
     startTitle ??
     selectedStart?.title ??
     (gpsStart ? "Current Location" : undefined);
+  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const routeKey =
     selectedDestination && routeStart
-      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}`
+      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
       : undefined;
 
-
-  const [routeResult, setRouteResult] = useState<{
-    coordinates: MapCoordinate[];
-    distance: number;
-    duration: number;
-    key: string;
-    signs: RouteSign[];
-    steps: NavigationStep[];
-  }>();
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     routeKey: string;
     signCoordinates: MapCoordinate[];
   }>();
-  const [mapSigns, setMapSigns] = useState<RouteSign[]>([]);
-  const [vehicleModes, setVehicleModes] = useState<VehicleMode[]>([]);
-  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
+  const { data: vehicleModes = [] } = useGetVehicleModes();
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locationToast, setLocationToast] = useState<{
@@ -201,28 +187,26 @@ export function NavigationMapScreen() {
     coordinate: MapCoordinate;
     requestId: number;
   }>();
-  const [navigationError, setNavigationError] = useState<string>();
+  const [navigationActionError, setNavigationError] = useState<string>();
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
-  const routeCoordinates =
-    routeResult && routeResult.key === routeKey
-      ? routeResult.coordinates
-      : undefined;
-  const routeDistance =
-    routeResult && routeResult.key === routeKey
-      ? routeResult.distance
-      : undefined;
-  const routeDuration =
-    routeResult && routeResult.key === routeKey
-      ? routeResult.duration
-      : undefined;
-  const routeSteps =
-    routeResult && routeResult.key === routeKey ? routeResult.steps : undefined;
-  const plannedSignCoordinates =
-    routeResult && routeResult.key === routeKey
-      ? routeResult.signs.map((sign) => sign.coordinate)
-      : [];
-  const plannedSigns =
-    routeResult && routeResult.key === routeKey ? routeResult.signs : [];
+  const { data: routeResult, error: routeError } = useGetNavigationRoute(
+    routeStart,
+    selectedDestination?.coordinate,
+    vehicleMode,
+  );
+  const [longitude, latitude] = currentLocation.coordinate;
+  const { data: mapSigns = [] } = useGetSignsInBounds(
+    [longitude - 0.04, latitude - 0.04],
+    [longitude + 0.04, latitude + 0.04],
+    !routeStart,
+  );
+  const navigationError = routeError?.message ?? navigationActionError;
+  const routeCoordinates = routeResult?.coordinates;
+  const routeDistance = routeResult?.distance;
+  const routeDuration = routeResult?.duration;
+  const routeSteps = routeResult?.steps;
+  const plannedSignCoordinates = routeResult?.signs.map((sign) => sign.coordinate) ?? [];
+  const plannedSigns = routeResult?.signs ?? [];
   const isNavigating = Boolean(
     routeKey && navigationSession?.routeKey === routeKey,
   );
@@ -295,60 +279,8 @@ export function NavigationMapScreen() {
   ]);
 
   useEffect(() => {
-    if (!selectedDestination || !routeStart || !routeKey) return;
-
-    const controller = new AbortController();
-
     setNavigationError(undefined);
-    getNavigationRoute(
-      routeStart,
-      selectedDestination.coordinate,
-      vehicleMode,
-      controller.signal,
-    )
-      .then(({ coordinates, distance, duration, signs, steps }) => {
-        setRouteResult({
-          coordinates,
-          distance,
-          duration,
-          key: routeKey,
-          signs,
-          steps,
-        });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === "AbortError") return;
-        setNavigationError(
-          error instanceof Error
-            ? error.message
-            : "Unable to calculate this route.",
-        );
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [routeKey, routeStart, selectedDestination, vehicleMode]);
-
-  useEffect(() => {
-    getVehicleModes()
-      .then((modes) => {
-        setVehicleModes(modes);
-        if (modes[0]) setVehicleMode(modes[0].id);
-      })
-      .catch(() => setVehicleModes([]));
-  }, []);
-
-  useEffect(() => {
-    if (routeStart) return;
-    const [longitude, latitude] = currentLocation.coordinate;
-    getSignsInBounds(
-      [longitude - 0.04, latitude - 0.04],
-      [longitude + 0.04, latitude + 0.04],
-    )
-      .then(setMapSigns)
-      .catch(() => setMapSigns([]));
-  }, [routeStart]);
+  }, [routeKey, vehicleMode]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !hasLiveLocation) return;
@@ -484,7 +416,6 @@ export function NavigationMapScreen() {
       },
     });
   };
-
 
   const handleChangeDestination = () => {
     router.push({

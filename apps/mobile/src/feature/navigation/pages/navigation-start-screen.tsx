@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -20,12 +20,8 @@ import {
   previousLocations,
   type MapCoordinate,
 } from "@/feature/navigation/data/navigation-locations";
-import {
-  getUserPlaces,
-  saveRecentPlace,
-  searchPlaces,
-  type ApiPlace,
-} from "@/feature/navigation/services/places-api";
+import type { ApiPlace } from '@/api/navigation/places';
+import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from "@/hooks/use-theme";
 import { getMapLibre } from "@/services/maplibre";
 import { SAME_LOCATION_MESSAGE } from "@/constants/message";
@@ -75,57 +71,8 @@ export function NavigationStartScreen() {
 
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const [query, setQuery] = useState("");
-  const [startLocations, setStartLocations] = useState<ApiPlace[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    if (!session?.accessToken) return;
-    if (query.trim().length >= 2) return;
-
-    getUserPlaces(session.accessToken)
-      .then((places) => {
-        setStartLocations(places);
-        setError(undefined);
-      })
-      .catch((cause: unknown) => {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Unable to load saved starting points.",
-        );
-      })
-      .finally(() => setIsLoading(false));
-  }, [query, session?.accessToken]);
-
-  useEffect(() => {
-    const normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) return;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      setIsLoading(true);
-      searchPlaces(normalizedQuery, controller.signal)
-        .then((places) => {
-          setStartLocations(places);
-          setError(undefined);
-        })
-        .catch((cause: unknown) => {
-          if (cause instanceof Error && cause.name === "AbortError") return;
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "Unable to search for starting points.",
-          );
-        })
-        .finally(() => setIsLoading(false));
-    }, 350);
-
-    return () => {
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [query]);
+  const { data: startLocations, isLoading, error } = usePlaceSuggestions(query);
+  const { mutate: saveRecent } = useSaveRecentPlace();
 
   const destinationParams = destination
     ? {
@@ -206,7 +153,7 @@ export function NavigationStartScreen() {
     }
 
     if (session?.accessToken) {
-      saveRecentPlace(start, session.accessToken).catch(() => undefined);
+      saveRecent(start);
     }
 
     router.replace({

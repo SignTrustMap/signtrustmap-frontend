@@ -3,5 +3,5 @@ export const API_PATHS = {
     DIRECTIONS: '/routing/directions',
     VEHICLE_MODES: '/routing/vehicle-modes',
     NAVIGATION_ROUTING: '/routing/directions',
-    SIGNS_ALONG_ROUTE: '/routing/along-route',
+    SIGNS_ALONG_ROUTE: '/signs/along-route',
 } as const;
