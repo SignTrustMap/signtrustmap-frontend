@@ -40,14 +40,14 @@ export function CustomAmountScreen() {
         </View>
         <View style={styles.amountEntry}>
           <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Custom amount</Text>
-          <View style={[styles.inputRow, { borderColor: theme.tertiary }]}>
+          <View style={[styles.inputRow, { borderColor: theme.primary }]}>
             <Text style={[styles.currency, { color: theme.text }]}>C</Text>
             <TextInput
               accessibilityLabel="Custom credit amount"
               autoFocus
               keyboardType="number-pad"
               onChangeText={(value) => setAmount(value.replace(/[^0-9]/g, ''))}
-              selectionColor={theme.tertiary}
+              selectionColor={theme.primary}
               style={[styles.input, { color: theme.text }]}
               value={amount}
             />

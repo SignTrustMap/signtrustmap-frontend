@@ -20,7 +20,7 @@ export function SubmissionFinishedScreen({ reviewedCount }: { reviewedCount: num
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <View style={styles.content}>
           <View style={[styles.icon, { backgroundColor: theme.backgroundSelected }]}>
-            <Text style={[styles.iconLabel, { color: theme.tertiary }]}>✓</Text>
+            <Text style={[styles.iconLabel, { color: theme.primary }]}>✓</Text>
           </View>
           <View style={styles.copy}>
             <Text style={[styles.title, { color: theme.text }]}>Submission complete</Text>

@@ -82,7 +82,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>Work</Text>
-            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            <Text style={[styles.subtitle, { color: theme.text }]}>
               Choose a role to view its assigned jobs.
             </Text>
           </View>
@@ -104,9 +104,9 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   onPress={() => setActiveRole(role)}
                   style={[
                     styles.roleButton,
-                    isActive ? { backgroundColor: theme.tertiary } : undefined,
+                    { borderBottomColor: isActive ? theme.primary : 'transparent' },
                   ]}
-                  textStyle={{ color: isActive ? theme.onTertiary : theme.text }}
+                  textStyle={{ color: isActive ? theme.primary : theme.text }}
                   variant="ghost"
                 />
               );
@@ -115,7 +115,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
           <View style={styles.roleSummary}>
             <Text style={[styles.roleTitle, { color: theme.text }]}>{roleLabels[selectedRole]} jobs</Text>
-            <Text style={[styles.roleDescription, { color: theme.textSecondary }]}>
+            <Text style={[styles.roleDescription, { color: theme.text }]}>
               {roleDescriptions[selectedRole]}
             </Text>
           </View>
@@ -130,7 +130,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 <View key={item.title} style={styles.workItem}>
                   <View style={styles.workCopy}>
                     <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
-                    <Text style={[styles.workLocation, { color: theme.textSecondary }]}>
+                    <Text style={[styles.workLocation, { color: theme.text }]}>
                       {item.location}
                     </Text>
                   </View>
@@ -148,10 +148,10 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             style={styles.floatingAction}
           >
             <SymbolView
-              fallback={<Text style={[styles.floatingActionFallback, { color: theme.onTertiary }]}>+</Text>}
+              fallback={<Text style={[styles.floatingActionFallback, { color: theme.onPrimary }]}>+</Text>}
               name={{ android: 'add', ios: 'plus', web: 'add' }}
               size={26}
-              tintColor={theme.onTertiary}
+              tintColor={theme.onPrimary}
             />
           </AppButton>
         ) : null}
@@ -193,13 +193,13 @@ const styles = StyleSheet.create({
   },
   roleSwitcher: {
     flexDirection: 'row',
-    gap: Spacing.half,
-    borderRadius: Rounded.lg,
-    padding: Spacing.half,
+    boxShadow: '0 3px 5px -2px rgba(0, 0, 0, 0.14)',
   },
   roleButton: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 48,
+    borderRadius: 0,
+    borderBottomWidth: 3,
     paddingHorizontal: Spacing.one,
     paddingVertical: Spacing.one,
   },

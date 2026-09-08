@@ -20,13 +20,13 @@ export function CreditsOverviewScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.balanceCard, { backgroundColor: theme.tertiary }]}>
-            <Text style={[styles.balanceLabel, { color: theme.onTertiary }]}>Current balance</Text>
+          <View style={[styles.balanceCard, { backgroundColor: theme.primary }]}>
+            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Current balance</Text>
             <View style={styles.balanceRow}>
-              <Text style={[styles.balanceValue, { color: theme.onTertiary }]}>
+              <Text style={[styles.balanceValue, { color: theme.onPrimary }]}>
                 {walletSummary.balance}
               </Text>
-              <Text style={[styles.balanceUnit, { color: theme.onTertiary }]}>credits</Text>
+              <Text style={[styles.balanceUnit, { color: theme.onPrimary }]}>credits</Text>
             </View>
             <View style={styles.balanceMetaRow}>
               <View>
@@ -47,7 +47,7 @@ export function CreditsOverviewScreen() {
               label="View all"
               onPress={() => router.push('/credits/history')}
               style={styles.viewAllButton}
-              textStyle={{ color: theme.tertiary }}
+              textStyle={{ color: theme.primary }}
               variant="ghost"
             />
           </View>

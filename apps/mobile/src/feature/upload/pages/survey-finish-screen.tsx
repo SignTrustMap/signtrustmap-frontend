@@ -29,7 +29,7 @@ export function SurveyFinishScreen() {
                         <SymbolView
                             name={{ android: 'check', ios: 'checkmark', web: 'check' }}
                             size={40}
-                            tintColor={theme.tertiary}
+                            tintColor={theme.primary}
                         />
                     </View>
 
