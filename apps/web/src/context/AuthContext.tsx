@@ -6,7 +6,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isLoading: boolean
   login: (email: string, password?: string) => Promise<DemoUserAccount>
-  logout: () => void
+  logout: (redirectTo?: string) => void
   updateProfile: (updatedData: Partial<DemoUserAccount>) => void
   claimDailyBonus: (amount?: number) => number
 }
@@ -32,7 +32,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (parsed && parsed.name) {
           parsed.name = sanitizeName(parsed.name)
         }
-        setUser(parsed)
+        // Sync with updated mock accounts (e.g. member names and dog avatars)
+        const matched = mockDemoAccounts.find(
+          (acc) =>
+            acc.id === parsed.id ||
+            acc.email.toLowerCase() === parsed.email?.toLowerCase() ||
+            acc.role.toLowerCase() === parsed.role?.toLowerCase()
+        )
+        if (matched) {
+          const syncedUser = {
+            ...parsed,
+            name: matched.name,
+            avatar: matched.avatar,
+            role: matched.role,
+            label: matched.label,
+          }
+          setUser(syncedUser)
+          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(syncedUser))
+        } else {
+          setUser(parsed)
+        }
       }
     } catch (e) {
       console.error('Failed to load user from localStorage', e)
@@ -72,11 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authenticatedUser
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback((redirectTo: string = '/') => {
     setUser(null)
     localStorage.removeItem(USER_STORAGE_KEY)
     localStorage.removeItem('stm_access_token')
     localStorage.removeItem('stm_refresh_token')
+    if (redirectTo) {
+      window.location.replace(redirectTo)
+    }
   }, [])
 
   const updateProfile = useCallback((updatedData: Partial<DemoUserAccount>) => {

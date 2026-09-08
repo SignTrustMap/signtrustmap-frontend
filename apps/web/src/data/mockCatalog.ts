@@ -2,9 +2,9 @@ export interface TrafficCatalogSign {
   code: string
   nameVi: string
   nameEn: string
-  category: 'prohibitory' | 'warning' | 'mandatory' | 'guide' | 'speed_limit'
+  category: 'prohibitory' | 'warning' | 'mandatory' | 'guide' | 'speed_limit' | 'additional'
   shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon'
-  color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White'
+  color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White' | 'Black-White'
   descriptionVi: string
   descriptionEn: string
   clipPrompt: string
@@ -73,6 +73,18 @@ export const mockTrafficCatalog: TrafficCatalogSign[] = [
     standardRef: 'QCVN 41:2019/BGTVT - Điều 29',
   },
   {
+    code: 'W.205a',
+    nameVi: 'Đường giao nhau cùng mức',
+    nameEn: 'Crossroads / Intersection Ahead',
+    category: 'warning',
+    shape: 'Triangle',
+    color: 'Yellow-Black',
+    descriptionVi: 'Báo trước sắp đến nơi giao nhau cùng mức của các tuyến đường cùng cấp.',
+    descriptionEn: 'Warns that an equal level road intersection is ahead.',
+    clipPrompt: 'a triangular yellow warning sign with black cross symbol in center',
+    standardRef: 'QCVN 41:2019/BGTVT - Điều 33',
+  },
+  {
     code: 'R.301a',
     nameVi: 'Hướng đi phải theo - Đi thẳng',
     nameEn: 'Mandatory Direction - Straight Only',
@@ -83,5 +95,53 @@ export const mockTrafficCatalog: TrafficCatalogSign[] = [
     descriptionEn: 'Mandates vehicles to proceed straight ahead only at the intersection.',
     clipPrompt: 'a round blue mandatory traffic sign with a straight white arrow pointing upwards',
     standardRef: 'QCVN 41:2019/BGTVT - Điều 36',
+  },
+  {
+    code: 'R.302a',
+    nameVi: 'Hướng phải đi vòng chướng ngại vật - Vòng sang phải',
+    nameEn: 'Pass on Right Side of Obstacle',
+    category: 'mandatory',
+    shape: 'Circle',
+    color: 'Blue-White',
+    descriptionVi: 'Báo cho các loại xe phải đi vòng sang phía bên phải để tránh chướng ngại vật.',
+    descriptionEn: 'Instructs drivers to keep right to navigate around obstacles or islands.',
+    clipPrompt: 'a blue round mandatory sign with an arrow pointing down and to the right',
+    standardRef: 'QCVN 41:2019/BGTVT - Điều 37',
+  },
+  {
+    code: 'I.401',
+    nameVi: 'Bắt đầu đường ưu tiên',
+    nameEn: 'Priority Road Begins',
+    category: 'guide',
+    shape: 'Rectangle',
+    color: 'Yellow-Black',
+    descriptionVi: 'Biểu thị cho người tham gia giao thông biết bắt đầu đoạn đường được quyền ưu tiên.',
+    descriptionEn: 'Indicates the beginning of a priority road where vehicles have right of way.',
+    clipPrompt: 'a diamond shaped sign with yellow center and white border indicating priority road',
+    standardRef: 'QCVN 41:2019/BGTVT - Điều 42',
+  },
+  {
+    code: 'I.407a',
+    nameVi: 'Đường một chiều',
+    nameEn: 'One-Way Street',
+    category: 'guide',
+    shape: 'Rectangle',
+    color: 'Blue-White',
+    descriptionVi: 'Chỉ dẫn những đoạn đường chỉ cho phép xe chạy theo một chiều quy định.',
+    descriptionEn: 'Guides road users on streets where traffic flows only in one direction.',
+    clipPrompt: 'a blue rectangular sign with a thick white arrow pointing upwards',
+    standardRef: 'QCVN 41:2019/BGTVT - Điều 48',
+  },
+  {
+    code: 'S.501',
+    nameVi: 'Phạm vi tác dụng của biển',
+    nameEn: 'Distance / Scope of Sign Effect',
+    category: 'additional',
+    shape: 'Rectangle',
+    color: 'Black-White',
+    descriptionVi: 'Thông báo chiều dài đoạn đường nguy hiểm hoặc đoạn đường áp dụng hiệu lực của biển chính.',
+    descriptionEn: 'Specifies the distance over which the main traffic regulation applies.',
+    clipPrompt: 'a small white rectangular auxiliary plate with black arrows and distance text',
+    standardRef: 'QCVN 41:2019/BGTVT - Điều 55',
   },
 ]

@@ -5,6 +5,7 @@ import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { I18nProvider } from '@/context/I18nContext'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { ToastProvider } from '@/context/ToastContext'
 import { AnnouncementBar } from '@/components/layout/AnnouncementBar'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -19,7 +20,9 @@ import {
   Docs,
   SurveyStudioPage,
   SurveyHistoryPage,
-  ReviewerWorkspacePage,
+  ReviewerHubPage,
+  CandidateReviewPage,
+  RevalidationReviewPage,
   WalletPage,
   CatalogPage,
   TermsPage,
@@ -100,7 +103,8 @@ export default function App() {
       <ThemeProvider>
         <I18nProvider>
           <AuthProvider>
-            <BrowserRouter>
+            <ToastProvider>
+              <BrowserRouter>
               <OpsRouteRedirectHandler />
               <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
                 <div className="sticky top-0 z-40 w-full">
@@ -158,7 +162,23 @@ export default function App() {
                       path="/review"
                       element={
                         <ProtectedRoute>
-                          <ReviewerWorkspacePage />
+                          <ReviewerHubPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/review/candidate"
+                      element={
+                        <ProtectedRoute>
+                          <CandidateReviewPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/review/revalidate"
+                      element={
+                        <ProtectedRoute>
+                          <RevalidationReviewPage />
                         </ProtectedRoute>
                       }
                     />
@@ -192,7 +212,8 @@ export default function App() {
                 <ScrollToTop />
               </div>
             </BrowserRouter>
-          </AuthProvider>
+          </ToastProvider>
+        </AuthProvider>
         </I18nProvider>
       </ThemeProvider>
     </I18nextProvider>

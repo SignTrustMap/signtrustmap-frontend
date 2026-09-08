@@ -337,9 +337,8 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={() => {
-                      logout()
                       setMobileOpen(false)
-                      navigate('/', { replace: true })
+                      logout('/')
                     }}
                     className="w-full py-2 px-3 rounded-xl bg-red-500/15 text-red-400 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                   >

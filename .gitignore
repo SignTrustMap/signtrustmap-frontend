@@ -38,6 +38,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+scratch/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -137,5 +138,5 @@ AGENTS.md
 **/context.md
 *.docx
 Report1_Project Introduction*
-SU26SE19xxxx_SignTrustMap_DucDNM2*
+FA26SE003_SignTrustMap_DucDNM2*
 

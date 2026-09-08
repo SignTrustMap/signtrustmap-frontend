@@ -36,7 +36,7 @@ export function AnnouncementBar() {
                 ? 'text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20'
                 : 'text-gray-700 hover:text-black bg-white hover:bg-gray-100 border border-[#E8E4E3]'
             }`}
-            title="Xem mã nguồn dự án trên GitHub"
+            title={t('announcement.view_github')}
           >
             <GithubLogo size={13} weight="bold" className={isDark ? 'text-gray-300 group-hover:text-white transition-colors' : 'text-gray-600 group-hover:text-black transition-colors'} />
             <span>GitHub</span>

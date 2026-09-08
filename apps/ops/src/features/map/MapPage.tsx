@@ -93,10 +93,13 @@ export default function MapPage() {
     const newUrl =
       tileMode === 'osm'
         ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
 
     const newLayer = L.tileLayer(newUrl, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution:
+        tileMode === 'osm'
+          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          : 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, USGS',
       maxZoom: 19,
     }).addTo(mapInstanceRef.current)
 

@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut, CheckCircle, WarningCircle } from '@phosphor-icons/react'
+import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut } from '@phosphor-icons/react'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 
 interface UserProfileModalProps {
@@ -14,63 +14,56 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
   const { user, updateProfile, logout } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
-  const navigate = useNavigate()
+  const toast = useToast()
 
   const [name, setName] = useState(user?.name || '')
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
-  const [saveSuccess, setSaveSuccess] = useState('')
-  const [saveError, setSaveError] = useState('')
 
   if (!isOpen || !user) return null
 
   const handleUpdateName = (e: FormEvent) => {
     e.preventDefault()
-    setSaveError('')
-    setSaveSuccess('')
     if (!name.trim()) {
-      setSaveError(t('profile.name_required') || 'Full name cannot be empty')
+      toast.error(t('profile.name_required'))
       return
     }
     updateProfile({ name: name.trim() })
-    setSaveSuccess(t('profile.save_success') || 'Profile updated successfully!')
-    setTimeout(() => setSaveSuccess(''), 3000)
+    toast.success(t('profile.save_success'))
   }
 
   const handleChangePassword = (e: FormEvent) => {
     e.preventDefault()
-    setSaveError('')
-    setSaveSuccess('')
     if (!newPw || newPw.length < 8) {
-      setSaveError(t('profile.pw_too_short') || 'Password must be at least 8 characters')
+      toast.error(t('profile.pw_too_short'))
       return
     }
     if (newPw !== confirmPw) {
-      setSaveError(t('profile.pw_mismatch') || 'Passwords do not match')
+      toast.error(t('profile.pw_mismatch'))
       return
     }
     updateProfile({ password: newPw })
     setCurrentPw('')
     setNewPw('')
     setConfirmPw('')
-    setSaveSuccess(t('profile.pw_change_success') || 'Password changed successfully!')
-    setTimeout(() => setSaveSuccess(''), 3000)
+    toast.success(t('profile.pw_change_success'))
   }
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
+    const r = (role || '').trim().toLowerCase()
+    switch (r) {
       case 'admin':
-        return { label: 'Admin (Quản trị)', bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' }
+        return { label: t('profile.roles.admin'), bg: 'bg-purple-500/15 text-purple-400 border-purple-500/30' }
       case 'staff':
-        return { label: 'Staff (Điều hành)', bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' }
+        return { label: t('profile.roles.staff'), bg: 'bg-blue-500/15 text-blue-400 border-blue-500/30' }
       case 'reviewer':
-        return { label: 'Reviewer (Duyệt viên)', bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
+        return { label: t('profile.roles.reviewer'), bg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' }
       case 'surveyor':
-        return { label: 'Surveyor (Khảo sát)', bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
+        return { label: t('profile.roles.surveyor'), bg: 'bg-amber-500/15 text-amber-400 border-amber-500/30' }
       default:
-        return { label: 'Driver (Tài xế)', bg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' }
+        return { label: t('profile.roles.driver'), bg: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' }
     }
   }
 
@@ -90,7 +83,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
           <div className="flex items-center gap-2">
             <span className="text-xl">{user.icon || '👤'}</span>
             <div>
-              <h2 className="text-base font-bold">{t('profile.modal_title') || 'Account Profile'}</h2>
+              <h2 className="text-base font-bold">{t('profile.modal_title')}</h2>
               <p className="text-xs text-gray-400">{user.email}</p>
             </div>
           </div>
@@ -135,7 +128,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
               <span className="text-[10px] uppercase font-mono text-gray-400 block mb-0.5 flex items-center gap-1">
                 <Coins size={12} className="text-amber-400" />
-                {t('profile.credits_balance') || 'Credits'}
+                {t('profile.credits_balance')}
               </span>
               <span className="text-sm font-bold text-amber-400">{user.credits || 0}</span>
             </div>
@@ -143,14 +136,14 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
               <span className="text-[10px] uppercase font-mono text-gray-400 block mb-0.5 flex items-center gap-1">
                 <ShieldCheck size={12} className="text-emerald-400" />
-                {t('profile.trust_score') || 'Trust Score'}
+                {t('profile.trust_score')}
               </span>
               <span className="text-sm font-bold text-emerald-400">{user.trustScore || 100}%</span>
             </div>
 
             <div className={`p-2.5 rounded-xl border col-span-2 sm:col-span-1 ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200'}`}>
               <span className="text-[10px] uppercase font-mono text-gray-400 block mb-0.5">
-                {t('profile.joined_date') || 'Member Since'}
+                {t('profile.joined_date')}
               </span>
               <span className="text-xs font-semibold">{user.joinDate || '2026'}</span>
             </div>
@@ -170,7 +163,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                 : 'border-transparent text-gray-400 hover:text-gray-200'
             }`}
           >
-            {t('profile.tab_general') || 'General Info'}
+            {t('profile.tab_general')}
           </button>
           <button
             type="button"
@@ -183,23 +176,9 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                 : 'border-transparent text-gray-400 hover:text-gray-200'
             }`}
           >
-            {t('profile.tab_security') || 'Security & Password'}
+            {t('profile.tab_security')}
           </button>
         </div>
-
-        {/* Alerts */}
-        {saveSuccess && (
-          <div className="mx-6 mt-4 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
-            <CheckCircle size={16} />
-            <span>{saveSuccess}</span>
-          </div>
-        )}
-        {saveError && (
-          <div className="mx-6 mt-4 p-2.5 rounded-xl bg-red-500/15 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-            <WarningCircle size={16} />
-            <span>{saveError}</span>
-          </div>
-        )}
 
         {/* Tab Contents */}
         <div className="p-6">
@@ -207,7 +186,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             <form onSubmit={handleUpdateName} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_fullname') || 'Display Name'}
+                  {t('profile.label_fullname')}
                 </label>
                 <div className="relative">
                   <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -226,7 +205,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
 
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_email') || 'Email Address'}
+                  {t('profile.label_email')}
                 </label>
                 <div className="relative">
                   <Envelope size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -250,7 +229,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                       : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
                   }`}
                 >
-                  {t('profile.btn_save') || 'Save Changes'}
+                  {t('profile.btn_save')}
                 </button>
               </div>
             </form>
@@ -258,7 +237,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
             <form onSubmit={handleChangePassword} className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_current_pw') || 'Current Password'}
+                  {t('profile.label_current_pw')}
                 </label>
                 <div className="relative">
                   <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -266,7 +245,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                     type="password"
                     value={currentPw}
                     onChange={(e) => setCurrentPw(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder={t('profile.placeholder_current_pw')}
                     className={`w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border outline-none transition-colors ${
                       isDark
                         ? 'bg-white/5 border-white/10 focus:border-[#00c4de] text-white'
@@ -278,7 +257,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
 
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_new_pw') || 'New Password'}
+                  {t('profile.label_new_pw')}
                 </label>
                 <div className="relative">
                   <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -286,7 +265,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                     type="password"
                     value={newPw}
                     onChange={(e) => setNewPw(e.target.value)}
-                    placeholder="Min. 8 characters"
+                    placeholder={t('profile.placeholder_new_pw')}
                     className={`w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border outline-none transition-colors ${
                       isDark
                         ? 'bg-white/5 border-white/10 focus:border-[#00c4de] text-white'
@@ -298,7 +277,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
 
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_confirm_pw') || 'Confirm New Password'}
+                  {t('profile.label_confirm_pw')}
                 </label>
                 <div className="relative">
                   <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -306,7 +285,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                     type="password"
                     value={confirmPw}
                     onChange={(e) => setConfirmPw(e.target.value)}
-                    placeholder="Re-enter new password"
+                    placeholder={t('profile.placeholder_confirm_pw')}
                     className={`w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border outline-none transition-colors ${
                       isDark
                         ? 'bg-white/5 border-white/10 focus:border-[#00c4de] text-white'
@@ -325,7 +304,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
                       : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
                   }`}
                 >
-                  {t('profile.btn_change_pw') || 'Update Password'}
+                  {t('profile.btn_change_pw')}
                 </button>
               </div>
             </form>
@@ -337,14 +316,13 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
           <button
             type="button"
             onClick={() => {
-              logout()
               onClose()
-              navigate('/', { replace: true })
+              logout('/')
             }}
             className="text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <SignOut size={16} />
-            <span>{t('profile.btn_logout') || 'Sign Out'}</span>
+            <span>{t('profile.btn_logout')}</span>
           </button>
 
           <button
@@ -354,7 +332,7 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
               isDark ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-700'
             }`}
           >
-            {t('common.close') || 'Close'}
+            {t('common.close')}
           </button>
         </div>
       </div>

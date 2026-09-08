@@ -31,7 +31,7 @@ export default function Login() {
       await login(targetEmail, targetPw)
       navigate(from, { replace: true })
     } catch {
-      setError(t('auth.login.error_default') || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email hoặc mật khẩu.')
+      setError(t('auth.login.error_default'))
     } finally {
       setIsLoading(false)
     }
@@ -40,7 +40,7 @@ export default function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!email.trim()) {
-      setError('Vui lòng nhập địa chỉ Email.')
+      setError(t('auth.login.email_required'))
       return
     }
     await performLogin(email, password)
@@ -97,10 +97,17 @@ export default function Login() {
                 className="w-12 h-12 object-contain"
               />
             </Link>
-            <h1 className="text-2xl font-bold font-sans tracking-tight">
-              {t('auth.login.title_action')}
+            <h1
+              className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}
+            >
+              <span>{t('auth.login.title_action')}</span>
+              <span>
+                Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
+              </span>
             </h1>
-            <p className="text-xs text-gray-400 mt-1 max-w-xs">
+            <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               {t('auth.login.subtitle')}
             </p>
           </div>
@@ -118,7 +125,9 @@ export default function Login() {
             <div>
               <label
                 htmlFor="login-email"
-                className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5"
+                className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
               >
                 {t('auth.login.email_label')}
               </label>
@@ -142,13 +151,15 @@ export default function Login() {
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="login-password"
-                  className="block text-xs font-semibold uppercase tracking-wider text-gray-400"
+                  className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                    isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}
                 >
                   {t('auth.login.password_label')}
                 </label>
                 <Link
                   to="#"
-                  className={`text-xs hover:underline ${
+                  className={`text-xs font-bold hover:underline ${
                     isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
                   }`}
                 >
@@ -208,8 +219,8 @@ export default function Login() {
               </div>
               <div className="relative flex justify-center text-xs">
                 <span
-                  className={`px-4 text-[11px] font-mono uppercase tracking-widest ${
-                    isDark ? 'bg-[#061417] text-gray-400' : 'bg-white text-gray-400'
+                  className={`px-4 text-[11px] font-mono font-bold uppercase tracking-widest ${
+                    isDark ? 'bg-[#061417] text-gray-300' : 'bg-white text-gray-600'
                   }`}
                 >
                   {t('auth.login.or')}
@@ -237,7 +248,7 @@ export default function Login() {
                 isDark ? 'border-white/10' : 'border-gray-100'
               }`}
             >
-              <p className="text-[11px] font-mono uppercase tracking-wider text-gray-400 mb-2">
+              <p className={`text-xs font-bold uppercase tracking-wider font-mono mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                 {t('auth.login.dev_quick')}
               </p>
               <div className="flex flex-wrap gap-1.5">

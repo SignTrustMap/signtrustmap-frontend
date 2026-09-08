@@ -6,9 +6,16 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   maxWidth?: string
+  topSpacing?: string
 }
 
-export function Modal({ isOpen, onClose, children, maxWidth = 'max-w-lg' }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  children,
+  maxWidth = 'max-w-lg',
+  topSpacing = 'pt-10 sm:pt-16 pb-12 sm:pb-16',
+}: ModalProps) {
   useEffect(() => {
     if (!isOpen) return
 
@@ -34,7 +41,7 @@ export function Modal({ isOpen, onClose, children, maxWidth = 'max-w-lg' }: Moda
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-md animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
@@ -42,10 +49,19 @@ export function Modal({ isOpen, onClose, children, maxWidth = 'max-w-lg' }: Moda
       }}
     >
       <div
-        className={`w-full ${maxWidth} relative animate-scaleIn`}
-        onClick={(e) => e.stopPropagation()}
+        className={`min-h-full flex items-start justify-center p-4 sm:p-6 ${topSpacing}`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose()
+          }
+        }}
       >
-        {children}
+        <div
+          className={`w-full ${maxWidth} relative animate-scaleIn my-auto sm:my-0`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
       </div>
     </div>,
     document.body

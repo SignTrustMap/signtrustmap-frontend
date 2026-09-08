@@ -20,7 +20,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }
 
   const toggleLang = () => {
-    setLang(lang === 'vi' ? 'en' : 'vi')
+    if (lang === 'vi') {
+      setLang('en')
+    } else {
+      setLang('vi')
+    }
   }
 
   return (

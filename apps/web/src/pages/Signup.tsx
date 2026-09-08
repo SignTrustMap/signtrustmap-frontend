@@ -363,7 +363,7 @@ export default function Signup() {
             <button
               type="button"
               onClick={() => {
-                setName('Nguyễn Văn A')
+                setName('Demo User')
                 setEmail('user@gmail.com')
                 setPassword('oauth-password')
                 setConfirmPassword('oauth-password')
