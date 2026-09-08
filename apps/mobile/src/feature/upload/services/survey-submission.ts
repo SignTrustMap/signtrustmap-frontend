@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import { apiRequest, jsonApiRequest } from '@/services/api-client';
+import { apiRequest, jsonApiRequest } from '@/api/api-client';
 
 type InitializeUploadResponse = {
   sessionId: string;

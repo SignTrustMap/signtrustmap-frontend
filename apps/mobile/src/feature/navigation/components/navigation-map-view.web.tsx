@@ -10,9 +10,11 @@ import {
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
 import type { RouteSign } from '@/api/navigation/navigation';
+import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 
 type NavigationMapViewProps = {
+  onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
   destination?: PreviousLocation;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
@@ -116,6 +118,7 @@ function createStartMarkerElement() {
 }
 
 export function NavigationMapView({
+  onBoundsChange,
   destination,
   focusCoordinate,
   focusRequestId = 0,
@@ -170,6 +173,44 @@ export function NavigationMapView({
   }, [theme.primary]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onBoundsChange) return;
+
+    const reportBounds = () => {
+      const bounds = map.getBounds();
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        minLon: bounds.getWest(),
+        maxLat: bounds.getNorth(),
+        maxLon: bounds.getEast(),
+      });
+    };
+    map.on('load', reportBounds);
+    map.on('moveend', reportBounds);
+    if (map.loaded()) reportBounds();
+    return () => {
+      map.off('load', reportBounds);
+      map.off('moveend', reportBounds);
+    };
+  }, [onBoundsChange, theme.primary]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const markers = routeSigns.map((sign) => (
+      new Marker({ element: createSignMarkerElement(sign) })
+        .setLngLat(sign.coordinate)
+        .addTo(map)
+    ));
+    stopSignMarkersRef.current = markers;
+    return () => {
+      markers.forEach((marker) => marker.remove());
+      stopSignMarkersRef.current = [];
+    };
+  }, [routeSigns, theme.primary]);
+
+  useEffect(() => {
     if (!focusCoordinate || !mapRef.current) return;
 
     currentLocationMarkerRef.current?.setLngLat(focusCoordinate);
@@ -182,10 +223,8 @@ export function NavigationMapView({
     const map = mapRef.current;
     destinationMarkerRef.current?.remove();
     startMarkerRef.current?.remove();
-    stopSignMarkersRef.current.forEach((marker) => marker.remove());
     destinationMarkerRef.current = null;
     startMarkerRef.current = null;
-    stopSignMarkersRef.current = [];
 
     if (map.getLayer('selected-route-line')) {
       map.removeLayer('selected-route-line');
@@ -245,14 +284,6 @@ export function NavigationMapView({
         .setLngLat(routeStart)
         .addTo(map);
 
-      if (routeSigns.length > 0) {
-        stopSignMarkersRef.current = routeSigns.map((sign) => (
-          new Marker({ element: createSignMarkerElement(sign) })
-            .setLngLat(sign.coordinate)
-            .addTo(map)
-        ));
-      }
-
       map.fitBounds([routeStart, destination.coordinate], {
         duration: 900,
         padding: { bottom: 160, left: 44, right: 44, top: 100 },
@@ -265,7 +296,7 @@ export function NavigationMapView({
       } else {
         map.once('load', renderRoute);
       }
-      return;
+      return () => { map.off('load', renderRoute); };
     }
 
     map.flyTo({
@@ -273,7 +304,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeSigns, routeStart, theme.primary]);
+  }, [destination, routeCoordinates, routeStart, theme.primary]);
 
   return (
     <View style={styles.container}>

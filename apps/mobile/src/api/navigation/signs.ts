@@ -1,6 +1,6 @@
 import type { MapCoordinate } from '@/types/navigation/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
-import { apiRequest } from '@/services/api-client';
+import { apiRequest } from '@/api/api-client';
 
 type BoundsResponse = {
     signs: {

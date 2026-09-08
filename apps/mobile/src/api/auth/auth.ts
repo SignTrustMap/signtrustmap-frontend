@@ -1,4 +1,4 @@
-import { jsonApiRequest } from '@/services/api-client';
+import { jsonApiRequest } from '@/api/api-client';
 import { API_PATHS } from '@/api/api';
 import type { AccountRole, AppSession } from '@/context/session-provider';
 

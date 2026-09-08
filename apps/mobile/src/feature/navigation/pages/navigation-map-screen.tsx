@@ -10,7 +10,6 @@ import { AppToast } from "@/components/ui/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
-  currentLocation,
   previousLocations,
   startLocations,
   type MapCoordinate,
@@ -21,7 +20,8 @@ import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep } from '@/api/navigation/navigation';
 import type { VehicleMode } from '@/types/navigation/navigationType';
 import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
-import { useGetSignsInBounds } from '../hooks/use-signs';
+import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { getMapLibre } from "@/services/maplibre";
 
@@ -174,7 +174,6 @@ export function NavigationMapScreen() {
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     routeKey: string;
-    signCoordinates: MapCoordinate[];
   }>();
   const { data: vehicleModes = [] } = useGetVehicleModes();
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
@@ -194,36 +193,30 @@ export function NavigationMapScreen() {
     selectedDestination?.coordinate,
     vehicleMode,
   );
-  const [longitude, latitude] = currentLocation.coordinate;
-  const { data: mapSigns = [] } = useGetSignsInBounds(
-    [longitude - 0.04, latitude - 0.04],
-    [longitude + 0.04, latitude + 0.04],
-    !routeStart,
+  const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
+  const hasSelectedRoute = Boolean(routeStart && selectedDestination);
+  const { data: mapSigns = [], error: boundsSignsError } = useGetSignsInBounds(
+    mapBounds,
+    !hasSelectedRoute,
   );
-  const navigationError = routeError?.message ?? navigationActionError;
+  const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
+    routeStart,
+    selectedDestination?.coordinate,
+    routeResult?.geometry,
+  );
+  const navigationError = routeError?.message ?? navigationActionError
+    ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
   const routeCoordinates = routeResult?.coordinates;
   const routeDistance = routeResult?.distance;
   const routeDuration = routeResult?.duration;
   const routeSteps = routeResult?.steps;
-  const plannedSignCoordinates = routeResult?.signs.map((sign) => sign.coordinate) ?? [];
-  const plannedSigns = routeResult?.signs ?? [];
   const isNavigating = Boolean(
     routeKey && navigationSession?.routeKey === routeKey,
   );
   const hasLiveLocation = Boolean(
     isNavigating && navigationSession?.hasLiveLocation,
   );
-  const visibleSigns = routeStart
-    ? isNavigating
-      ? plannedSigns.filter((sign) =>
-        navigationSession?.signCoordinates.some(
-          (coordinate) =>
-            coordinate[0] === sign.coordinate[0] &&
-            coordinate[1] === sign.coordinate[1],
-        ),
-      )
-      : plannedSigns
-    : mapSigns;
+  const visibleSigns = hasSelectedRoute ? plannedSigns : mapSigns;
   const maneuverProgresses = useMemo(
     () =>
       routeSteps?.map((step) =>
@@ -341,14 +334,12 @@ export function NavigationMapScreen() {
       setNavigationSession({
         hasLiveLocation: Boolean(currentPosition),
         routeKey,
-        signCoordinates: plannedSignCoordinates,
       });
     } catch {
       setUserCoordinate(routeStart);
       setNavigationSession({
         hasLiveLocation: false,
         routeKey,
-        signCoordinates: plannedSignCoordinates,
       });
     } finally {
       setIsStartingNavigation(false);
@@ -510,6 +501,7 @@ export function NavigationMapScreen() {
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <View style={styles.map}>
         <NavigationMapView
+          onBoundsChange={setMapBounds}
           destination={selectedDestination}
           focusCoordinate={
             selectedDestination ? undefined : mapFocus?.coordinate
@@ -525,6 +517,12 @@ export function NavigationMapScreen() {
           routeSigns={visibleSigns}
           showCurrentLocation={!isNavigating}
         />
+
+        {!hasSelectedRoute && boundsSignsError ? (
+          <AppToast
+            message="Unable to load traffic signs."
+          />
+        ) : null}
 
         {isNavigating && activeManeuver ? (
           <NavigationManeuverBanner

@@ -1,4 +1,4 @@
-import { apiRequest } from '@/services/api-client';
+import { apiRequest } from '@/api/api-client';
 
 export type CatalogCategory = {
   code: string;

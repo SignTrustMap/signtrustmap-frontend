@@ -1,5 +1,5 @@
 import type { MapCoordinate, VehicleMode } from "@/types/navigation/navigationType";
-import { apiRequest, jsonApiRequest } from "@/services/api-client";
+import { apiRequest, jsonApiRequest } from "@/api/api-client";
 import { API_PATHS } from "@/api/api";
 
 
@@ -36,18 +36,6 @@ type DirectionsResponse = {
             type: string;
         }[];
     };
-};
-
-type AlongRouteResponse = {
-    signs: {
-        sign: {
-            id: string;
-            latitude: number;
-            longitude: number;
-            signCropUrl: string;
-            signType: { nameEn: string; signCode: string };
-        };
-    }[];
 };
 
 function throwIfAborted(signal?: AbortSignal) {
@@ -95,36 +83,11 @@ export async function getNavigationRoute(
     const coordinates = directions.shortestPath.geometry.map(
         (point): MapCoordinate => [point.longitude, point.latitude],
     );
-    let signs: AlongRouteResponse = { signs: [] };
-    try {
-        signs = await jsonApiRequest<AlongRouteResponse>(
-            API_PATHS.SIGNS_ALONG_ROUTE,
-            { geometry: directions.shortestPath.geometry },
-            undefined,
-            signal,
-        );
-    } catch (error) {
-        if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-            throw error;
-        }
-        // If sign querying fails or geometry payload is large, proceed with route calculation
-        signs = { signs: [] };
-    }
-    throwIfAborted(signal);
-
     return {
         coordinates,
+        geometry: directions.shortestPath.geometry,
         distance: directions.shortestPath.distanceMeters,
         duration: directions.shortestPath.durationSeconds,
-        signs: signs.signs.map(
-            ({ sign }): RouteSign => ({
-                coordinate: [sign.longitude, sign.latitude],
-                id: sign.id,
-                imageUrl: sign.signCropUrl,
-                name: sign.signType.nameEn,
-                signCode: sign.signType.signCode,
-            }),
-        ),
         steps: directions.shortestPath.steps.map(
             (step): NavigationStep => ({
                 distance: step.distanceMeters,

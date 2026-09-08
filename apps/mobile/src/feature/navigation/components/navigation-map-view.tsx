@@ -1,4 +1,5 @@
-import type { StyleSpecification } from '@maplibre/maplibre-react-native';
+import type { MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
+import { useRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
@@ -8,10 +9,12 @@ import {
   type PreviousLocation,
 } from '@/feature/navigation/data/navigation-locations';
 import type { RouteSign } from '@/api/navigation/navigation';
+import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 
 type NavigationMapViewProps = {
+  onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
   destination?: PreviousLocation;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
@@ -60,6 +63,7 @@ const openStreetMapStyle: StyleSpecification = {
 };
 
 export function NavigationMapView({
+  onBoundsChange,
   destination,
   focusCoordinate,
   focusRequestId = 0,
@@ -71,6 +75,10 @@ export function NavigationMapView({
   isNavigatingFeature = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const mapRef = useRef<MapRef>(null);
+  const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
+    onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
+  };
   const mapLibre = loadMapLibre();
   const cameraCenter = destination?.coordinate ?? currentLocation.coordinate;
   const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
@@ -102,6 +110,13 @@ export function NavigationMapView({
 
   return (
     <Map
+      ref={mapRef}
+      onRegionDidChange={(event) => reportBounds(event.nativeEvent.bounds)}
+      onDidFinishLoadingMap={() => {
+        void mapRef.current?.getBounds().then(reportBounds).catch(() => {
+          // The next region change reports bounds if the map is not ready yet.
+        });
+      }}
       attribution
       attributionPosition={{ bottom: 8, right: 8 }}
       compass
@@ -192,16 +207,6 @@ export function NavigationMapView({
             <View style={styles.currentLocationHalo}>
               <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
             </View>
-            {(!destination || !routeStart) ? (
-              <View style={styles.stopSignMarker}>
-                <Image
-                  accessibilityLabel="Stop sign"
-                  source={stopSignImage}
-                  resizeMode='contain'
-                  style={styles.stopSignImage}
-                />
-              </View>
-            ) : null}
           </>
         </Marker>
       ) : null}
