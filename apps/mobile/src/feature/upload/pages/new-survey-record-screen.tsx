@@ -25,6 +25,7 @@ import {
   type ImageGpsCoordinates,
 } from '@/feature/upload/utils/image-gps';
 import { useTheme } from '@/hooks/use-theme';
+import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
 
 type SelectedSurveyMedia = {
   fileName?: string | null;
@@ -174,6 +175,8 @@ export function NewSurveyRecordScreen() {
   const [pickerError, setPickerError] = useState<string>();
   const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
   const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const scanInProgress = useRef(false);
   const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
   const [androidGalleryAssets, setAndroidGalleryAssets] = useState<MediaLibraryAsset[]>([]);
   const [androidGalleryCursor, setAndroidGalleryCursor] = useState<string>();
@@ -322,8 +325,42 @@ export function NewSurveyRecordScreen() {
     }
   };
 
+  const handleSubmitRecord = () => {
+    if (!selectedAsset || isOpeningGallery || scanInProgress.current) return;
+    scanInProgress.current = true;
+    setIsScanning(true);
+  };
+
+  const handleScanComplete = () => {
+    if (!scanInProgress.current || !selectedAsset) return;
+    scanInProgress.current = false;
+    setIsScanning(false);
+    router.push({
+      pathname: '/work/new-survey/details',
+      params: {
+        imageType: selectedAsset.type,
+        imageMimeType: selectedAsset.mimeType,
+        imageName: selectedAsset.fileName ?? undefined,
+        imageUri: selectedAsset.uri,
+        ...(selectedGps
+          ? { latitude: String(selectedGps.latitude), longitude: String(selectedGps.longitude) }
+          : {}),
+      },
+    });
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      {isScanning && selectedAsset ? (
+        <SurveyScanModal
+          imageUri={selectedAsset.uri}
+          onComplete={handleScanComplete}
+          onCancel={() => {
+            scanInProgress.current = false;
+            setIsScanning(false);
+          }}
+        />
+      ) : null}
       <Modal
         animationType="slide"
         transparent
@@ -448,7 +485,7 @@ export function NewSurveyRecordScreen() {
             accessibilityLabel={
               selectedAsset ? 'Change selected photo' : 'Choose a photo from gallery'
             }
-            disabled={isOpeningGallery}
+            disabled={isOpeningGallery || isScanning}
             onPress={handleOpenGallery}
             pressedOpacity={0.78}
             style={[
@@ -501,29 +538,9 @@ export function NewSurveyRecordScreen() {
           ) : null}
 
           <AppButton
-            disabled={!selectedAsset}
+            disabled={!selectedAsset || isOpeningGallery || isScanning}
             label="Submit Record"
-            onPress={() =>
-              router.push({
-                pathname: '/work/new-survey/details',
-                params: {
-                  ...(selectedAsset
-                    ? {
-                      imageType: selectedAsset.type ?? 'image',
-                      imageMimeType: selectedAsset.mimeType,
-                      imageName: selectedAsset.fileName ?? undefined,
-                      imageUri: selectedAsset.uri,
-                    }
-                    : {}),
-                  ...(selectedGps
-                    ? {
-                      latitude: String(selectedGps.latitude),
-                      longitude: String(selectedGps.longitude),
-                    }
-                    : {}),
-                },
-              })
-            }
+            onPress={handleSubmitRecord}
             style={styles.submitButton}
           />
         </ScrollView>
@@ -742,5 +759,10 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignSelf: 'stretch',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 3,
   },
 });

@@ -1,3 +1,4 @@
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -223,6 +224,21 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <View style={styles.section}>
+            <AppInput
+              label="Image location (latitude, longitude)"
+              accessibilityLabel="Image latitude and longitude, read only"
+              editable={false}
+              showSoftInputOnFocus={false}
+              value={imageCoordinate
+                ? `${imageCoordinate[1].toFixed(6)}, ${imageCoordinate[0].toFixed(6)}`
+                : ''}
+              placeholder="No image location available"
+              leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
+              containerStyle={styles.imageLocationInput}
+            />
+          </View>
+
+          <View style={styles.section}>
             <Text style={[styles.label, { color: theme.text }]}>Map Preview</Text>
             <View
               accessibilityLabel={
@@ -239,12 +255,14 @@ export function SurveyRecordDetailsScreen() {
               ]}
             >
               {selectedCoordinate ? (
-                <NavigationMapView
-                  focusCoordinate={selectedCoordinate}
-                  focusRequestId={focusRequestId}
-                  showCurrentLocation
-                  isNavigatingFeature
-                />
+                <View style={StyleSheet.absoluteFill}>
+                  <NavigationMapView
+                    focusCoordinate={selectedCoordinate}
+                    focusRequestId={focusRequestId}
+                    showCurrentLocation
+                    isNavigatingFeature
+                  />
+                </View>
               ) : (
                 <View style={styles.mapEmptyState}>
                   <SymbolView
@@ -260,6 +278,16 @@ export function SurveyRecordDetailsScreen() {
                   </Text>
                 </View>
               )}
+              <AppButton
+                accessibilityLabel="Zoom map preview"
+                style={[
+                  styles.mapZoomButton,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                variant="ghost"
+              >
+                <AntDesign name="expand" size={20} color={theme.primary} />
+              </AppButton>
             </View>
             {selectedCoordinate ? (
               <Text style={[styles.coordinateText, { color: theme.textSecondary }]}>
@@ -412,10 +440,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: Rounded.lg,
   },
+  imageLocationInput: {
+    paddingLeft: Spacing.two,
+  },
   mapEmptyState: {
     alignItems: 'center',
     gap: Spacing.one,
     paddingHorizontal: Spacing.four,
+  },
+  mapZoomButton: {
+    position: 'absolute',
+    right: Spacing.one,
+    bottom: Spacing.one,
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 3,
   },
   mapEmptyText: {
     fontFamily: Fonts.body,
