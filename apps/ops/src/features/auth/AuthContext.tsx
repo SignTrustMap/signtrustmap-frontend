@@ -31,21 +31,7 @@ async function mockLogin(email: string, _password: string): Promise<User> {
     cleanEmail.includes('reviewer') ||
     (matchedDemo && !matchedDemo.isOpsAuthorized)
   ) {
-    const role = matchedDemo
-      ? matchedDemo.role
-      : cleanEmail.includes('driver')
-      ? 'driver'
-      : cleanEmail.includes('surveyor')
-      ? 'surveyor'
-      : 'reviewer'
-    const name = matchedDemo
-      ? matchedDemo.name
-      : role === 'driver'
-      ? 'Lương Minh Nhật'
-      : role === 'surveyor'
-      ? 'Nguyễn Phúc Khang'
-      : 'Nguyễn Lê Quang Hưng'
-    throw new Error(`FORBIDDEN_COMMUNITY_ROLE:${role}:${name}`)
+    throw new Error('FORBIDDEN_ACCESS')
   }
 
   // Admin account
@@ -120,7 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('stm_access_token', 'mock_ops_token_' + user.role)
     } catch (err) {
       setState((s) => ({ ...s, isLoading: false }))
-      if (err instanceof Error && err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:')) {
+      if (
+        err instanceof Error &&
+        (err.message === 'FORBIDDEN_ACCESS' || err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:'))
+      ) {
         throw err
       }
       throw new Error('INVALID_CREDENTIALS')

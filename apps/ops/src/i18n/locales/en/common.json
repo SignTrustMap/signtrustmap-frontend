@@ -106,7 +106,7 @@
     "err_login_failed": "Login failed. Please try again.",
     "err_invalid_credentials": "Invalid username or password.",
     "forbidden_title": "Access Denied",
-    "forbidden_desc": "Accounts with {{role}} role are not authorized to access the Operations Portal.",
+    "forbidden_desc": "This account is not authorized to access the Operations Portal.",
     "btn_go_community": "Go to Community Portal",
     "role_forbidden_badge": "Unauthorized",
     "role_authorized_badge": "Authorized",

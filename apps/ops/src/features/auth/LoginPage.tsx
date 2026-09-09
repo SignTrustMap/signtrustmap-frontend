@@ -39,12 +39,6 @@ export default function LoginPage() {
     localStorage.setItem(LANG_STORAGE_KEY, nextLang)
   }
 
-  function getRoleLabel(roleKey: string) {
-    const key = `login.roles.${roleKey}`
-    const translated = t(key)
-    return translated !== key ? translated : roleKey
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
@@ -58,9 +52,13 @@ export default function LoginPage() {
         navigate(isAdmin ? '/' : '/', { replace: true })
       }
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:')) {
-        const [, role] = err.message.split(':')
-        toast.error(t('login.forbidden_desc', { role: getRoleLabel(role) }))
+      if (
+        err instanceof Error &&
+        (err.message === 'FORBIDDEN_ACCESS' || err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:'))
+      ) {
+        const errorMsg = t('login.forbidden_desc')
+        setError(errorMsg)
+        toast.error(errorMsg)
       } else if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
         setError(t('login.err_invalid_credentials'))
         toast.error(t('login.err_invalid_credentials'))
