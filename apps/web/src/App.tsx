@@ -28,7 +28,7 @@ import {
   TermsPage,
   PrivacyPage,
   ProfilePage,
-} from '@/pages'
+} from '@/features'
 
 function PlaceholderPage({ titleKey }: { titleKey: string }) {
   const { t } = useTranslation('common')

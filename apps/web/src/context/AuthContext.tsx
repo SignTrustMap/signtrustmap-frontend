@@ -60,6 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Listen for global unauthorized events from Axios to logout gracefully without hard reload
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null)
+      localStorage.removeItem(USER_STORAGE_KEY)
+      localStorage.removeItem('stm_access_token')
+      localStorage.removeItem('stm_refresh_token')
+    }
+    window.addEventListener('auth:unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
+  }, [])
+
   const login = useCallback(async (email: string, _password?: string): Promise<DemoUserAccount> => {
     setIsLoading(true)
     await new Promise((r) => setTimeout(r, 400)) // simulate quick network

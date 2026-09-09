@@ -22,7 +22,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { mockSurveySubmissions } from '@/data'
-import { PhotoLocationPicker, NewSignTypeModal } from '@/components/survey'
+import { PhotoLocationPicker, NewSignTypeModal } from './components'
 
 export default function SurveyStudioPage() {
   const { isDark } = useTheme()

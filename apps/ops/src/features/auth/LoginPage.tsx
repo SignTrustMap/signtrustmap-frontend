@@ -179,6 +179,8 @@ export default function LoginPage() {
           {/* Link to Community Portal */}
           <a
             href={communityPortalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-full border transition-all shadow-xs ${
               isDark
                 ? 'bg-[#00c4de]/10 border-[#00c4de]/30 text-[#00c4de] hover:bg-[#00c4de]/20'

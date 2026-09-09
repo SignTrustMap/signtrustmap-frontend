@@ -16,7 +16,7 @@ import {
   mockSurveySubmissions,
   type SurveySubmissionItem,
 } from '@/data'
-import { SurveyDetailModal, NewSignTypeModal } from '@/components/survey'
+import { SurveyDetailModal, NewSignTypeModal } from './components'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
 

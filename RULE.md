@@ -18,6 +18,30 @@
    - Cấu trúc dữ liệu phải sẵn sàng để thay thế bằng các hook gọi API thực tế (`services/`, `api/`, `tanstack-query`) mà không làm xáo trộn giao diện.
    - Xử lý đầy đủ các trạng thái của dữ liệu: `Loading` (skeleton/spinner), `Success`, `Error` (thông báo lỗi thân thiện), và `Empty State` (trạng thái danh sách trống, kèm hình minh họa/thông điệp khích lệ).
 
+3. **Chuẩn hóa Tầng Giao vận & Mạng (Axios Singleton & Zero Raw Fetch):**
+   - Tuyệt đối **không** dùng hàm `fetch()` trực tiếp rải rác trong các file nghiệp vụ hoặc service.
+   - 100% các request mạng phải thông qua **Axios Instance Singleton** (`apiClient` hoặc `edgeApiClient`).
+   - Cấu hình chuẩn cho Axios Instance:
+     - `baseURL` lấy từ `env.apiBaseUrl` (hoặc `AIOPS_BASE_URL`).
+     - Timeout tiêu chuẩn 15.000ms – 20.000ms.
+     - Headers mặc định (`Content-Type: application/json`, `Accept: application/json`).
+     - Request Interceptor: Tự động đính kèm `Authorization: Bearer <token>` từ Storage nếu có.
+     - Response Interceptor: Tự động unwrap `response.data`.
+
+4. **Cơ chế Quản lý Token & Xử lý 401 Unauthorized (Event-Driven Soft Redirect):**
+   - Xử lý refresh token tự động với cờ `_retry` khi gặp HTTP 401.
+   - Khi refresh token thất bại hoặc phiên đăng nhập hết hạn:
+     - Xóa các token lưu trữ (`stm_access_token`, `stm_refresh_token`).
+     - Tuyệt đối **không** dùng `window.location.href = '/login'` gây hard reload (làm mất sạch toàn bộ in-memory state của React).
+     - Bắt buộc kiểm tra xem request có header `Authorization` (protected route) hay không. Nếu có, phát sự kiện custom: `window.dispatchEvent(new CustomEvent('auth:unauthorized'))`.
+     - Tầng `AuthContext` lắng nghe sự kiện này để reset state mềm và điều hướng người dùng mượt mà qua React Router. Các API công cộng (public request) không được phép kick văng người dùng khách.
+
+5. **Quy tắc Tầng Dịch vụ Nghiệp vụ (Functional Service Objects):**
+   - 100% các service trong `src/api/services/` phải được viết dưới dạng **Functional Object** (`export const [name]Service = { ... }`), tuyệt đối không dùng `class` tĩnh:
+     - **Tối ưu hóa Tree-shaking:** Bundler (Vite/Rollup) dễ dàng phân tích và loại bỏ dead-code khi build production.
+     - **Tương thích hoàn hảo với TanStack Query (React Query) / SWR:** Dễ dàng truyền trực tiếp các hàm async vào `queryFn: () => userService.getUsers()` mà không bị ràng buộc ngữ cảnh `this`.
+     - **Codebase đồng nhất:** Loại bỏ cú pháp hướng đối tượng rườm rà không cần thiết trong React hiện đại.
+
 ---
 
 ## 2. QUY TẮC GIAO DIỆN & TRẢI NGHIỆM NGƯỜI DÙNG (UI/UX DESIGN)
@@ -78,3 +102,63 @@
      - Placeholder: `ph_search`, `ph_notes`
      - Thông báo Toast: `toast_success`, `toast_error`
      - Thông báo lỗi: `err_required`, `err_invalid_format`
+
+---
+
+## 4. QUY TẮC CẤU TRÚC THƯ MỤC THEO TÍNH NĂNG (FEATURE-DRIVEN ARCHITECTURE)
+
+1. **Mô hình tổ chức Feature-Based thống nhất (Đồng bộ Web & Ops):**
+   - Thay vì phân mảnh theo kiểu cũ (tách rời `pages/` một nơi và `components/` một nơi), dự án áp dụng mô hình Feature-Driven chuẩn công nghiệp quốc tế cho cả `apps/web` và `apps/ops`:
+   - Mọi tính năng nghiệp vụ được đóng gói độc lập trong thư mục `src/features/<feature-name>/`:
+     - `components/`: Chứa các component giao diện dành riêng cho feature đó (ví dụ: `features/review/components/`, `features/survey/components/`).
+     - `Page.tsx` hoặc các trang view chính: Đặt trực tiếp tại root của feature folder (ví dụ: `features/review/ReviewWorkspacePage.tsx`, `features/profile/ProfilePage.tsx`).
+     - `api/` hoặc `hooks/`: Chứa các hook và lời gọi API chỉ phục vụ riêng tính năng đó.
+     - `index.ts`: Export các trang chính hoặc public API của feature để router/app sử dụng.
+   - Thư mục `src/features/index.ts` đóng vai trò là single entrypoint re-export toàn bộ các trang và feature module của ứng dụng.
+
+2. **Vai trò tuyệt đối của thư mục `src/components/`:**
+   - Thư mục `src/components/` **CHỈ** được chứa 2 nhóm:
+     - `common/`: Các UI Primitives thuần túy dùng chung trên toàn ứng dụng (Buttons, Modals, Pagination, Badges, Tooltips, Empty States, Skeletons).
+     - `layout/`: Các thành phần bố cục toàn cục (Navbar, Footer, Sidebar, UserDropdownMenu, Banner).
+   - Tuyệt đối **không** tạo thư mục components nghiệp vụ riêng biệt tại `src/components/<feature>/` (như `components/review/`, `components/auth/`). Toàn bộ component nghiệp vụ phải nằm trong `src/features/<feature>/components/`.
+
+---
+
+## 5. QUY TẮC QUẢN LÝ BIẾN MÔI TRƯỜNG & CẤU HÌNH (12-FACTOR APP & ENV CONVENTIONS)
+
+1. **Tách biệt tuyệt đối Cấu hình (Config) khỏi Mã nguồn (Code):**
+   - Tuân thủ nguyên lý Factor III (Config) trong *12-Factor App*.
+   - **Nghiêm cấm hoàn toàn anti-pattern fallback ternary hardcode trong code:**
+     - ❌ **CẤM:** `const domain = import.meta.env.VITE_OPS_DOMAIN || (import.meta.env.DEV ? 'localhost:5174' : 'ops.signmap.site')`
+     - ❌ **CẤM:** Viết cứng URL/domain trong các component hoặc axios client.
+   - Toàn bộ giá trị cấu hình theo môi trường bắt buộc phải được khai báo tường minh trong các tệp `.env`:
+     - `.env.development`: Cấu hình cho môi trường local dev (ví dụ: `VITE_OPS_DOMAIN=localhost:5174`, `VITE_PUBLIC_DOMAIN=localhost:5173`, `VITE_API_BASE_URL=http://localhost:3000`).
+     - `.env.production`: Cấu hình cho production thực tế (`VITE_OPS_DOMAIN=ops.signmap.site`, `VITE_PUBLIC_DOMAIN=signmap.site`, `VITE_API_BASE_URL=https://api.signtrustmap.site`).
+     - `.env.example`: Mẫu chuẩn biến môi trường cam kết commit lên git để onboarding thành viên mới.
+
+2. **Single Source of Truth tại `src/config/env.ts`:**
+   - File `src/config/env.ts` ở mỗi app là nơi duy nhất đọc biến từ `import.meta.env`.
+   - File này chỉ làm nhiệm vụ:
+     - Đọc giá trị từ `import.meta.env`.
+     - Chuẩn hóa URL qua helper format (tự động gắn `http://` trong dev và `https://` trong prod nếu domain chưa có giao thức).
+     - Export object `env` đóng băng (`as const`) cùng các URL dẫn xuất (`opsPortalUrl`, `communityPortalUrl`, `opsLoginUrl`).
+   - Mọi nơi trong ứng dụng (Axios Client, Router redirect, Footer, Dropdown...) bắt buộc import từ `@/config/env`, không tự đọc `import.meta.env` trực tiếp.
+
+3. **Cơ chế Xác thực Biến Môi Trường lúc khởi động (Runtime Validation):**
+   - Tại `src/config/env.ts`, bắt buộc tích hợp hàm xác thực `validateEnv` ngay khi ứng dụng boot.
+   - Nếu phát hiện thiếu bất kỳ biến bắt buộc nào (như `VITE_API_BASE_URL`, `VITE_OPS_DOMAIN`, `VITE_PUBLIC_DOMAIN`...):
+     - Ghi log cảnh báo định dạng màu nổi bật (`console.warn`) trong DevTools Console để lập trình viên phát hiện và khắc phục ngay lập tức, tránh lỗi âm thầm (silent failure) do biến rỗng gây ra.
+
+---
+
+## 6. QUY TẮC ĐIỀU HƯỚNG LIÊN CỔNG ỨNG DỤNG (CROSS-PORTAL NAVIGATION)
+
+1. **Cơ chế mở Tab mới cho chuyển cổng (External Portal Transitions):**
+   - Hệ thống gồm 2 ứng dụng độc lập: **Web Portal** (dành cho người dùng công cộng, khảo sát, tài xế) và **Ops Portal** (dành cho Staff, Reviewer, Admin vận hành).
+   - Khi người dùng bấm vào các liên kết chuyển giao giữa hai ứng dụng (ví dụ: từ UserDropdownMenu trên Web sang Ops Workspace, từ link Community Portal trên Ops sang Web, hoặc link Reviewer trong Footer):
+     - **Bắt buộc mở trong tab mới:** Thẻ `<a>` phải có thuộc tính `target="_blank"` và `rel="noopener noreferrer"`.
+     - Tuyệt đối **không** dùng redirect trên tab hiện tại (`window.location.href` trực tiếp) để tránh làm mất trạng thái làm việc dang dở (unsaved review, active map view, form data) của người dùng ở cổng hiện tại.
+
+2. **Đồng bộ đích đến theo Môi trường:**
+   - Đường dẫn liên kết luôn trỏ qua biến môi trường chuẩn hóa (`opsPortalUrl` hoặc `communityPortalUrl`), đảm bảo ở môi trường dev trỏ đúng local port của app đối ứng (`localhost:5174` hoặc `localhost:5173`) và ở production trỏ đúng subdomain chính thức (`ops.signmap.site` và `signmap.site`).
+

@@ -584,6 +584,8 @@ export default function ProfilePage() {
                 {(user.role === 'admin' || user.role === 'staff') && (
                   <a
                     href={`${opsPortalUrl}/overview`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 group ${
                       isDark
                         ? 'bg-white/[0.02] border-white/10 hover:border-blue-400/50 hover:bg-white/[0.04]'

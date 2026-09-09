@@ -67,7 +67,17 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         localStorage.removeItem('stm_access_token')
         localStorage.removeItem('stm_refresh_token')
-        window.location.href = '/login'
+
+        // Soft event-driven unauthorized dispatch (prevents hard full-page reload)
+        // Only trigger redirect when the request was authenticated (protected route)
+        const wasProtectedRequest = !!originalRequest?.headers?.Authorization
+        if (wasProtectedRequest && typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('auth:unauthorized', {
+              detail: { reason: 'token_expired', path: window.location.pathname },
+            })
+          )
+        }
         return Promise.reject(refreshErr)
       }
     }

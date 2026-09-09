@@ -7,18 +7,20 @@ export interface ResolveEscalationDto {
   verdictNotes: string
 }
 
-export class EscalationService {
+export const escalationService = {
   /**
    * Fetch all staff escalation cases
    */
-  static async getEscalations(params?: { status?: string }): Promise<ApiResponse<AdminEscalationCase[]>> {
+  getEscalations: async (params?: { status?: string }): Promise<ApiResponse<AdminEscalationCase[]>> => {
     return http.get<ApiResponse<AdminEscalationCase[]>>(API_ENDPOINTS.ESCALATIONS.BASE, { params })
-  }
+  },
 
   /**
    * Resolve an escalated case with verdict justification
    */
-  static async resolveCase(caseId: string, data: ResolveEscalationDto): Promise<ApiResponse<AdminEscalationCase>> {
+  resolveCase: async (caseId: string, data: ResolveEscalationDto): Promise<ApiResponse<AdminEscalationCase>> => {
     return http.post<ApiResponse<AdminEscalationCase>>(API_ENDPOINTS.ESCALATIONS.RESOLVE(caseId), data)
-  }
+  },
 }
+
+export const EscalationService = escalationService

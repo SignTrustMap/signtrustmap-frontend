@@ -35,13 +35,13 @@ import {
   type TrafficCatalogSign,
 } from '@/data'
 import { Modal } from '@/components/common/Modal'
-import { NewSignTypeModal } from '@/components/survey/NewSignTypeModal'
+import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
 import {
   FlagCandidateModal,
   ReviewerMiniMap,
   RevalidationWorkspacePanel,
   ReviewHistoryDrawer,
-} from '@/components/review'
+} from './components'
 
 type QueueFilterType = 'all' | 'uncertain' | 'confident' | 'P' | 'W' | 'R'
 type CatalogCategoryFilter = 'all' | 'prohibitory' | 'warning' | 'mandatory' | 'guide' | 'additional'

@@ -25,9 +25,9 @@ import {
   type FlagReasonCode,
   type TrafficCatalogSign,
 } from '@/data'
-import { ReviewerMiniMap } from '@/components/review/ReviewerMiniMap'
-import { FlagCandidateModal } from '@/components/review/FlagCandidateModal'
-import { TrafficSignGraphic } from '@/components/catalog/TrafficSignGraphic'
+import { ReviewerMiniMap } from './components/ReviewerMiniMap'
+import { FlagCandidateModal } from './components/FlagCandidateModal'
+import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 
 type MediaViewType = 'crop' | 'context' | 'map'
 type QueueFilterType = 'all' | 'uncertain' | 'confident' | 'P' | 'W' | 'R'

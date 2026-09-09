@@ -164,50 +164,50 @@ export interface SystemConfigResponse {
   }
 }
 
-export class AiopsService {
+export const aiopsService = {
   /**
    * Fetch one-time infrastructure health snapshot (CUDA, TensorRT, MinIO)
    */
-  static async getSystemHealth(): Promise<SystemHealthResponse> {
+  getSystemHealth: async (): Promise<SystemHealthResponse> => {
     return edgeFetch<SystemHealthResponse>(API_ENDPOINTS.AIOPS.HEALTH)
-  }
+  },
 
   /**
    * Fetch full AI Runtime & Subsystems Configuration Tree (/api/v1/config)
    */
-  static async getConfig(): Promise<SystemConfigResponse> {
+  getConfig: async (): Promise<SystemConfigResponse> => {
     return edgeFetch<SystemConfigResponse>(API_ENDPOINTS.AIOPS.CONFIG)
-  }
+  },
 
   /**
    * Fetch all AI Model Weights & Engines on NVIDIA Edge Node
    */
-  static async getModels(): Promise<ModelsResponse> {
+  getModels: async (): Promise<ModelsResponse> => {
     return edgeFetch<ModelsResponse>(API_ENDPOINTS.AIOPS.MODELS)
-  }
+  },
 
   /**
    * Fetch available Active Learning Strategies & Aggregation Config
    */
-  static async getStrategies(): Promise<ActiveLearningStrategiesResponse> {
+  getStrategies: async (): Promise<ActiveLearningStrategiesResponse> => {
     return edgeFetch<ActiveLearningStrategiesResponse>(API_ENDPOINTS.AIOPS.STRATEGIES)
-  }
+  },
 
   /**
    * Fetch 100 AI Recognition Classes (VTSDB100)
    */
-  static async getClasses(): Promise<ClassesResponse> {
+  getClasses: async (): Promise<ClassesResponse> => {
     return edgeFetch<ClassesResponse>(API_ENDPOINTS.AIOPS.CLASSES)
-  }
+  },
 
   /**
    * Subscribe to live SSE Stream of NVIDIA Jetson Orin Hardware & AI Telemetry
    * Uses modern Fetch ReadableStream with custom headers to completely bypass Ngrok warnings and CORS issues
    */
-  static subscribeSystemMetricsStream(
+  subscribeSystemMetricsStream: (
     onData: (data: SystemHardwareMetrics) => void,
     onError?: (err: any) => void
-  ): () => void {
+  ): (() => void) => {
     const controller = new AbortController()
     let isCancelled = false
 
@@ -231,7 +231,7 @@ export class AiopsService {
         let buffer = ''
 
         while (!isCancelled) {
-          const { value, done } = await reader.read()
+          const { done, value } = await reader.read()
           if (done) break
 
           buffer += decoder.decode(value, { stream: true })
@@ -241,28 +241,22 @@ export class AiopsService {
           for (const line of lines) {
             const trimmed = line.trim()
             if (trimmed.startsWith('data:')) {
-              const jsonStr = trimmed.replace(/^data:\s*/, '').trim()
-              if (jsonStr) {
-                try {
-                  const parsed: SystemHardwareMetrics = JSON.parse(jsonStr)
+              try {
+                const rawJson = trimmed.replace(/^data:\s*/, '')
+                if (rawJson && rawJson !== '[DONE]') {
+                  const parsed: SystemHardwareMetrics = JSON.parse(rawJson)
                   onData(parsed)
-                } catch (parseErr) {
-                  console.warn('Error parsing JSON from SSE chunk:', parseErr)
                 }
+              } catch (e) {
+                console.warn('[SSE Parse Error]', e)
               }
             }
           }
         }
       } catch (err: any) {
-        if (err.name === 'AbortError' || isCancelled) return
-        console.warn('Fetch stream connection warning:', err)
-        if (onError) onError(err)
-
-        // Auto-reconnect after 3s if not intentionally closed
-        if (!isCancelled) {
-          setTimeout(() => {
-            if (!isCancelled) startStream()
-          }, 3000)
+        if (!isCancelled && err.name !== 'AbortError') {
+          console.error('[SSE Stream Error]', err)
+          if (onError) onError(err)
         }
       }
     }
@@ -273,33 +267,35 @@ export class AiopsService {
       isCancelled = true
       controller.abort()
     }
-  }
+  },
 
   /**
    * Fetch model retraining run history
    */
-  static async getRetrainingRuns(): Promise<ApiResponse<ModelRetrainingRun[]>> {
+  getRetrainingRuns: async (): Promise<ApiResponse<ModelRetrainingRun[]>> => {
     return http.get<ApiResponse<ModelRetrainingRun[]>>(API_ENDPOINTS.AIOPS.RETRAINING_RUNS)
-  }
+  },
 
   /**
    * Manually trigger a model retraining run
    */
-  static async triggerRetrain(modelName?: string): Promise<ApiResponse<ModelRetrainingRun>> {
+  triggerRetrain: async (modelName?: string): Promise<ApiResponse<ModelRetrainingRun>> => {
     return http.post<ApiResponse<ModelRetrainingRun>>(API_ENDPOINTS.AIOPS.TRIGGER_RUN, { modelName })
-  }
+  },
 
   /**
    * Get Active learning sampling configuration
    */
-  static async getActiveLearningConfig(): Promise<ApiResponse<ActiveLearningConfig>> {
+  getActiveLearningConfig: async (): Promise<ApiResponse<ActiveLearningConfig>> => {
     return http.get<ApiResponse<ActiveLearningConfig>>(API_ENDPOINTS.AIOPS.ACTIVE_LEARNING_CONFIG)
-  }
+  },
 
   /**
    * Update Active learning sampling configuration
    */
-  static async updateActiveLearningConfig(data: ActiveLearningConfig): Promise<ApiResponse<ActiveLearningConfig>> {
+  updateActiveLearningConfig: async (data: ActiveLearningConfig): Promise<ApiResponse<ActiveLearningConfig>> => {
     return http.put<ApiResponse<ActiveLearningConfig>>(API_ENDPOINTS.AIOPS.ACTIVE_LEARNING_CONFIG, data)
-  }
+  },
 }
+
+export const AiopsService = aiopsService

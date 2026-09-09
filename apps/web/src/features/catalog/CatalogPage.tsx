@@ -25,7 +25,7 @@ import { mockTrafficCatalog, type TrafficCatalogSign } from '@/data'
 import { Modal } from '@/components/common/Modal'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
-import { TrafficSignGraphic } from '@/components/catalog/TrafficSignGraphic'
+import { TrafficSignGraphic } from './components/TrafficSignGraphic'
 
 export default function CatalogPage() {
   const { isDark } = useTheme()

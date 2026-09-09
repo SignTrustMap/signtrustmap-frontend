@@ -22,8 +22,8 @@ import {
   mockReviewSessionHistory,
   type ReviewHistoryItem,
 } from '@/data'
-import { NewSignTypeModal } from '@/components/survey/NewSignTypeModal'
-import { ReviewHistoryDrawer } from '@/components/review/ReviewHistoryDrawer'
+import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
+import { ReviewHistoryDrawer } from './components/ReviewHistoryDrawer'
 
 export function ReviewerHubPage() {
   const { t } = useTranslation('common')

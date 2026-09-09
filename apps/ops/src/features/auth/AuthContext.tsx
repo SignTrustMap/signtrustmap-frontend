@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { User, AuthState } from '@/types/auth'
 
 interface AuthContextValue extends AuthState {
@@ -43,8 +43,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setState({ user: null, isLoading: false, isAuthenticated: false })
+    localStorage.removeItem('stm_access_token')
+    localStorage.removeItem('stm_refresh_token')
     // In production: call POST /auth/logout to clear httpOnly cookie
   }, [])
+
+  // Listen for global unauthorized events from Axios to logout gracefully without hard reload
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout()
+    }
+    window.addEventListener('auth:unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
+  }, [logout])
 
   return (
     <AuthContext.Provider value={{ ...state, login, logout }}>

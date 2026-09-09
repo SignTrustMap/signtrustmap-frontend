@@ -248,6 +248,9 @@ export function UserDropdownMenu({ isOpen, onClose }: UserDropdownMenuProps) {
               <a
                 key={item.href}
                 href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={onClose}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   isDark
                     ? 'hover:bg-white/5 text-gray-200 hover:text-white'

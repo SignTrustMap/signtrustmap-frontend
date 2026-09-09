@@ -15,7 +15,7 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@/components/common/Modal'
-import { SurveyRouteMap } from '@/components/survey/SurveyRouteMap'
+import { SurveyRouteMap } from './SurveyRouteMap'
 import type { SurveySubmissionItem, ExtractedCandidateItem } from '@/data'
 
 interface SurveyDetailModalProps {
