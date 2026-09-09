@@ -9,8 +9,11 @@
     "pagination": {
       "showing": "Showing",
       "of": "of",
+      "first": "First page",
       "prev": "Previous",
       "next": "Next",
+      "last": "Last page",
+      "page": "Page",
       "per_page": "/ page",
       "default_item": "results"
     },
@@ -641,8 +644,11 @@
   "pagination": {
     "showing": "Showing",
     "of": "of",
+    "first": "First page",
     "prev": "Previous",
     "next": "Next",
+    "last": "Last page",
+    "page": "Page",
     "per_page": "/ page",
     "default_item": "items"
   }

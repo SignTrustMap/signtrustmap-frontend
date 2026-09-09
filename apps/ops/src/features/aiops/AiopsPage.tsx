@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import {
   Brain,
   Pause,
   Play,
-  CheckCircle,
   Cpu,
   Lightning,
   Thermometer,
@@ -50,10 +50,10 @@ function formatUptime(seconds: number): string {
 
 export default function AiopsPage() {
   const { t } = useTranslation('ops')
+  const toast = useToast()
 
   // 5 Active Tabs connecting to real APIs
   const [activeTab, setActiveTab] = useState<'metrics' | 'models' | 'active-learning' | 'classes' | 'config'>('metrics')
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   // Infrastructure Health (/api/v1/system/health)
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
@@ -207,19 +207,14 @@ export default function AiopsPage() {
     }
   }, [isStreaming, activeTab, t])
 
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
-  }
-
   function handleSaveActiveLearning() {
-    showToast(t('mlops.al_toast_saved'))
+    toast.success(t('mlops.al_toast_saved'))
   }
 
   function handleCopyJson() {
     if (!configData) return
     navigator.clipboard.writeText(JSON.stringify(configData, null, 2))
-    showToast(t('mlops.config_copied'))
+    toast.success(t('mlops.config_copied'))
   }
 
   function toggleBranch(branchKey: string) {
@@ -257,18 +252,6 @@ export default function AiopsPage() {
           </p>
         </div>
       </div>
-
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Dismiss toast"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       {/* 5 Active Real API Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-white/10 pb-2">

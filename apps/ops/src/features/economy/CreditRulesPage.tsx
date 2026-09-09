@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import {
   Coins,
   CurrencyCircleDollar,
-  CheckCircle,
   FloppyDisk,
   NavigationArrow,
   PlusCircle,
@@ -12,6 +12,7 @@ import {
 
 export default function CreditRulesPage() {
   const { t } = useTranslation('ops')
+  const toast = useToast()
 
   const [surveyReward, setSurveyReward] = useState(50)
   const [reviewReward, setReviewReward] = useState(15)
@@ -25,12 +26,9 @@ export default function CreditRulesPage() {
     { id: 'PKG-3', priceVnd: 200000, credits: 2000, bonus: 400 },
   ])
 
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
-
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    setToastMsg(t('economy.toast_saved'))
-    setTimeout(() => setToastMsg(null), 3000)
+    toast.success(t('economy.toast_saved'))
   }
 
   function handleAddPackage() {
@@ -61,18 +59,6 @@ export default function CreditRulesPage() {
           </p>
         </div>
       </div>
-
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Reward Rules Grid */}
@@ -188,7 +174,7 @@ export default function CreditRulesPage() {
                     {t('economy.lbl_price_vnd')}
                   </span>
                   <span className="text-base font-bold font-mono text-gray-900 dark:text-white">
-                    {pkg.priceVnd.toLocaleString()} đ
+                    {pkg.priceVnd.toLocaleString()} ₫
                   </span>
                 </div>
                 <div className="space-y-1">

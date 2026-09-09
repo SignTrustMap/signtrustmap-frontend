@@ -1,43 +1,35 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from '@/features/auth/AuthContext'
 import { ThemeProvider } from '@/context/ThemeContext'
-import { AuthGuard, AdminGuard, StaffGuard } from '@/features/auth/Guards'
+import { ToastProvider } from '@/context/ToastContext'
 import { AppShell } from '@/components/layout/AppShell'
-import LoginPage from '@/features/auth/LoginPage'
-import NotAllowedPage from '@/features/auth/NotAllowedPage'
-
-// Overview
-import DashboardPage from '@/features/dashboard/DashboardPage'
-
-// Identity & Access
-import UsersPage from '@/features/users/UsersPage'
-import RolesPage from '@/features/roles/RolesPage'
-
-// Traffic Sign Governance
-import CatalogPage from '@/features/catalog/CatalogPage'
-import MissingSignsPage from '@/features/catalog/MissingSignsPage'
-import SpatialOverridesPage from '@/features/spatial/SpatialOverridesPage'
-import AdminEscalationsPage from '@/features/escalations/AdminEscalationsPage'
-
-// Economy
-import CreditRulesPage from '@/features/economy/CreditRulesPage'
-import CreditsApprovalPage from '@/features/credits/CreditsApprovalPage'
-
-// AI & Processing (AIOps)
-import AiopsPage from '@/features/aiops/AiopsPage'
-
-// Data
-import SpatialDataExportPage from '@/features/exports/SpatialDataExportPage'
-
-// System
-import SystemSettingsPage from '@/features/settings/SystemSettingsPage'
-import AuditLogsPage from '@/features/audit/AuditLogsPage'
-
-// Staff Specific Routes
-import CandidatesListPage from '@/features/candidates/CandidatesListPage'
-import CandidateDetailPage from '@/features/candidates/CandidateDetailPage'
-import MapPage from '@/features/map/MapPage'
-import TasksPage from '@/features/tasks/TasksPage'
+import {
+  AuthProvider,
+  AuthGuard,
+  AdminGuard,
+  StaffGuard,
+  LoginPage,
+  NotAllowedPage,
+  DashboardPage,
+  UsersPage,
+  RolesPage,
+  CatalogPage,
+  MissingSignsPage,
+  SpatialOverridesPage,
+  AdminEscalationsPage,
+  CreditRulesPage,
+  CreditsApprovalPage,
+  AiopsPage,
+  SpatialDataExportPage,
+  SystemSettingsPage,
+  AuditLogsPage,
+  CandidatesListPage,
+  CandidateDetailPage,
+  MapPage,
+  TasksPage,
+  StaffDirectoryPage,
+  StaffDetailPage,
+  ReportsPage,
+} from '@/features'
 
 function ProtectedLayout() {
   return (
@@ -170,6 +162,18 @@ function ProtectedLayout() {
             path="/tasks"
             element={<TasksPage />}
           />
+          <Route
+            path="/staff"
+            element={<StaffDirectoryPage />}
+          />
+          <Route
+            path="/staff/:id"
+            element={<StaffDetailPage />}
+          />
+          <Route
+            path="/reports"
+            element={<ReportsPage />}
+          />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -183,13 +187,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/403" element={<NotAllowedPage />} />
-            <Route path="/*" element={<ProtectedLayout />} />
-          </Routes>
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/403" element={<NotAllowedPage />} />
+              <Route path="/*" element={<ProtectedLayout />} />
+            </Routes>
+          </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>
   )

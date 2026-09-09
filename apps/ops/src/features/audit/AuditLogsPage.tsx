@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
+import { Pagination } from '@/components/common/Pagination'
 import {
   DownloadSimple,
   CalendarBlank,
   MagnifyingGlass,
-  CaretLeft,
-  CaretRight,
 } from '@phosphor-icons/react'
 import { mockAuditLogs, type AuditLogItem, type EventType } from '@/data'
 
@@ -53,6 +52,7 @@ export default function AuditLogsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [dateRange, setDateRange] = useState('01/10/2023 - 31/10/2023')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const filteredLogs = logs.filter((log) => {
     const matchesEvent =
@@ -65,8 +65,15 @@ export default function AuditLogsPage() {
     return matchesEvent && matchesSearch
   })
 
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+
   function handleExport() {
-    const headers = ['Mã sự kiện,Thời gian,Người thực hiện,Hành động,Đối tượng,IP,Phân loại']
+    const headers = [
+      `${t('audit.th_id', 'ID')},${t('audit.th_time')},${t('audit.th_user')},${t('audit.th_event')},${t('audit.th_target')},${t('audit.th_ip')},${t('audit.th_type')}`
+    ]
     const rows = filteredLogs.map(
       (l) =>
         `"${l.id}","${l.timestamp}","${l.user.name}","${l.action}","${l.targetId}","${l.ipAddress}","${l.eventType}"`
@@ -76,7 +83,7 @@ export default function AuditLogsPage() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `nhat_ky_audit_${Date.now()}.csv`)
+    link.setAttribute('download', `audit_logs_${Date.now()}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -172,7 +179,7 @@ export default function AuditLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10">
-              {filteredLogs.map((log) => (
+              {paginatedLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-[#F8F7F7]/50 dark:hover:bg-white/5 transition-colors">
                   <td className="py-4 px-6 font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     {log.timestamp}
@@ -208,29 +215,18 @@ export default function AuditLogsPage() {
         </div>
 
         {/* Footer pagination */}
-        <div className="py-3.5 px-6 border-t border-[#E8E4E3] dark:border-white/10 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>
-            {t('audit.showing_results', { count: filteredLogs.length, total: logs.length })}
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40"
-            >
-              <CaretLeft size={14} />
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#007b8b] text-white font-bold text-xs">
-              1
-            </button>
-            <button
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10"
-            >
-              <CaretRight size={14} />
-            </button>
-          </div>
+        <div className="px-6 py-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredLogs.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
     </div>

@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { LANG_STORAGE_KEY } from '@/i18n'
 import { communityPortalUrl } from '@/config/env'
+import { mockOpsDemoAccounts, type DemoAccount } from '@/data/mockAccounts'
 import {
   Eye,
   EyeSlash,
@@ -20,6 +22,7 @@ export default function LoginPage() {
   const { login, isLoading } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t, i18n } = useTranslation('common')
+  const toast = useToast()
   const navigate = useNavigate()
   const [params] = useSearchParams()
 
@@ -36,6 +39,12 @@ export default function LoginPage() {
     localStorage.setItem(LANG_STORAGE_KEY, nextLang)
   }
 
+  function getRoleLabel(roleKey: string) {
+    const key = `login.roles.${roleKey}`
+    const translated = t(key)
+    return translated !== key ? translated : roleKey
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
@@ -49,13 +58,28 @@ export default function LoginPage() {
         navigate(isAdmin ? '/' : '/', { replace: true })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại')
+      if (err instanceof Error && err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:')) {
+        const [, role] = err.message.split(':')
+        toast.error(t('login.forbidden_desc', { role: getRoleLabel(role) }))
+      } else if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
+        setError(t('login.err_invalid_credentials'))
+        toast.error(t('login.err_invalid_credentials'))
+      } else {
+        setError(t('login.err_login_failed'))
+        toast.error(t('login.err_login_failed'))
+      }
     }
+  }
+
+  function handleSelectDemo(acc: DemoAccount) {
+    setEmail(acc.email)
+    setPassword(acc.password)
+    setError('')
   }
 
   return (
     <div
-      className={`relative min-h-screen w-full flex flex-col justify-between overflow-hidden font-sans transition-colors duration-300 ${
+      className={`relative min-h-screen w-full flex flex-col justify-between font-sans transition-colors duration-300 ${
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
@@ -98,12 +122,12 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* ─── Top Header with Logo & Controls ──────────────────────── */}
+      {/* ─── Top Header with Logo & Controls (Fixed navigation) ─── */}
       <header
-        className={`relative z-10 w-full px-6 sm:px-12 py-5 flex items-center justify-between border-b backdrop-blur-md transition-colors ${
+        className={`fixed top-0 left-0 right-0 z-50 w-full px-6 sm:px-12 py-4 sm:py-5 flex items-center justify-between border-b backdrop-blur-xl transition-all shadow-sm ${
           isDark
-            ? 'bg-[#030708]/75 border-white/10'
-            : 'bg-white/80 border-[#E8E4E3]'
+            ? 'bg-[#030708]/90 border-white/10'
+            : 'bg-white/90 border-[#E8E4E3]'
         }`}
       >
         {/* Brand Logo */}
@@ -148,7 +172,7 @@ export default function LoginPage() {
                 : 'bg-white border-[#E8E4E3] text-[#007b8b] hover:bg-gray-50 shadow-xs'
             }`}
             title={isDark ? t('common.switch_theme_light') : t('common.switch_theme_dark')}
-            aria-label="Đổi giao diện"
+            aria-label={t('common.aria_theme')}
           >
             {isDark ? (
               <Sun size={18} weight="bold" />
@@ -167,7 +191,7 @@ export default function LoginPage() {
                 : 'bg-white border-[#E8E4E3] text-gray-800 hover:bg-gray-50'
             }`}
             title={t('common.switch_lang')}
-            aria-label="Đổi ngôn ngữ"
+            aria-label={t('common.aria_lang')}
           >
             <Globe size={14} weight="bold" className="text-[#00c4de]" />
             <span>{currentLang.toUpperCase()}</span>
@@ -192,6 +216,9 @@ export default function LoginPage() {
           </a>
         </div>
       </header>
+
+      {/* Spacer so page content does not hide behind fixed header */}
+      <div className="h-16 sm:h-[72px] shrink-0 pointer-events-none" aria-hidden="true" />
 
       {/* ─── Main Glassmorphism Login Card ─────────────────────────── */}
       <main className="relative z-10 flex items-center justify-center px-4 py-10">
@@ -296,14 +323,14 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPw(!showPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 p-1 cursor-pointer"
-                  aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  aria-label={showPw ? t('login.aria_hide_pw') : t('login.aria_show_pw')}
                 >
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            {/* Error banner */}
+            {/* Standard Error banner */}
             {error && (
               <p
                 role="alert"
@@ -359,8 +386,9 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
-                setEmail('staff@signtrustmap.site')
-                setPassword('google-oauth')
+                setEmail('staff@signtrustmap.com')
+                setPassword('password123')
+                setError('')
               }}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                 isDark
@@ -377,44 +405,50 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Quick Demo Logins (Always visible for convenience) */}
+          {/* Quick Demo Logins (Fills in credentials identical to Web format) */}
           <div
-            className={`mt-6 pt-5 border-t text-left ${
+            className={`mt-4 pt-4 border-t text-left ${
               isDark ? 'border-white/10' : 'border-gray-100'
             }`}
           >
-            <p className="text-[10px] font-mono uppercase text-gray-400 mb-2">
+            <p
+              className={`text-xs font-bold uppercase tracking-wider font-mono mb-2 ${
+                isDark ? 'text-gray-300' : 'text-gray-700'
+              }`}
+            >
               {t('login.dev_quick')}
             </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('staff@example.com')
-                  setPassword('password')
-                }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-                  isDark
-                    ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
-                    : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
-                }`}
-              >
-                {t('login.staff_portal')}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail('admin@example.com')
-                  setPassword('password')
-                }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
-                  isDark
-                    ? 'bg-[#00c4de]/15 hover:bg-[#00c4de]/25 border-[#00c4de]/40 text-[#00c4de]'
-                    : 'bg-[#007b8b]/10 hover:bg-[#007b8b]/20 border-[#007b8b]/30 text-[#007b8b]'
-                }`}
-              >
-                {t('login.admin_portal')}
-              </button>
+            <div className="flex flex-wrap gap-1.5">
+              {mockOpsDemoAccounts.map((acc) => {
+                const isSelected = email === acc.email
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => handleSelectDemo(acc)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer active:scale-95 ${
+                      isSelected
+                        ? isDark
+                          ? 'bg-[#00c4de]/20 border-[#00c4de]/60 text-[#00c4de]'
+                          : 'bg-[#007b8b]/15 border-[#007b8b]/50 text-[#007b8b]'
+                        : isDark
+                        ? 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-200'
+                        : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    <span>{acc.icon}</span>
+                    <span>{acc.label}</span>
+                    {!acc.isOpsAuthorized && (
+                      <span
+                        className="text-[9px] px-1 py-0.2 rounded font-mono font-bold leading-tight bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        title={t('login.role_forbidden_badge')}
+                      >
+                        403
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

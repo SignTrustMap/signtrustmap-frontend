@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react'
-import { CheckCircle, WarningCircle, Warning, Info, X } from '@phosphor-icons/react'
+import { CheckCircle, XCircle, Warning, Info, X } from '@phosphor-icons/react'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
+
+export interface ToastAction {
+  label: string
+  href?: string
+  onClick?: () => void
+}
 
 export interface ToastItem {
   id: string
@@ -9,16 +15,17 @@ export interface ToastItem {
   message: string
   title?: string
   duration?: number
+  action?: ToastAction
 }
 
 interface ToastContextType {
   toasts: ToastItem[]
   showToast: (toast: Omit<ToastItem, 'id'>) => string
   removeToast: (id: string) => void
-  success: (message: string, title?: string, duration?: number) => string
-  error: (message: string, title?: string, duration?: number) => string
-  warning: (message: string, title?: string, duration?: number) => string
-  info: (message: string, title?: string, duration?: number) => string
+  success: (message: string, title?: string, duration?: number, action?: ToastAction) => string
+  error: (message: string, title?: string, duration?: number, action?: ToastAction) => string
+  warning: (message: string, title?: string, duration?: number, action?: ToastAction) => string
+  info: (message: string, title?: string, duration?: number, action?: ToastAction) => string
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
@@ -31,12 +38,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const showToast = useCallback(
-    ({ type, message, title, duration = 3500 }: Omit<ToastItem, 'id'>) => {
+    ({ type, message, title, duration = 4000, action }: Omit<ToastItem, 'id'>) => {
       const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-      const newToast: ToastItem = { id, type, message, title, duration }
+      const newToast: ToastItem = { id, type, message, title, duration, action }
 
       setToasts((prev) => {
-        // Keep at most 4 active toasts to prevent viewport clutter
         const next = [...prev, newToast]
         if (next.length > 4) {
           return next.slice(next.length - 4)
@@ -56,26 +62,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   )
 
   const success = useCallback(
-    (message: string, title?: string, duration?: number) =>
-      showToast({ type: 'success', message, title, duration }),
+    (message: string, title?: string, duration?: number, action?: ToastAction) =>
+      showToast({ type: 'success', message, title, duration, action }),
     [showToast]
   )
 
   const error = useCallback(
-    (message: string, title?: string, duration?: number) =>
-      showToast({ type: 'error', message, title, duration }),
+    (message: string, title?: string, duration?: number, action?: ToastAction) =>
+      showToast({ type: 'error', message, title, duration, action }),
     [showToast]
   )
 
   const warning = useCallback(
-    (message: string, title?: string, duration?: number) =>
-      showToast({ type: 'warning', message, title, duration }),
+    (message: string, title?: string, duration?: number, action?: ToastAction) =>
+      showToast({ type: 'warning', message, title, duration, action }),
     [showToast]
   )
 
   const info = useCallback(
-    (message: string, title?: string, duration?: number) =>
-      showToast({ type: 'info', message, title, duration }),
+    (message: string, title?: string, duration?: number, action?: ToastAction) =>
+      showToast({ type: 'info', message, title, duration, action }),
     [showToast]
   )
 
@@ -96,7 +102,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
 
-      {/* ─── Global Top-Right Toast Viewport Container ─── */}
+      {/* ─── Global Top-Right Corner Toast Viewport Container ─── */}
       <div
         aria-live="polite"
         aria-atomic="true"
@@ -108,7 +114,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             'bg-white/95 text-gray-900 border-emerald-300 dark:bg-[#061513]/95 dark:text-emerald-100 dark:border-emerald-500/40 shadow-xl shadow-black/10 dark:shadow-black/70'
 
           if (toast.type === 'error') {
-            icon = <WarningCircle size={20} weight="fill" className="text-rose-500 shrink-0 mt-0.5" />
+            icon = <XCircle size={20} weight="fill" className="text-rose-500 shrink-0 mt-0.5" />
             cardStyle =
               'bg-white/95 text-gray-900 border-rose-300 dark:bg-[#1a0808]/95 dark:text-rose-100 dark:border-rose-500/40 shadow-xl shadow-black/10 dark:shadow-black/70'
           } else if (toast.type === 'warning') {
@@ -139,6 +145,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-100 leading-snug break-words">
                   {toast.message}
                 </p>
+                {toast.action && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toast.action?.onClick?.()
+                        removeToast(toast.id)
+                      }}
+                      className="text-xs font-bold underline hover:opacity-80 transition-opacity"
+                    >
+                      {toast.action.label}
+                    </button>
+                  </div>
+                )}
               </div>
               <button
                 type="button"

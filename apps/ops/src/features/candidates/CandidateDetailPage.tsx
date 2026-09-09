@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -25,9 +25,15 @@ import { mockCandidateDetail, availableCatalogSigns } from '@/data'
 
 type StatusKey = 'reviewing' | 'rejected' | 'resurvey' | 'approved' | 'escalated'
 type RejectReasonKey = 'reason_blur' | 'reason_not_sign' | 'reason_gps_offset' | 'reason_spoofing' | 'reason_duplicate'
+type ActionNoticeKey =
+  | 'notice_rejected'
+  | 'notice_resurvey'
+  | 'notice_approved'
+  | 'notice_corrected'
+  | 'notice_escalated'
 
 interface NoticeState {
-  key: string
+  key: ActionNoticeKey
   params?: Record<string, any>
 }
 
@@ -84,6 +90,48 @@ export default function CandidateDetailPage() {
     }
   }
 
+  // Keyboard accessibility & hotkeys (A: Approve, R: Reject, C: Correct, S: Resurvey, E: Escalate)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      const isInputFocused =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable
+
+      if (e.key === 'Escape') {
+        setIsCorrectModalOpen(false)
+        setIsRejectModalOpen(false)
+        setIsEscalateModalOpen(false)
+        return
+      }
+
+      if (isInputFocused || isCorrectModalOpen || isRejectModalOpen || isEscalateModalOpen) {
+        return
+      }
+
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault()
+        handleAction('approve')
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        setIsRejectModalOpen(true)
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault()
+        setIsCorrectModalOpen(true)
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault()
+        handleAction('resurvey')
+      } else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault()
+        setIsEscalateModalOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isCorrectModalOpen, isRejectModalOpen, isEscalateModalOpen])
+
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
       {/* Breadcrumb */}
@@ -117,51 +165,61 @@ export default function CandidateDetailPage() {
           </div>
         </div>
 
-        {/* Action Buttons Toolbar matching Flow 12 */}
+        {/* Action Buttons Toolbar matching Flow 12 with Hotkeys */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setIsCorrectModalOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50 dark:bg-cyan-500/15 text-cyan-800 dark:text-[#00c4de] hover:bg-cyan-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            title="Hotkey: C"
           >
             <Tag size={15} weight="bold" />
             <span>{t('candidate_detail.btn_correct')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white/70 dark:bg-white/15 rounded border border-cyan-300 dark:border-cyan-500/40">C</kbd>
           </button>
 
           <button
             type="button"
             onClick={() => setIsRejectModalOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            title="Hotkey: R"
           >
             <Prohibit size={15} />
             <span>{t('candidate_detail.btn_reject')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white/70 dark:bg-white/15 rounded border border-red-300 dark:border-red-500/40">R</kbd>
           </button>
 
           <button
             type="button"
             onClick={() => handleAction('resurvey')}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            title="Hotkey: S"
           >
             <ArrowsClockwise size={15} />
             <span>{t('candidate_detail.btn_resurvey')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white/70 dark:bg-white/15 rounded border border-amber-300 dark:border-amber-500/40">S</kbd>
           </button>
 
           <button
             type="button"
             onClick={() => setIsEscalateModalOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-100 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+            title="Hotkey: E"
           >
             <RocketLaunch size={15} weight="bold" />
             <span>{t('candidate_detail.btn_escalate')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white/70 dark:bg-white/15 rounded border border-purple-300 dark:border-purple-500/40">E</kbd>
           </button>
 
           <button
             type="button"
             onClick={() => handleAction('approve')}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
+            title="Hotkey: A"
           >
             <CheckCircle size={15} weight="bold" />
             <span>{t('candidate_detail.btn_approve')}</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white/20 rounded border border-white/30 text-white">A</kbd>
           </button>
         </div>
       </div>
@@ -169,7 +227,7 @@ export default function CandidateDetailPage() {
       {actionNotice && (
         <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
           <ShieldCheck size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{t(`candidate_detail.${actionNotice.key}`, actionNotice.params)}</span>
+          <span>{t(`candidate_detail.${actionNotice.key}` as any, actionNotice.params) as string}</span>
         </div>
       )}
 

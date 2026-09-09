@@ -1,11 +1,15 @@
+export type ContributorRole = 'surveyor' | 'reviewer' | 'contributor' | 'driver'
+
 export interface CreditApprovalItem {
   id: string
   user: {
     name: string
     email: string
     avatarBg: string
+    role: ContributorRole
   }
   activityType: 'Khảo sát thực địa' | 'Kiểm duyệt cộng đồng' | 'Tái xác thực biển báo' | 'Nhiệm vụ hàng ngày'
+  activityKey: 'survey' | 'review' | 'revalidation' | 'daily'
   amount: number
   riskLevel: 'Thấp' | 'Nghi vấn' | 'Cảnh báo gian lận'
   evidenceSummary: string
@@ -16,8 +20,14 @@ export interface CreditApprovalItem {
 export const mockCreditApprovals: CreditApprovalItem[] = [
   {
     id: 'CRD-1082',
-    user: { name: 'Trần Văn Minh', email: 'minh.tv@gmail.com', avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]' },
+    user: {
+      name: 'Trần Văn Minh',
+      email: 'minh.tv@gmail.com',
+      avatarBg: 'bg-[#dbeafe] text-[#1d4ed8]',
+      role: 'surveyor',
+    },
     activityType: 'Khảo sát thực địa',
+    activityKey: 'survey',
     amount: 150,
     riskLevel: 'Thấp',
     evidenceSummary: 'Video hành trình 3.2km kèm file GPX hợp lệ (14 biển báo phát hiện)',
@@ -26,8 +36,14 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
   },
   {
     id: 'CRD-1083',
-    user: { name: 'Lê Hoàng Phát', email: 'phat.lh@gmail.com', avatarBg: 'bg-[#fee2e2] text-[#b91c1c]' },
+    user: {
+      name: 'Lê Hoàng Phát',
+      email: 'phat.lh@gmail.com',
+      avatarBg: 'bg-[#fee2e2] text-[#b91c1c]',
+      role: 'reviewer',
+    },
     activityType: 'Kiểm duyệt cộng đồng',
+    activityKey: 'review',
     amount: 80,
     riskLevel: 'Cảnh báo gian lận',
     evidenceSummary: 'Tỷ lệ đồng thuận bất thường (Bỏ phiếu quá nhanh < 1s/biển báo)',
@@ -36,8 +52,14 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
   },
   {
     id: 'CRD-1084',
-    user: { name: 'Nguyễn Thị Hoa', email: 'hoa.nt@gmail.com', avatarBg: 'bg-[#dcfce7] text-[#15803d]' },
+    user: {
+      name: 'Nguyễn Thị Hoa',
+      email: 'hoa.nt@gmail.com',
+      avatarBg: 'bg-[#dcfce7] text-[#15803d]',
+      role: 'contributor',
+    },
     activityType: 'Tái xác thực biển báo',
+    activityKey: 'revalidation',
     amount: 50,
     riskLevel: 'Thấp',
     evidenceSummary: 'Ảnh chụp biển P.102 mới thay thế tại Quận 3',

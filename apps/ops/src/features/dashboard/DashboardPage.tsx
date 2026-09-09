@@ -28,7 +28,7 @@ export default function DashboardPage() {
   const { t } = useTranslation('ops')
   const isAdmin = user?.role === 'admin'
 
-  const [timeRange, setTimeRange] = useState('30 ngày qua')
+  const [timeRange, setTimeRange] = useState('30d')
   const [feedFilter, setFeedFilter] = useState('all')
 
   // Icons map for KPIs
@@ -127,9 +127,9 @@ export default function DashboardPage() {
             onChange={setTimeRange}
             leftIcon={<CalendarBlank size={16} />}
             options={[
-              { value: '7 ngày qua', label: t('dashboard.time_range_7') },
-              { value: '30 ngày qua', label: t('dashboard.time_range_30') },
-              { value: '90 ngày qua', label: t('dashboard.time_range_90') },
+              { value: '7d', label: t('dashboard.time_range_7') },
+              { value: '30d', label: t('dashboard.time_range_30') },
+              { value: '90d', label: t('dashboard.time_range_90') },
             ]}
           />
 

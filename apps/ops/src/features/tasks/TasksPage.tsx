@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
+import { Pagination } from '@/components/common/Pagination'
 import {
   MapPin,
   Clock,
-  CheckCircle,
   MagnifyingGlass,
   ArrowsClockwise,
   Eye,
@@ -19,11 +20,26 @@ export default function TasksPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'critical' | 'pending'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTask, setSelectedTask] = useState<RevalidationTask | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const toast = useToast()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && selectedTask) {
+        setSelectedTask(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedTask])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab, searchQuery])
 
   function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
+    toast.success(msg)
   }
 
   function handleRevalidationDecision(taskId: string, decision: 'unchanged' | 'changed' | 'retired' | 'invalid') {
@@ -61,6 +77,11 @@ export default function TasksPage() {
     return matchesSearch
   })
 
+  const paginatedTasks = filteredTasks.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -79,13 +100,7 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{toast}</span>
-        </div>
-      )}
+
 
       {/* Filter and Tabs */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 shadow-xs">
@@ -155,7 +170,7 @@ export default function TasksPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {filteredTasks.map((task) => (
+              {paginatedTasks.map((task) => (
                 <tr key={task.id} className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors">
                   <td className="py-4 px-6 font-mono font-bold text-gray-900 dark:text-white">
                     {task.id}
@@ -203,6 +218,21 @@ export default function TasksPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Container matching apps/web and RULE.md 2.4 */}
+        <div className="px-6 pb-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredTasks.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
 

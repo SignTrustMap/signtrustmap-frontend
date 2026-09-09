@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import CustomSelect from '@/components/common/CustomSelect'
 import {
   DownloadSimple,
-  CheckCircle,
   FileCode,
   FileCsv,
   MapPin,
@@ -13,6 +13,7 @@ import { mockExportHistory, type ExportHistoryRecord } from '@/data/adminGoverna
 
 export default function SpatialDataExportPage() {
   const { t } = useTranslation('ops')
+  const toast = useToast()
 
   const [exportFormat, setExportFormat] = useState<'geojson' | 'shapefile' | 'csv' | 'osm'>('geojson')
   const [selectedCity, setSelectedCity] = useState('all')
@@ -20,12 +21,6 @@ export default function SpatialDataExportPage() {
   const [includeConfidence, setIncludeConfidence] = useState(true)
   const [history, setHistory] = useState<ExportHistoryRecord[]>(mockExportHistory)
   const [isExporting, setIsExporting] = useState(false)
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
-
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
-  }
 
   function handleStartExport() {
     setIsExporting(true)
@@ -47,7 +42,7 @@ export default function SpatialDataExportPage() {
       }
       setHistory([newHistoryItem, ...history])
       setIsExporting(false)
-      showToast(t('exports.toast_exported', { id: newHistoryItem.id }))
+      toast.success(t('exports.toast_exported', { id: newHistoryItem.id }))
     }, 1200)
   }
 
@@ -68,18 +63,6 @@ export default function SpatialDataExportPage() {
           </p>
         </div>
       </div>
-
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       {/* Export Configuration Form */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-6">
@@ -208,7 +191,7 @@ export default function SpatialDataExportPage() {
                   <td className="py-3.5 px-4 text-center">
                     <button
                       type="button"
-                      onClick={() => showToast(t('exports.toast_downloading', { id: h.id }))}
+                      onClick={() => toast.success(t('exports.toast_downloading', { id: h.id }))}
                       className="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 text-gray-800 dark:text-white rounded-lg font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <DownloadSimple size={13} />

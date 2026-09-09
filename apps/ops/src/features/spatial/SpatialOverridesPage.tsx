@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import {
   MapTrifold,
   WarningOctagon,
   ArrowsClockwise,
-  CheckCircle,
   X,
   Compass,
 } from '@phosphor-icons/react'
@@ -19,12 +19,17 @@ export default function SpatialOverridesPage() {
   const [newHeading, setNewHeading] = useState<number>(0)
   const [newLat, setNewLat] = useState<number>(0)
   const [newLng, setNewLng] = useState<number>(0)
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const toast = useToast()
 
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
-  }
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && selectedSign) {
+        setSelectedSign(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedSign])
 
   function handleOpenModal(sign: SpatialSignRecord) {
     setSelectedSign(sign)
@@ -37,7 +42,7 @@ export default function SpatialOverridesPage() {
   function handleSaveOverride(e: React.FormEvent) {
     e.preventDefault()
     if (!overrideReason.trim()) {
-      showToast(t('spatial.toast_reason_required'))
+      toast.warning(t('spatial.toast_reason_required'))
       return
     }
     if (!selectedSign) return
@@ -56,13 +61,13 @@ export default function SpatialOverridesPage() {
       )
     )
 
-    showToast(t('spatial.toast_overridden', { id: selectedSign.id }))
+    toast.success(t('spatial.toast_overridden', { id: selectedSign.id }))
     setSelectedSign(null)
   }
 
   function handleDeleteMalicious(signId: string) {
     setSigns((prev) => prev.filter((s) => s.id !== signId))
-    showToast(t('spatial.toast_deleted', { id: signId }))
+    toast.success(t('spatial.toast_deleted', { id: signId }))
   }
 
   return (
@@ -83,17 +88,6 @@ export default function SpatialOverridesPage() {
         </div>
       </div>
 
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       {/* Spatial Signs Table */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">

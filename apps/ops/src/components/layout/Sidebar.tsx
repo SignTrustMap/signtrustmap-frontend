@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
 import {
@@ -7,7 +8,6 @@ import {
   Users,
   ShieldCheck,
   ClipboardText,
-  SignOut,
   Coins,
   CurrencyCircleDollar,
   CheckSquare,
@@ -17,7 +17,10 @@ import {
   DownloadSimple,
   ShieldWarning,
   SlidersHorizontal,
+  CaretUp,
 } from '@phosphor-icons/react'
+import { UserDropdownMenu } from './UserDropdownMenu'
+import { ProfileModal } from './ProfileModal'
 
 interface NavSection {
   title: string
@@ -30,23 +33,26 @@ interface NavSection {
 }
 
 export function Sidebar() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { t } = useTranslation('common')
-  const navigate = useNavigate()
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const isAdmin = user?.role === 'admin'
 
-  const userInitials = user?.name
-    ? user.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase()
-    : isAdmin
-    ? 'AD'
-    : 'MN'
+  const userInitials =
+    user?.initials ||
+    (user?.name
+      ? user.name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .slice(-2)
+          .toUpperCase()
+      : isAdmin
+      ? 'PĐ'
+      : 'NV')
 
-  const displayName = user?.name || (isAdmin ? 'Governance Admin' : 'Minh Nhật')
+  const displayName = user?.name || (isAdmin ? 'Phan Tài Đức' : 'Nguyễn Long Vũ')
 
   // Comprehensive Admin Sections matching registered scope
   const adminNavSections: NavSection[] = [
@@ -72,6 +78,11 @@ export function Sidebar() {
           icon: <ShieldCheck size={18} weight="duotone" />,
           label: t('nav.roles'),
           href: '/roles',
+        },
+        {
+          icon: <Users size={18} weight="duotone" />,
+          label: t('nav.staff_directory'),
+          href: '/staff',
         },
       ],
     },
@@ -99,6 +110,11 @@ export function Sidebar() {
           label: t('nav.escalations'),
           href: '/escalations',
           badge: 2,
+        },
+        {
+          icon: <ClipboardText size={18} weight="duotone" />,
+          label: t('nav.incident_reports'),
+          href: '/reports',
         },
       ],
     },
@@ -181,6 +197,11 @@ export function Sidebar() {
           href: '/catalog/missing-types',
           badge: 2,
         },
+        {
+          icon: <ClipboardText size={18} weight="duotone" />,
+          label: t('nav.incident_reports'),
+          href: '/reports',
+        },
       ],
     },
     {
@@ -225,10 +246,6 @@ export function Sidebar() {
         : 'text-gray-600 dark:text-gray-400 hover:bg-[#F8F7F7] dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
     }`
 
-  function handleLogout() {
-    logout()
-    navigate('/login', { replace: true })
-  }
 
   return (
     <aside className="flex flex-col w-64 shrink-0 border-r border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] h-full shadow-xs transition-colors">
@@ -276,37 +293,71 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* ─── Bottom User Profile & Sign Out ─────────────────────── */}
-      <div className="p-3 border-t border-[#E8E4E3] dark:border-white/10">
-        <div className="p-3 rounded-2xl bg-[#F4F4F4] dark:bg-[#0C1D23] border border-transparent dark:border-white/10 transition-colors flex flex-col gap-2.5">
-          <div className="flex items-center gap-3 min-w-0">
+      {/* ─── Bottom User Profile Trigger & Dropdown ───────────────── */}
+      <div className="p-3 border-t border-[#E8E4E3] dark:border-white/10 relative">
+        {/* Dropdown Menu (pops up above the card) */}
+        <UserDropdownMenu
+          isOpen={isUserMenuOpen}
+          onClose={() => setIsUserMenuOpen(false)}
+          onOpenProfile={() => setIsProfileOpen(true)}
+        />
+
+        {/* User Card Trigger Button */}
+        <button
+          type="button"
+          data-user-menu-trigger="true"
+          onClick={() => setIsUserMenuOpen((prev) => !prev)}
+          aria-expanded={isUserMenuOpen}
+          aria-haspopup="menu"
+          className={`w-full p-2.5 rounded-2xl border transition-all flex items-center gap-3 text-left cursor-pointer group select-none ${
+            isUserMenuOpen
+              ? 'bg-[#eef2f5] dark:bg-[#11232a] border-[#007b8b]/30 dark:border-[#00c4de]/40 ring-2 ring-[#007b8b]/10 dark:ring-[#00c4de]/20'
+              : 'bg-[#F4F4F4] hover:bg-gray-200/70 dark:bg-[#0C1D23] dark:hover:bg-[#10242b] border-transparent dark:border-white/10'
+          }`}
+        >
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={displayName}
+              className="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-black/10 dark:ring-white/20 shadow-xs group-hover:scale-105 transition-transform"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          ) : (
             <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs ${
+              className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform ${
                 isAdmin ? 'bg-[#7c3aed]' : 'bg-[#007b8b]'
               }`}
             >
               {userInitials}
             </div>
-            <div className="min-w-0 flex-1 leading-snug">
-              <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
-                {displayName}
-              </p>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono mt-0.5 font-semibold">
-                {isAdmin ? t('nav.role_admin') : t('nav.role_staff')}
-              </p>
-            </div>
+          )}
+
+          <div className="min-w-0 flex-1 leading-snug">
+            <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate" title={displayName}>
+              {displayName}
+            </p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono mt-0.5 font-semibold">
+              {isAdmin ? t('nav.role_admin') : t('nav.role_staff')}
+            </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full py-1.5 px-3 rounded-xl bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/15 border border-gray-200/80 dark:border-white/10 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <SignOut size={14} weight="bold" />
-            <span>{t('nav.logout')}</span>
-          </button>
-        </div>
+          <CaretUp
+            size={16}
+            weight="bold"
+            className={`text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0 transition-transform duration-200 ${
+              isUserMenuOpen ? 'rotate-180 text-[#007b8b] dark:text-[#00c4de]' : ''
+            }`}
+          />
+        </button>
       </div>
+
+      {/* ─── Profile Modal ────────────────────────────────────────── */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
     </aside>
   )
 }

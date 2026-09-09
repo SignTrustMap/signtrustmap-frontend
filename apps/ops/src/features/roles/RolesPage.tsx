@@ -98,7 +98,7 @@ export default function RolesPage() {
         <div
           onClick={() => setSaveSuccess(false)}
           className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
+          title={t('btn_close_notice')}
         >
           <Check size={16} weight="bold" />
           <span>{t('roles.toast_saved')}</span>

@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Pagination } from '@/components/common/Pagination'
 import {
   DownloadSimple,
   MapPin,
-  CaretLeft,
-  CaretRight,
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { mockSignReports, type SignReportItem, type ReportStatus } from '@/data'
@@ -41,6 +40,7 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Investigating' | 'Resolved'>('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const tabLabels: Record<'All' | 'Pending' | 'Investigating' | 'Resolved', string> = {
     All: t('reports.tab_all'),
@@ -58,8 +58,15 @@ export default function ReportsPage() {
     return matchesTab && matchesSearch
   })
 
+  const paginatedReports = filteredReports.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+
   function handleExport() {
-    const headers = ['Mã báo cáo,Vị trí,Người gửi,Ngày gửi,Trạng thái']
+    const headers = [
+      `${t('reports.th_id', 'ID')},${t('reports.th_location', 'Location')},${t('reports.th_reporter', 'Reporter')},${t('reports.th_date', 'Date')},${t('reports.th_status', 'Status')}`
+    ]
     const rows = filteredReports.map(
       (r) =>
         `"${r.id}","${r.location}","${r.reporter.name}","${r.dateSubmitted}","${r.status}"`
@@ -69,7 +76,7 @@ export default function ReportsPage() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `bao_cao_su_co_bien_bao_${Date.now()}.csv`)
+    link.setAttribute('download', `incident_reports_${Date.now()}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -167,7 +174,7 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10 text-sm">
-              {filteredReports.map((report) => (
+              {paginatedReports.map((report) => (
                 <tr
                   key={report.id}
                   className="hover:bg-[#F8F7F7]/50 dark:hover:bg-white/5 transition-colors group"
@@ -250,33 +257,18 @@ export default function ReportsPage() {
         </div>
 
         {/* Footer pagination */}
-        <div className="py-3.5 px-6 border-t border-[#E8E4E3] dark:border-white/10 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>{t('reports.showing_results', { count: filteredReports.length, total: 24 })}</span>
-
-          <div className="flex items-center gap-1">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 cursor-pointer"
-            >
-              <CaretLeft size={14} />
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#007b8b] text-white font-bold text-xs">
-              1
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs">
-              2
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs">
-              3
-            </button>
-            <button
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 cursor-pointer"
-            >
-              <CaretRight size={14} />
-            </button>
-          </div>
+        <div className="px-6 py-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredReports.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
     </div>

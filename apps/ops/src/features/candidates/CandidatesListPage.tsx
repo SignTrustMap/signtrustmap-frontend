@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
+import { Pagination } from '@/components/common/Pagination'
 import {
   MagnifyingGlass,
-  CaretLeft,
-  CaretRight,
   Eye,
 } from '@phosphor-icons/react'
 import { mockCandidates, type CandidateItem, type PriorityLevel, type CandidateStatus } from '@/data'
@@ -65,6 +64,7 @@ export default function CandidatesListPage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const filteredCandidates = candidates.filter((c) => {
     const matchesSearch =
@@ -84,6 +84,11 @@ export default function CandidatesListPage() {
 
     return matchesSearch && matchesPriority && matchesStatus
   })
+
+  const paginatedCandidates = filteredCandidates.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
@@ -175,7 +180,7 @@ export default function CandidatesListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8E4E3] dark:divide-white/10">
-              {filteredCandidates.map((c) => (
+              {paginatedCandidates.map((c) => (
                 <tr key={c.id} className="hover:bg-[#F8F7F7]/50 dark:hover:bg-white/5 transition-colors">
                   <td className="py-4 px-6 font-bold text-gray-900 dark:text-white font-mono text-xs">
                     {c.id}
@@ -205,29 +210,18 @@ export default function CandidatesListPage() {
         </div>
 
         {/* Pagination */}
-        <div className="py-3.5 px-6 border-t border-[#E8E4E3] dark:border-white/10 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>
-            {t('candidates.showing_results', { count: filteredCandidates.length, total: candidates.length })}
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 cursor-pointer"
-            >
-              <CaretLeft size={14} />
-            </button>
-            <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#007b8b] text-white font-bold text-xs">
-              1
-            </button>
-            <button
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 cursor-pointer"
-            >
-              <CaretRight size={14} />
-            </button>
-          </div>
+        <div className="px-6 py-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredCandidates.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
     </div>

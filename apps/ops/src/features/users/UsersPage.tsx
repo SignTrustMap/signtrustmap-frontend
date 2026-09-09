@@ -1,32 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import CustomSelect from '@/components/common/CustomSelect'
+import { Pagination } from '@/components/common/Pagination'
 import {
   Users,
   MagnifyingGlass,
   Funnel,
   ShieldCheck,
   Prohibit,
-  CheckCircle,
   X,
   Eye,
 } from '@phosphor-icons/react'
 import { mockAdminUsers, type AdminUserItem } from '@/data/adminGovernanceData'
 
 export default function UsersPage() {
-  const { t } = useTranslation('ops')
+  const { t } = useTranslation(['ops', 'common'])
+  const toast = useToast()
 
   const [users, setUsers] = useState<AdminUserItem[]>(mockAdminUsers)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null)
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 2500)
-  }
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && selectedUser) {
+        setSelectedUser(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedUser])
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
@@ -38,16 +46,21 @@ export default function UsersPage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
+
   function handleToggleStatus(userId: string) {
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
           const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active'
-          showToast(
-            nextStatus === 'Active'
-              ? t('users.toast_unlocked', { name: u.name })
-              : t('users.toast_locked', { name: u.name })
-          )
+          if (nextStatus === 'Active') {
+            toast.success(t('users.toast_unlocked', { name: u.name }))
+          } else {
+            toast.warning(t('users.toast_locked', { name: u.name }))
+          }
           return { ...u, status: nextStatus }
         }
         return u
@@ -60,13 +73,13 @@ export default function UsersPage() {
 
   function handleChangeRole(userId: string, newRole: 'driver' | 'surveyor' | 'reviewer' | 'staff' | 'admin') {
     if (userId === 'USR-1004' && newRole !== 'admin') {
-      showToast(t('users.toast_root_admin_warn'))
+      toast.warning(t('users.toast_root_admin_warn'))
       return
     }
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     )
-    showToast(t('users.toast_role_updated', { role: newRole.toUpperCase() }))
+    toast.success(t('users.toast_role_updated', { role: newRole.toUpperCase() }))
     if (selectedUser?.id === userId) {
       setSelectedUser((prev) => prev ? { ...prev, role: newRole } : null)
     }
@@ -87,18 +100,6 @@ export default function UsersPage() {
           {t('users.subtitle')}
         </p>
       </div>
-
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 shadow-xs">
@@ -158,7 +159,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {filteredUsers.map((u) => (
+              {paginatedUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                   <td className="py-3.5 px-4">
                     <div className="flex items-center gap-3">
@@ -226,6 +227,21 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="px-6 py-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredUsers.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
 

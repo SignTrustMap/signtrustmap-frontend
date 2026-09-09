@@ -9,8 +9,11 @@
     "pagination": {
       "showing": "Hiển thị",
       "of": "trên",
+      "first": "Trang đầu",
       "prev": "Trang trước",
       "next": "Trang sau",
+      "last": "Trang cuối",
+      "page": "Trang",
       "per_page": "/ trang",
       "default_item": "kết quả"
     },
@@ -641,8 +644,11 @@
   "pagination": {
     "showing": "Hiển thị",
     "of": "trên",
+    "first": "Trang đầu",
     "prev": "Trang trước",
     "next": "Trang sau",
+    "last": "Trang cuối",
+    "page": "Trang",
     "per_page": "/ trang",
     "default_item": "mục"
   }

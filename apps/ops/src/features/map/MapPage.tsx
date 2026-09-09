@@ -219,7 +219,7 @@ export default function MapPage() {
           <button
             onClick={() => setTileMode((m) => (m === 'osm' ? 'voyager' : 'osm'))}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 border border-[#E8E4E3] dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm cursor-pointer"
-            title="Đổi kiểu bản đồ"
+            title={t('map.tile_switch_title')}
           >
             <Stack size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
             <span>{tileMode === 'osm' ? t('map.tile_osm') : t('map.tile_voyager')}</span>
@@ -227,8 +227,8 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Main Map Container */}
-      <div className="flex-1 relative w-full h-full min-h-0 overflow-hidden">
+      {/* Main Map Container with Leaflet z-index isolation */}
+      <div className="flex-1 relative isolate z-0 w-full h-full min-h-0 overflow-hidden">
         {/* Leaflet OpenStreetMap canvas */}
         <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#061014]" />
 
@@ -287,7 +287,7 @@ export default function MapPage() {
                   <p className="text-[10px] text-gray-400 uppercase">{t('map.drawer_heading')}</p>
                   <p className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] flex items-center gap-1 mt-0.5">
                     <NavigationArrow size={13} className="rotate-45" />
-                    {selectedSign.heading}° (Bắc/Nam)
+                    {selectedSign.heading}° ({t('map.dir_north_south')})
                   </p>
                 </div>
                 <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
@@ -304,9 +304,9 @@ export default function MapPage() {
                   {t('map.drawer_consensus')}
                 </p>
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ Duyệt: {selectedSign.reviewerVotes.approve}</span>
-                  <span className="text-amber-600 dark:text-amber-400 font-bold">✎ Sửa: {selectedSign.reviewerVotes.modify}</span>
-                  <span className="text-red-600 dark:text-red-400 font-bold">✕ Từ chối: {selectedSign.reviewerVotes.reject}</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ {t('map.stat_votes_approve')}: {selectedSign.reviewerVotes.approve}</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">✎ {t('map.stat_votes_modify')}: {selectedSign.reviewerVotes.modify}</span>
+                  <span className="text-red-600 dark:text-red-400 font-bold">✕ {t('map.stat_votes_reject')}: {selectedSign.reviewerVotes.reject}</span>
                 </div>
               </div>
 
@@ -319,14 +319,14 @@ export default function MapPage() {
               {/* Moderator Actions */}
               <div className="pt-3 border-t border-gray-100 dark:border-white/10 flex gap-2">
                 <button
-                  onClick={() => alert(`Đã phê duyệt biển báo ${selectedSign.code} xuất bản!`)}
+                  onClick={() => alert(t('map.toast_approved', { code: selectedSign.code }))}
                   className="flex-1 py-2 rounded-lg bg-[#007b8b] hover:bg-[#006272] text-white text-xs font-bold transition-colors flex items-center justify-center gap-1 shadow-sm cursor-pointer"
                 >
                   <Check size={13} weight="bold" />
                   <span>{t('map.btn_quick_approve')}</span>
                 </button>
                 <button
-                  onClick={() => alert(`Đã tạo nhiệm vụ tái thẩm định cho biển báo ${selectedSign.code}!`)}
+                  onClick={() => alert(t('map.toast_resurvey_created', { code: selectedSign.code }))}
                   className="py-2 px-3 rounded-lg border border-gray-300 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
                   title={t('map.btn_revalidate_title')}
                 >

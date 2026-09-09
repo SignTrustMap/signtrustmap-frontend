@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import CustomSelect from '@/components/common/CustomSelect'
 import {
   Question,
-  CheckCircle,
   X,
   MagnifyingGlass,
   Check,
@@ -18,7 +18,8 @@ import { mockMissingSignTypeReports, availableCatalogSigns, type MissingSignType
 type MissingRejectReasonKey = 'reason_not_sign' | 'reason_blurred' | 'reason_duplicate'
 
 export default function MissingSignsPage() {
-  const { t } = useTranslation('ops')
+  const { t } = useTranslation(['ops', 'common'])
+  const toast = useToast()
 
   const [reports, setReports] = useState<MissingSignTypeReport[]>(mockMissingSignTypeReports)
   const [selectedReport, setSelectedReport] = useState<MissingSignTypeReport | null>(null)
@@ -34,18 +35,24 @@ export default function MissingSignsPage() {
   const [catalogSearch, setCatalogSearch] = useState('')
   const [escalateNote, setEscalateNote] = useState('')
   const [rejectReasonKey, setRejectReasonKey] = useState<MissingRejectReasonKey>('reason_not_sign')
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (isMergeModalOpen) setIsMergeModalOpen(false)
+        if (isEscalateModalOpen) setIsEscalateModalOpen(false)
+        if (isRejectModalOpen) setIsRejectModalOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isMergeModalOpen, isEscalateModalOpen, isRejectModalOpen])
 
   const filteredCatalogSigns = availableCatalogSigns.filter(
     (s) =>
       s.code.toLowerCase().includes(catalogSearch.toLowerCase()) ||
       s.codeTitle.toLowerCase().includes(catalogSearch.toLowerCase())
   )
-
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
-  }
 
   function handleMergeSubmit() {
     if (!selectedReport) return
@@ -54,7 +61,7 @@ export default function MissingSignsPage() {
         r.id === selectedReport.id ? { ...r, status: 'Approved', tempLabel: `${t('missing_signs.label_merged_prefix')} ${selectedCatalogCode}` } : r
       )
     )
-    showToast(t('missing_signs.toast_merged', { id: selectedReport.id, code: selectedCatalogCode }))
+    toast.success(t('missing_signs.toast_merged', { id: selectedReport.id, code: selectedCatalogCode }))
     setIsMergeModalOpen(false)
     setSelectedReport(null)
   }
@@ -66,7 +73,7 @@ export default function MissingSignsPage() {
         r.id === selectedReport.id ? { ...r, status: 'Approved', tempLabel: `${t('missing_signs.label_pending_admin')} ${r.tempLabel}` } : r
       )
     )
-    showToast(t('missing_signs.toast_escalated', { id: selectedReport.id }))
+    toast.success(t('missing_signs.toast_escalated', { id: selectedReport.id }))
     setIsEscalateModalOpen(false)
     setSelectedReport(null)
   }
@@ -78,7 +85,7 @@ export default function MissingSignsPage() {
         r.id === selectedReport.id ? { ...r, status: 'Approved', tempLabel: `${t('missing_signs.label_rejected')} ${r.tempLabel}` } : r
       )
     )
-    showToast(t('missing_signs.toast_rejected', { id: selectedReport.id, reason: t(`missing_signs.${rejectReasonKey}`) }))
+    toast.success(t('missing_signs.toast_rejected', { id: selectedReport.id, reason: t(`missing_signs.${rejectReasonKey}`) }))
     setIsRejectModalOpen(false)
     setSelectedReport(null)
   }
@@ -110,14 +117,6 @@ export default function MissingSignsPage() {
           </p>
         </div>
       </div>
-
-      {/* Toast Notification */}
-      {toastMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{toastMsg}</span>
-        </div>
-      )}
 
       {/* Filter and Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 shadow-xs">
@@ -244,7 +243,7 @@ export default function MissingSignsPage() {
                     >
                       <ArrowsMerge size={14} weight="bold" />
                       <span className="hidden sm:inline">{t('missing_signs.btn_merge_catalog')}</span>
-                      <span className="sm:hidden">Gộp</span>
+                      <span className="sm:hidden">{t('common:merge')}</span>
                     </button>
 
                     <button

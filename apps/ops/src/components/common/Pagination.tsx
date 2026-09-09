@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { CaretLeft, CaretRight, CaretDoubleLeft, CaretDoubleRight, DotsThree } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
-import { CustomSelect } from './CustomSelect'
+import CustomSelect from './CustomSelect'
 
 export interface PaginationProps {
   currentPage: number
@@ -83,17 +83,17 @@ export function Pagination({
   return (
     <div
       className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t ${
-        isDark ? 'border-white/10 text-gray-400' : 'border-gray-200 text-gray-600'
+        isDark ? 'border-white/10 text-gray-400' : 'border-[#E8E4E3] text-gray-600'
       } ${className}`}
     >
       {/* ─── Left: Showing count ────────────────────────────────────────── */}
       <div className="text-xs font-medium order-2 sm:order-1 text-center sm:text-left">
         {t('pagination.showing')}{' '}
-        <span className="font-bold text-gray-900 dark:text-white">
+        <span className="font-bold text-gray-900 dark:text-white font-mono">
           {startItem} - {endItem}
         </span>{' '}
         {t('pagination.of')}{' '}
-        <span className="font-bold text-gray-900 dark:text-white">{totalItems}</span>{' '}
+        <span className="font-bold text-gray-900 dark:text-white font-mono">{totalItems}</span>{' '}
         {displayItemLabel}
       </div>
 
@@ -162,7 +162,7 @@ export function Pagination({
                   key={item}
                   type="button"
                   onClick={() => onPageChange(item)}
-                  className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                  className={`h-8 min-w-[32px] px-2 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer border ${
                     isCurrent
                       ? isDark
                         ? 'bg-[#00c4de] border-[#00c4de] text-[#071317] shadow-sm shadow-[#00c4de]/25'
@@ -232,3 +232,5 @@ export function Pagination({
     </div>
   )
 }
+
+export default Pagination

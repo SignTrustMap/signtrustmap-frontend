@@ -1,24 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
+import { Pagination } from '@/components/common/Pagination'
 import {
   ShieldWarning,
-  CheckCircle,
   X,
 } from '@phosphor-icons/react'
 import { mockAdminEscalations, type AdminEscalationCase } from '@/data/adminGovernanceData'
 
 export default function AdminEscalationsPage() {
   const { t } = useTranslation('ops')
+  const toast = useToast()
 
   const [escalations, setEscalations] = useState<AdminEscalationCase[]>(mockAdminEscalations)
   const [selectedCase, setSelectedCase] = useState<AdminEscalationCase | null>(null)
   const [decisionNotes, setDecisionNotes] = useState('')
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-  function showToast(msg: string) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3000)
-  }
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && selectedCase) {
+        setSelectedCase(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedCase])
+
+  const paginatedEscalations = escalations.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  )
 
   function handleResolve(actionType: 'Resolved' | 'Rejected') {
     if (!selectedCase) return
@@ -29,7 +42,7 @@ export default function AdminEscalationsPage() {
           : item
       )
     )
-    showToast(t('escalations.toast_resolved', { id: selectedCase.id, status: actionType }))
+    toast.success(t('escalations.toast_resolved', { id: selectedCase.id, status: actionType }))
     setSelectedCase(null)
     setDecisionNotes('')
   }
@@ -52,18 +65,6 @@ export default function AdminEscalationsPage() {
         </div>
       </div>
 
-      {toastMsg && (
-        <div
-          onClick={() => setToastMsg(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toastMsg}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
-
       {/* Escalations Table */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -80,7 +81,7 @@ export default function AdminEscalationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {escalations.map((item) => (
+              {paginatedEscalations.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                   <td className="py-3.5 px-4 font-mono font-bold text-gray-900 dark:text-white">{item.id}</td>
                   <td className="py-3.5 px-4">
@@ -122,6 +123,20 @@ export default function AdminEscalationsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Pagination Container matching apps/web and RULE.md 2.4 */}
+        <div className="px-6 pb-4">
+          <Pagination
+            currentPage={currentPage}
+            totalItems={escalations.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize)
+              setCurrentPage(1)
+            }}
+            pageSizeOptions={[5, 10, 20]}
+          />
         </div>
       </div>
 

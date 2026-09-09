@@ -1,5 +1,5 @@
-// User roles in the ops portal
-export type Role = 'staff' | 'admin'
+// User roles across SignTrustMap platform
+export type Role = 'staff' | 'admin' | 'driver' | 'surveyor' | 'reviewer'
 
 export interface User {
   id: string
@@ -7,6 +7,11 @@ export interface User {
   email: string
   role: Role
   avatar?: string
+  initials?: string
+  joinDate?: string
+  password?: string
+  credits?: number
+  trustScore?: number
 }
 
 export interface AuthState {
