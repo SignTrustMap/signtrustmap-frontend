@@ -1,4 +1,5 @@
 import { API_PATHS } from '@/api/api';
+
 import { apiRequest, jsonApiRequest } from '@/api/api-client';
 import type {
   CompleteUploadResponse,
@@ -18,6 +19,18 @@ import type {
   UpdateSubmissionDto,
   UpdateSubmissionResponse,
 } from '@/types/survey-submission/surveySubmissionType';
+
+/** The list is newest-first; search subsequent pages when recent items are submitted. */
+export async function getLatestSurveyDraft(accessToken: string, signal?: AbortSignal) {
+  let page = 1;
+  while (true) {
+    const result = await getMySubmissions({ page: String(page), pageSize: '50' }, accessToken, signal);
+    const draft = result.items.find((item) => item.status === 'DRAFT' && item.submissionType === 'SINGLE_IMAGE');
+    if (draft) return draft;
+    if (!result.items.length || page >= result.totalPages) return null;
+    page += 1;
+  }
+}
 
 export function createSurveySubmission(
   request: CreateSubmissionDto,

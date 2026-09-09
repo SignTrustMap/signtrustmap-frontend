@@ -117,6 +117,11 @@ export type CompleteUploadResponse = {
 };
 
 export type SurveySubmission = {
+  capturedAt?: string;
+  coordinateSource?: CoordinateSource;
+  latitude?: number | null;
+  longitude?: number | null;
+  note?: string | null;
   id: string;
   surveyorId: string;
   submissionType: SubmissionType;
@@ -135,7 +140,7 @@ export type ListMySubmissionsResponse = {
   totalPages: number;
 };
 
-export type PendingSubmissionsResponse = { total: number; pending: number };
+export type PendingSubmissionsResponse = { total: number; pending: number; countsByStatus?: Partial<Record<SubmissionStatus, number>> };
 
 export type SurveyorStatsResponse = {
   userId: string;
@@ -148,6 +153,7 @@ export type SurveyorStatsResponse = {
 };
 
 export type SubmissionStatusResponse = {
+  mediaFiles?: { id: string; media_type: SurveyMediaType; file_url: string }[];
   submission: SurveySubmission;
   totalCandidates: number;
   /** Raw SQL rows use snake_case keys and have no declared response DTOs. */

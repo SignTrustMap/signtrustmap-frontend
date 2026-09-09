@@ -6,4 +6,5 @@ export const API_PATHS = {
     SIGNS: '/signs',
     SIGNS_ALONG_ROUTE: '/signs/along-route',
     SUBMISSIONS: '/submissions',
+    REVIEWS: '/reviews',
 } as const;

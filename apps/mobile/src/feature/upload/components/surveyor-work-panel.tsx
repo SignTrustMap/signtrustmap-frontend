@@ -12,16 +12,22 @@ export function SurveyorWorkPanel() {
   return (
     <View style={styles.panel}>
       <WorkActionCard
-        count={2}
-        label="Revalidation Map"
-        onPress={() => router.replace('/home')}
-        symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}
-      />
-      <WorkActionCard
         count={pending?.pending}
         label="Pending Submissions"
         onPress={() => router.push('/work/survey-history')}
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
+      />
+      <WorkActionCard
+        count={pending?.countsByStatus?.DRAFT}
+        label="Draft Submissions"
+        onPress={() => router.push('/work/new-survey')}
+        symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
+      />
+      <WorkActionCard
+        count={2}
+        label="Revalidation Map"
+        onPress={() => router.replace('/home')}
+        symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}
       />
     </View>
   );

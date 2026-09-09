@@ -2,9 +2,10 @@ import { Image } from 'expo-image';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,11 +29,19 @@ import { useTheme } from '@/hooks/use-theme';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
 
 type SelectedSurveyMedia = {
+  capturedAt?: string;
   fileName?: string | null;
   mimeType?: string;
   type: 'image';
   uri: string;
 };
+
+function captureTimeFromExif(exif: ImagePickerAsset['exif']) {
+  const value = exif?.DateTimeOriginal ?? exif?.DateTime;
+  if (typeof value !== 'string') return undefined;
+  const timestamp = Date.parse(value.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T'));
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
 
@@ -137,7 +146,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
       }
     }
 
-    console.log('[Surveyor] Original media-library EXIF:', originalExif ?? null);
 
     if (isValidGpsCoordinates(location)) {
       const coordinates = {
@@ -153,13 +161,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     }
 
     const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
-
-    console.log(
-      '[Surveyor] Extracted image GPS data:',
-      mediaLibraryExifCoordinates
-        ? { ...mediaLibraryExifCoordinates, source: 'media-library-exif' }
-        : null,
-    );
     return mediaLibraryExifCoordinates;
   } catch (error) {
     console.warn('[Surveyor] Unable to read original image GPS metadata:', error);
@@ -171,6 +172,12 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
 export function NewSurveyRecordScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { draftId } = useLocalSearchParams<{ draftId?: string }>();
+  const saveDraft = useSaveSurveyDraft();
+  const isFocused = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const scanFinished = useRef(false);
+  const savedDraftId = useRef<string | undefined>(undefined);
   const [isOpeningGallery, setIsOpeningGallery] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
   const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
@@ -185,6 +192,11 @@ export function NewSurveyRecordScreen() {
   const [isAndroidGalleryLoading, setIsAndroidGalleryLoading] = useState(false);
   const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
   const isLoadingAndroidGallery = useRef(false);
+
+  useFocusEffect(useCallback(() => {
+    isFocused.current = true;
+    return () => { isFocused.current = false; };
+  }, []));
 
   const loadAndroidGalleryPage = async (after?: string) => {
     if (isLoadingAndroidGallery.current) return;
@@ -264,6 +276,7 @@ export function NewSurveyRecordScreen() {
       );
 
       setSelectedAsset({
+        capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
         fileName: asset.filename,
         type: 'image',
         uri: assetInfo.localUri ?? asset.uri,
@@ -279,7 +292,7 @@ export function NewSurveyRecordScreen() {
   };
 
   const handleOpenGallery = async () => {
-    if (isOpeningGallery) return;
+    if (isOpeningGallery || isSaving) return;
 
     setIsOpeningGallery(true);
     setPickerError(undefined);
@@ -306,6 +319,7 @@ export function NewSurveyRecordScreen() {
         const gpsCoordinates = await extractSelectedAssetGps(asset);
 
         setSelectedAsset({
+          capturedAt: captureTimeFromExif(asset.exif),
           fileName: asset.fileName,
           mimeType: asset.mimeType,
           type: 'image',
@@ -325,28 +339,41 @@ export function NewSurveyRecordScreen() {
     }
   };
 
-  const handleSubmitRecord = () => {
+  const openSavedDraft = () => {
+    if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
+    router.replace({ pathname: '/work/new-survey/details', params: { submissionId: savedDraftId.current } });
+  };
+
+  const handleSubmitRecord = async () => {
     if (!selectedAsset || isOpeningGallery || scanInProgress.current) return;
     scanInProgress.current = true;
+    scanFinished.current = false;
+    savedDraftId.current = undefined;
+    setPickerError(undefined);
+    setIsSaving(true);
     setIsScanning(true);
+    try {
+      savedDraftId.current = await saveDraft({ ...selectedAsset, fileName: selectedAsset.fileName ?? undefined }, {
+        submissionType: 'SINGLE_IMAGE',
+        capturedAt: selectedAsset.capturedAt ?? new Date().toISOString(),
+        coordinateSource: 'IMAGE_EXIF',
+        ...(selectedGps ?? {}),
+      }, draftId);
+      openSavedDraft();
+    } catch (error) {
+      console.warn('[Surveyor] Unable to save survey draft:', error);
+      setPickerError(error instanceof Error ? error.message : 'Unable to save the draft. Please retry.');
+      setIsScanning(false);
+    } finally {
+      setIsSaving(false);
+      scanInProgress.current = false;
+    }
   };
 
   const handleScanComplete = () => {
-    if (!scanInProgress.current || !selectedAsset) return;
-    scanInProgress.current = false;
+    scanFinished.current = true;
     setIsScanning(false);
-    router.push({
-      pathname: '/work/new-survey/details',
-      params: {
-        imageType: selectedAsset.type,
-        imageMimeType: selectedAsset.mimeType,
-        imageName: selectedAsset.fileName ?? undefined,
-        imageUri: selectedAsset.uri,
-        ...(selectedGps
-          ? { latitude: String(selectedGps.latitude), longitude: String(selectedGps.longitude) }
-          : {}),
-      },
-    });
+    openSavedDraft();
   };
 
   return (
@@ -356,8 +383,7 @@ export function NewSurveyRecordScreen() {
           imageUri={selectedAsset.uri}
           onComplete={handleScanComplete}
           onCancel={() => {
-            scanInProgress.current = false;
-            setIsScanning(false);
+            handleScanComplete();
           }}
         />
       ) : null}
@@ -375,88 +401,88 @@ export function NewSurveyRecordScreen() {
             onPress={() => setIsAndroidGalleryVisible(false)}
             style={styles.galleryBackdrop}
           />
-        <SafeAreaView
-          edges={['bottom']}
-          style={[styles.galleryScreen, { backgroundColor: theme.backgroundElement }]}
-        >
-          <View style={styles.galleryHandleArea}>
-            <View style={[styles.galleryHandle, { backgroundColor: theme.border }]} />
-          </View>
-          <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
-            <View style={styles.galleryHeading}>
-              <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
-              <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
-                Original location metadata will be preserved
-              </Text>
+          <SafeAreaView
+            edges={['bottom']}
+            style={[styles.galleryScreen, { backgroundColor: theme.backgroundElement }]}
+          >
+            <View style={styles.galleryHandleArea}>
+              <View style={[styles.galleryHandle, { backgroundColor: theme.border }]} />
             </View>
-            <AppButton
-              accessibilityLabel="Close photo library"
-              label="Close"
-              onPress={() => setIsAndroidGalleryVisible(false)}
-              style={styles.galleryCloseButton}
-              variant="ghost"
-            />
-          </View>
-
-          {androidGalleryError ? (
-            <Text accessibilityRole="alert" style={styles.galleryErrorText}>
-              {androidGalleryError}
-            </Text>
-          ) : null}
-
-          <FlatList
-            contentContainerStyle={
-              androidGalleryAssets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
-            }
-            data={androidGalleryAssets}
-            keyExtractor={(asset) => asset.id}
-            ListEmptyComponent={
-              <View style={styles.galleryEmptyState}>
-                {isAndroidGalleryLoading ? (
-                  <ActivityIndicator color={theme.primary} size="large" />
-                ) : null}
-                <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
-                  {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
+            <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
+              <View style={styles.galleryHeading}>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
+                <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
+                  Original location metadata will be preserved
                 </Text>
               </View>
-            }
-            ListFooterComponent={
-              androidGalleryHasNextPage ? (
-                <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
-              ) : null
-            }
-            numColumns={3}
-            onEndReached={() => {
-              if (androidGalleryHasNextPage && androidGalleryCursor) {
-                void loadAndroidGalleryPage(androidGalleryCursor);
-              }
-            }}
-            onEndReachedThreshold={0.5}
-            renderItem={({ item }) => {
-              const isSelecting = selectingAndroidAssetId === item.id;
+              <AppButton
+                accessibilityLabel="Close photo library"
+                label="Close"
+                onPress={() => setIsAndroidGalleryVisible(false)}
+                style={styles.galleryCloseButton}
+                variant="ghost"
+              />
+            </View>
 
-              return (
-                <Pressable
-                  accessibilityLabel={`Select ${item.filename}`}
-                  accessibilityRole="button"
-                  disabled={Boolean(selectingAndroidAssetId)}
-                  onPress={() => void handleSelectAndroidAsset(item)}
-                  style={({ pressed }) => [
-                    styles.galleryItem,
-                    { opacity: pressed || isSelecting ? 0.65 : 1 },
-                  ]}
-                >
-                  <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
-                  {isSelecting ? (
-                    <View style={styles.gallerySelectingOverlay}>
-                      <ActivityIndicator color="#FFFFFF" />
-                    </View>
+            {androidGalleryError ? (
+              <Text accessibilityRole="alert" style={styles.galleryErrorText}>
+                {androidGalleryError}
+              </Text>
+            ) : null}
+
+            <FlatList
+              contentContainerStyle={
+                androidGalleryAssets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
+              }
+              data={androidGalleryAssets}
+              keyExtractor={(asset) => asset.id}
+              ListEmptyComponent={
+                <View style={styles.galleryEmptyState}>
+                  {isAndroidGalleryLoading ? (
+                    <ActivityIndicator color={theme.primary} size="large" />
                   ) : null}
-                </Pressable>
-              );
-            }}
-          />
-        </SafeAreaView>
+                  <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
+                    {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
+                  </Text>
+                </View>
+              }
+              ListFooterComponent={
+                androidGalleryHasNextPage ? (
+                  <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
+                ) : null
+              }
+              numColumns={3}
+              onEndReached={() => {
+                if (androidGalleryHasNextPage && androidGalleryCursor) {
+                  void loadAndroidGalleryPage(androidGalleryCursor);
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              renderItem={({ item }) => {
+                const isSelecting = selectingAndroidAssetId === item.id;
+
+                return (
+                  <Pressable
+                    accessibilityLabel={`Select ${item.filename}`}
+                    accessibilityRole="button"
+                    disabled={Boolean(selectingAndroidAssetId)}
+                    onPress={() => void handleSelectAndroidAsset(item)}
+                    style={({ pressed }) => [
+                      styles.galleryItem,
+                      { opacity: pressed || isSelecting ? 0.65 : 1 },
+                    ]}
+                  >
+                    <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
+                    {isSelecting ? (
+                      <View style={styles.gallerySelectingOverlay}>
+                        <ActivityIndicator color="#FFFFFF" />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              }}
+            />
+          </SafeAreaView>
         </View>
       </Modal>
 
@@ -538,8 +564,8 @@ export function NewSurveyRecordScreen() {
           ) : null}
 
           <AppButton
-            disabled={!selectedAsset || isOpeningGallery || isScanning}
-            label="Submit Record"
+            disabled={!selectedAsset || isOpeningGallery || isScanning || isSaving}
+            label={isSaving ? "Saving draft..." : "Submit Record"}
             onPress={handleSubmitRecord}
             style={styles.submitButton}
           />

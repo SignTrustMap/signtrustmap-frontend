@@ -104,13 +104,14 @@ export function jsonApiRequest<T>(
     body: unknown,
     accessToken?: string,
     signal?: AbortSignal,
+    method = "POST",
 ): Promise<T> {
     return apiRequest<T>(
         path,
         {
             body: JSON.stringify(body),
             headers: { "Content-Type": "application/json" },
-            method: "POST",
+            method: method,
             signal,
         },
         accessToken,

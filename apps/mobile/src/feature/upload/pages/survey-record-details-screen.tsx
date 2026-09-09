@@ -2,7 +2,7 @@ import AntDesign from '@expo/vector-icons/AntDesign';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,15 +15,12 @@ import {
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
 import {
-  useCompleteSurveyUpload,
-  useCreateSurveySubmission,
+  useGetSurveySubmissionStatus,
   useUpdateSurveySubmission,
   useSubmitSurveySubmission,
-  useInitializeSurveyUpload,
-  useUploadSurveyChunk,
 } from '@/feature/upload/hooks/use-survey-submission';
-import { prepareSurveyImage } from '@/feature/upload/utils/survey-image';
-import { readSubmissionId, readSubmittedStatus } from '@/feature/upload/utils/submission-response';
+import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
+import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
@@ -77,16 +74,17 @@ export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
-  const { imageMimeType, imageName, imageType, imageUri, latitude, longitude } = useLocalSearchParams<{
-    imageMimeType?: string;
-    imageName?: string;
-    imageType?: string;
-    imageUri?: string;
-    latitude?: string;
-    longitude?: string;
-  }>();
-  const parsedLatitude = latitude ? Number(latitude) : Number.NaN;
-  const parsedLongitude = longitude ? Number(longitude) : Number.NaN;
+  const { submissionId } = useLocalSearchParams<{ submissionId?: string }>();
+  const draftQuery = useGetSurveySubmissionStatus(submissionId);
+  const saveDraft = useSaveSurveyDraft();
+  const [imageUri, setImageUri] = useState<string>();
+  const [imageName, setImageName] = useState<string>();
+  const [imageMimeType, setImageMimeType] = useState<string>();
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const latitude = draftQuery.data?.submission.latitude;
+  const longitude = draftQuery.data?.submission.longitude;
+  const parsedLatitude = latitude != null ? Number(latitude) : Number.NaN;
+  const parsedLongitude = longitude != null ? Number(longitude) : Number.NaN;
   const imageCoordinate: MapCoordinate | undefined =
     Number.isFinite(parsedLatitude) &&
       Number.isFinite(parsedLongitude) &&
@@ -106,24 +104,38 @@ export function SurveyRecordDetailsScreen() {
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
-  const { mutateAsync: initializeUpload } = useInitializeSurveyUpload();
-  const { mutateAsync: createSubmission } = useCreateSurveySubmission();
   const { mutateAsync: updateSubmission } = useUpdateSurveySubmission();
   const { mutateAsync: submitSubmission } = useSubmitSurveySubmission();
-  const { mutateAsync: uploadChunk } = useUploadSurveyChunk();
-  const { mutateAsync: completeUpload } = useCompleteSurveyUpload();
   const submissionInProgress = useRef(false);
-  const submissionAttempt = useRef<{
-    imageKey: string;
-    submissionId?: string;
-    metadataKey?: string;
-    sessionId?: string;
-    chunkUploaded?: boolean;
-    uploadCompleted?: boolean;
-  } | undefined>(undefined);
+  const hydratedId = useRef<string | undefined>(undefined);
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
     imageCoordinate ? undefined : 'Image GPS is unavailable. Use current location before submitting.',
   );
+
+  useEffect(() => {
+    const draft = draftQuery.data?.submission;
+    if (!draft || !session || hydratedId.current === draft.id) return;
+    let active = true;
+    setIsDraftLoaded(false);
+    setCapturedAt(draft.capturedAt ?? '');
+    setNote(draft.note ?? '');
+    const hasCoordinate = draft.latitude != null && draft.longitude != null;
+    setSelectedCoordinate(hasCoordinate ? [draft.longitude!, draft.latitude!] : undefined);
+    setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
+    setLocationMessage(hasCoordinate ? undefined : 'Image GPS is unavailable. Use current location before submitting.');
+    void readDraftImage(session.account.id, draft.id).then((local) => {
+      if (!active) return;
+      const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE')?.file_url;
+      setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
+      setImageName(local?.fileName);
+      setImageMimeType(local?.mimeType);
+      hydratedId.current = draft.id;
+      setIsDraftLoaded(true);
+    }).catch(() => {
+      if (active) setSubmitError('Unable to restore the draft image. Reopen this page to retry.');
+    });
+    return () => { active = false; };
+  }, [draftQuery.data, session]);
 
   const handleUseCurrentLocation = async () => {
     if (isLocating || submissionInProgress.current) return;
@@ -150,8 +162,8 @@ export function SurveyRecordDetailsScreen() {
 
   const handleSubmit = async () => {
     if (submissionInProgress.current || isLocating) return;
-    if (!imageUri || imageType === 'video') {
-      setSubmitError('Choose a sign image before submitting.');
+    if (!submissionId || !isDraftLoaded || draftQuery.data?.submission.status !== 'DRAFT') {
+      setSubmitError('Load an editable draft before submitting.');
       return;
     }
     if (!session?.accessToken) {
@@ -159,7 +171,6 @@ export function SurveyRecordDetailsScreen() {
       return;
     }
     const captureTimestamp = Date.parse(capturedAt.trim());
-    console.log('captureTimestamp', captureTimestamp, capturedAt.trim());
     if (!Number.isFinite(captureTimestamp)) {
       setSubmitError('Enter the date and time the photo was taken, including its time zone.');
       return;
@@ -170,66 +181,34 @@ export function SurveyRecordDetailsScreen() {
     }
     const request: CreateSubmissionDto = {
       submissionType: 'SINGLE_IMAGE',
-      capturedAt: new Date(captureTimestamp).toISOString() ?? new Date(capturedAt.trim()).toISOString(),
+      capturedAt: new Date(captureTimestamp).toISOString(),
       coordinateSource,
       latitude: selectedCoordinate[1],
       longitude: selectedCoordinate[0],
       note: note.trim(),
     };
 
-    console.log(request);
 
 
     submissionInProgress.current = true;
     setIsSubmitting(true);
     setSubmitError(undefined);
     try {
-      const imageKey = JSON.stringify([session.account.id, imageUri, imageName, imageMimeType]);
-      if (submissionAttempt.current?.imageKey !== imageKey) {
-        submissionAttempt.current = { imageKey };
+      const { submissionType: _submissionType, ...updates } = request;
+      await updateSubmission({ submissionId, request: updates });
+      // A prior interrupted upload can be retried against this same draft.
+      const hasImage = draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE')
+        || draftQuery.data?.sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
+      if (!hasImage) {
+        if (!imageUri) throw new Error('This draft has no uploaded image available. Choose the image again.');
+        await saveDraft({ uri: imageUri, fileName: imageName, mimeType: imageMimeType }, request, submissionId);
       }
-      const attempt = submissionAttempt.current;
-      const metadataKey = JSON.stringify(request);
-      const image = !attempt.chunkUploaded
-        ? await prepareSurveyImage({ fileName: imageName, mimeType: imageMimeType, uri: imageUri })
-        : undefined;
-      if (!attempt.submissionId) {
-        attempt.submissionId = readSubmissionId(await createSubmission({ request }));
-        attempt.metadataKey = metadataKey;
-      } else if (attempt.metadataKey !== metadataKey) {
-        const { submissionType: _submissionType, ...updates } = request;
-        await updateSubmission({ submissionId: attempt.submissionId, request: updates });
-        attempt.metadataKey = metadataKey;
-      }
-
-      if (image) {
-        if (!attempt.sessionId) {
-          const upload = await initializeUpload({
-            submissionId: attempt.submissionId,
-            request: {
-              mediaType: 'IMAGE',
-              originalFilename: image.fileName,
-              totalChunks: 1,
-              totalSizeBytes: image.sizeBytes,
-            },
-          });
-          attempt.sessionId = upload.sessionId;
-        }
-        await uploadChunk({ sessionId: attempt.sessionId, request: image.chunk });
-        attempt.chunkUploaded = true;
-      }
-
-      if (!attempt.sessionId) throw new Error('Upload session is unavailable. Please retry.');
-      if (!attempt.uploadCompleted) {
-        await completeUpload({ sessionId: attempt.sessionId });
-        attempt.uploadCompleted = true;
-      }
-      const submitted = await submitSubmission({ submissionId: attempt.submissionId });
+      const submitted = await submitSubmission({ submissionId });
       const submissionStatus = readSubmittedStatus(submitted);
       router.replace({
         pathname: '/work/survey-finish',
         params: {
-          submissionId: attempt.submissionId,
+          submissionId,
           submissionStatus,
         },
       });
@@ -253,9 +232,9 @@ export function SurveyRecordDetailsScreen() {
         >
           <View style={styles.header}>
             <AppButton
-              accessibilityLabel="Back to media selection"
+              accessibilityLabel="Back to work"
               hitSlop={Spacing.one}
-              onPress={() => router.back()}
+              onPress={() => router.replace({ pathname: '/work', params: { currentRole: 'surveyor' } })}
               pressedOpacity={0.7}
               style={styles.backButton}
               variant="ghost"
@@ -270,6 +249,8 @@ export function SurveyRecordDetailsScreen() {
             <Text style={[styles.title, { color: theme.text }]}>New Survey Record</Text>
           </View>
 
+          {draftQuery.isPending ? <Text style={{ color: theme.text }}>Loading draft...</Text> : null}
+          {draftQuery.isError ? <AppButton label="Retry loading draft" onPress={() => { void draftQuery.refetch(); }} /> : null}
           <View
             accessibilityLabel={imageUri ? 'Selected survey media' : 'No survey media selected'}
             style={[
@@ -280,7 +261,7 @@ export function SurveyRecordDetailsScreen() {
               },
             ]}
           >
-            {imageUri && imageType !== 'video' ? (
+            {imageUri ? (
               <Image
                 accessibilityLabel="Selected survey image"
                 contentFit="cover"
@@ -294,20 +275,23 @@ export function SurveyRecordDetailsScreen() {
                     <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
                   }
                   name={{
-                    android: imageType === 'video' ? 'video_library' : 'image',
-                    ios: imageType === 'video' ? 'video' : 'photo',
-                    web: imageType === 'video' ? 'video_library' : 'image',
+                    android: 'image',
+                    ios: 'photo',
+                    web: 'image',
                   }}
                   size={40}
                   tintColor={theme.placeholder}
                 />
                 <Text style={[styles.placeholderLabel, { color: theme.placeholder }]}>
-                  {imageType === 'video' ? 'Selected survey video' : 'No image selected'}
+                  Image preview unavailable
                 </Text>
               </>
             )}
           </View>
 
+          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE') && !imageUri ? (
+            <AppButton label="Choose draft image" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
+          ) : null}
           <View style={styles.section}>
             <AppInput
               label="Photo capture time"
@@ -442,7 +426,7 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
-            disabled={isSubmitting || isLocating || !imageUri || imageType === 'video'}
+            disabled={isSubmitting || isLocating || !isDraftLoaded || draftQuery.data?.submission.status !== 'DRAFT'}
             label={isSubmitting ? 'Submitting...' : 'Submit'}
             onPress={handleSubmit}
             style={styles.submitButton}
