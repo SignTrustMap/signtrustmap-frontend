@@ -5,4 +5,5 @@ export const API_PATHS = {
     NAVIGATION_ROUTING: '/routing/directions',
     SIGNS: '/signs',
     SIGNS_ALONG_ROUTE: '/signs/along-route',
+    SUBMISSIONS: '/submissions',
 } as const;

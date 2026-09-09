@@ -32,7 +32,7 @@ export async function login(request: LoginRequest): Promise<AppSession> {
     .map((role) => backendRoleToAccountRole[role.toUpperCase()])
     .filter((role): role is AccountRole => Boolean(role));
 
-  return {
+  const res = {
     accessToken: response.accessToken,
     account: {
       displayName: response.user.fullName,
@@ -41,4 +41,8 @@ export async function login(request: LoginRequest): Promise<AppSession> {
       roles,
     },
   };
+
+  console.log('login response', res);
+
+  return res;
 }

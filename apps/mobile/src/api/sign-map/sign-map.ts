@@ -43,12 +43,15 @@ export function getSignsAlongRoute(
     request: RouteSignsRequestDto,
     signal?: AbortSignal,
 ): Promise<FindSignsAlongRouteResponse> {
-    return jsonApiRequest<FindSignsAlongRouteResponse>(
+    const res = jsonApiRequest<FindSignsAlongRouteResponse>(
         API_PATHS.SIGNS_ALONG_ROUTE,
         request,
         undefined,
         signal,
     );
+
+    console.log('getSignsAlongRoute', res);
+    return res;
 }
 
 /** Requires a Staff/Admin bearer token. */

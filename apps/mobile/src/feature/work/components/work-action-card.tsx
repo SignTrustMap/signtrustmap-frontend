@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 type WorkActionCardProps = {
-  count: number;
+  count?: number;
   label: string;
   onPress?: () => void;
   symbol: SymbolName;
@@ -20,7 +20,7 @@ export function WorkActionCard({ count, label, onPress, symbol }: WorkActionCard
 
   return (
     <AppButton
-      accessibilityLabel={`${label}, ${count} pending`}
+      accessibilityLabel={count === undefined ? label : `${label}, ${count} pending`}
       onPress={onPress}
       pressedOpacity={0.72}
       style={[
@@ -32,9 +32,9 @@ export function WorkActionCard({ count, label, onPress, symbol }: WorkActionCard
       ]}
       variant="surface"
     >
-      <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+      {count !== undefined ? <View style={[styles.badge, { backgroundColor: theme.primary }]}>
         <Text style={[styles.badgeText, { color: theme.onPrimary }]}>{count}</Text>
-      </View>
+      </View> : null}
       <SymbolView name={symbol} size={27} tintColor={theme.primary} />
       <Text style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
     </AppButton>

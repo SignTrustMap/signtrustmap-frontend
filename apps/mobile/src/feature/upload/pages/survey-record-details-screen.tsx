@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -15,9 +15,16 @@ import {
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
 import {
-  submitSurveyImage,
-  type SurveySubmissionAttempt,
-} from '@/feature/upload/services/survey-submission';
+  useCompleteSurveyUpload,
+  useCreateSurveySubmission,
+  useUpdateSurveySubmission,
+  useSubmitSurveySubmission,
+  useInitializeSurveyUpload,
+  useUploadSurveyChunk,
+} from '@/feature/upload/hooks/use-survey-submission';
+import { prepareSurveyImage } from '@/feature/upload/utils/survey-image';
+import { readSubmissionId, readSubmittedStatus } from '@/feature/upload/utils/submission-response';
+import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
 
@@ -91,16 +98,35 @@ export function SurveyRecordDetailsScreen() {
     imageCoordinate ?? currentLocation.coordinate,
   );
   const [focusRequestId, setFocusRequestId] = useState(1);
+  const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
+    imageCoordinate ? 'IMAGE_EXIF' : undefined,
+  );
+  const [capturedAt, setCapturedAt] = useState('');
+  const [note, setNote] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
-  const submissionAttempt = useRef<SurveySubmissionAttempt>({});
+  const { mutateAsync: initializeUpload } = useInitializeSurveyUpload();
+  const { mutateAsync: createSubmission } = useCreateSurveySubmission();
+  const { mutateAsync: updateSubmission } = useUpdateSurveySubmission();
+  const { mutateAsync: submitSubmission } = useSubmitSurveySubmission();
+  const { mutateAsync: uploadChunk } = useUploadSurveyChunk();
+  const { mutateAsync: completeUpload } = useCompleteSurveyUpload();
+  const submissionInProgress = useRef(false);
+  const submissionAttempt = useRef<{
+    imageKey: string;
+    submissionId?: string;
+    metadataKey?: string;
+    sessionId?: string;
+    chunkUploaded?: boolean;
+    uploadCompleted?: boolean;
+  } | undefined>(undefined);
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
-    imageCoordinate ? undefined : 'Image GPS is unavailable. Using the demo current location.',
+    imageCoordinate ? undefined : 'Image GPS is unavailable. Use current location before submitting.',
   );
 
   const handleUseCurrentLocation = async () => {
-    if (isLocating) return;
+    if (isLocating || submissionInProgress.current) return;
 
     setIsLocating(true);
     setLocationMessage(undefined);
@@ -109,14 +135,13 @@ export function SurveyRecordDetailsScreen() {
       const coordinate = await getCurrentSurveyCoordinate();
 
       setSelectedCoordinate(coordinate);
+      setCoordinateSource('DEVICE_GPS');
       setFocusRequestId((requestId) => requestId + 1);
     } catch (error) {
-      setSelectedCoordinate(currentLocation.coordinate);
-      setFocusRequestId((requestId) => requestId + 1);
       setLocationMessage(
         error instanceof Error
-          ? `${error.message} Using the demo current location.`
-          : 'Live GPS is unavailable. Using the demo current location.',
+          ? error.message
+          : 'Live GPS is unavailable. Please try again.',
       );
     } finally {
       setIsLocating(false);
@@ -124,7 +149,7 @@ export function SurveyRecordDetailsScreen() {
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
+    if (submissionInProgress.current || isLocating) return;
     if (!imageUri || imageType === 'video') {
       setSubmitError('Choose a sign image before submitting.');
       return;
@@ -133,20 +158,79 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError('Your session has expired. Log in again and retry.');
       return;
     }
+    const captureTimestamp = Date.parse(capturedAt.trim());
+    console.log('captureTimestamp', captureTimestamp, capturedAt.trim());
+    if (!Number.isFinite(captureTimestamp)) {
+      setSubmitError('Enter the date and time the photo was taken, including its time zone.');
+      return;
+    }
+    if (!coordinateSource || !selectedCoordinate) {
+      setSubmitError('Use an image with GPS metadata or select your current location.');
+      return;
+    }
+    const request: CreateSubmissionDto = {
+      submissionType: 'SINGLE_IMAGE',
+      capturedAt: new Date(captureTimestamp).toISOString() ?? new Date(capturedAt.trim()).toISOString(),
+      coordinateSource,
+      latitude: selectedCoordinate[1],
+      longitude: selectedCoordinate[0],
+      note: note.trim(),
+    };
 
+    console.log(request);
+
+
+    submissionInProgress.current = true;
     setIsSubmitting(true);
     setSubmitError(undefined);
     try {
-      const completed = await submitSurveyImage(
-        { fileName: imageName, mimeType: imageMimeType, uri: imageUri },
-        session.accessToken,
-        submissionAttempt.current,
-      );
+      const imageKey = JSON.stringify([session.account.id, imageUri, imageName, imageMimeType]);
+      if (submissionAttempt.current?.imageKey !== imageKey) {
+        submissionAttempt.current = { imageKey };
+      }
+      const attempt = submissionAttempt.current;
+      const metadataKey = JSON.stringify(request);
+      const image = !attempt.chunkUploaded
+        ? await prepareSurveyImage({ fileName: imageName, mimeType: imageMimeType, uri: imageUri })
+        : undefined;
+      if (!attempt.submissionId) {
+        attempt.submissionId = readSubmissionId(await createSubmission({ request }));
+        attempt.metadataKey = metadataKey;
+      } else if (attempt.metadataKey !== metadataKey) {
+        const { submissionType: _submissionType, ...updates } = request;
+        await updateSubmission({ submissionId: attempt.submissionId, request: updates });
+        attempt.metadataKey = metadataKey;
+      }
+
+      if (image) {
+        if (!attempt.sessionId) {
+          const upload = await initializeUpload({
+            submissionId: attempt.submissionId,
+            request: {
+              mediaType: 'IMAGE',
+              originalFilename: image.fileName,
+              totalChunks: 1,
+              totalSizeBytes: image.sizeBytes,
+            },
+          });
+          attempt.sessionId = upload.sessionId;
+        }
+        await uploadChunk({ sessionId: attempt.sessionId, request: image.chunk });
+        attempt.chunkUploaded = true;
+      }
+
+      if (!attempt.sessionId) throw new Error('Upload session is unavailable. Please retry.');
+      if (!attempt.uploadCompleted) {
+        await completeUpload({ sessionId: attempt.sessionId });
+        attempt.uploadCompleted = true;
+      }
+      const submitted = await submitSubmission({ submissionId: attempt.submissionId });
+      const submissionStatus = readSubmittedStatus(submitted);
       router.replace({
         pathname: '/work/survey-finish',
         params: {
-          submissionId: completed.submissionId,
-          submissionStatus: completed.submissionStatus,
+          submissionId: attempt.submissionId,
+          submissionStatus,
         },
       });
     } catch (error) {
@@ -154,6 +238,7 @@ export function SurveyRecordDetailsScreen() {
         error instanceof Error ? error.message : 'The sign could not be submitted. Please retry.',
       );
     } finally {
+      submissionInProgress.current = false;
       setIsSubmitting(false);
     }
   };
@@ -221,6 +306,18 @@ export function SurveyRecordDetailsScreen() {
                 </Text>
               </>
             )}
+          </View>
+
+          <View style={styles.section}>
+            <AppInput
+              label="Photo capture time"
+              accessibilityLabel="Photo capture date and time with time zone"
+              placeholder="YYYY-MM-DDTHH:mm:ss+07:00"
+              value={capturedAt}
+              onChangeText={setCapturedAt}
+              autoCapitalize="none"
+              editable={!isSubmitting}
+            />
           </View>
 
           <View style={styles.section}>
@@ -298,7 +395,7 @@ export function SurveyRecordDetailsScreen() {
               accessibilityLabel={
                 isLocating ? 'Getting current location' : 'Use current location for this survey'
               }
-              disabled={isLocating}
+              disabled={isLocating || isSubmitting}
               onPress={handleUseCurrentLocation}
               style={styles.locationButton}
             >
@@ -324,6 +421,10 @@ export function SurveyRecordDetailsScreen() {
           <View style={styles.section}>
             <AppInput
               label={'Note'}
+              value={note}
+              onChangeText={setNote}
+              maxLength={2000}
+              editable={!isSubmitting}
               accessibilityLabel="Survey note"
               multiline
               placeholder="Enter additional details..."
@@ -341,7 +442,7 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
-            disabled={isSubmitting || !imageUri || imageType === 'video'}
+            disabled={isSubmitting || isLocating || !imageUri || imageType === 'video'}
             label={isSubmitting ? 'Submitting...' : 'Submit'}
             onPress={handleSubmit}
             style={styles.submitButton}
