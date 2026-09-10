@@ -7,6 +7,8 @@ import {
     VoteDto,
     CannotIdentifySignReportParams,
     ReviewQueueParams,
+    ReviewQueueResponse,
+    MyReviewHistoryResponse,
 } from '@/types/reviewsType';
 
 import { API_PATHS } from '@/api/api';
@@ -20,12 +22,12 @@ export function getMyReviewHistory(
     const queryParams = new URLSearchParams({
         page: params.page,
         pageSize: params.pageSize,
-        status: params.status,
-        search: params.search,
-        surveyorId: params.surveyorId,
     });
+    if (params.status !== undefined) queryParams.set('status', params.status);
+    if (params.search !== undefined) queryParams.set('search', params.search);
+    if (params.surveyorId !== undefined) queryParams.set('surveyorId', params.surveyorId);
 
-    return apiRequest(
+    return apiRequest<MyReviewHistoryResponse>(
         `${API_PATHS.REVIEWS}/me/history?${queryParams}`,
         { signal },
         accessToken,
@@ -101,19 +103,21 @@ export function undoVoteOnCandidate(
     );
 }
 
-export function getReviewQueue(
+export async function getReviewQueue(
     params: ReviewQueueParams,
     accessToken: string,
     signal?: AbortSignal,
 ) {
     const queryParams = new URLSearchParams({
-        page: params.page,
-        pageSize: params.pageSize,
+        page: params.page = '1',
+        pageSize: params.pageSize = '10',
     });
 
-    return apiRequest(
+    const res = await apiRequest<ReviewQueueResponse>(
         `${API_PATHS.REVIEWS}/queue?${queryParams}`,
         { signal },
         accessToken,
     );
+
+    return res;
 }

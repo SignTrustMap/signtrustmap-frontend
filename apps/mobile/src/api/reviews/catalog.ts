@@ -27,10 +27,13 @@ type PageResponse<T> = {
   totalPages: number;
 };
 
-export async function getCatalog(accessToken: string) {
+export async function getCatalog(accessToken: string, signal?: AbortSignal) {
+  // Integration unclear: api/reviews/review has no catalog endpoints. Its
+  // SignCategoryDto uses string IDs and optional descriptions, while this feature
+  // uses numeric IDs and nullable descriptions. Keep these calls/types unchanged.
   const [categories, signTypes] = await Promise.all([
-    apiRequest<CatalogCategory[]>('/catalog/categories', {}, accessToken),
-    apiRequest<PageResponse<CatalogSign>>('/catalog/sign-types?size=100', {}, accessToken),
+    apiRequest<CatalogCategory[]>('/catalog/categories', { signal }, accessToken),
+    apiRequest<PageResponse<CatalogSign>>('/catalog/sign-types?size=100', { signal }, accessToken),
   ]);
   return { categories, signs: signTypes.content };
 }

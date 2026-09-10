@@ -163,7 +163,7 @@ export default function LoginScreen() {
 
           <View style={styles.signupRow}>
             <Text style={[styles.footerText, { color: theme.text }]}>Don&apos;t have an account?</Text>
-            <Pressable accessibilityRole="button">
+            <Pressable accessibilityRole="button" onPress={() => router.push('/register')}>
               <Text style={[styles.linkText, { color: theme.primary }]}> Sign Up</Text>
             </Pressable>
           </View>

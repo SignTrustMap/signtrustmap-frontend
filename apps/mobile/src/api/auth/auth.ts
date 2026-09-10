@@ -7,6 +7,17 @@ export type LoginRequest = {
   password: string;
 };
 
+export type RegisterRequest = {
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+};
+
+export type RegisterResponse = {
+  message?: string;
+};
+
 export type LoginResponse = {
   accessToken: string;
   user: {
@@ -41,4 +52,13 @@ export async function login(request: LoginRequest): Promise<AppSession> {
       roles,
     },
   };
+}
+
+export async function register(request: RegisterRequest): Promise<RegisterResponse> {
+  return jsonApiRequest<RegisterResponse>(API_PATHS.AUTH_REGISTER, {
+    ...request,
+    email: request.email.trim(),
+    fullName: request.fullName.trim(),
+    phone: request.phone.trim(),
+  });
 }

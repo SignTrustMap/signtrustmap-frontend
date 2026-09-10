@@ -1,14 +1,12 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
+import { useCastVoteOnSignCandidate, useReportSignCandidate, useGetReviewQueue, useGetReviewHistory, useUndoVoteOnCandidate } from '@/feature/review/hooks/use-review';
+
 import { useSession } from '@/context/session-provider';
 import {
-  getReviewHistory,
-  getReviewQueue,
-  submitReview,
-  undoReview,
   type ReviewDecision,
   type ReviewSubmission,
-} from '@/feature/review/services/reviews-api';
+} from '@/api/reviews/review-workflow';
 
 export type ReviewActionType = 'approved' | 'declined' | 'reported';
 
@@ -46,6 +44,20 @@ const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefin
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const accessToken = session?.accessToken;
+  const accountId = session?.account.id;
+  // Load on entry/refresh so background updates do not overwrite review ordering.
+  const { refetch: refetchQueue } = useGetReviewQueue(undefined, false);
+  const { refetch: refetchHistory } = useGetReviewHistory(false);
+  const refetchWorkflow = useCallback(async () => {
+    const [queue, history] = await Promise.all([
+      refetchQueue({ throwOnError: true }),
+      refetchHistory({ throwOnError: true }),
+    ]);
+    return { data: queue.data && history.data ? { queue: queue.data, history: history.data } : undefined };
+  }, [refetchQueue, refetchHistory]);
+  const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
+  const { mutateAsync: reportCandidate } = useReportSignCandidate();
+  const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
   const [pendingSubmissions, setPendingSubmissions] = useState<ReviewSubmission[]>([]);
   const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>([]);
   const [isCheckingSubmission, setIsCheckingSubmission] = useState(false);
@@ -64,10 +76,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setError(undefined);
     try {
-      const [queue, history] = await Promise.all([
-        getReviewQueue(accessToken),
-        getReviewHistory(accessToken),
-      ]);
+      const { data } = await refetchWorkflow();
+      if (!data) return;
+      const { queue, history } = data;
       setPendingSubmissions(queue.submissions);
       setReviewHistory(history);
       setTotalSubmissions(queue.total + history.length);
@@ -76,14 +87,15 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, refetchWorkflow]);
 
   useEffect(() => {
     if (!accessToken) return;
     let active = true;
-    Promise.all([getReviewQueue(accessToken), getReviewHistory(accessToken)])
-      .then(([queue, history]) => {
-        if (!active) return;
+    refetchWorkflow()
+      .then(({ data }) => {
+        if (!active || !data) return;
+        const { queue, history } = data;
         setPendingSubmissions(queue.submissions);
         setReviewHistory(history);
         setTotalSubmissions(queue.total + history.length);
@@ -98,7 +110,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [accessToken]);
+  }, [accessToken, accountId, refetchWorkflow]);
 
   const beginSubmissionCheck = () => {
     setCheckedReviewIndex(0);
@@ -136,7 +148,18 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setError(undefined);
 
     try {
-      await submitReview(submission.id, decision, session.accessToken);
+      const params = { candidateId: submission.id };
+      if (decision.action === 'reported') {
+        await reportCandidate({ params, request: {
+          reason: decision.declineNote || decision.declineReason || 'Reported by reviewer',
+        } });
+      } else {
+        await castVote({ params, request: {
+          vote: decision.action === 'approved' ? 1 : -1,
+          ...(decision.declineReason ? { declineReason: decision.declineReason } : {}),
+          ...(decision.declineNote ? { declineNote: decision.declineNote } : {}),
+        } });
+      }
       setReviewHistory((history) => {
         const completedReview = { action: decision.action, submission };
         if (completedRecheckIndex !== undefined) {
@@ -171,7 +194,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setError(undefined);
     try {
       if (lastReview.action !== 'reported') {
-        await undoReview(lastReview.submission.id, session.accessToken);
+        await undoVote({ params: { candidateId: lastReview.submission.id } });
       }
       setReviewHistory((history) => history.slice(0, -1));
       setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
@@ -192,7 +215,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setError(undefined);
     try {
       if (checkedReview.action !== 'reported') {
-        await undoReview(checkedReview.submission.id, session.accessToken);
+        await undoVote({ params: { candidateId: checkedReview.submission.id } });
       }
       setReviewHistory((history) => history.filter((_, index) => index !== checkedReviewIndex));
       setPendingSubmissions((pending) => [checkedReview.submission, ...pending]);

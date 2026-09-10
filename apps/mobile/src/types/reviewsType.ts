@@ -27,9 +27,9 @@ export type SignCategoryDto = {
 export type MyReviewHistoryParams = {
     page: string,
     pageSize: string,
-    status: string,
-    search: string,
-    surveyorId: string,
+    status?: string,
+    search?: string,
+    surveyorId?: string,
 }
 
 export type CandidateSignDetailsParams = {
@@ -52,4 +52,45 @@ export type ReviewQueueParams = {
     page: string,
     pageSize: string,
 }
+
+export type ReviewCandidate = {
+    bestFrameUrl?: string;
+    createdAt: string;
+    id: string;
+    predictedSignType?: {
+        id: number;
+        nameEn: string;
+        nameVi: string;
+        signCode: string;
+    };
+    signCropUrl?: string;
+    submission?: {
+        createdAt?: string;
+        surveyorId?: string;
+    };
+    submissionId: string;
+};
+
+export type ReviewQueueResponse = {
+    items: ReviewCandidate[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+};
+
+export type MyReviewHistoryResponse = {
+    items: {
+        candidate: ReviewCandidate;
+        candidateId: string;
+        declineNote?: string | null;
+        declineReason?: string | null;
+        reviewedAt: string;
+        vote: number;
+    }[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+};
 

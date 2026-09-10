@@ -1,19 +1,17 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
-import { useSession } from '@/context/session-provider';
+import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import {
-  getCatalog,
-  type CatalogCategory,
   type CatalogSign,
-} from '@/feature/review/services/catalog-api';
+} from '@/api/reviews/catalog';
 import { useTheme } from '@/hooks/use-theme';
 
 type CatalogFilter = 'all' | number;
@@ -81,27 +79,13 @@ function SignCard({ sign }: { sign: CatalogSign }) {
 export function SignCatalogScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { session } = useSession();
+
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
-  const [catalogSigns, setCatalogSigns] = useState<CatalogSign[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    if (!session?.accessToken) return;
-    getCatalog(session.accessToken)
-      .then(({ categories: nextCategories, signs }) => {
-        setCategories(nextCategories);
-        setCatalogSigns(signs);
-        setError(undefined);
-      })
-      .catch((cause: unknown) => {
-        setError(cause instanceof Error ? cause.message : 'Unable to load the sign catalog.');
-      })
-      .finally(() => setIsLoading(false));
-  }, [session?.accessToken]);
+  const { data: catalog, isPending: isLoading, error: catalogError } = useGetCatalog();
+  const categories = catalog?.categories ?? [];
+  const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
+  const error = catalogError?.message;
 
   const filteredSigns = useMemo(() => {
     const query = normalizeEnglishSearch(search);
