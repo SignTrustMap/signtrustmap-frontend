@@ -87,6 +87,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const transition = (document as unknown as {
       startViewTransition: (cb: () => void) => { ready: Promise<void> }
     }).startViewTransition(() => {
+      document.documentElement.classList.add('disable-transitions')
       updateDOMTheme(nextTheme)
       flushSync(() => {
         setThemeState(nextTheme)
@@ -94,16 +95,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     })
 
     transition.ready.then(() => {
-      document.documentElement.animate(
+      const anim = document.documentElement.animate(
         {
           clipPath: [clipFrom, clipTo],
         },
         {
-          duration: 750,
-          easing: 'ease-in-out',
+          duration: 1100,
+          easing: 'cubic-bezier(0.25, 1, 0.35, 1)',
           pseudoElement: '::view-transition-new(root)',
         }
       )
+
+      anim.onfinish = () => {
+        document.documentElement.classList.remove('disable-transitions')
+      }
     })
   }
 

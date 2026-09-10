@@ -20,32 +20,34 @@ export interface ToggleStatusDto {
   reason?: string
 }
 
-export class UserService {
+export const userService = {
   /**
    * Fetch paginated & filtered user list
    */
-  static async getUsers(params?: GetUsersQuery): Promise<ApiResponse<AdminUserItem[]>> {
+  getUsers: async (params?: GetUsersQuery): Promise<ApiResponse<AdminUserItem[]>> => {
     return http.get<ApiResponse<AdminUserItem[]>>(API_ENDPOINTS.USERS.BASE, { params })
-  }
+  },
 
   /**
    * Get detailed profile of a single user
    */
-  static async getUserById(userId: string): Promise<ApiResponse<AdminUserItem>> {
+  getUserById: async (userId: string): Promise<ApiResponse<AdminUserItem>> => {
     return http.get<ApiResponse<AdminUserItem>>(API_ENDPOINTS.USERS.DETAIL(userId))
-  }
+  },
 
   /**
    * Update user system role (RBAC)
    */
-  static async updateUserRole(userId: string, data: UpdateRoleDto): Promise<ApiResponse<AdminUserItem>> {
+  updateUserRole: async (userId: string, data: UpdateRoleDto): Promise<ApiResponse<AdminUserItem>> => {
     return http.patch<ApiResponse<AdminUserItem>>(API_ENDPOINTS.USERS.UPDATE_ROLE(userId), data)
-  }
+  },
 
   /**
    * Lock or unlock user account
    */
-  static async toggleUserStatus(userId: string, data: ToggleStatusDto): Promise<ApiResponse<AdminUserItem>> {
+  toggleUserStatus: async (userId: string, data: ToggleStatusDto): Promise<ApiResponse<AdminUserItem>> => {
     return http.patch<ApiResponse<AdminUserItem>>(API_ENDPOINTS.USERS.TOGGLE_STATUS(userId), data)
-  }
+  },
 }
+
+export const UserService = userService

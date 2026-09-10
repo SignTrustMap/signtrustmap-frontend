@@ -38,6 +38,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+scratch/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -130,4 +131,12 @@ dist-ssr/
 .claude/
 CLAUDE.md
 AGENTS.md
+
+# Temporary docs, project reports, and working notes
+**/a.md
+**/b.md
+**/context.md
+*.docx
+Report1_Project Introduction*
+FA26SE003_SignTrustMap_DucDNM2*
 

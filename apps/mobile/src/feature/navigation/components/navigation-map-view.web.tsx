@@ -147,7 +147,7 @@ export function NavigationMapView({
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
 
-    currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.tertiary) })
+    currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
       .setLngLat(currentLocation.coordinate)
       .addTo(map);
 
@@ -163,7 +163,7 @@ export function NavigationMapView({
       mapRef.current = null;
       map.remove();
     };
-  }, [theme.tertiary]);
+  }, [theme.primary]);
 
   useEffect(() => {
     if (!focusCoordinate || !mapRef.current) return;
@@ -230,7 +230,7 @@ export function NavigationMapView({
           'line-join': 'round',
         },
         paint: {
-          'line-color': theme.tertiary,
+          'line-color': theme.primary,
           'line-width': 5,
         },
       });
@@ -269,7 +269,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeStart, routeStopCoordinates, theme.tertiary]);
+  }, [destination, routeCoordinates, routeStart, routeStopCoordinates, theme.primary]);
 
   return (
     <View style={styles.container}>

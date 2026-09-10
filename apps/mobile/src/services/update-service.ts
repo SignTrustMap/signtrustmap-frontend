@@ -109,10 +109,11 @@ function parseReleaseData(data: any): ReleaseInfo {
     if (apkAssets.length > 0) {
       const supportedAbis = (Device.supportedCpuArchitectures ?? []).map((abi) => abi.toLowerCase());
 
-      let matched = apkAssets.find((asset: any) => {
-        const lowerName = asset.name.toLowerCase();
-        return supportedAbis.some((abi) => lowerName.includes(abi));
-      });
+      let matched: any = null;
+      for (const abi of supportedAbis) {
+        matched = apkAssets.find((asset: any) => asset.name.toLowerCase().includes(abi));
+        if (matched) break;
+      }
 
       if (!matched) {
         matched =

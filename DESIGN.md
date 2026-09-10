@@ -3,13 +3,13 @@ version: alpha
 name: SignTrustMap
 description: Clean, modernz
 colors:
+  primary: "#0671eb"
   secondary: "#d3f7ff"
-  tertiary: "#007b8b"
   neutral: "#F8F7F7"
   surface: "#FFFFFF"
-  on-tertiary: "#FFFFFF"
+  on-primary: "#FFFFFF"
   border: "#E8E4E3"
-  primary: "#000000"
+  text: "#000000"
 typography:
   App Title:
     fontFamily: Arvo
@@ -37,23 +37,23 @@ spacing:
   lg: 24px
 components:
   button-primary:
-    backgroundColor: "{colors.tertiary}"
-    textColor: "{colors.on-tertiary}"
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
     rounded: "{rounded.sm}"
     padding: "12px 20px"
   button-secondary:
     backgroundColor: transparent
-    textColor: "{colors.tertiary}"
+    textColor: "{colors.primary}"
     rounded: "{rounded.sm}"
     padding: "12px 20px"
   card:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
+    textColor: "{colors.text}"
     rounded: "{rounded.md}"
     padding: 20px
   input:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
+    textColor: "{colors.text}"
     rounded: "{rounded.sm}"
     padding: "10px 14px"
 ---
@@ -68,13 +68,13 @@ Architectural minimalism meets journalistic gravitas. The UI evokes a premium ma
 
 The palette is rooted in semantic tokens. Use the role (e.g. `{colors.primary}`) — never the hex literal — when authoring components.
 
+- **primary (#0671eb)**
 - **secondary (#d3f7ff)**
-- **tertiary (#007b8b)**
 - **neutral (#F8F7F7)**
 - **surface (#FFFFFF)**
-- **on-tertiary (#FFFFFF)**
+- **on-primary (#FFFFFF)**
 - **border (#E8E4E3)**
-- **primary (#000000)**
+- **text (#000000)**
 
 ## Typography
 
@@ -108,32 +108,32 @@ Corner radius scale:
 ## Components
 
 ### button-primary
-- backgroundColor: `{colors.tertiary}`
-- textColor: `{colors.on-tertiary}`
+- backgroundColor: `{colors.primary}`
+- textColor: `{colors.on-primary}`
 - rounded: `{rounded.sm}`
 - padding: `12px 20px`
 
 ### button-secondary
 - backgroundColor: `transparent`
-- textColor: `{colors.tertiary}`
+- textColor: `{colors.primary}`
 - rounded: `{rounded.sm}`
 - padding: `12px 20px`
 
 ### card
 - backgroundColor: `{colors.surface}`
-- textColor: `{colors.primary}`
+- textColor: `{colors.text}`
 - rounded: `{rounded.md}`
 - padding: `20px`
 
 ### input
 - backgroundColor: `{colors.surface}`
-- textColor: `{colors.primary}`
+- textColor: `{colors.text}`
 - rounded: `{rounded.sm}`
 - padding: `10px 14px`
 
 ## Do's and Don'ts
 
-- Do use the tertiary color sparingly — only for the highest-emphasis action.
+- Do use the primary color sparingly — only for the highest-emphasis action.
 - Don't combine more than two type families on a single screen.
 - Don't use full-width images without a generous bottom margin.
 - Do default to the warm neutral background; reserve pure white for cards.

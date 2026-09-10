@@ -6,12 +6,13 @@ export interface RoleDefinition {
   permissions: {
     userMgt: { read: boolean; create: boolean; update: boolean; delete: boolean }
     taskApproval: { read: boolean; create: boolean; update: boolean; delete: boolean }
+    catalog: { read: boolean; create: boolean; update: boolean; delete: boolean }
     financials: { read: boolean; create: boolean; update: boolean; delete: boolean }
     systemLogs: { read: boolean; create: boolean; update: boolean; delete: boolean }
   }
 }
 
-export type PermModuleKey = 'userMgt' | 'taskApproval' | 'financials' | 'systemLogs'
+export type PermModuleKey = 'userMgt' | 'taskApproval' | 'catalog' | 'financials' | 'systemLogs'
 export type PermActionKey = 'read' | 'create' | 'update' | 'delete'
 
 export interface PermCategory {
@@ -35,6 +36,12 @@ export const PERMISSION_CATEGORIES: PermCategory[] = [
     actions: ['read', 'create', 'update', 'delete'],
   },
   {
+    key: 'cat_catalog',
+    module: 'catalog',
+    nameKey: 'roles.cat_catalog',
+    actions: ['read', 'create', 'update', 'delete'],
+  },
+  {
     key: 'cat_financials',
     module: 'financials',
     nameKey: 'roles.cat_financials',
@@ -52,11 +59,12 @@ export const mockRoles: RoleDefinition[] = [
   {
     id: 'admin',
     name: { vi: 'Admin', en: 'Admin' },
-    desc: { vi: 'Toàn quyền quản trị nền tảng, AI MLOps và cấu hình hệ thống', en: 'Full platform governance, AI MLOps, and system configuration' },
+    desc: { vi: 'Toàn quyền quản trị nền tảng, phê duyệt cấp cao, AI MLOps và cấu hình hệ thống', en: 'Full platform governance, high-level escalations, AI MLOps, and system configuration' },
     isSystemDefault: true,
     permissions: {
       userMgt: { read: true, create: true, update: true, delete: true },
       taskApproval: { read: true, create: true, update: true, delete: true },
+      catalog: { read: true, create: true, update: true, delete: true },
       financials: { read: true, create: true, update: true, delete: true },
       systemLogs: { read: true, create: true, update: true, delete: true },
     },
@@ -64,10 +72,11 @@ export const mockRoles: RoleDefinition[] = [
   {
     id: 'staff',
     name: { vi: 'Staff', en: 'Staff' },
-    desc: { vi: 'Kiểm duyệt hồ sơ vi phạm, xác minh sự cố và xử lý tái kiểm định', en: 'Moderate candidate violations, verify reports, and handle revalidation' },
+    desc: { vi: 'Kiểm duyệt hồ sơ vi phạm, xác minh tọa độ, đề xuất danh mục và xử lý tái thẩm định', en: 'Moderate candidate violations, verify spatial coordinates, propose catalog changes, and handle revalidation' },
     permissions: {
       userMgt: { read: true, create: true, update: true, delete: false },
       taskApproval: { read: true, create: true, update: true, delete: false },
+      catalog: { read: true, create: true, update: true, delete: false },
       financials: { read: true, create: false, update: false, delete: false },
       systemLogs: { read: true, create: false, update: false, delete: false },
     },
@@ -75,10 +84,11 @@ export const mockRoles: RoleDefinition[] = [
   {
     id: 'reviewer',
     name: { vi: 'Reviewer', en: 'Reviewer' },
-    desc: { vi: 'Bỏ phiếu đồng thuận xác thực biển báo và nhận điểm tin cậy', en: 'Consensus voting on traffic sign candidates with reliability scoring' },
+    desc: { vi: 'Bỏ phiếu đồng thuận xác thực ứng viên biển báo, tích lũy điểm tin cậy và nhận thưởng', en: 'Consensus voting on traffic sign candidates with reliability scoring and reward payout' },
     permissions: {
       userMgt: { read: false, create: false, update: false, delete: false },
       taskApproval: { read: true, create: true, update: false, delete: false },
+      catalog: { read: true, create: false, update: false, delete: false },
       financials: { read: true, create: false, update: false, delete: false },
       systemLogs: { read: false, create: false, update: false, delete: false },
     },
@@ -86,10 +96,11 @@ export const mockRoles: RoleDefinition[] = [
   {
     id: 'surveyor',
     name: { vi: 'Surveyor', en: 'Surveyor' },
-    desc: { vi: 'Tải lên video hành trình, tạo hành trình và nhận thưởng khảo sát', en: 'Upload dashcam trip footage, submit surveys, and earn rewards' },
+    desc: { vi: 'Tải lên video hành trình dashcam kèm file GPX, đóng góp tọa độ và nhận credits', en: 'Upload dashcam video with companion GPX trajectories, contribute coordinates, and earn credits' },
     permissions: {
       userMgt: { read: false, create: false, update: false, delete: false },
       taskApproval: { read: true, create: false, update: false, delete: false },
+      catalog: { read: true, create: false, update: false, delete: false },
       financials: { read: true, create: false, update: false, delete: false },
       systemLogs: { read: false, create: false, update: false, delete: false },
     },
@@ -97,10 +108,11 @@ export const mockRoles: RoleDefinition[] = [
   {
     id: 'driver',
     name: { vi: 'Driver', en: 'Driver' },
-    desc: { vi: 'Dẫn đường cảnh báo biển báo thực tế và nộp báo cáo sự cố', en: 'Live road sign navigation and submit road hazard reports' },
+    desc: { vi: 'Dẫn đường cảnh báo biển báo thực tế, nộp báo cáo sai lệch và tiêu dùng credits', en: 'Live road sign navigation, voice alerts, hazard reporting, and spending wallet credits' },
     permissions: {
       userMgt: { read: false, create: false, update: false, delete: false },
       taskApproval: { read: false, create: false, update: false, delete: false },
+      catalog: { read: true, create: false, update: false, delete: false },
       financials: { read: true, create: false, update: false, delete: false },
       systemLogs: { read: false, create: false, update: false, delete: false },
     },

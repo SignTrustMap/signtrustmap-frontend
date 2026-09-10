@@ -1,8 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  BackHandler,
+  PanResponder,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { NavigationManeuverBanner } from '@/components/navigation-maneuver-banner';
@@ -21,6 +34,10 @@ import { getRouteStopCoordinates } from '../utils/route-stop-markers';
 
 type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
 
+const SHEET_DRAG_ACTIVATION_DISTANCE = 6;
+const SHEET_DRAG_SETTLE_DISTANCE = 72;
+const SHEET_FLING_VELOCITY = 0.45;
+
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   try {
     // Guarded require keeps Expo Go or stale native builds on the manual-start path.
@@ -38,6 +55,7 @@ async function getNativeGpsStart(): Promise<MapCoordinate | null> {
 
 export function NavigationMapScreen() {
   const router = useRouter();
+  const { height: windowHeight } = useWindowDimensions();
   const { destinationId, startId, startLat, startLng } = useLocalSearchParams<{
     destinationId?: string;
     startId?: string;
@@ -57,6 +75,8 @@ export function NavigationMapScreen() {
     selectedDestination && routeStart
       ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}`
       : undefined;
+
+
   const [routeResult, setRouteResult] = useState<{
     coordinates: MapCoordinate[];
     distance: number;
@@ -75,6 +95,7 @@ export function NavigationMapScreen() {
   const [mapFocus, setMapFocus] = useState<{ coordinate: MapCoordinate; requestId: number }>();
   const [navigationError, setNavigationError] = useState<string>();
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const routeCoordinates =
     routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
   const routeDistance = routeResult && routeResult.key === routeKey ? routeResult.distance : undefined;
@@ -85,6 +106,77 @@ export function NavigationMapScreen() {
     [routeCoordinates],
   );
   const isNavigating = Boolean(routeKey && navigationSession?.routeKey === routeKey);
+  const [isSheetExpanded, setIsSheetExpanded] = useState(false);
+  const sheetProgress = useRef(new Animated.Value(0)).current;
+  const sheetExpandedRef = useRef(false);
+  const sheetGestureStart = useRef(0);
+  const sheetGestureStartedExpanded = useRef(false);
+  const collapsedRouteSheetHeight = Math.max(200, Math.min(230, windowHeight * 0.28));
+  const expandedRouteSheetHeight = Math.max(
+    collapsedRouteSheetHeight,
+    Math.min(560, windowHeight * 0.68),
+  );
+  const routeSheetTravel = Math.max(
+    1,
+    expandedRouteSheetHeight - collapsedRouteSheetHeight,
+  );
+  const routeSheetHeight = sheetProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [collapsedRouteSheetHeight, expandedRouteSheetHeight],
+  });
+  const animateRouteSheet = useCallback((expanded: boolean) => {
+    sheetExpandedRef.current = expanded;
+    setIsSheetExpanded(expanded);
+    Animated.spring(sheetProgress, {
+      damping: 22,
+      mass: 0.8,
+      stiffness: 220,
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false,
+    }).start();
+  }, [sheetProgress]);
+  const routeSheetPanResponder = useMemo(
+    () => PanResponder.create({
+      // Own the handle gesture from touch-down. Pressable otherwise keeps the
+      // responder and turns a drag into a tap on some native platforms.
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        sheetGestureStartedExpanded.current = sheetExpandedRef.current;
+        sheetGestureStart.current = sheetExpandedRef.current ? 1 : 0;
+        sheetProgress.stopAnimation((progress) => {
+          sheetGestureStart.current = progress;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const nextProgress = sheetGestureStart.current - gesture.dy / routeSheetTravel;
+        sheetProgress.setValue(Math.max(0, Math.min(1, nextProgress)));
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const isTap =
+          Math.abs(gesture.dx) < SHEET_DRAG_ACTIVATION_DISTANCE &&
+          Math.abs(gesture.dy) < SHEET_DRAG_ACTIVATION_DISTANCE;
+
+        if (isTap) {
+          animateRouteSheet(!sheetGestureStartedExpanded.current);
+          return;
+        }
+
+        const passedDistanceThreshold = Math.abs(gesture.dy) >= SHEET_DRAG_SETTLE_DISTANCE;
+        const passedVelocityThreshold = Math.abs(gesture.vy) >= SHEET_FLING_VELOCITY;
+
+        if (passedDistanceThreshold || passedVelocityThreshold) {
+          animateRouteSheet(passedVelocityThreshold ? gesture.vy < 0 : gesture.dy < 0);
+          return;
+        }
+
+        animateRouteSheet(sheetGestureStartedExpanded.current);
+      },
+      onPanResponderTerminate: () => {
+        animateRouteSheet(sheetGestureStartedExpanded.current);
+      },
+    }),
+    [animateRouteSheet, routeSheetTravel, sheetProgress],
+  );
   const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
   const visibleStopSignCoordinates = isNavigating
     ? navigationSession?.stopSignCoordinates ?? []
@@ -169,6 +261,17 @@ export function NavigationMapScreen() {
     }
   }, [hasLiveLocation]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isSheetExpanded) return;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      animateRouteSheet(false);
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [animateRouteSheet, isSheetExpanded]);
+
   const handleBeginNavigation = async () => {
     if (Platform.OS === 'web' || !selectedDestination || !routeStart || !routeKey) return;
 
@@ -208,7 +311,7 @@ export function NavigationMapScreen() {
     }
   };
 
-  const handleUseCurrentLocation = async () => {
+  const handleCurrentLocation = async () => {
     if (isLocating) return;
 
     setIsLocating(true);
@@ -248,22 +351,13 @@ export function NavigationMapScreen() {
     }
   };
 
-  const handleBackToDriverHome = () => {
-    router.replace('/home');
+  const handleTurnOnSpeaker = async () => {
+    setIsSpeakerOn((current) => !current);
   };
 
-  const handleBackToDestinationInput = () => {
-    router.replace({
-      pathname: '/home/search',
-      params: {
-        ...(startId ? { startId } : {}),
-        ...(startLat && startLng ? { startLat, startLng } : {}),
-      },
-    });
-  };
 
   const handleChangeDestination = () => {
-    router.push({
+    router.replace({
       pathname: '/home/search',
       params: {
         ...(startId ? { startId } : {}),
@@ -323,6 +417,25 @@ export function NavigationMapScreen() {
     });
   };
 
+  const handleShareDestination = async () => {
+    if (!selectedDestination) return;
+
+    const [longitude, latitude] = selectedDestination.coordinate;
+    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+
+    try {
+      await Share.share({
+        message: `${selectedDestination.title}\n${mapUrl}`,
+        title: selectedDestination.title,
+      });
+    } catch {
+      setLocationToast((current) => ({
+        id: (current?.id ?? 0) + 1,
+        message: 'Unable to share this destination right now.',
+      }));
+    }
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <View style={styles.map}>
@@ -353,23 +466,13 @@ export function NavigationMapScreen() {
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
             <View style={styles.topControls}>
               {selectedDestination && routeStart ? (
-                <>
+                <View style={styles.routeInputGroup}>
                   <View
                     style={[
                       styles.routeInput,
                       { backgroundColor: theme.backgroundElement },
                     ]}
                   >
-                    <AppButton
-                      accessibilityLabel="Back to driver home"
-                      hitSlop={Spacing.one}
-                      onPress={handleBackToDriverHome}
-                      pressedOpacity={0.7}
-                      style={styles.routeInputBackButton}
-                      variant="ghost"
-                    >
-                      <Text style={[styles.routeInputBackIcon, { color: theme.text }]}>{'<'}</Text>
-                    </AppButton>
                     <AppButton
                       accessibilityLabel="Change starting point"
                       onPress={() => router.push({
@@ -379,7 +482,11 @@ export function NavigationMapScreen() {
                       style={styles.routeInputContentButton}
                       variant="ghost"
                     >
-                      <Text style={[styles.routeInputIcon, { color: theme.tertiary }]}>G</Text>
+                      <AntDesign
+                        name="pushpin"
+                        size={17}
+                        color={theme.primary}
+                      />
                       <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
                         {routeStartTitle}
                       </Text>
@@ -388,25 +495,21 @@ export function NavigationMapScreen() {
                   <View
                     style={[
                       styles.selectedDestinationInput,
-                      { backgroundColor: theme.backgroundElement },
+                      { backgroundColor: theme.background, borderColor: theme.primary },
                     ]}
                   >
-                    <AppButton
-                      accessibilityLabel="Back to destination input"
-                      hitSlop={Spacing.one}
-                      onPress={handleBackToDestinationInput}
-                      pressedOpacity={0.7}
-                      style={styles.inlineBackButton}
-                      variant="ghost"
-                    >
-                      <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
-                    </AppButton>
+
                     <AppButton
                       accessibilityLabel="Change destination"
                       onPress={handleChangeDestination}
                       style={styles.destinationNameButton}
                       variant="ghost"
                     >
+                      <AntDesign
+                        color={theme.primary}
+                        name="pushpin"
+                        size={17}
+                      />
                       <Text
                         ellipsizeMode="tail"
                         numberOfLines={1}
@@ -416,30 +519,21 @@ export function NavigationMapScreen() {
                       </Text>
                     </AppButton>
                   </View>
-                </>
+                </View>
               ) : selectedDestination ? (
                 <View
                   style={[
                     styles.selectedDestinationInput,
-                    { backgroundColor: theme.backgroundElement },
+                    { backgroundColor: theme.background, borderColor: theme.text },
                   ]}
                 >
-                  <AppButton
-                    accessibilityLabel="Back to destination input"
-                    hitSlop={Spacing.one}
-                    onPress={handleBackToDestinationInput}
-                    pressedOpacity={0.7}
-                    style={styles.inlineBackButton}
-                    variant="ghost"
-                  >
-                    <Text style={[styles.backIcon, { color: theme.text }]}>{'<'}</Text>
-                  </AppButton>
                   <AppButton
                     accessibilityLabel="Change destination"
                     onPress={handleChangeDestination}
                     style={styles.destinationNameButton}
                     variant="ghost"
                   >
+
                     <Text
                       ellipsizeMode="tail"
                       numberOfLines={1}
@@ -450,46 +544,78 @@ export function NavigationMapScreen() {
                   </AppButton>
                 </View>
               ) : (
-                <AppButton
-                  accessibilityLabel="Search destination"
-                  onPress={() => router.push('/home/search')}
-                  style={styles.searchButton}
-                  variant="surface"
+                <View
+                  style={[
+                    styles.searchBar,
+                    { backgroundColor: theme.backgroundElement },
+                  ]}
                 >
-                  <Text numberOfLines={1} style={[styles.searchText, { color: theme.text }]}>
-                    Search here...
-                  </Text>
-                </AppButton>
+                  <AppButton
+                    accessibilityLabel="Search destination"
+                    onPress={() => router.push('/home/search')}
+                    style={styles.searchButton}
+                    variant="ghost"
+                  >
+                    <Image
+                      accessibilityLabel="App logo"
+                      source={require('@/assets/images/app-logo.svg')}
+                      style={styles.appLogo}
+                    />
+                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                      Search here...
+                    </Text>
+                  </AppButton>
+
+                  <AppButton
+                    accessibilityLabel="Add credits. Current balance: 24"
+                    onPress={() => router.push('/credits/top-up')}
+                    pressedOpacity={0.68}
+                    style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
+                    <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                      <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                    </View>
+                  </AppButton>
+                </View>
               )}
             </View>
             {!selectedDestination ? (
               <View style={styles.mapActions}>
                 <AppButton
-                  accessibilityLabel={isLocating ? 'Getting current location' : 'Use current location'}
-                  disabled={isLocating}
-                  onPress={handleUseCurrentLocation}
+                  accessibilityLabel={isSpeakerOn ? 'Turn on speaker' : 'Turn off speaker'}
+                  onPress={handleTurnOnSpeaker}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.tertiary },
+                    { backgroundColor: isSpeakerOn ? theme.backgroundElement : '#ddd', borderColor: theme.border },
                   ]}
                   variant="surface"
                 >
-                  <SymbolView
-                    name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                    size={22}
-                    tintColor={theme.tertiary}
-                  />
+                  {isSpeakerOn ? (
+                    <AntDesign
+                      name='audio'
+                      size={22}
+                      tintColor={theme.primary}
+                    />
+                  ) : (
+                    <AntDesign
+                      name='audio-muted'
+                      size={22}
+                      tintColor={theme.primary}
+                    />
+                  )}
                 </AppButton>
                 <AppButton
                   accessibilityLabel="Search destination"
-                  onPress={() => router.push('/home/search')}
+                  onPress={handleCurrentLocation}
                   style={styles.mapActionButton}
                 >
                   <SymbolView
-                    name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
+                    name={{ android: 'my_location', ios: 'location.fill' }}
                     size={22}
-                    tintColor={theme.onTertiary}
+                    tintColor={theme.onPrimary}
                   />
                 </AppButton>
               </View>
@@ -498,101 +624,154 @@ export function NavigationMapScreen() {
         ) : null}
       </View>
 
-      {selectedDestination ? (
-        <View
-          style={[
-            styles.destinationSheet,
-            routeStart ? styles.routeDestinationSheet : undefined,
-            { backgroundColor: theme.backgroundElement },
-          ]}
-        >
-          <View style={styles.destinationSheetHandle} />
-          <Text
-            numberOfLines={1}
-            style={[styles.destinationTitle, { color: theme.text }]}
+      {
+        selectedDestination ? (
+          <Animated.View
+            style={[
+              styles.destinationSheet,
+              routeStart ? styles.routeDestinationSheet : undefined,
+              routeStart ? { height: routeSheetHeight } : undefined,
+              { backgroundColor: theme.backgroundElement },
+            ]}
           >
-            {selectedDestination.title}
-          </Text>
-          {navigationError ? (
-            <Text accessibilityRole="alert" style={styles.navigationError}>
-              {navigationError}
-            </Text>
-          ) : null}
-          {routeStart ? (
-            <View style={styles.directionsSection}>
-              {routeDuration !== undefined && routeDistance !== undefined ? (
-                <Text style={[styles.routeSummary, { color: theme.text }]}>
-                  ETA {formatRouteDuration(routeDuration)} (
-                  {formatRouteDistanceInKilometers(routeDistance)})
-                </Text>
-              ) : (
-                <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
-                  Calculating ETA...
-                </Text>
-              )}
-              <Text style={[styles.directionsHeading, { color: theme.text }]}>Sections:</Text>
-              {routeSteps ? (
-                routeSteps.length > 0 ? (
-                  <ScrollView
-                    contentContainerStyle={styles.directionsList}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                    style={styles.directionsScroll}
-                  >
-                    {routeSteps.map((step, index) => (
-                      <View
-                        key={`${index}-${step.maneuver.type}-${step.name}`}
-                        style={styles.directionRow}
-                      >
-                        <Text style={[styles.directionNumber, { color: theme.tertiary }]}>
-                          {index + 1}
-                        </Text>
-                        <View style={styles.directionCopy}>
-                          <Text style={[styles.directionInstruction, { color: theme.text }]}>
-                            {formatRouteInstruction(step)}
-                          </Text>
-                          <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
-                            {formatRouteDistance(step.distance)}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                    No turn-by-turn directions are available for this route.
-                  </Text>
-                )
-              ) : (
-                <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                  Loading directions...
-                </Text>
-              )}
+            <View
+              accessibilityActions={routeStart ? [{ name: 'activate' }] : undefined}
+              accessibilityHint={
+                routeStart ? 'Drag or tap to expand and collapse route directions' : undefined
+              }
+              accessibilityLabel={isSheetExpanded ? 'Collapse route details' : 'Expand route details'}
+              accessibilityRole="button"
+              accessible={Boolean(routeStart)}
+              hitSlop={Spacing.one}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'activate') {
+                  animateRouteSheet(!sheetExpandedRef.current);
+                }
+              }}
+              style={styles.destinationSheetHandleButton}
+              {...(routeStart ? routeSheetPanResponder.panHandlers : {})}
+            >
+              <View style={styles.destinationSheetHandle} />
             </View>
-          ) : null}
-          <AppButton
-            accessibilityLabel={
-              isNavigating
-                ? 'Navigation active'
-                : routeStart
-                  ? 'Begin navigation'
-                  : 'Start route'
-            }
-            disabled={isNavigating || isStartingNavigation}
-            label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
-            onPress={routeStart ? handleBeginNavigation : handleGo}
-            style={styles.goButton}
+            {routeStart ? (
+              <>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.destinationTitle, { color: theme.text }]}
+                >
+                  {selectedDestination.title}
+                </Text>
+                {navigationError ? (
+                  <Text accessibilityRole="alert" style={styles.navigationError}>
+                    {navigationError}
+                  </Text>
+                ) : null}
+                <View style={styles.directionsSection}>
+                  {routeDuration !== undefined && routeDistance !== undefined ? (
+                    <Text style={[styles.routeSummary, { color: theme.text }]}>
+                      Time of arrival: {formatRouteDuration(routeDuration)} (
+                      {formatRouteDistanceInKilometers(routeDistance)})
+                    </Text>
+                  ) : (
+                    <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
+                      Calculating ETA...
+                    </Text>
+                  )}
+                  <Text style={[styles.directionsHeading, { color: theme.text }]}>instructions:</Text>
+                  {routeSteps ? (
+                    routeSteps.length > 0 ? (
+                      <ScrollView
+                        contentContainerStyle={styles.directionsList}
+                        nestedScrollEnabled
+                        scrollEnabled={isSheetExpanded}
+                        showsVerticalScrollIndicator
+                        style={styles.directionsScroll}
+                      >
+                        {routeSteps.map((step, index) => (
+                          <View
+                            key={`${index}-${step.maneuver.type}-${step.name}`}
+                            style={styles.directionRow}
+                          >
+                            <Text style={[styles.directionNumber, { color: theme.primary }]}>
+                              {index + 1}
+                            </Text>
+                            <View style={styles.directionCopy}>
+                              <Text style={[styles.directionInstruction, { color: theme.text }]}>
+                                {formatRouteInstruction(step)}
+                              </Text>
+                              <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
+                                {formatRouteDistance(step.distance)}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
+                        No turn-by-turn directions are available for this route.
+                      </Text>
+                    )
+                  ) : (
+                    <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
+                      Loading directions...
+                    </Text>
+                  )}
+                </View>
+                <AppButton
+                  accessibilityLabel={isNavigating ? 'Navigation active' : 'Begin navigation'}
+                  disabled={isNavigating || isStartingNavigation}
+                  label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
+                  onPress={handleBeginNavigation}
+                  style={styles.goButton}
+                />
+              </>
+            ) : (
+              <>
+                <View style={styles.selectedPlaceSummary}>
+                  <Text style={[styles.selectedPlaceTitle, { color: theme.text }]}>
+                    {selectedDestination.title}
+                  </Text>
+                  <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+                    {selectedDestination.subtitle}
+                  </Text>
+                </View>
+                <View style={styles.destinationActions}>
+                  <AppButton
+                    accessibilityLabel="Choose a starting point and go"
+                    label="Go"
+                    onPress={handleGo}
+                    style={styles.destinationActionButton}
+                  />
+                  <AppButton
+                    accessibilityLabel={`Share ${selectedDestination.title}`}
+                    label="Share"
+                    onPress={handleShareDestination}
+                    style={[
+                      styles.destinationActionButton,
+                      {
+                        backgroundColor: theme.backgroundSelected,
+                        borderColor: 'transparent',
+                      },
+                    ]}
+                    textStyle={{ color: theme.textSecondary }}
+                    variant="surface"
+                  />
+                </View>
+              </>
+            )}
+          </Animated.View>
+        ) : null
+      }
+      {
+        locationToast ? (
+          <AppToast
+            key={locationToast.id}
+            message={locationToast.message}
+            onDismiss={() => setLocationToast(undefined)}
           />
-        </View>
-      ) : null}
-      {locationToast ? (
-        <AppToast
-          key={locationToast.id}
-          message={locationToast.message}
-          onDismiss={() => setLocationToast(undefined)}
-        />
-      ) : null}
-    </View>
+        ) : null
+      }
+    </View >
   );
 }
 
@@ -704,68 +883,125 @@ const styles = StyleSheet.create({
   locationActionButton: {
     borderWidth: 1,
   },
+  routeInputGroup: {
+    gap: Spacing.one,
+  },
   inlineBackButton: {
-    width: 44,
-    height: 44,
-    minHeight: 44,
+    width: 48,
+    height: 48,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  backIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 22,
+  antBackIcon: {
+    fontSize: 18,
     fontWeight: 700,
   },
   selectedDestinationInput: {
-    minHeight: 44,
-    borderRadius: Rounded.md,
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: Spacing.three,
+    paddingRight: Spacing.two,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 4,
+    paddingLeft: Spacing.four,
   },
   destinationNameButton: {
     flex: 1,
     minWidth: 0,
-    minHeight: 44,
-    alignItems: 'flex-start',
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: Spacing.one,
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
   destinationNameText: {
     flexShrink: 1,
     fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 700,
+    fontSize: 18,
+    fontWeight: 600,
   },
-  searchButton: {
-    minHeight: 42,
-    borderRadius: Rounded.md,
+  appLogo: {
+    width: 26,
+    height: 26,
+    objectFit: 'cover',
+  },
+  searchBar: {
+    minHeight: 58,
+    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    paddingLeft: Spacing.half,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
   },
+  searchButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 40,
+    borderRadius: Rounded.round,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 0,
+  },
+  creditContainer: {
+    alignSelf: 'stretch',
+    flexShrink: 0,
+    minHeight: 48,
+    borderRadius: Rounded.round,
+    flexDirection: 'row',
+    gap: Spacing.half,
+    paddingLeft: Spacing.two,
+    paddingRight: Spacing.half,
+    paddingVertical: 0,
+    marginLeft: Spacing.half,
+  },
+  creditText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  addCreditIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: Rounded.round,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addCreditGlyph: {
+    width: 26,
+    height: 26,
+    fontFamily: Fonts.body,
+    fontSize: 21,
+    fontWeight: 700,
+    lineHeight: 25,
+    includeFontPadding: false,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+  },
   searchText: {
     flex: 1,
     fontFamily: Fonts.body,
     fontSize: 14,
-    fontWeight: 700,
   },
   routeInput: {
     minHeight: 44,
-    borderRadius: Rounded.md,
+    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#09233C',
@@ -773,15 +1009,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 4,
-  },
-  routeInputBackButton: {
-    width: 44,
-    height: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingLeft: Spacing.four,
   },
   routeInputContentButton: {
     flex: 1,
@@ -795,11 +1023,6 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.three,
     paddingVertical: 0,
   },
-  routeInputBackIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 20,
-    fontWeight: 700,
-  },
   routeInputIcon: {
     fontFamily: Fonts.body,
     fontSize: 15,
@@ -808,19 +1031,19 @@ const styles = StyleSheet.create({
   routeInputText: {
     flex: 1,
     fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 700,
+    fontSize: 16,
+    fontWeight: 600,
   },
   destinationSheet: {
     position: 'absolute',
     right: 0,
     bottom: 0,
     left: 0,
-    borderTopLeftRadius: Rounded.lg,
-    borderTopRightRadius: Rounded.lg,
+    borderTopLeftRadius: Rounded.xlg,
+    borderTopRightRadius: Rounded.xlg,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.one,
-    paddingBottom: Spacing.two,
+    paddingBottom: Spacing.three,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.12,
@@ -828,16 +1051,44 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   routeDestinationSheet: {
-    height: '48%',
-    maxHeight: 440,
+    overflow: 'hidden',
+  },
+  destinationSheetHandleButton: {
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
   },
   destinationSheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    alignSelf: 'center',
     backgroundColor: '#D8DDE6',
-    marginBottom: Spacing.two,
+  },
+  selectedPlaceSummary: {
+    gap: Spacing.half,
+    marginBottom: Spacing.three,
+  },
+  selectedPlaceTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 29,
+  },
+  selectedPlaceDescription: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: 20,
+  },
+  destinationActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  destinationActionButton: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: Rounded.round,
   },
   destinationTitle: {
     fontFamily: Fonts.body,

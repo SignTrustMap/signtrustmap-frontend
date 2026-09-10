@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
+import PageHeader from '@/components/common/PageHeader'
 import {
   Users,
   WarningCircle,
@@ -28,7 +29,7 @@ export default function DashboardPage() {
   const { t } = useTranslation('ops')
   const isAdmin = user?.role === 'admin'
 
-  const [timeRange, setTimeRange] = useState('30 ngày qua')
+  const [timeRange, setTimeRange] = useState('30d')
   const [feedFilter, setFeedFilter] = useState('all')
 
   // Icons map for KPIs
@@ -108,41 +109,33 @@ export default function DashboardPage() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {isAdmin ? t('dashboard.admin_title') : t('dashboard.staff_title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isAdmin
-              ? t('dashboard.admin_subtitle')
-              : t('dashboard.staff_subtitle')}
-          </p>
-        </div>
+      <PageHeader
+        title={isAdmin ? t('dashboard.admin_title') : t('dashboard.staff_title')}
+        actions={
+          <>
+            {/* Time Range Custom Dropdown */}
+            <CustomSelect
+              value={timeRange}
+              onChange={setTimeRange}
+              leftIcon={<CalendarBlank size={16} />}
+              options={[
+                { value: '7d', label: t('dashboard.time_range_7') },
+                { value: '30d', label: t('dashboard.time_range_30') },
+                { value: '90d', label: t('dashboard.time_range_90') },
+              ]}
+            />
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Time Range Custom Dropdown */}
-          <CustomSelect
-            value={timeRange}
-            onChange={setTimeRange}
-            leftIcon={<CalendarBlank size={16} />}
-            options={[
-              { value: '7 ngày qua', label: t('dashboard.time_range_7') },
-              { value: '30 ngày qua', label: t('dashboard.time_range_30') },
-              { value: '90 ngày qua', label: t('dashboard.time_range_90') },
-            ]}
-          />
-
-          {/* Export Button */}
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
-          >
-            <DownloadSimple size={16} />
-            <span>{t('dashboard.export_report')}</span>
-          </button>
-        </div>
-      </div>
+            {/* Export Button */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+            >
+              <DownloadSimple size={16} />
+              <span>{t('dashboard.export_report')}</span>
+            </button>
+          </>
+        }
+      />
 
       {/* 4 KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

@@ -3,20 +3,20 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 export const Colors = {
-  primary: '#000000',
+  primary: '#0671eb',
   secondary: '#d3f7ff',
-  tertiary: '#148594',
   neutral: '#F8F7F7',
   surface: '#FFFFFF',
-  onTertiary: '#FFFFFF',
+  onPrimary: '#FFFFFF',
   border: '#E8E4E3',
   text: '#000000',
   background: '#F8F7F7',
   backgroundElement: '#FFFFFF',
-  backgroundSelected: '#d3f7ff',
+  backgroundSelected: '#E7F1FD',
   textSecondary: '#007b8b',
   placeholder: '#888888',
   danger: '#FF0000',
+  grey: '#888888',
 } as const;
 
 export type ThemeColor = keyof typeof Colors;
@@ -65,6 +65,8 @@ export const Rounded = {
   sm: 4,
   md: 8,
   lg: 12,
+  xlg: 16,
+  round: 9999,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

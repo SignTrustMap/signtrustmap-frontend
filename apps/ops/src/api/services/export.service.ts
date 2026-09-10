@@ -9,18 +9,20 @@ export interface GenerateExportDto {
   includeConfidence?: boolean
 }
 
-export class ExportService {
+export const exportService = {
   /**
    * Fetch previous spatial export jobs
    */
-  static async getExportHistory(): Promise<ApiResponse<ExportHistoryRecord[]>> {
+  getExportHistory: async (): Promise<ApiResponse<ExportHistoryRecord[]>> => {
     return http.get<ApiResponse<ExportHistoryRecord[]>>(API_ENDPOINTS.EXPORTS.HISTORY)
-  }
+  },
 
   /**
    * Request a new spatial data export bundle
    */
-  static async generateExport(data: GenerateExportDto): Promise<ApiResponse<ExportHistoryRecord>> {
+  generateExport: async (data: GenerateExportDto): Promise<ApiResponse<ExportHistoryRecord>> => {
     return http.post<ApiResponse<ExportHistoryRecord>>(API_ENDPOINTS.EXPORTS.TRIGGER, data)
-  }
+  },
 }
+
+export const ExportService = exportService

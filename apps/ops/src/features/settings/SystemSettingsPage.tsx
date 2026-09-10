@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
+import PageHeader from '@/components/common/PageHeader'
 import {
   FloppyDisk,
-  CheckCircle,
-  SlidersHorizontal,
   ShieldCheck,
   Cpu,
   ArrowsClockwise,
@@ -35,51 +35,29 @@ export default function SystemSettingsPage() {
   const [autoEscalateTieVotes, setAutoEscalateTieVotes] = useState(true)
   const [gpsAnomalySpeedLimitKmh, setGpsAnomalySpeedLimitKmh] = useState(150)
 
-  const [toast, setToast] = useState<string | null>(null)
+  const toast = useToast()
 
   function handleSave() {
-    setToast(t('settings.toast_saved'))
-    setTimeout(() => setToast(null), 3000)
+    toast.success(t('settings.toast_saved'))
   }
 
   return (
     <div className="p-6 sm:p-8 w-full max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#E8E4E3] dark:border-white/10 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de] uppercase tracking-wider mb-1">
-            <SlidersHorizontal size={16} weight="bold" />
-            <span>{t('settings.tag')}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {t('settings.title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t('settings.subtitle')}
-          </p>
-        </div>
+      <PageHeader
+        title={t('settings.title')}
+        actions={
+          <button
+            type="button"
+            onClick={handleSave}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all cursor-pointer active:scale-95"
+          >
+            <FloppyDisk size={16} weight="bold" />
+            <span>{t('settings.btn_save')}</span>
+          </button>
+        }
+      />
 
-        <button
-          type="button"
-          onClick={handleSave}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all cursor-pointer active:scale-95"
-        >
-          <FloppyDisk size={18} />
-          <span>{t('settings.btn_save')}</span>
-        </button>
-      </div>
-
-      {toast && (
-        <div
-          onClick={() => setToast(null)}
-          className="fixed top-20 right-8 z-50 bg-[#007b8b] text-white text-xs font-mono font-bold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 cursor-pointer hover:bg-[#00606d] transition-all active:scale-95 select-none"
-          title="Bấm để đóng thông báo"
-        >
-          <CheckCircle size={16} weight="bold" />
-          <span>{toast}</span>
-          <span className="ml-2 text-white/70 hover:text-white text-xs font-bold font-sans">✕</span>
-        </div>
-      )}
 
       {/* Tabs Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

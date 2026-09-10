@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { GithubLogo, XLogo, FacebookLogo, ArrowSquareOut } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { opsPortalUrl } from '@/config/env'
 
 export function Footer() {
   const { isDark } = useTheme()
@@ -16,9 +17,9 @@ export function Footer() {
     ],
     [t('footer.sections.solutions')]: [
       { label: t('footer.links.for_surveyor'), href: '/product/app' },
-      { label: t('footer.links.for_reviewer'), href: 'https://ops.signtrustmap.site', external: true },
+      { label: t('footer.links.for_reviewer'), href: opsPortalUrl, external: true },
       { label: t('footer.links.for_driver'), href: '/product/app' },
-      { label: t('footer.links.ops_portal'), href: 'https://ops.signtrustmap.site', external: true },
+      { label: t('footer.links.ops_portal'), href: opsPortalUrl, external: true },
     ],
     [t('footer.sections.docs_mlops')]: [
       { label: t('footer.links.api_docs'), href: '/docs' },

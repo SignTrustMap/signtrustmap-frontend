@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'motion/react'
 import { ArrowUp } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 
 export function ScrollToTop() {
+  const { t } = useTranslation('common')
   const { isDark } = useTheme()
   const { pathname, hash } = useLocation()
   const [isVisible, setIsVisible] = useState(false)
@@ -75,8 +77,8 @@ export function ScrollToTop() {
           }}
           type="button"
           onClick={scrollToTop}
-          aria-label="Cuộn lên đầu trang"
-          title="Cuộn lên đầu trang"
+          aria-label={t('common.scroll_to_top')}
+          title={t('common.scroll_to_top')}
           className={`fixed bottom-7 right-7 z-40 w-12 h-12 rounded-full backdrop-blur-xl border flex items-center justify-center cursor-pointer transition-all group ${
             isDark
               ? 'bg-[#061519]/90 border-white/20 hover:border-[#00c4de]/70 text-[#00c4de] hover:text-white hover:bg-[#007b8b]/40 shadow-2xl hover:shadow-[0_0_30px_rgba(0,196,222,0.35)]'
