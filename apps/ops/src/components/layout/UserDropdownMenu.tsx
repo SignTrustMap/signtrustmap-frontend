@@ -12,9 +12,10 @@ interface UserDropdownMenuProps {
   isOpen: boolean
   onClose: () => void
   onOpenProfile?: () => void
+  className?: string
 }
 
-export function UserDropdownMenu({ isOpen, onClose, onOpenProfile }: UserDropdownMenuProps) {
+export function UserDropdownMenu({ isOpen, onClose, onOpenProfile, className }: UserDropdownMenuProps) {
   const { user, logout } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
@@ -65,11 +66,11 @@ export function UserDropdownMenu({ isOpen, onClose, onOpenProfile }: UserDropdow
       ref={menuRef}
       role="menu"
       aria-label={t('nav.account_profile', { defaultValue: 'Account Profile' })}
-      className={`absolute left-3 right-3 bottom-full mb-2 rounded-2xl border shadow-xl overflow-hidden z-50 animate-fadeIn transition-all select-none p-1.5 ${
+      className={`rounded-2xl border shadow-xl overflow-hidden z-50 animate-fadeIn transition-all select-none p-1.5 ${
         isDark
           ? 'bg-[#071317] border-white/10 text-white shadow-2xl shadow-black/80 ring-1 ring-white/10'
           : 'bg-white border-[#E8E4E3] text-gray-900 shadow-xl ring-1 ring-black/5'
-      }`}
+      } ${className || 'absolute left-3 right-3 bottom-full mb-2'}`}
     >
       {/* ─── Button 1: Account Profile ─── */}
       <button

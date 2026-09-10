@@ -19,6 +19,8 @@ export interface CustomSelectProps {
   dropdownClassName?: string
   size?: 'sm' | 'md'
   disabled?: boolean
+  direction?: 'down' | 'up' | 'auto'
+  align?: 'left' | 'right'
 }
 
 export function CustomSelect({
@@ -31,11 +33,16 @@ export function CustomSelect({
   dropdownClassName = '',
   size = 'md',
   disabled = false,
+  direction = 'auto',
+  align = 'right',
 }: CustomSelectProps) {
   const { t } = useTranslation('common')
   const { isDark } = useTheme()
   const displayPlaceholder = placeholder || t('common.select_placeholder')
   const [isOpen, setIsOpen] = useState(false)
+  const [computedDirection, setComputedDirection] = useState<'down' | 'up'>(
+    direction === 'up' ? 'up' : 'down'
+  )
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedOption = options.find((opt) => opt.value === value)
@@ -69,6 +76,29 @@ export function CustomSelect({
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
+
+  // Dynamic direction calculation (dropup vs dropdown)
+  useEffect(() => {
+    if (isOpen) {
+      if (direction === 'up') {
+        setComputedDirection('up')
+      } else if (direction === 'down') {
+        setComputedDirection('down')
+      } else {
+        // Auto detection based on space below container
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect()
+          const spaceBelow = window.innerHeight - rect.bottom
+          const spaceAbove = rect.top
+          if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            setComputedDirection('up')
+          } else {
+            setComputedDirection('down')
+          }
+        }
+      }
+    }
+  }, [isOpen, direction])
 
   const sizeClasses =
     size === 'sm'
@@ -114,7 +144,9 @@ export function CustomSelect({
 
       {isOpen && (
         <div
-          className={`absolute right-0 top-full mt-1.5 min-w-full w-max max-w-[280px] rounded-2xl border shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-fadeIn ${
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
+            computedDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } min-w-full w-max max-w-[280px] rounded-2xl border shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-fadeIn ${
             isDark
               ? 'bg-[#071317]/95 border-white/15 text-gray-200 shadow-black/80'
               : 'bg-white/95 border-[#E8E4E3] text-gray-800 shadow-gray-200/80'

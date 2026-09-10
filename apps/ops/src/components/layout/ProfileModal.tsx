@@ -17,6 +17,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
+import { ModalPortal } from '@/components/common/ModalPortal'
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -126,13 +127,14 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const roleBadge = getRoleBadge(user.role)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fadeIn select-none"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="profile-modal-title"
-    >
+    <ModalPortal>
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto animate-fadeIn select-none"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+      >
       <div
         className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden my-auto transition-all ${
           isDark
@@ -145,7 +147,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/70'}`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              {/* Avatar with Status Dot */}
+              {/* Avatar */}
               <div className="relative shrink-0">
                 {user.avatar ? (
                   <img
@@ -162,7 +164,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#071317]" />
               </div>
 
               {/* Name, Role & Email */}
@@ -470,5 +471,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

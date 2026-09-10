@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
-import { mockDemoAccounts } from '@/data'
+import { mockDemoAccounts, type DemoUserAccount } from '@/data'
 
 export default function Login() {
   const { isDark } = useTheme()
@@ -23,6 +23,39 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isRevealed, setIsRevealed] = useState(false)
+  const ctrlPressTimesRef = useRef<number[]>([])
+
+  // Easter egg: Press Ctrl 5 times within 2.5 seconds to toggle visibility of secret demo account cells
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Control') {
+        if (e.repeat) return
+        const now = Date.now()
+        // Keep presses within the last 2500ms
+        const recentPresses = ctrlPressTimesRef.current.filter((time) => now - time < 2500)
+        recentPresses.push(now)
+        ctrlPressTimesRef.current = recentPresses
+
+        if (recentPresses.length >= 5) {
+          setIsRevealed((prev) => !prev)
+          ctrlPressTimesRef.current = []
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const leftAccounts = mockDemoAccounts.slice(0, 3) // Driver, Surveyor, Reviewer
+  const rightAccounts = mockDemoAccounts.slice(3) // Staff, Admin
+
+  function handleSecretFill(acc: DemoUserAccount) {
+    setEmail(acc.email)
+    setPassword(acc.password)
+    setError('')
+  }
 
   async function performLogin(targetEmail: string, targetPw: string) {
     setError('')
@@ -77,6 +110,102 @@ export default function Login() {
               : 'from-[#F8F7F7]/90 via-[#F8F7F7]/60 to-[#F8F7F7]'
           }`}
         />
+        {/* Subtle coordinate dot-grid overlay (Aligned with 48px grid cells) */}
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, #00c4de 1px, transparent 1px), linear-gradient(to right, #00c4de 1px, transparent 1px), linear-gradient(to bottom, #00c4de 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+      </div>
+
+      {/* ─── Secret Grid Edge Trigger Cells (Aligned with 48px CSS Grid) ─── */}
+      {/* Left Edge: Community Accounts (Driver, Surveyor, Reviewer) */}
+      <div
+        className={`fixed left-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-r transition-all duration-300 ${
+          isRevealed
+            ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
+            : 'border-transparent hover:border-[#00c4de]/20'
+        }`}
+        title="Demo Account Grid Cells (Ctrl x5 to toggle)"
+      >
+        {leftAccounts.map((acc) => (
+          <button
+            key={acc.id}
+            type="button"
+            onClick={() => handleSecretFill(acc)}
+            className={`group relative w-12 h-12 border transition-all duration-200 flex items-center justify-center cursor-pointer select-none ${
+              isRevealed
+                ? 'border-[#00c4de]/30 bg-[#00c4de]/10 hover:border-[#00c4de] hover:bg-[#00c4de]/25 hover:shadow-[inset_0_0_16px_rgba(0,196,222,0.35)]'
+                : 'border-transparent hover:border-[#007b8b]/60 dark:hover:border-[#00c4de]/60 hover:bg-[#00c4de]/10 hover:shadow-[inset_0_0_16px_rgba(0,196,222,0.25)]'
+            }`}
+            aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
+          >
+            {/* Role icon revealed when isRevealed or on hover */}
+            <span
+              className={`text-xl select-none transition-all duration-200 pointer-events-none ${
+                isRevealed
+                  ? 'opacity-100 scale-100 group-hover:scale-110'
+                  : 'opacity-0 group-hover:opacity-100 group-hover:scale-110'
+              }`}
+            >
+              {acc.icon}
+            </span>
+
+            {/* Inward-pointing floating tooltip */}
+            <div className="absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
+              <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
+                <span>{acc.icon}</span>
+                <span>{acc.label} • {acc.role.toUpperCase()}</span>
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Right Edge: Platform Accounts (Staff, Admin) */}
+      <div
+        className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-l transition-all duration-300 ${
+          isRevealed
+            ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
+            : 'border-transparent hover:border-[#00c4de]/20'
+        }`}
+        title="Demo Account Grid Cells (Ctrl x5 to toggle)"
+      >
+        {rightAccounts.map((acc) => (
+          <button
+            key={acc.id}
+            type="button"
+            onClick={() => handleSecretFill(acc)}
+            className={`group relative w-12 h-12 border transition-all duration-200 flex items-center justify-center cursor-pointer select-none ${
+              isRevealed
+                ? 'border-[#00c4de]/30 bg-[#00c4de]/10 hover:border-[#00c4de] hover:bg-[#00c4de]/25 hover:shadow-[inset_0_0_16px_rgba(0,196,222,0.35)]'
+                : 'border-transparent hover:border-[#007b8b]/60 dark:hover:border-[#00c4de]/60 hover:bg-[#00c4de]/10 hover:shadow-[inset_0_0_16px_rgba(0,196,222,0.25)]'
+            }`}
+            aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
+          >
+            {/* Role icon revealed when isRevealed or on hover */}
+            <span
+              className={`text-xl select-none transition-all duration-200 pointer-events-none ${
+                isRevealed
+                  ? 'opacity-100 scale-100 group-hover:scale-110'
+                  : 'opacity-0 group-hover:opacity-100 group-hover:scale-110'
+              }`}
+            >
+              {acc.icon}
+            </span>
+
+            {/* Inward-pointing floating tooltip */}
+            <div className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
+              <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
+                <span>{acc.icon}</span>
+                <span>{acc.label} • {acc.role.toUpperCase()}</span>
+              </span>
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* Main Container */}
@@ -107,9 +236,6 @@ export default function Login() {
                 Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
               </span>
             </h1>
-            <p className={`text-xs sm:text-sm mt-1.5 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {t('auth.login.subtitle')}
-            </p>
           </div>
 
           {/* Form */}
@@ -241,42 +367,6 @@ export default function Login() {
               <img src="/brand/google-g.png" alt="Google" className="w-5 h-5 object-contain" />
               <span>{t('auth.login.google')}</span>
             </button>
-
-            {/* Quick Demo Logins (Fills in credentials like in Ops) */}
-            <div
-              className={`mt-4 pt-4 border-t text-left ${
-                isDark ? 'border-white/10' : 'border-gray-100'
-              }`}
-            >
-              <p className={`text-xs font-bold uppercase tracking-wider font-mono mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                {t('auth.login.dev_quick')}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {mockDemoAccounts.map((acc) => (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => {
-                      setEmail(acc.email)
-                      setPassword(acc.password)
-                      setError('')
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer active:scale-95 ${
-                      email === acc.email
-                        ? isDark
-                          ? 'bg-[#00c4de]/20 border-[#00c4de]/60 text-[#00c4de]'
-                          : 'bg-[#007b8b]/15 border-[#007b8b]/50 text-[#007b8b]'
-                        : isDark
-                        ? 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-200'
-                        : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-700'
-                    }`}
-                  >
-                    <span>{acc.icon}</span>
-                    <span>{acc.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </form>
 
           {/* Footer switch link */}
@@ -294,6 +384,44 @@ export default function Login() {
             >
               {t('auth.login.go_signup')}
             </Link>
+          </div>
+        </div>
+
+        {/* ─── Mobile/Tablet subtle bottom corners fallback ─── */}
+        <div className="md:hidden flex items-center justify-between w-full px-3 mt-3">
+          <div className="flex gap-2">
+            {leftAccounts.map((acc) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => handleSecretFill(acc)}
+                className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${
+                  isRevealed
+                    ? 'border-[#00c4de]/40 bg-[#00c4de]/15 opacity-100'
+                    : 'border-transparent active:border-[#00c4de]/40 active:bg-[#00c4de]/10 opacity-10 hover:opacity-100'
+                }`}
+                title={acc.label}
+              >
+                <span className="text-xs">{acc.icon}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {rightAccounts.map((acc) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => handleSecretFill(acc)}
+                className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${
+                  isRevealed
+                    ? 'border-[#00c4de]/40 bg-[#00c4de]/15 opacity-100'
+                    : 'border-transparent active:border-[#00c4de]/40 active:bg-[#00c4de]/10 opacity-10 hover:opacity-100'
+                }`}
+                title={acc.label}
+              >
+                <span className="text-xs">{acc.icon}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

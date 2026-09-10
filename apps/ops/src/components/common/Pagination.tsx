@@ -219,6 +219,8 @@ export function Pagination({
         <div className="order-3 flex items-center gap-1.5 text-xs">
           <CustomSelect
             size="sm"
+            direction="up"
+            align="right"
             value={String(pageSize)}
             onChange={(val) => onPageSizeChange(Number(val))}
             options={pageSizeOptions.map((sz) => ({

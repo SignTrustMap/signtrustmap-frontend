@@ -35,12 +35,16 @@ function AiMarqueeLogos() {
         <div className="animate-marquee flex items-center gap-12 sm:gap-16 py-2">
           {/* First set of logos */}
           {sponsorList.map((s) => (
-            <div
+            <a
               key={`logo-1-${s.id}`}
-              className={`flex items-center gap-3 transition-colors cursor-default shrink-0 group ${
+              href={s.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-3 transition-all cursor-pointer shrink-0 group ${
                 isDark ? 'text-gray-300 hover:text-[#00c4de]' : 'text-gray-700 hover:text-[#007b8b]'
               }`}
               title={s.label}
+              aria-label={s.label}
             >
               <img
                 src={s.logoUrl}
@@ -60,17 +64,21 @@ function AiMarqueeLogos() {
               >
                 {s.name}
               </span>
-            </div>
+            </a>
           ))}
 
           {/* Duplicate set of logos for seamless infinite loop */}
           {sponsorList.map((s) => (
-            <div
+            <a
               key={`logo-2-${s.id}`}
-              className={`flex items-center gap-3 transition-colors cursor-default shrink-0 group ${
+              href={s.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex items-center gap-3 transition-all cursor-pointer shrink-0 group ${
                 isDark ? 'text-gray-300 hover:text-[#00c4de]' : 'text-gray-700 hover:text-[#007b8b]'
               }`}
               title={s.label}
+              aria-label={s.label}
             >
               <img
                 src={s.logoUrl}
@@ -90,7 +98,7 @@ function AiMarqueeLogos() {
               >
                 {s.name}
               </span>
-            </div>
+            </a>
           ))}
 
         </div>

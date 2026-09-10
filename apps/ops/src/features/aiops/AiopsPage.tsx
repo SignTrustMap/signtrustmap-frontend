@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
+import PageHeader from '@/components/common/PageHeader'
 import {
   Brain,
   Pause,
@@ -18,7 +19,6 @@ import {
   SlidersHorizontal,
   Tag,
   Package,
-  MagnifyingGlass,
   FloppyDisk,
   FileCode,
   Sparkle,
@@ -29,6 +29,7 @@ import {
   GearSix,
   Check,
 } from '@phosphor-icons/react'
+import { SearchBar } from '@/components/common/SearchBar'
 import {
   AiopsService,
   type SystemHardwareMetrics,
@@ -237,38 +238,29 @@ export default function AiopsPage() {
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8E4E3] dark:border-white/10 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de] uppercase tracking-wider mb-1">
-            <Brain size={16} weight="bold" />
-            <span>{t('mlops.tag')}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {t('mlops.title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t('mlops.subtitle')}
-          </p>
-        </div>
-      </div>
+      {/* Page Title Only - Clean & Minimalist */}
+      <PageHeader title={t('mlops.title')} />
 
-      {/* 5 Active Real API Navigation Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-white/10 pb-2">
+      {/* Sleek Segmented Tab Navigation Bar */}
+      <div className="p-1 bg-neutral-100 dark:bg-neutral-900/80 border border-neutral-200/80 dark:border-white/10 rounded-2xl inline-flex flex-wrap items-center gap-1 shadow-2xs max-w-full overflow-x-auto">
         {/* Tab 1: Live Hardware Telemetry */}
         <button
           type="button"
           onClick={() => setActiveTab('metrics')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'metrics'
-              ? 'bg-[#007b8b] text-white shadow-xs'
-              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Broadcast size={16} weight="bold" />
+          <Broadcast
+            size={15}
+            weight={activeTab === 'metrics' ? 'bold' : 'regular'}
+            className={activeTab === 'metrics' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
+          />
           <span>{t('mlops.tab_metrics')}</span>
           {isStreaming && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5 shrink-0" />
           )}
         </button>
 
@@ -276,16 +268,20 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('models')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'models'
-              ? 'bg-[#007b8b] text-white shadow-xs'
-              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Package size={16} weight="bold" />
+          <Package
+            size={15}
+            weight={activeTab === 'models' ? 'bold' : 'regular'}
+            className={activeTab === 'models' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
+          />
           <span>{t('mlops.tab_models')}</span>
           {modelsData && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-purple-500/20 text-purple-700 dark:text-purple-300">
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
               {modelsData.total_detectors + modelsData.total_classifiers}
             </span>
           )}
@@ -295,13 +291,17 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('active-learning')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'active-learning'
-              ? 'bg-[#007b8b] text-white shadow-xs'
-              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <SlidersHorizontal size={16} weight="bold" />
+          <SlidersHorizontal
+            size={15}
+            weight={activeTab === 'active-learning' ? 'bold' : 'regular'}
+            className={activeTab === 'active-learning' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
+          />
           <span>{t('mlops.tab_active_learning')}</span>
         </button>
 
@@ -309,16 +309,20 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('classes')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'classes'
-              ? 'bg-[#007b8b] text-white shadow-xs'
-              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Tag size={16} weight="bold" />
+          <Tag
+            size={15}
+            weight={activeTab === 'classes' ? 'bold' : 'regular'}
+            className={activeTab === 'classes' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
+          />
           <span>{t('mlops.tab_classes')}</span>
           {classesData && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-teal-500/20 text-teal-700 dark:text-teal-300">
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
               {classesData.total}
             </span>
           )}
@@ -328,13 +332,17 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('config')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === 'config'
-              ? 'bg-[#007b8b] text-white shadow-xs'
-              : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <GearSix size={16} weight="bold" />
+          <GearSix
+            size={15}
+            weight={activeTab === 'config' ? 'bold' : 'regular'}
+            className={activeTab === 'config' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
+          />
           <span>{t('mlops.tab_config')}</span>
         </button>
       </div>
@@ -1010,16 +1018,13 @@ export default function AiopsPage() {
               </div>
             </div>
 
-            <div className="relative w-full sm:w-80">
-              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={t('mlops.classes_search_placeholder')}
-                value={classesSearch}
-                onChange={(e) => setClassesSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs font-mono bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-[#00c4de]"
-              />
-            </div>
+            <SearchBar
+              value={classesSearch}
+              onChange={setClassesSearch}
+              placeholder={t('mlops.classes_search_placeholder')}
+              className="w-full sm:w-80"
+              inputClassName="font-mono"
+            />
           </div>
 
           {/* Classes Table */}
@@ -1147,27 +1152,27 @@ export default function AiopsPage() {
               /* SUBSYSTEMS OVERVIEW VIEW */
               <div className="space-y-6">
                 {/* 1. ROOT CENTRAL NODE */}
-                <div className="p-5 bg-linear-to-r from-teal-900/40 via-[#0A171C] to-purple-900/40 border-2 border-[#007b8b]/40 rounded-2xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-5 bg-white dark:bg-[#0A171C] border border-neutral-200/80 dark:border-white/10 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
-                    <div className="p-3 rounded-xl bg-[#007b8b] text-white shadow-md shrink-0">
-                      <Brain size={28} weight="fill" />
+                    <div className="w-11 h-11 rounded-xl bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center shrink-0">
+                      <Brain size={24} weight="duotone" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-[#00c4de] uppercase tracking-wider">{t('mlops.config_root_badge')}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300">{t('mlops.config_subsystems_active')}</span>
-                      </div>
-                      <h3 className="text-lg font-extrabold text-white">
+                      <h3 className="text-base font-bold text-neutral-900 dark:text-white">
                         {t('mlops.config_root_node')}
                       </h3>
-                      <p className="text-xs font-mono text-gray-400">
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 font-mono">
                         {t('mlops.config_root_desc')}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-white/10 text-gray-200 border border-white/15">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {t('mlops.config_subsystems_active')}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 border border-neutral-200/80 dark:border-white/10">
                       Orin GPU Device: #{configData.system.default_device}
                     </span>
                   </div>

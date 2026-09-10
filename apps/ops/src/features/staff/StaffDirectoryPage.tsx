@@ -3,12 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
 import { Pagination } from '@/components/common/Pagination'
-import {
-  MagnifyingGlass,
-  UserPlus,
-  MapPin,
-  Funnel,
-} from '@phosphor-icons/react'
+import { DataFilterBar } from '@/components/common/DataFilterBar'
+import PageHeader from '@/components/common/PageHeader'
+import { UserPlus, Funnel, MapPin } from '@phosphor-icons/react'
 import { mockSystemUsers, type SystemUser, type StaffStatus } from '@/data'
 
 function StatusDot({ status }: { status: StaffStatus }) {
@@ -97,91 +94,67 @@ export default function StaffDirectoryPage() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {t('staff.title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {t('staff.subtitle')}
-          </p>
+      <PageHeader
+        title={t('staff.title')}
+        actions={
+          <button
+            type="button"
+            onClick={() => navigate('/staff/new')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+          >
+            <UserPlus size={16} weight="bold" />
+            <span>{t('staff.btn_add_user')}</span>
+          </button>
+        }
+      />
+
+      {/* Filter Bar */}
+      <DataFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('staff.search_placeholder')}
+      >
+        <div className="w-36 sm:w-44">
+          <CustomSelect
+            value={roleFilter}
+            onChange={setRoleFilter}
+            className="w-full"
+            buttonClassName="w-full"
+            options={[
+              { value: 'all', label: t('staff.role_all') },
+              { value: 'Admin', label: 'Admin' },
+              { value: 'Staff', label: 'Staff' },
+              { value: 'Reviewer', label: 'Reviewer' },
+              { value: 'Surveyor', label: 'Surveyor' },
+              { value: 'Driver', label: 'Driver' },
+            ]}
+          />
+        </div>
+
+        <div className="w-36 sm:w-44">
+          <CustomSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            className="w-full"
+            buttonClassName="w-full"
+            options={[
+              { value: 'all', label: t('staff.status_all') },
+              { value: 'Active', label: t('staff.status_active') },
+              { value: 'Suspended', label: t('staff.status_suspended') },
+              { value: 'Inactive', label: t('staff.status_inactive') },
+            ]}
+          />
         </div>
 
         <button
           type="button"
-          onClick={() => navigate('/staff/new')}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all active:scale-95 cursor-pointer"
+          onClick={handleClearFilters}
+          className="py-2 px-3 border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300 rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
         >
-          <UserPlus size={16} weight="bold" />
-          <span>{t('staff.btn_add_user')}</span>
+          <Funnel size={14} />
+          <span>{t('staff.btn_clear_filter')}</span>
         </button>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-5 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-          {/* Search */}
-          <div className="sm:col-span-4 relative">
-            <MagnifyingGlass
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder={t('staff.search_placeholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-white dark:bg-[#061115] border border-[#E8E4E3] dark:border-white/15 rounded-lg focus:outline-none focus:border-[#00c4de]"
-            />
-          </div>
-
-          {/* Role Filter */}
-          <div className="sm:col-span-3">
-            <CustomSelect
-              value={roleFilter}
-              onChange={setRoleFilter}
-              className="w-full"
-              buttonClassName="w-full"
-              options={[
-                { value: 'all', label: t('staff.role_all') },
-                { value: 'Admin', label: 'Admin' },
-                { value: 'Staff', label: 'Staff' },
-                { value: 'Reviewer', label: 'Reviewer' },
-                { value: 'Surveyor', label: 'Surveyor' },
-                { value: 'Driver', label: 'Driver' },
-              ]}
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="sm:col-span-3">
-            <CustomSelect
-              value={statusFilter}
-              onChange={setStatusFilter}
-              className="w-full"
-              buttonClassName="w-full"
-              options={[
-                { value: 'all', label: t('staff.status_all') },
-                { value: 'Active', label: t('staff.status_active') },
-                { value: 'Suspended', label: t('staff.status_suspended') },
-                { value: 'Inactive', label: t('staff.status_inactive') },
-              ]}
-            />
-          </div>
-
-          {/* Clear button */}
-          <div className="sm:col-span-2 flex justify-end">
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              className="w-full py-2 px-3 border border-[#E8E4E3] dark:border-white/15 hover:bg-gray-50 dark:hover:bg-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
-            >
-              <Funnel size={14} />
-              <span>{t('staff.btn_clear_filter')}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      </DataFilterBar>
 
       {/* Table */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] shadow-xs overflow-hidden">

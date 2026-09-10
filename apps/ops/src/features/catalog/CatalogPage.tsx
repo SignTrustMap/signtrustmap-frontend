@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   TrafficSignal,
   PlusCircle,
-  MagnifyingGlass,
   Sparkle,
   Copy,
   Check,
@@ -22,6 +21,9 @@ import {
 import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/common/Pagination'
 import CustomSelect from '@/components/common/CustomSelect'
+import { DataFilterBar } from '@/components/common/DataFilterBar'
+import { ModalPortal } from '@/components/common/ModalPortal'
+import PageHeader from '@/components/common/PageHeader'
 import {
   mockCatalogData,
   type CatalogEntry,
@@ -360,169 +362,98 @@ export default function CatalogPage() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full text-left">
       {/* ─── Header: Standard Badge, Title, Metrics, Quick Actions ───────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#E8E4E3] dark:border-white/10">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/30">
-              <TrafficSignal size={14} weight="bold" />
-              <span>{t('catalog.badge_standard')}</span>
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {t('catalog.title')}
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl leading-relaxed">
-            {t('catalog.subtitle')}
-          </p>
-        </div>
-
-        {/* Counter Badge + Action Button (Clean single-line layout) */}
-        <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
-          {/* Sign Count Badge */}
-          <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <div className="flex flex-col">
-              <span className="text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                QCVN 41:2019
-              </span>
-              <span className="text-sm font-extrabold text-gray-900 dark:text-white font-mono">
-                {filteredCatalog.length} / {catalog.length}{' '}
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  {t('catalog.sign_types_unit')}
+      <PageHeader
+        title={t('catalog.title')}
+        actions={
+          <>
+            {/* Sign Count Badge */}
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  QCVN 41:2019
                 </span>
-              </span>
+                <span className="text-sm font-extrabold text-gray-900 dark:text-white font-mono">
+                  {filteredCatalog.length} / {catalog.length}{' '}
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    {t('catalog.sign_types_unit')}
+                  </span>
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Add New Sign Button */}
+            {/* Add New Sign Button */}
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <PlusCircle size={17} weight="bold" />
+              <span>{t('catalog.btn_add_sign')}</span>
+            </button>
+          </>
+        }
+      />
+
+      {/* ─── Toolbar: Unified DataFilterBar ──────────────────────────────── */}
+      <DataFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={(val) => {
+          setSearchQuery(val)
+          setCurrentPage(1)
+        }}
+        searchPlaceholder={t('catalog.search_placeholder')}
+        categories={categories.map((cat) => ({
+          id: cat.id,
+          label: cat.label,
+          count: cat.id === 'all' ? catalog.length : catalog.filter((s) => s.category === cat.id).length,
+          icon: <span className={`w-2 h-2 rounded-full inline-block ${selectedCategory === cat.id ? 'bg-white' : cat.dot}`} />,
+        }))}
+        selectedCategory={selectedCategory}
+        onSelectCategory={(id) => {
+          setSelectedCategory(id)
+          setCurrentPage(1)
+        }}
+        sortOptions={[
+          { id: 'code', label: t('catalog.sort_code') },
+          { id: 'name', label: t('catalog.sort_name') },
+        ]}
+        selectedSort={sortBy}
+        onSelectSort={(val) => {
+          setSortBy(val as 'code' | 'name')
+          setCurrentPage(1)
+        }}
+      >
+        {/* View Mode Switcher (Grid vs Table) */}
+        <div className="flex items-center p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 text-xs">
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              viewMode === 'grid'
+                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+            title={t('catalog.view_grid')}
           >
-            <PlusCircle size={17} weight="bold" />
-            <span>{t('catalog.btn_add_sign')}</span>
+            <SquaresFour size={15} weight="bold" />
+            <span className="hidden sm:inline">{t('catalog.view_grid')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              viewMode === 'table'
+                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
+                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+            title={t('catalog.view_table')}
+          >
+            <Rows size={15} weight="bold" />
+            <span className="hidden sm:inline">{t('catalog.view_table')}</span>
           </button>
         </div>
-      </div>
-
-      {/* ─── Toolbar: Search, Category Tabs with Count Pills, View Switcher ── */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-        {/* Row 1: Search Input + View Toggle + Sort Dropdown */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <MagnifyingGlass
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setCurrentPage(1)
-              }}
-              placeholder={t('catalog.search_placeholder')}
-              className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-[#061115] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b] transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2.5 self-end sm:self-auto">
-            {/* View Mode Switcher (Grid vs Table) */}
-            <div className="flex items-center p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  viewMode === 'grid'
-                    ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title={t('catalog.view_grid')}
-              >
-                <SquaresFour size={15} weight="bold" />
-                <span className="hidden sm:inline">{t('catalog.view_grid')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
-                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-                }`}
-                title={t('catalog.view_table')}
-              >
-                <Rows size={15} weight="bold" />
-                <span className="hidden sm:inline">{t('catalog.view_table')}</span>
-              </button>
-            </div>
-
-            {/* Sort Dropdown */}
-            <CustomSelect
-              value={sortBy}
-              onChange={(val) => {
-                setSortBy(val as 'code' | 'name')
-                setCurrentPage(1)
-              }}
-              size="sm"
-              options={[
-                { value: 'code', label: t('catalog.sort_code') },
-                { value: 'name', label: t('catalog.sort_name') },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Row 2: Category Filter Tabs with Count Pills */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id
-            const count =
-              cat.id === 'all'
-                ? catalog.length
-                : catalog.filter((s) => s.category === cat.id).length
-
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => {
-                  setSelectedCategory(cat.id)
-                  setCurrentPage(1)
-                }}
-                className={`px-3 py-1.5 rounded-xl border font-bold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#007b8b] border-[#007b8b] text-white shadow-xs'
-                    : 'bg-gray-50 hover:bg-gray-100 dark:bg-white/5 dark:hover:bg-white/10 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : cat.dot}`} />
-                <span>{cat.label}</span>
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
-                    isSelected
-                      ? 'bg-white/20 text-white'
-                      : 'bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-400'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      </DataFilterBar>
 
       {/* ─── Empty State ─────────────────────────────────────────────────── */}
       {filteredCatalog.length === 0 ? (
@@ -745,12 +676,13 @@ export default function CatalogPage() {
 
       {/* ─── Sign Detail Inspection Modal (QCVN 41:2019 Specs) ─────────────── */}
       {selectedSign && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setSelectedSign(null)}
-        >
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+            onClick={() => setSelectedSign(null)}
+          >
           <div
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200"
@@ -947,16 +879,18 @@ export default function CatalogPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* ─── Add Sign Modal ("Thêm Biển Báo Mới") ─────────────────────────── */}
       {showCreateModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
-          onClick={() => setShowCreateModal(false)}
-        >
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+            onClick={() => setShowCreateModal(false)}
+          >
           <div
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200 text-left"
@@ -1124,6 +1058,7 @@ export default function CatalogPage() {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )

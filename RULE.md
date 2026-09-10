@@ -72,6 +72,11 @@
    - Hiển thị gợi ý phím tắt trực quan dạng thẻ `<kbd>` ngay trên các nút bấm.
    - Khi focus vào ô nhập text (`input`, `textarea`), phím tắt duyệt phải tạm thời bị vô hiệu hóa để tránh bấm nhầm.
 
+6. **Chuẩn hóa Tiêu đề & Bố cục Đầu trang (PageHeader Standard):**
+   - 100% các trang nghiệp vụ (cả Staff lẫn Admin) bắt buộc dùng chung component `PageHeader.tsx` (`src/components/common/PageHeader.tsx`).
+   - Tuyệt đối không tự viết thẻ `<h1>` riêng rẽ với kích cỡ font lệch nhau. Tiêu chuẩn kiểu chữ thống nhất cho toàn bộ hệ thống là: `text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight`.
+   - Giữ tiêu đề tối giản và tinh gọn, không chèn các tag râu ria hoặc đoạn mô tả thừa thãi phía trên/dưới. Các nút thao tác cấp trang (Lưu, Xuất tệp, Tạo mới...) phải được truyền qua prop `actions` để hiển thị thẳng hàng ở góc phải.
+
 ---
 
 ## 3. QUY TẮC ĐA NGÔN NGỮ & BẢN DỊCH (I18N CONVENTIONS)
@@ -161,4 +166,27 @@
 
 2. **Đồng bộ đích đến theo Môi trường:**
    - Đường dẫn liên kết luôn trỏ qua biến môi trường chuẩn hóa (`opsPortalUrl` hoặc `communityPortalUrl`), đảm bảo ở môi trường dev trỏ đúng local port của app đối ứng (`localhost:5174` hoặc `localhost:5173`) và ở production trỏ đúng subdomain chính thức (`ops.signmap.site` và `signmap.site`).
+
+---
+
+## 7. QUY TẮC PHÂN QUYỀN TRUY CẬP & CƠ CHẾ PHÒNG VỆ ROUTE GUARD (RBAC & ZERO TRUST ROUTING)
+
+1. **Nguyên tắc Tách biệt Trách nhiệm (Separation of Duties - SoD):**
+   - Tuân thủ nghiêm ngặt tài liệu đặc tả dự án (`a.md`, `b.md`, `FA26SE003_SignTrustMap_DucDNM2.docx`, `Report1_Project Introduction.docx`):
+     - **Staff (Nhân viên vận hành):** Phụ trách hàng đợi duyệt ứng viên biển báo (`/candidates`), điều phối tác vụ (`/tasks`), báo cáo (`/reports`), và phê duyệt/xử lý trả thưởng tín chỉ hàng ngày (`/credits`, `/credits/payments`). Tuyệt đối **không** được can thiệp cấu hình hệ thống, quản lý người dùng, mô hình AI hay chính sách vĩ mô.
+     - **Admin (Quản trị viên hệ thống):** Phụ trách quản trị tài khoản người dùng (`/users`), phân quyền vai trò (`/roles`), giám sát MLOps/AIOps (`/mlops`), nhật ký kiểm toán (`/audit-logs`), đè tọa độ không gian GIS (`/spatial-data`), cấu hình chính sách tính điểm/tín chỉ (`/credits/rules`), và **chỉ xử lý các trường hợp ngoại lệ leo thang (`/escalations`)**.
+     - Tuyệt đối **không** cho phép Admin thực hiện duyệt các giao dịch tín chỉ hàng ngày (`/credits`). Đây là nguyên tắc bắt buộc trong kiểm soát gian lận tài chính và tránh tập trung quyền lực (Separation of Duties).
+
+2. **Cơ chế Phòng vệ Tuyến đường: Tự động Điều hướng an toàn kèm Toast Cảnh báo Thông minh (Redirect with Contextual Action Toast):**
+   - Toàn bộ tuyến đường phân hệ Ops phải được bọc chặt chẽ bởi Guard tương ứng (`AuthGuard`, `AdminGuard`, `StaffGuard`).
+   - **Tuyệt đối cấm Silent Redirect:** Không được chuyển hướng ngầm trong im lặng mà không có phản hồi nào cho người dùng.
+   - **Cơ chế Redirect kèm Toast Cảnh báo (`AccessDeniedRedirect`):**
+     - Khi người dùng cố tình hoặc vô tình truy cập URL sâu (deep link) không thuộc thẩm quyền của vai trò hiện tại:
+       - Hệ thống tự động chuyển hướng mượt mà về Bảng điều khiển (`/`).
+       - Đồng thời kích hoạt ngay **Toast cảnh báo (Warning Toast)** ở góc trên bên phải màn hình trong 5.5 giây kèm thông điệp rõ ràng:
+         - **Trường hợp Admin truy cập route của Staff (`/credits`, `/candidates`, v.v.):** Cảnh báo nguyên tắc SoD (*"Admin không duyệt tín chỉ trực tiếp nhằm đảm bảo tính khách quan. Đã chuyển bạn về Bảng điều khiển."*) kèm nút hành động nhanh **[Đến Ngoại lệ]** trỏ thẳng đến `/escalations`.
+         - **Trường hợp Staff truy cập route của Admin (`/users`, `/roles`, `/audit-logs`, v.v.):** Cảnh báo yêu cầu quyền Quản trị viên (*"Trang này yêu cầu đặc quyền Admin. Đã chuyển bạn về Bảng điều khiển."*) kèm nút hành động nhanh **[Đến Hàng đợi]** trỏ về `/candidates`.
+   - 100% chuỗi thông báo và nút bấm phải qua hệ thống đa ngôn ngữ `t('not_allowed.toast_*')`, đảm bảo tính nhất quán tuyệt đối giữa tiếng Việt và tiếng Anh.
+
+
 

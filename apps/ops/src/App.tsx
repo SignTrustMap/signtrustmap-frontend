@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { ToastProvider } from '@/context/ToastContext'
+import { SidebarProvider } from '@/context/SidebarContext'
 import { AppShell } from '@/components/layout/AppShell'
 import {
   AuthProvider,
@@ -26,8 +27,6 @@ import {
   CandidateDetailPage,
   MapPage,
   TasksPage,
-  StaffDirectoryPage,
-  StaffDetailPage,
   ReportsPage,
 } from '@/features'
 
@@ -59,7 +58,8 @@ function ProtectedLayout() {
 
           {/* ─── Traffic Sign Governance (Admin / Staff Accessible) ── */}
           <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/catalog/missing-types" element={<MissingSignsPage />} />
+          <Route path="/catalog/new-types" element={<MissingSignsPage />} />
+          <Route path="/catalog/missing-types" element={<Navigate to="/catalog/new-types" replace />} />
           <Route
             path="/spatial-data"
             element={
@@ -88,11 +88,19 @@ function ProtectedLayout() {
           />
           <Route
             path="/credits/payments"
-            element={<CreditsApprovalPage />}
+            element={
+              <StaffGuard>
+                <CreditsApprovalPage />
+              </StaffGuard>
+            }
           />
           <Route
             path="/credits"
-            element={<CreditsApprovalPage />}
+            element={
+              <StaffGuard>
+                <CreditsApprovalPage />
+              </StaffGuard>
+            }
           />
 
           {/* ─── AI Pipeline & AIOps ─────────────────────────────── */}
@@ -160,19 +168,27 @@ function ProtectedLayout() {
           />
           <Route
             path="/tasks"
-            element={<TasksPage />}
+            element={
+              <StaffGuard>
+                <TasksPage />
+              </StaffGuard>
+            }
           />
           <Route
             path="/staff"
-            element={<StaffDirectoryPage />}
+            element={<Navigate to="/users" replace />}
           />
           <Route
             path="/staff/:id"
-            element={<StaffDetailPage />}
+            element={<Navigate to="/users" replace />}
           />
           <Route
             path="/reports"
-            element={<ReportsPage />}
+            element={
+              <StaffGuard>
+                <ReportsPage />
+              </StaffGuard>
+            }
           />
 
           {/* Catch-all */}
@@ -189,11 +205,13 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/403" element={<NotAllowedPage />} />
-              <Route path="/*" element={<ProtectedLayout />} />
-            </Routes>
+            <SidebarProvider>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/403" element={<NotAllowedPage />} />
+                <Route path="/*" element={<ProtectedLayout />} />
+              </Routes>
+            </SidebarProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

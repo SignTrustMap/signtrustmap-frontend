@@ -1,11 +1,13 @@
-import { Bell, Sun, Moon, Globe, ArrowSquareOut } from '@phosphor-icons/react'
+import { Bell, Sun, Moon, Globe, ArrowSquareOut, SidebarSimple } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useSidebar } from '@/context/SidebarContext'
 import { useTranslation } from 'react-i18next'
 import { LANG_STORAGE_KEY } from '@/i18n'
 import { communityPortalUrl } from '@/config/env'
 
 export function Topbar() {
   const { isDark, toggleTheme } = useTheme()
+  const { isCollapsed, toggleSidebar } = useSidebar()
   const { t, i18n } = useTranslation('common')
 
   const currentLang = i18n.language.startsWith('en') ? 'en' : 'vi'
@@ -18,8 +20,18 @@ export function Topbar() {
 
   return (
     <header className="flex items-center justify-between px-6 h-16 border-b border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] shrink-0 shadow-xs transition-colors">
-      {/* Left empty container to push controls to the right and avoid duplicate page titles */}
-      <div />
+      {/* Left: Sidebar Collapse/Expand Toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
+          title={isCollapsed ? t('common.expand_sidebar') : t('common.collapse_sidebar')}
+          aria-label={isCollapsed ? t('common.expand_sidebar') : t('common.collapse_sidebar')}
+        >
+          <SidebarSimple size={20} weight="bold" />
+        </button>
+      </div>
 
       {/* Right: Community Portal Link, Notifications, Theme Switcher, Language Switcher */}
       <div className="flex items-center gap-3">
