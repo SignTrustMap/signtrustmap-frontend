@@ -314,7 +314,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       {roleBadge.label}
                     </span>
                     <span className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate">
-                      {isAdmin ? 'Quản trị hệ thống toàn diện' : 'Vận hành & kiểm duyệt dữ liệu'}
+                      {isAdmin ? t('profile.admin_role_desc') : t('profile.staff_role_desc')}
                     </span>
                   </div>
                 </div>

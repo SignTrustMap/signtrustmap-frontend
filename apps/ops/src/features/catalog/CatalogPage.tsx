@@ -692,7 +692,7 @@ export default function CatalogPage() {
               type="button"
               onClick={() => setSelectedSign(null)}
               className="absolute top-4 right-4 p-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 transition-colors cursor-pointer"
-              title="Đóng (Esc)"
+              title={t('catalog.btn_close_esc')}
             >
               <X size={18} weight="bold" />
             </button>

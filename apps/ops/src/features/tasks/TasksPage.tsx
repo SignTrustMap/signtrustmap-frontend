@@ -100,9 +100,9 @@ export default function TasksPage() {
     const newTask: RevalidationTask = {
       id: `TSK-${Math.floor(9000 + Math.random() * 900)}`,
       signCode: newTaskCode,
-      signName: catalogEntry ? catalogEntry.nameVi : 'Biển báo giao thông',
+      signName: catalogEntry ? catalogEntry.nameVi : t('tasks.default_sign_name'),
       location: newTaskLocation.trim(),
-      lastVerifiedDate: 'Quá hạn 12 tháng',
+      lastVerifiedDate: t('tasks.default_overdue'),
       freshnessStatus: 'Stale',
       rewardCredits: newTaskBounty,
       submittedEvidenceCount: 0,
@@ -389,7 +389,7 @@ export default function TasksPage() {
                         >
                           <Camera size={11} weight={task.submittedEvidenceCount > 0 ? 'bold' : 'regular'} />
                           {task.submittedEvidenceCount > 0
-                            ? `${task.submittedEvidenceCount} tệp`
+                            ? t('tasks.evidence_count', { count: task.submittedEvidenceCount })
                             : '0'}
                         </span>
                       </td>
@@ -646,13 +646,11 @@ export default function TasksPage() {
                   onChange={(e) => setNewTaskCode(e.target.value)}
                   className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl font-mono text-xs focus:outline-none focus:border-[#007b8b]"
                 >
-                  <option value="P.102">P.102 - Cấm đi ngược chiều</option>
-                  <option value="P.103a">P.103a - Cấm xe ô tô</option>
-                  <option value="P.127">P.127 - Tốc độ tối đa cho phép</option>
-                  <option value="P.130">P.130 - Cấm dừng và đỗ xe</option>
-                  <option value="W.207a">W.207a - Giao nhau đường không ưu tiên</option>
-                  <option value="R.301a">R.301a - Hướng đi phải theo</option>
-                  <option value="I.401">I.401 - Bắt đầu đường ưu tiên</option>
+                  {mockCatalogData.slice(0, 8).map((cat) => (
+                    <option key={cat.code} value={cat.code}>
+                      {cat.code} - {cat.nameVi}
+                    </option>
+                  ))}
                 </select>
               </div>
 

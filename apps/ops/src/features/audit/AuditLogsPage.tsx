@@ -163,7 +163,7 @@ export default function AuditLogsPage() {
               {paginatedLogs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-neutral-400 font-medium">
-                    Không tìm thấy bản ghi kiểm toán nào khớp với bộ lọc.
+                    {t('audit.empty_state')}
                   </td>
                 </tr>
               ) : (

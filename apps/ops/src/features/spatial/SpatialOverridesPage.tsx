@@ -287,7 +287,7 @@ export default function SpatialOverridesPage() {
                           type="button"
                           onClick={() => handleOpenModal(sign)}
                           className="px-2.5 py-1.5 bg-[#007b8b]/10 hover:bg-[#007b8b]/20 text-[#007b8b] dark:text-[#00c4de] rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Ghi đè thuộc tính không gian"
+                          title={t('spatial.btn_override_tooltip')}
                         >
                           <ArrowsClockwise size={13} weight="bold" />
                           <span>{t('spatial.btn_override')}</span>
@@ -296,7 +296,7 @@ export default function SpatialOverridesPage() {
                           type="button"
                           onClick={() => handleDeleteMalicious(sign.id)}
                           className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                          title="Xóa dữ liệu sai lệch hoặc giả mạo"
+                          title={t('spatial.btn_delete_tooltip')}
                         >
                           <WarningOctagon size={13} weight="bold" />
                           <span>{t('spatial.btn_delete')}</span>
@@ -351,7 +351,7 @@ export default function SpatialOverridesPage() {
                   type="button"
                   onClick={() => setSelectedSign(null)}
                   className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Đóng"
+                  title={t('spatial.btn_close')}
                 >
                   <X size={18} />
                 </button>
@@ -434,7 +434,7 @@ export default function SpatialOverridesPage() {
                       type="text"
                       value={newDirection}
                       onChange={(e) => setNewDirection(e.target.value)}
-                      placeholder="Đông Nam (Southeast)"
+                      placeholder={t('spatial.placeholder_direction')}
                       className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-neutral-300 dark:border-white/15 rounded-xl text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
                     />
                   </div>

@@ -182,6 +182,8 @@
     "roles": {
       "admin": "Admin",
       "staff": "Staff"
-    }
+    },
+    "admin_role_desc": "Quản trị hệ thống toàn diện",
+    "staff_role_desc": "Vận hành & kiểm duyệt dữ liệu"
   }
 }

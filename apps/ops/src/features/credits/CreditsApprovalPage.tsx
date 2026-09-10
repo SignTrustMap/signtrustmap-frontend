@@ -493,7 +493,7 @@ export default function CreditsApprovalPage() {
                           </span>
                           {item.gpsDistance !== undefined && (
                             <span className="text-[10px] font-mono text-gray-400 block">
-                              Độ lệch: {item.gpsDistance}m
+                              {t('credits.gps_offset_meters', { dist: item.gpsDistance })}
                             </span>
                           )}
                         </div>
@@ -649,7 +649,7 @@ export default function CreditsApprovalPage() {
                     {selectedItem.gpsDistance !== undefined && (
                       <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[11px]">
                         <MapPin size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
-                        <span>Độ lệch GPS: {selectedItem.gpsDistance} mét</span>
+                        <span>{t('credits.lbl_gps_offset_meters', { dist: selectedItem.gpsDistance })}</span>
                       </div>
                     )}
                   </div>
@@ -667,7 +667,7 @@ export default function CreditsApprovalPage() {
                     </p>
                     {selectedItem.riskScore && (
                       <p className="font-mono font-bold text-[11px] text-red-800 dark:text-red-300 pt-0.5">
-                        Chỉ số bất thường (Anomaly Index): {selectedItem.riskScore}/100
+                        {t('credits.lbl_anomaly_index', { score: selectedItem.riskScore })}
                       </p>
                     )}
                   </div>

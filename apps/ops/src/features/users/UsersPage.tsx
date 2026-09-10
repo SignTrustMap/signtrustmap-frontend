@@ -136,11 +136,11 @@ export default function UsersPage() {
     if (!editForm || !selectedUser) return
 
     if (!editForm.name.trim()) {
-      toast.error('Họ tên người dùng không được để trống!')
+      toast.error(t('users.err_name_required'))
       return
     }
     if (!editForm.email.trim()) {
-      toast.error('Địa chỉ email không được để trống!')
+      toast.error(t('users.err_email_required'))
       return
     }
     if ((selectedUser.id === 'USR-001' || selectedUser.id === 'USR-006') && editForm.role !== 'admin') {
@@ -317,7 +317,7 @@ export default function UsersPage() {
 
                     {/* Location / Division */}
                     <td className="py-3.5 px-4 text-neutral-600 dark:text-neutral-300 font-medium">
-                      {u.department || u.location || 'Toàn quốc'}
+                      {u.department || u.location || t('users.nationwide')}
                     </td>
 
                     {/* Role Metrics / Contribution strictly matching documents */}
@@ -327,7 +327,7 @@ export default function UsersPage() {
                           <span className="font-bold text-emerald-600 dark:text-emerald-400">
                             {u.reliabilityScore ? `${(u.reliabilityScore * 100).toFixed(0)}%` : '--'}
                           </span>
-                          <span className="text-neutral-400 ml-1">({u.reviewsCount || 0} reviews)</span>
+                          <span className="text-neutral-400 ml-1">{t('users.reviews_count', { count: u.reviewsCount || 0 })}</span>
                         </div>
                       )}
                       {u.role === 'surveyor' && (
@@ -335,17 +335,17 @@ export default function UsersPage() {
                           <span className="font-bold text-blue-600 dark:text-blue-400">
                             {u.reliabilityScore ? `${(u.reliabilityScore * 100).toFixed(0)}%` : '--'}
                           </span>
-                          <span className="text-neutral-400 ml-1">({u.surveysSubmitted || 0} bài gửi)</span>
+                          <span className="text-neutral-400 ml-1">{t('users.surveys_count', { count: u.surveysSubmitted || 0 })}</span>
                         </div>
                       )}
                       {u.role === 'staff' && (
                         <div className="text-[11px] text-[#007b8b] dark:text-[#00c4de] font-semibold">
-                          {u.moderationHandled || 0} ca đã xử lý
+                          {t('users.moderations_count', { count: u.moderationHandled || 0 })}
                         </div>
                       )}
                       {u.role === 'driver' && (
                         <div className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
-                          {u.distanceTraveled || 'Hoạt động'}
+                          {u.distanceTraveled || t('users.status_active')}
                         </div>
                       )}
                       {u.role === 'admin' && (
@@ -380,7 +380,7 @@ export default function UsersPage() {
                           type="button"
                           onClick={() => handleOpenUser(u)}
                           className="p-1.5 text-neutral-500 hover:text-[#007b8b] dark:hover:text-[#00c4de] hover:bg-neutral-100 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                          title="Xem & Chỉnh sửa thông tin tài khoản"
+                          title={t('users.edit_user_tooltip')}
                         >
                           <NotePencil size={16} />
                         </button>
@@ -512,7 +512,7 @@ export default function UsersPage() {
                       required
                       value={editForm.name}
                       onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      placeholder="Nhập họ và tên..."
+                      placeholder={t('users.placeholder_name')}
                       className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
                     />
                   </div>
@@ -555,7 +555,7 @@ export default function UsersPage() {
                       type="text"
                       value={editForm.location || ''}
                       onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                      placeholder="TP. Hồ Chí Minh"
+                      placeholder={t('users.placeholder_location')}
                       className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
                     />
                   </div>
@@ -607,7 +607,7 @@ export default function UsersPage() {
                       type="text"
                       value={editForm.department || ''}
                       onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                      placeholder="Vận hành, Kiểm duyệt, Kỹ thuật..."
+                      placeholder={t('users.placeholder_department')}
                       className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
                     />
                   </div>
@@ -641,7 +641,7 @@ export default function UsersPage() {
                       <div className="flex items-center justify-between text-[11px]">
                         <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-medium">
                           <CheckCircle size={14} weight="fill" className="text-emerald-500" />
-                          <span>Đã gửi lúc {resetEmailSentInfo.sentAt} (hết hạn trong 30 phút)</span>
+                          <span>{t('users.reset_sent_info', { time: resetEmailSentInfo.sentAt })}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

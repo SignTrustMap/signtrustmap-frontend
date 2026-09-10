@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle, Warning, Info, X } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info'
 
@@ -21,6 +22,7 @@ export function Notification({
   onClose,
   className = '',
 }: NotificationProps) {
+  const { t } = useTranslation('ops')
   let icon = <CheckCircle size={20} weight="fill" className="text-emerald-500 shrink-0 mt-0.5" />
   let cardStyle =
     'bg-white/95 text-gray-900 border-emerald-300 dark:bg-[#061513]/95 dark:text-emerald-100 dark:border-emerald-500/40 shadow-xl shadow-black/10 dark:shadow-black/70'
@@ -44,7 +46,7 @@ export function Notification({
       role="alert"
       onClick={onClose}
       className={`fixed top-6 sm:top-20 right-6 sm:right-8 z-[9999] max-w-sm w-full group cursor-pointer rounded-2xl border p-3.5 sm:p-4 shadow-xl backdrop-blur-md flex items-start gap-3 animate-in fade-in slide-in-from-top-3 duration-200 transition-all hover:scale-[1.01] hover:brightness-105 active:scale-[0.99] select-none ${cardStyle} ${className}`}
-      title="Bấm để đóng thông báo"
+      title={t('btn_close_notice')}
     >
       {icon}
       <div className="flex-1 min-w-0 pr-1">

@@ -105,12 +105,12 @@ export default function SpatialDataExportPage() {
               buttonClassName="w-full text-xs"
               options={[
                 { value: 'all', label: t('exports.boundary_all') },
-                { value: 'Hà Nội', label: 'Hà Nội' },
-                { value: 'TP. Hồ Chí Minh & Thủ Đức', label: 'TP. Hồ Chí Minh & Thủ Đức' },
-                { value: 'Đà Nẵng', label: 'Đà Nẵng' },
-                { value: 'Hải Phòng', label: 'Hải Phòng' },
-                { value: 'Cần Thơ', label: 'Cần Thơ' },
-                { value: 'Quốc lộ 1A (Tuyến Bắc - Nam)', label: 'Quốc lộ 1A (Tuyến Bắc - Nam)' },
+                { value: 'Hà Nội', label: t('exports.reg_hn') },
+                { value: 'TP. Hồ Chí Minh & Thủ Đức', label: t('exports.reg_hcm') },
+                { value: 'Đà Nẵng', label: t('exports.reg_dn') },
+                { value: 'Hải Phòng', label: t('exports.reg_hp') },
+                { value: 'Cần Thơ', label: t('exports.reg_ct') },
+                { value: 'Quốc lộ 1A (Tuyến Bắc - Nam)', label: t('exports.reg_ql1a') },
               ]}
             />
           </div>

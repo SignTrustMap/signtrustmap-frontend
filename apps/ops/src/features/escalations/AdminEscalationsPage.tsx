@@ -64,7 +64,7 @@ export default function AdminEscalationsPage() {
     if (!selectedCase) return
 
     if (!decisionNotes.trim() && actionType === 'Rejected') {
-      toast.warning(t('escalations.toast_verdict_required', 'Vui lòng nhập căn cứ để lưu vết kiểm toán hệ thống!'))
+      toast.warning(t('escalations.toast_verdict_required'))
       return
     }
 
@@ -77,9 +77,9 @@ export default function AdminEscalationsPage() {
     )
 
     if (actionType === 'Resolved') {
-      toast.success(t('escalations.toast_resolved', { id: selectedCase.id, defaultValue: `Đã phê chuẩn và thi hành ca ${selectedCase.id} thành công!` }))
+      toast.success(t('escalations.toast_resolved', { id: selectedCase.id }))
     } else {
-      toast.warning(t('escalations.toast_rejected', { id: selectedCase.id, defaultValue: `Đã bác bỏ yêu cầu chuyển tiếp ca ${selectedCase.id}.` }))
+      toast.warning(t('escalations.toast_rejected', { id: selectedCase.id }))
     }
 
     setSelectedCase(null)
@@ -91,26 +91,26 @@ export default function AdminEscalationsPage() {
       case 'Spatial Override':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-            {t('escalations.type_spatial', 'Ghi đè Không gian')}
+            {t('escalations.type_spatial')}
           </span>
         )
       case 'Catalog Modification':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
-            {t('escalations.type_catalog', 'Danh mục Biển báo')}
+            {t('escalations.type_catalog')}
           </span>
         )
       case 'Credit Discrepancy':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[#007b8b]/10 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/20">
-            {t('escalations.type_credit', 'Bất thường Điểm thưởng')}
+            {t('escalations.type_credit')}
           </span>
         )
       case 'Privileged Moderation':
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20">
-            {t('escalations.type_moderation', 'Chế tài Gian lận')}
+            {t('escalations.type_moderation')}
           </span>
         )
     }
@@ -121,20 +121,20 @@ export default function AdminEscalationsPage() {
       case 'Critical':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30">
-            {t('escalations.priority_critical', 'Khẩn cấp')}
+            {t('escalations.priority_critical')}
           </span>
         )
       case 'High':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-            {t('escalations.priority_high', 'Cao')}
+            {t('escalations.priority_high')}
           </span>
         )
       case 'Medium':
       default:
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-500/15 text-slate-700 dark:text-slate-400 border border-slate-500/30">
-            {t('escalations.priority_medium', 'Trung bình')}
+            {t('escalations.priority_medium')}
           </span>
         )
     }
@@ -145,20 +145,20 @@ export default function AdminEscalationsPage() {
       case 'Pending Admin Review':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-            {t('escalations.status_pending', 'Chờ duyệt')}
+            {t('escalations.status_pending')}
           </span>
         )
       case 'Resolved':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
-            {t('escalations.status_resolved', 'Đã phê chuẩn')}
+            {t('escalations.status_resolved')}
           </span>
         )
       case 'Rejected':
       default:
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-white/15">
-            {t('escalations.status_rejected', 'Đã bác bỏ')}
+            {t('escalations.status_rejected')}
           </span>
         )
     }
@@ -173,18 +173,18 @@ export default function AdminEscalationsPage() {
       <DataFilterBar
         searchQuery={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder={t('escalations.search_placeholder', 'Tìm theo mã ca, đối tượng, nhân sự, từ khóa...')}
+        searchPlaceholder={t('escalations.search_placeholder')}
       >
         <CustomSelect
           value={typeFilter}
           onChange={setTypeFilter}
           size="sm"
           options={[
-            { value: 'all', label: t('escalations.filter_all_types', 'Tất cả phân loại') },
-            { value: 'Spatial Override', label: t('escalations.type_spatial', 'Ghi đè Không gian') },
-            { value: 'Catalog Modification', label: t('escalations.type_catalog', 'Danh mục Biển báo') },
-            { value: 'Credit Discrepancy', label: t('escalations.type_credit', 'Bất thường Điểm thưởng') },
-            { value: 'Privileged Moderation', label: t('escalations.type_moderation', 'Chế tài Gian lận') },
+            { value: 'all', label: t('escalations.filter_all_types') },
+            { value: 'Spatial Override', label: t('escalations.type_spatial') },
+            { value: 'Catalog Modification', label: t('escalations.type_catalog') },
+            { value: 'Credit Discrepancy', label: t('escalations.type_credit') },
+            { value: 'Privileged Moderation', label: t('escalations.type_moderation') },
           ]}
         />
 
@@ -193,10 +193,10 @@ export default function AdminEscalationsPage() {
           onChange={setPriorityFilter}
           size="sm"
           options={[
-            { value: 'all', label: t('escalations.filter_all_priorities', 'Tất cả mức độ') },
-            { value: 'Critical', label: t('escalations.priority_critical', 'Khẩn cấp') },
-            { value: 'High', label: t('escalations.priority_high', 'Cao') },
-            { value: 'Medium', label: t('escalations.priority_medium', 'Trung bình') },
+            { value: 'all', label: t('escalations.filter_all_priorities') },
+            { value: 'Critical', label: t('escalations.priority_critical') },
+            { value: 'High', label: t('escalations.priority_high') },
+            { value: 'Medium', label: t('escalations.priority_medium') },
           ]}
         />
 
@@ -205,10 +205,10 @@ export default function AdminEscalationsPage() {
           onChange={setStatusFilter}
           size="sm"
           options={[
-            { value: 'all', label: t('escalations.filter_all_statuses', 'Tất cả trạng thái') },
-            { value: 'Pending Admin Review', label: t('escalations.status_pending', 'Chờ duyệt') },
-            { value: 'Resolved', label: t('escalations.status_resolved', 'Đã phê chuẩn') },
-            { value: 'Rejected', label: t('escalations.status_rejected', 'Đã bác bỏ') },
+            { value: 'all', label: t('escalations.filter_all_statuses') },
+            { value: 'Pending Admin Review', label: t('escalations.status_pending') },
+            { value: 'Resolved', label: t('escalations.status_resolved') },
+            { value: 'Rejected', label: t('escalations.status_rejected') },
           ]}
         />
       </DataFilterBar>
@@ -232,7 +232,7 @@ export default function AdminEscalationsPage() {
               {paginatedEscalations.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-gray-500 dark:text-gray-400">
-                    Không tìm thấy ca chuyển tiếp nào phù hợp với bộ lọc.
+                    {t('escalations.empty_filter')}
                   </td>
                 </tr>
               ) : (
@@ -302,8 +302,8 @@ export default function AdminEscalationsPage() {
                         }`}
                       >
                         {item.status === 'Pending Admin Review'
-                          ? t('escalations.btn_inspect', 'Xử lý')
-                          : 'Xem lại'}
+                          ? t('escalations.btn_inspect')
+                          : t('escalations.btn_revisit')}
                       </button>
                     </td>
                   </tr>
@@ -361,7 +361,7 @@ export default function AdminEscalationsPage() {
                   type="button"
                   onClick={() => setSelectedCase(null)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Đóng"
+                  title={t('escalations.btn_close')}
                 >
                   <X size={20} />
                 </button>
@@ -383,7 +383,7 @@ export default function AdminEscalationsPage() {
 
                 <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl">
                   <span className="text-gray-400 font-mono text-[10px] uppercase block mb-1">
-                    Đối tượng liên quan
+                    {t('escalations.affected_target')}
                   </span>
                   <span className="font-mono font-bold text-gray-900 dark:text-white block truncate">
                     {selectedCase.affectedResource}
@@ -429,8 +429,8 @@ export default function AdminEscalationsPage() {
                 ) : (
                   <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl text-gray-600 dark:text-gray-300 italic">
                     {selectedCase.status === 'Resolved'
-                      ? 'Ca này đã được Quản trị viên phê chuẩn thi hành và ghi nhận Audit Log.'
-                      : 'Yêu cầu này đã bị bác bỏ và chuyển trả kết quả cho Staff.'}
+                      ? t('escalations.resolved_audit_notice')
+                      : t('escalations.rejected_audit_notice')}
                   </div>
                 )}
               </div>
@@ -454,7 +454,7 @@ export default function AdminEscalationsPage() {
                         onClick={() => setSelectedCase(null)}
                         className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 font-medium transition-colors cursor-pointer"
                       >
-                        Đóng
+                        {t('escalations.btn_close')}
                       </button>
 
                       <button
@@ -474,7 +474,7 @@ export default function AdminEscalationsPage() {
                       onClick={() => setSelectedCase(null)}
                       className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-all cursor-pointer"
                     >
-                      Đóng
+                      {t('escalations.btn_close')}
                     </button>
                   </div>
                 )}
