@@ -8,6 +8,7 @@ import { Image } from "expo-image";
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
+import { NavigationSignAlertBanner } from "@/components/navigation-sign-alert-banner";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
   previousLocations,
@@ -21,6 +22,7 @@ import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
 import type { VehicleMode } from '@/types/navigation/navigationType';
 import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { getMapLibre } from "@/services/maplibre";
@@ -225,7 +227,7 @@ export function NavigationMapScreen() {
     const mid = routeCoordinates[Math.floor((routeCoordinates.length - 1) / 2)];
     return [
       { id: 'sample-sign-start', coordinate: nearStart, imageUrl: '', name: 'Stop', signCode: 'STOP' },
-      { id: 'sample-sign-mid',   coordinate: mid,        imageUrl: '', name: 'Stop', signCode: 'STOP' },
+      { id: 'sample-sign-mid', coordinate: mid, imageUrl: '', name: 'Stop', signCode: 'STOP' },
     ];
   }, [hasSelectedRoute, routeCoordinates]);
 
@@ -290,6 +292,14 @@ export function NavigationMapScreen() {
     routeSteps,
     userCoordinate,
   ]);
+
+  const { activeAlert: activeSignAlert } = useSignProximityAlert({
+    alertDistanceMeters: 50,
+    isNavigating,
+    signs: signsWithSamples,
+    userCoordinate: userCoordinate ?? routeStart,
+    speechLanguage: "en-US",
+  });
 
   useEffect(() => {
     setNavigationError(undefined);
@@ -549,6 +559,14 @@ export function NavigationMapScreen() {
             distance={formatManeuverDistance(activeManeuver.distance)}
             instruction={formatRouteInstruction(activeManeuver.step)}
             symbol={getManeuverSymbol(activeManeuver.step)}
+          />
+        ) : null}
+
+        {isNavigating && activeSignAlert ? (
+          <NavigationSignAlertBanner
+            distanceMeters={activeSignAlert.distanceMeters}
+            hasActiveManeuver={Boolean(activeManeuver)}
+            sign={activeSignAlert.sign}
           />
         ) : null}
 

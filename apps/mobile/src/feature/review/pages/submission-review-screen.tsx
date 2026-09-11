@@ -361,7 +361,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     goToPreviousCheckedReview,
     pendingSubmissions,
     isLoading,
-    isSubmitting,
     recheckingPreviousAction,
     recheckingReviewIndex,
     isRecheckingSubmission,
@@ -370,6 +369,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     totalSubmissions,
     undoLastReview,
   } = useReviewWorkflow();
+
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
@@ -395,7 +395,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     action: ReviewActionType,
     details?: { declineNote?: string; declineReason?: string },
   ) => {
-    if (!submission || isSubmitting) return false;
+    if (!submission) return false;
     const completesReviewQueue = !isRecheckingSubmission && pendingSubmissions.length === 1;
 
     const completed = await completeCurrentReview({ action, ...details });
@@ -631,8 +631,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   </View>
                 </View>
                 <AppButton
-                  disabled={isSubmitting}
-                  label={isSubmitting ? 'Updating...' : 'Review again'}
+                  label="Review again"
                   onPress={reviewCheckedSubmissionAgain}
                 />
                 <View style={styles.checkNavigation}>
@@ -664,7 +663,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 <View style={styles.primaryActions}>
                   <ReviewAction
                     color={theme.primary}
-                    disabled={isSubmitting}
                     label="Approve"
                     onPress={() => completeReview('approved')}
                     symbol="✓"
@@ -675,7 +673,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 <View style={styles.secondaryActions}>
                   <ReviewAction
                     color={Colors.danger}
-                    disabled={isSubmitting}
                     label="Decline"
                     onPress={() => setActiveSheet('decline')}
                     style={styles.secondaryButton}
@@ -683,7 +680,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   />
                   <AppButton
                     label="⚑  Report"
-                    disabled={isSubmitting}
                     onPress={() => setActiveSheet('report')}
                     style={[styles.secondaryButton, { borderColor: theme.border }]}
                     textStyle={styles.secondaryButtonLabel}
@@ -694,7 +690,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {reviewHistory.length > 0 && !isRecheckingSubmission ? (
                   <AppButton
                     label="↶  Undo Last Action"
-                    disabled={isSubmitting}
                     onPress={undoLastAction}
                     style={[styles.undoButton, { borderColor: theme.border }]}
                     textStyle={styles.undoLabel}

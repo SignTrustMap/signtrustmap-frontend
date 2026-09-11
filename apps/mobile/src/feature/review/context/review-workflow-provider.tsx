@@ -1,6 +1,8 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
-import { useCastVoteOnSignCandidate, useReportSignCandidate, useGetReviewQueue, useGetReviewHistory, useUndoVoteOnCandidate } from '@/feature/review/hooks/use-review';
+// TODO: Restore mutation imports when batch-submit API is wired up.
+// import { useCastVoteOnSignCandidate, useReportSignCandidate, useGetReviewQueue, useGetReviewHistory, useUndoVoteOnCandidate } from '@/feature/review/hooks/use-review';
+import { useGetReviewQueue, useGetReviewHistory } from '@/feature/review/hooks/use-review';
 
 import { useSession } from '@/context/session-provider';
 import {
@@ -25,7 +27,6 @@ type ReviewWorkflowContextValue = {
   goToNextCheckedReview: () => void;
   goToPreviousCheckedReview: () => void;
   isLoading: boolean;
-  isSubmitting: boolean;
   pendingSubmissions: ReviewSubmission[];
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
@@ -55,9 +56,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     ]);
     return { data: queue.data && history.data ? { queue: queue.data, history: history.data } : undefined };
   }, [refetchQueue, refetchHistory]);
-  const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
-  const { mutateAsync: reportCandidate } = useReportSignCandidate();
-  const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
+  // TODO: Restore mutation hooks when batch-submit API is wired up.
+  // const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
+  // const { mutateAsync: reportCandidate } = useReportSignCandidate();
+  // const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
   const [pendingSubmissions, setPendingSubmissions] = useState<ReviewSubmission[]>([]);
   const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>([]);
   const [isCheckingSubmission, setIsCheckingSubmission] = useState(false);
@@ -66,7 +68,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [recheckingReviewIndex, setRecheckingReviewIndex] = useState<number>();
   const [recheckingPreviousAction, setRecheckingPreviousAction] = useState<ReviewActionType>();
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // isSubmitting is unused while review actions are local-only; re-enable with the batch submit API.
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
@@ -77,8 +79,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setError(undefined);
     try {
       const { data } = await refetchWorkflow();
+      console.log('refresh data', data);
       if (!data) return;
       const { queue, history } = data;
+      console.log('refresh queue', queue);
       setPendingSubmissions(queue.submissions);
       setReviewHistory(history);
       setTotalSubmissions(queue.total + history.length);
@@ -123,13 +127,19 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const resetReviewWorkflow = async () => {
+    // TODO: Call the batch-submit API here with the accumulated reviewHistory before clearing.
+    // await submitReviewBatch(reviewHistory, session?.accessToken);
+
     setIsCheckingSubmission(false);
     setCheckedReviewIndex(0);
     setIsRecheckingSubmission(false);
     setRecheckingReviewIndex(undefined);
     setRecheckingPreviousAction(undefined);
+    setReviewHistory([]);
     setSessionReviewCount(0);
-    await refresh();
+
+    // TODO: Re-enable refresh() after the submit API is wired up to reload the queue.
+    // await refresh();
   };
 
   const goToPreviousCheckedReview = () => {
@@ -142,95 +152,82 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const completeCurrentReview = async (decision: ReviewDecision) => {
     const submission = pendingSubmissions[0];
-    if (!submission || !session?.accessToken || isSubmitting) return false;
+    if (!submission) return false;
     const completedRecheckIndex = isRecheckingSubmission ? recheckingReviewIndex : undefined;
-    setIsSubmitting(true);
-    setError(undefined);
 
-    try {
-      const params = { candidateId: submission.id };
-      if (decision.action === 'reported') {
-        await reportCandidate({ params, request: {
-          reason: decision.declineNote || decision.declineReason || 'Reported by reviewer',
-        } });
-      } else {
-        await castVote({ params, request: {
-          vote: decision.action === 'approved' ? 1 : -1,
-          ...(decision.declineReason ? { declineReason: decision.declineReason } : {}),
-          ...(decision.declineNote ? { declineNote: decision.declineNote } : {}),
-        } });
-      }
-      setReviewHistory((history) => {
-        const completedReview = { action: decision.action, submission };
-        if (completedRecheckIndex !== undefined) {
-          const nextHistory = [...history];
-          nextHistory.splice(completedRecheckIndex, 0, completedReview);
-          return nextHistory;
-        }
-        return [...history, completedReview];
-      });
-      setPendingSubmissions((pending) => pending.slice(1));
+    // TODO: API calls are deferred to the final submit step.
+    // When the reviewer hits "Finish", all accumulated decisions will be sent in one batch.
+    //
+    // const params = { candidateId: submission.id };
+    // if (decision.action === 'reported') {
+    //   await reportCandidate({
+    //     params, request: {
+    //       reason: decision.declineNote || decision.declineReason || 'Reported by reviewer',
+    //     }
+    //   });
+    // } else {
+    //   await castVote({
+    //     params, request: {
+    //       vote: decision.action === 'approved' ? 1 : -1,
+    //       ...(decision.declineReason ? { declineReason: decision.declineReason } : {}),
+    //       ...(decision.declineNote ? { declineNote: decision.declineNote } : {}),
+    //     }
+    //   });
+    // }
+
+    setReviewHistory((history) => {
+      const completedReview = { action: decision.action, submission };
       if (completedRecheckIndex !== undefined) {
-        setCheckedReviewIndex(completedRecheckIndex);
-        setIsCheckingSubmission(true);
+        const nextHistory = [...history];
+        nextHistory.splice(completedRecheckIndex, 0, completedReview);
+        return nextHistory;
       }
-      setIsRecheckingSubmission(false);
-      setRecheckingReviewIndex(undefined);
-      setRecheckingPreviousAction(undefined);
-      setSessionReviewCount((count) => count + 1);
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to submit this review.');
-      return false;
-    } finally {
-      setIsSubmitting(false);
+      return [...history, completedReview];
+    });
+    setPendingSubmissions((pending) => pending.slice(1));
+    if (completedRecheckIndex !== undefined) {
+      setCheckedReviewIndex(completedRecheckIndex);
+      setIsCheckingSubmission(true);
     }
+    setIsRecheckingSubmission(false);
+    setRecheckingReviewIndex(undefined);
+    setRecheckingPreviousAction(undefined);
+    setSessionReviewCount((count) => count + 1);
+    return true;
   };
 
   const undoLastReview = async () => {
     const lastReview = reviewHistory[reviewHistory.length - 1];
-    if (!lastReview || !session?.accessToken || isSubmitting) return false;
-    setIsSubmitting(true);
-    setError(undefined);
-    try {
-      if (lastReview.action !== 'reported') {
-        await undoVote({ params: { candidateId: lastReview.submission.id } });
-      }
-      setReviewHistory((history) => history.slice(0, -1));
-      setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
-      setSessionReviewCount((count) => Math.max(0, count - 1));
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to undo this review.');
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!lastReview) return false;
+
+    // TODO: undo vote API call deferred to batch submit.
+    // if (lastReview.action !== 'reported') {
+    //   await undoVote({ params: { candidateId: lastReview.submission.id } });
+    // }
+
+    setReviewHistory((history) => history.slice(0, -1));
+    setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
+    setSessionReviewCount((count) => Math.max(0, count - 1));
+    return true;
   };
 
   const reviewCheckedSubmissionAgain = async () => {
     const checkedReview = reviewHistory[checkedReviewIndex];
-    if (!checkedReview || !session?.accessToken || isSubmitting) return false;
-    setIsSubmitting(true);
-    setError(undefined);
-    try {
-      if (checkedReview.action !== 'reported') {
-        await undoVote({ params: { candidateId: checkedReview.submission.id } });
-      }
-      setReviewHistory((history) => history.filter((_, index) => index !== checkedReviewIndex));
-      setPendingSubmissions((pending) => [checkedReview.submission, ...pending]);
-      setRecheckingPreviousAction(checkedReview.action);
-      setRecheckingReviewIndex(checkedReviewIndex);
-      setCheckedReviewIndex(0);
-      setIsCheckingSubmission(false);
-      setIsRecheckingSubmission(true);
-      return true;
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to reopen this review.');
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!checkedReview) return false;
+
+    // TODO: undo vote API call deferred to batch submit.
+    // if (checkedReview.action !== 'reported') {
+    //   await undoVote({ params: { candidateId: checkedReview.submission.id } });
+    // }
+
+    setReviewHistory((history) => history.filter((_, index) => index !== checkedReviewIndex));
+    setPendingSubmissions((pending) => [checkedReview.submission, ...pending]);
+    setRecheckingPreviousAction(checkedReview.action);
+    setRecheckingReviewIndex(checkedReviewIndex);
+    setCheckedReviewIndex(0);
+    setIsCheckingSubmission(false);
+    setIsRecheckingSubmission(true);
+    return true;
   };
 
   return (
@@ -245,7 +242,6 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         goToNextCheckedReview,
         goToPreviousCheckedReview,
         isLoading,
-        isSubmitting,
         pendingSubmissions,
         refresh,
         recheckingPreviousAction,

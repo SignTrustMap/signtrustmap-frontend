@@ -118,6 +118,7 @@ export async function getReviewQueue(
         { signal },
         accessToken,
     );
+    console.log('getReviewQueue response', res);
 
     return res;
 }

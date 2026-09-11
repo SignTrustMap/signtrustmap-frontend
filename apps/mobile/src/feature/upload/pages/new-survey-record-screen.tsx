@@ -403,7 +403,7 @@ export function NewSurveyRecordScreen() {
       }, draftId);
       openSavedDraft();
     } catch (error) {
-      console.warn('[Surveyor] Unable to save survey draft:', error);
+      console.warn('[Survey or] Unable to save survey draft:', error);
       setPickerError(error instanceof Error ? error.message : 'Unable to save the draft. Please retry.');
       setIsScanning(false);
     } finally {

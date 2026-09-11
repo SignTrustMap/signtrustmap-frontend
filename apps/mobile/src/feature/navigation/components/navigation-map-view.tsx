@@ -133,9 +133,15 @@ export function NavigationMapView({
           easing="fly"
           maxZoom={19}
           minZoom={11}
-          padding={{ bottom: 210, left: 24, right: 24, top: 120 }}
+          padding={{
+            bottom: 320,
+            left: 24,
+            right: 24,
+            top: 80,
+          }}
           trackUserLocation="heading"
-          zoom={17}
+          zoom={18}
+          pitch={20}
         />
       ) : focusCoordinate ? (
         <Camera
