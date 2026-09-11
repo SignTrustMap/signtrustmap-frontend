@@ -202,39 +202,39 @@ export function NavigationStartScreen() {
             backgroundColor: theme.background, borderColor: theme.primary, borderWidth: 1,
           }]}>
             <AntDesign name="pushpin" size={17} color={theme.text} />
-        <TextInput
-          accessibilityLabel="Search starting point"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus
-          clearButtonMode="while-editing"
-          onChangeText={setQuery}
-          placeholder="Your starting point..."
-          placeholderTextColor={theme.placeholder}
-          returnKeyType="search"
-          style={[styles.searchPrompt, { color: theme.text }]}
-          value={query}
-        />
+            <TextInput
+              accessibilityLabel="Search starting point"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              clearButtonMode="while-editing"
+              onChangeText={setQuery}
+              placeholder="Your starting point..."
+              placeholderTextColor={theme.placeholder}
+              returnKeyType="search"
+              style={[styles.searchPrompt, { color: theme.text }]}
+              value={query}
+            />
           </View>
 
-      {destination ? (
-        <>
-          <View pointerEvents="none" style={styles.inputConnector}>
-            {[0, 1, 2].map((dot) => (
-              <View key={dot} style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
-            ))}
-          </View>
-        <View style={[styles.destinationRow, { backgroundColor: theme.background, borderColor: 'transparent' }]}>
-          <AntDesign name="pushpin" size={17} color={theme.danger} />
-          <Text
-            numberOfLines={1}
-            style={[styles.destinationText, { color: theme.text }]}
-          >
-            {destination.title}
-          </Text>
-        </View>
-        </>
-      ) : null}
+          {destination ? (
+            <>
+              <View pointerEvents="none" style={styles.inputConnector}>
+                {[0, 1, 2].map((dot) => (
+                  <View key={dot} style={[styles.inputConnectorDot, { backgroundColor: theme.placeholder }]} />
+                ))}
+              </View>
+              <View style={[styles.destinationRow, { backgroundColor: theme.background, borderColor: 'transparent' }]}>
+                <AntDesign name="pushpin" size={17} color={theme.danger} />
+                <Text
+                  numberOfLines={1}
+                  style={[styles.destinationText, { color: theme.text }]}
+                >
+                  {destination.title}
+                </Text>
+              </View>
+            </>
+          ) : null}
         </View>
         <AppButton
           accessibilityLabel="Swap starting point and destination"

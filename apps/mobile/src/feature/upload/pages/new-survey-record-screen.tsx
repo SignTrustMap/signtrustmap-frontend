@@ -32,8 +32,14 @@ type SelectedSurveyMedia = {
   capturedAt?: string;
   fileName?: string | null;
   mimeType?: string;
-  type: 'image';
+  type: 'image' | 'video';
   uri: string;
+};
+
+type SelectedGpxFile = {
+  name: string;
+  uri: string;
+  mimeType?: string;
 };
 
 function captureTimeFromExif(exif: ImagePickerAsset['exif']) {
@@ -182,6 +188,8 @@ export function NewSurveyRecordScreen() {
   const [pickerError, setPickerError] = useState<string>();
   const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
   const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
+  const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
+  const [gpxPickerError, setGpxPickerError] = useState<string>();
   const [isScanning, setIsScanning] = useState(false);
   const scanInProgress = useRef(false);
   const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
@@ -209,7 +217,7 @@ export function NewSurveyRecordScreen() {
       const page = await LegacyMediaLibrary.getAssetsAsync({
         after,
         first: ANDROID_GALLERY_PAGE_SIZE,
-        mediaType: LegacyMediaLibrary.MediaType.photo,
+        mediaType: [LegacyMediaLibrary.MediaType.photo, LegacyMediaLibrary.MediaType.video],
         sortBy: [[LegacyMediaLibrary.SortBy.creationTime, false]],
       });
 
@@ -228,7 +236,7 @@ export function NewSurveyRecordScreen() {
   };
 
   const openAndroidMediaLibrary = async () => {
-    const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo']);
+    const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
 
     console.log('[Surveyor] Media permission before gallery:', {
       accessPrivileges: permission.accessPrivileges,
@@ -236,7 +244,7 @@ export function NewSurveyRecordScreen() {
     });
 
     if (permission.status !== 'granted') {
-      setPickerError('Photo-library permission is required to read image location metadata.');
+      setPickerError('Media library permission is required to select photos and videos.');
       return;
     }
 
@@ -256,9 +264,11 @@ export function NewSurveyRecordScreen() {
 
     try {
       const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+      const assetType = asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
+
       const exif = assetInfo.exif as Record<string, unknown> | undefined;
-      const exifCoordinates = extractImageGpsCoordinates(exif);
-      const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+      const exifCoordinates = assetType === 'image' ? extractImageGpsCoordinates(exif) : null;
+      const gpsCoordinates = assetType === 'image' && isValidGpsCoordinates(assetInfo.location)
         ? {
           latitude: assetInfo.location.latitude,
           longitude: assetInfo.location.longitude,
@@ -268,6 +278,7 @@ export function NewSurveyRecordScreen() {
       console.log('[Surveyor] Selected MediaStore asset:', {
         assetId: asset.id,
         fileName: asset.filename,
+        mediaType: asset.mediaType,
         location: assetInfo.location ?? null,
       });
       console.log(
@@ -278,14 +289,16 @@ export function NewSurveyRecordScreen() {
       setSelectedAsset({
         capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
         fileName: asset.filename,
-        type: 'image',
+        type: assetType,
         uri: assetInfo.localUri ?? asset.uri,
       });
       setSelectedGps(gpsCoordinates ?? null);
+      setSelectedGpxFile(undefined);
+      setGpxPickerError(undefined);
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
-      setAndroidGalleryError('Unable to read that photo. Please choose another one.');
+      setAndroidGalleryError('Unable to read that file. Please choose another one.');
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
@@ -309,23 +322,26 @@ export function NewSurveyRecordScreen() {
         allowsMultipleSelection: false,
         defaultTab: 'photos',
         exif: true,
-        mediaTypes: ['images'],
+        mediaTypes: ['images', 'videos'],
         presentationStyle: ImagePicker.UIImagePickerPresentationStyle.PAGE_SHEET,
         quality: 1,
       });
 
       if (!result.canceled) {
         const asset = result.assets[0];
-        const gpsCoordinates = await extractSelectedAssetGps(asset);
+        const assetType = asset.type === 'video' ? 'video' : 'image';
+        const gpsCoordinates = assetType === 'image' ? await extractSelectedAssetGps(asset) : null;
 
         setSelectedAsset({
           capturedAt: captureTimeFromExif(asset.exif),
           fileName: asset.fileName,
           mimeType: asset.mimeType,
-          type: 'image',
+          type: assetType,
           uri: asset.uri,
         });
         setSelectedGps(gpsCoordinates);
+        setSelectedGpxFile(undefined);
+        setGpxPickerError(undefined);
       }
     } catch (error) {
       setPickerError(
@@ -338,6 +354,32 @@ export function NewSurveyRecordScreen() {
       setIsOpeningGallery(false);
     }
   };
+
+  const handlePickGpx = async () => {
+    setGpxPickerError(undefined);
+    try {
+      const DocumentPicker = await import('expo-document-picker');
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: ['application/gpx+xml', 'application/octet-stream', '*/*'],
+      });
+
+      if (!result.canceled) {
+        const file = result.assets[0];
+        const name = file.name ?? '';
+        if (!name.toLowerCase().endsWith('.gpx')) {
+          setGpxPickerError('Please select a valid GPX file (.gpx).');
+          return;
+        }
+        setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
+      }
+    } catch (error) {
+      setGpxPickerError('Unable to open file picker. Please try again.');
+      console.log('[Surveyor] Unable to open document picker:', error);
+    }
+  };
+
 
   const openSavedDraft = () => {
     if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
@@ -396,7 +438,7 @@ export function NewSurveyRecordScreen() {
       >
         <View style={styles.galleryModalRoot}>
           <Pressable
-            accessibilityLabel="Close photo library"
+            accessibilityLabel="Close media library"
             accessibilityRole="button"
             onPress={() => setIsAndroidGalleryVisible(false)}
             style={styles.galleryBackdrop}
@@ -410,13 +452,13 @@ export function NewSurveyRecordScreen() {
             </View>
             <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
               <View style={styles.galleryHeading}>
-                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo or video</Text>
                 <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
                   Original location metadata will be preserved
                 </Text>
               </View>
               <AppButton
-                accessibilityLabel="Close photo library"
+                accessibilityLabel="Close media library"
                 label="Close"
                 onPress={() => setIsAndroidGalleryVisible(false)}
                 style={styles.galleryCloseButton}
@@ -442,7 +484,7 @@ export function NewSurveyRecordScreen() {
                     <ActivityIndicator color={theme.primary} size="large" />
                   ) : null}
                   <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
-                    {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
+                    {isAndroidGalleryLoading ? 'Loading your media…' : 'No photos or videos found'}
                   </Text>
                 </View>
               }
@@ -460,6 +502,7 @@ export function NewSurveyRecordScreen() {
               onEndReachedThreshold={0.5}
               renderItem={({ item }) => {
                 const isSelecting = selectingAndroidAssetId === item.id;
+                const isVideo = item.mediaType === LegacyMediaLibrary.MediaType.video;
 
                 return (
                   <Pressable
@@ -473,6 +516,16 @@ export function NewSurveyRecordScreen() {
                     ]}
                   >
                     <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
+                    {isVideo ? (
+                      <View style={styles.galleryVideoBadge}>
+                        <SymbolView
+                          fallback={<Text style={styles.galleryVideoBadgeText}>▶</Text>}
+                          name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
+                          size={12}
+                          tintColor="#FFFFFF"
+                        />
+                      </View>
+                    ) : null}
                     {isSelecting ? (
                       <View style={styles.gallerySelectingOverlay}>
                         <ActivityIndicator color="#FFFFFF" />
@@ -524,12 +577,26 @@ export function NewSurveyRecordScreen() {
             variant="surface"
           >
             {selectedAsset ? (
-              <Image
-                accessibilityLabel="Selected survey media"
-                contentFit="cover"
-                source={{ uri: selectedAsset.uri }}
-                style={styles.selectedImage}
-              />
+              selectedAsset.type === 'video' ? (
+                <View style={styles.videoPreview}>
+                  <SymbolView
+                    fallback={<Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>}
+                    name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
+                    size={36}
+                    tintColor={theme.onPrimary}
+                  />
+                  <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
+                    {selectedAsset.fileName ?? 'Video selected'}
+                  </Text>
+                </View>
+              ) : (
+                <Image
+                  accessibilityLabel="Selected survey media"
+                  contentFit="cover"
+                  source={{ uri: selectedAsset.uri }}
+                  style={styles.selectedImage}
+                />
+              )
             ) : (
               <>
                 <SymbolView
@@ -547,20 +614,60 @@ export function NewSurveyRecordScreen() {
                 <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
                   {isOpeningGallery
                     ? 'Opening gallery...'
-                    : 'Upload photo'}
+                    : 'Upload photo or video'}
                 </Text>
               </>
             )}
           </AppButton>
 
           <Text style={[styles.helperText, { color: theme.placeholder }]}>
-            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your sign image here'}
+            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your sign image or video here'}
           </Text>
 
           {pickerError ? (
             <Text accessibilityRole="alert" style={styles.errorText}>
               {pickerError}
             </Text>
+          ) : null}
+
+          {selectedAsset?.type === 'video' ? (
+            <>
+              <AppButton
+                accessibilityLabel={selectedGpxFile ? 'Change GPX file' : 'Upload GPX file'}
+                disabled={isScanning || isSaving}
+                onPress={handlePickGpx}
+                pressedOpacity={0.78}
+                style={[
+                  styles.uploadPlaceholder,
+                  styles.gpxPickerButton,
+                  {
+                    backgroundColor: theme.neutral,
+                    borderColor: selectedGpxFile ? theme.primary : theme.border,
+                  },
+                ]}
+                variant="surface"
+              >
+                <SymbolView
+                  fallback={<Text style={[styles.imageFallback, { color: selectedGpxFile ? theme.primary : theme.placeholder }]}>GPX</Text>}
+                  name={{ android: 'route', ios: 'map', web: 'route' }}
+                  size={28}
+                  tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
+                />
+                <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
+                  {selectedGpxFile ? selectedGpxFile.name : 'Upload your GPX file'}
+                </Text>
+              </AppButton>
+
+              <Text style={[styles.helperText, { color: theme.placeholder }]}>
+                {selectedGpxFile ? 'Tap to choose a different GPX file' : 'Accepts .gpx files only'}
+              </Text>
+
+              {gpxPickerError ? (
+                <Text accessibilityRole="alert" style={styles.errorText}>
+                  {gpxPickerError}
+                </Text>
+              ) : null}
+            </>
           ) : null}
 
           <AppButton
@@ -574,6 +681,7 @@ export function NewSurveyRecordScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   screen: {
@@ -696,6 +804,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
+  galleryVideoBadge: {
+    position: 'absolute',
+    bottom: Spacing.one,
+    right: Spacing.one,
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    borderRadius: Rounded.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryVideoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700' as const,
+  },
   galleryFooterLoader: {
     marginVertical: Spacing.three,
   },
@@ -790,5 +914,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 3,
+  },
+  videoPreview: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    backgroundColor: 'rgba(9, 35, 60, 0.72)',
+    padding: Spacing.three,
+  },
+  videoFileName: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  gpxPickerButton: {
+    minHeight: 100,
+    marginTop: Spacing.one,
   },
 });

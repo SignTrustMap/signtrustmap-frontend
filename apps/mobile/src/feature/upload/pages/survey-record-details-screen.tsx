@@ -145,7 +145,6 @@ export function SurveyRecordDetailsScreen() {
 
     try {
       const coordinate = await getCurrentSurveyCoordinate();
-
       setSelectedCoordinate(coordinate);
       setCoordinateSource('DEVICE_GPS');
       setFocusRequestId((requestId) => requestId + 1);

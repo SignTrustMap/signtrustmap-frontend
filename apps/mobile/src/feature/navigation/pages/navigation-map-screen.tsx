@@ -17,7 +17,7 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 
 import { NavigationMapView } from "../components/navigation-map-view";
-import type { NavigationStep } from '@/api/navigation/navigation';
+import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
 import type { VehicleMode } from '@/types/navigation/navigationType';
 import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
@@ -204,6 +204,7 @@ export function NavigationMapScreen() {
     selectedDestination?.coordinate,
     routeResult?.geometry,
   );
+  console.log('plannedSigns', plannedSigns);
   const navigationError = routeError?.message ?? navigationActionError
     ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
   const routeCoordinates = routeResult?.coordinates;
@@ -217,6 +218,25 @@ export function NavigationMapScreen() {
     isNavigating && navigationSession?.hasLiveLocation,
   );
   const visibleSigns = hasSelectedRoute ? plannedSigns : mapSigns;
+
+  const sampleRouteSigns = useMemo((): RouteSign[] => {
+    if (!hasSelectedRoute || !routeCoordinates || routeCoordinates.length < 2) return [];
+    const nearStart = routeCoordinates[Math.min(1, routeCoordinates.length - 1)];
+    const mid = routeCoordinates[Math.floor((routeCoordinates.length - 1) / 2)];
+    return [
+      { id: 'sample-sign-start', coordinate: nearStart, imageUrl: '', name: 'Stop', signCode: 'STOP' },
+      { id: 'sample-sign-mid',   coordinate: mid,        imageUrl: '', name: 'Stop', signCode: 'STOP' },
+    ];
+  }, [hasSelectedRoute, routeCoordinates]);
+
+  const signsWithSamples = useMemo(
+    () => {
+      const sampleIds = new Set(sampleRouteSigns.map((s) => s.id));
+      const deduped = visibleSigns.filter((s) => !sampleIds.has(s.id));
+      return [...sampleRouteSigns, ...deduped];
+    },
+    [sampleRouteSigns, visibleSigns],
+  );
   const maneuverProgresses = useMemo(
     () =>
       routeSteps?.map((step) =>
@@ -371,7 +391,7 @@ export function NavigationMapScreen() {
       }
 
       coordinate = [position.coords.longitude, position.coords.latitude];
-
+      console.log(coordinate);
       setMapFocus((current) => ({
         coordinate,
         requestId: (current?.requestId ?? 0) + 1,
@@ -514,7 +534,7 @@ export function NavigationMapScreen() {
           }
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
-          routeSigns={visibleSigns}
+          routeSigns={signsWithSamples}
           showCurrentLocation={!isNavigating}
         />
 
