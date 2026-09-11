@@ -4,11 +4,11 @@
     "slug": "signtrustmap-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app-logo-1024.png",
+    "icon": "./assets/images/app-logo.png",
     "scheme": "mobile",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/images/app-logo-1024.png",
+      "icon": "./assets/images/app-logo.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route."
       }
@@ -24,14 +24,14 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/app-logo-1024.png"
+        "foregroundImage": "./assets/images/app-logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.mobile"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/app-logo-1024.png"
+      "favicon": "./assets/images/app-logo.png"
     },
     "plugins": [
       "expo-router",
