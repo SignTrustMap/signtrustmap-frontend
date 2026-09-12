@@ -25,6 +25,7 @@ import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
+import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
 import { getMapLibre } from "@/services/maplibre";
 
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
@@ -221,7 +222,15 @@ export function NavigationMapScreen() {
   const hasLiveLocation = Boolean(
     isNavigating && navigationSession?.hasLiveLocation,
   );
-  const visibleSigns = hasSelectedRoute ? plannedSigns : mapSigns;
+  const visibleSigns = useMemo(() => {
+    const rawSigns = hasSelectedRoute ? plannedSigns : mapSigns;
+    return rawSigns.map((sign) => ({
+      ...sign,
+      imageUrl: sign.imageUrl && !sign.imageUrl.includes('mock/')
+        ? resolveImageUrl(sign.imageUrl)
+        : TARGET_SIGN_IMAGE_URL,
+    }));
+  }, [hasSelectedRoute, mapSigns, plannedSigns]);
   const sampleRouteSigns = useMemo((): RouteSign[] => {
     if (!hasSelectedRoute || !routeCoordinates || routeCoordinates.length < 2) return [];
     const nearStart = routeCoordinates[Math.min(1, routeCoordinates.length - 1)];

@@ -27,6 +27,7 @@ import {
 } from '@/feature/upload/utils/image-gps';
 import { useTheme } from '@/hooks/use-theme';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
+import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 
 type SelectedSurveyMedia = {
   capturedAt?: string;
@@ -373,6 +374,17 @@ export function NewSurveyRecordScreen() {
           return;
         }
         setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
+        const gpxData = await extractGpxGpsData(file.uri);
+        if (gpxData?.firstPoint) {
+          setSelectedGps({
+            latitude: gpxData.firstPoint.latitude,
+            longitude: gpxData.firstPoint.longitude,
+          });
+          console.log('[Surveyor] Extracted GPX GPS coordinates:', gpxData.firstPoint);
+          if (gpxData.startTime) {
+            setSelectedAsset((prev) => (prev && !prev.capturedAt ? { ...prev, capturedAt: gpxData.startTime } : prev));
+          }
+        }
       }
     } catch (error) {
       setGpxPickerError('Unable to open file picker. Please try again.');
@@ -380,10 +392,15 @@ export function NewSurveyRecordScreen() {
     }
   };
 
-
   const openSavedDraft = () => {
     if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
-    router.replace({ pathname: '/work/new-survey/details', params: { submissionId: savedDraftId.current } });
+    router.replace({
+      pathname: '/work/new-survey/details',
+      params: {
+        submissionId: savedDraftId.current,
+        ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
+      },
+    });
   };
 
   const handleSubmitRecord = async () => {
@@ -394,16 +411,21 @@ export function NewSurveyRecordScreen() {
     setPickerError(undefined);
     setIsSaving(true);
     setIsScanning(true);
+    const isVideo = selectedAsset.type === 'video';
     try {
-      savedDraftId.current = await saveDraft({ ...selectedAsset, fileName: selectedAsset.fileName ?? undefined }, {
-        submissionType: 'SINGLE_IMAGE',
+      savedDraftId.current = await saveDraft({
+        ...selectedAsset,
+        fileName: selectedAsset.fileName ?? undefined,
+        type: selectedAsset.type,
+      }, {
+        submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
         capturedAt: selectedAsset.capturedAt ?? new Date().toISOString(),
-        coordinateSource: 'IMAGE_EXIF',
+        coordinateSource: isVideo ? (selectedGpxFile ? 'GPX_FILE' : 'DEVICE_GPS') : 'IMAGE_EXIF',
         ...(selectedGps ?? {}),
-      }, draftId);
+      }, draftId, selectedGpxFile);
       openSavedDraft();
     } catch (error) {
-      console.warn('[Survey or] Unable to save survey draft:', error);
+      console.warn('[Surveyor] Unable to save survey draft:', error);
       setPickerError(error instanceof Error ? error.message : 'Unable to save the draft. Please retry.');
       setIsScanning(false);
     } finally {
@@ -423,6 +445,7 @@ export function NewSurveyRecordScreen() {
       {isScanning && selectedAsset ? (
         <SurveyScanModal
           imageUri={selectedAsset.uri}
+          isVideo={selectedAsset.type === 'video'}
           onComplete={handleScanComplete}
           onCancel={() => {
             handleScanComplete();

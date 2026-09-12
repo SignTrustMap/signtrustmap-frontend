@@ -24,6 +24,7 @@ import { readSubmittedStatus } from '@/feature/upload/utils/submission-response'
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
+import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 
 import { getMapLibre } from '@/services/maplibre';
 
@@ -74,7 +75,11 @@ export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
-  const { submissionId } = useLocalSearchParams<{ submissionId?: string }>();
+  const { submissionId, gpxUri, gpxName } = useLocalSearchParams<{
+    submissionId?: string;
+    gpxUri?: string;
+    gpxName?: string;
+  }>();
   const draftQuery = useGetSurveySubmissionStatus(submissionId);
   const saveDraft = useSaveSurveyDraft();
   const [imageUri, setImageUri] = useState<string>();
@@ -95,6 +100,7 @@ export function SurveyRecordDetailsScreen() {
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
     imageCoordinate ?? currentLocation.coordinate,
   );
+  const displayCoordinate = selectedCoordinate ?? imageCoordinate;
   const [focusRequestId, setFocusRequestId] = useState(1);
   const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
     imageCoordinate ? 'IMAGE_EXIF' : undefined,
@@ -109,8 +115,26 @@ export function SurveyRecordDetailsScreen() {
   const submissionInProgress = useRef(false);
   const hydratedId = useRef<string | undefined>(undefined);
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
-    imageCoordinate ? undefined : 'Image GPS is unavailable. Use current location before submitting.',
+    imageCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.',
   );
+
+  useEffect(() => {
+    if (!gpxUri) return;
+    let active = true;
+    void extractGpxGpsData(gpxUri).then((gpxData) => {
+      if (active && gpxData?.firstPoint) {
+        const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
+        setSelectedCoordinate(coord);
+        setCoordinateSource('GPX_FILE');
+        setLocationMessage(gpxName ? `Coordinates loaded from ${gpxName}` : undefined);
+        setFocusRequestId((r) => r + 1);
+        if (gpxData.startTime) {
+          setCapturedAt((prev) => prev || gpxData.startTime || '');
+        }
+      }
+    });
+    return () => { active = false; };
+  }, [gpxName, gpxUri]);
 
   useEffect(() => {
     const draft = draftQuery.data?.submission;
@@ -122,20 +146,40 @@ export function SurveyRecordDetailsScreen() {
     const hasCoordinate = draft.latitude != null && draft.longitude != null;
     setSelectedCoordinate(hasCoordinate ? [draft.longitude!, draft.latitude!] : undefined);
     setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
-    setLocationMessage(hasCoordinate ? undefined : 'Image GPS is unavailable. Use current location before submitting.');
-    void readDraftImage(session.account.id, draft.id).then((local) => {
+    setLocationMessage(hasCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.');
+    void readDraftImage(session.account.id, draft.id).then(async (local) => {
       if (!active) return;
-      const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE')?.file_url;
+      const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')?.file_url;
       setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
       setImageName(local?.fileName);
       setImageMimeType(local?.mimeType);
+
+      const activeGpx = gpxUri || local?.gpxUri;
+      if (activeGpx) {
+        try {
+          const gpxData = await extractGpxGpsData(activeGpx);
+          if (gpxData?.firstPoint && active) {
+            const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
+            setSelectedCoordinate(coord);
+            setCoordinateSource('GPX_FILE');
+            setLocationMessage(undefined);
+            setFocusRequestId((r) => r + 1);
+            if (gpxData.startTime && !draft.capturedAt) {
+              setCapturedAt(gpxData.startTime);
+            }
+          }
+        } catch (err) {
+          console.warn('[Surveyor] Failed to extract GPX in details:', err);
+        }
+      }
+
       hydratedId.current = draft.id;
       setIsDraftLoaded(true);
     }).catch(() => {
-      if (active) setSubmitError('Unable to restore the draft image. Reopen this page to retry.');
+      if (active) setSubmitError('Unable to restore the draft media. Reopen this page to retry.');
     });
     return () => { active = false; };
-  }, [draftQuery.data, session]);
+  }, [draftQuery.data, gpxUri, session]);
 
   const handleUseCurrentLocation = async () => {
     if (isLocating || submissionInProgress.current) return;
@@ -178,16 +222,17 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError('Use an image with GPS metadata or select your current location.');
       return;
     }
+    const isVideoDraft = draftQuery.data?.submission.submissionType === 'VIDEO_GPX'
+      || imageMimeType?.startsWith('video/')
+      || Boolean(gpxUri);
     const request: CreateSubmissionDto = {
-      submissionType: 'SINGLE_IMAGE',
+      submissionType: isVideoDraft ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
       capturedAt: new Date(captureTimestamp).toISOString(),
-      coordinateSource,
+      coordinateSource: coordinateSource ?? (isVideoDraft ? 'GPX_FILE' : 'IMAGE_EXIF'),
       latitude: selectedCoordinate[1],
       longitude: selectedCoordinate[0],
       note: note.trim(),
     };
-
-
 
     submissionInProgress.current = true;
     setIsSubmitting(true);
@@ -196,11 +241,11 @@ export function SurveyRecordDetailsScreen() {
       const { submissionType: _submissionType, ...updates } = request;
       await updateSubmission({ submissionId, request: updates });
       // A prior interrupted upload can be retried against this same draft.
-      const hasImage = draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE')
-        || draftQuery.data?.sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
-      if (!hasImage) {
-        if (!imageUri) throw new Error('This draft has no uploaded image available. Choose the image again.');
-        await saveDraft({ uri: imageUri, fileName: imageName, mimeType: imageMimeType }, request, submissionId);
+      const hasMedia = draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')
+        || draftQuery.data?.sessions.some((upload) => (upload.media_type === 'IMAGE' || upload.media_type === 'VIDEO') && upload.status === 'COMPLETED');
+      if (!hasMedia) {
+        if (!imageUri) throw new Error('This draft has no uploaded media available. Choose the file again.');
+        await saveDraft({ uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: isVideoDraft ? 'video' : 'image' }, request, submissionId);
       }
       const submitted = await submitSubmission({ submissionId });
       const submissionStatus = readSubmittedStatus(submitted);
@@ -260,7 +305,7 @@ export function SurveyRecordDetailsScreen() {
               },
             ]}
           >
-            {imageUri ? (
+            {imageUri && !imageMimeType?.startsWith('video/') && !/\.(mp4|mov|mkv)$/i.test(imageUri) ? (
               <Image
                 accessibilityLabel="Selected survey image"
                 contentFit="cover"
@@ -271,30 +316,32 @@ export function SurveyRecordDetailsScreen() {
               <>
                 <SymbolView
                   fallback={
-                    <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
+                    <Text style={[styles.imageFallback, { color: theme.placeholder }]}>
+                      {imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'VID' : 'IMG'}
+                    </Text>
                   }
                   name={{
-                    android: 'image',
-                    ios: 'photo',
-                    web: 'image',
+                    android: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'videocam' : 'image',
+                    ios: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'video' : 'photo',
+                    web: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'videocam' : 'image',
                   }}
                   size={40}
-                  tintColor={theme.placeholder}
+                  tintColor={theme.primary}
                 />
-                <Text style={[styles.placeholderLabel, { color: theme.placeholder }]}>
-                  Image preview unavailable
+                <Text style={[styles.placeholderLabel, { color: theme.textSecondary }]}>
+                  {imageName ?? (imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'Video survey recording' : 'Media preview unavailable')}
                 </Text>
               </>
             )}
           </View>
 
-          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE') && !imageUri ? (
-            <AppButton label="Choose draft image" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
+          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO') && !imageUri ? (
+            <AppButton label="Choose draft media" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
           ) : null}
           <View style={styles.section}>
             <AppInput
-              label="Photo capture time"
-              accessibilityLabel="Photo capture date and time with time zone"
+              label="Capture time"
+              accessibilityLabel="Media capture date and time with time zone"
               placeholder="YYYY-MM-DDTHH:mm:ss+07:00"
               value={capturedAt}
               onChangeText={setCapturedAt}
@@ -305,14 +352,14 @@ export function SurveyRecordDetailsScreen() {
 
           <View style={styles.section}>
             <AppInput
-              label="Image location (latitude, longitude)"
-              accessibilityLabel="Image latitude and longitude, read only"
+              label={coordinateSource === 'GPX_FILE' ? 'GPX location (latitude, longitude)' : 'Location (latitude, longitude)'}
+              accessibilityLabel="Location latitude and longitude, read only"
               editable={false}
               showSoftInputOnFocus={false}
-              value={imageCoordinate
-                ? `${imageCoordinate[1].toFixed(6)}, ${imageCoordinate[0].toFixed(6)}`
+              value={displayCoordinate
+                ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
                 : ''}
-              placeholder="No image location available"
+              placeholder={coordinateSource === 'GPX_FILE' ? 'Extracting GPX location...' : 'No location available'}
               leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
               containerStyle={styles.imageLocationInput}
             />

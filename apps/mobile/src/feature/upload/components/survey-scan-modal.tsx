@@ -1,15 +1,16 @@
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, StyleSheet, View, useAnimatedValue } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Modal, StyleSheet, Text, View, useAnimatedValue } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type SurveyScanModalProps = {
   imageUri: string;
+  isVideo?: boolean;
   onComplete: () => void;
   onCancel: () => void;
 };
@@ -18,7 +19,8 @@ const SCAN_DURATION_MS = 1700;
 const PREVIEW_HEIGHT = 220;
 const ARROW_WIDTH = 32;
 
-export function SurveyScanModal({ imageUri, onComplete, onCancel }: SurveyScanModalProps) {
+export function SurveyScanModal({ imageUri, isVideo, onComplete, onCancel }: SurveyScanModalProps) {
+  const isVideoAsset = isVideo || /\.(mp4|mov|mkv|webm|avi)$/i.test(imageUri);
   const theme = useTheme();
   const reduceMotion = useReducedMotion();
   const progress = useAnimatedValue(0);
@@ -50,6 +52,36 @@ export function SurveyScanModal({ imageUri, onComplete, onCancel }: SurveyScanMo
       if (finished) onComplete();
     });
   };
+
+  if (isVideoAsset) {
+    return (
+      <Modal
+        animationType="fade"
+        transparent
+        visible
+        statusBarTranslucent
+        onShow={startScan}
+        onRequestClose={() => {
+          animation.current?.stop();
+          onCancel();
+        }}
+      >
+        <SafeAreaView style={styles.backdrop}>
+          <View
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+            style={[
+              styles.loadingPanel,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>Loading...</Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -234,4 +266,24 @@ const styles = StyleSheet.create({
   fillHighlight: { position: 'absolute', top: 4, left: 9, right: 9, height: 3, borderRadius: Rounded.round },
   fillEdge: { ...StyleSheet.absoluteFill, borderWidth: 1, borderRadius: Rounded.round },
   arrow: { position: 'absolute', top: 0, left: 0, bottom: 0, width: ARROW_WIDTH, alignItems: 'center', justifyContent: 'center' },
+  loadingPanel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.six,
+    paddingVertical: Spacing.five,
+    borderRadius: Rounded.xlg,
+    borderWidth: 1,
+    gap: Spacing.three,
+    minWidth: 160,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  loadingText: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

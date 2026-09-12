@@ -68,6 +68,36 @@ type SignCalloutProps = {
   sign: RouteSign;
 };
 
+function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: string }) {
+  const [hasError, setHasError] = useState(false);
+  const source = imageUrl && !hasError ? { uri: imageUrl } : stopSignImage;
+
+  return (
+    <Image
+      accessibilityLabel={title}
+      source={source}
+      onError={() => setHasError(true)}
+      resizeMode="contain"
+      style={styles.calloutImage}
+    />
+  );
+}
+
+function SignMarkerIcon({ imageUrl, name, signCode }: { imageUrl?: string; name?: string; signCode?: string }) {
+  const [hasError, setHasError] = useState(false);
+  const source = imageUrl && !hasError ? { uri: imageUrl } : stopSignImage;
+
+  return (
+    <Image
+      accessibilityLabel={name || signCode}
+      source={source}
+      onError={() => setHasError(true)}
+      resizeMode="contain"
+      style={styles.stopSignImage}
+    />
+  );
+}
+
 function SignCallout({ sign }: SignCalloutProps) {
   const theme = useTheme();
   const signTitle = sign.name || sign.signCode || 'Traffic Sign';
@@ -78,12 +108,7 @@ function SignCallout({ sign }: SignCalloutProps) {
         backgroundColor: theme.backgroundElement,
         shadowColor: '#09233C',
       }]}>
-        <Image
-          accessibilityLabel={signTitle}
-          source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
-          resizeMode="contain"
-          style={styles.calloutImage}
-        />
+        <SignCalloutImage imageUrl={sign.imageUrl} title={signTitle} />
         <View style={styles.calloutText}>
           <Text numberOfLines={2} style={[styles.calloutTitle, { color: theme.text }]}>
             {signTitle}
@@ -265,11 +290,10 @@ export function NavigationMapView({
               accessibilityRole="button"
               style={styles.stopSignMarker}
             >
-              <Image
-                accessibilityLabel={sign.name || sign.signCode}
-                source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
-                resizeMode="contain"
-                style={styles.stopSignImage}
+              <SignMarkerIcon
+                imageUrl={sign.imageUrl}
+                name={sign.name}
+                signCode={sign.signCode}
               />
             </View>
           </View>

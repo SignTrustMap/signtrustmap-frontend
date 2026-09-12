@@ -2,6 +2,8 @@ import type { MapCoordinate } from '@/types/navigation/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { apiRequest } from '@/api/api-client';
 
+import { resolveImageUrl } from '@/feature/navigation/utils/signs';
+
 type BoundsResponse = {
     signs: {
         id: string;
@@ -27,7 +29,7 @@ export async function getSignsInBounds(
     return response.signs.map((sign) => ({
         coordinate: [sign.longitude, sign.latitude],
         id: sign.id,
-        imageUrl: sign.signCropUrl,
+        imageUrl: resolveImageUrl(sign.signCropUrl),
         name: sign.signType.nameEn,
         signCode: sign.signType.signCode,
     }));
