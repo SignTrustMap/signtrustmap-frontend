@@ -1,5 +1,5 @@
 import type { MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
@@ -62,6 +62,47 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
+// ─── Sign callout tooltip ────────────────────────────────────────────────────
+
+type SignCalloutProps = {
+  sign: RouteSign;
+};
+
+function SignCallout({ sign }: SignCalloutProps) {
+  const theme = useTheme();
+  const signTitle = sign.name || sign.signCode || 'Traffic Sign';
+
+  return (
+    <View style={styles.calloutWrapper}>
+      <View style={[styles.calloutCard, {
+        backgroundColor: theme.backgroundElement,
+        shadowColor: '#09233C',
+      }]}>
+        <Image
+          accessibilityLabel={signTitle}
+          source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
+          resizeMode="contain"
+          style={styles.calloutImage}
+        />
+        <View style={styles.calloutText}>
+          <Text numberOfLines={2} style={[styles.calloutTitle, { color: theme.text }]}>
+            {signTitle}
+          </Text>
+          {sign.signCode ? (
+            <Text numberOfLines={1} style={[styles.calloutCode, { color: theme.textSecondary }]}>
+              {sign.signCode}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      {/* Downward-pointing triangle arrow */}
+      <View style={[styles.calloutArrow, { borderTopColor: theme.backgroundElement }]} />
+    </View>
+  );
+}
+
+// ─── Main map view ───────────────────────────────────────────────────────────
+
 export function NavigationMapView({
   onBoundsChange,
   destination,
@@ -76,6 +117,27 @@ export function NavigationMapView({
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
+
+  // Auto-dismiss the callout after 4 seconds
+  useEffect(() => {
+    if (!selectedSignId) return;
+
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      setSelectedSignId(null);
+    }, 4000);
+
+    return () => {
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    };
+  }, [selectedSignId]);
+
+  const handleSignPress = (sign: RouteSign) => {
+    setSelectedSignId((prev) => (prev === sign.id ? null : sign.id));
+  };
+
   const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
     onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
   };
@@ -189,14 +251,27 @@ export function NavigationMapView({
       ) : null}
 
       {routeSigns.map((sign) => (
-        <Marker anchor="center" id={`route-sign-${sign.id}`} key={sign.id} lngLat={sign.coordinate}>
-          <View style={styles.stopSignMarker}>
-            <Image
-              accessibilityLabel={sign.name || sign.signCode}
-              source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
-              resizeMode="contain"
-              style={styles.stopSignImage}
-            />
+        <Marker
+          anchor="bottom"
+          id={`route-sign-${sign.id}`}
+          key={sign.id}
+          lngLat={sign.coordinate}
+          onPress={() => handleSignPress(sign)}
+        >
+          <View style={styles.signMarkerRoot}>
+            {selectedSignId === sign.id ? <SignCallout sign={sign} /> : null}
+            <View
+              accessibilityLabel={`View details for ${sign.name || sign.signCode || 'sign'}`}
+              accessibilityRole="button"
+              style={styles.stopSignMarker}
+            >
+              <Image
+                accessibilityLabel={sign.name || sign.signCode}
+                source={sign.imageUrl ? { uri: sign.imageUrl } : stopSignImage}
+                resizeMode="contain"
+                style={styles.stopSignImage}
+              />
+            </View>
           </View>
         </Marker>
       ))}
@@ -262,6 +337,10 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     lineHeight: 19,
   },
+  // ── Sign marker ─────────────────────────────────────────────────────────────
+  signMarkerRoot: {
+    alignItems: 'center',
+  },
   stopSignMarker: {
     width: 36,
     height: 36,
@@ -277,6 +356,58 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
   },
+  // ── Callout tooltip ──────────────────────────────────────────────────────────
+  calloutWrapper: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  calloutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    width: 200,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  calloutImage: {
+    width: 32,
+    height: 32,
+    flexShrink: 0,
+  },
+  calloutText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  calloutTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 16,
+  },
+  calloutCode: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 600,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  // Downward-pointing CSS triangle
+  calloutArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 7,
+    borderRightColor: 'transparent',
+    borderTopWidth: 7,
+    // borderTopColor is set inline from theme
+  },
+  // ── Location markers ─────────────────────────────────────────────────────────
   currentLocationHalo: {
     width: 58,
     height: 58,
