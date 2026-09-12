@@ -145,6 +145,17 @@ export function SurveyRecordDetailsScreen() {
   const submissionStatus = draftQuery.data?.submission.status;
   const isEditable = isDirty || submissionStatus === 'DRAFT' || submissionStatus === 'PENDING_CORRECTION';
 
+  // GPX fields are only relevant for video-based (VIDEO_GPX) submissions.
+  // For plain image submissions we hide the GPX section entirely.
+  const isImageSubmission =
+    draftQuery.data?.submission.submissionType === 'SINGLE_IMAGE'
+    || (
+      draftQuery.data?.submission.submissionType !== 'VIDEO_GPX'
+      && !imageMimeType?.startsWith('video/')
+      && !(imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+      && !activeGpxUri
+    );
+
   const handlePickGpx = async () => {
     try {
       const DocumentPicker = await import('expo-document-picker');
@@ -451,26 +462,28 @@ export function SurveyRecordDetailsScreen() {
             />
           </View>
 
-          <View style={styles.section}>
-            <AppInput
-              label="GPX file"
-              accessibilityLabel="Attached GPX track file"
-              editable={false}
-              showSoftInputOnFocus={false}
-              value={displayGpxName}
-              placeholder="No GPX file attached"
-              leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
-              containerStyle={styles.imageLocationInput}
-            />
-            {!isSubmitting ? (
-              <AppButton
-                label={displayGpxName ? 'Change GPX file' : 'Attach GPX file'}
-                variant="surface"
-                onPress={handlePickGpx}
-                style={styles.attachGpxButton}
+          {!isImageSubmission ? (
+            <View style={styles.section}>
+              <AppInput
+                label="GPX file"
+                accessibilityLabel="Attached GPX track file"
+                editable={false}
+                showSoftInputOnFocus={false}
+                value={displayGpxName}
+                placeholder="No GPX file attached"
+                leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
+                containerStyle={styles.imageLocationInput}
               />
-            ) : null}
-          </View>
+              {!isSubmitting ? (
+                <AppButton
+                  label={displayGpxName ? 'Change GPX file' : 'Attach GPX file'}
+                  variant="surface"
+                  onPress={handlePickGpx}
+                  style={styles.attachGpxButton}
+                />
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={styles.section}>
             <AppInput

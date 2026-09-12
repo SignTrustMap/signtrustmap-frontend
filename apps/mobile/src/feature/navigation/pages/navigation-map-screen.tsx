@@ -472,6 +472,26 @@ export function NavigationMapScreen() {
   const handleGo = async () => {
     if (!selectedDestination) return;
 
+    // If the user has already chosen an explicit start point, go straight to
+    // navigation with that start — do NOT overwrite it with GPS.
+    if (routeStart) {
+      router.replace({
+        pathname: "/home",
+        params: {
+          destinationId: selectedDestination.id,
+          destinationLat: String(selectedDestination.coordinate[1]),
+          destinationLng: String(selectedDestination.coordinate[0]),
+          destinationSubtitle: selectedDestination.subtitle,
+          destinationTitle: selectedDestination.title,
+          startLat: String(routeStart[1]),
+          startLng: String(routeStart[0]),
+          ...(startTitle ? { startTitle } : {}),
+          ...(startId ? { startId } : {}),
+        },
+      });
+      return;
+    }
+
     if (Platform.OS !== "web") {
       const nativeGpsStart = await getNativeGpsStart();
 
@@ -486,6 +506,7 @@ export function NavigationMapScreen() {
             destinationTitle: selectedDestination.title,
             startLat: String(nativeGpsStart[1]),
             startLng: String(nativeGpsStart[0]),
+            startTitle: "Current Location",
           },
         });
         return;
