@@ -72,6 +72,8 @@ export function NavigationMapScreen() {
   const sheetExpandedRef = useRef(false);
   const gestureStart = useRef(0);
   const gestureStartedExpanded = useRef(false);
+  const directionsScrollRef = useRef<ScrollView>(null);
+  const stepLayoutOffsets = useRef<number[]>([]);
   const collapsedSheetHeight = Math.min(280, windowHeight * 0.36);
   const expandedSheetHeight = Math.max(collapsedSheetHeight, Math.min(560, windowHeight * 0.68));
   const sheetTravel = Math.max(1, expandedSheetHeight - collapsedSheetHeight);
@@ -220,7 +222,6 @@ export function NavigationMapScreen() {
     isNavigating && navigationSession?.hasLiveLocation,
   );
   const visibleSigns = hasSelectedRoute ? plannedSigns : mapSigns;
-
   const sampleRouteSigns = useMemo((): RouteSign[] => {
     if (!hasSelectedRoute || !routeCoordinates || routeCoordinates.length < 2) return [];
     const nearStart = routeCoordinates[Math.min(1, routeCoordinates.length - 1)];
@@ -283,6 +284,7 @@ export function NavigationMapScreen() {
         (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress,
       ),
       step: routeSteps[stepIndex],
+      stepIndex,
     };
   }, [
     isNavigating,
@@ -304,6 +306,15 @@ export function NavigationMapScreen() {
   useEffect(() => {
     setNavigationError(undefined);
   }, [routeKey, vehicleMode]);
+
+  useEffect(() => {
+    const stepIndex = activeManeuver?.stepIndex;
+    if (stepIndex == null) return;
+    const offset = stepLayoutOffsets.current[stepIndex];
+    if (offset != null) {
+      directionsScrollRef.current?.scrollTo({ y: offset, animated: true });
+    }
+  }, [activeManeuver?.stepIndex]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !hasLiveLocation) return;
@@ -809,44 +820,56 @@ export function NavigationMapScreen() {
               {routeSteps ? (
                 routeSteps.length > 0 ? (
                   <ScrollView
+                    ref={directionsScrollRef}
                     contentContainerStyle={styles.directionsList}
                     nestedScrollEnabled
                     showsVerticalScrollIndicator
                     style={styles.directionsScroll}
                   >
-                    {routeSteps.map((step, index) => (
-                      <View
-                        key={`${index}-${step.maneuver.type}-${step.name}`}
-                        style={styles.directionRow}
-                      >
-                        <Text
+                    {routeSteps.map((step, index) => {
+                      const isActiveStep = isNavigating && activeManeuver?.stepIndex === index;
+                      return (
+                        <View
+                          key={`${index}-${step.maneuver.type}-${step.name}`}
+                          onLayout={(e) => {
+                            stepLayoutOffsets.current[index] = e.nativeEvent.layout.y;
+                          }}
                           style={[
-                            styles.directionNumber,
-                            { color: theme.primary },
+                            styles.directionRow,
+                            isActiveStep && styles.directionRowActive,
+                            isActiveStep && { backgroundColor: theme.backgroundSelected },
                           ]}
                         >
-                          {index + 1}
-                        </Text>
-                        <View style={styles.directionCopy}>
                           <Text
                             style={[
-                              styles.directionInstruction,
-                              { color: theme.text },
+                              styles.directionNumber,
+                              { color: isActiveStep ? theme.primary : theme.textSecondary },
                             ]}
                           >
-                            {formatRouteInstruction(step)}
+                            {index + 1}
                           </Text>
-                          <Text
-                            style={[
-                              styles.directionDistance,
-                              { color: theme.textSecondary },
-                            ]}
-                          >
-                            {formatRouteDistance(step.distance)}
-                          </Text>
+                          <View style={styles.directionCopy}>
+                            <Text
+                              style={[
+                                styles.directionInstruction,
+                                { color: theme.text },
+                                isActiveStep && styles.directionInstructionActive,
+                              ]}
+                            >
+                              {formatRouteInstruction(step)}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.directionDistance,
+                                { color: theme.textSecondary },
+                              ]}
+                            >
+                              {formatRouteDistance(step.distance)}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </ScrollView>
                 ) : (
                   <Text
@@ -1351,6 +1374,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.two,
     alignItems: "flex-start",
+  },
+  directionRowActive: {
+    borderRadius: Rounded.sm,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.half,
+    marginHorizontal: -Spacing.one,
+  },
+  directionInstructionActive: {
+    fontWeight: 900,
   },
   directionNumber: {
     width: 22,
