@@ -50,6 +50,20 @@ export default function LoginScreen() {
     setLoginError('Google sign-in is not available in the mobile app yet.');
   };
 
+  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
+    if (isSubmitting) return;
+    setEmail(quickEmail);
+    setPassword(quickPass);
+    setErrors({});
+    setLoginError(undefined);
+    loginMutation.reset();
+    try {
+      await loginMutation.mutateAsync({ email: quickEmail, password: quickPass });
+      router.replace('/');
+    } catch {
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -129,33 +143,27 @@ export default function LoginScreen() {
                       styles.devChip,
                       { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
                     ]}
-                    onPress={() => {
-                      setEmail('demo@stm.dev');
-                      loginMutation.reset();
-                      setPassword('Demo@123');
-                      setErrors({});
-                      setLoginError(undefined);
-                    }}
+                    onPress={() => handleQuickLogin('demo@stm.dev', 'Demo@123')}
                   >
                     <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All Roles)</Text>
                   </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    style={({ pressed }) => [
-                      styles.devChip,
-                      { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
-                    ]}
-                    onPress={() => {
-                      setEmail('surveyor@stm.dev');
-                      loginMutation.reset();
-                      setPassword('Surveyor@123');
-                      setErrors({});
-                      setLoginError(undefined);
-                    }}
-                  >
-                    <Text style={[styles.devChipText, { color: theme.text }]}>Surveyor</Text>
-                  </Pressable>
+                </View>
+                <Text style={[styles.devSubheader, { color: theme.textSecondary }]}>REVIEWERS (CONSENSUS TESTING)</Text>
+                <View style={styles.reviewerGrid}>
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <Pressable
+                      key={num}
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      style={({ pressed }) => [
+                        styles.reviewerChip,
+                        { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                      ]}
+                      onPress={() => handleQuickLogin(`reviewer${num}@stm.dev`, 'Reviewer@123')}
+                    >
+                      <Text style={[styles.devChipText, { color: theme.text }]}>Reviewer {num}</Text>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
             ) : null}
@@ -321,5 +329,29 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 600,
+  },
+  devSubheader: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    marginTop: Spacing.one,
+    textTransform: 'uppercase',
+  },
+  reviewerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  reviewerChip: {
+    minWidth: '28%',
+    flexGrow: 1,
+    minHeight: 38,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

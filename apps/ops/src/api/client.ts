@@ -19,7 +19,7 @@ export interface ApiResponse<T = any> {
  * Base Axios Client configuration
  */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://api.signtrustmap.site',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://preview.api.signmap.site',
   timeout: 20000,
   headers: {
     'Content-Type': 'application/json',

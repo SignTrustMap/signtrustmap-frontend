@@ -43,6 +43,14 @@ function normalizeEnglishSearch(value: string) {
 function SignCard({ sign }: { sign: CatalogSign }) {
   const theme = useTheme();
   const colors = categoryColor(sign.category.code);
+  const [imageError, setImageError] = useState(false);
+
+  const hasValidUrl =
+    sign.representativeImageKey &&
+    !sign.representativeImageKey.includes('signtrustmap.vn') &&
+    !imageError;
+
+  const imageSource = hasValidUrl ? { uri: sign.representativeImageKey! } : fallbackSignImage;
 
   return (
     <View
@@ -54,8 +62,9 @@ function SignCard({ sign }: { sign: CatalogSign }) {
       <View style={[styles.imageShell, { backgroundColor: theme.neutral }]}>
         <Image
           accessibilityLabel={`${sign.nameEn || sign.nameVi} example`}
-          contentFit="cover"
-          source={sign.representativeImageKey || fallbackSignImage}
+          contentFit="contain"
+          onError={() => setImageError(true)}
+          source={imageSource}
           style={styles.signImage}
         />
       </View>

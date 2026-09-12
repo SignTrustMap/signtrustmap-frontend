@@ -59,7 +59,7 @@
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": true,
           "granularPermissions": [
-            "photos",
+            "photo",
             "video"
           ]
         }

@@ -388,8 +388,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail('staff@example.com')
-                  setPassword('password')
+                  setEmail('demo@stm.dev')
+                  setPassword('Demo@123')
                 }}
                 className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                   isDark
@@ -402,8 +402,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEmail('admin@example.com')
-                  setPassword('password')
+                  setEmail('admin@stm.dev')
+                  setPassword('Admin@123')
                 }}
                 className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors cursor-pointer ${
                   isDark

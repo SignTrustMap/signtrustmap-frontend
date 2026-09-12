@@ -1112,7 +1112,6 @@ import {
   type ReviewActionType,
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
-import { sampleReviewSubmissions } from '@/feature/review/data/sample-submissions';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -1449,6 +1448,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     recheckingSubmission,
     reviewCheckedSubmissionAgain,
     reviewHistory,
+    totalSubmissions,
     undoLastReview,
   } = useReviewWorkflow();
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
@@ -1463,20 +1463,25 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const checkedReview = checkingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
   const displayedReviewAction = checkedReview?.action ?? recheckingPreviousAction;
   const submission = checkedReview?.submission ?? pendingSubmissions[0];
+  const totalInQueue = Math.max(
+    totalSubmissions,
+    reviewHistory.length + pendingSubmissions.length,
+    1,
+  );
   const reviewPosition = checkingSubmission
     ? checkedReviewIndex + 1
     : recheckingSubmission
       ? (recheckingReviewIndex ?? 0) + 1
       : Math.min(
         reviewHistory.length + (submission ? 1 : 0),
-        sampleReviewSubmissions.length,
+        totalInQueue,
       );
 
-  const completeReview = (action: ReviewActionType) => {
+  const completeReview = (action: ReviewActionType, details?: { declineReason?: string; declineNote?: string }) => {
     if (!submission) return;
     const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
 
-    completeCurrentReview(action);
+    completeCurrentReview(action, details);
 
     const toastMessages: Record<ReviewActionType, string> = {
       approved: 'Sign approved',
@@ -1501,7 +1506,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     const canDecline = declineReason && (declineReason !== 'Other' || declineReasonDetail.trim());
     if (!canDecline) return;
 
-    completeReview('declined');
+    completeReview('declined', { declineReason, declineNote: declineReasonDetail });
     setDeclineReason(undefined);
     setDeclineReasonDetail('');
     closeSheet();
@@ -1510,7 +1515,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const confirmReport = () => {
     if (!reportNote.trim()) return;
 
-    completeReview('reported');
+    completeReview('reported', { declineNote: reportNote });
     setReportNote('');
     closeSheet();
   };
@@ -1556,7 +1561,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               styles.progressFill,
               {
                 backgroundColor: Colors.primary,
-                width: `${(reviewPosition / sampleReviewSubmissions.length) * 100}%`,
+                width: `${Math.min(100, (reviewPosition / totalInQueue) * 100)}%`,
               },
             ]}
           />
@@ -1565,7 +1570,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           <Text style={[styles.counter, { color: theme.textSecondary }]}>
             {checkingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
             {reviewPosition} OF{' '}
-            {sampleReviewSubmissions.length}
+            {totalInQueue}
           </Text>
         </View>
 
