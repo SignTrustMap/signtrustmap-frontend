@@ -85,6 +85,8 @@ export function SurveyRecordDetailsScreen() {
   const [imageUri, setImageUri] = useState<string>();
   const [imageName, setImageName] = useState<string>();
   const [imageMimeType, setImageMimeType] = useState<string>();
+  const [savedGpxUri, setSavedGpxUri] = useState<string>();
+  const [savedGpxName, setSavedGpxName] = useState<string>();
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const latitude = draftQuery.data?.submission.latitude;
   const longitude = draftQuery.data?.submission.longitude;
@@ -109,14 +111,77 @@ export function SurveyRecordDetailsScreen() {
   const [note, setNote] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isModified, setIsModified] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
   const { mutateAsync: updateSubmission } = useUpdateSurveySubmission();
   const { mutateAsync: submitSubmission } = useSubmitSurveySubmission();
   const submissionInProgress = useRef(false);
   const hydratedId = useRef<string | undefined>(undefined);
+  const [initialBaseline, setInitialBaseline] = useState<{
+    note: string;
+    capturedAt: string;
+    longitude?: number;
+    latitude?: number;
+    gpxUri?: string;
+  }>();
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
     imageCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.',
   );
+
+  const remoteGpx = draftQuery.data?.mediaFiles?.find((f) => f.media_type === 'GPX');
+  const activeGpxUri = gpxUri || savedGpxUri;
+  const activeGpxName = gpxName || savedGpxName;
+  const displayGpxName = activeGpxName
+    || (activeGpxUri ? activeGpxUri.split('/').pop()?.split('?')[0] : undefined)
+    || (remoteGpx ? (remoteGpx.file_url?.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
+
+  const isDirty = isModified
+    || (Boolean(initialBaseline) && (
+      note !== initialBaseline!.note
+      || capturedAt !== initialBaseline!.capturedAt
+      || (selectedCoordinate?.[0] !== initialBaseline!.longitude || selectedCoordinate?.[1] !== initialBaseline!.latitude)
+      || (activeGpxUri !== initialBaseline!.gpxUri)
+    ));
+  const submissionStatus = draftQuery.data?.submission.status;
+  const isEditable = isDirty || submissionStatus === 'DRAFT' || submissionStatus === 'PENDING_CORRECTION';
+
+  const handlePickGpx = async () => {
+    try {
+      const DocumentPicker = await import('expo-document-picker');
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: ['application/gpx+xml', 'application/octet-stream', '*/*'],
+      });
+
+      if (!result.canceled) {
+        const file = result.assets[0];
+        const name = file.name ?? '';
+        if (!name.toLowerCase().endsWith('.gpx')) {
+          setSubmitError('Please select a valid GPX file (.gpx).');
+          return;
+        }
+        setSavedGpxUri(file.uri);
+        setSavedGpxName(name);
+        setIsModified(true);
+        setSubmitError(undefined);
+
+        const gpxData = await extractGpxGpsData(file.uri);
+        if (gpxData?.firstPoint) {
+          const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
+          setSelectedCoordinate(coord);
+          setCoordinateSource('GPX_FILE');
+          setLocationMessage(`Coordinates loaded from ${name}`);
+          setFocusRequestId((r) => r + 1);
+          if (gpxData.startTime && !capturedAt) {
+            setCapturedAt(gpxData.startTime);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Surveyor] Unable to pick GPX in details screen:', err);
+    }
+  };
 
   useEffect(() => {
     if (!gpxUri) return;
@@ -153,6 +218,8 @@ export function SurveyRecordDetailsScreen() {
       setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
       setImageName(local?.fileName);
       setImageMimeType(local?.mimeType);
+      if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
+      if (local?.gpxName) setSavedGpxName(local.gpxName);
 
       const activeGpx = gpxUri || local?.gpxUri;
       if (activeGpx) {
@@ -174,9 +241,20 @@ export function SurveyRecordDetailsScreen() {
       }
 
       hydratedId.current = draft.id;
+      setInitialBaseline({
+        note: draft.note ?? '',
+        capturedAt: draft.capturedAt ?? '',
+        longitude: hasCoordinate ? draft.longitude! : undefined,
+        latitude: hasCoordinate ? draft.latitude! : undefined,
+        gpxUri: local?.gpxUri ?? gpxUri,
+      });
       setIsDraftLoaded(true);
+      setIsModified(false);
     }).catch(() => {
-      if (active) setSubmitError('Unable to restore the draft media. Reopen this page to retry.');
+      if (active) {
+        setIsDraftLoaded(true);
+        setSubmitError('Unable to restore the draft media. Reopen this page to retry.');
+      }
     });
     return () => { active = false; };
   }, [draftQuery.data, gpxUri, session]);
@@ -191,6 +269,8 @@ export function SurveyRecordDetailsScreen() {
       const coordinate = await getCurrentSurveyCoordinate();
       setSelectedCoordinate(coordinate);
       setCoordinateSource('DEVICE_GPS');
+      setIsModified(true);
+      setSubmitError(undefined);
       setFocusRequestId((requestId) => requestId + 1);
     } catch (error) {
       setLocationMessage(
@@ -205,7 +285,7 @@ export function SurveyRecordDetailsScreen() {
 
   const handleSubmit = async () => {
     if (submissionInProgress.current || isLocating) return;
-    if (!submissionId || !isDraftLoaded || draftQuery.data?.submission.status !== 'DRAFT') {
+    if (!submissionId || !isDraftLoaded || !isEditable) {
       setSubmitError('Load an editable draft before submitting.');
       return;
     }
@@ -222,13 +302,16 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError('Use an image with GPS metadata or select your current location.');
       return;
     }
+    const activeGpxUri = gpxUri || savedGpxUri;
+    const activeGpxName = gpxName || savedGpxName;
     const isVideoDraft = draftQuery.data?.submission.submissionType === 'VIDEO_GPX'
       || imageMimeType?.startsWith('video/')
-      || Boolean(gpxUri);
+      || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+      || Boolean(activeGpxUri);
     const request: CreateSubmissionDto = {
       submissionType: isVideoDraft ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
       capturedAt: new Date(captureTimestamp).toISOString(),
-      coordinateSource: coordinateSource ?? (isVideoDraft ? 'GPX_FILE' : 'IMAGE_EXIF'),
+      coordinateSource: coordinateSource ?? (isVideoDraft ? (activeGpxUri ? 'GPX_FILE' : 'DEVICE_GPS') : 'IMAGE_EXIF'),
       latitude: selectedCoordinate[1],
       longitude: selectedCoordinate[0],
       note: note.trim(),
@@ -240,12 +323,25 @@ export function SurveyRecordDetailsScreen() {
     try {
       const { submissionType: _submissionType, ...updates } = request;
       await updateSubmission({ submissionId, request: updates });
-      // A prior interrupted upload can be retried against this same draft.
-      const hasMedia = draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')
-        || draftQuery.data?.sessions.some((upload) => (upload.media_type === 'IMAGE' || upload.media_type === 'VIDEO') && upload.status === 'COMPLETED');
-      if (!hasMedia) {
+
+      // Ensure both the video and GPX media sessions are completed before submitting
+      const mediaFiles = draftQuery.data?.mediaFiles ?? [];
+      const sessions = draftQuery.data?.sessions ?? [];
+      const hasMainMedia = mediaFiles.some((file) => file.media_type === (isVideoDraft ? 'VIDEO' : 'IMAGE'))
+        || sessions.some((upload) => upload.media_type === (isVideoDraft ? 'VIDEO' : 'IMAGE') && upload.status === 'COMPLETED');
+      const hasGpxMedia = !isVideoDraft
+        || mediaFiles.some((file) => file.media_type === 'GPX')
+        || sessions.some((upload) => upload.media_type === 'GPX' && upload.status === 'COMPLETED');
+
+      if (!hasMainMedia || (!hasGpxMedia && activeGpxUri)) {
         if (!imageUri) throw new Error('This draft has no uploaded media available. Choose the file again.');
-        await saveDraft({ uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: isVideoDraft ? 'video' : 'image' }, request, submissionId);
+        const targetGpx = activeGpxUri ? { uri: activeGpxUri, name: activeGpxName } : undefined;
+        await saveDraft(
+          { uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: isVideoDraft ? 'video' : 'image' },
+          request,
+          submissionId,
+          targetGpx,
+        );
       }
       const submitted = await submitSubmission({ submissionId });
       const submissionStatus = readSubmittedStatus(submitted);
@@ -260,6 +356,7 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError(
         error instanceof Error ? error.message : 'The sign could not be submitted. Please retry.',
       );
+      setIsModified(true);
     } finally {
       submissionInProgress.current = false;
       setIsSubmitting(false);
@@ -344,10 +441,35 @@ export function SurveyRecordDetailsScreen() {
               accessibilityLabel="Media capture date and time with time zone"
               placeholder="YYYY-MM-DDTHH:mm:ss+07:00"
               value={capturedAt}
-              onChangeText={setCapturedAt}
+              onChangeText={(text) => {
+                setCapturedAt(text);
+                setIsModified(true);
+                setSubmitError(undefined);
+              }}
               autoCapitalize="none"
               editable={!isSubmitting}
             />
+          </View>
+
+          <View style={styles.section}>
+            <AppInput
+              label="GPX file"
+              accessibilityLabel="Attached GPX track file"
+              editable={false}
+              showSoftInputOnFocus={false}
+              value={displayGpxName}
+              placeholder="No GPX file attached"
+              leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
+              containerStyle={styles.imageLocationInput}
+            />
+            {!isSubmitting ? (
+              <AppButton
+                label={displayGpxName ? 'Change GPX file' : 'Attach GPX file'}
+                variant="surface"
+                onPress={handlePickGpx}
+                style={styles.attachGpxButton}
+              />
+            ) : null}
           </View>
 
           <View style={styles.section}>
@@ -452,7 +574,11 @@ export function SurveyRecordDetailsScreen() {
             <AppInput
               label={'Note'}
               value={note}
-              onChangeText={setNote}
+              onChangeText={(text) => {
+                setNote(text);
+                setIsModified(true);
+                setSubmitError(undefined);
+              }}
               maxLength={2000}
               editable={!isSubmitting}
               accessibilityLabel="Survey note"
@@ -472,7 +598,7 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
-            disabled={isSubmitting || isLocating || !isDraftLoaded || draftQuery.data?.submission.status !== 'DRAFT'}
+            disabled={isSubmitting || isLocating || !isDraftLoaded || !isEditable}
             label={isSubmitting ? 'Submitting...' : 'Submit'}
             onPress={handleSubmit}
             style={styles.submitButton}
@@ -573,6 +699,9 @@ const styles = StyleSheet.create({
   },
   imageLocationInput: {
     paddingLeft: Spacing.two,
+  },
+  attachGpxButton: {
+    marginTop: Spacing.two,
   },
   mapEmptyState: {
     alignItems: 'center',

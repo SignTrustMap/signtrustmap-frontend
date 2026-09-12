@@ -2,7 +2,7 @@ import { useRef } from 'react';
 
 import { useSession } from '@/context/session-provider';
 import { useCompleteSurveyUpload, useCreateSurveySubmission, useInitializeSurveyUpload, useUploadSurveyChunk } from './use-survey-submission';
-import { prepareSurveyImage, type SurveyImage } from '../utils/survey-image';
+import { prepareSurveyGpx, prepareSurveyImage, type SurveyImage } from '../utils/survey-image';
 import { readSubmissionId } from '../utils/submission-response';
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
@@ -14,6 +14,9 @@ type DraftImage = SurveyImage & {
   uploadCompleted?: boolean;
   gpxUri?: string;
   gpxName?: string;
+  gpxSessionId?: string;
+  gpxChunkUploaded?: boolean;
+  gpxUploadCompleted?: boolean;
 };
 const draftKey = (accountId: string, submissionId: string) => `survey-draft-${accountId}-${submissionId}`;
 
@@ -86,6 +89,28 @@ export function useSaveSurveyDraft() {
       draft.uploadCompleted = true;
       await persist();
     }
+
+    const targetGpxUri = gpx?.uri ?? draft.gpxUri;
+    if (targetGpxUri && !draft.gpxUploadCompleted) {
+      if (!draft.gpxChunkUploaded) {
+        const preparedGpx = await prepareSurveyGpx({ uri: targetGpxUri, name: gpx?.name ?? draft.gpxName });
+        if (!draft.gpxSessionId) {
+          const result = await initialize.mutateAsync({ submissionId: draft.submissionId, request: {
+            originalFilename: preparedGpx.fileName, mediaType: 'GPX', totalChunks: 1, totalSizeBytes: preparedGpx.sizeBytes,
+          } });
+          draft.gpxSessionId = result.sessionId;
+          await persist();
+        }
+        await upload.mutateAsync({ sessionId: draft.gpxSessionId, request: preparedGpx.chunk });
+        draft.gpxChunkUploaded = true;
+        await persist();
+      }
+      if (!draft.gpxSessionId) throw new Error('GPX upload session is unavailable. Please retry.');
+      await complete.mutateAsync({ sessionId: draft.gpxSessionId });
+      draft.gpxUploadCompleted = true;
+      await persist();
+    }
+
     return draft.submissionId;
   };
 }

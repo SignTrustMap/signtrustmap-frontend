@@ -9,6 +9,11 @@ export type SurveyImage = {
   uri: string;
 };
 
+export type SurveyGpx = {
+  name?: string;
+  uri: string;
+};
+
 function imageMimeType(fileName: string, preferred?: string) {
   if (preferred?.startsWith('image/') || preferred?.startsWith('video/')) return preferred;
   const extension = fileName.toLowerCase().split('.').pop();
@@ -45,6 +50,30 @@ export async function prepareSurveyImage(image: SurveyImage) {
     // Supply a name explicitly for expo-blob on native as well.
     // expo-blob's bytes() uses ArrayBufferLike; DOM types require ArrayBuffer.
     file: Object.assign(blob.slice(0, blob.size, mimeType), { name: fileName }) as unknown as globalThis.Blob,
+  };
+
+  return { fileName, sizeBytes: blob.size, chunk };
+}
+
+/** Read the selected GPX file and prepare a Blob for GPX media upload. */
+export async function prepareSurveyGpx(gpx: SurveyGpx) {
+  const response = await fetch(gpx.uri);
+  if (/^https?:/i.test(gpx.uri) && !response.ok) {
+    throw new Error('The selected GPX file could not be read.');
+  }
+  const blob = new Blob([await response.arrayBuffer()], {
+    type: 'application/gpx+xml',
+  });
+  if (blob.size < 1) throw new Error('The selected GPX file is empty.');
+
+  const fileName = gpx.name?.trim()
+    || gpx.uri.split('/').pop()?.split('?')[0]
+    || `track-${Date.now()}.gpx`;
+
+  const chunk: UploadChunkRequest = {
+    chunkIndex: 0,
+    fileName,
+    file: Object.assign(blob.slice(0, blob.size, 'application/gpx+xml'), { name: fileName }) as unknown as globalThis.Blob,
   };
 
   return { fileName, sizeBytes: blob.size, chunk };
