@@ -8,21 +8,24 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AppButton } from '@/components/ui/button';
 import { AppInput } from '@/components/ui/input';
-import { useSession } from '@/context/session-provider';
-import { createFakeSession } from '@/feature/auth/data/fake-session';
+import { useLogin } from '@/feature/auth/hooks/use-login';
 import { useTheme } from '@/hooks/use-theme';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
-  const { logIn } = useSession();
+  const loginMutation = useLogin();
   const router = useRouter();
   const theme = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const isSubmitting = loginMutation.isPending;
+  const [loginError, setLoginError] = useState<string>();
+  const displayedLoginError = loginError ?? loginMutation.error?.message;
 
   const handleLogIn = async () => {
+    if (isSubmitting) return;
     const nextErrors = {
       email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Must be a valid email address.',
       password: password.length > 1 ? undefined : 'Password must be greater than 1 character.',
@@ -34,13 +37,31 @@ export default function LoginScreen() {
       return;
     }
 
-    await logIn(createFakeSession(email.trim()));
-    router.replace('/');
+    setLoginError(undefined);
+    try {
+      await loginMutation.mutateAsync({ email: email.trim(), password });
+      router.replace('/');
+    } catch {
+      // The mutation exposes request and session-storage errors to the form.
+    }
   };
 
-  const handleGoogleLogIn = async () => {
-    await logIn(createFakeSession());
-    router.replace('/');
+  const handleGoogleLogIn = () => {
+    setLoginError('Google sign-in is not available in the mobile app yet.');
+  };
+
+  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
+    if (isSubmitting) return;
+    setEmail(quickEmail);
+    setPassword(quickPass);
+    setErrors({});
+    setLoginError(undefined);
+    loginMutation.reset();
+    try {
+      await loginMutation.mutateAsync({ email: quickEmail, password: quickPass });
+      router.replace('/');
+    } catch {
+    }
   };
 
   return (
@@ -65,9 +86,11 @@ export default function LoginScreen() {
               label="Email Address"
               onChangeText={(value) => {
                 setEmail(value);
+                if (!isSubmitting) loginMutation.reset();
+                setLoginError(undefined);
                 setErrors((current) => ({ ...current, email: undefined }));
               }}
-              placeholder="driver@example.com"
+              placeholder="demo@stm.dev"
               type="email"
               value={email}
             />
@@ -76,6 +99,8 @@ export default function LoginScreen() {
               label="Password"
               onChangeText={(value) => {
                 setPassword(value);
+                if (!isSubmitting) loginMutation.reset();
+                setLoginError(undefined);
                 setErrors((current) => ({ ...current, password: undefined }));
               }}
               placeholder="Enter your password"
@@ -85,7 +110,8 @@ export default function LoginScreen() {
             <Pressable accessibilityRole="button" style={styles.forgotPassword}>
               <Text style={[styles.linkText, { color: theme.primary }]}>Forgot Password?</Text>
             </Pressable>
-            <AppButton label="Login" onPress={handleLogIn} style={styles.loginButton} />
+            {displayedLoginError ? <Text accessibilityRole="alert" style={styles.errorText}>{displayedLoginError}</Text> : null}
+            <AppButton disabled={isSubmitting} label={isSubmitting ? 'Logging in...' : 'Login'} onPress={handleLogIn} style={styles.loginButton} />
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
               <Text style={[styles.dividerText, { color: theme.textSecondary }]}>or</Text>
@@ -106,11 +132,46 @@ export default function LoginScreen() {
               />
               <Text style={[styles.googleText, { color: theme.text }]}>Log in with google</Text>
             </Pressable>
+            {__DEV__ ? (
+              <View style={[styles.devContainer, { borderColor: theme.border }]}>
+                <Text style={[styles.devHeader, { color: theme.textSecondary }]}>DEV QUICK LOGIN</Text>
+                <View style={styles.devButtonsRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isSubmitting}
+                    style={({ pressed }) => [
+                      styles.devChip,
+                      { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                    onPress={() => handleQuickLogin('demo@stm.dev', 'Demo@123')}
+                  >
+                    <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All Roles)</Text>
+                  </Pressable>
+                </View>
+                <Text style={[styles.devSubheader, { color: theme.textSecondary }]}>REVIEWERS (CONSENSUS TESTING)</Text>
+                <View style={styles.reviewerGrid}>
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <Pressable
+                      key={num}
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      style={({ pressed }) => [
+                        styles.reviewerChip,
+                        { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                      ]}
+                      onPress={() => handleQuickLogin(`reviewer${num}@stm.dev`, 'Reviewer@123')}
+                    >
+                      <Text style={[styles.devChipText, { color: theme.text }]}>Reviewer {num}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
           </ThemedView>
 
           <View style={styles.signupRow}>
             <Text style={[styles.footerText, { color: theme.text }]}>Don&apos;t have an account?</Text>
-            <Pressable accessibilityRole="button">
+            <Pressable accessibilityRole="button" onPress={() => router.push('/register')}>
               <Text style={[styles.linkText, { color: theme.primary }]}> Sign Up</Text>
             </Pressable>
           </View>
@@ -186,6 +247,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 700,
   },
+  errorText: {
+    color: '#C62828',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+  },
   loginButton: {
     alignSelf: 'stretch',
   },
@@ -229,5 +297,61 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+  devContainer: {
+    marginTop: Spacing.one,
+    paddingTop: Spacing.three,
+    borderTopWidth: 1,
+    gap: Spacing.two,
+  },
+  devHeader: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  devButtonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  devChip: {
+    flex: 1,
+    minHeight: 40,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  devChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  devSubheader: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    marginTop: Spacing.one,
+    textTransform: 'uppercase',
+  },
+  reviewerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  reviewerChip: {
+    minWidth: '28%',
+    flexGrow: 1,
+    minHeight: 38,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

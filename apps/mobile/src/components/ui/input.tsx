@@ -14,7 +14,7 @@ import {
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type AppInputKind = 'email' | 'password' | 'text';
+type AppInputKind = 'email' | 'password' | 'phone' | 'text';
 
 
 type AppInputProps =
@@ -48,6 +48,13 @@ function getInputConfig(type: AppInputKind): {
         autoComplete: 'password',
         keyboardType: 'default',
         textContentType: 'password',
+      };
+    case 'phone':
+      return {
+        autoCapitalize: 'none',
+        autoComplete: 'tel',
+        keyboardType: 'phone-pad',
+        textContentType: 'telephoneNumber',
       };
     case 'text':
     default:

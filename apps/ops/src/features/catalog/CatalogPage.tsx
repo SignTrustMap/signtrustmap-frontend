@@ -133,56 +133,56 @@ export default function CatalogPage() {
     badgeClass: string
     dot: string
   }[] = [
-    {
-      id: 'all',
-      label: t('catalog.cat_all'),
-      icon: TrafficSignal,
-      badgeClass: 'bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-white/20',
-      dot: 'bg-[#007b8b] dark:bg-[#00c4de]',
-    },
-    {
-      id: 'prohibitory',
-      label: t('catalog.cat_prohibitory'),
-      icon: WarningCircle,
-      badgeClass: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
-      dot: 'bg-rose-500',
-    },
-    {
-      id: 'warning',
-      label: t('catalog.cat_warning'),
-      icon: WarningCircle,
-      badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
-      dot: 'bg-amber-500',
-    },
-    {
-      id: 'mandatory',
-      label: t('catalog.cat_mandatory'),
-      icon: ArrowUpRight,
-      badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
-      dot: 'bg-teal-500',
-    },
-    {
-      id: 'speed_limit',
-      label: t('catalog.cat_speed_limit'),
-      icon: Gauge,
-      badgeClass: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30',
-      dot: 'bg-purple-500',
-    },
-    {
-      id: 'guide',
-      label: t('catalog.cat_guide'),
-      icon: Compass,
-      badgeClass: 'bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30',
-      dot: 'bg-sky-500',
-    },
-    {
-      id: 'additional',
-      label: t('catalog.cat_additional'),
-      icon: Shapes,
-      badgeClass: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:border-slate-500/30',
-      dot: 'bg-slate-400',
-    },
-  ]
+      {
+        id: 'all',
+        label: t('catalog.cat_all'),
+        icon: TrafficSignal,
+        badgeClass: 'bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-white/20',
+        dot: 'bg-[#007b8b] dark:bg-[#00c4de]',
+      },
+      {
+        id: 'prohibitory',
+        label: t('catalog.cat_prohibitory'),
+        icon: WarningCircle,
+        badgeClass: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
+        dot: 'bg-rose-500',
+      },
+      {
+        id: 'warning',
+        label: t('catalog.cat_warning'),
+        icon: WarningCircle,
+        badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
+        dot: 'bg-amber-500',
+      },
+      {
+        id: 'mandatory',
+        label: t('catalog.cat_mandatory'),
+        icon: ArrowUpRight,
+        badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-500/30',
+        dot: 'bg-teal-500',
+      },
+      {
+        id: 'speed_limit',
+        label: t('catalog.cat_speed_limit'),
+        icon: Gauge,
+        badgeClass: 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30',
+        dot: 'bg-purple-500',
+      },
+      {
+        id: 'guide',
+        label: t('catalog.cat_guide'),
+        icon: Compass,
+        badgeClass: 'bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30',
+        dot: 'bg-sky-500',
+      },
+      {
+        id: 'additional',
+        label: t('catalog.cat_additional'),
+        icon: Shapes,
+        badgeClass: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-500/15 dark:text-slate-300 dark:border-slate-500/30',
+        dot: 'bg-slate-400',
+      },
+    ]
 
   const getCategoryMeta = (cat: string) => {
     const found = categories.find((c) => c.id === cat)
@@ -429,11 +429,10 @@ export default function CatalogPage() {
           <button
             type="button"
             onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              viewMode === 'grid'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${viewMode === 'grid'
                 ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
                 : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
             title={t('catalog.view_grid')}
           >
             <SquaresFour size={15} weight="bold" />
@@ -442,11 +441,10 @@ export default function CatalogPage() {
           <button
             type="button"
             onClick={() => setViewMode('table')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              viewMode === 'table'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${viewMode === 'table'
                 ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
                 : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
+              }`}
             title={t('catalog.view_table')}
           >
             <Rows size={15} weight="bold" />
@@ -543,11 +541,10 @@ export default function CatalogPage() {
                         {sign.version || 'v2.5'}
                       </span>
                       <span
-                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                          isActive
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${isActive
                             ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                             : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400'
-                        }`}
+                          }`}
                       >
                         {isActive ? t('catalog.status_active') : t('catalog.status_deprecated')}
                       </span>
@@ -639,11 +636,10 @@ export default function CatalogPage() {
                         <td className="py-3.5 px-4 font-mono text-gray-400">{item.version || 'v2.5'}</td>
                         <td className="py-3.5 px-4 text-center">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                              isActive
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${isActive
                                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400'
-                            }`}
+                              }`}
                           >
                             {isActive ? t('catalog.status_active') : t('catalog.status_deprecated')}
                           </span>
@@ -683,202 +679,201 @@ export default function CatalogPage() {
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
             onClick={() => setSelectedSign(null)}
           >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200"
-          >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setSelectedSign(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 transition-colors cursor-pointer"
-              title={t('catalog.btn_close_esc')}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200"
             >
-              <X size={18} weight="bold" />
-            </button>
-
-            {/* Modal Header: Sign Plate + Titles + Categories */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-5 border-b border-gray-200 dark:border-white/10 pr-8 sm:pr-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl p-2 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] flex items-center justify-center shadow-xs">
-                <TrafficSignGraphic sign={selectedSign} className="w-full h-full drop-shadow-md" />
-              </div>
-
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className={`font-mono text-xs sm:text-sm font-extrabold px-2.5 py-1 rounded-md border ${getCategoryMeta(selectedSign.category).badgeClass}`}>
-                    {selectedSign.code}
-                  </span>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md border inline-flex items-center gap-1.5 ${getCategoryMeta(selectedSign.category).badgeClass}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${getCategoryMeta(selectedSign.category).dot}`} />
-                    {getCategoryMeta(selectedSign.category).label}
-                  </span>
-                  <span className="font-mono text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded border border-gray-200 dark:border-white/10">
-                    {selectedSign.standardRef || 'QCVN 41:2019/BGTVT'}
-                  </span>
-                </div>
-
-                <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-snug">
-                  {getSignPrimaryName(selectedSign)}
-                </h2>
-                <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
-                  {getSignSecondaryName(selectedSign)}
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="space-y-4 text-xs">
-              {/* Description & Meaning */}
-              <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] space-y-1.5">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  <BookOpen size={16} className="text-[#007b8b] dark:text-[#00c4de]" weight="bold" />
-                  <span>{t('catalog.desc_and_meaning')}</span>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-relaxed font-medium">
-                  {getSignPrimaryDesc(selectedSign)}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-white/10 italic leading-relaxed">
-                  {getSignSecondaryDesc(selectedSign)}
-                </p>
-              </div>
-
-              {/* AI CLIP Visual Prompt Vector */}
-              <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-mono font-extrabold uppercase tracking-wider">
-                    <Sparkle size={16} className="text-amber-600 dark:text-amber-400" weight="fill" />
-                    <span>{t('catalog.clip_vector')}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleCopyPrompt(selectedSign.aiPrompt || selectedSign.clipPrompt || '')}
-                    className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-amber-500/20 text-amber-950 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-500/30 transition-all cursor-pointer shadow-xs"
-                  >
-                    {copiedPrompt ? (
-                      <>
-                        <Check size={14} className="text-emerald-500" weight="bold" />
-                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">{t('catalog.copied')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} weight="bold" />
-                        <span>{t('catalog.copy_prompt')}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="p-2.5 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-white dark:bg-black/40 text-amber-950 dark:text-amber-200 font-mono text-xs leading-relaxed select-all break-words shadow-xs">
-                  "{selectedSign.aiPrompt || selectedSign.clipPrompt}"
-                </div>
-
-                <p className="text-[11px] text-amber-900 dark:text-amber-300/80 font-medium">
-                  💡 {t('catalog.clip_hint')}
-                </p>
-              </div>
-
-              {/* OSM Mapping Rule */}
-              <div className="p-4 rounded-xl border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50/60 dark:bg-cyan-500/10 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-cyan-900 dark:text-cyan-300 font-mono font-extrabold uppercase tracking-wider">
-                    <Compass size={16} className="text-[#007b8b] dark:text-[#00c4de]" weight="bold" />
-                    <span>{t('catalog.osm_title')}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleCopyOsm(selectedSign.osmMapping || '')}
-                    className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-500/20 text-cyan-950 dark:text-cyan-200 hover:bg-cyan-100 dark:hover:bg-cyan-500/30 transition-all cursor-pointer shadow-xs"
-                  >
-                    {copiedOsm ? (
-                      <>
-                        <Check size={14} className="text-emerald-500" weight="bold" />
-                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">{t('catalog.copied')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} weight="bold" />
-                        <span>{t('catalog.copy_osm')}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="p-2.5 rounded-lg border border-cyan-200 dark:border-cyan-500/20 bg-white dark:bg-black/40 text-cyan-950 dark:text-cyan-200 font-mono text-xs leading-relaxed select-all break-words shadow-xs">
-                  {selectedSign.osmMapping}
-                </div>
-              </div>
-
-              {/* 4 Technical Specs Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                    <Shapes size={14} weight="bold" />
-                    <span>{t('catalog.geometry')}</span>
-                  </div>
-                  <div className="font-extrabold text-xs text-gray-900 dark:text-white truncate">
-                    {getShapeLabel(selectedSign.shape)}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                    <Palette size={14} weight="bold" />
-                    <span>{t('catalog.colors')}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 font-extrabold text-xs text-gray-900 dark:text-white mt-0.5">
-                    {renderColorPill(selectedSign.color)}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                    <SquaresFour size={14} weight="bold" />
-                    <span>{t('catalog.category_lbl')}</span>
-                  </div>
-                  <div className="font-extrabold text-xs text-gray-900 dark:text-white truncate">
-                    {getCategoryMeta(selectedSign.category).label}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                    <span className="text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">v</span>
-                    <span>{t('catalog.version_lbl')}</span>
-                  </div>
-                  <div className="font-extrabold text-xs font-mono text-gray-900 dark:text-white truncate">
-                    {selectedSign.version || 'v2.5'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-white/10">
-              <button
-                type="button"
-                onClick={() => handleToggleStatus(selectedSign.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                  selectedSign.status === 'Active'
-                    ? 'border-amber-300 text-amber-800 dark:border-amber-500/30 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10'
-                    : 'border-emerald-300 text-emerald-800 dark:border-emerald-500/30 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
-                }`}
-              >
-                <span>{t('catalog.btn_toggle_status')}</span>
-                <span className="font-mono">({selectedSign.status})</span>
-              </button>
-
+              {/* Close Button */}
               <button
                 type="button"
                 onClick={() => setSelectedSign(null)}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-colors cursor-pointer"
+                className="absolute top-4 right-4 p-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 transition-colors cursor-pointer"
+                title={t('catalog.btn_close_esc')}
               >
-                {t('users.btn_close')}
+                <X size={18} weight="bold" />
               </button>
+
+              {/* Modal Header: Sign Plate + Titles + Categories */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-5 border-b border-gray-200 dark:border-white/10 pr-8 sm:pr-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 rounded-2xl p-2 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] flex items-center justify-center shadow-xs">
+                  <TrafficSignGraphic sign={selectedSign} className="w-full h-full drop-shadow-md" />
+                </div>
+
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className={`font-mono text-xs sm:text-sm font-extrabold px-2.5 py-1 rounded-md border ${getCategoryMeta(selectedSign.category).badgeClass}`}>
+                      {selectedSign.code}
+                    </span>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md border inline-flex items-center gap-1.5 ${getCategoryMeta(selectedSign.category).badgeClass}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${getCategoryMeta(selectedSign.category).dot}`} />
+                      {getCategoryMeta(selectedSign.category).label}
+                    </span>
+                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded border border-gray-200 dark:border-white/10">
+                      {selectedSign.standardRef || 'QCVN 41:2019/BGTVT'}
+                    </span>
+                  </div>
+
+                  <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-snug">
+                    {getSignPrimaryName(selectedSign)}
+                  </h2>
+                  <p className="text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                    {getSignSecondaryName(selectedSign)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="space-y-4 text-xs">
+                {/* Description & Meaning */}
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    <BookOpen size={16} className="text-[#007b8b] dark:text-[#00c4de]" weight="bold" />
+                    <span>{t('catalog.desc_and_meaning')}</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-relaxed font-medium">
+                    {getSignPrimaryDesc(selectedSign)}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-white/10 italic leading-relaxed">
+                    {getSignSecondaryDesc(selectedSign)}
+                  </p>
+                </div>
+
+                {/* AI CLIP Visual Prompt Vector */}
+                <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-amber-900 dark:text-amber-300 font-mono font-extrabold uppercase tracking-wider">
+                      <Sparkle size={16} className="text-amber-600 dark:text-amber-400" weight="fill" />
+                      <span>{t('catalog.clip_vector')}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPrompt(selectedSign.aiPrompt || selectedSign.clipPrompt || '')}
+                      className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-amber-500/20 text-amber-950 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-500/30 transition-all cursor-pointer shadow-xs"
+                    >
+                      {copiedPrompt ? (
+                        <>
+                          <Check size={14} className="text-emerald-500" weight="bold" />
+                          <span className="text-emerald-700 dark:text-emerald-400 font-bold">{t('catalog.copied')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} weight="bold" />
+                          <span>{t('catalog.copy_prompt')}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-white dark:bg-black/40 text-amber-950 dark:text-amber-200 font-mono text-xs leading-relaxed select-all break-words shadow-xs">
+                    "{selectedSign.aiPrompt || selectedSign.clipPrompt}"
+                  </div>
+
+                  <p className="text-[11px] text-amber-900 dark:text-amber-300/80 font-medium">
+                    💡 {t('catalog.clip_hint')}
+                  </p>
+                </div>
+
+                {/* OSM Mapping Rule */}
+                <div className="p-4 rounded-xl border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50/60 dark:bg-cyan-500/10 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-cyan-900 dark:text-cyan-300 font-mono font-extrabold uppercase tracking-wider">
+                      <Compass size={16} className="text-[#007b8b] dark:text-[#00c4de]" weight="bold" />
+                      <span>{t('catalog.osm_title')}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyOsm(selectedSign.osmMapping || '')}
+                      className="px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-500/20 text-cyan-950 dark:text-cyan-200 hover:bg-cyan-100 dark:hover:bg-cyan-500/30 transition-all cursor-pointer shadow-xs"
+                    >
+                      {copiedOsm ? (
+                        <>
+                          <Check size={14} className="text-emerald-500" weight="bold" />
+                          <span className="text-emerald-700 dark:text-emerald-400 font-bold">{t('catalog.copied')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={14} weight="bold" />
+                          <span>{t('catalog.copy_osm')}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg border border-cyan-200 dark:border-cyan-500/20 bg-white dark:bg-black/40 text-cyan-950 dark:text-cyan-200 font-mono text-xs leading-relaxed select-all break-words shadow-xs">
+                    {selectedSign.osmMapping}
+                  </div>
+                </div>
+
+                {/* 4 Technical Specs Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
+                      <Shapes size={14} weight="bold" />
+                      <span>{t('catalog.geometry')}</span>
+                    </div>
+                    <div className="font-extrabold text-xs text-gray-900 dark:text-white truncate">
+                      {getShapeLabel(selectedSign.shape)}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
+                      <Palette size={14} weight="bold" />
+                      <span>{t('catalog.colors')}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-extrabold text-xs text-gray-900 dark:text-white mt-0.5">
+                      {renderColorPill(selectedSign.color)}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
+                      <SquaresFour size={14} weight="bold" />
+                      <span>{t('catalog.category_lbl')}</span>
+                    </div>
+                    <div className="font-extrabold text-xs text-gray-900 dark:text-white truncate">
+                      {getCategoryMeta(selectedSign.category).label}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
+                      <span className="text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">v</span>
+                      <span>{t('catalog.version_lbl')}</span>
+                    </div>
+                    <div className="font-extrabold text-xs font-mono text-gray-900 dark:text-white truncate">
+                      {selectedSign.version || 'v2.5'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-200 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus(selectedSign.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${selectedSign.status === 'Active'
+                      ? 'border-amber-300 text-amber-800 dark:border-amber-500/30 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10'
+                      : 'border-emerald-300 text-emerald-800 dark:border-emerald-500/30 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                    }`}
+                >
+                  <span>{t('catalog.btn_toggle_status')}</span>
+                  <span className="font-mono">({selectedSign.status})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSign(null)}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-colors cursor-pointer"
+                >
+                  {t('users.btn_close')}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </ModalPortal>
       )}
 
@@ -891,173 +886,173 @@ export default function CatalogPage() {
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
             onClick={() => setShowCreateModal(false)}
           >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200 text-left"
-          >
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 pb-3">
-              <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
-                {t('catalog.modal_title')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateEntry} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_code')} *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. P.106a"
-                    value={newCode}
-                    onChange={(e) => setNewCode(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_category')} *
-                  </label>
-                  <CustomSelect
-                    value={newCategory}
-                    onChange={(val) => setNewCategory(val as CatalogCategory)}
-                    className="w-full"
-                    buttonClassName="w-full"
-                    options={[
-                      { value: 'prohibitory', label: t('catalog.cat_prohibitory') },
-                      { value: 'warning', label: t('catalog.cat_warning') },
-                      { value: 'mandatory', label: t('catalog.cat_mandatory') },
-                      { value: 'speed_limit', label: t('catalog.cat_speed_limit') },
-                      { value: 'guide', label: t('catalog.cat_guide') },
-                      { value: 'additional', label: t('catalog.cat_additional') },
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_name')} *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder={t('catalog.field_name_placeholder')}
-                    value={newNameVi}
-                    onChange={(e) => setNewNameVi(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_name_en')}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={t('catalog.field_name_en_placeholder')}
-                    value={newNameEn}
-                    onChange={(e) => setNewNameEn(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_shape')}
-                  </label>
-                  <CustomSelect
-                    value={newShape}
-                    onChange={(val) => setNewShape(val as any)}
-                    className="w-full"
-                    buttonClassName="w-full"
-                    options={[
-                      { value: 'Circle', label: t('catalog.shape_circle') },
-                      { value: 'Triangle', label: t('catalog.shape_triangle') },
-                      { value: 'Rectangle', label: t('catalog.shape_rectangle') },
-                      { value: 'Octagon', label: t('catalog.shape_octagon') },
-                      { value: 'Diamond', label: t('catalog.shape_diamond') },
-                    ]}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_color')}
-                  </label>
-                  <CustomSelect
-                    value={newColor}
-                    onChange={(val) => setNewColor(val)}
-                    className="w-full"
-                    buttonClassName="w-full"
-                    options={[
-                      { value: 'Red-White', label: t('catalog.colors_red_white') },
-                      { value: 'Yellow-Black', label: t('catalog.colors_yellow_black') },
-                      { value: 'Blue-White', label: t('catalog.colors_blue_white') },
-                      { value: 'Green-White', label: t('catalog.colors_green_white') },
-                      { value: 'Black-White', label: t('catalog.colors_black_white') },
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_ai_prompt')}
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="a circular red traffic sign with a black truck silhouette indicating no trucks"
-                  value={newAiPrompt}
-                  onChange={(e) => setNewAiPrompt(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_osm_mapping')}
-                </label>
-                <input
-                  type="text"
-                  placeholder="hgv=no; traffic_sign=VN:P.106a"
-                  value={newOsmMapping}
-                  onChange={(e) => setNewOsmMapping(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-white/10">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200 text-left"
+            >
+              <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 pb-3">
+                <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
+                  {t('catalog.modal_title')}
+                </h3>
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white"
                 >
-                  {t('catalog.btn_cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
-                >
-                  {t('catalog.btn_publish')}
+                  <X size={18} />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleCreateEntry} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_code')} *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. P.106a"
+                      value={newCode}
+                      onChange={(e) => setNewCode(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_category')} *
+                    </label>
+                    <CustomSelect
+                      value={newCategory}
+                      onChange={(val) => setNewCategory(val as CatalogCategory)}
+                      className="w-full"
+                      buttonClassName="w-full"
+                      options={[
+                        { value: 'prohibitory', label: t('catalog.cat_prohibitory') },
+                        { value: 'warning', label: t('catalog.cat_warning') },
+                        { value: 'mandatory', label: t('catalog.cat_mandatory') },
+                        { value: 'speed_limit', label: t('catalog.cat_speed_limit') },
+                        { value: 'guide', label: t('catalog.cat_guide') },
+                        { value: 'additional', label: t('catalog.cat_additional') },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_name')} *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder={t('catalog.field_name_placeholder')}
+                      value={newNameVi}
+                      onChange={(e) => setNewNameVi(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_name_en')}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t('catalog.field_name_en_placeholder')}
+                      value={newNameEn}
+                      onChange={(e) => setNewNameEn(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_shape')}
+                    </label>
+                    <CustomSelect
+                      value={newShape}
+                      onChange={(val) => setNewShape(val as any)}
+                      className="w-full"
+                      buttonClassName="w-full"
+                      options={[
+                        { value: 'Circle', label: t('catalog.shape_circle') },
+                        { value: 'Triangle', label: t('catalog.shape_triangle') },
+                        { value: 'Rectangle', label: t('catalog.shape_rectangle') },
+                        { value: 'Octagon', label: t('catalog.shape_octagon') },
+                        { value: 'Diamond', label: t('catalog.shape_diamond') },
+                      ]}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      {t('catalog.field_color')}
+                    </label>
+                    <CustomSelect
+                      value={newColor}
+                      onChange={(val) => setNewColor(val)}
+                      className="w-full"
+                      buttonClassName="w-full"
+                      options={[
+                        { value: 'Red-White', label: t('catalog.colors_red_white') },
+                        { value: 'Yellow-Black', label: t('catalog.colors_yellow_black') },
+                        { value: 'Blue-White', label: t('catalog.colors_blue_white') },
+                        { value: 'Green-White', label: t('catalog.colors_green_white') },
+                        { value: 'Black-White', label: t('catalog.colors_black_white') },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                    {t('catalog.field_ai_prompt')}
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="a circular red traffic sign with a black truck silhouette indicating no trucks"
+                    value={newAiPrompt}
+                    onChange={(e) => setNewAiPrompt(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                    {t('catalog.field_osm_mapping')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="hgv=no; traffic_sign=VN:P.106a"
+                    value={newOsmMapping}
+                    onChange={(e) => setNewOsmMapping(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors cursor-pointer"
+                  >
+                    {t('catalog.btn_cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span>{t('catalog.btn_publish')}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
         </ModalPortal>
       )}
     </div>

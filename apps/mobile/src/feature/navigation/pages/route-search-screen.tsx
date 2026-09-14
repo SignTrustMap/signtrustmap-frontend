@@ -1,40 +1,41 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useDebounce } from '@/hooks/use-debounce';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { AppInput } from '@/components/ui/input';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Spacing, Rounded } from '@/constants/theme';
+import { useSession } from '@/context/session-provider';
 import {
-  previousLocations,
   startLocations,
   type MapCoordinate,
 } from '@/feature/navigation/data/navigation-locations';
+import type { ApiPlace } from '@/api/navigation/places';
+import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
-import { AppInput } from '@/components/ui/input';
 import { SAME_LOCATION_MESSAGE } from '@/constants/message';
-
 
 export function RouteSearchScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { startId, startLat, startLng } = useLocalSearchParams<{
+  const { session } = useSession();
+  const { startId, startLat, startLng, startTitle } = useLocalSearchParams<{
     startId?: string;
     startLat?: string;
     startLng?: string;
+    startTitle?: string;
   }>();
 
-  const [searchText, setSearchText] = useState('');
-  const debouncedSearchText = useDebounce(searchText, 500);
-  const [searchResults, setSearchResults] = useState<typeof previousLocations>(previousLocations);
-
   const [toast, setToast] = useState<{ id: number; message: string }>();
+  const [query, setQuery] = useState('');
+  const { data: locations, isLoading, error } = usePlaceSuggestions(query);
+  const { mutate: saveRecent } = useSaveRecentPlace();
   const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
     () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
@@ -42,10 +43,11 @@ export function RouteSearchScreen() {
   );
   const routeStart = coordinateStart ?? selectedStart?.coordinate;
 
-  const handleSelectLocation = (locationId: string) => {
-    const destination = previousLocations.find((location) => location.id === locationId);
+  const handleSelectLocation = (destination: ApiPlace) => {
+    if (destination.latitude == null || destination.longitude == null) return;
+    const coordinate: MapCoordinate = [destination.longitude, destination.latitude];
 
-    if (areSameLocation(destination?.coordinate, routeStart)) {
+    if (areSameLocation(coordinate, routeStart)) {
       setToast((currentToast) => ({
         id: (currentToast?.id ?? 0) + 1,
         message: SAME_LOCATION_MESSAGE,
@@ -53,46 +55,36 @@ export function RouteSearchScreen() {
       return;
     }
 
+    if (session?.accessToken) saveRecent(destination);
     router.replace({
       pathname: '/home',
       params: {
-        destinationId: locationId,
+        destinationId: destination.id,
+        destinationLat: String(destination.latitude),
+        destinationLng: String(destination.longitude),
+        destinationSubtitle: destination.address ?? '',
+        destinationTitle: destination.title,
         ...(startId ? { startId } : {}),
         ...(startLat && startLng ? { startLat, startLng } : {}),
+        ...(startTitle ? { startTitle } : {}),
       },
     });
   };
 
-  useEffect(() => {
-    if (debouncedSearchText) {
-      setTimeout(() => {
-        const results = previousLocations.filter((location) =>
-          location.title.toLowerCase().includes(debouncedSearchText.toLowerCase())
-        );
-        setSearchResults(results);
-      }, 500);
-    }
-
-    return () => {
-      setSearchResults(previousLocations);
-    };
-  }, [debouncedSearchText]);
-
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
-        <View style={{ flex: 1, minWidth: 0, marginTop: Spacing.one }}>
+        <View style={styles.searchInputWrapper}>
           <AppInput
-            accessibilityLabel='Search for your destination'
+            accessibilityLabel="Search for your destination"
             autoFocus
+            onChangeText={setQuery}
             placeholder="Where to?"
+            returnKeyType="search"
             style={[styles.searchPrompt, { color: theme.text }]}
             containerStyle={[
               styles.searchInputContainer,
-              {
-                backgroundColor: theme.background,
-                borderColor: 'transparent',
-              },
+              { backgroundColor: theme.background, borderColor: 'transparent' },
             ]}
             leadingIcon={
               <AppButton
@@ -109,7 +101,7 @@ export function RouteSearchScreen() {
                 />
               </AppButton>
             }
-            callback={setSearchText}
+            value={query}
           />
         </View>
       </View>
@@ -119,12 +111,21 @@ export function RouteSearchScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       >
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>RECENT</Text>
-        {searchResults.map((location) => (
+        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          {query.trim().length >= 2 ? 'SEARCH RESULTS' : 'SAVED & RECENT'}
+        </Text>
+        {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
+        {!isLoading && error ? (
+          <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
+        ) : null}
+        {!isLoading && !error && locations.length === 0 ? (
+          <Text style={[styles.error, { color: theme.textSecondary }]}>No destinations found.</Text>
+        ) : null}
+        {!isLoading && locations.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
             key={location.id}
-            onPress={() => handleSelectLocation(location.id)}
+            onPress={() => handleSelectLocation(location)}
             pressedOpacity={0.72}
             style={[styles.locationRow, { borderColor: theme.border }]}
             variant="ghost"
@@ -138,8 +139,8 @@ export function RouteSearchScreen() {
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text style={[styles.locationSubtitle, { color: theme.grey }]}>
-                {location.subtitle}
+              <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+                {location.address}
               </Text>
             </View>
           </AppButton>
@@ -197,6 +198,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
+  searchInputWrapper: {
+    flex: 1,
+    minWidth: 0,
+    marginTop: Spacing.one,
+  },
   list: {
     flex: 1,
   },
@@ -209,6 +215,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 900,
     marginBottom: Spacing.one,
+  },
+  loading: { paddingVertical: Spacing.four },
+  error: {
+    paddingVertical: Spacing.four,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
   locationRow: {
     minHeight: 64,

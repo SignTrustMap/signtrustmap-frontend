@@ -95,7 +95,7 @@ export const initSigns: MapSignMarker[] = [
 ];
 
 export const currentLocation = {
-  coordinate: [106.8075, 10.845] as MapCoordinate,
+  coordinate: [106.682148, 10.758866] as MapCoordinate,
   label: 'Vị trí hiện tại của tài xế',
 };
 

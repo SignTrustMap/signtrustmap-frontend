@@ -2,9 +2,10 @@ import { Image } from 'expo-image';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,12 +26,29 @@ import {
   type ImageGpsCoordinates,
 } from '@/feature/upload/utils/image-gps';
 import { useTheme } from '@/hooks/use-theme';
+import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
+import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 
 type SelectedSurveyMedia = {
+  capturedAt?: string;
   fileName?: string | null;
+  mimeType?: string;
   type: 'image' | 'video';
   uri: string;
 };
+
+type SelectedGpxFile = {
+  name: string;
+  uri: string;
+  mimeType?: string;
+};
+
+function captureTimeFromExif(exif: ImagePickerAsset['exif']) {
+  const value = exif?.DateTimeOriginal ?? exif?.DateTime;
+  if (typeof value !== 'string') return undefined;
+  const timestamp = Date.parse(value.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3').replace(' ', 'T'));
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
 
@@ -135,7 +153,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
       }
     }
 
-    console.log('[Surveyor] Original media-library EXIF:', originalExif ?? null);
 
     if (isValidGpsCoordinates(location)) {
       const coordinates = {
@@ -151,13 +168,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     }
 
     const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
-
-    console.log(
-      '[Surveyor] Extracted image GPS data:',
-      mediaLibraryExifCoordinates
-        ? { ...mediaLibraryExifCoordinates, source: 'media-library-exif' }
-        : null,
-    );
     return mediaLibraryExifCoordinates;
   } catch (error) {
     console.warn('[Surveyor] Unable to read original image GPS metadata:', error);
@@ -169,10 +179,20 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
 export function NewSurveyRecordScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { draftId } = useLocalSearchParams<{ draftId?: string }>();
+  const saveDraft = useSaveSurveyDraft();
+  const isFocused = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const scanFinished = useRef(false);
+  const savedDraftId = useRef<string | undefined>(undefined);
   const [isOpeningGallery, setIsOpeningGallery] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
   const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
   const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
+  const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
+  const [gpxPickerError, setGpxPickerError] = useState<string>();
+  const [isScanning, setIsScanning] = useState(false);
+  const scanInProgress = useRef(false);
   const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
   const [androidGalleryAssets, setAndroidGalleryAssets] = useState<MediaLibraryAsset[]>([]);
   const [androidGalleryCursor, setAndroidGalleryCursor] = useState<string>();
@@ -181,6 +201,11 @@ export function NewSurveyRecordScreen() {
   const [isAndroidGalleryLoading, setIsAndroidGalleryLoading] = useState(false);
   const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
   const isLoadingAndroidGallery = useRef(false);
+
+  useFocusEffect(useCallback(() => {
+    isFocused.current = true;
+    return () => { isFocused.current = false; };
+  }, []));
 
   const loadAndroidGalleryPage = async (after?: string) => {
     if (isLoadingAndroidGallery.current) return;
@@ -193,7 +218,7 @@ export function NewSurveyRecordScreen() {
       const page = await LegacyMediaLibrary.getAssetsAsync({
         after,
         first: ANDROID_GALLERY_PAGE_SIZE,
-        mediaType: LegacyMediaLibrary.MediaType.photo,
+        mediaType: [LegacyMediaLibrary.MediaType.photo, LegacyMediaLibrary.MediaType.video],
         sortBy: [[LegacyMediaLibrary.SortBy.creationTime, false]],
       });
 
@@ -212,7 +237,7 @@ export function NewSurveyRecordScreen() {
   };
 
   const openAndroidMediaLibrary = async () => {
-    const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo']);
+    const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
 
     console.log('[Surveyor] Media permission before gallery:', {
       accessPrivileges: permission.accessPrivileges,
@@ -220,7 +245,7 @@ export function NewSurveyRecordScreen() {
     });
 
     if (permission.status !== 'granted') {
-      setPickerError('Photo-library permission is required to read image location metadata.');
+      setPickerError('Media library permission is required to select photos and videos.');
       return;
     }
 
@@ -240,9 +265,11 @@ export function NewSurveyRecordScreen() {
 
     try {
       const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+      const assetType = asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
+
       const exif = assetInfo.exif as Record<string, unknown> | undefined;
-      const exifCoordinates = extractImageGpsCoordinates(exif);
-      const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+      const exifCoordinates = assetType === 'image' ? extractImageGpsCoordinates(exif) : null;
+      const gpsCoordinates = assetType === 'image' && isValidGpsCoordinates(assetInfo.location)
         ? {
           latitude: assetInfo.location.latitude,
           longitude: assetInfo.location.longitude,
@@ -252,6 +279,7 @@ export function NewSurveyRecordScreen() {
       console.log('[Surveyor] Selected MediaStore asset:', {
         assetId: asset.id,
         fileName: asset.filename,
+        mediaType: asset.mediaType,
         location: assetInfo.location ?? null,
       });
       console.log(
@@ -260,22 +288,25 @@ export function NewSurveyRecordScreen() {
       );
 
       setSelectedAsset({
+        capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
         fileName: asset.filename,
-        type: 'image',
+        type: assetType,
         uri: assetInfo.localUri ?? asset.uri,
       });
       setSelectedGps(gpsCoordinates ?? null);
+      setSelectedGpxFile(undefined);
+      setGpxPickerError(undefined);
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
-      setAndroidGalleryError('Unable to read that photo. Please choose another one.');
+      setAndroidGalleryError('Unable to read that file. Please choose another one.');
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
   };
 
   const handleOpenGallery = async () => {
-    if (isOpeningGallery) return;
+    if (isOpeningGallery || isSaving) return;
 
     setIsOpeningGallery(true);
     setPickerError(undefined);
@@ -299,14 +330,19 @@ export function NewSurveyRecordScreen() {
 
       if (!result.canceled) {
         const asset = result.assets[0];
-        const gpsCoordinates = await extractSelectedAssetGps(asset);
+        const assetType = asset.type === 'video' ? 'video' : 'image';
+        const gpsCoordinates = assetType === 'image' ? await extractSelectedAssetGps(asset) : null;
 
         setSelectedAsset({
+          capturedAt: captureTimeFromExif(asset.exif),
           fileName: asset.fileName,
-          type: asset.type === 'video' ? 'video' : 'image',
+          mimeType: asset.mimeType,
+          type: assetType,
           uri: asset.uri,
         });
         setSelectedGps(gpsCoordinates);
+        setSelectedGpxFile(undefined);
+        setGpxPickerError(undefined);
       }
     } catch (error) {
       setPickerError(
@@ -320,92 +356,210 @@ export function NewSurveyRecordScreen() {
     }
   };
 
+  const handlePickGpx = async () => {
+    setGpxPickerError(undefined);
+    try {
+      const DocumentPicker = await import('expo-document-picker');
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: ['application/gpx+xml', 'application/octet-stream', '*/*'],
+      });
+
+      if (!result.canceled) {
+        const file = result.assets[0];
+        const name = file.name ?? '';
+        if (!name.toLowerCase().endsWith('.gpx')) {
+          setGpxPickerError('Please select a valid GPX file (.gpx).');
+          return;
+        }
+        setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
+        const gpxData = await extractGpxGpsData(file.uri);
+        if (gpxData?.firstPoint) {
+          setSelectedGps({
+            latitude: gpxData.firstPoint.latitude,
+            longitude: gpxData.firstPoint.longitude,
+          });
+          console.log('[Surveyor] Extracted GPX GPS coordinates:', gpxData.firstPoint);
+          if (gpxData.startTime) {
+            setSelectedAsset((prev) => (prev && !prev.capturedAt ? { ...prev, capturedAt: gpxData.startTime } : prev));
+          }
+        }
+      }
+    } catch (error) {
+      setGpxPickerError('Unable to open file picker. Please try again.');
+      console.log('[Surveyor] Unable to open document picker:', error);
+    }
+  };
+
+  const openSavedDraft = () => {
+    if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
+    router.replace({
+      pathname: '/work/new-survey/details',
+      params: {
+        submissionId: savedDraftId.current,
+        ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
+      },
+    });
+  };
+
+  const handleSubmitRecord = async () => {
+    if (!selectedAsset || isOpeningGallery || scanInProgress.current) return;
+    scanInProgress.current = true;
+    scanFinished.current = false;
+    savedDraftId.current = undefined;
+    setPickerError(undefined);
+    setIsSaving(true);
+    setIsScanning(true);
+    const isVideo = selectedAsset.type === 'video';
+    try {
+      savedDraftId.current = await saveDraft({
+        ...selectedAsset,
+        fileName: selectedAsset.fileName ?? undefined,
+        type: selectedAsset.type,
+      }, {
+        submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
+        capturedAt: selectedAsset.capturedAt ?? new Date().toISOString(),
+        coordinateSource: isVideo ? (selectedGpxFile ? 'GPX_FILE' : 'DEVICE_GPS') : 'IMAGE_EXIF',
+        ...(selectedGps ?? {}),
+      }, draftId, selectedGpxFile);
+      openSavedDraft();
+    } catch (error) {
+      console.warn('[Surveyor] Unable to save survey draft:', error);
+      setPickerError(error instanceof Error ? error.message : 'Unable to save the draft. Please retry.');
+      setIsScanning(false);
+    } finally {
+      setIsSaving(false);
+      scanInProgress.current = false;
+    }
+  };
+
+  const handleScanComplete = () => {
+    scanFinished.current = true;
+    setIsScanning(false);
+    openSavedDraft();
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      {isScanning && selectedAsset ? (
+        <SurveyScanModal
+          imageUri={selectedAsset.uri}
+          isVideo={selectedAsset.type === 'video'}
+          onComplete={handleScanComplete}
+          onCancel={() => {
+            handleScanComplete();
+          }}
+        />
+      ) : null}
       <Modal
         animationType="slide"
+        transparent
+        statusBarTranslucent
         onRequestClose={() => setIsAndroidGalleryVisible(false)}
         visible={isAndroidGalleryVisible}
       >
-        <SafeAreaView
-          edges={['top', 'bottom']}
-          style={[styles.galleryScreen, { backgroundColor: theme.background }]}
-        >
-          <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
-            <View style={styles.galleryHeading}>
-              <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo</Text>
-              <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
-                Original location metadata will be preserved
-              </Text>
+        <View style={styles.galleryModalRoot}>
+          <Pressable
+            accessibilityLabel="Close media library"
+            accessibilityRole="button"
+            onPress={() => setIsAndroidGalleryVisible(false)}
+            style={styles.galleryBackdrop}
+          />
+          <SafeAreaView
+            edges={['bottom']}
+            style={[styles.galleryScreen, { backgroundColor: theme.backgroundElement }]}
+          >
+            <View style={styles.galleryHandleArea}>
+              <View style={[styles.galleryHandle, { backgroundColor: theme.border }]} />
             </View>
-            <AppButton
-              accessibilityLabel="Close photo library"
-              label="Close"
-              onPress={() => setIsAndroidGalleryVisible(false)}
-              style={styles.galleryCloseButton}
-              variant="ghost"
-            />
-          </View>
-
-          {androidGalleryError ? (
-            <Text accessibilityRole="alert" style={styles.galleryErrorText}>
-              {androidGalleryError}
-            </Text>
-          ) : null}
-
-          <FlatList
-            contentContainerStyle={
-              androidGalleryAssets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
-            }
-            data={androidGalleryAssets}
-            keyExtractor={(asset) => asset.id}
-            ListEmptyComponent={
-              <View style={styles.galleryEmptyState}>
-                {isAndroidGalleryLoading ? (
-                  <ActivityIndicator color={theme.primary} size="large" />
-                ) : null}
-                <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
-                  {isAndroidGalleryLoading ? 'Loading your photos…' : 'No photos found'}
+            <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
+              <View style={styles.galleryHeading}>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo or video</Text>
+                <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
+                  Original location metadata will be preserved
                 </Text>
               </View>
-            }
-            ListFooterComponent={
-              androidGalleryHasNextPage ? (
-                <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
-              ) : null
-            }
-            numColumns={3}
-            onEndReached={() => {
-              if (androidGalleryHasNextPage && androidGalleryCursor) {
-                void loadAndroidGalleryPage(androidGalleryCursor);
-              }
-            }}
-            onEndReachedThreshold={0.5}
-            renderItem={({ item }) => {
-              const isSelecting = selectingAndroidAssetId === item.id;
+              <AppButton
+                accessibilityLabel="Close media library"
+                label="Close"
+                onPress={() => setIsAndroidGalleryVisible(false)}
+                style={styles.galleryCloseButton}
+                variant="ghost"
+              />
+            </View>
 
-              return (
-                <Pressable
-                  accessibilityLabel={`Select ${item.filename}`}
-                  accessibilityRole="button"
-                  disabled={Boolean(selectingAndroidAssetId)}
-                  onPress={() => void handleSelectAndroidAsset(item)}
-                  style={({ pressed }) => [
-                    styles.galleryItem,
-                    { opacity: pressed || isSelecting ? 0.65 : 1 },
-                  ]}
-                >
-                  <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
-                  {isSelecting ? (
-                    <View style={styles.gallerySelectingOverlay}>
-                      <ActivityIndicator color="#FFFFFF" />
-                    </View>
+            {androidGalleryError ? (
+              <Text accessibilityRole="alert" style={styles.galleryErrorText}>
+                {androidGalleryError}
+              </Text>
+            ) : null}
+
+            <FlatList
+              contentContainerStyle={
+                androidGalleryAssets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
+              }
+              data={androidGalleryAssets}
+              keyExtractor={(asset) => asset.id}
+              ListEmptyComponent={
+                <View style={styles.galleryEmptyState}>
+                  {isAndroidGalleryLoading ? (
+                    <ActivityIndicator color={theme.primary} size="large" />
                   ) : null}
-                </Pressable>
-              );
-            }}
-          />
-        </SafeAreaView>
+                  <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
+                    {isAndroidGalleryLoading ? 'Loading your media…' : 'No photos or videos found'}
+                  </Text>
+                </View>
+              }
+              ListFooterComponent={
+                androidGalleryHasNextPage ? (
+                  <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
+                ) : null
+              }
+              numColumns={3}
+              onEndReached={() => {
+                if (androidGalleryHasNextPage && androidGalleryCursor) {
+                  void loadAndroidGalleryPage(androidGalleryCursor);
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              renderItem={({ item }) => {
+                const isSelecting = selectingAndroidAssetId === item.id;
+                const isVideo = item.mediaType === LegacyMediaLibrary.MediaType.video;
+
+                return (
+                  <Pressable
+                    accessibilityLabel={`Select ${item.filename}`}
+                    accessibilityRole="button"
+                    disabled={Boolean(selectingAndroidAssetId)}
+                    onPress={() => void handleSelectAndroidAsset(item)}
+                    style={({ pressed }) => [
+                      styles.galleryItem,
+                      { opacity: pressed || isSelecting ? 0.65 : 1 },
+                    ]}
+                  >
+                    <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
+                    {isVideo ? (
+                      <View style={styles.galleryVideoBadge}>
+                        <SymbolView
+                          fallback={<Text style={styles.galleryVideoBadgeText}>▶</Text>}
+                          name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
+                          size={12}
+                          tintColor="#FFFFFF"
+                        />
+                      </View>
+                    ) : null}
+                    {isSelecting ? (
+                      <View style={styles.gallerySelectingOverlay}>
+                        <ActivityIndicator color="#FFFFFF" />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              }}
+            />
+          </SafeAreaView>
+        </View>
       </Modal>
 
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -431,9 +585,9 @@ export function NewSurveyRecordScreen() {
 
           <AppButton
             accessibilityLabel={
-              selectedAsset ? 'Change selected photo or video' : 'Choose a photo or video from gallery'
+              selectedAsset ? 'Change selected photo' : 'Choose a photo from gallery'
             }
-            disabled={isOpeningGallery}
+            disabled={isOpeningGallery || isScanning}
             onPress={handleOpenGallery}
             pressedOpacity={0.78}
             style={[
@@ -445,13 +599,27 @@ export function NewSurveyRecordScreen() {
             ]}
             variant="surface"
           >
-            {selectedAsset?.type === 'image' ? (
-              <Image
-                accessibilityLabel="Selected survey media"
-                contentFit="cover"
-                source={{ uri: selectedAsset.uri }}
-                style={styles.selectedImage}
-              />
+            {selectedAsset ? (
+              selectedAsset.type === 'video' ? (
+                <View style={styles.videoPreview}>
+                  <SymbolView
+                    fallback={<Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>}
+                    name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
+                    size={36}
+                    tintColor={theme.onPrimary}
+                  />
+                  <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
+                    {selectedAsset.fileName ?? 'Video selected'}
+                  </Text>
+                </View>
+              ) : (
+                <Image
+                  accessibilityLabel="Selected survey media"
+                  contentFit="cover"
+                  source={{ uri: selectedAsset.uri }}
+                  style={styles.selectedImage}
+                />
+              )
             ) : (
               <>
                 <SymbolView
@@ -459,9 +627,9 @@ export function NewSurveyRecordScreen() {
                     <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
                   }
                   name={{
-                    android: selectedAsset ? 'video_library' : 'image',
-                    ios: selectedAsset ? 'video' : 'photo',
-                    web: selectedAsset ? 'video_library' : 'image',
+                    android: 'image',
+                    ios: 'photo',
+                    web: 'image',
                   }}
                   size={38}
                   tintColor={theme.placeholder}
@@ -469,14 +637,14 @@ export function NewSurveyRecordScreen() {
                 <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
                   {isOpeningGallery
                     ? 'Opening gallery...'
-                    : selectedAsset?.fileName ?? 'Upload photo / video'}
+                    : 'Upload photo or video'}
                 </Text>
               </>
             )}
           </AppButton>
 
           <Text style={[styles.helperText, { color: theme.placeholder }]}>
-            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your image / video here'}
+            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your sign image or video here'}
           </Text>
 
           {pickerError ? (
@@ -485,27 +653,50 @@ export function NewSurveyRecordScreen() {
             </Text>
           ) : null}
 
+          {selectedAsset?.type === 'video' ? (
+            <>
+              <AppButton
+                accessibilityLabel={selectedGpxFile ? 'Change GPX file' : 'Upload GPX file'}
+                disabled={isScanning || isSaving}
+                onPress={handlePickGpx}
+                pressedOpacity={0.78}
+                style={[
+                  styles.uploadPlaceholder,
+                  styles.gpxPickerButton,
+                  {
+                    backgroundColor: theme.neutral,
+                    borderColor: selectedGpxFile ? theme.primary : theme.border,
+                  },
+                ]}
+                variant="surface"
+              >
+                <SymbolView
+                  fallback={<Text style={[styles.imageFallback, { color: selectedGpxFile ? theme.primary : theme.placeholder }]}>GPX</Text>}
+                  name={{ android: 'route', ios: 'map', web: 'route' }}
+                  size={28}
+                  tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
+                />
+                <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
+                  {selectedGpxFile ? selectedGpxFile.name : 'Upload your GPX file'}
+                </Text>
+              </AppButton>
+
+              <Text style={[styles.helperText, { color: theme.placeholder }]}>
+                {selectedGpxFile ? 'Tap to choose a different GPX file' : 'Accepts .gpx files only'}
+              </Text>
+
+              {gpxPickerError ? (
+                <Text accessibilityRole="alert" style={styles.errorText}>
+                  {gpxPickerError}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
+
           <AppButton
-            label="Submit Record"
-            onPress={() =>
-              router.push({
-                pathname: '/work/new-survey/details',
-                params: {
-                  ...(selectedAsset
-                    ? {
-                      imageType: selectedAsset.type ?? 'image',
-                      imageUri: selectedAsset.uri,
-                    }
-                    : {}),
-                  ...(selectedGps
-                    ? {
-                      latitude: String(selectedGps.latitude),
-                      longitude: String(selectedGps.longitude),
-                    }
-                    : {}),
-                },
-              })
-            }
+            disabled={!selectedAsset || isOpeningGallery || isScanning || isSaving}
+            label={isSaving ? "Saving draft..." : "Submit Record"}
+            onPress={handleSubmitRecord}
             style={styles.submitButton}
           />
         </ScrollView>
@@ -513,6 +704,7 @@ export function NewSurveyRecordScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   screen: {
@@ -522,7 +714,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   galleryScreen: {
+    height: '85%',
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    borderTopLeftRadius: Rounded.xlg,
+    borderTopRightRadius: Rounded.xlg,
+    overflow: 'hidden',
+    paddingTop: Spacing.one,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  galleryModalRoot: {
     flex: 1,
+    justifyContent: 'flex-end',
+  },
+  galleryBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(15, 23, 42, 0.48)',
+  },
+  galleryHandleArea: {
+    minHeight: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  galleryHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   galleryHeader: {
     minHeight: 72,
@@ -538,10 +761,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   galleryTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 20,
-    fontWeight: 700,
-    lineHeight: 28,
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 29,
   },
   gallerySubtitle: {
     fontFamily: Fonts.body,
@@ -551,6 +774,7 @@ const styles = StyleSheet.create({
   },
   galleryCloseButton: {
     minHeight: 40,
+    borderRadius: Rounded.round,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
   },
@@ -564,7 +788,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   galleryGrid: {
-    padding: 1,
+    padding: Spacing.two,
   },
   galleryEmptyContent: {
     flexGrow: 1,
@@ -585,21 +809,39 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '33.3333%',
     aspectRatio: 1,
-    padding: 1,
+    padding: Spacing.half,
   },
   galleryImage: {
     width: '100%',
     height: '100%',
+    borderRadius: Rounded.md,
   },
   gallerySelectingOverlay: {
     position: 'absolute',
-    top: 1,
-    right: 1,
-    bottom: 1,
-    left: 1,
+    top: Spacing.half,
+    right: Spacing.half,
+    bottom: Spacing.half,
+    left: Spacing.half,
+    borderRadius: Rounded.md,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  galleryVideoBadge: {
+    position: 'absolute',
+    bottom: Spacing.one,
+    right: Spacing.one,
+    backgroundColor: 'rgba(0, 0, 0, 0.60)',
+    borderRadius: Rounded.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryVideoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700' as const,
   },
   galleryFooterLoader: {
     marginVertical: Spacing.three,
@@ -690,5 +932,33 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignSelf: 'stretch',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  videoPreview: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    backgroundColor: 'rgba(9, 35, 60, 0.72)',
+    padding: Spacing.three,
+  },
+  videoFileName: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  gpxPickerButton: {
+    minHeight: 100,
+    marginTop: Spacing.one,
   },
 });

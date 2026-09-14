@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,10 @@ import { useWorkRoute } from '@/hooks/use-work-route';
 
 export function SurveyFinishScreen() {
     const router = useRouter();
+    const { submissionId, submissionStatus } = useLocalSearchParams<{
+        submissionId?: string;
+        submissionStatus?: string;
+    }>();
     const theme = useTheme();
     const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
 
@@ -34,10 +38,15 @@ export function SurveyFinishScreen() {
                     </View>
 
                     <View style={styles.copy}>
-                        <Text style={[styles.title, { color: theme.text }]}>Survey complete</Text>
+                        <Text style={[styles.title, { color: theme.text }]}>Sign submitted</Text>
                         <Text style={[styles.description, { color: theme.textSecondary }]}>
-                            Thank you for completing the survey. Your responses have been submitted successfully.
+                            Your image was uploaded successfully and is queued for processing.
                         </Text>
+                        {submissionId ? (
+                            <Text style={[styles.reference, { color: theme.placeholder }]}>
+                                Reference {submissionId.slice(0, 8)} - {submissionStatus ?? 'QUEUED'}
+                            </Text>
+                        ) : null}
                     </View>
 
                     <View style={styles.actionFooter}>
@@ -99,6 +108,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 500,
         lineHeight: 21,
+        textAlign: 'center',
+    },
+    reference: {
+        fontFamily: Fonts.mono,
+        fontSize: 12,
+        fontWeight: 600,
+        lineHeight: 17,
         textAlign: 'center',
     },
     actionFooter: {

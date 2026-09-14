@@ -1,48 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  BackHandler,
-  PanResponder,
-  Platform,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import AntDesign from '@expo/vector-icons/AntDesign';
-import { AppButton } from '@/components/ui/button';
-import { AppToast } from '@/components/ui/toast';
-import { NavigationManeuverBanner } from '@/components/navigation-maneuver-banner';
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import { Animated, BackHandler, PanResponder, Platform, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import { Image } from "expo-image";
+import { AppButton } from "@/components/ui/button";
+import { AppToast } from "@/components/ui/toast";
+import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
+import { NavigationSignAlertBanner } from "@/components/navigation-sign-alert-banner";
+import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
   previousLocations,
   startLocations,
   type MapCoordinate,
-} from '@/feature/navigation/data/navigation-locations';
-import { useTheme } from '@/hooks/use-theme';
+} from "@/feature/navigation/data/navigation-locations";
+import { useTheme } from "@/hooks/use-theme";
 
-import { NavigationMapView } from '../components/navigation-map-view';
-import { getDrivingRoute, type OsrmRouteStep } from '../services/osrm';
-import { getRouteProgressMeters } from '../utils/route-progress';
-import { getRouteStopCoordinates } from '../utils/route-stop-markers';
-
-type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
-
-const SHEET_DRAG_ACTIVATION_DISTANCE = 6;
-const SHEET_DRAG_SETTLE_DISTANCE = 72;
-const SHEET_FLING_VELOCITY = 0.45;
+import { NavigationMapView } from "../components/navigation-map-view";
+import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
+import type { VehicleMode } from '@/types/navigation/navigationType';
+import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
+import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
+import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
+import { getRouteProgressMeters } from "../utils/route-progress";
+import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
+import { getMapLibre } from "@/services/maplibre";
 
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
+  const mapLibre = getMapLibre();
+  if (!mapLibre) return null;
+
   try {
-    // Guarded require keeps Expo Go or stale native builds on the manual-start path.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
     const position = await mapLibre.LocationManager.getCurrentPosition();
 
     if (!position) return null;
@@ -55,137 +45,217 @@ async function getNativeGpsStart(): Promise<MapCoordinate | null> {
 
 export function NavigationMapScreen() {
   const router = useRouter();
-  const { height: windowHeight } = useWindowDimensions();
-  const { destinationId, startId, startLat, startLng } = useLocalSearchParams<{
+  const {
+    destinationId,
+    destinationLat,
+    destinationLng,
+    destinationSubtitle,
+    destinationTitle,
+    startId,
+    startLat,
+    startLng,
+    startTitle,
+  } = useLocalSearchParams<{
     destinationId?: string;
+    destinationLat?: string;
+    destinationLng?: string;
+    destinationSubtitle?: string;
+    destinationTitle?: string;
     startId?: string;
     startLat?: string;
     startLng?: string;
+    startTitle?: string;
   }>();
   const theme = useTheme();
-  const selectedDestination = previousLocations.find((location) => location.id === destinationId);
-  const selectedStart = startLocations.find((location) => location.id === startId);
-  const gpsStart = useMemo(
-    () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
-    [startLat, startLng],
-  );
-  const routeStart = useMemo(() => gpsStart ?? selectedStart?.coordinate, [gpsStart, selectedStart]);
-  const routeStartTitle = selectedStart?.title ?? (gpsStart ? 'Current Location' : undefined);
-  const routeKey =
-    selectedDestination && routeStart
-      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}`
-      : undefined;
-
-
-  const [routeResult, setRouteResult] = useState<{
-    coordinates: MapCoordinate[];
-    distance: number;
-    duration: number;
-    key: string;
-    steps: OsrmRouteStep[];
-  }>();
-  const [navigationSession, setNavigationSession] = useState<{
-    hasLiveLocation: boolean;
-    routeKey: string;
-    stopSignCoordinates: MapCoordinate[];
-  }>();
-  const [isStartingNavigation, setIsStartingNavigation] = useState(false);
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationToast, setLocationToast] = useState<{ id: number; message: string }>();
-  const [mapFocus, setMapFocus] = useState<{ coordinate: MapCoordinate; requestId: number }>();
-  const [navigationError, setNavigationError] = useState<string>();
-  const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
-  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
-  const routeCoordinates =
-    routeResult && routeResult.key === routeKey ? routeResult.coordinates : undefined;
-  const routeDistance = routeResult && routeResult.key === routeKey ? routeResult.distance : undefined;
-  const routeDuration = routeResult && routeResult.key === routeKey ? routeResult.duration : undefined;
-  const routeSteps = routeResult && routeResult.key === routeKey ? routeResult.steps : undefined;
-  const plannedStopSignCoordinates = useMemo(
-    () => getRouteStopCoordinates(routeCoordinates),
-    [routeCoordinates],
-  );
-  const isNavigating = Boolean(routeKey && navigationSession?.routeKey === routeKey);
+  const { height: windowHeight } = useWindowDimensions();
   const [isSheetExpanded, setIsSheetExpanded] = useState(false);
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const sheetExpandedRef = useRef(false);
-  const sheetGestureStart = useRef(0);
-  const sheetGestureStartedExpanded = useRef(false);
-  const collapsedRouteSheetHeight = Math.max(200, Math.min(230, windowHeight * 0.28));
-  const expandedRouteSheetHeight = Math.max(
-    collapsedRouteSheetHeight,
-    Math.min(560, windowHeight * 0.68),
-  );
-  const routeSheetTravel = Math.max(
-    1,
-    expandedRouteSheetHeight - collapsedRouteSheetHeight,
-  );
-  const routeSheetHeight = sheetProgress.interpolate({
+  const gestureStart = useRef(0);
+  const gestureStartedExpanded = useRef(false);
+  const directionsScrollRef = useRef<ScrollView>(null);
+  const stepLayoutOffsets = useRef<number[]>([]);
+  const collapsedSheetHeight = Math.min(280, windowHeight * 0.36);
+  const expandedSheetHeight = Math.max(collapsedSheetHeight, Math.min(560, windowHeight * 0.68));
+  const sheetTravel = Math.max(1, expandedSheetHeight - collapsedSheetHeight);
+  const sheetHeight = sheetProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [collapsedRouteSheetHeight, expandedRouteSheetHeight],
+    outputRange: [collapsedSheetHeight, expandedSheetHeight],
   });
   const animateRouteSheet = useCallback((expanded: boolean) => {
     sheetExpandedRef.current = expanded;
     setIsSheetExpanded(expanded);
     Animated.spring(sheetProgress, {
+      toValue: expanded ? 1 : 0,
       damping: 22,
       mass: 0.8,
       stiffness: 220,
-      toValue: expanded ? 1 : 0,
       useNativeDriver: false,
     }).start();
   }, [sheetProgress]);
-  const routeSheetPanResponder = useMemo(
-    () => PanResponder.create({
-      // Own the handle gesture from touch-down. Pressable otherwise keeps the
-      // responder and turns a drag into a tap on some native platforms.
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        sheetGestureStartedExpanded.current = sheetExpandedRef.current;
-        sheetGestureStart.current = sheetExpandedRef.current ? 1 : 0;
-        sheetProgress.stopAnimation((progress) => {
-          sheetGestureStart.current = progress;
-        });
-      },
-      onPanResponderMove: (_, gesture) => {
-        const nextProgress = sheetGestureStart.current - gesture.dy / routeSheetTravel;
-        sheetProgress.setValue(Math.max(0, Math.min(1, nextProgress)));
-      },
-      onPanResponderRelease: (_, gesture) => {
-        const isTap =
-          Math.abs(gesture.dx) < SHEET_DRAG_ACTIVATION_DISTANCE &&
-          Math.abs(gesture.dy) < SHEET_DRAG_ACTIVATION_DISTANCE;
+  const sheetPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      gestureStartedExpanded.current = sheetExpandedRef.current;
+      gestureStart.current = sheetExpandedRef.current ? 1 : 0;
+      sheetProgress.stopAnimation((value) => { gestureStart.current = value; });
+    },
+    onPanResponderMove: (_, gesture) => {
+      sheetProgress.setValue(Math.max(0, Math.min(1, gestureStart.current - gesture.dy / sheetTravel)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (Math.abs(gesture.dx) < 6 && Math.abs(gesture.dy) < 6) {
+        animateRouteSheet(!gestureStartedExpanded.current);
+      } else if (Math.abs(gesture.vy) > 0.35) {
+        animateRouteSheet(gesture.vy < 0);
+      } else if (Math.abs(gesture.dy) > 32) {
+        animateRouteSheet(gesture.dy < 0);
+      } else {
+        animateRouteSheet(gestureStartedExpanded.current);
+      }
+    },
+    onPanResponderTerminate: () => animateRouteSheet(gestureStartedExpanded.current),
+  }), [animateRouteSheet, sheetProgress, sheetTravel]);
 
-        if (isTap) {
-          animateRouteSheet(!sheetGestureStartedExpanded.current);
-          return;
-        }
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !destinationId || !isSheetExpanded) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      animateRouteSheet(false);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [animateRouteSheet, destinationId, isSheetExpanded]);
 
-        const passedDistanceThreshold = Math.abs(gesture.dy) >= SHEET_DRAG_SETTLE_DISTANCE;
-        const passedVelocityThreshold = Math.abs(gesture.vy) >= SHEET_FLING_VELOCITY;
-
-        if (passedDistanceThreshold || passedVelocityThreshold) {
-          animateRouteSheet(passedVelocityThreshold ? gesture.vy < 0 : gesture.dy < 0);
-          return;
-        }
-
-        animateRouteSheet(sheetGestureStartedExpanded.current);
-      },
-      onPanResponderTerminate: () => {
-        animateRouteSheet(sheetGestureStartedExpanded.current);
-      },
-    }),
-    [animateRouteSheet, routeSheetTravel, sheetProgress],
+  useEffect(() => () => sheetProgress.stopAnimation(), [sheetProgress]);
+  const savedDestination = previousLocations.find(
+    (location) => location.id === destinationId,
   );
-  const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
-  const visibleStopSignCoordinates = isNavigating
-    ? navigationSession?.stopSignCoordinates ?? []
-    : plannedStopSignCoordinates;
+  const selectedDestination = useMemo(() => {
+    if (destinationLat && destinationLng && destinationId) {
+      return {
+        category: "recent" as const,
+        coordinate: [
+          Number(destinationLng),
+          Number(destinationLat),
+        ] as MapCoordinate,
+        id: destinationId,
+        subtitle: destinationSubtitle ?? "",
+        title: destinationTitle ?? "Destination",
+      };
+    }
+    return savedDestination;
+  }, [
+    destinationId,
+    destinationLat,
+    destinationLng,
+    destinationSubtitle,
+    destinationTitle,
+    savedDestination,
+  ]);
+  const selectedStart = startLocations.find(
+    (location) => location.id === startId,
+  );
+  const gpsStart = useMemo(
+    () =>
+      startLng && startLat
+        ? ([Number(startLng), Number(startLat)] as MapCoordinate)
+        : undefined,
+    [startLat, startLng],
+  );
+  const routeStart = useMemo(
+    () => gpsStart ?? selectedStart?.coordinate,
+    [gpsStart, selectedStart],
+  );
+  const routeStartTitle =
+    startTitle ??
+    selectedStart?.title ??
+    (gpsStart ? "Current Location" : undefined);
+  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
+  const routeKey =
+    selectedDestination && routeStart
+      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
+      : undefined;
+
+  const [navigationSession, setNavigationSession] = useState<{
+    hasLiveLocation: boolean;
+    routeKey: string;
+  }>();
+  const { data: vehicleModes = [] } = useGetVehicleModes();
+  const [isStartingNavigation, setIsStartingNavigation] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationToast, setLocationToast] = useState<{
+    id: number;
+    message: string;
+  }>();
+  const [mapFocus, setMapFocus] = useState<{
+    coordinate: MapCoordinate;
+    requestId: number;
+  }>();
+  const [navigationActionError, setNavigationError] = useState<string>();
+  const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  const { data: routeResult, error: routeError } = useGetNavigationRoute(
+    routeStart,
+    selectedDestination?.coordinate,
+    vehicleMode,
+  );
+  const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
+  const hasSelectedRoute = Boolean(routeStart && selectedDestination);
+  const { data: mapSigns = [], error: boundsSignsError } = useGetSignsInBounds(
+    mapBounds,
+    !hasSelectedRoute,
+  );
+  const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
+    routeStart,
+    selectedDestination?.coordinate,
+    routeResult?.geometry,
+  );
+  console.log('plannedSigns', plannedSigns);
+  const navigationError = routeError?.message ?? navigationActionError
+    ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
+  const routeCoordinates = routeResult?.coordinates;
+  const routeDistance = routeResult?.distance;
+  const routeDuration = routeResult?.duration;
+  const routeSteps = routeResult?.steps;
+  const isNavigating = Boolean(
+    routeKey && navigationSession?.routeKey === routeKey,
+  );
+  const hasLiveLocation = Boolean(
+    isNavigating && navigationSession?.hasLiveLocation,
+  );
+  const visibleSigns = useMemo(() => {
+    const rawSigns = hasSelectedRoute ? plannedSigns : mapSigns;
+    return rawSigns.map((sign) => ({
+      ...sign,
+      imageUrl: sign.imageUrl && !sign.imageUrl.includes('mock/')
+        ? resolveImageUrl(sign.imageUrl)
+        : TARGET_SIGN_IMAGE_URL,
+    }));
+  }, [hasSelectedRoute, mapSigns, plannedSigns]);
+  const sampleRouteSigns = useMemo((): RouteSign[] => {
+    if (!hasSelectedRoute || !routeCoordinates || routeCoordinates.length < 2) return [];
+    const nearStart = routeCoordinates[Math.min(1, routeCoordinates.length - 1)];
+    const mid = routeCoordinates[Math.floor((routeCoordinates.length - 1) / 2)];
+    return [
+      { id: 'sample-sign-start', coordinate: nearStart, imageUrl: '', name: 'Stop', signCode: 'STOP' },
+      { id: 'sample-sign-mid', coordinate: mid, imageUrl: '', name: 'Stop', signCode: 'STOP' },
+    ];
+  }, [hasSelectedRoute, routeCoordinates]);
+
+  const signsWithSamples = useMemo(
+    () => {
+      const sampleIds = new Set(sampleRouteSigns.map((s) => s.id));
+      const deduped = visibleSigns.filter((s) => !sampleIds.has(s.id));
+      return [...sampleRouteSigns, ...deduped];
+    },
+    [sampleRouteSigns, visibleSigns],
+  );
   const maneuverProgresses = useMemo(
-    () => routeSteps?.map((step) =>
-      step.maneuver.location && routeCoordinates
-        ? getRouteProgressMeters(step.maneuver.location, routeCoordinates)
-        : undefined),
+    () =>
+      routeSteps?.map((step) =>
+        step.maneuver.location && routeCoordinates
+          ? getRouteProgressMeters(step.maneuver.location, routeCoordinates)
+          : undefined,
+      ),
     [routeCoordinates, routeSteps],
   );
   const activeManeuver = useMemo(() => {
@@ -201,12 +271,15 @@ export function NavigationMapScreen() {
       return undefined;
     }
 
-    const currentProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
+    const currentProgress = getRouteProgressMeters(
+      navigationCoordinate,
+      routeCoordinates,
+    );
     let stepIndex = routeSteps.findIndex((step, index) => {
       const maneuverProgress = maneuverProgresses[index];
 
       return (
-        step.maneuver.type !== 'depart' &&
+        step.maneuver.type !== "depart" &&
         maneuverProgress !== undefined &&
         maneuverProgress >= currentProgress + 10
       );
@@ -215,39 +288,57 @@ export function NavigationMapScreen() {
     if (stepIndex < 0) stepIndex = routeSteps.length - 1;
 
     return {
-      distance: Math.max(0, (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress),
+      distance: Math.max(
+        0,
+        (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress,
+      ),
       step: routeSteps[stepIndex],
+      stepIndex,
     };
-  }, [isNavigating, maneuverProgresses, routeCoordinates, routeStart, routeSteps, userCoordinate]);
+  }, [
+    isNavigating,
+    maneuverProgresses,
+    routeCoordinates,
+    routeStart,
+    routeSteps,
+    userCoordinate,
+  ]);
+
+  const { activeAlert: activeSignAlert } = useSignProximityAlert({
+    alertDistanceMeters: 50,
+    isNavigating,
+    signs: signsWithSamples,
+    userCoordinate: userCoordinate ?? routeStart,
+    speechLanguage: "en-US",
+  });
 
   useEffect(() => {
-    if (!selectedDestination || !routeStart || !routeKey) return;
-
-    const controller = new AbortController();
-
-    getDrivingRoute(routeStart, selectedDestination.coordinate, controller.signal)
-      .then(({ coordinates, distance, duration, steps }) => {
-        setRouteResult({ coordinates, distance, duration, key: routeKey, steps });
-      })
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [routeKey, routeStart, selectedDestination]);
+    setNavigationError(undefined);
+  }, [routeKey, vehicleMode]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' || !hasLiveLocation) return;
+    const stepIndex = activeManeuver?.stepIndex;
+    if (stepIndex == null) return;
+    const offset = stepLayoutOffsets.current[stepIndex];
+    if (offset != null) {
+      directionsScrollRef.current?.scrollTo({ y: offset, animated: true });
+    }
+  }, [activeManeuver?.stepIndex]);
+
+  useEffect(() => {
+    if (Platform.OS === "web" || !hasLiveLocation) return;
+
+    const mapLibre = getMapLibre();
+    if (!mapLibre) return;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
       const handleLocationUpdate = (position: {
         coords: { latitude: number; longitude: number };
       }) => {
-        setUserCoordinate([position.coords.longitude, position.coords.latitude]);
+        setUserCoordinate([
+          position.coords.longitude,
+          position.coords.latitude,
+        ]);
       };
 
       mapLibre.LocationManager.setMinDisplacement(3);
@@ -261,22 +352,17 @@ export function NavigationMapScreen() {
     }
   }, [hasLiveLocation]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'android' || !isSheetExpanded) return;
-
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      animateRouteSheet(false);
-      return true;
-    });
-
-    return () => subscription.remove();
-  }, [animateRouteSheet, isSheetExpanded]);
-
   const handleBeginNavigation = async () => {
-    if (Platform.OS === 'web' || !selectedDestination || !routeStart || !routeKey) return;
+    if (
+      Platform.OS === "web" ||
+      !selectedDestination ||
+      !routeStart ||
+      !routeKey
+    )
+      return;
 
-    if (plannedStopSignCoordinates.length !== 5) {
-      setNavigationError('The route is still loading. Try again in a moment.');
+    if (!routeCoordinates?.length) {
+      setNavigationError("The route is still loading. Try again in a moment.");
       return;
     }
 
@@ -284,9 +370,10 @@ export function NavigationMapScreen() {
     setNavigationError(undefined);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
-      const currentPosition = await mapLibre.LocationManager.getCurrentPosition();
+      const mapLibre = getMapLibre();
+      const currentPosition = mapLibre
+        ? await mapLibre.LocationManager.getCurrentPosition()
+        : null;
 
       setUserCoordinate(
         currentPosition
@@ -297,14 +384,12 @@ export function NavigationMapScreen() {
       setNavigationSession({
         hasLiveLocation: Boolean(currentPosition),
         routeKey,
-        stopSignCoordinates: plannedStopSignCoordinates,
       });
     } catch {
       setUserCoordinate(routeStart);
       setNavigationSession({
         hasLiveLocation: false,
         routeKey,
-        stopSignCoordinates: plannedStopSignCoordinates,
       });
     } finally {
       setIsStartingNavigation(false);
@@ -319,24 +404,24 @@ export function NavigationMapScreen() {
     try {
       let coordinate: MapCoordinate;
 
-
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+      const mapLibre = getMapLibre();
+      if (!mapLibre) {
+        throw new Error("Current GPS location requires a native build.");
+      }
       const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
       if (!hasPermission) {
-        throw new Error('Allow location access to use your current position.');
+        throw new Error("Allow location access to use your current position.");
       }
 
       const position = await mapLibre.LocationManager.getCurrentPosition();
 
       if (!position) {
-        throw new Error('Turn on GPS and try again.');
+        throw new Error("Turn on GPS and try again.");
       }
 
       coordinate = [position.coords.longitude, position.coords.latitude];
-
-
+      console.log(coordinate);
       setMapFocus((current) => ({
         coordinate,
         requestId: (current?.requestId ?? 0) + 1,
@@ -344,24 +429,42 @@ export function NavigationMapScreen() {
     } catch (error) {
       setLocationToast((current) => ({
         id: (current?.id ?? 0) + 1,
-        message: error instanceof Error ? error.message : 'Unable to get your current location.',
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to get your current location.",
       }));
     } finally {
       setIsLocating(false);
     }
   };
 
-  const handleTurnOnSpeaker = async () => {
-    setIsSpeakerOn((current) => !current);
+  const handleSwapSelectedRoute = () => {
+    if (!selectedDestination || !routeStart) return;
+    setNavigationSession(undefined);
+    router.replace({
+      pathname: '/home',
+      params: {
+        destinationId: startId ?? 'swapped-start',
+        destinationLat: String(routeStart[1]),
+        destinationLng: String(routeStart[0]),
+        destinationTitle: routeStartTitle ?? 'Starting point',
+        destinationSubtitle: '',
+        startId: selectedDestination.id,
+        startLat: String(selectedDestination.coordinate[1]),
+        startLng: String(selectedDestination.coordinate[0]),
+        startTitle: selectedDestination.title,
+      },
+    });
   };
 
-
   const handleChangeDestination = () => {
-    router.replace({
-      pathname: '/home/search',
+    router.push({
+      pathname: "/home/search",
       params: {
         ...(startId ? { startId } : {}),
         ...(startLat && startLng ? { startLat, startLng } : {}),
+        ...(startTitle ? { startTitle } : {}),
       },
     });
   };
@@ -369,41 +472,83 @@ export function NavigationMapScreen() {
   const handleGo = async () => {
     if (!selectedDestination) return;
 
-    if (Platform.OS !== 'web') {
+    // If the user has already chosen an explicit start point, go straight to
+    // navigation with that start — do NOT overwrite it with GPS.
+    if (routeStart) {
+      router.replace({
+        pathname: "/home",
+        params: {
+          destinationId: selectedDestination.id,
+          destinationLat: String(selectedDestination.coordinate[1]),
+          destinationLng: String(selectedDestination.coordinate[0]),
+          destinationSubtitle: selectedDestination.subtitle,
+          destinationTitle: selectedDestination.title,
+          startLat: String(routeStart[1]),
+          startLng: String(routeStart[0]),
+          ...(startTitle ? { startTitle } : {}),
+          ...(startId ? { startId } : {}),
+        },
+      });
+      return;
+    }
+
+    if (Platform.OS !== "web") {
       const nativeGpsStart = await getNativeGpsStart();
 
       if (nativeGpsStart) {
         router.replace({
-          pathname: '/home',
+          pathname: "/home",
           params: {
             destinationId: selectedDestination.id,
+            destinationLat: String(selectedDestination.coordinate[1]),
+            destinationLng: String(selectedDestination.coordinate[0]),
+            destinationSubtitle: selectedDestination.subtitle,
+            destinationTitle: selectedDestination.title,
             startLat: String(nativeGpsStart[1]),
             startLng: String(nativeGpsStart[0]),
+            startTitle: "Current Location",
           },
         });
         return;
       }
     }
 
-    if (Platform.OS === 'web' && 'geolocation' in navigator && 'permissions' in navigator) {
-      const permission = await navigator.permissions.query({ name: 'geolocation' });
+    if (
+      Platform.OS === "web" &&
+      "geolocation" in navigator &&
+      "permissions" in navigator
+    ) {
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
 
-      if (permission.state === 'granted') {
+      if (permission.state === "granted") {
         navigator.geolocation.getCurrentPosition(
           ({ coords }) => {
             router.replace({
-              pathname: '/home',
+              pathname: "/home",
               params: {
                 destinationId: selectedDestination.id,
+                destinationLat: String(selectedDestination.coordinate[1]),
+                destinationLng: String(selectedDestination.coordinate[0]),
+                destinationSubtitle: selectedDestination.subtitle,
+                destinationTitle: selectedDestination.title,
                 startLat: String(coords.latitude),
                 startLng: String(coords.longitude),
+                startTitle: "Current Location",
               },
             });
           },
           () => {
             router.push({
-              pathname: '/home/start',
-              params: { destinationId: selectedDestination.id },
+              pathname: "/home/start",
+              params: {
+                destinationId: selectedDestination.id,
+                destinationLat: String(selectedDestination.coordinate[1]),
+                destinationLng: String(selectedDestination.coordinate[0]),
+                destinationSubtitle: selectedDestination.subtitle,
+                destinationTitle: selectedDestination.title,
+              },
             });
           },
         );
@@ -412,47 +557,43 @@ export function NavigationMapScreen() {
     }
 
     router.push({
-      pathname: '/home/start',
-      params: { destinationId: selectedDestination.id },
+      pathname: "/home/start",
+      params: {
+        destinationId: selectedDestination.id,
+        destinationLat: String(selectedDestination.coordinate[1]),
+        destinationLng: String(selectedDestination.coordinate[0]),
+        destinationSubtitle: selectedDestination.subtitle,
+        destinationTitle: selectedDestination.title,
+      },
     });
-  };
-
-  const handleShareDestination = async () => {
-    if (!selectedDestination) return;
-
-    const [longitude, latitude] = selectedDestination.coordinate;
-    const mapUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-
-    try {
-      await Share.share({
-        message: `${selectedDestination.title}\n${mapUrl}`,
-        title: selectedDestination.title,
-      });
-    } catch {
-      setLocationToast((current) => ({
-        id: (current?.id ?? 0) + 1,
-        message: 'Unable to share this destination right now.',
-      }));
-    }
   };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <View style={styles.map}>
         <NavigationMapView
+          onBoundsChange={setMapBounds}
           destination={selectedDestination}
-          focusCoordinate={selectedDestination ? undefined : mapFocus?.coordinate}
+          focusCoordinate={
+            selectedDestination ? undefined : mapFocus?.coordinate
+          }
           focusRequestId={mapFocus?.requestId}
           navigationActive={
-            Platform.OS !== 'web' &&
+            Platform.OS !== "web" &&
             isNavigating &&
             Boolean(navigationSession?.hasLiveLocation)
           }
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
-          routeStopCoordinates={visibleStopSignCoordinates}
+          routeSigns={signsWithSamples}
           showCurrentLocation={!isNavigating}
         />
+
+        {!hasSelectedRoute && boundsSignsError ? (
+          <AppToast
+            message="Unable to load traffic signs."
+          />
+        ) : null}
 
         {isNavigating && activeManeuver ? (
           <NavigationManeuverBanner
@@ -462,82 +603,88 @@ export function NavigationMapScreen() {
           />
         ) : null}
 
+        {isNavigating && activeSignAlert ? (
+          <NavigationSignAlertBanner
+            distanceMeters={activeSignAlert.distanceMeters}
+            hasActiveManeuver={Boolean(activeManeuver)}
+            sign={activeSignAlert.sign}
+          />
+        ) : null}
+
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
             <View style={styles.topControls}>
               {selectedDestination && routeStart ? (
-                <View style={styles.routeInputGroup}>
-                  <View
-                    style={[
-                      styles.routeInput,
-                      { backgroundColor: theme.backgroundElement },
-                    ]}
-                  >
+                <View style={[styles.selectedRouteRow, { backgroundColor: theme.backgroundElement }]}>
+                  <View style={styles.selectedRouteFields}>
                     <AppButton
                       accessibilityLabel="Change starting point"
                       onPress={() => router.push({
                         pathname: '/home/start',
-                        params: { destinationId: selectedDestination.id },
+                        params: {
+                          destinationId: selectedDestination.id,
+                          destinationLat: String(selectedDestination.coordinate[1]),
+                          destinationLng: String(selectedDestination.coordinate[0]),
+                          destinationSubtitle: selectedDestination.subtitle,
+                          destinationTitle: selectedDestination.title,
+                        },
                       })}
-                      style={styles.routeInputContentButton}
+                      style={styles.selectedRouteInput}
                       variant="ghost"
                     >
-                      <AntDesign
-                        name="pushpin"
-                        size={17}
-                        color={theme.primary}
-                      />
-                      <Text numberOfLines={1} style={[styles.routeInputText, { color: theme.text }]}>
+                      <View style={[styles.routeOriginCircle, { borderColor: theme.textSecondary }]} />
+                      <Text numberOfLines={1} style={[styles.selectedStartText, { color: theme.text }]}>
                         {routeStartTitle}
                       </Text>
                     </AppButton>
-                  </View>
-                  <View
-                    style={[
-                      styles.selectedDestinationInput,
-                      { backgroundColor: theme.background, borderColor: theme.primary },
-                    ]}
-                  >
-
+                    <View pointerEvents="none" style={[styles.routeFieldDivider, { backgroundColor: theme.border }]} />
+                    <View pointerEvents="none" style={styles.selectedRouteConnector}>
+                      {[0, 1, 2].map((dot) => (
+                        <View key={dot} style={[styles.selectedRouteDot, { backgroundColor: theme.placeholder }]} />
+                      ))}
+                    </View>
                     <AppButton
                       accessibilityLabel="Change destination"
                       onPress={handleChangeDestination}
-                      style={styles.destinationNameButton}
+                      style={[styles.selectedRouteInput, styles.destinationWithSwap]}
                       variant="ghost"
                     >
-                      <AntDesign
-                        color={theme.primary}
-                        name="pushpin"
-                        size={17}
-                      />
-                      <Text
-                        ellipsizeMode="tail"
-                        numberOfLines={1}
-                        style={[styles.destinationNameText, { color: theme.text }]}
-                      >
+                      <AntDesign name="environment" size={17} color={theme.danger} />
+                      <Text numberOfLines={1} style={[styles.selectedDestinationText, { color: theme.text }]}>
                         {selectedDestination.title}
                       </Text>
                     </AppButton>
                   </View>
+                  <AppButton
+                    accessibilityLabel="Swap starting point and destination"
+                    onPress={handleSwapSelectedRoute}
+                    style={styles.routeSwapButton}
+                    variant="ghost"
+                  >
+                    <AntDesign name="swap" size={20} color={theme.text} style={{ transform: [{ rotate: '90deg' }] }} />
+                  </AppButton>
                 </View>
               ) : selectedDestination ? (
                 <View
                   style={[
-                    styles.selectedDestinationInput,
-                    { backgroundColor: theme.background, borderColor: theme.text },
+                    styles.selectedRouteRow,
+                    { borderRadius: Rounded.round },
+                    { backgroundColor: theme.backgroundElement },
                   ]}
                 >
                   <AppButton
                     accessibilityLabel="Change destination"
                     onPress={handleChangeDestination}
-                    style={styles.destinationNameButton}
+                    style={[styles.selectedRouteInput, styles.selectedRouteFields, { borderRadius: Rounded.round }]}
                     variant="ghost"
                   >
-
                     <Text
                       ellipsizeMode="tail"
                       numberOfLines={1}
-                      style={[styles.destinationNameText, { color: theme.text }]}
+                      style={[
+                        styles.selectedDestinationText,
+                        { color: theme.text },
+                      ]}
                     >
                       {selectedDestination.title}
                     </Text>
@@ -545,10 +692,7 @@ export function NavigationMapScreen() {
                 </View>
               ) : (
                 <View
-                  style={[
-                    styles.searchBar,
-                    { backgroundColor: theme.backgroundElement },
-                  ]}
+                  style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                 >
                   <AppButton
                     accessibilityLabel="Search destination"
@@ -558,6 +702,7 @@ export function NavigationMapScreen() {
                   >
                     <Image
                       accessibilityLabel="App logo"
+                      contentFit="cover"
                       source={require('@/assets/images/app-logo.svg')}
                       style={styles.appLogo}
                     />
@@ -565,7 +710,6 @@ export function NavigationMapScreen() {
                       Search here...
                     </Text>
                   </AppButton>
-
                   <AppButton
                     accessibilityLabel="Add credits. Current balance: 24"
                     onPress={() => router.push('/credits/top-up')}
@@ -584,36 +728,44 @@ export function NavigationMapScreen() {
             {!selectedDestination ? (
               <View style={styles.mapActions}>
                 <AppButton
-                  accessibilityLabel={isSpeakerOn ? 'Turn on speaker' : 'Turn off speaker'}
-                  onPress={handleTurnOnSpeaker}
+                  accessibilityLabel={
+                    isLocating
+                      ? "Getting current location"
+                      : "Use current location"
+                  }
+                  disabled={isLocating}
+                  onPress={handleCurrentLocation}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
-                    { backgroundColor: isSpeakerOn ? theme.backgroundElement : '#ddd', borderColor: theme.border },
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.primary,
+                    },
                   ]}
                   variant="surface"
                 >
-                  {isSpeakerOn ? (
-                    <AntDesign
-                      name='audio'
-                      size={22}
-                      tintColor={theme.primary}
-                    />
-                  ) : (
-                    <AntDesign
-                      name='audio-muted'
-                      size={22}
-                      tintColor={theme.primary}
-                    />
-                  )}
+                  <SymbolView
+                    name={{
+                      android: "my_location",
+                      ios: "location.fill",
+                      web: "my_location",
+                    }}
+                    size={22}
+                    tintColor={theme.primary}
+                  />
                 </AppButton>
                 <AppButton
                   accessibilityLabel="Search destination"
-                  onPress={handleCurrentLocation}
+                  onPress={() => router.push("/home/search")}
                   style={styles.mapActionButton}
                 >
                   <SymbolView
-                    name={{ android: 'my_location', ios: 'location.fill' }}
+                    name={{
+                      android: "search",
+                      ios: "magnifyingglass",
+                      web: "search",
+                    }}
                     size={22}
                     tintColor={theme.onPrimary}
                   />
@@ -624,202 +776,233 @@ export function NavigationMapScreen() {
         ) : null}
       </View>
 
-      {
-        selectedDestination ? (
-          <Animated.View
+      {selectedDestination ? (
+        <Animated.View
+          style={[
+            styles.destinationSheet,
+            styles.routeDestinationSheet,
+            { height: sheetHeight },
+            { backgroundColor: theme.backgroundElement },
+          ]}
+        >
+          <View
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={isSheetExpanded ? 'Collapse route details' : 'Expand route details'}
+            accessibilityHint="Drag up to expand or down to collapse. Tap to toggle."
+            accessibilityState={{ expanded: isSheetExpanded }}
+            accessibilityActions={[{ name: 'activate' }]}
+            onAccessibilityAction={() => animateRouteSheet(!sheetExpandedRef.current)}
+            style={styles.destinationSheetHandleArea}
+            {...sheetPanResponder.panHandlers}
+          >
+            <View style={styles.destinationSheetHandle} />
+          </View>
+          <Text
+            numberOfLines={1}
             style={[
-              styles.destinationSheet,
-              routeStart ? styles.routeDestinationSheet : undefined,
-              routeStart ? { height: routeSheetHeight } : undefined,
-              { backgroundColor: theme.backgroundElement },
+              styles.destinationTitle,
+              !routeStart ? styles.selectedPlaceTitle : undefined,
+              { color: theme.text },
             ]}
           >
-            <View
-              accessibilityActions={routeStart ? [{ name: 'activate' }] : undefined}
-              accessibilityHint={
-                routeStart ? 'Drag or tap to expand and collapse route directions' : undefined
-              }
-              accessibilityLabel={isSheetExpanded ? 'Collapse route details' : 'Expand route details'}
-              accessibilityRole="button"
-              accessible={Boolean(routeStart)}
-              hitSlop={Spacing.one}
-              onAccessibilityAction={(event) => {
-                if (event.nativeEvent.actionName === 'activate') {
-                  animateRouteSheet(!sheetExpandedRef.current);
-                }
-              }}
-              style={styles.destinationSheetHandleButton}
-              {...(routeStart ? routeSheetPanResponder.panHandlers : {})}
-            >
-              <View style={styles.destinationSheetHandle} />
-            </View>
-            {routeStart ? (
-              <>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.destinationTitle, { color: theme.text }]}
-                >
-                  {selectedDestination.title}
+            {selectedDestination.title}
+          </Text>
+          {!routeStart && selectedDestination.subtitle ? (
+            <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+              {selectedDestination.subtitle}
+            </Text>
+          ) : null}
+          {navigationError ? (
+            <Text accessibilityRole="alert" style={styles.navigationError}>
+              {navigationError}
+            </Text>
+          ) : null}
+          {routeStart ? (
+            <View style={styles.directionsSection}>
+              {vehicleModes.length > 1 ? (
+                <View style={styles.vehicleModes}>
+                  {vehicleModes.map((mode) => (
+                    <AppButton
+                      key={mode.id}
+                      label={mode.label}
+                      onPress={() => setVehicleMode(mode.id)}
+                      variant={vehicleMode === mode.id ? "primary" : "surface"}
+                    />
+                  ))}
+                </View>
+              ) : null}
+              {routeDuration !== undefined && routeDistance !== undefined ? (
+                <Text style={[styles.routeSummary, { color: theme.text }]}>
+                  ETA {formatRouteDuration(routeDuration)} (
+                  {formatRouteDistanceInKilometers(routeDistance)})
                 </Text>
-                {navigationError ? (
-                  <Text accessibilityRole="alert" style={styles.navigationError}>
-                    {navigationError}
-                  </Text>
-                ) : null}
-                <View style={styles.directionsSection}>
-                  {routeDuration !== undefined && routeDistance !== undefined ? (
-                    <Text style={[styles.routeSummary, { color: theme.text }]}>
-                      Time of arrival: {formatRouteDuration(routeDuration)} (
-                      {formatRouteDistanceInKilometers(routeDistance)})
-                    </Text>
-                  ) : (
-                    <Text style={[styles.routeSummary, { color: theme.textSecondary }]}>
-                      Calculating ETA...
-                    </Text>
-                  )}
-                  <Text style={[styles.directionsHeading, { color: theme.text }]}>instructions:</Text>
-                  {routeSteps ? (
-                    routeSteps.length > 0 ? (
-                      <ScrollView
-                        contentContainerStyle={styles.directionsList}
-                        nestedScrollEnabled
-                        scrollEnabled={isSheetExpanded}
-                        showsVerticalScrollIndicator
-                        style={styles.directionsScroll}
-                      >
-                        {routeSteps.map((step, index) => (
-                          <View
-                            key={`${index}-${step.maneuver.type}-${step.name}`}
-                            style={styles.directionRow}
+              ) : (
+                <Text
+                  style={[styles.routeSummary, { color: theme.textSecondary }]}
+                >
+                  Calculating ETA...
+                </Text>
+              )}
+              <Text style={[styles.directionsHeading, { color: theme.text }]}>
+                Sections:
+              </Text>
+              {routeSteps ? (
+                routeSteps.length > 0 ? (
+                  <ScrollView
+                    ref={directionsScrollRef}
+                    contentContainerStyle={styles.directionsList}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.directionsScroll}
+                  >
+                    {routeSteps.map((step, index) => {
+                      const isActiveStep = isNavigating && activeManeuver?.stepIndex === index;
+                      return (
+                        <View
+                          key={`${index}-${step.maneuver.type}-${step.name}`}
+                          onLayout={(e) => {
+                            stepLayoutOffsets.current[index] = e.nativeEvent.layout.y;
+                          }}
+                          style={[
+                            styles.directionRow,
+                            isActiveStep && styles.directionRowActive,
+                            isActiveStep && { backgroundColor: theme.backgroundSelected },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.directionNumber,
+                              { color: isActiveStep ? theme.primary : theme.textSecondary },
+                            ]}
                           >
-                            <Text style={[styles.directionNumber, { color: theme.primary }]}>
-                              {index + 1}
+                            {index + 1}
+                          </Text>
+                          <View style={styles.directionCopy}>
+                            <Text
+                              style={[
+                                styles.directionInstruction,
+                                { color: theme.text },
+                                isActiveStep && styles.directionInstructionActive,
+                              ]}
+                            >
+                              {formatRouteInstruction(step)}
                             </Text>
-                            <View style={styles.directionCopy}>
-                              <Text style={[styles.directionInstruction, { color: theme.text }]}>
-                                {formatRouteInstruction(step)}
-                              </Text>
-                              <Text style={[styles.directionDistance, { color: theme.textSecondary }]}>
-                                {formatRouteDistance(step.distance)}
-                              </Text>
-                            </View>
+                            <Text
+                              style={[
+                                styles.directionDistance,
+                                { color: theme.textSecondary },
+                              ]}
+                            >
+                              {formatRouteDistance(step.distance)}
+                            </Text>
                           </View>
-                        ))}
-                      </ScrollView>
-                    ) : (
-                      <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                        No turn-by-turn directions are available for this route.
-                      </Text>
-                    )
-                  ) : (
-                    <Text style={[styles.directionsStatus, { color: theme.textSecondary }]}>
-                      Loading directions...
-                    </Text>
-                  )}
-                </View>
-                <AppButton
-                  accessibilityLabel={isNavigating ? 'Navigation active' : 'Begin navigation'}
-                  disabled={isNavigating || isStartingNavigation}
-                  label={isNavigating ? 'Navigating...' : isStartingNavigation ? 'Starting...' : 'Go'}
-                  onPress={handleBeginNavigation}
-                  style={styles.goButton}
-                />
-              </>
-            ) : (
-              <>
-                <View style={styles.selectedPlaceSummary}>
-                  <Text style={[styles.selectedPlaceTitle, { color: theme.text }]}>
-                    {selectedDestination.title}
-                  </Text>
-                  <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
-                    {selectedDestination.subtitle}
-                  </Text>
-                </View>
-                <View style={styles.destinationActions}>
-                  <AppButton
-                    accessibilityLabel="Choose a starting point and go"
-                    label="Go"
-                    onPress={handleGo}
-                    style={styles.destinationActionButton}
-                  />
-                  <AppButton
-                    accessibilityLabel={`Share ${selectedDestination.title}`}
-                    label="Share"
-                    onPress={handleShareDestination}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <Text
                     style={[
-                      styles.destinationActionButton,
-                      {
-                        backgroundColor: theme.backgroundSelected,
-                        borderColor: 'transparent',
-                      },
+                      styles.directionsStatus,
+                      { color: theme.textSecondary },
                     ]}
-                    textStyle={{ color: theme.textSecondary }}
-                    variant="surface"
-                  />
-                </View>
-              </>
-            )}
-          </Animated.View>
-        ) : null
-      }
-      {
-        locationToast ? (
-          <AppToast
-            key={locationToast.id}
-            message={locationToast.message}
-            onDismiss={() => setLocationToast(undefined)}
-          />
-        ) : null
-      }
-    </View >
+                  >
+                    No turn-by-turn directions are available for this route.
+                  </Text>
+                )
+              ) : (
+                <Text
+                  style={[
+                    styles.directionsStatus,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Loading directions...
+                </Text>
+              )}
+            </View>
+          ) : null}
+          <View style={styles.destinationActions}>
+            <AppButton
+              accessibilityLabel={
+                isNavigating
+                  ? "Navigation active"
+                  : routeStart
+                    ? "Begin navigation"
+                    : "Start route"
+              }
+              disabled={isNavigating || isStartingNavigation}
+              label={
+                isNavigating
+                  ? "Navigating..."
+                  : isStartingNavigation
+                    ? "Starting..."
+                    : "Go"
+              }
+              onPress={routeStart ? handleBeginNavigation : handleGo}
+              style={[styles.goButton, !routeStart ? styles.destinationActionButton : undefined]}
+            />
+            {!routeStart ? (
+              <AppButton
+                accessibilityLabel={`Share ${selectedDestination.title}`}
+                label="Share"
+                onPress={async () => {
+                  try {
+                    const [longitude, latitude] = selectedDestination.coordinate;
+                    await Share.share({
+                      title: selectedDestination.title,
+                      message: `${selectedDestination.title}\nhttps://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+                    });
+                  } catch {
+                    setLocationToast((current) => ({
+                      id: (current?.id ?? 0) + 1,
+                      message: 'Unable to share this destination right now.',
+                    }));
+                  }
+                }}
+                style={[styles.destinationActionButton, {
+                  backgroundColor: theme.backgroundSelected, borderColor: 'transparent',
+                }]}
+                textStyle={{ color: theme.textSecondary }}
+                variant="surface"
+              />
+            ) : null}
+          </View>
+        </Animated.View>
+      ) : null}
+      {locationToast ? (
+        <AppToast
+          key={locationToast.id}
+          message={locationToast.message}
+          onDismiss={() => setLocationToast(undefined)}
+        />
+      ) : null}
+    </View>
   );
 }
 
-function formatRouteInstruction(step: OsrmRouteStep) {
-  const roadName = step.name || 'the road';
-  const modifier = step.maneuver.modifier?.replaceAll('_', ' ');
-
-  switch (step.maneuver.type) {
-    case 'depart':
-      return `Start on ${roadName}`;
-    case 'arrive':
-      return 'Arrive at your destination';
-    case 'turn':
-      return `Turn ${modifier ?? ''} onto ${roadName}`.replace('  ', ' ');
-    case 'continue':
-      return `Continue${modifier ? ` ${modifier}` : ''} on ${roadName}`;
-    case 'new name':
-      return `Continue onto ${roadName}`;
-    case 'merge':
-      return `Merge${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
-    case 'on ramp':
-      return `Take the ramp${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
-    case 'off ramp':
-      return `Take the exit${modifier ? ` ${modifier}` : ''} onto ${roadName}`;
-    case 'roundabout':
-    case 'rotary':
-      return `Enter the roundabout toward ${roadName}`;
-    default:
-      return `${step.maneuver.type.replaceAll('_', ' ')} on ${roadName}`;
-  }
+function formatRouteInstruction(step: NavigationStep) {
+  return step.instruction;
 }
 
-function getManeuverSymbol(step: OsrmRouteStep) {
-  if (step.maneuver.type === 'arrive') return '●';
-  if (step.maneuver.type === 'roundabout' || step.maneuver.type === 'rotary') return '↻';
+function getManeuverSymbol(step: NavigationStep) {
+  if (step.maneuver.type === "arrive") return "●";
+  if (step.maneuver.type === "roundabout" || step.maneuver.type === "rotary")
+    return "↻";
 
-  const modifier = step.maneuver.modifier ?? '';
+  const instruction = step.instruction.toLowerCase();
+  if (instruction.includes("left")) return "↖";
+  if (instruction.includes("right")) return "↗";
+  if (instruction.includes("u-turn")) return "↶";
 
-  if (modifier.includes('left')) return modifier.includes('sharp') ? '↰' : '↖';
-  if (modifier.includes('right')) return modifier.includes('sharp') ? '↱' : '↗';
-  if (modifier.includes('uturn')) return '↶';
-
-  return '↑';
+  return "↑";
 }
 
 function formatManeuverDistance(distanceInMeters: number) {
-  if (distanceInMeters < 20) return 'Now';
-  if (distanceInMeters < 1000) return `${Math.max(10, Math.round(distanceInMeters / 10) * 10)} m`;
+  if (distanceInMeters < 20) return "Now";
+  if (distanceInMeters < 1000)
+    return `${Math.max(10, Math.round(distanceInMeters / 10) * 10)} m`;
 
   return `${(distanceInMeters / 1000).toFixed(1)} km`;
 }
@@ -846,12 +1029,120 @@ function formatRouteDuration(durationInSeconds: number) {
 }
 
 const styles = StyleSheet.create({
+  selectedRouteRow: {
+    flexDirection: 'row',
+    borderRadius: Rounded.lg,
+    paddingHorizontal: Spacing.two,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  selectedRouteBackButton: {
+    width: 36,
+    minHeight: 48,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  selectedRouteFields: {
+    flex: 1,
+    minWidth: 0,
+  },
+  selectedRouteInput: {
+    minHeight: 48,
+    borderRadius: 0,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: Spacing.two,
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.one,
+    paddingLeft: Spacing.two
+  },
+  routeOriginCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    marginHorizontal: 2.5,
+  },
+  routeFieldDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 17 + Spacing.two,
+    marginRight: 36,
+  },
+  destinationWithSwap: { paddingRight: 40 },
+  routeSwapButton: {
+    position: 'absolute',
+    right: Spacing.half,
+    bottom: 0,
+    width: 44,
+    minHeight: 48,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  selectedRouteConnector: {
+    position: 'absolute',
+    left: 0,
+    top: 39,
+    width: 16,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    paddingVertical: 2,
+  },
+  selectedRouteDot: {
+    width: 2,
+    height: 2,
+    borderRadius: Rounded.round,
+  },
+  selectedStartText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: 500,
+  },
+  selectedDestinationText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: 500,
+  },
+  destinationSheetHandleArea: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one,
+  },
+  destinationActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: 'auto',
+  },
+  destinationActionButton: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: Rounded.round,
+  },
+  selectedPlaceDescription: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: 20,
+    marginBottom: Spacing.three,
+  },
+  selectedPlaceTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 29,
+  },
   screen: {
     flex: 1,
   },
   map: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   overlay: {
     ...StyleSheet.absoluteFill,
@@ -862,7 +1153,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   mapActions: {
-    position: 'absolute',
+    position: "absolute",
     right: Spacing.four,
     bottom: Spacing.four,
     gap: Spacing.one,
@@ -874,7 +1165,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 0,
     paddingVertical: 0,
-    shadowColor: '#09233C',
+    shadowColor: "#09233C",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
@@ -887,26 +1178,25 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   inlineBackButton: {
-    width: 48,
-    height: 48,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  antBackIcon: {
+  backIcon: {
     fontSize: 18,
     fontWeight: 700,
   },
   selectedDestinationInput: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: Rounded.round,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: Spacing.two,
-    shadowColor: '#09233C',
+    minHeight: 44,
+    borderRadius: Rounded.md,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: Spacing.three,
+    shadowColor: "#09233C",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
@@ -916,11 +1206,11 @@ const styles = StyleSheet.create({
   destinationNameButton: {
     flex: 1,
     minWidth: 0,
-    minHeight: 48,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    gap: Spacing.one,
+    gap: Spacing.two,
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
@@ -933,13 +1223,12 @@ const styles = StyleSheet.create({
   appLogo: {
     width: 26,
     height: 26,
-    objectFit: 'cover',
   },
   searchBar: {
     minHeight: 58,
-    borderRadius: Rounded.round,
     flexDirection: 'row',
     alignItems: 'center',
+    borderRadius: Rounded.round,
     paddingLeft: Spacing.half,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: 6 },
@@ -1001,23 +1290,31 @@ const styles = StyleSheet.create({
   },
   routeInput: {
     minHeight: 44,
-    borderRadius: Rounded.round,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#09233C',
+    borderRadius: Rounded.md,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#09233C",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
     elevation: 4,
-    paddingLeft: Spacing.four,
+  },
+  routeInputBackButton: {
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   routeInputContentButton: {
     flex: 1,
     minWidth: 0,
     minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
     gap: Spacing.two,
     paddingHorizontal: 0,
     paddingRight: Spacing.three,
@@ -1053,42 +1350,12 @@ const styles = StyleSheet.create({
   routeDestinationSheet: {
     overflow: 'hidden',
   },
-  destinationSheetHandleButton: {
-    minHeight: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
-  },
   destinationSheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D8DDE6',
-  },
-  selectedPlaceSummary: {
-    gap: Spacing.half,
-    marginBottom: Spacing.three,
-  },
-  selectedPlaceTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 22,
-    fontWeight: 900,
-    lineHeight: 29,
-  },
-  selectedPlaceDescription: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 600,
-    lineHeight: 20,
-  },
-  destinationActions: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  destinationActionButton: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: Rounded.round,
+    alignSelf: "center",
+    backgroundColor: "#D8DDE6",
   },
   destinationTitle: {
     fontFamily: Fonts.body,
@@ -1097,7 +1364,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
   },
   navigationError: {
-    color: '#B42318',
+    color: "#B42318",
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 700,
@@ -1109,6 +1376,10 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginBottom: Spacing.three,
     minHeight: 0,
+  },
+  vehicleModes: {
+    flexDirection: "row",
+    gap: Spacing.one,
   },
   routeSummary: {
     fontFamily: Fonts.body,
@@ -1130,16 +1401,25 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.one,
   },
   directionRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.two,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
+  },
+  directionRowActive: {
+    borderRadius: Rounded.sm,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.half,
+    marginHorizontal: -Spacing.one,
+  },
+  directionInstructionActive: {
+    fontWeight: 900,
   },
   directionNumber: {
     width: 22,
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 900,
-    textAlign: 'center',
+    textAlign: "center",
   },
   directionCopy: {
     flex: 1,
@@ -1164,15 +1444,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   goButton: {
-    alignSelf: 'stretch',
-    marginTop: 'auto',
+    flex: 1,
+    alignSelf: "stretch",
+    borderRadius: Rounded.round,
   },
   creditPill: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     borderRadius: Rounded.sm,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
-    shadowColor: '#09233C',
+    shadowColor: "#09233C",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14,
     shadowRadius: 9,

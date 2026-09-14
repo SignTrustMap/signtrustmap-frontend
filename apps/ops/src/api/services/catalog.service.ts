@@ -11,6 +11,75 @@ export interface CreateCatalogSignDto {
   guidelines?: string
 }
 
+export interface SignCategoryItem {
+  id: number
+  code: string
+  nameVi: string
+  nameEn: string
+  description?: string | null
+  iconUrl?: string | null
+  sortOrder?: number
+}
+
+export interface CatalogSignTypeItem {
+  id: number
+  categoryId: number
+  signCode: string
+  nameVi: string
+  nameEn: string
+  description?: string | null
+  labelingGuidelines?: string | null
+  shape?: string | null
+  colorScheme?: string | null
+  isActive: boolean
+  createdAt?: string
+  updatedAt?: string
+  category?: SignCategoryItem
+  aiLabelPrompt?: string | null
+  osmMapping?: string | null
+  representativeImageKey?: string | null
+}
+
+export interface PageResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface ListSignTypesParams {
+  categoryId?: number
+  isActive?: boolean
+  search?: string
+  page?: number
+  size?: number
+}
+
+export interface CreateSignTypeInput {
+  categoryId: number
+  signCode: string
+  nameVi: string
+  nameEn: string
+  description?: string
+  labelingGuidelines?: string
+  aiLabelPrompt?: string
+  osmMapping?: string
+  representativeImageKey?: string
+  shape?: string
+  colorScheme?: string
+  isActive?: boolean
+}
+
+export interface CreateSignCategoryInput {
+  code: string
+  nameVi: string
+  nameEn: string
+  description?: string
+  iconUrl?: string
+  sortOrder?: number
+}
+
 export const catalogService = {
   /**
    * Fetch official traffic sign catalog entries

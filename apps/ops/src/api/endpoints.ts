@@ -29,8 +29,11 @@ export const API_ENDPOINTS = {
     UPDATE_PERMISSIONS: (roleId: string) => `/api/v1/roles/${roleId}/permissions`,
   },
   CATALOG: {
-    BASE: '/api/v1/catalog',
-    DETAIL: (code: string) => `/api/v1/catalog/${code}`,
+    BASE: '/api/v1/catalog/sign-types',
+    SIGN_TYPES: '/api/v1/catalog/sign-types',
+    SIGN_TYPE_DETAIL: (id: number | string) => `/api/v1/catalog/sign-types/${id}`,
+    CATEGORIES: '/api/v1/catalog/categories',
+    CATEGORY_DETAIL: (id: number | string) => `/api/v1/catalog/categories/${id}`,
     PUBLISH_VERSION: '/api/v1/catalog/publish-version',
     SYNC_EMBEDDINGS: '/api/v1/catalog/sync-embeddings',
     MISSING_REPORTS: {

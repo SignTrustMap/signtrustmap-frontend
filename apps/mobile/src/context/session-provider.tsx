@@ -1,4 +1,5 @@
 import { getStorageItemAsync, removeStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
 
 export const ACCOUNT_ROLES = ['driver', 'surveyor', 'reviewer'] as const;
@@ -53,24 +54,32 @@ function parseStoredSession(value: string | null): AppSession | null {
   try {
     const parsed = JSON.parse(value) as Partial<AppSession>;
 
-    if (!parsed.accessToken || !parsed.account?.id) return null;
+    if (
+      !parsed.accessToken ||
+      parsed.accessToken === 'fake-session-token' ||
+      !parsed.account?.id
+    ) {
+      return null;
+    }
 
     return {
       accessToken: parsed.accessToken,
       account: {
-        displayName: parsed.account.displayName ?? 'Demo Field Worker',
-        email: parsed.account.email ?? 'field.worker@example.com',
+        displayName: parsed.account.displayName ?? 'Demo User',
+        email: parsed.account.email ?? 'demo@example.com',
         id: parsed.account.id,
         roles: normalizeRoles(parsed.account.roles),
       },
     };
   } catch {
+    if (value === 'fake-session-token') return null;
+
     // Upgrade the previous fake token-only session without signing the user out.
     return {
       accessToken: value,
       account: {
-        displayName: 'Demo Field Worker',
-        email: 'field.worker@example.com',
+        displayName: 'Demo User',
+        email: 'demo@example.com',
         id: 'demo-account',
         roles: [...ACCOUNT_ROLES],
       },
@@ -79,6 +88,7 @@ function parseStoredSession(value: string | null): AppSession | null {
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<AppSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -112,6 +122,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   async function logOut() {
     setSession(null);
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await removeStorageItemAsync('session');
   }
 
