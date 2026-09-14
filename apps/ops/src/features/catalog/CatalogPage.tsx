@@ -1047,7 +1047,6 @@ export default function CatalogPage() {
                     type="submit"
                     className="px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
                   >
-                    {isSubmitting ? <CircleNotch size={16} className="animate-spin" /> : null}
                     <span>{t('catalog.btn_publish')}</span>
                   </button>
                 </div>

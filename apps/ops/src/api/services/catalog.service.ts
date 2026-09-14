@@ -1,5 +1,15 @@
-import { http } from '../client'
+import { http, type ApiResponse } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import type { CatalogEntry, MissingSignTypeReport } from '@/data/catalogData'
+
+export interface CreateCatalogSignDto {
+  code: string
+  name: string
+  category: 'prohibition' | 'warning' | 'mandatory' | 'information'
+  aiPrompt?: string
+  osmMapping?: string
+  guidelines?: string
+}
 
 export interface SignCategoryItem {
   id: number

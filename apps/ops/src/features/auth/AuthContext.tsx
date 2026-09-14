@@ -100,18 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setState((s) => ({ ...s, isLoading: true }))
     try {
-      const res = await http.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, { email, password })
-      const token = res.accessToken
-      const roles = res.user?.roles || []
-      const isAdmin = roles.includes('ADMIN') || email.toLowerCase().includes('admin')
-      const user: User = {
-        id: String(res.user?.id || '1'),
-        name: res.user?.fullName || email,
-        email,
-        role: isAdmin ? 'admin' : 'staff',
-      }
-      localStorage.setItem('stm_access_token', token)
-      localStorage.setItem('stm_user', JSON.stringify(user))
+      const user = await mockLogin(email, password)
       setState({ user, isLoading: false, isAuthenticated: true })
       localStorage.setItem(OPS_USER_STORAGE_KEY, JSON.stringify(user))
       localStorage.setItem('stm_access_token', 'mock_ops_token_' + user.role)
@@ -128,9 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('stm_access_token')
-    localStorage.removeItem('stm_refresh_token')
-    localStorage.removeItem('stm_user')
     setState({ user: null, isLoading: false, isAuthenticated: false })
     localStorage.removeItem(OPS_USER_STORAGE_KEY)
     localStorage.removeItem('stm_access_token')
