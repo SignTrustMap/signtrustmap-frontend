@@ -1,42 +1,40 @@
-/**
- * Specialized HTTP client for Jetson Orin Edge Node APIs (AIOps).
- * Automatically injects required proxy bypass headers, manages timeouts and formats responses.
- */
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
+import { AIOPS_BASE_URL } from './endpoints'
 
-export interface EdgeRequestOptions extends RequestInit {
+/**
+ * Specialized Axios Client singleton for Jetson Orin Edge Node APIs (AIOps).
+ * Automatically injects required proxy bypass headers and manages timeouts.
+ */
+export const edgeApiClient: AxiosInstance = axios.create({
+  baseURL: AIOPS_BASE_URL,
+  timeout: 15000,
+  headers: {
+    'ngrok-skip-browser-warning': '69420',
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+})
+
+export interface EdgeRequestOptions extends AxiosRequestConfig {
   timeoutMs?: number
 }
 
 /**
- * Standardized Fetch wrapper for Edge AI endpoints
+ * Standardized Edge Request method backed by Axios Singleton (Zero raw fetch)
  */
 export async function edgeFetch<T = any>(
   endpoint: string,
   options: EdgeRequestOptions = {}
 ): Promise<T> {
-  const { timeoutMs = 15000, headers, ...rest } = options
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-
-  try {
-    const response = await fetch(endpoint, {
-      ...rest,
-      signal: options.signal || controller.signal,
-      headers: {
-        'ngrok-skip-browser-warning': '69420',
-        Accept: 'application/json',
-        ...headers,
-      },
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '')
-      throw new Error(`Edge API Error [${response.status}]: ${errorText || response.statusText}`)
-    }
-
-    return await response.json()
-  } finally {
-    clearTimeout(timeoutId)
-  }
+  const { timeoutMs, headers, ...rest } = options
+  const response = await edgeApiClient.request<T>({
+    url: endpoint,
+    timeout: timeoutMs || 15000,
+    headers: {
+      'ngrok-skip-browser-warning': '69420',
+      ...headers,
+    },
+    ...rest,
+  })
+  return response.data
 }

@@ -70,32 +70,41 @@ export interface CreateSignCategoryInput {
   sortOrder?: number
 }
 
-export class CatalogService {
-  static async getSignTypes(params?: ListSignTypesParams): Promise<PageResponse<CatalogSignTypeItem>> {
-    return http.get<PageResponse<CatalogSignTypeItem>>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params })
-  }
+export const catalogService = {
+  /**
+   * Fetch official traffic sign catalog entries
+   */
+  getCatalog: async (params?: { category?: string; search?: string }): Promise<ApiResponse<CatalogEntry[]>> => {
+    return http.get<ApiResponse<CatalogEntry[]>>(API_ENDPOINTS.CATALOG.BASE, { params })
+  },
 
-  static async getSignType(id: number | string): Promise<CatalogSignTypeItem> {
-    return http.get<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
-  }
+  /**
+   * Create and publish a new standard sign into the catalog
+   */
+  createSign: async (data: CreateCatalogSignDto): Promise<ApiResponse<CatalogEntry>> => {
+    return http.post<ApiResponse<CatalogEntry>>(API_ENDPOINTS.CATALOG.BASE, data)
+  },
 
-  static async createSignType(data: CreateSignTypeInput): Promise<CatalogSignTypeItem> {
-    return http.post<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPES, data)
-  }
+  /**
+   * Fetch pending missing sign reports from field submissions
+   */
+  getMissingSignReports: async (): Promise<ApiResponse<MissingSignTypeReport[]>> => {
+    return http.get<ApiResponse<MissingSignTypeReport[]>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.BASE)
+  },
 
-  static async updateSignType(id: number | string, data: Partial<CreateSignTypeInput>): Promise<CatalogSignTypeItem> {
-    return http.patch<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id), data)
-  }
+  /**
+   * Approve a missing sign proposal to create a new catalog entry
+   */
+  approveMissingReport: async (reportId: string, data?: { catalogCode?: string }): Promise<ApiResponse<MissingSignTypeReport>> => {
+    return http.post<ApiResponse<MissingSignTypeReport>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.APPROVE(reportId), data)
+  },
 
-  static async deleteSignType(id: number | string): Promise<void> {
-    return http.delete<void>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
-  }
-
-  static async getCategories(): Promise<SignCategoryItem[]> {
-    return http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
-  }
-
-  static async createCategory(data: CreateSignCategoryInput): Promise<SignCategoryItem> {
-    return http.post<SignCategoryItem>(API_ENDPOINTS.CATALOG.CATEGORIES, data)
-  }
+  /**
+   * Merge a missing sign proposal into an existing catalog sign
+   */
+  mergeMissingReport: async (reportId: string, targetCatalogCode: string): Promise<ApiResponse<MissingSignTypeReport>> => {
+    return http.post<ApiResponse<MissingSignTypeReport>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.MERGE(reportId), { targetCatalogCode })
+  },
 }
+
+export const CatalogService = catalogService

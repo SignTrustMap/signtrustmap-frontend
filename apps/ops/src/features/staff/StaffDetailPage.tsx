@@ -1,22 +1,21 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '@/context/ToastContext'
 import {
   ArrowLeft,
   LockKey,
-  CheckCircle,
   MapPin,
 } from '@phosphor-icons/react'
 
 export default function StaffDetailPage() {
   const { t } = useTranslation('ops')
   const navigate = useNavigate()
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState<'profile' | 'history' | 'records'>('profile')
-  const [toast, setToast] = useState<string | null>(null)
 
   function handleResetPassword() {
-    setToast('Đã gửi liên kết đặt lại mật khẩu tới sarah.jenkins@enterprise.com.')
-    setTimeout(() => setToast(null), 3000)
+    toast.success(t('staff_detail.toast_reset_sent', { email: 'sarah.jenkins@enterprise.com' }))
   }
 
   return (
@@ -42,7 +41,7 @@ export default function StaffDetailPage() {
             </div>
 
             <div className="flex items-center gap-3 mt-1.5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
                 Sarah Jenkins
               </h1>
               <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-[#dcfce7] text-[#15803d] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/30">
@@ -51,7 +50,7 @@ export default function StaffDetailPage() {
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
-              Mã: USR-8842-A9 • Điều phối viên logistics cao cấp
+              {t('staff_detail.role_description')}
             </p>
           </div>
         </div>
@@ -68,12 +67,7 @@ export default function StaffDetailPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center gap-2 animate-in fade-in">
-          <CheckCircle size={18} weight="fill" className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-          <span>{toast}</span>
-        </div>
-      )}
+
 
       {/* Tabs */}
       <div className="border-b border-[#E8E4E3] dark:border-white/10 flex gap-8 text-xs sm:text-sm font-semibold">
@@ -103,23 +97,23 @@ export default function StaffDetailPage() {
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs sm:text-sm">
           <div>
-            <span className="text-gray-400 font-mono text-xs uppercase">Email liên hệ</span>
+            <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_email')}</span>
             <p className="font-bold text-gray-900 dark:text-white mt-1">sarah.jenkins@enterprise.com</p>
           </div>
           <div>
-            <span className="text-gray-400 font-mono text-xs uppercase">Số điện thoại</span>
+            <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_phone')}</span>
             <p className="font-bold text-gray-900 dark:text-white mt-1">+84 (0) 912 345 678</p>
           </div>
           <div>
-            <span className="text-gray-400 font-mono text-xs uppercase">Khu vực phụ trách</span>
+            <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_assigned_area')}</span>
             <div className="flex items-center gap-1.5 font-bold text-gray-900 dark:text-white mt-1">
               <MapPin size={16} className="text-[#007b8b] dark:text-[#00c4de]" />
               <span>Quận 1, TP. Hồ Chí Minh</span>
             </div>
           </div>
           <div>
-            <span className="text-gray-400 font-mono text-xs uppercase">Ngày tham gia hệ thống</span>
-            <p className="font-bold text-gray-900 dark:text-white mt-1 font-mono">14/03/2024 (2 năm trước)</p>
+            <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_joined_date')}</span>
+            <p className="font-bold text-gray-900 dark:text-white mt-1 font-mono">{t('staff_detail.joined_val')}</p>
           </div>
         </div>
       </div>

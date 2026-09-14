@@ -11,6 +11,7 @@ interface CustomSelectProps {
   options: OptionItem[]
   value: string
   onChange: (value: string) => void
+  prefixLabel?: string
   leftIcon?: React.ReactNode
   placeholder?: string
   className?: string
@@ -18,12 +19,15 @@ interface CustomSelectProps {
   dropdownClassName?: string
   size?: 'sm' | 'md'
   disabled?: boolean
+  direction?: 'down' | 'up' | 'auto'
+  align?: 'left' | 'right'
 }
 
 export default function CustomSelect({
   options,
   value,
   onChange,
+  prefixLabel,
   leftIcon,
   placeholder,
   className = '',
@@ -31,8 +35,13 @@ export default function CustomSelect({
   dropdownClassName = '',
   size = 'md',
   disabled = false,
+  direction = 'auto',
+  align = 'left',
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [computedDirection, setComputedDirection] = useState<'down' | 'up'>(
+    direction === 'up' ? 'up' : 'down'
+  )
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedOption = options.find((opt) => opt.value === value)
@@ -67,6 +76,29 @@ export default function CustomSelect({
     }
   }, [isOpen])
 
+  // Dynamic direction calculation (dropup vs dropdown)
+  useEffect(() => {
+    if (isOpen) {
+      if (direction === 'up') {
+        setComputedDirection('up')
+      } else if (direction === 'down') {
+        setComputedDirection('down')
+      } else {
+        // Auto detection based on space below container
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect()
+          const spaceBelow = window.innerHeight - rect.bottom
+          const spaceAbove = rect.top
+          if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            setComputedDirection('up')
+          } else {
+            setComputedDirection('down')
+          }
+        }
+      }
+    }
+  }, [isOpen, direction])
+
   const sizeClasses =
     size === 'sm'
       ? 'px-3 py-1.5 text-xs rounded-lg min-h-[34px]'
@@ -84,8 +116,13 @@ export default function CustomSelect({
             : 'border-[#E8E4E3] dark:border-white/15 hover:border-gray-300 dark:hover:border-white/25'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${buttonClassName}`}
       >
-        <div className="flex items-center gap-2 min-w-0 truncate">
+        <div className="flex items-center gap-1.5 min-w-0 truncate">
           {leftIcon && <span className="text-gray-400 shrink-0">{leftIcon}</span>}
+          {prefixLabel && (
+            <span className="text-gray-500 dark:text-gray-400 font-normal shrink-0 text-xs">
+              {prefixLabel}
+            </span>
+          )}
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           <span className="truncate text-gray-900 dark:text-white font-semibold">
             {selectedOption ? selectedOption.label : placeholder || ''}
@@ -103,7 +140,9 @@ export default function CustomSelect({
 
       {isOpen && (
         <div
-          className={`absolute left-0 top-full mt-1 w-full min-w-[160px] bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/15 rounded-xl shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 max-h-60 overflow-y-auto ${dropdownClassName}`}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} ${
+            computedDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          } w-full min-w-[150px] bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/15 rounded-xl shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 max-h-60 overflow-y-auto ${dropdownClassName}`}
         >
           {options.map((option) => {
             const isSelected = option.value === value

@@ -16,25 +16,27 @@ export interface SystemSettingsConfig {
   maintenanceMode: boolean
 }
 
-export class SystemService {
+export const systemService = {
   /**
    * Fetch all technical system configuration parameters
    */
-  static async getSettings(): Promise<ApiResponse<SystemSettingsConfig>> {
+  getSettings: async (): Promise<ApiResponse<SystemSettingsConfig>> => {
     return http.get<ApiResponse<SystemSettingsConfig>>(API_ENDPOINTS.SETTINGS.BASE)
-  }
+  },
 
   /**
    * Update full or partial system settings
    */
-  static async updateSettings(data: Partial<SystemSettingsConfig>): Promise<ApiResponse<SystemSettingsConfig>> {
+  updateSettings: async (data: Partial<SystemSettingsConfig>): Promise<ApiResponse<SystemSettingsConfig>> => {
     return http.put<ApiResponse<SystemSettingsConfig>>(API_ENDPOINTS.SETTINGS.BASE, data)
-  }
+  },
 
   /**
    * Toggle global maintenance mode
    */
-  static async toggleMaintenance(enabled: boolean): Promise<ApiResponse<{ maintenanceMode: boolean }>> {
+  toggleMaintenance: async (enabled: boolean): Promise<ApiResponse<{ maintenanceMode: boolean }>> => {
     return http.post<ApiResponse<{ maintenanceMode: boolean }>>(API_ENDPOINTS.SETTINGS.MAINTENANCE, { enabled })
-  }
+  },
 }
+
+export const SystemService = systemService

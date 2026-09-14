@@ -9,27 +9,29 @@ export interface OverrideSpatialSignDto {
   reason: string
 }
 
-export class SpatialService {
+export const spatialService = {
   /**
    * Fetch verified road signs for GIS map and tabular inspection
    */
-  static async getSpatialSigns(params?: { city?: string; category?: string }): Promise<ApiResponse<SpatialSignRecord[]>> {
+  getSpatialSigns: async (params?: { city?: string; category?: string }): Promise<ApiResponse<SpatialSignRecord[]>> => {
     return http.get<ApiResponse<SpatialSignRecord[]>>(API_ENDPOINTS.SPATIAL.SIGNS, { params })
-  }
+  },
 
   /**
    * Perform administrative spatial override (coordinates / heading / bearing)
    */
-  static async overrideSign(signId: string, data: OverrideSpatialSignDto): Promise<ApiResponse<SpatialSignRecord>> {
+  overrideSign: async (signId: string, data: OverrideSpatialSignDto): Promise<ApiResponse<SpatialSignRecord>> => {
     return http.put<ApiResponse<SpatialSignRecord>>(API_ENDPOINTS.SPATIAL.OVERRIDE(signId), data)
-  }
+  },
 
   /**
    * Delete or flag a malicious GPS sign record
    */
-  static async deleteMaliciousSign(signId: string, reason: string): Promise<ApiResponse<{ deleted: boolean }>> {
+  deleteMaliciousSign: async (signId: string, reason: string): Promise<ApiResponse<{ deleted: boolean }>> => {
     return http.delete<ApiResponse<{ deleted: boolean }>>(API_ENDPOINTS.SPATIAL.DELETE_MALICIOUS(signId), {
       data: { reason },
     })
-  }
+  },
 }
+
+export const SpatialService = spatialService
