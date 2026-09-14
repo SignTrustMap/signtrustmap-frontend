@@ -433,6 +433,7 @@ export function NavigationMapScreen() {
   // Tracks sign IDs the user has already responded to — local only, no API call.
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
+  const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
   const { data: routeResult, error: routeError } = useGetNavigationRoute(
     routeStart,
     selectedDestination?.coordinate,
@@ -1044,46 +1045,138 @@ export function NavigationMapScreen() {
                 </View>
               )}
             </View>
+            {isHomeSignFilterOpen && !selectedDestination ? (
+              <Pressable
+                accessibilityLabel="Close sign filter menu"
+                onPress={() => setIsHomeSignFilterOpen(false)}
+                style={styles.homeFilterBackdrop}
+              />
+            ) : null}
+
+            {isHomeSignFilterOpen && !selectedDestination ? (
+              <View
+                style={[
+                  styles.homeFilterCard,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={[styles.homeFilterHeader, { borderBottomColor: theme.border }]}>
+                  <View style={styles.homeFilterTitleRow}>
+                    <MaterialCommunityIcons name="filter-variant" size={16} color={theme.primary} />
+                    <Text style={[styles.homeFilterTitle, { color: theme.text }]}>Sign Filters</Text>
+                  </View>
+                  <AppButton
+                    accessibilityLabel="Toggle all sign categories"
+                    onPress={handleToggleAllCategories}
+                    style={styles.homeFilterToggleAllButton}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.homeFilterToggleAllText, { color: theme.primary }]}>
+                      {selectedSignCategories.size === SIGN_CATEGORIES.length ? 'Clear all' : 'Select all'}
+                    </Text>
+                  </AppButton>
+                </View>
+
+                <View style={styles.homeFilterCategoryList}>
+                  {SIGN_CATEGORIES.map((cat) => {
+                    const isSelected = selectedSignCategories.has(cat.id);
+                    const count = signCategoryCounts[cat.id] ?? 0;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        accessibilityLabel={`${cat.label} signs, ${count} on map, ${isSelected ? 'selected' : 'unselected'}`}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: isSelected }}
+                        onPress={() => handleToggleCategory(cat.id)}
+                        style={({ pressed }) => [
+                          styles.homeFilterRow,
+                          {
+                            backgroundColor: isSelected ? theme.backgroundSelected : 'transparent',
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.homeFilterIconBadge, { backgroundColor: cat.bgColor }]}>
+                          <MaterialCommunityIcons name={cat.icon} size={16} color={cat.color} />
+                        </View>
+                        <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
+                          {cat.label}
+                        </Text>
+                        <View
+                          style={[
+                            styles.homeFilterCheckbox,
+                            isSelected
+                              ? { backgroundColor: cat.color, borderColor: cat.color }
+                              : { backgroundColor: 'transparent', borderColor: theme.border },
+                          ]}
+                        >
+                          {isSelected ? <AntDesign name="check" size={11} color="#FFFFFF" /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
             {!selectedDestination ? (
               <View style={styles.mapActions}>
+                {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
                   accessibilityLabel={
-                    isLocating
-                      ? "Getting current location"
-                      : "Use current location"
+                    isHomeSignFilterOpen
+                      ? "Close sign filter list"
+                      : "Open sign filter list"
                   }
-                  disabled={isLocating}
-                  onPress={handleCurrentLocation}
+                  onPress={() => setIsHomeSignFilterOpen((prev) => !prev)}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
                     {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.primary,
+                      backgroundColor: isHomeSignFilterOpen
+                        ? theme.backgroundSelected
+                        : theme.backgroundElement,
+                      borderColor: isHomeSignFilterOpen
+                        ? theme.primary
+                        : theme.border,
                     },
                   ]}
                   variant="surface"
+                >
+                  <MaterialCommunityIcons
+                    name="filter-variant"
+                    size={22}
+                    color={isHomeSignFilterOpen ? theme.primary : theme.text}
+                  />
+                  {selectedSignCategories.size < SIGN_CATEGORIES.length ? (
+                    <View
+                      style={[
+                        styles.filterActiveBadge,
+                        { backgroundColor: theme.primary },
+                      ]}
+                    />
+                  ) : null}
+                </AppButton>
+
+                {/* 2. Snap to current location button (replaced previous secondary search button) */}
+                <AppButton
+                  accessibilityLabel={
+                    isLocating
+                      ? "Getting current location"
+                      : "Snap to current location"
+                  }
+                  disabled={isLocating}
+                  onPress={handleCurrentLocation}
+                  style={styles.mapActionButton}
                 >
                   <SymbolView
                     name={{
                       android: "my_location",
                       ios: "location.fill",
                       web: "my_location",
-                    }}
-                    size={22}
-                    tintColor={theme.primary}
-                  />
-                </AppButton>
-                <AppButton
-                  accessibilityLabel="Search destination"
-                  onPress={() => router.push("/home/search")}
-                  style={styles.mapActionButton}
-                >
-                  <SymbolView
-                    name={{
-                      android: "search",
-                      ios: "magnifyingglass",
-                      web: "search",
                     }}
                     size={22}
                     tintColor={theme.onPrimary}
@@ -1613,6 +1706,105 @@ const styles = StyleSheet.create({
   },
   locationActionButton: {
     borderWidth: 1,
+  },
+  filterActiveBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  homeFilterBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "transparent",
+  },
+  homeFilterCard: {
+    position: "absolute",
+    right: Spacing.four,
+    bottom: 124,
+    width: 260,
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    padding: Spacing.two,
+    shadowColor: "#09233C",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  homeFilterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: Spacing.one,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.one,
+  },
+  homeFilterTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.half,
+  },
+  homeFilterTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  homeFilterToggleAllButton: {
+    minHeight: 24,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 0,
+  },
+  homeFilterToggleAllText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  homeFilterCategoryList: {
+    gap: 4,
+  },
+  homeFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: Rounded.md,
+    gap: Spacing.one,
+  },
+  homeFilterIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  homeFilterRowLabel: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  homeFilterCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Rounded.round,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  homeFilterCountText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  homeFilterCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   routeInputGroup: {
     gap: Spacing.one,
