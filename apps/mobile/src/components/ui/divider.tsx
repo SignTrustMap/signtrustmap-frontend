@@ -1,5 +1,5 @@
 import { StyleSheet, View } from "react-native";
-import { Spacing, Rounded, Colors } from "@/constants/theme";
+import { Colors } from "@/constants/theme";
 
 export function Divider({ style }: { style?: any }) {
     return (

@@ -211,8 +211,8 @@ export function NavigationMapView({
       logo={false}
       mapStyle={openStreetMapStyle}
       style={styles.map}
-      touchPitch={false}
-      touchRotate={false}
+      touchPitch={navigationActive}
+      touchRotate={navigationActive}
     >
       {navigationActive ? (
         <Camera
@@ -228,7 +228,7 @@ export function NavigationMapView({
           }}
           trackUserLocation="heading"
           zoom={18}
-          pitch={20}
+          pitch={45}
         />
       ) : focusCoordinate ? (
         <Camera

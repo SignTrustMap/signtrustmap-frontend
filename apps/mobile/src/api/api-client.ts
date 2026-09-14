@@ -1,6 +1,26 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+// ---------------------------------------------------------------------------
+// Auth-expiry emitter
+// A minimal, zero-dependency pub/sub used to notify the app when the server
+// returns 401/403 so the session can be cleared without coupling the API
+// layer to React context.
+// ---------------------------------------------------------------------------
+type AuthExpiredListener = () => void;
+
+const _authExpiredListeners = new Set<AuthExpiredListener>();
+
+export const authExpiredEmitter = {
+    subscribe(listener: AuthExpiredListener) {
+        _authExpiredListeners.add(listener);
+        return () => _authExpiredListeners.delete(listener);
+    },
+    emit() {
+        for (const fn of _authExpiredListeners) fn();
+    },
+};
+
 type ApiErrorBody = {
     error?: string;
     message?: string | string[];
@@ -23,8 +43,9 @@ function resolveHost(host: string | undefined): string {
     return host;
 }
 
+const rawConfiguredUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://api.signmap.site/api/v1"
+
 export function apiBaseUrl() {
-    const rawConfiguredUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
     if (rawConfiguredUrl) {
         const configuredUrl = rawConfiguredUrl.endsWith("/api/v1")
             ? rawConfiguredUrl
@@ -90,10 +111,16 @@ export async function apiRequest<T>(
     }
 
     if (!response.ok) {
-        throw new ApiError(
+        const err = new ApiError(
             errorMessage(body as ApiErrorBody | undefined, response.status),
             response.status,
         );
+        // Notify the app that the token is no longer valid so it can redirect
+        // to the login screen.
+        if (response.status === 401 || response.status === 403) {
+            authExpiredEmitter.emit();
+        }
+        throw err;
     }
 
     return body as T;

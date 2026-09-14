@@ -2,7 +2,6 @@ import type { MapCoordinate, VehicleMode } from "@/types/navigation/navigationTy
 import { apiRequest, jsonApiRequest } from "@/api/api-client";
 import { API_PATHS } from "@/api/api";
 
-
 export type NavigationStep = {
     distance: number;
     duration: number;
@@ -56,7 +55,10 @@ export async function getVehicleModes(signal?: AbortSignal): Promise<VehicleMode
         if (signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
             throw error;
         }
-        return [{ id: "DRIVING", label: "Driving" }];
+        return [
+            { id: "DRIVING", label: "Car" },
+            { id: "BIKE", label: "Bike" },
+        ];
     }
 }
 
