@@ -5,6 +5,7 @@ import { Animated, BackHandler, PanResponder, Platform, Pressable, ScrollView, S
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { Camera } from "expo-camera";
 import { Image } from "expo-image";
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
@@ -450,7 +451,6 @@ export function NavigationMapScreen() {
     selectedDestination?.coordinate,
     routeResult?.geometry,
   );
-  console.log('plannedSigns', plannedSigns);
   const navigationError = routeError?.message ?? navigationActionError
     ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
   const routeCoordinates = routeResult?.coordinates;
@@ -527,6 +527,17 @@ export function NavigationMapScreen() {
       return new Set(SIGN_CATEGORIES.map((c) => c.id));
     });
   };
+
+  const handleLivestreamPress = useCallback(async () => {
+    // Request camera permission
+    const cameraResult = await Camera.requestCameraPermissionsAsync();
+    if (!cameraResult.granted) return;
+    // Request microphone permission
+    const micResult = await Camera.requestMicrophonePermissionsAsync();
+    if (!micResult.granted) return;
+    // Navigate to the dedicated livestream screen
+    router.push('/(authenticated)/(tabs)/livestream');
+  }, [router]);
 
   const signCategoryCounts = useMemo(() => {
     const counts: Record<SignCategory, number> = {
@@ -1011,45 +1022,74 @@ export function NavigationMapScreen() {
                   </AppButton>
                 </View>
               ) : (
-                <View
-                  style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
-                >
-                  <AppButton
-                    accessibilityLabel="Search destination"
-                    onPress={() => router.push('/home/search')}
-                    style={styles.searchButton}
-                    variant="ghost"
+                <>
+                  <View
+                    style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                   >
-                    <Image
-                      accessibilityLabel="App logo"
-                      contentFit="cover"
-                      source={require('@/assets/images/app-logo.svg')}
-                      style={styles.appLogo}
-                    />
-                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                      Search here...
-                    </Text>
-                  </AppButton>
-                  <AppButton
-                    accessibilityLabel="Add credits. Current balance: 24"
-                    onPress={() => router.push('/credits/top-up')}
-                    pressedOpacity={0.68}
-                    style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                    variant="ghost"
-                  >
-                    <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
-                    <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                      <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                    </View>
-                  </AppButton>
-                </View>
+                    <AppButton
+                      accessibilityLabel="Search destination"
+                      onPress={() => router.push('/home/search')}
+                      style={styles.searchButton}
+                      variant="ghost"
+                    >
+                      <Image
+                        accessibilityLabel="App logo"
+                        contentFit="cover"
+                        source={require('@/assets/images/app-logo.svg')}
+                        style={styles.appLogo}
+                      />
+                      <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                        Search here...
+                      </Text>
+                    </AppButton>
+                    <AppButton
+                      accessibilityLabel="Add credits. Current balance: 24"
+                      onPress={() => router.push('/credits/top-up')}
+                      pressedOpacity={0.68}
+                      style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
+                      <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                        <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                      </View>
+                    </AppButton>
+                  </View>
+                  <>
+                    <AppButton
+                      accessibilityLabel="Live streaming"
+                      variant="ghost"
+                      onPress={handleLivestreamPress}
+                      style={[
+                        {
+                          backgroundColor: theme.background,
+                          boxShadow: '0px 4px 12px 1px #ccc',
+                          marginLeft: 'auto',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: Spacing.half,
+                        }
+                      ]}
+                    >
+                      <SymbolView
+                        name={{
+                          android: 'live_tv',
+                          ios: 'dot.radiowaves.left.and.right'
+                        }}
+                        size={24}
+                        tintColor='#ff0000'
+                      />
+                    </AppButton>
+                  </>
+                </>
               )}
             </View>
             {isHomeSignFilterOpen && !selectedDestination ? (
-              <Pressable
+              <AppButton
                 accessibilityLabel="Close sign filter menu"
                 onPress={() => setIsHomeSignFilterOpen(false)}
                 style={styles.homeFilterBackdrop}
+                variant="ghost"
               />
             ) : null}
 

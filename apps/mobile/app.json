@@ -20,7 +20,9 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_MEDIA_LOCATION",
         "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO"
+        "READ_MEDIA_VIDEO",
+        "CAMERA",
+        "RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
@@ -62,6 +64,14 @@
             "photo",
             "video"
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SignTrustMap to access your camera for real-time sign detection during Livestream.",
+          "microphonePermission": "Allow SignTrustMap to access your microphone for Livestream recording.",
+          "recordAudioAndroid": true
         }
       ],
       "@maplibre/maplibre-react-native"
