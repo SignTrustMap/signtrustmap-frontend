@@ -201,8 +201,8 @@
     "lbl_closest_catalog": "Biển chuẩn tương đồng trong Catalog:",
     "lbl_road_location": "Vị trí & Tọa độ thực địa:",
     "lbl_ai_confidence": "Độ tin cậy nhận diện AI:",
-    "modal_merge_title": "Gộp Đề xuất vào Biển Catalog Có Sẵn",
-    "modal_merge_desc": "Nếu đề xuất này thực chất là một biển báo đã có trong Danh mục chuẩn (chỉ do người dùng gắn nhãn tạm khác tên), hãy chọn biển tương ứng để gộp:",
+    "modal_merge_title": "Khớp Báo cáo vào Biển Catalog Có Sẵn",
+    "modal_merge_desc": "Nếu đề xuất này thực chất là một biển báo đã có trong Danh mục chuẩn (chỉ do người dùng gắn nhãn tạm khác tên), hãy chọn biển tương ứng để quy về:",
     "modal_escalate_title": "Chuyển tiếp Admin Bổ sung Catalog",
     "modal_escalate_desc": "Chuyển tiếp báo cáo đến Admin để xem xét ban hành phiên bản Catalog mới và đồng bộ nhãn AI CLIP.",
     "lbl_staff_notes": "Ghi chú đề xuất của Staff:",
@@ -211,14 +211,14 @@
     "reason_not_sign": "Ảnh chụp không phải biển báo giao thông (biển quảng cáo, cây cối...)",
     "reason_blurred": "Ảnh mờ, chụp quá xa hoặc không rõ chi tiết",
     "reason_duplicate": "Báo cáo trùng lặp với đề xuất đã tồn tại",
-    "btn_confirm_merge": "Xác nhận Gộp",
+    "btn_confirm_merge": "Xác nhận Khớp với Biển này",
     "btn_confirm_escalate": "Chuyển tiếp Admin",
     "btn_confirm_reject": "Xác nhận Từ chối",
     "btn_cancel": "Hủy",
-    "toast_merged": "Đã gộp báo cáo {{id}} vào biển {{code}} thành công.",
+    "toast_merged": "Đã khớp báo cáo {{id}} vào biển {{code}} thành công.",
     "toast_escalated": "Đã chuyển tiếp đề xuất {{id}} lên Admin để bổ sung vào Catalog.",
     "toast_rejected": "Đã từ chối báo cáo {{id}} ({{reason}}).",
-    "label_merged_prefix": "Gộp vào:",
+    "label_merged_prefix": "Khớp với:",
     "label_pending_admin": "[Chờ Admin duyệt]",
     "label_rejected": "[Đã từ chối]",
     "toast_processed": "Đã xử lý đề xuất {{id}}: {{action}}"
@@ -1099,10 +1099,11 @@
     "empty_state": "Không tìm thấy bản ghi kiểm toán nào khớp với bộ lọc."
   },
   "not_allowed": {
-    "title": "Không có quyền truy cập",
-    "desc": "Trang này yêu cầu quyền Admin.",
+    "title": "Truy Cập Bị Từ Chối...",
+    "desc": "Trang bạn đang cố gắng truy cập bị giới hạn quyền hạn. Vui lòng liên hệ với quản trị viên hệ thống.",
     "account": "Tài khoản",
-    "btn_back": "Quay về Vận hành",
+    "btn_back": "Quay Lại",
+    "btn_home": "Về Bảng Điều Khiển",
     "btn_contact": "Liên hệ Quản trị viên",
     "badge_forbidden": "403 • Truy cập Bị từ chối",
     "badge_sod": "Nguyên tắc Tách biệt Nhiệm vụ (SoD)",
@@ -1125,5 +1126,11 @@
   "profile": {
     "admin_role_desc": "Quản trị hệ thống toàn diện",
     "staff_role_desc": "Vận hành & kiểm duyệt dữ liệu"
+  },
+  "not_found_404": {
+    "title": "Không Tìm Thấy Trang...",
+    "desc": "Đường dẫn bạn đang tìm kiếm không tồn tại hoặc đã bị thay đổi toạ độ.",
+    "btn_home": "Về Bảng Điều Khiển",
+    "btn_back": "Quay Lại"
   }
 }

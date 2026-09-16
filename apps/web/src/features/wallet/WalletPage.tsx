@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Coins,
   Sparkle,
   ArrowUpRight,
   ArrowDownLeft,
@@ -152,10 +151,6 @@ export default function WalletPage() {
         {/* ─── Page Header ────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-white/10">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-950 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800/60 mb-2">
-              <Coins size={15} weight="fill" className="text-amber-600 dark:text-amber-400" />
-              <span>{t('wallet.economy_badge')}</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               {t('wallet.title')}
             </h1>

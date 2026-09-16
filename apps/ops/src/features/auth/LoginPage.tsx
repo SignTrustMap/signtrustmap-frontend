@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
@@ -28,6 +28,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
+  const [error, setError] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const ctrlPressTimesRef = useRef<number[]>([])
 
@@ -63,6 +64,15 @@ export default function LoginPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    setError('')
+    if (!email.trim()) {
+      setError(t('login.email_required', { defaultValue: 'Vui lòng nhập email tài khoản' }))
+      return
+    }
+    if (!password) {
+      setError(t('login.password_required', { defaultValue: 'Vui lòng nhập mật khẩu' }))
+      return
+    }
     try {
       await login(email, password)
       const next = params.get('next') ?? null
@@ -73,16 +83,17 @@ export default function LoginPage() {
         navigate(isAdmin ? '/' : '/', { replace: true })
       }
     } catch (err) {
+      let msg = t('login.err_login_failed')
       if (
         err instanceof Error &&
         (err.message === 'FORBIDDEN_ACCESS' || err.message.startsWith('FORBIDDEN_COMMUNITY_ROLE:'))
       ) {
-        toast.error(t('login.forbidden_desc'))
+        msg = t('login.forbidden_desc')
       } else if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
-        toast.error(t('login.err_invalid_credentials'))
-      } else {
-        toast.error(t('login.err_login_failed'))
+        msg = t('login.err_invalid_credentials')
       }
+      setError(msg)
+      toast.error(msg)
     }
   }
 
@@ -92,6 +103,7 @@ export default function LoginPage() {
   function handleSecretFill(acc: DemoAccount) {
     setEmail(acc.email)
     setPassword(acc.password)
+    setError('')
   }
 
   return (
@@ -324,10 +336,11 @@ export default function LoginPage() {
 
           {/* ─── Main Login Card ───────────────────────────────────────── */}
           <div
-            className={`w-full max-w-[480px] rounded-[24px] p-8 sm:p-10 transition-all duration-300 animate-in fade-in zoom-in-95 ${isDark
-                ? 'bg-[#0A171C]/90 backdrop-blur-2xl border border-white/15 shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.15)] text-white'
-                : 'bg-white rounded-[24px] shadow-xl border border-gray-200/80 text-gray-900'
-              }`}
+            className={`w-full max-w-[460px] rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${
+              isDark
+                ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
+                : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
+            }`}
           >
             {/* Card Header */}
             <div className="flex flex-col items-center text-center mb-6">
@@ -339,8 +352,9 @@ export default function LoginPage() {
                 />
               </a>
               <h1
-                className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${isDark ? 'text-white' : 'text-gray-900'
-                  }`}
+                className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-sans flex flex-col items-center gap-1 ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}
               >
                 <span>{t('login.title')}</span>
                 <span>
@@ -350,83 +364,102 @@ export default function LoginPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
               {/* Email field */}
-              <div className="flex flex-col gap-1.5 text-left">
+              <div>
                 <label
                   htmlFor="ops-email"
-                  className={`text-xs font-bold font-mono uppercase tracking-wide ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
-                    }`}
+                  className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${
+                    isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}
                 >
-                  {t('login.email')}<span className="text-red-500">*</span>
+                  {t('login.email')}
                 </label>
 
                 <input
                   id="ops-email"
                   type="email"
-                  autoComplete="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }}
                   placeholder="staff@signtrustmap.site"
-                  className={`w-full px-4 py-3 text-sm rounded-xl border focus:outline-none focus:ring-2 transition-all ${isDark
-                      ? 'bg-[#061115] border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-[#00c4de]/25'
-                      : 'bg-gray-50/50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-[#007b8b]/20'
-                    }`}
+                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${
+                    isDark
+                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                  }`}
                 />
               </div>
 
               {/* Password field */}
-              <div className="flex flex-col gap-1.5 text-left">
-                <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
                   <label
                     htmlFor="ops-password"
-                    className={`text-xs font-bold font-mono uppercase tracking-wide ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
-                      }`}
+                    className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                      isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}
                   >
-                    {t('login.password')}<span className="text-red-500">*</span>
+                    {t('login.password')}
                   </label>
-                  <a
-                    href="#"
-                    className={`text-[11px] hover:underline ${isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
-                      }`}
+                  <Link
+                    to="/forgot-password"
+                    className={`text-xs font-bold hover:underline ${
+                      isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
+                    }`}
                   >
                     {t('login.forgot_password')}
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
                   <input
                     id="ops-password"
                     type={showPw ? 'text' : 'password'}
-                    autoComplete="current-password"
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setError('')
+                    }}
                     placeholder="••••••••"
-                    className={`w-full px-4 py-3 pr-10 text-sm rounded-xl border focus:outline-none focus:ring-2 transition-all ${isDark
-                        ? 'bg-[#061115] border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-[#00c4de]/25'
-                        : 'bg-gray-50/50 border-gray-300 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-[#007b8b]/20'
-                      }`}
+                    className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${
+                      isDark
+                        ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                    }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPw(!showPw)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 p-1 cursor-pointer"
                     aria-label={showPw ? t('login.aria_hide_pw') : t('login.aria_show_pw')}
+                    className={`absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors cursor-pointer ${
+                      isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-700'
+                    }`}
                   >
                     {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
-              {/* Primary Submit Button */}
+              {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading || !email || !password}
-                className={`mt-1 w-full py-3.5 text-white font-bold text-sm rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${isDark
-                    ? 'bg-gradient-to-r from-[#007b8b] to-[#00c4de] hover:from-[#008fa1] hover:to-[#00d6f2] shadow-[#00c4de]/25'
-                    : 'bg-[#007b8b] hover:bg-[#00606d] shadow-[#007b8b]/25'
-                  }`}
+                disabled={isLoading}
+                className={`w-full py-3.5 px-4 rounded-full font-bold text-sm tracking-wide transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDark
+                    ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/25'
+                    : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
+                }`}
               >
                 {isLoading ? (
                   <>
@@ -438,20 +471,22 @@ export default function LoginPage() {
                 )}
               </button>
 
-              {/* Centered Divider */}
-              <div className="relative flex items-center justify-center my-1 w-full">
+              {/* Divider */}
+              <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
                   <div
-                    className={`w-full border-t ${isDark ? 'border-white/10' : 'border-gray-200'
-                      }`}
+                    className={`w-full border-t ${
+                      isDark ? 'border-white/10' : 'border-gray-200'
+                    }`}
                   />
                 </div>
                 <div className="relative flex justify-center text-xs">
                   <span
-                    className={`px-4 text-[11px] font-mono uppercase tracking-widest ${isDark
-                        ? 'bg-[#0A171C] text-gray-500'
-                        : 'bg-white text-gray-400'
-                      }`}
+                    className={`px-4 text-[11px] font-mono font-bold uppercase tracking-widest ${
+                      isDark
+                        ? 'bg-[#061417] text-gray-300'
+                        : 'bg-white text-gray-600'
+                    }`}
                   >
                     {t('login.or')}
                   </span>
@@ -464,11 +499,13 @@ export default function LoginPage() {
                 onClick={() => {
                   setEmail('staff@signtrustmap.com')
                   setPassword('password123')
+                  setError('')
                 }}
-                className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${isDark
-                    ? 'bg-white/5 hover:bg-white/10 border-white/15 text-white'
-                    : 'bg-white hover:bg-gray-50 border-gray-300 text-gray-800'
-                  }`}
+                className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
+                  isDark
+                    ? 'border-white/15 bg-white/5 hover:bg-white/10 text-white'
+                    : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-800 shadow-gray-200/50'
+                }`}
               >
                 <img
                   src="/brand/google-g.png"
@@ -481,7 +518,7 @@ export default function LoginPage() {
           </div>
 
           {/* ─── Mobile/Tablet subtle bottom corners fallback ─── */}
-          <div className="md:hidden flex items-center justify-between w-full max-w-[480px] px-3 mt-3">
+          <div className="md:hidden flex items-center justify-between w-full max-w-[460px] px-3 mt-3">
             <div className="flex gap-2">
               {unauthorizedAccounts.map((acc) => (
                 <button

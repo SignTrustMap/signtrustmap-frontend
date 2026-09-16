@@ -6,9 +6,9 @@ import {
   Coins,
   VideoCamera,
   MapPin,
-  Sparkle,
   Eye,
   Camera,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
@@ -16,7 +16,7 @@ import {
   mockSurveySubmissions,
   type SurveySubmissionItem,
 } from '@/data'
-import { SurveyDetailModal, NewSignTypeModal } from './components'
+import { SurveyDetailModal } from './components'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
 
@@ -32,9 +32,6 @@ export default function SurveyHistoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('date_desc')
-
-  // Modal state for New Sign Type Report
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
 
   // Status badge config matching ProfilePage's soft, readable palette
   const getStatusBadge = (status: SurveySubmissionItem['status']) => {
@@ -195,18 +192,17 @@ export default function SurveyHistoryPage() {
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsReportModalOpen(true)}
+            <Link
+              to="/survey/revalidation"
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
                 isDark
-                  ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
-                  : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-800'
+                  ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
+                  : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
               }`}
             >
-              <Sparkle size={16} className="text-amber-500" />
-              <span>{t('survey.btn_report_new_sign')}</span>
-            </button>
+              <ClockCounterClockwise size={16} weight="bold" />
+              <span>{t('survey.btn_revalidation')}</span>
+            </Link>
 
             <Link
               to="/survey"
@@ -482,12 +478,6 @@ export default function SurveyHistoryPage() {
         onClose={() => setModalSubmission(null)}
         submission={modalSubmission}
         getStatusBadge={getStatusBadge}
-      />
-
-      {/* ─── New Sign Type Report Modal ────────────────────────────────────── */}
-      <NewSignTypeModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
       />
     </div>
   )

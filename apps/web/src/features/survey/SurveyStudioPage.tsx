@@ -9,20 +9,19 @@ import {
   Clock,
   WarningCircle,
   Coins,
-  Cpu,
   ArrowRight,
-  Sparkle,
   Pause,
   Play,
   X,
   Crosshair,
   Compass,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { mockSurveySubmissions } from '@/data'
-import { PhotoLocationPicker, NewSignTypeModal } from './components'
+import { PhotoLocationPicker } from './components'
 
 export default function SurveyStudioPage() {
   const { isDark } = useTheme()
@@ -50,9 +49,6 @@ export default function SurveyStudioPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadSuccess, setUploadSuccess] = useState(false)
   const [error, setError] = useState('')
-
-  // Modal for new sign type
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
 
   const uploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -194,18 +190,6 @@ export default function SurveyStudioPage() {
         {/* ─── Page Header (Matching ProfilePage & SurveyHistoryPage) ──────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                  isDark
-                    ? 'bg-[#007b8b]/20 border-[#00c4de]/30 text-[#00c4de]'
-                    : 'bg-teal-50 border-teal-200 text-[#007b8b]'
-                }`}
-              >
-                <Cpu size={14} weight="bold" />
-                <span>Crowd-AI Survey Studio</span>
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               {t('survey.title')}
             </h1>
@@ -216,18 +200,17 @@ export default function SurveyStudioPage() {
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setIsReportModalOpen(true)}
+            <Link
+              to="/survey/revalidation"
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
                 isDark
-                  ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
-                  : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-800'
+                  ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
+                  : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
               }`}
             >
-              <Sparkle size={16} className="text-amber-500" />
-              <span>{t('survey.btn_report_new_sign')}</span>
-            </button>
+              <ClockCounterClockwise size={16} weight="bold" />
+              <span>{t('survey.btn_revalidation')}</span>
+            </Link>
 
             <Link
               to="/survey/history"
@@ -736,14 +719,6 @@ export default function SurveyStudioPage() {
           )}
         </div>
       </div>
-
-      {/* New Sign Type Report Modal */}
-      <NewSignTypeModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        initialLat={photoLat.toString()}
-        initialLng={photoLng.toString()}
-      />
     </div>
   )
 }

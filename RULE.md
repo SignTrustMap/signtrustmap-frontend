@@ -77,6 +77,19 @@
    - Tuyệt đối không tự viết thẻ `<h1>` riêng rẽ với kích cỡ font lệch nhau. Tiêu chuẩn kiểu chữ thống nhất cho toàn bộ hệ thống là: `text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight`.
    - Giữ tiêu đề tối giản và tinh gọn, không chèn các tag râu ria hoặc đoạn mô tả thừa thãi phía trên/dưới. Các nút thao tác cấp trang (Lưu, Xuất tệp, Tạo mới...) phải được truyền qua prop `actions` để hiển thị thẳng hàng ở góc phải.
 
+7. **Chuẩn hóa Bộ lọc & Bộ chọn Thống nhất (DataFilterBar & CustomSelect Standard):**
+   - Mọi thanh tìm kiếm & lọc dữ liệu trên danh sách/bảng nghiệp vụ (khảo sát, tái thẩm định, duyệt biển, danh mục QCVN...) bắt buộc dùng chung component `DataFilterBar.tsx` (`src/components/common/DataFilterBar.tsx`).
+   - Tuyệt đối **không** dùng thẻ `<select>` gốc của trình duyệt (vốn bị lỗi xám xịt và vỡ phong cách trên Dark Mode), bắt buộc sử dụng component `CustomSelect` có theme styling đồng nhất, hỗ trợ đóng/mở mượt mà và trạng thái focus/active chuẩn mực.
+   - Hỗ trợ truyền các dropdown/bộ lọc mở rộng linh hoạt thông qua prop `children`.
+
+8. **Chuẩn hóa Màn hình Lỗi Toàn cục (Global Error Canvas: 403 & 404):**
+   - Tuyệt đối **không** nhốt nội dung lỗi vào trong các ô hộp (card box) nhỏ cô đơn giữa màn hình trắng.
+   - Áp dụng bố cục **Open Hero Canvas** tràn màn hình tự nhiên giữa Navbar và Footer (`min-h-[calc(100vh-140px)]`):
+     - Nền địa hình 3D Wireframe (`/images/hero-wireframe.jpg`) với spotlight, radial glow và fade gradient mượt mà.
+     - Chữ số lỗi **`403`** / **`404`** kích thước lớn (`text-8xl sm:text-9xl md:text-[11rem] font-extrabold`), phủ dải màu chuyển sắc gradient đồng nhất với chữ **"Trust"** của trang chủ (`bg-gradient-to-r from-[#00c4de] via-[#d3f7ff] to-[#007b8b] glow-cyan` ở Dark Mode và `from-[#007b8b] to-[#00c4de]` ở Light Mode).
+     - Nút điều hướng bo tròn dạng viên thuốc (`rounded-full px-8 py-3.5`) chuẩn màu nút Hero trang chính (`text-black bg-[#00c4de]` ở Dark, `text-white bg-[#007b8b]` ở Light).
+     - Thông tin tối giản, tập trung vào giải pháp cho người dùng.
+
 ---
 
 ## 3. QUY TẮC ĐA NGÔN NGỮ & BẢN DỊCH (I18N CONVENTIONS)
@@ -177,16 +190,18 @@
      - **Admin (Quản trị viên hệ thống):** Phụ trách quản trị tài khoản người dùng (`/users`), phân quyền vai trò (`/roles`), giám sát MLOps/AIOps (`/mlops`), nhật ký kiểm toán (`/audit-logs`), đè tọa độ không gian GIS (`/spatial-data`), cấu hình chính sách tính điểm/tín chỉ (`/credits/rules`), và **chỉ xử lý các trường hợp ngoại lệ leo thang (`/escalations`)**.
      - Tuyệt đối **không** cho phép Admin thực hiện duyệt các giao dịch tín chỉ hàng ngày (`/credits`). Đây là nguyên tắc bắt buộc trong kiểm soát gian lận tài chính và tránh tập trung quyền lực (Separation of Duties).
 
-2. **Cơ chế Phòng vệ Tuyến đường: Tự động Điều hướng an toàn kèm Toast Cảnh báo Thông minh (Redirect with Contextual Action Toast):**
-   - Toàn bộ tuyến đường phân hệ Ops phải được bọc chặt chẽ bởi Guard tương ứng (`AuthGuard`, `AdminGuard`, `StaffGuard`).
-   - **Tuyệt đối cấm Silent Redirect:** Không được chuyển hướng ngầm trong im lặng mà không có phản hồi nào cho người dùng.
-   - **Cơ chế Redirect kèm Toast Cảnh báo (`AccessDeniedRedirect`):**
-     - Khi người dùng cố tình hoặc vô tình truy cập URL sâu (deep link) không thuộc thẩm quyền của vai trò hiện tại:
-       - Hệ thống tự động chuyển hướng mượt mà về Bảng điều khiển (`/`).
-       - Đồng thời kích hoạt ngay **Toast cảnh báo (Warning Toast)** ở góc trên bên phải màn hình trong 5.5 giây kèm thông điệp rõ ràng:
-         - **Trường hợp Admin truy cập route của Staff (`/credits`, `/candidates`, v.v.):** Cảnh báo nguyên tắc SoD (*"Admin không duyệt tín chỉ trực tiếp nhằm đảm bảo tính khách quan. Đã chuyển bạn về Bảng điều khiển."*) kèm nút hành động nhanh **[Đến Ngoại lệ]** trỏ thẳng đến `/escalations`.
-         - **Trường hợp Staff truy cập route của Admin (`/users`, `/roles`, `/audit-logs`, v.v.):** Cảnh báo yêu cầu quyền Quản trị viên (*"Trang này yêu cầu đặc quyền Admin. Đã chuyển bạn về Bảng điều khiển."*) kèm nút hành động nhanh **[Đến Hàng đợi]** trỏ về `/candidates`.
-   - 100% chuỗi thông báo và nút bấm phải qua hệ thống đa ngôn ngữ `t('not_allowed.toast_*')`, đảm bảo tính nhất quán tuyệt đối giữa tiếng Việt và tiếng Anh.
-
-
+2. **Cơ chế Phòng vệ Tuyến đường: Render Màn hình 403 Tại Chỗ & Giữ Nguyên URL (In-place 403 Render & Zero Information Leak):**
+   - Áp dụng đồng bộ cho cả hai hệ thống **Web Portal** (`RoleRoute`) và **Ops Portal** (`AdminGuard`, `StaffGuard`).
+   - **Bảo toàn URL trên thanh địa chỉ (URL Preservation):**
+     - Khi người dùng truy cập một tuyến đường yêu cầu đặc quyền cao hơn mà chưa đủ quyền (ví dụ: Staff vào `/users`, Admin vào `/candidates`, Driver vào `/survey`), hệ thống **bắt buộc giữ nguyên 100% URL gốc** trên thanh địa chỉ trình duyệt và render trực tiếp component 403 (`Forbidden403Page` trên Web / `NotAllowedPage` trên Ops) tại chỗ.
+     - Tuyệt đối **không** dùng redirect đẩy người dùng về `/` hay đổi link thành `/403`, tránh gây giật trang bất ngờ và làm mất liên kết gốc.
+     - **Mục đích UX & Vận hành:** Người dùng có thể sao chép chính xác liên kết gửi cho Quản trị viên/Sếp xin cấp quyền. Sau khi được phân quyền xong, chỉ cần nhấn `F5` tải lại trang là lập tức truy cập thẳng vào trang làm việc.
+   - **Chuẩn hóa Nút Hành động Điều hướng Tinh gọn:**
+     - Trên màn hình 403, chỉ giữ đúng 2 nút điều hướng tinh gọn, rõ ràng theo quy chuẩn Hero CTA:
+       - Nút chính **[Quay Lại]**: Cho phép người dùng lùi lại trang an toàn trước đó (`navigate(-1)`).
+       - Nút phụ **[Về Bảng Điều Khiển]** (trên Ops) / **[Về Trang Chủ]** (trên Web): Đưa người dùng về vùng làm việc mặc định.
+     - Giữ giao diện khoáng đạt, không rườm rà nút phụ phân nhánh làm phân tâm người dùng.
+   - **Nguyên tắc Chống Rò rỉ Phân quyền (Zero Information Leak / Anti-Role Enumeration):**
+     - Tuyệt đối **không** hiển thị các chuỗi thông báo kỹ thuật dạng debug (như `vai trò reviewer`, `quyền surveyor`) hay in email thô trong dấu ngoặc đơn trên giao diện lỗi.
+     - Luôn dùng văn phong trung lập, lịch sự và bảo mật theo chuẩn quốc tế (OWASP Top 10): *"Khu vực hạn chế phân quyền. Trang bạn đang cố gắng truy cập bị giới hạn quyền hạn. Vui lòng liên hệ với quản trị viên hệ thống."* Tránh để lộ sơ đồ phân quyền nội bộ (RBAC Mapping) cho người dùng bên ngoài hoặc kẻ tấn công.
 

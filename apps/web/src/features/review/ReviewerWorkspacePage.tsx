@@ -368,15 +368,6 @@ export default function ReviewerWorkspacePage() {
         {/* ─── 1. Page Header (Consistent with ProfilePage) ────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10">
           <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#007b8b]/15 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/30 dark:border-[#00c4de]/30">
-                SignTrustMap Reviewer
-              </span>
-              <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                QCVN 41:2019/BGTVT
-              </span>
-            </div>
-
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               {t('reviewer.title')}
             </h1>

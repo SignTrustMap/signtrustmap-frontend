@@ -3,6 +3,7 @@ import {
   BookOpen,
   VideoCamera,
   Clock,
+  ClockCounterClockwise,
   Coins,
   ShieldCheck,
   UserCircle,
@@ -81,6 +82,11 @@ export function UserDropdownMenu({ isOpen, onClose }: UserDropdownMenuProps) {
             label: t('nav.survey_studio'),
             href: '/survey',
             icon: <VideoCamera size={18} weight="duotone" className="text-amber-500 dark:text-amber-400" />,
+          },
+          {
+            label: t('nav.survey_revalidation'),
+            href: '/survey/revalidation',
+            icon: <ClockCounterClockwise size={18} weight="duotone" className="text-teal-600 dark:text-teal-400" />,
           },
           {
             label: t('nav.survey_history'),

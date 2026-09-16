@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import {
-  Plus,
   Info,
   Sparkle,
   CheckCircle,
@@ -281,18 +280,6 @@ export default function CatalogPage() {
         {/* ─── Page Header (Strictly styled like ProfilePage.tsx) ───────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10 text-left">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                  isDark
-                    ? 'bg-[#007b8b]/20 border-[#00c4de]/30 text-[#00c4de]'
-                    : 'bg-teal-50 border-teal-200 text-[#007b8b]'
-                }`}
-              >
-                <TrafficSignal size={14} weight="bold" />
-                <span>{t('catalog.badge_standard')}</span>
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               {t('catalog.title')}
             </h1>
@@ -322,18 +309,6 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowProposalModal(true)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer ${
-                isDark
-                  ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/20'
-                  : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
-              }`}
-            >
-              <Plus size={16} weight="bold" />
-              <span>{t('catalog.btn_propose')}</span>
-            </button>
           </div>
         </div>
 

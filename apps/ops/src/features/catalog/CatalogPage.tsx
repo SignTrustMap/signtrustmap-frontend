@@ -24,6 +24,7 @@ import CustomSelect from '@/components/common/CustomSelect'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import PageHeader from '@/components/common/PageHeader'
+import { useAuth } from '@/features/auth/AuthContext'
 import {
   mockCatalogData,
   type CatalogEntry,
@@ -33,6 +34,8 @@ import { TrafficSignGraphic } from './components/TrafficSignGraphic'
 
 export default function CatalogPage() {
   const { t, i18n } = useTranslation('ops')
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const toast = useToast()
   const isEnglish = i18n.language.startsWith('en')
 
@@ -382,15 +385,17 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            {/* Add New Sign Button */}
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              <PlusCircle size={17} weight="bold" />
-              <span>{t('catalog.btn_add_sign')}</span>
-            </button>
+            {/* Add New Sign Button (Admin Only) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+              >
+                <PlusCircle size={17} weight="bold" />
+                <span>{t('catalog.btn_add_sign')}</span>
+              </button>
+            )}
           </>
         }
       />
@@ -878,7 +883,7 @@ export default function CatalogPage() {
       )}
 
       {/* ─── Add Sign Modal ("Thêm Biển Báo Mới") ─────────────────────────── */}
-      {showCreateModal && (
+      {showCreateModal && isAdmin && (
         <ModalPortal>
           <div
             role="dialog"
