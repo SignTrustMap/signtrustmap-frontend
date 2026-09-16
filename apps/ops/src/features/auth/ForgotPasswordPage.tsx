@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 
 export default function ForgotPasswordPage() {
-  const { t } = useTranslation('ops')
+  const { t } = useTranslation('common')
   const { isDark } = useTheme()
   const { success } = useToast()
 
@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
 
     const token = `ops_sec_${Math.random().toString(36).substring(2, 12)}`
     setMockResetLink(`/reset-password?token=${token}&email=${encodeURIComponent(email.trim())}`)
-    success(t('auth.forgot_sent_toast', { defaultValue: 'Đã gửi liên kết khôi phục mật khẩu nhân sự!' }))
+    success(t('auth_recovery.toast_sent'))
   }
 
   return (
@@ -48,9 +48,9 @@ export default function ForgotPasswordPage() {
             <Key size={22} weight="duotone" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Khôi phục Mật khẩu Vận hành</h1>
+            <h1 className="text-xl font-bold tracking-tight">{t('auth_recovery.forgot_title')}</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Dành cho nhân sự Staff & Admin SignTrustMap
+              {t('auth_recovery.forgot_subtitle')}
             </p>
           </div>
         </div>
@@ -58,12 +58,12 @@ export default function ForgotPasswordPage() {
         {!isSubmitted ? (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-xs">
-              Nhập email định danh nhân sự nội bộ (@signtrustmap.site hoặc @signtrustmap.com) để nhận liên kết khôi phục an toàn.
+              {t('auth_recovery.forgot_desc')}
             </p>
 
             <div>
               <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
-                Email nội bộ
+                {t('auth_recovery.email_label')}
               </label>
               <div className="relative">
                 <input
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="staff@signtrustmap.site"
+                  placeholder={t('auth_recovery.email_placeholder')}
                   className={`w-full px-4 py-2.5 pl-10 text-xs rounded-xl border focus:outline-none focus:ring-2 ${
                     isDark
                       ? 'bg-[#030708] border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-[#00c4de]/20'
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
               }`}
             >
               <PaperPlaneRight size={15} weight="bold" />
-              <span>{isSubmitting ? 'Đang gửi...' : 'Gửi liên kết khôi phục'}</span>
+              <span>{isSubmitting ? t('auth_recovery.btn_sending') : t('auth_recovery.btn_send_link')}</span>
             </button>
           </form>
         ) : (
@@ -100,9 +100,9 @@ export default function ForgotPasswordPage() {
             <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-300 flex items-start gap-2.5">
               <CheckCircle size={20} weight="fill" className="text-emerald-500 shrink-0 mt-0.5" />
               <div className="text-xs leading-relaxed">
-                <p className="font-bold text-sm">Đã gửi liên kết khôi phục</p>
+                <p className="font-bold text-sm">{t('auth_recovery.sent_title')}</p>
                 <p className="mt-1">
-                  Nếu email <strong className="underline">{email}</strong> thuộc danh sách nhân sự được cấp quyền, hướng dẫn đổi mật khẩu đã được gửi đến hộp thư.
+                  {t('auth_recovery.sent_desc', { email })}
                 </p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
             {mockResetLink && (
               <div className={`p-3 rounded-xl border text-xs ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
                 <span className="text-[10px] font-bold text-[#007b8b] dark:text-[#00c4de] uppercase tracking-wider block mb-1">
-                  🧪 Demo Helper / Direct Reset Link:
+                  {t('auth_recovery.demo_helper')}
                 </span>
                 <Link to={mockResetLink} className="font-mono text-xs underline text-gray-600 dark:text-gray-300 hover:text-[#007b8b] dark:hover:text-[#00c4de] break-all">
                   {mockResetLink}
@@ -126,7 +126,7 @@ export default function ForgotPasswordPage() {
             className="flex items-center gap-1.5 font-bold text-gray-600 dark:text-gray-300 hover:text-[#007b8b] dark:hover:text-[#00c4de]"
           >
             <ArrowLeft size={14} weight="bold" />
-            <span>Quay lại Đăng nhập</span>
+            <span>{t('auth_recovery.back_login')}</span>
           </Link>
           <div className="flex items-center gap-1 text-gray-400">
             <Headset size={14} />

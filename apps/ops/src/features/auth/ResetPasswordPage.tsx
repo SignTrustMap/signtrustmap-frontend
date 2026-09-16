@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import {
@@ -11,6 +12,7 @@ import {
 } from '@phosphor-icons/react'
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation('common')
   const { isDark } = useTheme()
   const { success } = useToast()
   const navigate = useNavigate()
@@ -37,7 +39,7 @@ export default function ResetPasswordPage() {
     await new Promise((r) => setTimeout(r, 600))
     setIsSubmitting(false)
     setIsSuccess(true)
-    success('Mật khẩu tài khoản nhân sự đã được cập nhật thành công!')
+    success(t('auth_recovery.toast_reset_success'))
   }
 
   return (
@@ -52,9 +54,9 @@ export default function ResetPasswordPage() {
             <LockKey size={22} weight="duotone" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Thiết lập Mật khẩu Mới</h1>
+            <h1 className="text-xl font-bold tracking-tight">{t('auth_recovery.reset_title')}</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {emailParam ? `Tài khoản: ${emailParam}` : 'Cổng Vận hành SignTrustMap Ops'}
+              {emailParam ? t('auth_recovery.account_label', { email: emailParam }) : t('auth_recovery.ops_portal_label')}
             </p>
           </div>
         </div>
@@ -63,7 +65,7 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
-                Mật khẩu mới
+                {t('auth_recovery.new_pw_label')}
               </label>
               <div className="relative">
                 <input
@@ -90,7 +92,7 @@ export default function ResetPasswordPage() {
 
             <div>
               <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
-                Xác nhận mật khẩu
+                {t('auth_recovery.confirm_pw_label')}
               </label>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -109,15 +111,15 @@ export default function ResetPasswordPage() {
             <div className={`p-3 rounded-xl border text-xs space-y-1 ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
               <div className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-500' : 'text-gray-400'}`}>
                 <CheckCircle size={14} weight={hasMinLength ? 'fill' : 'regular'} />
-                <span>Tối thiểu 8 ký tự</span>
+                <span>{t('auth_recovery.req_min_chars')}</span>
               </div>
               <div className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-500' : 'text-gray-400'}`}>
                 <CheckCircle size={14} weight={hasNumber ? 'fill' : 'regular'} />
-                <span>Chứa ít nhất 1 chữ số</span>
+                <span>{t('auth_recovery.req_has_digit')}</span>
               </div>
               <div className={`flex items-center gap-1.5 ${passwordsMatch ? 'text-emerald-500' : 'text-gray-400'}`}>
                 <CheckCircle size={14} weight={passwordsMatch ? 'fill' : 'regular'} />
-                <span>Mật khẩu xác nhận trùng khớp</span>
+                <span>{t('auth_recovery.req_match')}</span>
               </div>
             </div>
 
@@ -131,7 +133,7 @@ export default function ResetPasswordPage() {
               }`}
             >
               <LockKey size={15} weight="bold" />
-              <span>{isSubmitting ? 'Đang cập nhật...' : 'Xác nhận Mật khẩu Mới'}</span>
+              <span>{isSubmitting ? t('auth_recovery.btn_updating') : t('auth_recovery.btn_reset_submit')}</span>
             </button>
           </form>
         ) : (
@@ -140,9 +142,9 @@ export default function ResetPasswordPage() {
               <CheckCircle size={28} weight="fill" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Đặt lại mật khẩu thành công</h2>
+              <h2 className="text-base font-bold">{t('auth_recovery.success_title')}</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Bạn có thể đăng nhập vào cổng vận hành bằng mật khẩu mới vừa tạo.
+                {t('auth_recovery.success_desc')}
               </p>
             </div>
             <button
@@ -152,14 +154,14 @@ export default function ResetPasswordPage() {
                 isDark ? 'bg-[#00c4de] text-black' : 'bg-[#007b8b] text-white'
               }`}
             >
-              Đăng nhập ngay
+              {t('auth_recovery.btn_login_now')}
             </button>
           </div>
         )}
 
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between text-xs">
           <Link to="/login" className="font-bold text-gray-600 dark:text-gray-300 hover:text-[#007b8b] dark:hover:text-[#00c4de]">
-            Quay lại Đăng nhập
+            {t('auth_recovery.back_login')}
           </Link>
           <span className="text-gray-400 flex items-center gap-1">
             <ShieldCheck size={14} />

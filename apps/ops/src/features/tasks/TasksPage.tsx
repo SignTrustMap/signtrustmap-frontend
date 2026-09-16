@@ -6,6 +6,7 @@ import { Pagination } from '@/components/common/Pagination'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
 import { ModalPortal } from '@/components/common/ModalPortal'
+import CustomSelect from '@/components/common/CustomSelect'
 import {
   MapPin,
   Clock,
@@ -641,17 +642,16 @@ export default function TasksPage() {
                 <label className="block text-gray-500 dark:text-gray-400 font-mono uppercase text-[11px] mb-1 font-semibold">
                   {t('tasks.lbl_target_sign_code')}
                 </label>
-                <select
+                <CustomSelect
                   value={newTaskCode}
-                  onChange={(e) => setNewTaskCode(e.target.value)}
-                  className="w-full p-2.5 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl font-mono text-xs focus:outline-none focus:border-[#007b8b]"
-                >
-                  {mockCatalogData.slice(0, 8).map((cat) => (
-                    <option key={cat.code} value={cat.code}>
-                      {cat.code} - {cat.nameVi}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setNewTaskCode(val)}
+                  className="w-full"
+                  buttonClassName="w-full"
+                  options={mockCatalogData.slice(0, 8).map((cat) => ({
+                    value: cat.code,
+                    label: `${cat.code} - ${cat.nameVi}`,
+                  }))}
+                />
               </div>
 
               <div>

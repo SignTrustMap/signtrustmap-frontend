@@ -679,21 +679,19 @@ export default function SurveyRevalidationPage() {
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                   {t('survey.reval.condition_label')}
                 </label>
-                <select
+                <CustomSelect
+                  options={[
+                    { value: 'intact', label: t('survey.reval.condition_intact') },
+                    { value: 'obstructed', label: t('survey.reval.condition_obstructed') },
+                    { value: 'damaged', label: t('survey.reval.condition_damaged') },
+                    { value: 'removed', label: t('survey.reval.condition_removed') },
+                    { value: 'replaced', label: t('survey.reval.condition_replaced') },
+                  ]}
                   value={observedCondition}
-                  onChange={(e) => setObservedCondition(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border focus:outline-none cursor-pointer ${
-                    isDark
-                      ? 'bg-[#030708] border-white/15 text-white'
-                      : 'bg-white border-gray-300 text-gray-800'
-                  }`}
-                >
-                  <option value="intact">{t('survey.reval.condition_intact')}</option>
-                  <option value="obstructed">{t('survey.reval.condition_obstructed')}</option>
-                  <option value="damaged">{t('survey.reval.condition_damaged')}</option>
-                  <option value="removed">{t('survey.reval.condition_removed')}</option>
-                  <option value="replaced">{t('survey.reval.condition_replaced')}</option>
-                </select>
+                  onChange={setObservedCondition}
+                  className="w-full"
+                  align="left"
+                />
               </div>
 
               {/* Optional Notes */}

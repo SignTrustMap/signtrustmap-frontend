@@ -20,6 +20,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { Modal } from '@/components/common/Modal'
+import { CustomSelect } from '@/components/common/CustomSelect'
 import { mockSigns, signCategories, type SignItem } from '@/data'
 
 // Fix Leaflet default marker icons in bundler
@@ -814,22 +815,19 @@ export default function ProductMap() {
                 <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
                   {t('map_page.report_modal.type_label')} <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CustomSelect
                   value={issueType}
-                  onChange={(e) => setIssueType(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs font-semibold rounded-xl border focus:outline-none ${
-                    isDark
-                      ? 'bg-[#030708] border-white/15 text-white'
-                      : 'bg-white border-gray-300 text-gray-800'
-                  }`}
-                >
-                  <option value="damaged">{t('map_page.report_modal.type_damaged')}</option>
-                  <option value="obstructed">{t('map_page.report_modal.type_obstructed')}</option>
-                  <option value="missing">{t('map_page.report_modal.type_missing')}</option>
-                  <option value="wrong_location">{t('map_page.report_modal.type_wrong_location')}</option>
-                  <option value="wrong_type">{t('map_page.report_modal.type_wrong_type')}</option>
-                  <option value="other">{t('map_page.report_modal.type_other')}</option>
-                </select>
+                  onChange={(val) => setIssueType(val)}
+                  className="w-full"
+                  options={[
+                    { value: 'damaged', label: t('map_page.report_modal.type_damaged') },
+                    { value: 'obstructed', label: t('map_page.report_modal.type_obstructed') },
+                    { value: 'missing', label: t('map_page.report_modal.type_missing') },
+                    { value: 'wrong_location', label: t('map_page.report_modal.type_wrong_location') },
+                    { value: 'wrong_type', label: t('map_page.report_modal.type_wrong_type') },
+                    { value: 'other', label: t('map_page.report_modal.type_other') },
+                  ]}
+                />
               </div>
 
               <div>

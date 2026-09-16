@@ -9,8 +9,50 @@ export default function NotFound404Page() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex-1 w-full flex flex-col items-center justify-center text-center px-4 py-8 sm:py-12 relative z-10 my-auto select-none">
-      <div className="mx-auto max-w-2xl px-4 flex flex-col items-center">
+    <div
+      className={`flex-1 w-full min-h-[calc(100vh-140px)] flex flex-col items-center justify-center relative overflow-hidden transition-colors px-4 py-12 sm:py-16 ${
+        isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
+      }`}
+    >
+      {/* ─── 3D Wireframe Terrain & Ambient Spotlight (Rõ nét theo Hero) ─── */}
+      <div className="absolute inset-0 pointer-events-none z-0 select-none overflow-hidden">
+        <img
+          src="/images/hero-wireframe.jpg"
+          alt="Terrain Wireframe"
+          className={`w-full h-full object-cover object-bottom translate-y-8 sm:translate-y-12 transition-all ${
+            isDark
+              ? 'opacity-45 brightness-[0.8] contrast-[1.2] mix-blend-screen'
+              : 'opacity-30 mix-blend-multiply filter invert hue-rotate-180 brightness-95 contrast-120'
+          }`}
+        />
+
+        {/* Overhead spotlight beam with soft glow */}
+        <div
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-[850px] h-[450px] blur-[130px] ${
+            isDark
+              ? 'bg-gradient-to-b from-[#00c4de]/20 via-[#007b8b]/10 to-transparent'
+              : 'bg-gradient-to-b from-[#007b8b]/20 via-[#d3f7ff]/35 to-transparent'
+          }`}
+        />
+
+        {/* Soft radial scrim behind text */}
+        <div
+          className={`absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[480px] rounded-full blur-[110px] ${
+            isDark ? 'bg-[#030708]/30' : 'bg-[#F8F7F7]/30'
+          }`}
+        />
+
+        {/* Top and bottom gradient fades */}
+        <div
+          className={`absolute inset-0 bg-gradient-to-b ${
+            isDark
+              ? 'from-[#030708]/80 via-transparent to-[#030708]'
+              : 'from-[#F8F7F7]/70 via-transparent to-[#F8F7F7]'
+          }`}
+        />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-2xl px-4 text-center flex flex-col items-center">
         {/* Large Typography 404 phong cách Hero Title SignTrustMap */}
         <div className="relative mb-4 select-none">
           <h1
