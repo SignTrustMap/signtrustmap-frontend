@@ -12,6 +12,7 @@ import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import { SessionProvider, useSession } from '@/context/session-provider';
 import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
 import { queryClient } from '@/api/query-client';
+import { authExpiredEmitter } from '@/api/api-client';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,7 +29,7 @@ export default function TabLayout() {
 }
 
 function RootNavigation() {
-  const { isInitializing, session } = useSession();
+  const { isInitializing, logOut, session } = useSession();
   const [hasSplashProgressElapsed, setHasSplashProgressElapsed] = useState(false);
   const hasValidSession = Boolean(session?.accessToken);
   const shouldShowSplash = isInitializing || !hasSplashProgressElapsed;
@@ -49,6 +50,16 @@ function RootNavigation() {
     });
   }, [shouldShowSplash]);
 
+  // Redirect to login when any API call returns 401 / 403 (expired token).
+  useEffect(() => {
+    const unsubscribe = authExpiredEmitter.subscribe(() => {
+      logOut().catch(() => {
+        // Ignore storage errors during forced log-out.
+      });
+    });
+    return () => { unsubscribe(); };
+  }, [logOut]);
+
   return (
     <View style={{ flex: 1 }}>
       <Stack
@@ -60,12 +71,12 @@ function RootNavigation() {
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="index" />
         <Stack.Protected guard={!hasValidSession}>
           <Stack.Screen name="(public)/login" />
           <Stack.Screen name="(public)/register" />
         </Stack.Protected>
         <Stack.Protected guard={hasValidSession}>
-          <Stack.Screen name="index" />
           <Stack.Screen name="(authenticated)" />
         </Stack.Protected>
       </Stack>

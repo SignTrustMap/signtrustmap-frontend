@@ -1,7 +1,16 @@
 {
   "files": [],
   "references": [
-    { "path": "./apps/web" },
-    { "path": "./apps/ops" }
-  ]
+    {
+      "path": "./apps/web"
+    },
+    {
+      "path": "./apps/ops"
+    }
+  ],
+  "compilerOptions": {
+    "types": [
+      "jest"
+    ]
+  }
 }

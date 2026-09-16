@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { Animated, BackHandler, PanResponder, Platform, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Animated, BackHandler, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
+import { Camera } from "expo-camera";
 import { Image } from "expo-image";
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
-import { NavigationSignAlertBanner } from "@/components/navigation-sign-alert-banner";
+import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
+import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
   previousLocations,
@@ -16,11 +19,12 @@ import {
   type MapCoordinate,
 } from "@/feature/navigation/data/navigation-locations";
 import { useTheme } from "@/hooks/use-theme";
+import { useNavigationActive } from "@/context/navigation-active-provider";
 
 import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
 import type { VehicleMode } from '@/types/navigation/navigationType';
-import { useGetNavigationRoute, useGetVehicleModes } from '../hooks/use-navigation';
+import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
@@ -43,8 +47,144 @@ async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   }
 }
 
+export type SignCategory = 'WARNING' | 'MANDATORY' | 'PROHIBITORY' | 'INFORMATION' | 'TEMPORARY';
+
+export const SIGN_CATEGORIES: {
+  id: SignCategory;
+  label: string;
+  sublabel: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  color: string;
+  bgColor: string;
+}[] = [
+    {
+      id: 'PROHIBITORY',
+      label: 'Prohibitory',
+      sublabel: 'No entry, turns, speed limits',
+      icon: 'cancel',
+      color: '#EF4444',
+      bgColor: 'rgba(239, 68, 68, 0.14)',
+    },
+    {
+      id: 'WARNING',
+      label: 'Warning',
+      sublabel: 'Curves, hazards, crossings',
+      icon: 'alert',
+      color: '#F59E0B',
+      bgColor: 'rgba(245, 158, 11, 0.14)',
+    },
+    {
+      id: 'MANDATORY',
+      label: 'Mandatory',
+      sublabel: 'Required direction, min speed',
+      icon: 'arrow-right-circle',
+      color: '#3B82F6',
+      bgColor: 'rgba(59, 130, 246, 0.14)',
+    },
+    {
+      id: 'INFORMATION',
+      label: 'Information',
+      sublabel: 'Priority road, one-way, facilities',
+      icon: 'information-outline',
+      color: '#10B981',
+      bgColor: 'rgba(16, 185, 129, 0.14)',
+    },
+    {
+      id: 'TEMPORARY',
+      label: 'Temporary',
+      sublabel: 'Roadworks, detours, repairs',
+      icon: 'traffic-cone',
+      color: '#F97316',
+      bgColor: 'rgba(249, 115, 22, 0.14)',
+    },
+  ];
+
+export function getSignCategory(sign: { signCode?: string; name?: string }): SignCategory {
+  const code = (sign.signCode ?? '').toUpperCase().trim();
+  const name = (sign.name ?? '').toUpperCase().trim();
+
+  if (
+    code.startsWith('T.') ||
+    code.startsWith('T-') ||
+    code.startsWith('TEMP') ||
+    name.includes('TEMP') ||
+    name.includes('ROADWORK') ||
+    name.includes('CONSTRUCTION') ||
+    name.includes('TẠM THỜI')
+  ) {
+    return 'TEMPORARY';
+  }
+
+  if (
+    code.startsWith('P.') ||
+    code.startsWith('P-') ||
+    code === 'STOP' ||
+    code.startsWith('PROHIB') ||
+    name.includes('STOP') ||
+    name.includes('NO ENTRY') ||
+    name.includes('PROHIB') ||
+    name.includes('SPEED LIMIT') ||
+    name.includes('CẤM')
+  ) {
+    return 'PROHIBITORY';
+  }
+
+  if (
+    code.startsWith('W.') ||
+    code.startsWith('W-') ||
+    code.startsWith('WARN') ||
+    name.includes('WARN') ||
+    name.includes('DANGER') ||
+    name.includes('HAZARD') ||
+    name.includes('CURVE') ||
+    name.includes('CROSSING') ||
+    name.includes('INTERSECTION') ||
+    name.includes('NGUY HIỂM') ||
+    name.includes('CẢNH BÁO')
+  ) {
+    return 'WARNING';
+  }
+
+  if (
+    code.startsWith('R.') ||
+    code.startsWith('R-') ||
+    code.startsWith('MAND') ||
+    name.includes('MAND') ||
+    name.includes('COMPULSORY') ||
+    name.includes('ROUNDABOUT') ||
+    name.includes('HIỆU LỆNH')
+  ) {
+    return 'MANDATORY';
+  }
+
+  if (
+    code.startsWith('I.') ||
+    code.startsWith('I-') ||
+    code.startsWith('G.') ||
+    code.startsWith('G-') ||
+    code.startsWith('INFO') ||
+    name.includes('INFO') ||
+    name.includes('GUIDE') ||
+    name.includes('PARKING') ||
+    name.includes('PRIORITY') ||
+    name.includes('ONE WAY') ||
+    name.includes('CHỈ DẪN')
+  ) {
+    return 'INFORMATION';
+  }
+
+  if (code.startsWith('W')) return 'WARNING';
+  if (code.startsWith('P')) return 'PROHIBITORY';
+  if (code.startsWith('R')) return 'MANDATORY';
+  if (code.startsWith('I') || code.startsWith('G')) return 'INFORMATION';
+  if (code.startsWith('T')) return 'TEMPORARY';
+
+  return 'WARNING';
+}
+
 export function NavigationMapScreen() {
   const router = useRouter();
+  const { setNavigationActive } = useNavigationActive();
   const {
     destinationId,
     destinationLat,
@@ -68,65 +208,6 @@ export function NavigationMapScreen() {
   }>();
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
-  const [isSheetExpanded, setIsSheetExpanded] = useState(false);
-  const sheetProgress = useRef(new Animated.Value(0)).current;
-  const sheetExpandedRef = useRef(false);
-  const gestureStart = useRef(0);
-  const gestureStartedExpanded = useRef(false);
-  const directionsScrollRef = useRef<ScrollView>(null);
-  const stepLayoutOffsets = useRef<number[]>([]);
-  const collapsedSheetHeight = Math.min(280, windowHeight * 0.36);
-  const expandedSheetHeight = Math.max(collapsedSheetHeight, Math.min(560, windowHeight * 0.68));
-  const sheetTravel = Math.max(1, expandedSheetHeight - collapsedSheetHeight);
-  const sheetHeight = sheetProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [collapsedSheetHeight, expandedSheetHeight],
-  });
-  const animateRouteSheet = useCallback((expanded: boolean) => {
-    sheetExpandedRef.current = expanded;
-    setIsSheetExpanded(expanded);
-    Animated.spring(sheetProgress, {
-      toValue: expanded ? 1 : 0,
-      damping: 22,
-      mass: 0.8,
-      stiffness: 220,
-      useNativeDriver: false,
-    }).start();
-  }, [sheetProgress]);
-  const sheetPanResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
-      gestureStartedExpanded.current = sheetExpandedRef.current;
-      gestureStart.current = sheetExpandedRef.current ? 1 : 0;
-      sheetProgress.stopAnimation((value) => { gestureStart.current = value; });
-    },
-    onPanResponderMove: (_, gesture) => {
-      sheetProgress.setValue(Math.max(0, Math.min(1, gestureStart.current - gesture.dy / sheetTravel)));
-    },
-    onPanResponderRelease: (_, gesture) => {
-      if (Math.abs(gesture.dx) < 6 && Math.abs(gesture.dy) < 6) {
-        animateRouteSheet(!gestureStartedExpanded.current);
-      } else if (Math.abs(gesture.vy) > 0.35) {
-        animateRouteSheet(gesture.vy < 0);
-      } else if (Math.abs(gesture.dy) > 32) {
-        animateRouteSheet(gesture.dy < 0);
-      } else {
-        animateRouteSheet(gestureStartedExpanded.current);
-      }
-    },
-    onPanResponderTerminate: () => animateRouteSheet(gestureStartedExpanded.current),
-  }), [animateRouteSheet, sheetProgress, sheetTravel]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'android' || !destinationId || !isSheetExpanded) return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      animateRouteSheet(false);
-      return true;
-    });
-    return () => subscription.remove();
-  }, [animateRouteSheet, destinationId, isSheetExpanded]);
-
-  useEffect(() => () => sheetProgress.stopAnimation(), [sheetProgress]);
   const savedDestination = previousLocations.find(
     (location) => location.id === destinationId,
   );
@@ -171,16 +252,178 @@ export function NavigationMapScreen() {
     selectedStart?.title ??
     (gpsStart ? "Current Location" : undefined);
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
-  const routeKey =
-    selectedDestination && routeStart
-      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
-      : undefined;
-
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     routeKey: string;
   }>();
-  const { data: vehicleModes = [] } = useGetVehicleModes();
+  const routeKey =
+    selectedDestination && routeStart
+      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
+      : undefined;
+  const isNavigating = Boolean(
+    routeKey && navigationSession?.routeKey === routeKey,
+  );
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(Spacing.two, insets.bottom);
+  const [sheetSnapIndex, setSheetSnapIndex] = useState<0 | 1 | 2>(1);
+  const snapIndexRef = useRef<0 | 1 | 2>(1);
+  const directionsScrollRef = useRef<ScrollView>(null);
+  const stepLayoutOffsets = useRef<number[]>([]);
+
+  // 3 collapse ranges:
+  // 0: Peek range (navigation: compact bar with X + ETA; non-navigation: vehicle mode, ETA, distance)
+  // 1: Mid range (standard preview with vehicle tabs, filters preview, and Start button)
+  // 2: Full range (expanded view showing the full sign filter list and Start button)
+  const peekSheetHeight = routeStart
+    ? isNavigating
+      ? 80 + bottomInset   // navigation mode: compact bar (handle + header row only)
+      : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
+    : Math.min(180, windowHeight * 0.22);
+  const midSheetHeight = routeStart
+    ? Math.min(420, windowHeight * 0.52)
+    : Math.min(280, windowHeight * 0.36);
+  const maxSheetHeight = Math.max(
+    midSheetHeight,
+    Math.min(640, windowHeight * 0.82),
+  );
+
+  const sheetHeightAnim = useRef(new Animated.Value(midSheetHeight)).current;
+  const currentHeightRef = useRef(midSheetHeight);
+
+  const snapTo = useCallback(
+    (index: 0 | 1 | 2) => {
+      snapIndexRef.current = index;
+      setSheetSnapIndex(index);
+      const targetHeight =
+        index === 0
+          ? peekSheetHeight
+          : index === 1
+            ? midSheetHeight
+            : maxSheetHeight;
+      currentHeightRef.current = targetHeight;
+      Animated.spring(sheetHeightAnim, {
+        toValue: targetHeight,
+        damping: 24,
+        mass: 0.8,
+        stiffness: 240,
+        useNativeDriver: false,
+      }).start();
+    },
+    [peekSheetHeight, midSheetHeight, maxSheetHeight, sheetHeightAnim],
+  );
+
+  // Keep animated height in sync if window size or routeStart changes
+  useEffect(() => {
+    const targetHeight =
+      snapIndexRef.current === 0
+        ? peekSheetHeight
+        : snapIndexRef.current === 1
+          ? midSheetHeight
+          : maxSheetHeight;
+    currentHeightRef.current = targetHeight;
+    Animated.spring(sheetHeightAnim, {
+      toValue: targetHeight,
+      damping: 24,
+      mass: 0.8,
+      stiffness: 240,
+      useNativeDriver: false,
+    }).start();
+  }, [peekSheetHeight, midSheetHeight, maxSheetHeight, sheetHeightAnim]);
+
+  useEffect(() => {
+    if (selectedDestination) {
+      snapTo(1);
+    }
+  }, [selectedDestination, snapTo]);
+
+  const expandableContentOpacity = sheetHeightAnim.interpolate({
+    inputRange: [peekSheetHeight, peekSheetHeight + 50],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dy) > 3 || Math.abs(gesture.dx) > 3,
+        onPanResponderGrant: () => {
+          sheetHeightAnim.stopAnimation((value) => {
+            currentHeightRef.current = value;
+          });
+        },
+        onPanResponderMove: (_, gesture) => {
+          const newHeight = currentHeightRef.current - gesture.dy;
+          const clamped = Math.max(
+            peekSheetHeight - 10,
+            Math.min(maxSheetHeight + 15, newHeight),
+          );
+          sheetHeightAnim.setValue(clamped);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          // Tap handling: cycle snapIndex up, if it reaches 2, wrap back to 0
+          if (Math.abs(gesture.dx) < 6 && Math.abs(gesture.dy) < 6) {
+            const current = snapIndexRef.current;
+            const nextIndex = ((current + 1) % 3) as 0 | 1 | 2;
+            snapTo(nextIndex);
+            return;
+          }
+
+          // Velocity flick gestures
+          const vy = gesture.vy;
+          if (vy < -0.45) {
+            if (snapIndexRef.current === 0) {
+              snapTo(1);
+            } else {
+              snapTo(2);
+            }
+            return;
+          } else if (vy > 0.45) {
+            if (snapIndexRef.current === 2) {
+              snapTo(1);
+            } else {
+              snapTo(0);
+            }
+            return;
+          }
+
+          // Distance-based snapping to nearest tier
+          const finalHeight = currentHeightRef.current - gesture.dy;
+          const thresholdPeekToMid = (peekSheetHeight + midSheetHeight) / 2;
+          const thresholdMidToMax = (midSheetHeight + maxSheetHeight) / 2;
+
+          if (finalHeight < thresholdPeekToMid) {
+            snapTo(0);
+          } else if (finalHeight < thresholdMidToMax) {
+            snapTo(1);
+          } else {
+            snapTo(2);
+          }
+        },
+        onPanResponderTerminate: () => {
+          snapTo(snapIndexRef.current);
+        },
+      }),
+    [
+      peekSheetHeight,
+      midSheetHeight,
+      maxSheetHeight,
+      sheetHeightAnim,
+      snapTo,
+    ],
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !destinationId || sheetSnapIndex < 2) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      snapTo(1);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [destinationId, sheetSnapIndex, snapTo]);
+
+  useEffect(() => () => sheetHeightAnim.stopAnimation(), [sheetHeightAnim]);
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locationToast, setLocationToast] = useState<{
@@ -193,6 +436,10 @@ export function NavigationMapScreen() {
   }>();
   const [navigationActionError, setNavigationError] = useState<string>();
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  // Tracks sign IDs the user has already responded to — local only, no API call.
+  const verifiedSignIdsRef = useRef<Set<string>>(new Set());
+  const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
+  const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
   const { data: routeResult, error: routeError } = useGetNavigationRoute(
     routeStart,
     selectedDestination?.coordinate,
@@ -209,16 +456,30 @@ export function NavigationMapScreen() {
     selectedDestination?.coordinate,
     routeResult?.geometry,
   );
-  console.log('plannedSigns', plannedSigns);
   const navigationError = routeError?.message ?? navigationActionError
     ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
   const routeCoordinates = routeResult?.coordinates;
   const routeDistance = routeResult?.distance;
   const routeDuration = routeResult?.duration;
   const routeSteps = routeResult?.steps;
-  const isNavigating = Boolean(
-    routeKey && navigationSession?.routeKey === routeKey,
-  );
+  const baseDuration = routeDuration ?? 0;
+  const carDuration = vehicleMode === "DRIVING" ? baseDuration : Math.round(baseDuration * 1.18);
+  const bikeDuration = vehicleMode === "BIKE" ? baseDuration : Math.max(60, Math.round(baseDuration * 0.85));
+  const activeDuration = vehicleMode === "DRIVING" ? carDuration : bikeDuration;
+
+  // Sync navigation state with tab bar visibility context
+  useEffect(() => {
+    setNavigationActive(isNavigating);
+    return () => setNavigationActive(false);
+  }, [isNavigating, setNavigationActive]);
+
+  // Automatically reduce the bottom sheet to peek range (vehicle mode, ETA & distance) when navigating
+  useEffect(() => {
+    if (isNavigating) {
+      snapTo(0);
+    }
+  }, [isNavigating, snapTo]);
+
   const hasLiveLocation = Boolean(
     isNavigating && navigationSession?.hasLiveLocation,
   );
@@ -249,6 +510,64 @@ export function NavigationMapScreen() {
     },
     [sampleRouteSigns, visibleSigns],
   );
+
+  const [selectedSignCategories, setSelectedSignCategories] = useState<Set<SignCategory>>(
+    () => new Set(['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION', 'TEMPORARY'])
+  );
+
+  const handleToggleCategory = (category: SignCategory) => {
+    setSelectedSignCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleAllCategories = () => {
+    setSelectedSignCategories((prev) => {
+      if (prev.size === SIGN_CATEGORIES.length) {
+        return new Set();
+      }
+      return new Set(SIGN_CATEGORIES.map((c) => c.id));
+    });
+  };
+
+  const handleLivestreamPress = useCallback(async () => {
+    // Request camera permission
+    const cameraResult = await Camera.requestCameraPermissionsAsync();
+    if (!cameraResult.granted) return;
+    // Request microphone permission
+    const micResult = await Camera.requestMicrophonePermissionsAsync();
+    if (!micResult.granted) return;
+    // Navigate to the dedicated livestream screen
+    router.push('/(authenticated)/(tabs)/livestream');
+  }, [router]);
+
+  const signCategoryCounts = useMemo(() => {
+    const counts: Record<SignCategory, number> = {
+      WARNING: 0,
+      MANDATORY: 0,
+      PROHIBITORY: 0,
+      INFORMATION: 0,
+      TEMPORARY: 0,
+    };
+    for (const sign of signsWithSamples) {
+      const cat = getSignCategory(sign);
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    }
+    return counts;
+  }, [signsWithSamples]);
+
+  const filteredSigns = useMemo(() => {
+    return signsWithSamples.filter((sign) => {
+      const cat = getSignCategory(sign);
+      return selectedSignCategories.has(cat);
+    });
+  }, [signsWithSamples, selectedSignCategories]);
   const maneuverProgresses = useMemo(
     () =>
       routeSteps?.map((step) =>
@@ -307,10 +626,33 @@ export function NavigationMapScreen() {
   const { activeAlert: activeSignAlert } = useSignProximityAlert({
     alertDistanceMeters: 50,
     isNavigating,
-    signs: signsWithSamples,
+    signs: filteredSigns,
     userCoordinate: userCoordinate ?? routeStart,
     speechLanguage: "en-US",
   });
+
+  // 3 nearest upcoming signs on the route, ahead of the user's current position
+  const upcomingSignsOnRoute = useMemo(() => {
+    if (!isNavigating || !routeCoordinates || filteredSigns.length === 0) return [];
+    const navigationCoordinate = userCoordinate ?? routeStart;
+    if (!navigationCoordinate) return [];
+    const userProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
+    const signsAhead = filteredSigns
+      .filter((sign) => sign.coordinate)
+      .map((sign) => {
+        const signProgress = getRouteProgressMeters(
+          sign.coordinate as [number, number],
+          routeCoordinates,
+        );
+        const distanceMeters = Math.max(0, signProgress - userProgress);
+        return { ...sign, distanceMeters };
+      })
+      .filter((sign) => sign.distanceMeters > 5)
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 3);
+    return signsAhead;
+  }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, routeStart]);
+
 
   useEffect(() => {
     setNavigationError(undefined);
@@ -458,6 +800,11 @@ export function NavigationMapScreen() {
     });
   };
 
+  const handleCloseRoute = () => {
+    setNavigationSession(undefined);
+    router.replace('/home');
+  };
+
   const handleChangeDestination = () => {
     router.push({
       pathname: "/home/search",
@@ -585,7 +932,7 @@ export function NavigationMapScreen() {
           }
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
-          routeSigns={signsWithSamples}
+          routeSigns={filteredSigns}
           showCurrentLocation={!isNavigating}
         />
 
@@ -603,12 +950,62 @@ export function NavigationMapScreen() {
           />
         ) : null}
 
-        {isNavigating && activeSignAlert ? (
-          <NavigationSignAlertBanner
+        {/* NavigationSignAlertBanner removed - stop-ahead banner hidden during navigation */}
+
+        {isNavigating && activeSignAlert &&
+          !verifiedSignIdsRef.current.has(activeSignAlert.sign.id) &&
+          activeSignAlert.sign.id !== dismissedVerifySignId ? (
+          <NavigationSignVerifyCard
             distanceMeters={activeSignAlert.distanceMeters}
-            hasActiveManeuver={Boolean(activeManeuver)}
             sign={activeSignAlert.sign}
+            onVerify={(sign, _result: SignVerifyResult) => {
+              verifiedSignIdsRef.current.add(sign.id);
+            }}
+            onDismiss={() => {
+              setDismissedVerifySignId(activeSignAlert.sign.id);
+            }}
           />
+        ) : null}
+
+        {/* Upcoming signs panel - directly below the maneuver banner, left-anchored */}
+        {isNavigating && upcomingSignsOnRoute.length > 0 ? (
+          <SafeAreaView
+            edges={['top']}
+            pointerEvents="none"
+            style={styles.upcomingSignsOverlay}
+          >
+            <View
+              style={[
+                styles.upcomingSignsPanel,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.upcomingSignsPanelLabel, { color: theme.grey }]}>Ahead</Text>
+              {upcomingSignsOnRoute.map((sign) => (
+                <View key={sign.id} style={styles.upcomingSignRow}>
+                  <Image
+                    accessibilityLabel={sign.name ?? 'Sign'}
+                    contentFit="contain"
+                    source={sign.imageUrl ? { uri: sign.imageUrl } : require('@/assets/images/smaple_signs/stop_sign.webp')}
+                    style={styles.upcomingSignImage}
+                  />
+                  <View style={styles.upcomingSignInfo}>
+                    <Text numberOfLines={1} style={[styles.upcomingSignName, { color: theme.text }]}>
+                      {sign.name ?? 'Sign'}
+                    </Text>
+                    <Text style={[styles.upcomingSignDist, { color: theme.grey }]}>
+                      {sign.distanceMeters < 1000
+                        ? `${Math.round(sign.distanceMeters)} m`
+                        : `${(sign.distanceMeters / 1000).toFixed(1)} km`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </SafeAreaView>
         ) : null}
 
         {!isNavigating ? (
@@ -691,80 +1088,201 @@ export function NavigationMapScreen() {
                   </AppButton>
                 </View>
               ) : (
-                <View
-                  style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
-                >
-                  <AppButton
-                    accessibilityLabel="Search destination"
-                    onPress={() => router.push('/home/search')}
-                    style={styles.searchButton}
-                    variant="ghost"
+                <>
+                  <View
+                    style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                   >
-                    <Image
-                      accessibilityLabel="App logo"
-                      contentFit="cover"
-                      source={require('@/assets/images/app-logo.svg')}
-                      style={styles.appLogo}
-                    />
-                    <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                      Search here...
-                    </Text>
-                  </AppButton>
-                  <AppButton
-                    accessibilityLabel="Add credits. Current balance: 24"
-                    onPress={() => router.push('/credits/top-up')}
-                    pressedOpacity={0.68}
-                    style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                    variant="ghost"
-                  >
-                    <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
-                    <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                      <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                    </View>
-                  </AppButton>
-                </View>
+                    <AppButton
+                      accessibilityLabel="Search destination"
+                      onPress={() => router.push('/home/search')}
+                      style={styles.searchButton}
+                      variant="ghost"
+                    >
+                      <Image
+                        accessibilityLabel="App logo"
+                        contentFit="cover"
+                        source={require('@/assets/images/app-logo.svg')}
+                        style={styles.appLogo}
+                      />
+                      <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                        Search here...
+                      </Text>
+                    </AppButton>
+                    <AppButton
+                      accessibilityLabel="Add credits. Current balance: 24"
+                      onPress={() => router.push('/credits/top-up')}
+                      pressedOpacity={0.68}
+                      style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
+                      <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                        <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                      </View>
+                    </AppButton>
+                  </View>
+                  <>
+                    <AppButton
+                      accessibilityLabel="Live streaming"
+                      variant="ghost"
+                      onPress={handleLivestreamPress}
+                      style={[
+                        {
+                          backgroundColor: theme.background,
+                          boxShadow: '0px 4px 12px 1px #ccc',
+                          marginLeft: 'auto',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: Spacing.half,
+                        }
+                      ]}
+                    >
+                      <SymbolView
+                        name={{
+                          android: 'live_tv',
+                          ios: 'dot.radiowaves.left.and.right'
+                        }}
+                        size={24}
+                        tintColor='#ff0000'
+                      />
+                    </AppButton>
+                  </>
+                </>
               )}
             </View>
+            {isHomeSignFilterOpen && !selectedDestination ? (
+              <AppButton
+                accessibilityLabel="Close sign filter menu"
+                onPress={() => setIsHomeSignFilterOpen(false)}
+                style={styles.homeFilterBackdrop}
+                variant="ghost"
+              />
+            ) : null}
+
+            {isHomeSignFilterOpen && !selectedDestination ? (
+              <View
+                style={[
+                  styles.homeFilterCard,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={[styles.homeFilterHeader, { borderBottomColor: theme.border }]}>
+                  <View style={styles.homeFilterTitleRow}>
+                    <MaterialCommunityIcons name="filter-variant" size={16} color={theme.primary} />
+                    <Text style={[styles.homeFilterTitle, { color: theme.text }]}>Sign Filters</Text>
+                  </View>
+                  <AppButton
+                    accessibilityLabel="Toggle all sign categories"
+                    onPress={handleToggleAllCategories}
+                    style={styles.homeFilterToggleAllButton}
+                    variant="ghost"
+                  >
+                    <Text style={[styles.homeFilterToggleAllText, { color: theme.primary }]}>
+                      {selectedSignCategories.size === SIGN_CATEGORIES.length ? 'Clear all' : 'Select all'}
+                    </Text>
+                  </AppButton>
+                </View>
+
+                <View style={styles.homeFilterCategoryList}>
+                  {SIGN_CATEGORIES.map((cat) => {
+                    const isSelected = selectedSignCategories.has(cat.id);
+                    const count = signCategoryCounts[cat.id] ?? 0;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        accessibilityLabel={`${cat.label} signs, ${count} on map, ${isSelected ? 'selected' : 'unselected'}`}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: isSelected }}
+                        onPress={() => handleToggleCategory(cat.id)}
+                        style={({ pressed }) => [
+                          styles.homeFilterRow,
+                          {
+                            backgroundColor: isSelected ? theme.backgroundSelected : 'transparent',
+                            opacity: pressed ? 0.7 : 1,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.homeFilterIconBadge, { backgroundColor: cat.bgColor }]}>
+                          <MaterialCommunityIcons name={cat.icon} size={16} color={cat.color} />
+                        </View>
+                        <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
+                          {cat.label}
+                        </Text>
+                        <View
+                          style={[
+                            styles.homeFilterCheckbox,
+                            isSelected
+                              ? { backgroundColor: cat.color, borderColor: cat.color }
+                              : { backgroundColor: 'transparent', borderColor: theme.border },
+                          ]}
+                        >
+                          {isSelected ? <AntDesign name="check" size={11} color="#FFFFFF" /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
             {!selectedDestination ? (
               <View style={styles.mapActions}>
+                {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
                   accessibilityLabel={
-                    isLocating
-                      ? "Getting current location"
-                      : "Use current location"
+                    isHomeSignFilterOpen
+                      ? "Close sign filter list"
+                      : "Open sign filter list"
                   }
-                  disabled={isLocating}
-                  onPress={handleCurrentLocation}
+                  onPress={() => setIsHomeSignFilterOpen((prev) => !prev)}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
                     {
-                      backgroundColor: theme.backgroundElement,
-                      borderColor: theme.primary,
+                      backgroundColor: isHomeSignFilterOpen
+                        ? theme.backgroundSelected
+                        : theme.backgroundElement,
+                      borderColor: isHomeSignFilterOpen
+                        ? theme.primary
+                        : theme.border,
                     },
                   ]}
                   variant="surface"
+                >
+                  <MaterialCommunityIcons
+                    name="filter-variant"
+                    size={22}
+                    color={isHomeSignFilterOpen ? theme.primary : theme.text}
+                  />
+                  {selectedSignCategories.size < SIGN_CATEGORIES.length ? (
+                    <View
+                      style={[
+                        styles.filterActiveBadge,
+                        { backgroundColor: theme.primary },
+                      ]}
+                    />
+                  ) : null}
+                </AppButton>
+
+                {/* 2. Snap to current location button (replaced previous secondary search button) */}
+                <AppButton
+                  accessibilityLabel={
+                    isLocating
+                      ? "Getting current location"
+                      : "Snap to current location"
+                  }
+                  disabled={isLocating}
+                  onPress={handleCurrentLocation}
+                  style={styles.mapActionButton}
                 >
                   <SymbolView
                     name={{
                       android: "my_location",
                       ios: "location.fill",
                       web: "my_location",
-                    }}
-                    size={22}
-                    tintColor={theme.primary}
-                  />
-                </AppButton>
-                <AppButton
-                  accessibilityLabel="Search destination"
-                  onPress={() => router.push("/home/search")}
-                  style={styles.mapActionButton}
-                >
-                  <SymbolView
-                    name={{
-                      android: "search",
-                      ios: "magnifyingglass",
-                      web: "search",
                     }}
                     size={22}
                     tintColor={theme.onPrimary}
@@ -781,194 +1299,346 @@ export function NavigationMapScreen() {
           style={[
             styles.destinationSheet,
             styles.routeDestinationSheet,
-            { height: sheetHeight },
+            { height: sheetHeightAnim, paddingBottom: bottomInset },
             { backgroundColor: theme.backgroundElement },
           ]}
         >
           <View
             accessible
             accessibilityRole="button"
-            accessibilityLabel={isSheetExpanded ? 'Collapse route details' : 'Expand route details'}
-            accessibilityHint="Drag up to expand or down to collapse. Tap to toggle."
-            accessibilityState={{ expanded: isSheetExpanded }}
+            accessibilityLabel={
+              sheetSnapIndex === 0
+                ? 'Expand route preview'
+                : sheetSnapIndex === 1
+                  ? 'Expand full sign filter list'
+                  : 'Collapse route details'
+            }
+            accessibilityHint="Drag up or down to adjust bottom sheet height. Tap to toggle."
+            accessibilityState={{ expanded: sheetSnapIndex > 0 }}
             accessibilityActions={[{ name: 'activate' }]}
-            onAccessibilityAction={() => animateRouteSheet(!sheetExpandedRef.current)}
+            onAccessibilityAction={() => {
+              const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
+              snapTo(nextIndex);
+            }}
             style={styles.destinationSheetHandleArea}
             {...sheetPanResponder.panHandlers}
           >
             <View style={styles.destinationSheetHandle} />
           </View>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.destinationTitle,
-              !routeStart ? styles.selectedPlaceTitle : undefined,
-              { color: theme.text },
-            ]}
-          >
-            {selectedDestination.title}
-          </Text>
-          {!routeStart && selectedDestination.subtitle ? (
-            <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
-              {selectedDestination.subtitle}
-            </Text>
-          ) : null}
-          {navigationError ? (
-            <Text accessibilityRole="alert" style={styles.navigationError}>
-              {navigationError}
-            </Text>
-          ) : null}
           {routeStart ? (
-            <View style={styles.directionsSection}>
-              {vehicleModes.length > 1 ? (
-                <View style={styles.vehicleModes}>
-                  {vehicleModes.map((mode) => (
-                    <AppButton
-                      key={mode.id}
-                      label={mode.label}
-                      onPress={() => setVehicleMode(mode.id)}
-                      variant={vehicleMode === mode.id ? "primary" : "surface"}
+            /* When starting point and destination have been selected: STRICTLY FOLLOW SCREENSHOT STRUCTURE */
+            <View style={styles.routeSheetContainer}>
+              {/* Header row: X on left, time+distance centred — layout swaps when navigating */}
+              {isNavigating ? (
+                <View style={styles.routeHeaderRowNavigating}>
+                  <AppButton
+                    accessibilityLabel="Stop navigation"
+                    onPress={handleCloseRoute}
+                    style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
+                    variant="ghost"
+                  >
+                    <AntDesign name="close" size={18} color={theme.text} />
+                  </AppButton>
+                  <View style={styles.routeHeaderCentred}>
+                    <Text numberOfLines={1} style={[styles.headerDurationText, { color: theme.text }]}>
+                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
+                    </Text>
+                    {routeDistance !== undefined ? (
+                      <Text style={[styles.headerDistanceText, { color: theme.textSecondary }]}>
+                        {`(${formatRouteDistanceInKilometers(routeDistance)})`}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {/* Spacer to balance the X button */}
+                  <View style={styles.sheetCloseButton} />
+                </View>
+              ) : (
+                <View style={styles.routeHeaderRow}>
+                  <Pressable
+                    accessibilityHint="Tap to change bottom sheet view"
+                    accessibilityLabel="Vehicle mode, duration and distance"
+                    accessibilityRole="button"
+                    onPress={() => {
+                      const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
+                      snapTo(nextIndex);
+                    }}
+                    style={styles.routeHeaderInfo}
+                  >
+                    <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
+                      {vehicleMode === 'BIKE' ? 'Bike' : 'Car'}
+                    </Text>
+                    {routeDuration !== undefined && routeDistance !== undefined ? (
+                      <>
+                        <View style={styles.headerTimeDistanceGroup}>
+                          <Text style={[styles.headerDurationText]}>
+                            {formatRouteDuration(activeDuration)}
+                          </Text>
+                        </View>
+                        <View style={styles.headerTimeDistanceGroup}>
+                          <Text style={[styles.headerDistanceText, { color: theme.textSecondary }]}>
+                            {`(${formatRouteDistanceInKilometers(routeDistance)})`}
+                          </Text>
+                        </View>
+                      </>
+                    ) : null}
+                  </Pressable>
+                  <AppButton
+                    accessibilityLabel="Close route preview"
+                    onPress={handleCloseRoute}
+                    style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
+                    variant="ghost"
+                  >
+                    <AntDesign name="close" size={18} color={theme.text} />
+                  </AppButton>
+                </View>
+              )}
+
+              {/* Vehicle picker: hidden during active navigation */}
+              {!isNavigating ? (
+                <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
+                  <AppButton
+                    accessibilityLabel="Car route"
+                    onPress={() => setVehicleMode('DRIVING')}
+                    style={[
+                      styles.vehicleTabButton,
+                      vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
+                    ]}
+                    variant="ghost"
+                  >
+                    <MaterialCommunityIcons
+                      name="car"
+                      size={24}
+                      color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
                     />
-                  ))}
+                    <Text
+                      style={[
+                        styles.vehicleTabDurationText,
+                        { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                      ]}
+                    >
+                      {routeDuration !== undefined ? formatRouteDuration(carDuration) : '--'}
+                    </Text>
+                    {vehicleMode === 'DRIVING' ? (
+                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </AppButton>
+
+                  <AppButton
+                    accessibilityLabel="Bike route"
+                    onPress={() => setVehicleMode('BIKE')}
+                    style={[
+                      styles.vehicleTabButton,
+                      vehicleMode === 'BIKE' && styles.vehicleTabButtonActive,
+                    ]}
+                    variant="ghost"
+                  >
+                    <MaterialCommunityIcons
+                      name="motorbike"
+                      size={24}
+                      color={vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleTabDurationText,
+                        { color: vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary },
+                      ]}
+                    >
+                      {routeDuration !== undefined ? formatRouteDuration(bikeDuration) : '--'}
+                    </Text>
+                    {vehicleMode === 'BIKE' ? (
+                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </AppButton>
                 </View>
               ) : null}
-              {routeDuration !== undefined && routeDistance !== undefined ? (
-                <Text style={[styles.routeSummary, { color: theme.text }]}>
-                  ETA {formatRouteDuration(routeDuration)} (
-                  {formatRouteDistanceInKilometers(routeDistance)})
+
+              {navigationError ? (
+                <Text accessibilityRole="alert" style={styles.navigationError}>
+                  {navigationError}
                 </Text>
-              ) : (
-                <Text
-                  style={[styles.routeSummary, { color: theme.textSecondary }]}
-                >
-                  Calculating ETA...
-                </Text>
-              )}
-              <Text style={[styles.directionsHeading, { color: theme.text }]}>
-                Sections:
-              </Text>
-              {routeSteps ? (
-                routeSteps.length > 0 ? (
-                  <ScrollView
-                    ref={directionsScrollRef}
-                    contentContainerStyle={styles.directionsList}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                    style={styles.directionsScroll}
+              ) : null}
+
+              {/* Lower content: map sign filters and Go button are hidden in peek mode */}
+              <Animated.View
+                pointerEvents={sheetSnapIndex === 0 ? 'none' : 'auto'}
+                style={[
+                  styles.routeSheetExpandableContent,
+                  { opacity: expandableContentOpacity },
+                ]}
+              >
+                {/* Divider between vehicle tabs and sign filter */}
+                <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+                {/* Sign filter section: filter by WARNING, MANDATORY, PROHIBITORY, INFORMATION, TEMPORARY */}
+                <View style={styles.signFilterHeader}>
+                  <View style={styles.signFilterTitleGroup}>
+                    <MaterialCommunityIcons name="filter-variant" size={18} color={theme.primary} />
+                    <Text style={[styles.signFilterTitle, { color: theme.text }]}>
+                      Filter
+                    </Text>
+                    <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
+                      <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
+                        {filteredSigns.length}/{signsWithSamples.length}
+                      </Text>
+                    </View>
+                  </View>
+                  <AppButton
+                    accessibilityLabel="Toggle all sign categories"
+                    onPress={handleToggleAllCategories}
+                    style={styles.toggleAllButton}
+                    variant="ghost"
                   >
-                    {routeSteps.map((step, index) => {
-                      const isActiveStep = isNavigating && activeManeuver?.stepIndex === index;
-                      return (
+                    <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                      {selectedSignCategories.size === SIGN_CATEGORIES.length ? 'Clear all' : 'Select all'}
+                    </Text>
+                  </AppButton>
+                </View>
+
+                <ScrollView
+                  contentContainerStyle={styles.signFilterListContainer}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                  style={styles.signFilterScrollView}
+                >
+                  {SIGN_CATEGORIES.map((cat) => {
+                    const isSelected = selectedSignCategories.has(cat.id);
+                    const count = signCategoryCounts[cat.id] ?? 0;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        accessibilityLabel={`${cat.label} signs filter, ${count} signs on map, ${isSelected ? 'enabled' : 'disabled'}`}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: isSelected }}
+                        onPress={() => handleToggleCategory(cat.id)}
+                        style={({ pressed }) => [
+                          styles.signFilterCard,
+                          {
+                            backgroundColor: isSelected
+                              ? theme.backgroundSelected
+                              : theme.backgroundElement,
+                            borderColor: isSelected ? cat.color : theme.border,
+                            opacity: pressed ? 0.75 : 1,
+                          },
+                        ]}
+                      >
+                        <View style={[styles.signCatIconBadge, { backgroundColor: cat.bgColor }]}>
+                          <MaterialCommunityIcons name={cat.icon} size={22} color={cat.color} />
+                        </View>
+                        <View style={styles.signCatInfo}>
+                          <View style={styles.signCatTitleRow}>
+                            <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                              {cat.label}
+                            </Text>
+                            <View
+                              style={[
+                                styles.signCountBadge,
+                                { backgroundColor: isSelected ? cat.color : theme.border },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.signCountText,
+                                  { color: isSelected ? '#FFFFFF' : theme.textSecondary },
+                                ]}
+                              >
+                                {count}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text numberOfLines={1} style={[styles.signCatSublabel, { color: theme.textSecondary }]}>
+                            {cat.sublabel}
+                          </Text>
+                        </View>
                         <View
-                          key={`${index}-${step.maneuver.type}-${step.name}`}
-                          onLayout={(e) => {
-                            stepLayoutOffsets.current[index] = e.nativeEvent.layout.y;
-                          }}
                           style={[
-                            styles.directionRow,
-                            isActiveStep && styles.directionRowActive,
-                            isActiveStep && { backgroundColor: theme.backgroundSelected },
+                            styles.signCatCheckbox,
+                            isSelected
+                              ? { backgroundColor: cat.color, borderColor: cat.color }
+                              : { backgroundColor: 'transparent', borderColor: theme.border },
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.directionNumber,
-                              { color: isActiveStep ? theme.primary : theme.textSecondary },
-                            ]}
-                          >
-                            {index + 1}
-                          </Text>
-                          <View style={styles.directionCopy}>
-                            <Text
-                              style={[
-                                styles.directionInstruction,
-                                { color: theme.text },
-                                isActiveStep && styles.directionInstructionActive,
-                              ]}
-                            >
-                              {formatRouteInstruction(step)}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.directionDistance,
-                                { color: theme.textSecondary },
-                              ]}
-                            >
-                              {formatRouteDistance(step.distance)}
-                            </Text>
-                          </View>
+                          {isSelected ? (
+                            <AntDesign name="check" size={14} color="#FFFFFF" />
+                          ) : null}
                         </View>
-                      );
-                    })}
-                  </ScrollView>
-                ) : (
-                  <Text
-                    style={[
-                      styles.directionsStatus,
-                      { color: theme.textSecondary },
-                    ]}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </Animated.View>
+
+              {/* Start button — hidden during active navigation */}
+              {!isNavigating ? (
+                <View style={styles.sheetBottomButtonRow}>
+                  <AppButton
+                    accessibilityLabel={
+                      isStartingNavigation
+                        ? "Starting navigation"
+                        : "Begin navigation"
+                    }
+                    disabled={isStartingNavigation}
+                    onPress={handleBeginNavigation}
+                    style={styles.bottomGoButton}
                   >
-                    No turn-by-turn directions are available for this route.
-                  </Text>
-                )
-              ) : (
-                <Text
-                  style={[
-                    styles.directionsStatus,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  Loading directions...
-                </Text>
-              )}
+                    <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
+                      {isStartingNavigation ? "Starting..." : "Start"}
+                    </Text>
+                  </AppButton>
+                </View>
+              ) : null}
             </View>
-          ) : null}
-          <View style={styles.destinationActions}>
-            <AppButton
-              accessibilityLabel={
-                isNavigating
-                  ? "Navigation active"
-                  : routeStart
-                    ? "Begin navigation"
-                    : "Start route"
-              }
-              disabled={isNavigating || isStartingNavigation}
-              label={
-                isNavigating
-                  ? "Navigating..."
-                  : isStartingNavigation
-                    ? "Starting..."
-                    : "Go"
-              }
-              onPress={routeStart ? handleBeginNavigation : handleGo}
-              style={[styles.goButton, !routeStart ? styles.destinationActionButton : undefined]}
-            />
-            {!routeStart ? (
-              <AppButton
-                accessibilityLabel={`Share ${selectedDestination.title}`}
-                label="Share"
-                onPress={async () => {
-                  try {
-                    const [longitude, latitude] = selectedDestination.coordinate;
-                    await Share.share({
-                      title: selectedDestination.title,
-                      message: `${selectedDestination.title}\nhttps://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
-                    });
-                  } catch {
-                    setLocationToast((current) => ({
-                      id: (current?.id ?? 0) + 1,
-                      message: 'Unable to share this destination right now.',
-                    }));
-                  }
-                }}
-                style={[styles.destinationActionButton, {
-                  backgroundColor: theme.backgroundSelected, borderColor: 'transparent',
-                }]}
-                textStyle={{ color: theme.textSecondary }}
-                variant="surface"
-              />
-            ) : null}
-          </View>
+          ) : (
+            /* Destination selected, no start selected yet */
+            <>
+              <Text
+                numberOfLines={1}
+                style={[styles.destinationTitle, styles.selectedPlaceTitle, { color: theme.text }]}
+              >
+                {selectedDestination.title}
+              </Text>
+              {selectedDestination.subtitle ? (
+                <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+                  {selectedDestination.subtitle}
+                </Text>
+              ) : null}
+              {navigationError ? (
+                <Text accessibilityRole="alert" style={styles.navigationError}>
+                  {navigationError}
+                </Text>
+              ) : null}
+              <View style={styles.destinationActions}>
+                <AppButton
+                  accessibilityLabel="Start route"
+                  disabled={isStartingNavigation}
+                  label={isStartingNavigation ? "Starting..." : "Start route"}
+                  onPress={handleGo}
+                  style={[styles.goButton, styles.destinationActionButton]}
+                />
+                <AppButton
+                  accessibilityLabel={`Share ${selectedDestination.title}`}
+                  label="Share"
+                  onPress={async () => {
+                    try {
+                      const [longitude, latitude] = selectedDestination.coordinate;
+                      await Share.share({
+                        title: selectedDestination.title,
+                        message: `${selectedDestination.title}\nhttps://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+                      });
+                    } catch {
+                      setLocationToast((current) => ({
+                        id: (current?.id ?? 0) + 1,
+                        message: 'Unable to share this destination right now.',
+                      }));
+                    }
+                  }}
+                  style={[styles.destinationActionButton, {
+                    backgroundColor: theme.backgroundSelected, borderColor: 'transparent',
+                  }]}
+                  textStyle={{ color: theme.textSecondary }}
+                  variant="surface"
+                />
+              </View>
+            </>
+          )}
         </Animated.View>
       ) : null}
       {locationToast ? (
@@ -1003,12 +1673,6 @@ function formatManeuverDistance(distanceInMeters: number) {
   if (distanceInMeters < 20) return "Now";
   if (distanceInMeters < 1000)
     return `${Math.max(10, Math.round(distanceInMeters / 10) * 10)} m`;
-
-  return `${(distanceInMeters / 1000).toFixed(1)} km`;
-}
-
-function formatRouteDistance(distanceInMeters: number) {
-  if (distanceInMeters < 1000) return `${Math.round(distanceInMeters)} m`;
 
   return `${(distanceInMeters / 1000).toFixed(1)} km`;
 }
@@ -1109,10 +1773,12 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   destinationSheetHandleArea: {
-    minHeight: 44,
+    minHeight: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.one,
+    paddingVertical: 6,
+    paddingTop: 8,
+    marginBottom: 4,
   },
   destinationActions: {
     flexDirection: 'row',
@@ -1139,6 +1805,65 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+  },
+  upcomingSignsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: Spacing.three,
+    // SafeAreaView handles top inset; offset = banner marginTop(8) + minHeight(88) + paddingVertical(12) + gap(8)
+    marginTop: 116,
+  },
+  upcomingSignsPanel: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.one,
+    gap: 4,
+    width: 160,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  upcomingSignsPanelLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 4,
+    paddingBottom: 2,
+  },
+  upcomingSignRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  upcomingSignImage: {
+    width: 36,
+    height: 36,
+    borderRadius: Rounded.sm,
+    flexShrink: 0,
+  },
+  upcomingSignInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  upcomingSignName: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  upcomingSignDist: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 14,
   },
   map: {
     flex: 1,
@@ -1173,6 +1898,105 @@ const styles = StyleSheet.create({
   },
   locationActionButton: {
     borderWidth: 1,
+  },
+  filterActiveBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  homeFilterBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "transparent",
+  },
+  homeFilterCard: {
+    position: "absolute",
+    right: Spacing.four,
+    bottom: 124,
+    width: 260,
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    padding: Spacing.two,
+    shadowColor: "#09233C",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  homeFilterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: Spacing.one,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.one,
+  },
+  homeFilterTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.half,
+  },
+  homeFilterTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  homeFilterToggleAllButton: {
+    minHeight: 24,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 0,
+  },
+  homeFilterToggleAllText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  homeFilterCategoryList: {
+    gap: 4,
+  },
+  homeFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: Rounded.md,
+    gap: Spacing.one,
+  },
+  homeFilterIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  homeFilterRowLabel: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  homeFilterCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Rounded.round,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  homeFilterCountText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  homeFilterCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   routeInputGroup: {
     gap: Spacing.one,
@@ -1339,8 +2163,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Rounded.xlg,
     borderTopRightRadius: Rounded.xlg,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.one,
-    paddingBottom: Spacing.three,
+    paddingTop: 0,
+    paddingBottom: Spacing.two,
     shadowColor: '#09233C',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.12,
@@ -1427,26 +2251,258 @@ const styles = StyleSheet.create({
   },
   directionInstruction: {
     fontFamily: Fonts.body,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 700,
-    lineHeight: 18,
+    lineHeight: 22,
   },
   directionDistance: {
     fontFamily: Fonts.body,
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: 600,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   directionsStatus: {
     fontFamily: Fonts.body,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 600,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   goButton: {
     flex: 1,
     alignSelf: "stretch",
     borderRadius: Rounded.round,
+  },
+  routeSheetContainer: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  routeSheetExpandableContent: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  routeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.half,
+  },
+  routeHeaderRowNavigating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.half,
+  },
+  routeHeaderCentred: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: Spacing.one,
+  },
+  routeHeaderTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  routeHeaderInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.one,
+    flexWrap: 'wrap',
+  },
+  headerTimeDistanceGroup: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.half,
+    marginLeft: Spacing.one,
+  },
+  headerDurationText: {
+    fontFamily: Fonts.body,
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  headerDistanceText: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sheetCloseButton: {
+    width: 36,
+    height: 36,
+    minHeight: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginLeft: Spacing.two,
+  },
+  vehicleTabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.two,
+  },
+  vehicleTabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.one,
+    minHeight: 46,
+    position: 'relative',
+    borderRadius: 0,
+  },
+  vehicleTabButtonActive: {},
+  vehicleTabDurationText: {
+    fontFamily: Fonts.body,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  vehicleTabActiveLine: {
+    position: 'absolute',
+    bottom: -StyleSheet.hairlineWidth,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: Spacing.two,
+  },
+  signFilterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.one,
+  },
+  signFilterTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  signFilterTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  signFilterTotalBadge: {
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 2,
+    borderRadius: Rounded.round,
+    marginLeft: Spacing.half,
+  },
+  signFilterTotalText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  toggleAllButton: {
+    minHeight: 32,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 2,
+  },
+  toggleAllText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  signFilterScrollView: {
+    flex: 1,
+    minHeight: 0,
+  },
+  signFilterListContainer: {
+    gap: Spacing.two,
+    paddingVertical: Spacing.half,
+    paddingRight: Spacing.half,
+  },
+  signFilterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Rounded.lg,
+    borderWidth: 1.5,
+    minHeight: 58,
+    gap: Spacing.two,
+  },
+  signCatIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signCatInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  signCatTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  signCatLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  signCatSublabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  signCountBadge: {
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 1,
+    borderRadius: Rounded.round,
+    minWidth: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signCountText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  signCatCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetBottomButtonRow: {
+    paddingTop: Spacing.two,
+    marginTop: 'auto',
+  },
+  bottomGoButton: {
+    alignSelf: 'stretch',
+    minHeight: 52,
+    borderRadius: Rounded.round,
+  },
+  goButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+  },
+  goButtonLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '800',
   },
   creditPill: {
     alignSelf: "flex-end",

@@ -2,7 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
-  reportCannotIdentifySign, reportSignCandidate, undoVoteOnCandidate,
+  reportSignCandidate, undoVoteOnCandidate, skipSign
 } from '@/api/reviews/review';
 import { getCatalog } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
@@ -69,15 +69,15 @@ export function useCastVoteOnSignCandidate() {
     castVoteOnSignCandidate(params, request, token, signal));
 }
 
+
 export function useReportSignCandidate() {
   return useReviewMutation(({ params, request, signal }: { params: CandidateReportParams; request: ReportDto; signal?: AbortSignal }, token) =>
     reportSignCandidate(params, request, token, signal));
 }
 
-// No matching UI action is defined yet; do not map a general decline to this report.
-export function useReportCannotIdentifySign() {
+export function useSkipSign() {
   return useReviewMutation(({ params, signal }: { params: CannotIdentifySignReportParams; signal?: AbortSignal }, token) =>
-    reportCannotIdentifySign(params, token, signal));
+    skipSign(params, token, signal));
 }
 
 export function useUndoVoteOnCandidate() {
