@@ -63,7 +63,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
 
   return (
     <SafeAreaView
-      edges={[]}
+      edges={['bottom']}
       style={[
         styles.safeArea,
         {
@@ -100,17 +100,27 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
               style={styles.tab}
               variant="ghost"
             >
-              <View style={[styles.iconCircle, isActive ? styles.activeIconContent : undefined]}>
-              <SymbolView
-                fallback={
-                  <Text style={[styles.iconFallback, { color: isActive ? theme.onPrimary : theme.text }]}>
-                    {tab.fallbackLabel}
-                  </Text>
-                }
-                name={tab.symbol}
-                size={18}
-                tintColor={isActive ? theme.onPrimary : theme.text}
-              />
+              <View
+                style={[
+                  styles.iconCircle,
+                  isActive && styles.activeIconContent,
+                ]}
+              >
+                <SymbolView
+                  fallback={
+                    <Text
+                      style={[
+                        styles.iconFallback,
+                        { color: isActive ? theme.onPrimary : theme.text },
+                      ]}
+                    >
+                      {tab.fallbackLabel}
+                    </Text>
+                  }
+                  name={tab.symbol}
+                  size={isActive ? 22 : 20}
+                  tintColor={isActive ? theme.onPrimary : theme.text}
+                />
               </View>
               <Text style={[styles.label, { color: isActive ? theme.primary : theme.text }]}>
                 {tab.label}
@@ -129,7 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   container: {
-    height: 50,
+    height: 58,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
