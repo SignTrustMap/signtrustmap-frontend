@@ -4,7 +4,6 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   MagnifyingGlass,
-  Compass,
   X,
   Stack,
   FunnelSimple,
@@ -14,8 +13,13 @@ import {
   Copy,
   Check,
   NavigationArrow,
+  Flag,
+  UploadSimple,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
+import { Modal } from '@/components/common/Modal'
 import { mockSigns, signCategories, type SignItem } from '@/data'
 
 // Fix Leaflet default marker icons in bundler
@@ -28,7 +32,17 @@ L.Icon.Default.mergeOptions({
 
 export default function ProductMap() {
   const { isDark } = useTheme()
+  const { user, isAuthenticated } = useAuth()
+  const toast = useToast()
   const { t } = useTranslation('product')
+  const isDriver = isAuthenticated && user?.role === 'driver'
+
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [issueType, setIssueType] = useState('damaged')
+  const [issueDesc, setIssueDesc] = useState('')
+  const [issuePhotoPreview, setIssuePhotoPreview] = useState<string | null>(null)
+  const [isReporting, setIsReporting] = useState(false)
+
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
@@ -292,18 +306,6 @@ export default function ProductMap() {
         {/* ─── Page Header (Strictly styled like ProfilePage.tsx) ───────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10 text-left">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                  isDark
-                    ? 'bg-[#007b8b]/20 border-[#00c4de]/30 text-[#00c4de]'
-                    : 'bg-teal-50 border-teal-200 text-[#007b8b]'
-                }`}
-              >
-                <Compass size={14} weight="bold" />
-                <span>{t('map_page.standards_qcvn')}</span>
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
               {t('map_page.title')}
             </h1>
@@ -734,11 +736,197 @@ export default function ProductMap() {
                     )}
                   </button>
                 </div>
+
+                {/* Driver-exclusive Report Sign Issue Button */}
+                {isDriver ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsReportModalOpen(true)}
+                    className="w-full mt-3 py-2 px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Flag size={14} weight="bold" />
+                    <span>{t('map_page.btn_report_issue')}</span>
+                  </button>
+                ) : !isAuthenticated ? (
+                  <div className="mt-2.5 pt-2 border-t border-gray-200 dark:border-white/10 text-center">
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      💡 {t('map_page.login_driver_hint')}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* ─── Driver Report Sign Issue Modal ──────────────────────────── */}
+      {selectedSign && (
+        <Modal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          maxWidth="max-w-md"
+        >
+          <div
+            className={`w-full rounded-2xl border p-5 sm:p-6 shadow-2xl relative transition-colors ${
+              isDark ? 'bg-[#071317] border-white/15 text-white' : 'bg-white border-[#E8E4E3] text-gray-900'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-gray-200 dark:border-white/10">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono font-extrabold text-xs px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                    {selectedSign.code}
+                  </span>
+                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                    {t('map_page.report_modal.subtitle')}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {selectedSign.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                setIsReporting(true)
+                await new Promise((r) => setTimeout(r, 600))
+                setIsReporting(false)
+                setIsReportModalOpen(false)
+                setIssueDesc('')
+                setIssuePhotoPreview(null)
+                toast.success(
+                  t('map_page.report_modal.toast_success', { code: selectedSign.code })
+                )
+              }}
+              className="mt-4 space-y-3.5 text-xs"
+            >
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                  {t('map_page.report_modal.type_label')} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={issueType}
+                  onChange={(e) => setIssueType(e.target.value)}
+                  className={`w-full px-3 py-2 text-xs font-semibold rounded-xl border focus:outline-none ${
+                    isDark
+                      ? 'bg-[#030708] border-white/15 text-white'
+                      : 'bg-white border-gray-300 text-gray-800'
+                  }`}
+                >
+                  <option value="damaged">{t('map_page.report_modal.type_damaged')}</option>
+                  <option value="obstructed">{t('map_page.report_modal.type_obstructed')}</option>
+                  <option value="missing">{t('map_page.report_modal.type_missing')}</option>
+                  <option value="wrong_location">{t('map_page.report_modal.type_wrong_location')}</option>
+                  <option value="wrong_type">{t('map_page.report_modal.type_wrong_type')}</option>
+                  <option value="other">{t('map_page.report_modal.type_other')}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                  {t('map_page.report_modal.desc_label')} <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={issueDesc}
+                  onChange={(e) => setIssueDesc(e.target.value)}
+                  placeholder={t('map_page.report_modal.desc_placeholder')}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none ${
+                    isDark
+                      ? 'bg-[#030708] border-white/15 text-white placeholder:text-gray-500'
+                      : 'bg-white border-gray-300 text-gray-800 placeholder:text-gray-400'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                  {t('map_page.report_modal.photo_label')}
+                </label>
+                <div
+                  className={`border border-dashed rounded-xl p-3 text-center cursor-pointer relative ${
+                    isDark ? 'border-white/20 bg-white/5' : 'border-gray-300 bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) {
+                        const reader = new FileReader()
+                        reader.onload = () => setIssuePhotoPreview(reader.result as string)
+                        reader.readAsDataURL(f)
+                      }
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  {issuePhotoPreview ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <img src={issuePhotoPreview} alt="Preview" className="h-14 rounded object-cover" />
+                      <span className="text-emerald-500 font-bold">{t('map_page.report_modal.photo_attached')}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <UploadSimple size={18} className="text-amber-500" />
+                      <span>{t('map_page.report_modal.photo_cta')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-black/20 border border-white/10 text-[11px] text-gray-400 space-y-0.5">
+                <div>
+                  {t('map_page.report_modal.auto_coords', {
+                    lat: selectedSign.lat.toFixed(5),
+                    lng: selectedSign.lng.toFixed(5),
+                  })}
+                </div>
+                <div>
+                  {t('map_page.report_modal.auto_sign_id', { id: selectedSign.id })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="px-3 py-1.5 font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  {t('map_page.report_modal.btn_cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isReporting || !issueDesc.trim()}
+                  className={`px-4 py-2 rounded-xl font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 ${
+                    isDark
+                      ? 'bg-amber-400 hover:bg-amber-300 text-black disabled:opacity-40'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40'
+                  }`}
+                >
+                  <Flag size={13} weight="bold" />
+                  <span>
+                    {isReporting
+                      ? t('map_page.report_modal.btn_submitting')
+                      : t('map_page.report_modal.btn_submit')}
+                  </span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -29,6 +29,7 @@ export interface DataFilterBarProps {
   selectedSort?: string
   onSelectSort?: (id: string) => void
 
+  children?: React.ReactNode
   className?: string
 }
 
@@ -42,6 +43,7 @@ export function DataFilterBar({
   sortOptions = [],
   selectedSort,
   onSelectSort,
+  children,
   className = '',
 }: DataFilterBarProps) {
   const { t } = useTranslation('common')
@@ -50,10 +52,10 @@ export function DataFilterBar({
 
   return (
     <div className={`space-y-3.5 ${className}`}>
-      {/* Top row: Search input + Custom Sort Dropdown */}
+      {/* Top row: Search input + Controls (Sort Dropdown, Custom Selects, View toggles via children) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Search Input */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <MagnifyingGlass
             size={16}
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none"
@@ -81,20 +83,25 @@ export function DataFilterBar({
           )}
         </div>
 
-        {/* Normal Standard Sort Dropdown */}
-        {sortOptions.length > 0 && selectedSort && onSelectSort && (
-          <div className="shrink-0">
-            <CustomSelect
-              prefixLabel={t('common.sort_prefix')}
-              options={sortOptions.map((opt) => ({
-                value: opt.id,
-                label: opt.label,
-              }))}
-              value={selectedSort}
-              onChange={onSelectSort}
-              size="sm"
-              className="min-w-[175px]"
-            />
+        {/* Right side controls (Sort dropdown + custom children) */}
+        {(children || (sortOptions.length > 0 && selectedSort && onSelectSort)) && (
+          <div className="flex flex-wrap items-center gap-2.5 self-end sm:self-auto shrink-0">
+            {sortOptions.length > 0 && selectedSort && onSelectSort && (
+              <div className="shrink-0 min-w-[160px]">
+                <CustomSelect
+                  prefixLabel={t('common.sort_prefix')}
+                  options={sortOptions.map((opt) => ({
+                    value: opt.id,
+                    label: opt.label,
+                  }))}
+                  value={selectedSort}
+                  onChange={onSelectSort}
+                  size="sm"
+                  className="min-w-[175px]"
+                />
+              </div>
+            )}
+            {children}
           </div>
         )}
       </div>

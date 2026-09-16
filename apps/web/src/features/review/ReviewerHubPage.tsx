@@ -68,18 +68,6 @@ export function ReviewerHubPage() {
         {/* ─── 1. Page Header ─────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-white/10 text-left">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                  isDark
-                    ? 'bg-[#00c4de]/15 border-[#00c4de]/30 text-[#00c4de]'
-                    : 'bg-teal-50 border-teal-200 text-[#007b8b]'
-                }`}
-              >
-                <Sparkle size={14} weight="fill" />
-                <span>SignTrustMap Reviewer • QCVN 41:2019</span>
-              </span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
               {t('reviewer.hub_title')}
             </h1>

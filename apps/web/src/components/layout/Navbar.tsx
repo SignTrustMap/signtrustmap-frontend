@@ -276,14 +276,23 @@ export function Navbar() {
               >
                 📖 {t('nav.catalog')}
               </Link>
-              {isAuthenticated && (user?.role === 'surveyor' || user?.role === 'reviewer') && (
-                <Link
-                  to="/survey"
-                  onClick={() => setMobileOpen(false)}
-                  className="px-3 py-2 text-sm font-semibold rounded-xl hover:bg-white/10"
-                >
-                  📹 {t('nav.survey_studio')}
-                </Link>
+              {isAuthenticated && user?.role === 'surveyor' && (
+                <>
+                  <Link
+                    to="/survey"
+                    onClick={() => setMobileOpen(false)}
+                    className="px-3 py-2 text-sm font-semibold rounded-xl hover:bg-white/10"
+                  >
+                    📹 {t('nav.survey_studio')}
+                  </Link>
+                  <Link
+                    to="/survey/revalidation"
+                    onClick={() => setMobileOpen(false)}
+                    className="px-3 py-2 text-sm font-semibold rounded-xl hover:bg-white/10"
+                  >
+                    🔄 {t('nav.survey_revalidation')}
+                  </Link>
+                </>
               )}
               {isAuthenticated && user?.role === 'reviewer' && (
                 <Link
@@ -294,7 +303,7 @@ export function Navbar() {
                   ⚖️ {t('nav.review_queue')}
                 </Link>
               )}
-              {isAuthenticated && user?.role !== 'staff' && user?.role !== 'admin' && (
+              {isAuthenticated && ['driver', 'surveyor', 'reviewer'].includes(user?.role || '') && (
                 <Link
                   to="/wallet"
                   onClick={() => setMobileOpen(false)}

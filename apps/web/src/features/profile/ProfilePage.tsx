@@ -511,7 +511,7 @@ export default function ProfilePage() {
                 {/* 1. Driver Workspace (Driver / Default) */}
                 {(!user.role || user.role === 'driver') && (
                   <Link
-                    to="/driver"
+                    to="/product/map"
                     className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 group ${
                       isDark
                         ? 'bg-white/[0.02] border-white/10 hover:border-[#00c4de]/50 hover:bg-white/[0.04]'

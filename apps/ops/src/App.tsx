@@ -9,7 +9,10 @@ import {
   AdminGuard,
   StaffGuard,
   LoginPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
   NotAllowedPage,
+  NotFound404Page,
   DashboardPage,
   UsersPage,
   RolesPage,
@@ -58,7 +61,14 @@ function ProtectedLayout() {
 
           {/* ─── Traffic Sign Governance (Admin / Staff Accessible) ── */}
           <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/catalog/new-types" element={<MissingSignsPage />} />
+          <Route
+            path="/catalog/new-types"
+            element={
+              <StaffGuard>
+                <MissingSignsPage />
+              </StaffGuard>
+            }
+          />
           <Route path="/catalog/missing-types" element={<Navigate to="/catalog/new-types" replace />} />
           <Route
             path="/spatial-data"
@@ -124,7 +134,11 @@ function ProtectedLayout() {
           {/* ─── Data Export ───────────────────────────────────────── */}
           <Route
             path="/exports"
-            element={<SpatialDataExportPage />}
+            element={
+              <AdminGuard>
+                <SpatialDataExportPage />
+              </AdminGuard>
+            }
           />
 
           {/* ─── System Configuration & Audit ──────────────────────── */}
@@ -191,8 +205,10 @@ function ProtectedLayout() {
             }
           />
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Error Routes & Catch-all (Rendered within AppShell right viewport, keeping left sidebar intact) */}
+          <Route path="/403" element={<NotAllowedPage />} />
+          <Route path="/404" element={<NotFound404Page />} />
+          <Route path="*" element={<NotFound404Page />} />
         </Routes>
       </AppShell>
     </AuthGuard>
@@ -208,7 +224,8 @@ export default function App() {
             <SidebarProvider>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/403" element={<NotAllowedPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/*" element={<ProtectedLayout />} />
               </Routes>
             </SidebarProvider>

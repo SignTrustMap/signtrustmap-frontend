@@ -201,8 +201,8 @@
     "lbl_closest_catalog": "Closest Standard Catalog Signs:",
     "lbl_road_location": "Field Location & Coordinates:",
     "lbl_ai_confidence": "AI Detection Confidence:",
-    "modal_merge_title": "Merge Proposal with Existing Catalog Sign",
-    "modal_merge_desc": "If this report matches an existing sign in the catalog under a different temporary name, select it to merge:",
+    "modal_merge_title": "Match Report to Existing Catalog Sign",
+    "modal_merge_desc": "If this report matches an existing sign in the catalog under a different temporary name, select it to resolve:",
     "modal_escalate_title": "Escalate to Admin for Catalog Addition",
     "modal_escalate_desc": "Forward this report to Admin for consideration in the next catalog release and AI model synchronization.",
     "lbl_staff_notes": "Staff Recommendations & Notes:",
@@ -211,14 +211,14 @@
     "reason_not_sign": "Not a valid traffic sign (billboard, obstruction, tree...)",
     "reason_blurred": "Blurred image or taken too far away",
     "reason_duplicate": "Duplicate report with an existing proposal",
-    "btn_confirm_merge": "Confirm Merge",
+    "btn_confirm_merge": "Confirm Match with this Sign",
     "btn_confirm_escalate": "Escalate to Admin",
     "btn_confirm_reject": "Confirm Rejection",
     "btn_cancel": "Cancel",
-    "toast_merged": "Merged report {{id}} into {{code}}.",
+    "toast_merged": "Matched report {{id}} to {{code}} successfully.",
     "toast_escalated": "Escalated proposal {{id}} to Admin for Catalog inclusion.",
     "toast_rejected": "Rejected report {{id}} ({{reason}}).",
-    "label_merged_prefix": "Merged into:",
+    "label_merged_prefix": "Matched to:",
     "label_pending_admin": "[Pending Admin]",
     "label_rejected": "[Rejected]",
     "toast_processed": "Processed proposal {{id}}: {{action}}"
@@ -1099,10 +1099,11 @@
     "empty_state": "No audit logs found matching the filter."
   },
   "not_allowed": {
-    "title": "Access Denied",
-    "desc": "This page requires Administrator privileges.",
+    "title": "We are Sorry...",
+    "desc": "The page you're trying to access has restricted access. Please contact your system administrator.",
     "account": "Account",
-    "btn_back": "Back to Operations",
+    "btn_back": "Go Back",
+    "btn_home": "Back to Dashboard",
     "btn_contact": "Contact Admin",
     "badge_forbidden": "403 • Access Forbidden",
     "badge_sod": "Separation of Duties (SoD)",
@@ -1125,5 +1126,11 @@
   "profile": {
     "admin_role_desc": "Comprehensive System Administration",
     "staff_role_desc": "Operations & Data Verification"
+  },
+  "not_found_404": {
+    "title": "Page Not Found...",
+    "desc": "The page you are looking for does not exist or has been moved.",
+    "btn_home": "Back to Dashboard",
+    "btn_back": "Go Back"
   }
 }

@@ -39,6 +39,9 @@ export { default as ReportsPage } from './reports/ReportsPage'
 
 // Authentication & Access Control
 export { default as LoginPage } from './auth/LoginPage'
+export { default as ForgotPasswordPage } from './auth/ForgotPasswordPage'
+export { default as ResetPasswordPage } from './auth/ResetPasswordPage'
 export { default as NotAllowedPage } from './auth/NotAllowedPage'
+export { default as NotFound404Page } from './auth/NotFound404Page'
 export * from './auth/Guards'
 export * from './auth/AuthContext'
