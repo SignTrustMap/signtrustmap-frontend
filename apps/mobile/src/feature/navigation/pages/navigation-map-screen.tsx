@@ -10,7 +10,6 @@ import { Image } from "expo-image";
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
-import { NavigationSignAlertBanner } from "@/components/navigation-sign-alert-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
@@ -20,6 +19,7 @@ import {
   type MapCoordinate,
 } from "@/feature/navigation/data/navigation-locations";
 import { useTheme } from "@/hooks/use-theme";
+import { useNavigationActive } from "@/context/navigation-active-provider";
 
 import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
@@ -184,6 +184,7 @@ export function getSignCategory(sign: { signCode?: string; name?: string }): Sig
 
 export function NavigationMapScreen() {
   const router = useRouter();
+  const { setNavigationActive } = useNavigationActive();
   const {
     destinationId,
     destinationLat,
@@ -251,6 +252,17 @@ export function NavigationMapScreen() {
     selectedStart?.title ??
     (gpsStart ? "Current Location" : undefined);
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
+  const [navigationSession, setNavigationSession] = useState<{
+    hasLiveLocation: boolean;
+    routeKey: string;
+  }>();
+  const routeKey =
+    selectedDestination && routeStart
+      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
+      : undefined;
+  const isNavigating = Boolean(
+    routeKey && navigationSession?.routeKey === routeKey,
+  );
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(Spacing.two, insets.bottom);
   const [sheetSnapIndex, setSheetSnapIndex] = useState<0 | 1 | 2>(1);
@@ -259,11 +271,13 @@ export function NavigationMapScreen() {
   const stepLayoutOffsets = useRef<number[]>([]);
 
   // 3 collapse ranges:
-  // 0: Peek range (displays vehicle mode, ETA, distance, close button, vehicle mode tabs, and Start button)
+  // 0: Peek range (navigation: compact bar with X + ETA; non-navigation: vehicle mode, ETA, distance)
   // 1: Mid range (standard preview with vehicle tabs, filters preview, and Start button)
   // 2: Full range (expanded view showing the full sign filter list and Start button)
   const peekSheetHeight = routeStart
-    ? 188 + bottomInset
+    ? isNavigating
+      ? 80 + bottomInset   // navigation mode: compact bar (handle + header row only)
+      : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
     : Math.min(180, windowHeight * 0.22);
   const midSheetHeight = routeStart
     ? Math.min(420, windowHeight * 0.52)
@@ -410,15 +424,6 @@ export function NavigationMapScreen() {
   }, [destinationId, sheetSnapIndex, snapTo]);
 
   useEffect(() => () => sheetHeightAnim.stopAnimation(), [sheetHeightAnim]);
-  const routeKey =
-    selectedDestination && routeStart
-      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
-      : undefined;
-
-  const [navigationSession, setNavigationSession] = useState<{
-    hasLiveLocation: boolean;
-    routeKey: string;
-  }>();
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locationToast, setLocationToast] = useState<{
@@ -461,9 +466,12 @@ export function NavigationMapScreen() {
   const carDuration = vehicleMode === "DRIVING" ? baseDuration : Math.round(baseDuration * 1.18);
   const bikeDuration = vehicleMode === "BIKE" ? baseDuration : Math.max(60, Math.round(baseDuration * 0.85));
   const activeDuration = vehicleMode === "DRIVING" ? carDuration : bikeDuration;
-  const isNavigating = Boolean(
-    routeKey && navigationSession?.routeKey === routeKey,
-  );
+
+  // Sync navigation state with tab bar visibility context
+  useEffect(() => {
+    setNavigationActive(isNavigating);
+    return () => setNavigationActive(false);
+  }, [isNavigating, setNavigationActive]);
 
   // Automatically reduce the bottom sheet to peek range (vehicle mode, ETA & distance) when navigating
   useEffect(() => {
@@ -622,6 +630,29 @@ export function NavigationMapScreen() {
     userCoordinate: userCoordinate ?? routeStart,
     speechLanguage: "en-US",
   });
+
+  // 3 nearest upcoming signs on the route, ahead of the user's current position
+  const upcomingSignsOnRoute = useMemo(() => {
+    if (!isNavigating || !routeCoordinates || filteredSigns.length === 0) return [];
+    const navigationCoordinate = userCoordinate ?? routeStart;
+    if (!navigationCoordinate) return [];
+    const userProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
+    const signsAhead = filteredSigns
+      .filter((sign) => sign.coordinate)
+      .map((sign) => {
+        const signProgress = getRouteProgressMeters(
+          sign.coordinate as [number, number],
+          routeCoordinates,
+        );
+        const distanceMeters = Math.max(0, signProgress - userProgress);
+        return { ...sign, distanceMeters };
+      })
+      .filter((sign) => sign.distanceMeters > 5)
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+      .slice(0, 3);
+    return signsAhead;
+  }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, routeStart]);
+
 
   useEffect(() => {
     setNavigationError(undefined);
@@ -919,13 +950,7 @@ export function NavigationMapScreen() {
           />
         ) : null}
 
-        {isNavigating && activeSignAlert ? (
-          <NavigationSignAlertBanner
-            distanceMeters={activeSignAlert.distanceMeters}
-            hasActiveManeuver={Boolean(activeManeuver)}
-            sign={activeSignAlert.sign}
-          />
-        ) : null}
+        {/* NavigationSignAlertBanner removed - stop-ahead banner hidden during navigation */}
 
         {isNavigating && activeSignAlert &&
           !verifiedSignIdsRef.current.has(activeSignAlert.sign.id) &&
@@ -940,6 +965,47 @@ export function NavigationMapScreen() {
               setDismissedVerifySignId(activeSignAlert.sign.id);
             }}
           />
+        ) : null}
+
+        {/* Upcoming signs panel - directly below the maneuver banner, left-anchored */}
+        {isNavigating && upcomingSignsOnRoute.length > 0 ? (
+          <SafeAreaView
+            edges={['top']}
+            pointerEvents="none"
+            style={styles.upcomingSignsOverlay}
+          >
+            <View
+              style={[
+                styles.upcomingSignsPanel,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Text style={[styles.upcomingSignsPanelLabel, { color: theme.grey }]}>Ahead</Text>
+              {upcomingSignsOnRoute.map((sign) => (
+                <View key={sign.id} style={styles.upcomingSignRow}>
+                  <Image
+                    accessibilityLabel={sign.name ?? 'Sign'}
+                    contentFit="contain"
+                    source={sign.imageUrl ? { uri: sign.imageUrl } : require('@/assets/images/smaple_signs/stop_sign.webp')}
+                    style={styles.upcomingSignImage}
+                  />
+                  <View style={styles.upcomingSignInfo}>
+                    <Text numberOfLines={1} style={[styles.upcomingSignName, { color: theme.text }]}>
+                      {sign.name ?? 'Sign'}
+                    </Text>
+                    <Text style={[styles.upcomingSignDist, { color: theme.grey }]}>
+                      {sign.distanceMeters < 1000
+                        ? `${Math.round(sign.distanceMeters)} m`
+                        : `${(sign.distanceMeters / 1000).toFixed(1)} km`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </SafeAreaView>
         ) : null}
 
         {!isNavigating ? (
@@ -1262,98 +1328,129 @@ export function NavigationMapScreen() {
           {routeStart ? (
             /* When starting point and destination have been selected: STRICTLY FOLLOW SCREENSHOT STRUCTURE */
             <View style={styles.routeSheetContainer}>
-              {/* Row: Title + ETA + Distance on the left, ONLY the X button on the farmost right */}
-              <View style={styles.routeHeaderRow}>
-                <Pressable
-                  accessibilityHint="Tap to change bottom sheet view"
-                  accessibilityLabel="Vehicle mode, duration and distance"
-                  accessibilityRole="button"
-                  onPress={() => {
-                    const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
-                    snapTo(nextIndex);
-                  }}
-                  style={styles.routeHeaderInfo}
-                >
-                  <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
-                    {vehicleMode === 'BIKE' ? 'Bike' : 'Car'}
-                  </Text>
-                  {routeDuration !== undefined && routeDistance !== undefined ? (
-                    <View style={styles.headerTimeDistanceGroup}>
-                      <Text style={[styles.headerDurationText]}>
-                        {formatRouteDuration(activeDuration)}
-                      </Text>
+              {/* Header row: X on left, time+distance centred — layout swaps when navigating */}
+              {isNavigating ? (
+                <View style={styles.routeHeaderRowNavigating}>
+                  <AppButton
+                    accessibilityLabel="Stop navigation"
+                    onPress={handleCloseRoute}
+                    style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
+                    variant="ghost"
+                  >
+                    <AntDesign name="close" size={18} color={theme.text} />
+                  </AppButton>
+                  <View style={styles.routeHeaderCentred}>
+                    <Text numberOfLines={1} style={[styles.headerDurationText, { color: theme.text }]}>
+                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
+                    </Text>
+                    {routeDistance !== undefined ? (
                       <Text style={[styles.headerDistanceText, { color: theme.textSecondary }]}>
                         {`(${formatRouteDistanceInKilometers(routeDistance)})`}
                       </Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-                <AppButton
-                  accessibilityLabel="Close route preview"
-                  onPress={handleCloseRoute}
-                  style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
-                  variant="ghost"
-                >
-                  <AntDesign name="close" size={18} color={theme.text} />
-                </AppButton>
-              </View>
-
-              {/* Vehicle picker: display two types of vehicles which is car and bike only (also displayed at peek range) */}
-              <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
-                <AppButton
-                  accessibilityLabel="Car route"
-                  onPress={() => setVehicleMode('DRIVING')}
-                  style={[
-                    styles.vehicleTabButton,
-                    vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
-                  ]}
-                  variant="ghost"
-                >
-                  <MaterialCommunityIcons
-                    name="car"
-                    size={24}
-                    color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.vehicleTabDurationText,
-                      { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
-                    ]}
+                    ) : null}
+                  </View>
+                  {/* Spacer to balance the X button */}
+                  <View style={styles.sheetCloseButton} />
+                </View>
+              ) : (
+                <View style={styles.routeHeaderRow}>
+                  <Pressable
+                    accessibilityHint="Tap to change bottom sheet view"
+                    accessibilityLabel="Vehicle mode, duration and distance"
+                    accessibilityRole="button"
+                    onPress={() => {
+                      const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
+                      snapTo(nextIndex);
+                    }}
+                    style={styles.routeHeaderInfo}
                   >
-                    {routeDuration !== undefined ? formatRouteDuration(carDuration) : '--'}
-                  </Text>
-                  {vehicleMode === 'DRIVING' ? (
-                    <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                  ) : null}
-                </AppButton>
-
-                <AppButton
-                  accessibilityLabel="Bike route"
-                  onPress={() => setVehicleMode('BIKE')}
-                  style={[
-                    styles.vehicleTabButton,
-                    vehicleMode === 'BIKE' && styles.vehicleTabButtonActive,
-                  ]}
-                  variant="ghost"
-                >
-                  <MaterialCommunityIcons
-                    name="motorbike"
-                    size={24}
-                    color={vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.vehicleTabDurationText,
-                      { color: vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary },
-                    ]}
+                    <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
+                      {vehicleMode === 'BIKE' ? 'Bike' : 'Car'}
+                    </Text>
+                    {routeDuration !== undefined && routeDistance !== undefined ? (
+                      <>
+                        <View style={styles.headerTimeDistanceGroup}>
+                          <Text style={[styles.headerDurationText]}>
+                            {formatRouteDuration(activeDuration)}
+                          </Text>
+                        </View>
+                        <View style={styles.headerTimeDistanceGroup}>
+                          <Text style={[styles.headerDistanceText, { color: theme.textSecondary }]}>
+                            {`(${formatRouteDistanceInKilometers(routeDistance)})`}
+                          </Text>
+                        </View>
+                      </>
+                    ) : null}
+                  </Pressable>
+                  <AppButton
+                    accessibilityLabel="Close route preview"
+                    onPress={handleCloseRoute}
+                    style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
+                    variant="ghost"
                   >
-                    {routeDuration !== undefined ? formatRouteDuration(bikeDuration) : '--'}
-                  </Text>
-                  {vehicleMode === 'BIKE' ? (
-                    <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                  ) : null}
-                </AppButton>
-              </View>
+                    <AntDesign name="close" size={18} color={theme.text} />
+                  </AppButton>
+                </View>
+              )}
+
+              {/* Vehicle picker: hidden during active navigation */}
+              {!isNavigating ? (
+                <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
+                  <AppButton
+                    accessibilityLabel="Car route"
+                    onPress={() => setVehicleMode('DRIVING')}
+                    style={[
+                      styles.vehicleTabButton,
+                      vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
+                    ]}
+                    variant="ghost"
+                  >
+                    <MaterialCommunityIcons
+                      name="car"
+                      size={24}
+                      color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleTabDurationText,
+                        { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                      ]}
+                    >
+                      {routeDuration !== undefined ? formatRouteDuration(carDuration) : '--'}
+                    </Text>
+                    {vehicleMode === 'DRIVING' ? (
+                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </AppButton>
+
+                  <AppButton
+                    accessibilityLabel="Bike route"
+                    onPress={() => setVehicleMode('BIKE')}
+                    style={[
+                      styles.vehicleTabButton,
+                      vehicleMode === 'BIKE' && styles.vehicleTabButtonActive,
+                    ]}
+                    variant="ghost"
+                  >
+                    <MaterialCommunityIcons
+                      name="motorbike"
+                      size={24}
+                      color={vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.vehicleTabDurationText,
+                        { color: vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary },
+                      ]}
+                    >
+                      {routeDuration !== undefined ? formatRouteDuration(bikeDuration) : '--'}
+                    </Text>
+                    {vehicleMode === 'BIKE' ? (
+                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                    ) : null}
+                  </AppButton>
+                </View>
+              ) : null}
 
               {navigationError ? (
                 <Text accessibilityRole="alert" style={styles.navigationError}>
@@ -1469,29 +1566,25 @@ export function NavigationMapScreen() {
                 </ScrollView>
               </Animated.View>
 
-              {/* Start button placed strictly at the bottom of the bottom sheet (visible in all snap ranges) */}
-              <View style={styles.sheetBottomButtonRow}>
-                <AppButton
-                  accessibilityLabel={
-                    isNavigating
-                      ? "Navigation active"
-                      : isStartingNavigation
+              {/* Start button — hidden during active navigation */}
+              {!isNavigating ? (
+                <View style={styles.sheetBottomButtonRow}>
+                  <AppButton
+                    accessibilityLabel={
+                      isStartingNavigation
                         ? "Starting navigation"
                         : "Begin navigation"
-                  }
-                  disabled={isNavigating || isStartingNavigation}
-                  onPress={handleBeginNavigation}
-                  style={styles.bottomGoButton}
-                >
-                  <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
-                    {isNavigating
-                      ? "Navigating..."
-                      : isStartingNavigation
-                        ? "Starting..."
-                        : "Start"}
-                  </Text>
-                </AppButton>
-              </View>
+                    }
+                    disabled={isStartingNavigation}
+                    onPress={handleBeginNavigation}
+                    style={styles.bottomGoButton}
+                  >
+                    <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
+                      {isStartingNavigation ? "Starting..." : "Start"}
+                    </Text>
+                  </AppButton>
+                </View>
+              ) : null}
             </View>
           ) : (
             /* Destination selected, no start selected yet */
@@ -1712,6 +1805,65 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+  },
+  upcomingSignsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: Spacing.three,
+    // SafeAreaView handles top inset; offset = banner marginTop(8) + minHeight(88) + paddingVertical(12) + gap(8)
+    marginTop: 116,
+  },
+  upcomingSignsPanel: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.one,
+    gap: 4,
+    width: 160,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  upcomingSignsPanelLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingHorizontal: 4,
+    paddingBottom: 2,
+  },
+  upcomingSignRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  upcomingSignImage: {
+    width: 36,
+    height: 36,
+    borderRadius: Rounded.sm,
+    flexShrink: 0,
+  },
+  upcomingSignInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  upcomingSignName: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  upcomingSignDist: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 14,
   },
   map: {
     flex: 1,
@@ -2138,6 +2290,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.half,
+  },
+  routeHeaderRowNavigating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.half,
+  },
+  routeHeaderCentred: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: Spacing.one,
   },
   routeHeaderTitle: {
     fontFamily: Fonts.body,

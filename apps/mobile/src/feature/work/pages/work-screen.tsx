@@ -263,22 +263,51 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               />
             </View>
           ) : (
-            <View style={[styles.workList, { borderColor: theme.border }]}>
-              {driverJobs.map((item) => (
-                <View key={item.title} style={styles.workItem}>
-                  <View style={styles.workCopy}>
-                    <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
-                    <Text style={[styles.workLocation, { color: theme.grey }]}>
-                      {item.location}
+            <View style={styles.driverSection}>
+              <View style={[styles.workList, { borderColor: theme.border }]}>
+                {driverJobs.map((item) => (
+                  <View key={item.title} style={styles.workItem}>
+                    <View style={styles.workCopy}>
+                      <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
+                      <Text style={[styles.workLocation, { color: theme.grey }]}>
+                        {item.location}
+                      </Text>
+                    </View>
+                    <AppButton
+                      label={item.action}
+                      onPress={() => router.push('/home')}
+                      style={styles.workAction}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              {/* Recorded Signs from Livestream */}
+              <AppButton
+                accessibilityLabel="View signs recorded during livestream"
+                onPress={() => router.push('/work/recorded-signs')}
+                pressedOpacity={0.88}
+                style={[
+                  styles.recordedSignsButton,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                variant="ghost"
+              >
+                <View style={styles.recordedSignsLeft}>
+                  <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
+                    <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
+                  </View>
+                  <View style={styles.recordedSignsCopy}>
+                    <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
+                      Recorded Signs
+                    </Text>
+                    <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
+                      Review signs captured from your livestream session
                     </Text>
                   </View>
-                  <AppButton
-                    label={item.action}
-                    onPress={() => router.push('/home')}
-                    style={styles.workAction}
-                  />
                 </View>
-              ))}
+                <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
+              </AppButton>
             </View>
           )}
         </ScrollView>
@@ -487,5 +516,51 @@ const styles = StyleSheet.create({
   },
   workAction: {
     alignSelf: 'flex-start',
+  },
+  driverSection: {
+    gap: Spacing.three,
+  },
+  recordedSignsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  recordedSignsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    flex: 1,
+  },
+  recordedSignsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordedSignsCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  recordedSignsLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  recordedSignsSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
   },
 });

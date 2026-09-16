@@ -63,7 +63,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
 
   return (
     <SafeAreaView
-      edges={['bottom']}
+      edges={[]}
       style={[
         styles.safeArea,
         {
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   container: {
-    height: 58,
+    height: 50,
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
