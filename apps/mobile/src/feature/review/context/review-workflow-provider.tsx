@@ -1,12 +1,19 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { useGetReviewQueue, useGetReviewHistory, useCastVoteOnSignCandidate, useReportSignCandidate, useUndoVoteOnCandidate } from '@/feature/review/hooks/use-review';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  useGetReviewQueue,
+  useGetReviewHistory,
+  useCastVoteOnSignCandidate,
+  useReportSignCandidate,
+  useSkipSign,
+  useUndoVoteOnCandidate,
+} from '@/feature/review/hooks/use-review';
 import { useSession } from '@/context/session-provider';
 import {
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
 
-export type ReviewActionType = 'approved' | 'declined' | 'reported';
+export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped';
 
 export type CompletedReview = {
   action: ReviewActionType;
@@ -34,6 +41,7 @@ type ReviewWorkflowContextValue = {
   reviewCheckedSubmissionAgain: () => Promise<boolean>;
   reviewHistory: CompletedReview[];
   sessionReviewCount: number;
+  skipCurrentReview: () => Promise<boolean>;
   totalSubmissions: number;
   undoLastReview: () => Promise<boolean>;
 };
@@ -50,6 +58,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
   const { mutateAsync: reportCandidate } = useReportSignCandidate();
+  const { mutateAsync: skipSign } = useSkipSign();
   const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
 
   const [pendingSubmissions, setPendingSubmissions] = useState<ReviewSubmission[]>([]);
@@ -63,6 +72,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   const refetchWorkflow = useCallback(async () => {
     const [queueResult, historyResult] = await Promise.all([
@@ -92,7 +102,15 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   }, [accessToken, refetchWorkflow]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      hasLoadedRef.current = false;
+      return;
+    }
+    // Only load initial queue once per login/account session, preventing background
+    // cache invalidations from wiping out ongoing reviewer swiping progress
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+
     let active = true;
     refetchWorkflow()
       .then((data) => {
@@ -130,6 +148,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingPreviousAction(undefined);
     setReviewHistory([]);
     setSessionReviewCount(0);
+    hasLoadedRef.current = false;
     await refresh();
   };
 
@@ -153,29 +172,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const reason = details?.declineReason || (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
     const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
 
-    const params = { candidateId: submission.id };
-
-    try {
-      if (action === 'reported') {
-        await reportCandidate({
-          params,
-          request: {
-            reason: note || reason || 'Reported by reviewer',
-          },
-        });
-      } else {
-        await castVote({
-          params,
-          request: {
-            vote: action === 'approved' ? 1 : -1,
-            ...(reason ? { declineReason: reason } : {}),
-            ...(note ? { declineNote: note } : {}),
-          },
-        });
-      }
-    } catch {
-    }
-
+    // 1. Immediately update UI state optimistically so review cards advance with zero lag
     setReviewHistory((history) => {
       const completedReview = { action, submission };
       if (completedRecheckIndex !== undefined) {
@@ -195,6 +192,35 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingReviewIndex(undefined);
     setRecheckingPreviousAction(undefined);
     setSessionReviewCount((count) => count + 1);
+
+    // 2. Dispatch backend network call in background without blocking state progression
+    const params = { candidateId: submission.id };
+    try {
+      if (action === 'reported') {
+        await reportCandidate({
+          params,
+          request: {
+            reason: note || reason || 'Reported by reviewer',
+          },
+        });
+      } else if (action === 'skipped') {
+        await skipSign({
+          params,
+        });
+      } else {
+        await castVote({
+          params,
+          request: {
+            vote: action === 'approved' ? 1 : -1,
+            ...(reason ? { declineReason: reason } : {}),
+            ...(note ? { declineNote: note } : {}),
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to submit review action:', err);
+    }
+
     return true;
   };
 
@@ -202,16 +228,19 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const lastReview = reviewHistory[reviewHistory.length - 1];
     if (!lastReview) return false;
 
+    // Immediately restore previous card
+    setReviewHistory((history) => history.slice(0, -1));
+    setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
+    setSessionReviewCount((count) => Math.max(0, count - 1));
+
     try {
       if (lastReview.action !== 'reported') {
         await undoVote({ params: { candidateId: lastReview.submission.id } });
       }
-    } catch {
+    } catch (err) {
+      console.warn('Failed to undo vote:', err);
     }
 
-    setReviewHistory((history) => history.slice(0, -1));
-    setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
-    setSessionReviewCount((count) => Math.max(0, count - 1));
     return true;
   };
 
@@ -219,13 +248,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const checkedReview = reviewHistory[checkedReviewIndex];
     if (!checkedReview) return false;
 
-    try {
-      if (checkedReview.action !== 'reported') {
-        await undoVote({ params: { candidateId: checkedReview.submission.id } });
-      }
-    } catch {
-    }
-
+    // Immediately switch card back to rechecking state
     setReviewHistory((history) => history.filter((_, index) => index !== checkedReviewIndex));
     setPendingSubmissions((pending) => [checkedReview.submission, ...pending]);
     setRecheckingPreviousAction(checkedReview.action);
@@ -233,7 +256,20 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setCheckedReviewIndex(0);
     setIsCheckingSubmission(false);
     setIsRecheckingSubmission(true);
+
+    try {
+      if (checkedReview.action !== 'reported') {
+        await undoVote({ params: { candidateId: checkedReview.submission.id } });
+      }
+    } catch (err) {
+      console.warn('Failed to undo vote for recheck:', err);
+    }
+
     return true;
+  };
+
+  const skipCurrentReview = (): Promise<boolean> => {
+    return completeCurrentReview('skipped');
   };
 
   return (
@@ -259,6 +295,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         reviewCheckedSubmissionAgain,
         reviewHistory,
         sessionReviewCount,
+        skipCurrentReview,
         totalSubmissions,
         undoLastReview,
       }}

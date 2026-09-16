@@ -75,6 +75,21 @@ export function reportCannotIdentifySign(
     );
 }
 
+export function skipSign(
+    params: CannotIdentifySignReportParams,
+    accessToken: string,
+    signal?: AbortSignal,
+) {
+    return apiRequest(
+        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/skip`,
+        {
+            method: 'POST',
+            signal,
+        },
+        accessToken,
+    );
+}
+
 export function castVoteOnSignCandidate(
     params: CandidateVoteParams,
     request: VoteDto,
@@ -109,8 +124,8 @@ export async function getReviewQueue(
     signal?: AbortSignal,
 ) {
     const queryParams = new URLSearchParams({
-        page: params.page = '1',
-        pageSize: params.pageSize = '10',
+        page: params.page || '1',
+        pageSize: params.pageSize || '100',
     });
 
     const res = await apiRequest<ReviewQueueResponse>(

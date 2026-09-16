@@ -1,15 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { useGetReviewQueue } from '@/feature/review/hooks/use-review';
-import { useGetMyPendingSubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useGetMyPendingSubmissions, useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -44,19 +44,6 @@ const roleMeta: Record<
 
 const driverOnlyRoles: AccountRole[] = ['driver'];
 
-type WorkItem = {
-  action: string;
-  location: string;
-  title: string;
-};
-
-const driverJobs: WorkItem[] = [
-  {
-    action: 'Open driving job',
-    location: 'District 1 corridor',
-    title: 'Verify signs on assigned route',
-  },
-];
 
 export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const router = useRouter();
@@ -84,6 +71,17 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
+
+  const { data: mySubmissionsData } = useGetMySubmissions(
+    { page: '1', pageSize: '10' },
+    Boolean(session && selectedRole === 'surveyor'),
+  );
+
+  const pendingSubmissionsList = useMemo(() => {
+    return (mySubmissionsData?.items ?? []).filter(
+      (item) => !['COMPLETED', 'DRAFT'].includes(item.status),
+    );
+  }, [mySubmissionsData?.items]);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -202,13 +200,86 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
                 label="Pending Submissions"
-                onPress={() => router.push('/work/survey-history')}
+                onPress={() => {
+                  if (pendingSubmissionsList.length === 1) {
+                    router.push({
+                      pathname: '/work/survey-submission-details',
+                      params: { id: pendingSubmissionsList[0].id },
+                    });
+                  } else {
+                    router.push({
+                      pathname: '/work/survey-history',
+                      params: { filter: 'pending' },
+                    });
+                  }
+                }}
                 subtitle={
                   pendingSurveyCount > 0
                     ? `${pendingSurveyCount} sessions awaiting AI processing and detection`
                     : 'All submitted survey recordings processed'
                 }
               />
+
+              {/* Quick-Access to In-Flight Pending Submissions */}
+              {pendingSubmissionsList.length > 0 ? (
+                <View style={styles.pendingPreviewSection}>
+                  <Text style={[styles.pendingPreviewTitle, { color: theme.textSecondary }]}>
+                    Active Processing ({pendingSubmissionsList.length})
+                  </Text>
+                  {pendingSubmissionsList.slice(0, 3).map((item) => {
+                    const isVideo = item.submissionType === 'VIDEO_GPX';
+                    return (
+                      <Pressable
+                        accessibilityLabel={`View pending submission ${item.id}`}
+                        accessibilityRole="button"
+                        key={item.id}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/work/survey-submission-details',
+                            params: { id: item.id },
+                          })
+                        }
+                        style={[
+                          styles.pendingPreviewCard,
+                          {
+                            backgroundColor: theme.backgroundElement,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.pendingPreviewIconBox,
+                            { backgroundColor: isVideo ? 'rgba(239, 68, 68, 0.12)' : 'rgba(37, 99, 235, 0.12)' },
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            color={isVideo ? '#EF4444' : '#2563EB'}
+                            name={isVideo ? 'video-outline' : 'camera-outline'}
+                            size={20}
+                          />
+                        </View>
+                        <View style={styles.pendingPreviewText}>
+                          <View style={styles.pendingPreviewTop}>
+                            <Text numberOfLines={1} style={[styles.pendingPreviewName, { color: theme.text }]}>
+                              {isVideo ? 'Video survey' : 'Image survey'}
+                            </Text>
+                            <View style={styles.pendingPreviewStatusBadge}>
+                              <Text style={styles.pendingPreviewStatusText}>
+                                {item.status}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.pendingPreviewSub, { color: theme.placeholder }]}>
+                            #{item.id.slice(0, 8)} · {item.totalCandidatesExtracted} signs detected
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
 
               {/* Standout Action: Revalidation Map */}
               <WorkActionCard
@@ -263,67 +334,48 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               />
             </View>
           ) : (
-            <View style={styles.driverSection}>
-              <View style={[styles.workList, { borderColor: theme.border }]}>
-                {driverJobs.map((item) => (
-                  <View key={item.title} style={styles.workItem}>
-                    <View style={styles.workCopy}>
-                      <Text style={[styles.workTitle, { color: theme.text }]}>{item.title}</Text>
-                      <Text style={[styles.workLocation, { color: theme.grey }]}>
-                        {item.location}
-                      </Text>
-                    </View>
-                    <AppButton
-                      label={item.action}
-                      onPress={() => router.push('/home')}
-                      style={styles.workAction}
-                    />
-                  </View>
-                ))}
-              </View>
-
-              {/* Recorded Signs from Livestream */}
-              <AppButton
-                accessibilityLabel="View signs recorded during livestream"
-                onPress={() => router.push('/work/recorded-signs')}
-                pressedOpacity={0.88}
-                style={[
-                  styles.recordedSignsButton,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-                variant="ghost"
-              >
-                <View style={styles.recordedSignsLeft}>
-                  <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
-                    <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
-                  </View>
-                  <View style={styles.recordedSignsCopy}>
-                    <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
-                      Recorded Signs
-                    </Text>
-                    <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
-                      Review signs captured from your livestream session
-                    </Text>
-                  </View>
+            <AppButton
+              accessibilityLabel="View signs recorded during livestream"
+              onPress={() => router.push('/work/recorded-signs')}
+              pressedOpacity={0.88}
+              style={[
+                styles.recordedSignsButton,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              variant="ghost"
+            >
+              <View style={styles.recordedSignsLeft}>
+                <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
+                  <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
                 </View>
-                <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
-              </AppButton>
-            </View>
+                <View style={styles.recordedSignsCopy}>
+                  <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
+                    Recorded Signs
+                  </Text>
+                  <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
+                    Review signs captured from your livestream session
+                  </Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
+            </AppButton>
           )}
-        </ScrollView>
+        </ScrollView >
 
         {/* Clean Surveyor Floating Action Button */}
-        {selectedRole === 'surveyor' ? (
-          <AppButton
-            accessibilityLabel="Create new survey record"
-            onPress={() => router.push('/work/new-survey')}
-            pressedOpacity={0.75}
-            style={styles.floatingAction}
-          >
-            <MaterialCommunityIcons color={theme.onPrimary} name="plus" size={28} />
-          </AppButton>
-        ) : null}
-      </SafeAreaView>
+        {
+          selectedRole === 'surveyor' ? (
+            <AppButton
+              accessibilityLabel="Create new survey record"
+              onPress={() => router.push('/work/new-survey')}
+              pressedOpacity={0.75}
+              style={styles.floatingAction}
+            >
+              <MaterialCommunityIcons color={theme.onPrimary} name="plus" size={28} />
+            </AppButton>
+          ) : null
+        }
+      </SafeAreaView >
     </View >
   );
 }
@@ -562,5 +614,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     lineHeight: 16,
+  },
+  pendingPreviewSection: {
+    gap: Spacing.one,
+    marginTop: Spacing.half,
+    marginBottom: Spacing.one,
+  },
+  pendingPreviewTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.half,
+  },
+  pendingPreviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  pendingPreviewIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingPreviewText: {
+    flex: 1,
+    gap: 2,
+  },
+  pendingPreviewTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.one,
+  },
+  pendingPreviewName: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  pendingPreviewStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+  },
+  pendingPreviewStatusText: {
+    color: '#2563EB',
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  pendingPreviewSub: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
   },
 });

@@ -71,12 +71,12 @@ function RootNavigation() {
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="index" />
         <Stack.Protected guard={!hasValidSession}>
           <Stack.Screen name="(public)/login" />
           <Stack.Screen name="(public)/register" />
         </Stack.Protected>
         <Stack.Protected guard={hasValidSession}>
-          <Stack.Screen name="index" />
           <Stack.Screen name="(authenticated)" />
         </Stack.Protected>
       </Stack>
