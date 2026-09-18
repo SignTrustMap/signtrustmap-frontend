@@ -19,6 +19,7 @@ import {
   ShieldWarning,
   SlidersHorizontal,
   CaretUp,
+  Gear,
 } from '@phosphor-icons/react'
 import { UserDropdownMenu } from './UserDropdownMenu'
 import { ProfileModal } from './ProfileModal'
@@ -127,6 +128,11 @@ export function Sidebar() {
           icon: <DownloadSimple size={18} weight="duotone" />,
           label: t('nav.exports'),
           href: '/exports',
+        },
+        {
+          icon: <Gear size={18} weight="duotone" />,
+          label: t('nav.settings'),
+          href: '/settings',
         },
       ],
     },
@@ -291,6 +297,7 @@ export function Sidebar() {
                   <NavLink
                     key={item.href}
                     to={item.href}
+                    title={item.label + (item.badge ? ` (${item.badge})` : '')}
                     className={`group relative w-10 h-10 mx-auto flex items-center justify-center rounded-xl transition-all select-none ${
                       active
                         ? 'bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] font-bold shadow-xs'
@@ -305,12 +312,6 @@ export function Sidebar() {
                     {item.badge ? (
                       <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-[#071317]" />
                     ) : null}
-
-                    {/* Floating Tooltip like ChatGPT */}
-                    <div className="absolute left-full ml-3 px-2.5 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-semibold rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
-                      {item.label}
-                      {item.badge ? ` (${item.badge})` : ''}
-                    </div>
                   </NavLink>
                 )
               }
@@ -393,11 +394,6 @@ export function Sidebar() {
                 {userInitials}
               </div>
             )}
-
-            {/* Floating Tooltip */}
-            <div className="absolute left-full ml-3 px-2.5 py-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs font-semibold rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-xl">
-              {displayName} • {isAdmin ? 'Admin' : 'Staff'}
-            </div>
           </button>
         ) : (
           <button
