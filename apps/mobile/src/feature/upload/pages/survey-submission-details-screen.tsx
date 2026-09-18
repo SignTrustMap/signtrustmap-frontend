@@ -23,6 +23,9 @@ import { AppButton } from '@/components/ui/button';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetSurveySubmissionStatus, useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
 import { useTheme } from '@/hooks/use-theme';
+import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
+import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
+import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
 import type {
   SubmissionStatus,
   SubmissionType,
@@ -134,6 +137,19 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
   const primaryImageUrl = primaryImage?.file_url ? resolveCdnUrl(primaryImage.file_url) : undefined;
 
   const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
+
+  const hasCoordinates =
+    submission?.latitude != null &&
+    submission?.longitude != null &&
+    Number.isFinite(submission.latitude) &&
+    Number.isFinite(submission.longitude);
+
+  const startCoord: MapCoordinate | undefined = hasCoordinates
+    ? [submission!.longitude!, submission!.latitude!]
+    : undefined;
+
+  const endCoord: MapCoordinate | undefined =
+    startCoord && isVideoSubmission ? estimateEndPoint(startCoord, 60) : undefined;
 
   const statusColor = getStatusColor(submission?.status || 'QUEUED');
 
@@ -561,6 +577,128 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ) : null}
               </View>
             </View>
+
+            {/* Route Map Preview */}
+            {startCoord ? (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={20} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    {isVideoSubmission ? 'Survey Route Preview (S → D)' : 'Location Preview'}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.submissionMapPlaceholder,
+                    {
+                      backgroundColor: theme.neutral,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={StyleSheet.absoluteFill}>
+                    <NavigationMapView
+                      focusCoordinate={startCoord}
+                      routeStart={isVideoSubmission ? startCoord : undefined}
+                      destination={
+                        isVideoSubmission && endCoord
+                          ? {
+                              coordinate: endCoord,
+                              id: 'survey-end',
+                              title: 'Điểm kết thúc',
+                              subtitle: 'Lộ trình khảo sát',
+                              category: 'recent',
+                            }
+                          : undefined
+                      }
+                      routeCoordinates={
+                        isVideoSubmission && startCoord && endCoord
+                          ? [startCoord, endCoord]
+                          : undefined
+                      }
+                      showCurrentLocation={false}
+                    />
+                  </View>
+                </View>
+                <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
+                  {isVideoSubmission && endCoord
+                    ? `Start (S): ${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)} → End (D): ${endCoord[1].toFixed(6)}, ${endCoord[0].toFixed(6)}`
+                    : `${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)}`}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Extracted Signs / Candidates Card */}
+            {statusData?.candidates && statusData.candidates.length > 0 ? (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={20} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    Detected Traffic Signs ({statusData.candidates.length})
+                  </Text>
+                </View>
+
+                <View style={styles.candidateList}>
+                  {statusData.candidates.map((cand: any, idx: number) => {
+                    const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
+                    const signLabel = cand.sign_type || cand.label || cand.type || `Sign #${idx + 1}`;
+                    const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
+                    const resolvedImg = candidateImg ? resolveCdnUrl(candidateImg) : undefined;
+
+                    return (
+                      <View
+                        key={cand.id || idx}
+                        style={[
+                          styles.candidateCard,
+                          {
+                            backgroundColor: theme.neutral,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                      >
+                        <Image
+                          contentFit="cover"
+                          source={resolvedImg ? { uri: resolvedImg } : fallbackImage}
+                          style={styles.candidateThumbnail}
+                        />
+                        <View style={styles.candidateInfo}>
+                          <Text style={[styles.candidateTitle, { color: theme.text }]} numberOfLines={1}>
+                            {signLabel}
+                          </Text>
+                          {confidence != null ? (
+                            <View style={styles.confidenceBadge}>
+                              <MaterialCommunityIcons name="check-circle" size={12} color="#16A34A" />
+                              <Text style={styles.confidenceText}>Confidence: {confidence}%</Text>
+                            </View>
+                          ) : null}
+                          {cand.timestamp_ms != null ? (
+                            <Text style={[styles.candidateMeta, { color: theme.placeholder }]}>
+                              Video offset: {Math.round(cand.timestamp_ms / 1000)}s
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
           </ScrollView>
         )}
 
@@ -1001,5 +1139,58 @@ const styles = StyleSheet.create({
   zoomedImage: {
     width: '100%',
     height: '85%',
+  },
+  submissionMapPlaceholder: {
+    height: 180,
+    borderRadius: Rounded.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginTop: Spacing.one,
+  },
+  mapCoordinateSubtext: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    marginTop: Spacing.half,
+  },
+  candidateList: {
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  candidateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  candidateThumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: Rounded.sm,
+  },
+  candidateInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  candidateTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confidenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  confidenceText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  candidateMeta: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
   },
 });

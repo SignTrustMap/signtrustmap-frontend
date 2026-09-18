@@ -35,6 +35,8 @@ type SelectedSurveyMedia = {
   mimeType?: string;
   type: 'image' | 'video';
   uri: string;
+  duration?: number;
+  assetId?: string;
 };
 
 type SelectedGpxFile = {
@@ -109,14 +111,14 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     return exifCoordinates;
   }
 
-  if (asset.type !== 'image' || Platform.OS === 'web') {
-    console.log('[Surveyor] Extracted image GPS data:', null);
+  if (Platform.OS === 'web') {
+    console.log('[Surveyor] Extracted GPS data:', null);
     return null;
   }
 
   try {
     const MediaLibrary = await import('expo-media-library');
-    const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
+    const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
 
     console.log('[Surveyor] Media location permission:', {
       accessPrivileges: permission.accessPrivileges,
@@ -124,7 +126,7 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     });
 
     if (permission.status !== 'granted') {
-      console.log('[Surveyor] Extracted image GPS data:', null);
+      console.log('[Surveyor] Extracted GPS data:', null);
       return null;
     }
 
@@ -153,14 +155,13 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
       }
     }
 
-
     if (isValidGpsCoordinates(location)) {
       const coordinates = {
         latitude: location.latitude,
         longitude: location.longitude,
       } satisfies ImageGpsCoordinates;
 
-      console.log('[Surveyor] Extracted image GPS data:', {
+      console.log('[Surveyor] Extracted GPS data:', {
         ...coordinates,
         source: 'media-library-original',
       });
@@ -170,8 +171,8 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
     return mediaLibraryExifCoordinates;
   } catch (error) {
-    console.warn('[Surveyor] Unable to read original image GPS metadata:', error);
-    console.log('[Surveyor] Extracted image GPS data:', null);
+    console.warn('[Surveyor] Unable to read original GPS metadata:', error);
+    console.log('[Surveyor] Extracted GPS data:', null);
     return null;
   }
 }
@@ -190,6 +191,7 @@ export function NewSurveyRecordScreen() {
   const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
   const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
   const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
+  const [showAdvancedGpx, setShowAdvancedGpx] = useState(false);
   const [gpxPickerError, setGpxPickerError] = useState<string>();
   const [isScanning, setIsScanning] = useState(false);
   const scanInProgress = useRef(false);
@@ -268,8 +270,8 @@ export function NewSurveyRecordScreen() {
       const assetType = asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
 
       const exif = assetInfo.exif as Record<string, unknown> | undefined;
-      const exifCoordinates = assetType === 'image' ? extractImageGpsCoordinates(exif) : null;
-      const gpsCoordinates = assetType === 'image' && isValidGpsCoordinates(assetInfo.location)
+      const exifCoordinates = extractImageGpsCoordinates(exif);
+      const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
         ? {
           latitude: assetInfo.location.latitude,
           longitude: assetInfo.location.longitude,
@@ -281,9 +283,10 @@ export function NewSurveyRecordScreen() {
         fileName: asset.filename,
         mediaType: asset.mediaType,
         location: assetInfo.location ?? null,
+        duration: asset.duration,
       });
       console.log(
-        '[Surveyor] Extracted image GPS data:',
+        '[Surveyor] Extracted GPS data:',
         gpsCoordinates ? { ...gpsCoordinates, source: 'media-library-original' } : null,
       );
 
@@ -292,6 +295,8 @@ export function NewSurveyRecordScreen() {
         fileName: asset.filename,
         type: assetType,
         uri: assetInfo.localUri ?? asset.uri,
+        duration: asset.duration,
+        assetId: asset.id,
       });
       setSelectedGps(gpsCoordinates ?? null);
       setSelectedGpxFile(undefined);
@@ -331,7 +336,7 @@ export function NewSurveyRecordScreen() {
       if (!result.canceled) {
         const asset = result.assets[0];
         const assetType = asset.type === 'video' ? 'video' : 'image';
-        const gpsCoordinates = assetType === 'image' ? await extractSelectedAssetGps(asset) : null;
+        const gpsCoordinates = await extractSelectedAssetGps(asset);
 
         setSelectedAsset({
           capturedAt: captureTimeFromExif(asset.exif),
@@ -339,6 +344,8 @@ export function NewSurveyRecordScreen() {
           mimeType: asset.mimeType,
           type: assetType,
           uri: asset.uri,
+          duration: asset.duration ? asset.duration / 1000 : undefined,
+          assetId: asset.assetId ?? undefined,
         });
         setSelectedGps(gpsCoordinates);
         setSelectedGpxFile(undefined);
@@ -398,6 +405,16 @@ export function NewSurveyRecordScreen() {
       pathname: '/work/new-survey/details',
       params: {
         submissionId: savedDraftId.current,
+        ...(selectedGps ? {
+          startLat: String(selectedGps.latitude),
+          startLon: String(selectedGps.longitude),
+        } : {}),
+        ...(selectedAsset?.duration ? {
+          duration: String(Math.round(selectedAsset.duration)),
+        } : {}),
+        ...(selectedAsset?.assetId ? {
+          assetId: selectedAsset.assetId,
+        } : {}),
         ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
       },
     });
@@ -420,7 +437,7 @@ export function NewSurveyRecordScreen() {
       }, {
         submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
         capturedAt: selectedAsset.capturedAt ?? new Date().toISOString(),
-        coordinateSource: isVideo ? (selectedGpxFile ? 'GPX_FILE' : 'DEVICE_GPS') : 'IMAGE_EXIF',
+        coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
         ...(selectedGps ?? {}),
       }, draftId, selectedGpxFile);
       openSavedDraft();
@@ -654,43 +671,83 @@ export function NewSurveyRecordScreen() {
           ) : null}
 
           {selectedAsset?.type === 'video' ? (
-            <>
-              <AppButton
-                accessibilityLabel={selectedGpxFile ? 'Change GPX file' : 'Upload GPX file'}
-                disabled={isScanning || isSaving}
-                onPress={handlePickGpx}
-                pressedOpacity={0.78}
+            <View style={styles.videoMetaContainer}>
+              <View
                 style={[
-                  styles.uploadPlaceholder,
-                  styles.gpxPickerButton,
+                  styles.videoGpsCard,
                   {
-                    backgroundColor: theme.neutral,
-                    borderColor: selectedGpxFile ? theme.primary : theme.border,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: selectedGps ? theme.primary : theme.border,
                   },
                 ]}
-                variant="surface"
               >
                 <SymbolView
-                  fallback={<Text style={[styles.imageFallback, { color: selectedGpxFile ? theme.primary : theme.placeholder }]}>GPX</Text>}
-                  name={{ android: 'route', ios: 'map', web: 'route' }}
-                  size={28}
-                  tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
+                  fallback={<Text style={{ color: selectedGps ? theme.primary : theme.placeholder }}>GPS</Text>}
+                  name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                  size={22}
+                  tintColor={selectedGps ? theme.primary : theme.placeholder}
                 />
-                <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
-                  {selectedGpxFile ? selectedGpxFile.name : 'Upload your GPX file'}
-                </Text>
-              </AppButton>
+                <View style={styles.videoGpsText}>
+                  <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
+                    {selectedGps
+                      ? `GPS detected: ${selectedGps.latitude.toFixed(5)}, ${selectedGps.longitude.toFixed(5)}`
+                      : 'No GPS metadata found in video'}
+                  </Text>
+                  <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
+                    {selectedGps
+                      ? 'Route start and end points will be mapped on the next screen'
+                      : 'You can select or confirm your location on the map in the next step'}
+                  </Text>
+                </View>
+              </View>
 
-              <Text style={[styles.helperText, { color: theme.placeholder }]}>
-                {selectedGpxFile ? 'Tap to choose a different GPX file' : 'Accepts .gpx files only'}
-              </Text>
-
-              {gpxPickerError ? (
-                <Text accessibilityRole="alert" style={styles.errorText}>
-                  {gpxPickerError}
+              <Pressable
+                accessibilityLabel="Toggle advanced GPX file picker"
+                accessibilityRole="button"
+                onPress={() => setShowAdvancedGpx((prev) => !prev)}
+                style={styles.advancedGpxToggle}
+              >
+                <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
+                  {showAdvancedGpx ? 'Hide external GPX option' : 'Tùy chọn nâng cao: Đính kèm file GPX ngoài (không bắt buộc)'}
                 </Text>
+              </Pressable>
+
+              {showAdvancedGpx ? (
+                <>
+                  <AppButton
+                    accessibilityLabel={selectedGpxFile ? 'Change GPX file' : 'Upload GPX file'}
+                    disabled={isScanning || isSaving}
+                    onPress={handlePickGpx}
+                    pressedOpacity={0.78}
+                    style={[
+                      styles.uploadPlaceholder,
+                      styles.gpxPickerButton,
+                      {
+                        backgroundColor: theme.neutral,
+                        borderColor: selectedGpxFile ? theme.primary : theme.border,
+                      },
+                    ]}
+                    variant="surface"
+                  >
+                    <SymbolView
+                      fallback={<Text style={[styles.imageFallback, { color: selectedGpxFile ? theme.primary : theme.placeholder }]}>GPX</Text>}
+                      name={{ android: 'route', ios: 'map', web: 'route' }}
+                      size={28}
+                      tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
+                    />
+                    <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
+                      {selectedGpxFile ? selectedGpxFile.name : 'Choose external .gpx file'}
+                    </Text>
+                  </AppButton>
+
+                  {gpxPickerError ? (
+                    <Text accessibilityRole="alert" style={styles.errorText}>
+                      {gpxPickerError}
+                    </Text>
+                  ) : null}
+                </>
               ) : null}
-            </>
+            </View>
           ) : null}
 
           <AppButton
@@ -960,5 +1017,43 @@ const styles = StyleSheet.create({
   gpxPickerButton: {
     minHeight: 100,
     marginTop: Spacing.one,
+  },
+  videoMetaContainer: {
+    gap: Spacing.two,
+    marginBottom: Spacing.three,
+  },
+  videoGpsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  videoGpsText: {
+    flex: 1,
+    gap: 2,
+  },
+  videoGpsTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: 18,
+  },
+  videoGpsSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: 16,
+  },
+  advancedGpxToggle: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.one,
+  },
+  advancedGpxToggleText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+    textDecorationLine: 'underline',
   },
 });

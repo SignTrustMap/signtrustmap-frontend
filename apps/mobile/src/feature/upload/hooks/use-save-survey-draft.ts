@@ -54,8 +54,10 @@ export function useSaveSurveyDraft() {
       };
     }
     if (!attempt.current || attempt.current.uri !== image.uri) {
-      // Read the file before creating a record so unreadable images do not create empty drafts.
-      await prepareSurveyImage(image);
+      if (image.type !== 'video') {
+        // Read the file before creating a record so unreadable images do not create empty drafts.
+        await prepareSurveyImage(image);
+      }
       attempt.current = {
         ...image,
         submissionId: submissionId ?? readSubmissionId(await create.mutateAsync({ request })),
@@ -69,13 +71,15 @@ export function useSaveSurveyDraft() {
     const draft = attempt.current;
     const persist = () => setStorageItemAsync(draftKey(session.account.id, draft.submissionId), JSON.stringify(draft));
     await persist();
-    if (!draft.uploadCompleted) {
+
+    // Chunked video uploads are orchestrated via chunk-upload-manager in survey-record-details-screen.
+    // For single images, complete the direct single-chunk upload here.
+    if (image.type !== 'video' && !draft.uploadCompleted) {
       if (!draft.chunkUploaded) {
         const prepared = await prepareSurveyImage(image);
         if (!draft.sessionId) {
-          const mediaType = image.type === 'video' ? 'VIDEO' : 'IMAGE';
           const result = await initialize.mutateAsync({ submissionId: draft.submissionId, request: {
-            originalFilename: prepared.fileName, mediaType, totalChunks: 1, totalSizeBytes: prepared.sizeBytes,
+            originalFilename: prepared.fileName, mediaType: 'IMAGE', totalChunks: 1, totalSizeBytes: prepared.sizeBytes,
           } });
           draft.sessionId = result.sessionId;
           await persist();

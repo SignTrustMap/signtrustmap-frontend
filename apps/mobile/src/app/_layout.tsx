@@ -2,7 +2,7 @@ import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { LogBox, View } from 'react-native';
 import {
   QueryClientProvider
 } from '@tanstack/react-query';
@@ -13,6 +13,12 @@ import { SessionProvider, useSession } from '@/context/session-provider';
 import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
 import { queryClient } from '@/api/query-client';
 import { authExpiredEmitter } from '@/api/api-client';
+import { reconcilePendingCrops } from '@/feature/upload/utils/crop-sync-manager';
+
+LogBox.ignoreLogs([
+  // Known Expo Router 57 / React 19 Fabric dev-only warning triggered when resolving initial deep link in useLinking
+  "Can't perform a React state update on a component that hasn't mounted yet",
+]);
 
 SplashScreen.preventAutoHideAsync();
 
@@ -48,7 +54,11 @@ function RootNavigation() {
     requestLocationPermissionOnFirstLaunch().catch(() => {
       // Permission storage failures should not prevent the app from opening.
     });
-  }, [shouldShowSplash]);
+
+    if (hasValidSession && session?.accessToken) {
+      void reconcilePendingCrops(session.accessToken);
+    }
+  }, [hasValidSession, session?.accessToken, shouldShowSplash]);
 
   // Redirect to login when any API call returns 401 / 403 (expired token).
   useEffect(() => {

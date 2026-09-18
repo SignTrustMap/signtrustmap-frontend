@@ -7,6 +7,12 @@ export type SurveyImage = {
   mimeType?: string;
   type?: 'image' | 'video';
   uri: string;
+  duration?: number;
+  assetId?: string;
+  startLat?: number;
+  startLon?: number;
+  endLat?: number;
+  endLon?: number;
 };
 
 export type SurveyGpx = {

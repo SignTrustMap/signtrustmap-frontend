@@ -1,9 +1,10 @@
 import AntDesign from '@expo/vector-icons/AntDesign';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -25,6 +26,9 @@ import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submi
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
+import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
+import { executeChunkedVideoUpload, type UploadProgressInfo } from '@/feature/upload/utils/chunk-upload-manager';
+import { registerZeroCopyDraft, startSmartPollingSync } from '@/feature/upload/utils/crop-sync-manager';
 
 import { getMapLibre } from '@/services/maplibre';
 
@@ -75,10 +79,14 @@ export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
-  const { submissionId, gpxUri, gpxName } = useLocalSearchParams<{
+  const { submissionId, gpxUri, gpxName, startLat, startLon, duration, assetId } = useLocalSearchParams<{
     submissionId?: string;
     gpxUri?: string;
     gpxName?: string;
+    startLat?: string;
+    startLon?: string;
+    duration?: string;
+    assetId?: string;
   }>();
   const draftQuery = useGetSurveySubmissionStatus(submissionId);
   const saveDraft = useSaveSurveyDraft();
@@ -99,10 +107,31 @@ export function SurveyRecordDetailsScreen() {
       Math.abs(parsedLongitude) <= 180
       ? [parsedLongitude, parsedLatitude]
       : undefined;
+
+  const parsedStartLat = startLat ? Number(startLat) : parsedLatitude;
+  const parsedStartLon = startLon ? Number(startLon) : parsedLongitude;
+  const initialStartCoord: MapCoordinate | undefined =
+    Number.isFinite(parsedStartLat) && Number.isFinite(parsedStartLon)
+      ? [parsedStartLon, parsedStartLat]
+      : imageCoordinate;
+
+  const durationSec = duration ? Math.max(1, Number(duration)) : 60;
+  const [startCoordinate, setStartCoordinate] = useState<MapCoordinate | undefined>(initialStartCoord);
+  const [endCoordinate, setEndCoordinate] = useState<MapCoordinate | undefined>(() => {
+    if (initialStartCoord) {
+      return estimateEndPoint(initialStartCoord, durationSec);
+    }
+    return undefined;
+  });
+  const [isLocatingEnd, setIsLocatingEnd] = useState(false);
+  const [isGpxAccordionOpen, setIsGpxAccordionOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | undefined>(undefined);
+
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
-    imageCoordinate ?? currentLocation.coordinate,
+    initialStartCoord ?? currentLocation.coordinate,
   );
-  const displayCoordinate = selectedCoordinate ?? imageCoordinate;
+  const effectiveStartCoord = startCoordinate ?? selectedCoordinate ?? imageCoordinate;
+  const displayCoordinate = effectiveStartCoord;
   const [focusRequestId, setFocusRequestId] = useState(1);
   const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
     imageCoordinate ? 'IMAGE_EXIF' : undefined,
@@ -154,6 +183,7 @@ export function SurveyRecordDetailsScreen() {
       && !imageMimeType?.startsWith('video/')
       && !(imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
       && !activeGpxUri
+      && !duration
     );
 
   const handlePickGpx = async () => {
@@ -181,6 +211,12 @@ export function SurveyRecordDetailsScreen() {
         if (gpxData?.firstPoint) {
           const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
           setSelectedCoordinate(coord);
+          setStartCoordinate(coord);
+          if (gpxData.lastPoint) {
+            setEndCoordinate([gpxData.lastPoint.longitude, gpxData.lastPoint.latitude]);
+          } else {
+            setEndCoordinate(estimateEndPoint(coord, durationSec));
+          }
           setCoordinateSource('GPX_FILE');
           setLocationMessage(`Coordinates loaded from ${name}`);
           setFocusRequestId((r) => r + 1);
@@ -201,6 +237,12 @@ export function SurveyRecordDetailsScreen() {
       if (active && gpxData?.firstPoint) {
         const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
         setSelectedCoordinate(coord);
+        setStartCoordinate(coord);
+        if (gpxData.lastPoint) {
+          setEndCoordinate([gpxData.lastPoint.longitude, gpxData.lastPoint.latitude]);
+        } else {
+          setEndCoordinate(estimateEndPoint(coord, durationSec));
+        }
         setCoordinateSource('GPX_FILE');
         setLocationMessage(gpxName ? `Coordinates loaded from ${gpxName}` : undefined);
         setFocusRequestId((r) => r + 1);
@@ -210,21 +252,26 @@ export function SurveyRecordDetailsScreen() {
       }
     });
     return () => { active = false; };
-  }, [gpxName, gpxUri]);
+  }, [durationSec, gpxName, gpxUri]);
 
   useEffect(() => {
     const draft = draftQuery.data?.submission;
     if (!draft || !session || hydratedId.current === draft.id) return;
     let active = true;
-    setIsDraftLoaded(false);
-    setCapturedAt(draft.capturedAt ?? '');
-    setNote(draft.note ?? '');
-    const hasCoordinate = draft.latitude != null && draft.longitude != null;
-    setSelectedCoordinate(hasCoordinate ? [draft.longitude!, draft.latitude!] : undefined);
-    setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
-    setLocationMessage(hasCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.');
     void readDraftImage(session.account.id, draft.id).then(async (local) => {
       if (!active) return;
+      setIsDraftLoaded(false);
+      setCapturedAt(draft.capturedAt ?? '');
+      setNote(draft.note ?? '');
+      const hasCoordinate = draft.latitude != null && draft.longitude != null;
+      if (hasCoordinate) {
+        const coord: MapCoordinate = [draft.longitude!, draft.latitude!];
+        setSelectedCoordinate(coord);
+        setStartCoordinate((prev) => prev ?? coord);
+        setEndCoordinate((prev) => prev ?? estimateEndPoint(coord, durationSec));
+      }
+      setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
+      setLocationMessage(hasCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.');
       const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')?.file_url;
       setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
       setImageName(local?.fileName);
@@ -239,6 +286,12 @@ export function SurveyRecordDetailsScreen() {
           if (gpxData?.firstPoint && active) {
             const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
             setSelectedCoordinate(coord);
+            setStartCoordinate(coord);
+            if (gpxData.lastPoint) {
+              setEndCoordinate([gpxData.lastPoint.longitude, gpxData.lastPoint.latitude]);
+            } else {
+              setEndCoordinate(estimateEndPoint(coord, durationSec));
+            }
             setCoordinateSource('GPX_FILE');
             setLocationMessage(undefined);
             setFocusRequestId((r) => r + 1);
@@ -268,7 +321,7 @@ export function SurveyRecordDetailsScreen() {
       }
     });
     return () => { active = false; };
-  }, [draftQuery.data, gpxUri, session]);
+  }, [draftQuery.data, durationSec, gpxUri, session]);
 
   const handleUseCurrentLocation = async () => {
     if (isLocating || submissionInProgress.current) return;
@@ -279,7 +332,11 @@ export function SurveyRecordDetailsScreen() {
     try {
       const coordinate = await getCurrentSurveyCoordinate();
       setSelectedCoordinate(coordinate);
-      setCoordinateSource('DEVICE_GPS');
+      setStartCoordinate(coordinate);
+      if (!endCoordinate) {
+        setEndCoordinate(estimateEndPoint(coordinate, durationSec));
+      }
+      setCoordinateSource(!isImageSubmission ? 'GPX_FILE' : 'DEVICE_GPS');
       setIsModified(true);
       setSubmitError(undefined);
       setFocusRequestId((requestId) => requestId + 1);
@@ -294,8 +351,23 @@ export function SurveyRecordDetailsScreen() {
     }
   };
 
+  const handleUseCurrentLocationForEnd = async () => {
+    if (isLocatingEnd || submissionInProgress.current) return;
+    setIsLocatingEnd(true);
+    try {
+      const coord = await getCurrentSurveyCoordinate();
+      setEndCoordinate(coord);
+      setIsModified(true);
+      setSubmitError(undefined);
+    } catch (err) {
+      setLocationMessage(err instanceof Error ? err.message : 'Unable to get location for end point.');
+    } finally {
+      setIsLocatingEnd(false);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (submissionInProgress.current || isLocating) return;
+    if (submissionInProgress.current || isLocating || isLocatingEnd) return;
     if (!submissionId || !isDraftLoaded || !isEditable) {
       setSubmitError('Load an editable draft before submitting.');
       return;
@@ -306,54 +378,95 @@ export function SurveyRecordDetailsScreen() {
     }
     const captureTimestamp = Date.parse(capturedAt.trim());
     if (!Number.isFinite(captureTimestamp)) {
-      setSubmitError('Enter the date and time the photo was taken, including its time zone.');
+      setSubmitError('Enter the date and time the media was recorded, including its time zone.');
       return;
     }
-    if (!coordinateSource || !selectedCoordinate) {
-      setSubmitError('Use an image with GPS metadata or select your current location.');
+
+    const effectiveStart = startCoordinate ?? selectedCoordinate;
+    if (!effectiveStart) {
+      setSubmitError('Use media with GPS metadata or select your current location.');
       return;
     }
-    const activeGpxUri = gpxUri || savedGpxUri;
-    const activeGpxName = gpxName || savedGpxName;
-    const isVideoDraft = draftQuery.data?.submission.submissionType === 'VIDEO_GPX'
-      || imageMimeType?.startsWith('video/')
-      || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
-      || Boolean(activeGpxUri);
-    const request: CreateSubmissionDto = {
-      submissionType: isVideoDraft ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-      capturedAt: new Date(captureTimestamp).toISOString(),
-      coordinateSource: coordinateSource ?? (isVideoDraft ? (activeGpxUri ? 'GPX_FILE' : 'DEVICE_GPS') : 'IMAGE_EXIF'),
-      latitude: selectedCoordinate[1],
-      longitude: selectedCoordinate[0],
-      note: note.trim(),
-    };
+
+    const isVideoDraft = !isImageSubmission;
 
     submissionInProgress.current = true;
     setIsSubmitting(true);
     setSubmitError(undefined);
+
     try {
-      const { submissionType: _submissionType, ...updates } = request;
-      await updateSubmission({ submissionId, request: updates });
+      const formattedCapturedAt = new Date(captureTimestamp).toISOString();
 
-      // Ensure both the video and GPX media sessions are completed before submitting
-      const mediaFiles = draftQuery.data?.mediaFiles ?? [];
-      const sessions = draftQuery.data?.sessions ?? [];
-      const hasMainMedia = mediaFiles.some((file) => file.media_type === (isVideoDraft ? 'VIDEO' : 'IMAGE'))
-        || sessions.some((upload) => upload.media_type === (isVideoDraft ? 'VIDEO' : 'IMAGE') && upload.status === 'COMPLETED');
-      const hasGpxMedia = !isVideoDraft
-        || mediaFiles.some((file) => file.media_type === 'GPX')
-        || sessions.some((upload) => upload.media_type === 'GPX' && upload.status === 'COMPLETED');
+      if (isVideoDraft) {
+        if (!imageUri) {
+          throw new Error('This draft has no video media available. Choose the file again.');
+        }
 
-      if (!hasMainMedia || (!hasGpxMedia && activeGpxUri)) {
-        if (!imageUri) throw new Error('This draft has no uploaded media available. Choose the file again.');
-        const targetGpx = activeGpxUri ? { uri: activeGpxUri, name: activeGpxName } : undefined;
-        await saveDraft(
-          { uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: isVideoDraft ? 'video' : 'image' },
-          request,
+        const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
+
+        // 1. Chunked video upload (1-minute temporal chunks down-res 640p + companion GPX)
+        await executeChunkedVideoUpload({
           submissionId,
-          targetGpx,
-        );
+          videoUri: imageUri,
+          videoFileName: imageName,
+          durationSeconds: durationSec,
+          startCoordinate: effectiveStart,
+          endCoordinate: effectiveEnd,
+          capturedAt: formattedCapturedAt,
+          accessToken: session.accessToken,
+          manualGpxUri: activeGpxUri,
+          manualGpxName: activeGpxName,
+          onProgress: (info) => {
+            setUploadProgress(info);
+          },
+        });
+
+        // 2. Register zero-copy draft for high-res 4K RoI cropping
+        await registerZeroCopyDraft(submissionId, imageUri, assetId);
+
+        // 3. Start Layer 1 Foreground Smart Polling
+        startSmartPollingSync(submissionId, imageUri, session.accessToken);
+
+        // 4. Update submission metadata with GPX_FILE and coordinates
+        await updateSubmission({
+          submissionId,
+          request: {
+            capturedAt: formattedCapturedAt,
+            coordinateSource: 'GPX_FILE',
+            latitude: effectiveStart[1],
+            longitude: effectiveStart[0],
+            note: note.trim(),
+          },
+        });
+      } else {
+        // Single Image Upload Flow
+        const request: CreateSubmissionDto = {
+          submissionType: 'SINGLE_IMAGE',
+          capturedAt: formattedCapturedAt,
+          coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
+          latitude: effectiveStart[1],
+          longitude: effectiveStart[0],
+          note: note.trim(),
+        };
+        const { submissionType: _submissionType, ...updates } = request;
+        await updateSubmission({ submissionId, request: updates });
+
+        const mediaFiles = draftQuery.data?.mediaFiles ?? [];
+        const sessions = draftQuery.data?.sessions ?? [];
+        const hasMainMedia = mediaFiles.some((file) => file.media_type === 'IMAGE')
+          || sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
+
+        if (!hasMainMedia) {
+          if (!imageUri) throw new Error('This draft has no uploaded media available. Choose the file again.');
+          await saveDraft(
+            { uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: 'image' },
+            request,
+            submissionId,
+          );
+        }
       }
+
+      // 5. Submit to finalize
       const submitted = await submitSubmission({ submissionId });
       const submissionStatus = readSubmittedStatus(submitted);
       router.replace({
@@ -365,12 +478,13 @@ export function SurveyRecordDetailsScreen() {
       });
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : 'The sign could not be submitted. Please retry.',
+        error instanceof Error ? error.message : 'The survey could not be submitted. Please retry.',
       );
       setIsModified(true);
     } finally {
       submissionInProgress.current = false;
       setIsSubmitting(false);
+      setUploadProgress(undefined);
     }
   };
 
@@ -462,50 +576,185 @@ export function SurveyRecordDetailsScreen() {
             />
           </View>
 
+          {/* Location / Telemetry Section */}
           {!isImageSubmission ? (
+            <>
+              {/* Điểm xuất phát (Start Point - S) */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.subSectionTitle, { color: theme.text }]}>
+                    Điểm xuất phát (Start Point - S)
+                  </Text>
+                  <AppButton
+                    accessibilityLabel="Use current location for start point"
+                    disabled={isLocating || isSubmitting}
+                    onPress={handleUseCurrentLocation}
+                    variant="ghost"
+                    style={styles.locationSmallButton}
+                  >
+                    <SymbolView
+                      name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                      size={14}
+                      tintColor={theme.primary}
+                    />
+                    <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
+                      {isLocating ? 'Đang lấy...' : 'Lấy vị trí'}
+                    </Text>
+                  </AppButton>
+                </View>
+                <AppInput
+                  label="Start Location (latitude, longitude)"
+                  accessibilityLabel="Start Location latitude and longitude"
+                  editable={false}
+                  showSoftInputOnFocus={false}
+                  value={effectiveStartCoord
+                    ? `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`
+                    : 'Chưa có tọa độ xuất phát'}
+                  placeholder="No start location available"
+                  leadingIcon={<MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />}
+                  containerStyle={styles.imageLocationInput}
+                />
+              </View>
+
+              {/* Điểm kết thúc (End Point - D) */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.subSectionTitle, { color: theme.text }]}>
+                    Điểm kết thúc (End Point - D)
+                  </Text>
+                  <AppButton
+                    accessibilityLabel="Use current location for end point"
+                    disabled={isLocatingEnd || isSubmitting}
+                    onPress={handleUseCurrentLocationForEnd}
+                    variant="ghost"
+                    style={styles.locationSmallButton}
+                  >
+                    <SymbolView
+                      name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                      size={14}
+                      tintColor={theme.primary}
+                    />
+                    <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
+                      {isLocatingEnd ? 'Đang lấy...' : 'Lấy vị trí'}
+                    </Text>
+                  </AppButton>
+                </View>
+                <AppInput
+                  label="End Location (latitude, longitude)"
+                  accessibilityLabel="End Location latitude and longitude"
+                  editable={false}
+                  showSoftInputOnFocus={false}
+                  value={endCoordinate
+                    ? `${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
+                    : 'Ước lượng theo thời lượng video...'}
+                  placeholder="Estimating end location..."
+                  leadingIcon={<MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />}
+                  containerStyle={styles.imageLocationInput}
+                />
+              </View>
+
+              {/* Advanced GPX Accordion */}
+              <View style={styles.section}>
+                <Pressable
+                  onPress={() => setIsGpxAccordionOpen(!isGpxAccordionOpen)}
+                  style={[styles.accordionHeader, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                >
+                  <View style={styles.accordionHeaderLeft}>
+                    <AntDesign name="file-text" size={18} color={theme.primary} />
+                    <Text style={[styles.accordionTitle, { color: theme.text }]}>
+                      Tùy chọn nâng cao: Đính kèm file GPX ngoài
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name={isGpxAccordionOpen ? 'chevron-up' : 'chevron-down'}
+                    size={22}
+                    color={theme.textSecondary}
+                  />
+                </Pressable>
+
+                {isGpxAccordionOpen ? (
+                  <View style={[styles.accordionBody, { borderColor: theme.border, backgroundColor: theme.neutral }]}>
+                    <Text style={[styles.accordionDesc, { color: theme.textSecondary }]}>
+                      Mặc định hệ thống tự động trích xuất GPS và sinh file GPX tương thích. Bạn chỉ cần đính kèm file GPX ngoài nếu muốn dùng lộ trình từ thiết bị GPS chuyên dụng.
+                    </Text>
+                    <AppInput
+                      label="GPX file"
+                      accessibilityLabel="Attached GPX track file"
+                      editable={false}
+                      showSoftInputOnFocus={false}
+                      value={displayGpxName || 'Tự động trích xuất từ GPS video'}
+                      placeholder="No GPX file attached"
+                      leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
+                      containerStyle={styles.imageLocationInput}
+                    />
+                    {!isSubmitting ? (
+                      <View style={styles.gpxActionsRow}>
+                        <AppButton
+                          label={displayGpxName ? 'Chọn file GPX khác' : 'Chọn file GPX (.gpx)'}
+                          variant="surface"
+                          onPress={handlePickGpx}
+                          style={styles.attachGpxButton}
+                        />
+                        {displayGpxName ? (
+                          <AppButton
+                            label="Dùng GPS tự động"
+                            variant="ghost"
+                            onPress={() => {
+                              setSavedGpxUri(undefined);
+                              setSavedGpxName(undefined);
+                              setIsModified(true);
+                            }}
+                            style={styles.attachGpxButton}
+                          />
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            /* Single Image Location Input */
             <View style={styles.section}>
               <AppInput
-                label="GPX file"
-                accessibilityLabel="Attached GPX track file"
+                label="Location (latitude, longitude)"
+                accessibilityLabel="Location latitude and longitude, read only"
                 editable={false}
                 showSoftInputOnFocus={false}
-                value={displayGpxName}
-                placeholder="No GPX file attached"
-                leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
+                value={displayCoordinate
+                  ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
+                  : ''}
+                placeholder="No location available"
+                leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
                 containerStyle={styles.imageLocationInput}
               />
-              {!isSubmitting ? (
-                <AppButton
-                  label={displayGpxName ? 'Change GPX file' : 'Attach GPX file'}
-                  variant="surface"
-                  onPress={handlePickGpx}
-                  style={styles.attachGpxButton}
+              <AppButton
+                accessibilityLabel={
+                  isLocating ? 'Getting current location' : 'Use current location for this survey'
+                }
+                disabled={isLocating || isSubmitting}
+                onPress={handleUseCurrentLocation}
+                style={styles.locationButton}
+              >
+                <SymbolView
+                  name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                  size={16}
+                  tintColor={theme.onPrimary}
                 />
-              ) : null}
+                <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
+                  {isLocating ? 'Getting location...' : 'Use current location'}
+                </Text>
+              </AppButton>
             </View>
-          ) : null}
+          )}
 
-          <View style={styles.section}>
-            <AppInput
-              label={coordinateSource === 'GPX_FILE' ? 'GPX location (latitude, longitude)' : 'Location (latitude, longitude)'}
-              accessibilityLabel="Location latitude and longitude, read only"
-              editable={false}
-              showSoftInputOnFocus={false}
-              value={displayCoordinate
-                ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
-                : ''}
-              placeholder={coordinateSource === 'GPX_FILE' ? 'Extracting GPX location...' : 'No location available'}
-              leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
-              containerStyle={styles.imageLocationInput}
-            />
-          </View>
-
+          {/* Map Preview */}
           <View style={styles.section}>
             <Text style={[styles.label, { color: theme.text }]}>Map Preview</Text>
             <View
               accessibilityLabel={
-                selectedCoordinate
-                  ? `Selected survey location at ${selectedCoordinate[1]}, ${selectedCoordinate[0]}`
+                effectiveStartCoord
+                  ? `Selected survey location at ${effectiveStartCoord[1]}, ${effectiveStartCoord[0]}`
                   : 'No survey location selected'
               }
               style={[
@@ -516,11 +765,28 @@ export function SurveyRecordDetailsScreen() {
                 },
               ]}
             >
-              {selectedCoordinate ? (
+              {effectiveStartCoord ? (
                 <View style={StyleSheet.absoluteFill}>
                   <NavigationMapView
-                    focusCoordinate={selectedCoordinate}
+                    focusCoordinate={effectiveStartCoord}
                     focusRequestId={focusRequestId}
+                    routeStart={!isImageSubmission ? effectiveStartCoord : undefined}
+                    destination={
+                      !isImageSubmission && endCoordinate
+                        ? {
+                            coordinate: endCoordinate,
+                            id: 'survey-end',
+                            title: 'Điểm kết thúc',
+                            subtitle: 'Lộ trình khảo sát',
+                            category: 'recent',
+                          }
+                        : undefined
+                    }
+                    routeCoordinates={
+                      !isImageSubmission && effectiveStartCoord && endCoordinate
+                        ? [effectiveStartCoord, endCoordinate]
+                        : undefined
+                    }
                     showCurrentLocation
                     isNavigatingFeature
                   />
@@ -536,7 +802,7 @@ export function SurveyRecordDetailsScreen() {
                     tintColor={theme.placeholder}
                   />
                   <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
-                    No GPS metadata found in this image
+                    No GPS metadata found in this media
                   </Text>
                 </View>
               )}
@@ -551,28 +817,13 @@ export function SurveyRecordDetailsScreen() {
                 <AntDesign name="expand" size={20} color={theme.primary} />
               </AppButton>
             </View>
-            {selectedCoordinate ? (
+            {effectiveStartCoord ? (
               <Text style={[styles.coordinateText, { color: theme.textSecondary }]}>
-                {selectedCoordinate[1].toFixed(6)}, {selectedCoordinate[0].toFixed(6)}
+                {!isImageSubmission && endCoordinate
+                  ? `S: ${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)} → D: ${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
+                  : `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`}
               </Text>
             ) : null}
-            <AppButton
-              accessibilityLabel={
-                isLocating ? 'Getting current location' : 'Use current location for this survey'
-              }
-              disabled={isLocating || isSubmitting}
-              onPress={handleUseCurrentLocation}
-              style={styles.locationButton}
-            >
-              <SymbolView
-                name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                size={16}
-                tintColor={theme.onPrimary}
-              />
-              <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
-                {isLocating ? 'Getting location...' : 'Use current location'}
-              </Text>
-            </AppButton>
             {locationMessage ? (
               <Text
                 accessibilityRole="alert"
@@ -611,7 +862,7 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
-            disabled={isSubmitting || isLocating || !isDraftLoaded || !isEditable}
+            disabled={isSubmitting || isLocating || isLocatingEnd || !isDraftLoaded || !isEditable}
             label={isSubmitting ? 'Submitting...' : 'Submit'}
             onPress={handleSubmit}
             style={styles.submitButton}
@@ -623,6 +874,39 @@ export function SurveyRecordDetailsScreen() {
           ) : null}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Chunk Upload Progress Modal */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={Boolean(uploadProgress)}
+      >
+        <View style={styles.progressModalOverlay}>
+          <View style={[styles.progressModalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <ActivityIndicator color={theme.primary} size="large" />
+            <Text style={[styles.progressModalTitle, { color: theme.text }]}>Uploading Survey Video</Text>
+            <Text style={[styles.progressModalStatus, { color: theme.textSecondary }]}>
+              {uploadProgress?.statusText}
+            </Text>
+            <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { backgroundColor: theme.primary, width: `${uploadProgress?.percent ?? 0}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.progressMetaRow}>
+              <Text style={[styles.progressMetaText, { color: theme.textSecondary }]}>
+                {uploadProgress?.currentChunk ? `Đoạn ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Khởi tạo'}
+              </Text>
+              <Text style={[styles.progressMetaText, { color: theme.primary, fontWeight: '700' }]}>
+                {`${uploadProgress?.percent ?? 0}%`}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -796,5 +1080,120 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     lineHeight: 18,
     marginTop: Spacing.one,
+  },
+  subSectionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.half,
+  },
+  locationSmallButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 2,
+    minHeight: 32,
+  },
+  locationSmallButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+  },
+  accordionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    flex: 1,
+  },
+  accordionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  accordionBody: {
+    padding: Spacing.two,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: Rounded.md,
+    borderBottomRightRadius: Rounded.md,
+    gap: Spacing.two,
+  },
+  accordionDesc: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  gpxActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    flexWrap: 'wrap',
+  },
+  progressModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(9, 35, 60, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.four,
+  },
+  progressModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: Rounded.xlg,
+    borderWidth: 1,
+    padding: Spacing.four,
+    alignItems: 'center',
+    gap: Spacing.two,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  progressModalTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 18,
+    fontWeight: 700,
+    marginTop: Spacing.one,
+  },
+  progressModalStatus: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: Spacing.one,
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressMetaRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: Spacing.half,
+  },
+  progressMetaText: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
   },
 });

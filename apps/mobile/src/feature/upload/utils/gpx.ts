@@ -8,6 +8,7 @@ export type GpxPoint = {
 export type GpxData = {
   coordinates: [longitude: number, latitude: number][];
   firstPoint?: GpxPoint;
+  lastPoint?: GpxPoint;
   startTime?: string;
 };
 
@@ -22,6 +23,7 @@ export function parseGpxContent(xml: string): GpxData {
 
   const coordinates: [longitude: number, latitude: number][] = [];
   let firstPoint: GpxPoint | undefined;
+  let lastPoint: GpxPoint | undefined;
 
   // Match trkpt, wpt, or rtept tags (opening, self-closing, or with body)
   const pointTagRegex = /<(?:[\w-]+:)?(trkpt|wpt|rtept)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[\w-]+:)?\1>)/gi;
@@ -46,17 +48,19 @@ export function parseGpxContent(xml: string): GpxData {
       ) {
         coordinates.push([longitude, latitude]);
 
-        if (!firstPoint) {
-          const timeMatch = /<(?:[\w-]+:)?time>([^<]+)<\/(?:[\w-]+:)?time>/i.exec(body);
-          const eleMatch = /<(?:[\w-]+:)?ele>([-+]?\d*\.?\d+)<\/(?:[\w-]+:)?ele>/i.exec(body);
+        const timeMatch = /<(?:[\w-]+:)?time>([^<]+)<\/(?:[\w-]+:)?time>/i.exec(body);
+        const eleMatch = /<(?:[\w-]+:)?ele>([-+]?\d*\.?\d+)<\/(?:[\w-]+:)?ele>/i.exec(body);
+        const currentPoint: GpxPoint = {
+          latitude,
+          longitude,
+          time: timeMatch ? timeMatch[1].trim() : undefined,
+          elevation: eleMatch ? Number.parseFloat(eleMatch[1]) : undefined,
+        };
 
-          firstPoint = {
-            latitude,
-            longitude,
-            time: timeMatch ? timeMatch[1].trim() : undefined,
-            elevation: eleMatch ? Number.parseFloat(eleMatch[1]) : undefined,
-          };
+        if (!firstPoint) {
+          firstPoint = currentPoint;
         }
+        lastPoint = currentPoint;
       }
     }
   }
@@ -64,6 +68,7 @@ export function parseGpxContent(xml: string): GpxData {
   return {
     coordinates,
     firstPoint,
+    lastPoint,
     startTime: firstPoint?.time,
   };
 }
