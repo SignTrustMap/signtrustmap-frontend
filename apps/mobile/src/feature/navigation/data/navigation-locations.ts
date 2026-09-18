@@ -96,7 +96,7 @@ export const initSigns: MapSignMarker[] = [
 
 export const currentLocation = {
   coordinate: [106.682148, 10.758866] as MapCoordinate,
-  label: 'Vị trí hiện tại của tài xế',
+  label: 'Driver current location',
 };
 
 export const openStreetMapTiles = [

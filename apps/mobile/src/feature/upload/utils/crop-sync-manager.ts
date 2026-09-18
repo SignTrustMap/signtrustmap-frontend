@@ -1,6 +1,9 @@
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import { getSurveySubmissionStatus } from '@/api/survey-submission/survey-submission';
-import { cropHighResSignPatch, type SignCandidateBox } from './high-res-cropper';
+import {
+  batchCropCandidateSigns,
+  type SignCandidateBox,
+} from './high-res-cropper';
 
 const ZERO_COPY_INDEX_KEY = 'stm_zero_copy_submissions_index';
 
@@ -87,10 +90,7 @@ export function startSmartPollingSync(
         clearInterval(pollInterval);
 
         // Execute 4K high-res crop for each detected sign box
-        for (const candidate of candidates) {
-          await cropHighResSignPatch(candidate, videoUri);
-        }
-
+        await batchCropCandidateSigns(candidates, videoUri);
         await releaseZeroCopyDraft(submissionId);
         onComplete?.(candidates.length);
       }
@@ -103,6 +103,51 @@ export function startSmartPollingSync(
     active = false;
     clearInterval(pollInterval);
   };
+}
+
+/**
+ * Layer 2 (Background - Silent Push Notification / Background Task):
+ * Handles asynchronous wake-up signals (FCM Silent Push) from Backend when Jetson AI finishes.
+ * Executes within a 30-second budget to crop patches and free zero-copy references.
+ */
+export async function handleBackgroundSilentPush(params: {
+  submissionId: string;
+  candidates?: SignCandidateBox[];
+  accessToken?: string;
+}): Promise<{ processedCount: number; success: boolean }> {
+  const { submissionId, candidates: payloadCandidates, accessToken } = params;
+
+  try {
+    const records = await getIndexedRecords();
+    const record = records[submissionId];
+
+    if (!record) {
+      return { processedCount: 0, success: true };
+    }
+
+    let candidates = payloadCandidates;
+
+    // If candidates not included directly in push payload, fetch from status endpoint
+    if (!candidates || candidates.length === 0) {
+      if (!accessToken) {
+        console.warn(`[CropSync] Access token missing for background sync of ${submissionId}`);
+        return { processedCount: 0, success: false };
+      }
+      const statusRes = await getSurveySubmissionStatus(submissionId, accessToken);
+      candidates = (statusRes as any)?.candidates as SignCandidateBox[] | undefined;
+    }
+
+    if (candidates && candidates.length > 0) {
+      const results = await batchCropCandidateSigns(candidates, record.videoUri);
+      await releaseZeroCopyDraft(submissionId);
+      return { processedCount: results.length, success: true };
+    }
+
+    return { processedCount: 0, success: true };
+  } catch (error) {
+    console.warn(`[CropSync] Background silent push crop failed for ${submissionId}:`, error);
+    return { processedCount: 0, success: false };
+  }
 }
 
 /**
@@ -126,9 +171,7 @@ export async function reconcilePendingCrops(accessToken: string): Promise<void> 
         const statusRes = await getSurveySubmissionStatus(id, accessToken);
         const candidates = (statusRes as any)?.candidates as SignCandidateBox[] | undefined;
         if (candidates && candidates.length > 0) {
-          for (const candidate of candidates) {
-            await cropHighResSignPatch(candidate, record.videoUri);
-          }
+          await batchCropCandidateSigns(candidates, record.videoUri);
           await releaseZeroCopyDraft(id);
         }
       } catch {
@@ -139,3 +182,4 @@ export async function reconcilePendingCrops(accessToken: string): Promise<void> 
     // Fail silently during background launch reconciliation
   }
 }
+

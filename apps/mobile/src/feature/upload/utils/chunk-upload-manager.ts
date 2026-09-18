@@ -1,4 +1,3 @@
-import { Blob } from 'expo-blob';
 import {
   completeSurveyUpload,
   getSurveyUploadSession,
@@ -87,15 +86,13 @@ export async function executeChunkedVideoUpload(
     statusText: 'Preparing video for chunk upload...',
   });
 
-  // Read the source video Blob once
+  // Read the source video Blob lazily without loading the entire file into an ArrayBuffer
   const response = await fetch(videoUri);
   if (!response.ok && /^https?:/i.test(videoUri)) {
     throw new Error('Unable to read video for chunked upload.');
   }
-  const arrayBuffer = await response.arrayBuffer();
-  const fullBlob = new Blob([arrayBuffer], {
-    type: response.headers.get('content-type') || 'video/mp4',
-  });
+  const fullBlob = await response.blob();
+
 
   const fileName = videoFileName?.trim()
     || videoUri.split('/').pop()?.split('?')[0]

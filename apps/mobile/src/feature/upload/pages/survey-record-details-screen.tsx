@@ -579,11 +579,11 @@ export function SurveyRecordDetailsScreen() {
           {/* Location / Telemetry Section */}
           {!isImageSubmission ? (
             <>
-              {/* Điểm xuất phát (Start Point - S) */}
+              {/* Start Point (S) */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
-                    Điểm xuất phát (Start Point - S)
+                    Start Point (S)
                   </Text>
                   <AppButton
                     accessibilityLabel="Use current location for start point"
@@ -598,7 +598,7 @@ export function SurveyRecordDetailsScreen() {
                       tintColor={theme.primary}
                     />
                     <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
-                      {isLocating ? 'Đang lấy...' : 'Lấy vị trí'}
+                      {isLocating ? 'Locating...' : 'Get Location'}
                     </Text>
                   </AppButton>
                 </View>
@@ -609,18 +609,18 @@ export function SurveyRecordDetailsScreen() {
                   showSoftInputOnFocus={false}
                   value={effectiveStartCoord
                     ? `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`
-                    : 'Chưa có tọa độ xuất phát'}
+                    : 'No start location available'}
                   placeholder="No start location available"
                   leadingIcon={<MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />}
                   containerStyle={styles.imageLocationInput}
                 />
               </View>
 
-              {/* Điểm kết thúc (End Point - D) */}
+              {/* End Point (D) */}
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
-                    Điểm kết thúc (End Point - D)
+                    End Point (D)
                   </Text>
                   <AppButton
                     accessibilityLabel="Use current location for end point"
@@ -635,7 +635,7 @@ export function SurveyRecordDetailsScreen() {
                       tintColor={theme.primary}
                     />
                     <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
-                      {isLocatingEnd ? 'Đang lấy...' : 'Lấy vị trí'}
+                      {isLocatingEnd ? 'Locating...' : 'Get Location'}
                     </Text>
                   </AppButton>
                 </View>
@@ -646,7 +646,7 @@ export function SurveyRecordDetailsScreen() {
                   showSoftInputOnFocus={false}
                   value={endCoordinate
                     ? `${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
-                    : 'Ước lượng theo thời lượng video...'}
+                    : 'Estimated from video duration...'}
                   placeholder="Estimating end location..."
                   leadingIcon={<MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />}
                   containerStyle={styles.imageLocationInput}
@@ -662,7 +662,7 @@ export function SurveyRecordDetailsScreen() {
                   <View style={styles.accordionHeaderLeft}>
                     <AntDesign name="file-text" size={18} color={theme.primary} />
                     <Text style={[styles.accordionTitle, { color: theme.text }]}>
-                      Tùy chọn nâng cao: Đính kèm file GPX ngoài
+                      Advanced: Attach external GPX file
                     </Text>
                   </View>
                   <MaterialCommunityIcons
@@ -675,14 +675,14 @@ export function SurveyRecordDetailsScreen() {
                 {isGpxAccordionOpen ? (
                   <View style={[styles.accordionBody, { borderColor: theme.border, backgroundColor: theme.neutral }]}>
                     <Text style={[styles.accordionDesc, { color: theme.textSecondary }]}>
-                      Mặc định hệ thống tự động trích xuất GPS và sinh file GPX tương thích. Bạn chỉ cần đính kèm file GPX ngoài nếu muốn dùng lộ trình từ thiết bị GPS chuyên dụng.
+                      The system automatically extracts GPS and generates a companion GPX track. Only attach an external GPX file if you want to use a route from a dedicated GPS device.
                     </Text>
                     <AppInput
                       label="GPX file"
                       accessibilityLabel="Attached GPX track file"
                       editable={false}
                       showSoftInputOnFocus={false}
-                      value={displayGpxName || 'Tự động trích xuất từ GPS video'}
+                      value={displayGpxName || 'Auto-extracted from video GPS'}
                       placeholder="No GPX file attached"
                       leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
                       containerStyle={styles.imageLocationInput}
@@ -690,14 +690,14 @@ export function SurveyRecordDetailsScreen() {
                     {!isSubmitting ? (
                       <View style={styles.gpxActionsRow}>
                         <AppButton
-                          label={displayGpxName ? 'Chọn file GPX khác' : 'Chọn file GPX (.gpx)'}
+                          label={displayGpxName ? 'Choose different GPX file' : 'Choose GPX file (.gpx)'}
                           variant="surface"
                           onPress={handlePickGpx}
                           style={styles.attachGpxButton}
                         />
                         {displayGpxName ? (
                           <AppButton
-                            label="Dùng GPS tự động"
+                            label="Use auto GPS"
                             variant="ghost"
                             onPress={() => {
                               setSavedGpxUri(undefined);
@@ -774,12 +774,12 @@ export function SurveyRecordDetailsScreen() {
                     destination={
                       !isImageSubmission && endCoordinate
                         ? {
-                            coordinate: endCoordinate,
-                            id: 'survey-end',
-                            title: 'Điểm kết thúc',
-                            subtitle: 'Lộ trình khảo sát',
-                            category: 'recent',
-                          }
+                          coordinate: endCoordinate,
+                          id: 'survey-end',
+                          title: 'End Point',
+                          subtitle: 'Survey Route',
+                          category: 'recent',
+                        }
                         : undefined
                     }
                     routeCoordinates={
@@ -898,7 +898,7 @@ export function SurveyRecordDetailsScreen() {
             </View>
             <View style={styles.progressMetaRow}>
               <Text style={[styles.progressMetaText, { color: theme.textSecondary }]}>
-                {uploadProgress?.currentChunk ? `Đoạn ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Khởi tạo'}
+                {uploadProgress?.currentChunk ? `Part ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Initializing'}
               </Text>
               <Text style={[styles.progressMetaText, { color: theme.primary, fontWeight: '700' }]}>
                 {`${uploadProgress?.percent ?? 0}%`}

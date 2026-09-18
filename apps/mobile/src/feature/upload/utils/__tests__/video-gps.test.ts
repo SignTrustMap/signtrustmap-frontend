@@ -3,7 +3,9 @@ import {
   createCompanionGpxDescriptor,
   estimateEndCoordinate,
   estimateEndPoint,
+  extractVideoMetadata,
 } from '../video-gps';
+
 
 describe('video-gps utility', () => {
   const startCoord: [number, number] = [106.691383, 10.770046];
@@ -74,4 +76,39 @@ describe('video-gps utility', () => {
       expect(descriptor.uri).toMatch(/^data:application\/gpx\+xml;utf8,/);
     });
   });
+
+  describe('extractVideoMetadata', () => {
+    it('correctly extracts metadata from an asset with GPS coordinates', () => {
+      const metadata = extractVideoMetadata({
+        id: 'asset-123',
+        uri: 'file:///path/to/video.mp4',
+        filename: 'survey_run.mp4',
+        duration: 120,
+        creationTime: 1773830000000,
+        location: { latitude: 10.770046, longitude: 106.691383 },
+      });
+
+      expect(metadata.hasDeviceGps).toBe(true);
+      expect(metadata.startCoordinate).toEqual([106.691383, 10.770046]);
+      expect(metadata.durationSeconds).toBe(120);
+      expect(metadata.endCoordinate).toHaveLength(2);
+      expect(metadata.endCoordinate[0]).not.toBe(metadata.startCoordinate[0]);
+      expect(metadata.capturedAt).toBe(new Date(1773830000000).toISOString());
+    });
+
+    it('falls back gracefully when GPS coordinates are missing', () => {
+      const metadata = extractVideoMetadata({
+        id: 'asset-456',
+        uri: 'file:///path/to/no-gps.mp4',
+        filename: 'no_gps.mp4',
+        duration: 65,
+      });
+
+      expect(metadata.hasDeviceGps).toBe(false);
+      expect(metadata.durationSeconds).toBe(65);
+      expect(metadata.startCoordinate).toEqual([106.660172, 10.762622]);
+      expect(metadata.endCoordinate).toHaveLength(2);
+    });
+  });
 });
+

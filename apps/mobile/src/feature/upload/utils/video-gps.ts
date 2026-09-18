@@ -1,3 +1,5 @@
+import { extractGpsFromVideoFile } from './video-file-gps';
+
 export type VideoGpsData = {
   startCoordinate: [longitude: number, latitude: number];
   endCoordinate: [longitude: number, latitude: number];
@@ -28,7 +30,7 @@ export function estimateEndCoordinate(
 
   const endLatRad = Math.asin(
     Math.sin(startLatRad) * Math.cos(distanceMeters / earthRadius) +
-      Math.cos(startLatRad) * Math.sin(distanceMeters / earthRadius) * Math.cos(bearingRad),
+    Math.cos(startLatRad) * Math.sin(distanceMeters / earthRadius) * Math.cos(bearingRad),
   );
 
   const endLonRad =
@@ -111,3 +113,104 @@ export function createCompanionGpxDescriptor(params: {
   const name = params.fileName ?? `companion-track-${Date.now()}.gpx`;
   return { uri, name };
 }
+
+export type RawVideoAsset = {
+  id?: string;
+  uri: string;
+  filename?: string | null;
+  duration?: number;
+  creationTime?: number;
+  location?: { latitude: number; longitude: number } | null;
+  exif?: Record<string, unknown> | null;
+};
+
+/**
+ * Synchronously extracts and normalizes video metadata if coordinates are already known.
+ */
+export function extractVideoMetadata(asset: RawVideoAsset): VideoGpsData {
+  const durationSeconds = Number.isFinite(asset.duration) && asset.duration! > 0
+    ? Math.round(asset.duration! > 1000 ? asset.duration! / 1000 : asset.duration!)
+    : 60;
+
+  let capturedAt = new Date().toISOString();
+  if (asset.creationTime && asset.creationTime > 0) {
+    const d = new Date(asset.creationTime);
+    if (!Number.isNaN(d.getTime())) {
+      capturedAt = d.toISOString();
+    }
+  }
+
+  const lat = asset.location?.latitude;
+  const lon = asset.location?.longitude;
+  const hasValidGps = typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lon) <= 180;
+
+  const startCoordinate: [longitude: number, latitude: number] = hasValidGps
+    ? [Number.parseFloat(lon!.toFixed(6)), Number.parseFloat(lat!.toFixed(6))]
+    : [106.660172, 10.762622]; // Default reference coordinate
+
+  const endCoordinate = estimateEndPoint(startCoordinate, durationSeconds);
+
+  return {
+    startCoordinate,
+    endCoordinate,
+    durationSeconds,
+    capturedAt,
+    hasDeviceGps: hasValidGps,
+  };
+}
+
+/**
+ * Asynchronously extracts video metadata.
+ * If Android MediaStore redacted or missed GPS (e.g. dashcam NMEA, QuickTime atom, GoPro),
+ * reads directly from the MP4 video container header/footer to extract true GPS and duration.
+ */
+export async function extractVideoMetadataAsync(asset: RawVideoAsset): Promise<VideoGpsData> {
+  const syncResult = extractVideoMetadata(asset);
+
+  // If MediaStore already provided valid GPS and a sensible duration, return immediately
+  if (syncResult.hasDeviceGps && syncResult.durationSeconds > 1) {
+    return syncResult;
+  }
+
+  // Fallback: inspect video file container directly
+  try {
+    const fileMetadata = await extractGpsFromVideoFile(asset.uri);
+    if (fileMetadata) {
+      const durationSeconds = (fileMetadata.durationSeconds && fileMetadata.durationSeconds > 0)
+        ? fileMetadata.durationSeconds
+        : syncResult.durationSeconds;
+
+      const startCoordinate: [longitude: number, latitude: number] = [
+        fileMetadata.longitude,
+        fileMetadata.latitude,
+      ];
+      const endCoordinate = estimateEndPoint(startCoordinate, durationSeconds);
+
+      console.log('[VideoGps] Successfully extracted GPS from video container:', {
+        source: fileMetadata.source,
+        latitude: fileMetadata.latitude,
+        longitude: fileMetadata.longitude,
+        durationSeconds,
+      });
+
+      return {
+        startCoordinate,
+        endCoordinate,
+        durationSeconds,
+        capturedAt: syncResult.capturedAt,
+        hasDeviceGps: true,
+      };
+    }
+  } catch (err) {
+    console.warn('[VideoGps] Unable to inspect video file container for GPS:', err);
+  }
+
+  return syncResult;
+}
+
+

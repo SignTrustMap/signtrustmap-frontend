@@ -613,8 +613,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           ? {
                               coordinate: endCoord,
                               id: 'survey-end',
-                              title: 'Điểm kết thúc',
-                              subtitle: 'Lộ trình khảo sát',
+                              title: 'End Point',
+                              subtitle: 'Survey Route',
                               category: 'recent',
                             }
                           : undefined

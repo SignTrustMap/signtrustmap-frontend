@@ -28,6 +28,9 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
+import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
+import { extractGpsFromVideoFile } from '@/feature/upload/utils/video-file-gps';
+
 
 type SelectedSurveyMedia = {
   capturedAt?: string;
@@ -169,8 +172,37 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     }
 
     const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
-    return mediaLibraryExifCoordinates;
+    if (mediaLibraryExifCoordinates) return mediaLibraryExifCoordinates;
+
+    if (asset.type === 'video') {
+      const fileGps = await extractGpsFromVideoFile(asset.uri);
+      if (fileGps) {
+        console.log('[Surveyor] Extracted GPS data from video file container:', {
+          latitude: fileGps.latitude,
+          longitude: fileGps.longitude,
+          source: fileGps.source,
+        });
+        return { latitude: fileGps.latitude, longitude: fileGps.longitude };
+      }
+    }
+
+    return null;
   } catch (error) {
+    if (asset.type === 'video') {
+      try {
+        const fileGps = await extractGpsFromVideoFile(asset.uri);
+        if (fileGps) {
+          console.log('[Surveyor] Extracted GPS data from video file container (catch):', {
+            latitude: fileGps.latitude,
+            longitude: fileGps.longitude,
+            source: fileGps.source,
+          });
+          return { latitude: fileGps.latitude, longitude: fileGps.longitude };
+        }
+      } catch {
+        // continue to return null
+      }
+    }
     console.warn('[Surveyor] Unable to read original GPS metadata:', error);
     console.log('[Surveyor] Extracted GPS data:', null);
     return null;
@@ -290,15 +322,46 @@ export function NewSurveyRecordScreen() {
         gpsCoordinates ? { ...gpsCoordinates, source: 'media-library-original' } : null,
       );
 
-      setSelectedAsset({
-        capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
-        fileName: asset.filename,
-        type: assetType,
-        uri: assetInfo.localUri ?? asset.uri,
-        duration: asset.duration,
-        assetId: asset.id,
-      });
-      setSelectedGps(gpsCoordinates ?? null);
+      if (assetType === 'video') {
+        const videoMeta = await extractVideoMetadataAsync({
+          id: asset.id,
+          uri: assetInfo.localUri ?? asset.uri,
+          filename: asset.filename,
+          duration: asset.duration,
+          creationTime: asset.creationTime,
+          location: gpsCoordinates,
+          exif,
+        });
+
+        console.log('[Surveyor] Video GPS & duration result:', {
+          hasDeviceGps: videoMeta.hasDeviceGps,
+          startCoordinate: videoMeta.startCoordinate,
+          durationSeconds: videoMeta.durationSeconds,
+        });
+
+        setSelectedAsset({
+          capturedAt: videoMeta.capturedAt,
+          fileName: asset.filename,
+          type: 'video',
+          uri: assetInfo.localUri ?? asset.uri,
+          duration: videoMeta.durationSeconds,
+          assetId: asset.id,
+        });
+        setSelectedGps(videoMeta.hasDeviceGps ? {
+          latitude: videoMeta.startCoordinate[1],
+          longitude: videoMeta.startCoordinate[0],
+        } : null);
+      } else {
+        setSelectedAsset({
+          capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
+          fileName: asset.filename,
+          type: 'image',
+          uri: assetInfo.localUri ?? asset.uri,
+          duration: asset.duration,
+          assetId: asset.id,
+        });
+        setSelectedGps(gpsCoordinates ?? null);
+      }
       setSelectedGpxFile(undefined);
       setGpxPickerError(undefined);
       setIsAndroidGalleryVisible(false);
@@ -338,16 +401,41 @@ export function NewSurveyRecordScreen() {
         const assetType = asset.type === 'video' ? 'video' : 'image';
         const gpsCoordinates = await extractSelectedAssetGps(asset);
 
-        setSelectedAsset({
-          capturedAt: captureTimeFromExif(asset.exif),
-          fileName: asset.fileName,
-          mimeType: asset.mimeType,
-          type: assetType,
-          uri: asset.uri,
-          duration: asset.duration ? asset.duration / 1000 : undefined,
-          assetId: asset.assetId ?? undefined,
-        });
-        setSelectedGps(gpsCoordinates);
+        if (assetType === 'video') {
+          const videoMeta = await extractVideoMetadataAsync({
+            id: asset.assetId ?? undefined,
+            uri: asset.uri,
+            filename: asset.fileName,
+            duration: asset.duration ? asset.duration / 1000 : undefined,
+            location: gpsCoordinates ? { latitude: gpsCoordinates.latitude, longitude: gpsCoordinates.longitude } : null,
+            exif: asset.exif as Record<string, unknown> | undefined,
+          });
+
+          setSelectedAsset({
+            capturedAt: videoMeta.capturedAt,
+            fileName: asset.fileName,
+            mimeType: asset.mimeType,
+            type: 'video',
+            uri: asset.uri,
+            duration: videoMeta.durationSeconds,
+            assetId: asset.assetId ?? undefined,
+          });
+          setSelectedGps(videoMeta.hasDeviceGps ? {
+            latitude: videoMeta.startCoordinate[1],
+            longitude: videoMeta.startCoordinate[0],
+          } : null);
+        } else {
+          setSelectedAsset({
+            capturedAt: captureTimeFromExif(asset.exif),
+            fileName: asset.fileName,
+            mimeType: asset.mimeType,
+            type: 'image',
+            uri: asset.uri,
+            duration: asset.duration ? asset.duration / 1000 : undefined,
+            assetId: asset.assetId ?? undefined,
+          });
+          setSelectedGps(gpsCoordinates);
+        }
         setSelectedGpxFile(undefined);
         setGpxPickerError(undefined);
       }
@@ -429,14 +517,23 @@ export function NewSurveyRecordScreen() {
     setIsSaving(true);
     setIsScanning(true);
     const isVideo = selectedAsset.type === 'video';
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const parsedCaptureTime = selectedAsset.capturedAt ? Date.parse(selectedAsset.capturedAt) : NaN;
+    const isCaptureValid =
+      !Number.isNaN(parsedCaptureTime) &&
+      (Date.now() - parsedCaptureTime) >= 0 &&
+      (Date.now() - parsedCaptureTime) < THIRTY_DAYS_MS;
+    const safeCapturedAt = isCaptureValid ? selectedAsset.capturedAt! : new Date().toISOString();
+
     try {
       savedDraftId.current = await saveDraft({
-        ...selectedAsset,
         fileName: selectedAsset.fileName ?? undefined,
+        mimeType: selectedAsset.mimeType,
         type: selectedAsset.type,
+        uri: selectedAsset.uri,
       }, {
         submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-        capturedAt: selectedAsset.capturedAt ?? new Date().toISOString(),
+        capturedAt: safeCapturedAt,
         coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
         ...(selectedGps ?? {}),
       }, draftId, selectedGpxFile);
@@ -708,7 +805,7 @@ export function NewSurveyRecordScreen() {
                 style={styles.advancedGpxToggle}
               >
                 <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
-                  {showAdvancedGpx ? 'Hide external GPX option' : 'Tùy chọn nâng cao: Đính kèm file GPX ngoài (không bắt buộc)'}
+                  {showAdvancedGpx ? 'Hide external GPX option' : 'Advanced option: Attach external GPX file (optional)'}
                 </Text>
               </Pressable>
 
