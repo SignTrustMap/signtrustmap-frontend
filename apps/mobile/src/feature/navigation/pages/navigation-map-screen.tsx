@@ -14,6 +14,7 @@ import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-ca
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
+  currentLocation,
   previousLocations,
   startLocations,
   type MapCoordinate,
@@ -276,7 +277,7 @@ export function NavigationMapScreen() {
   // 2: Full range (expanded view showing the full sign filter list and Start button)
   const peekSheetHeight = routeStart
     ? isNavigating
-      ? 80 + bottomInset   // navigation mode: compact bar (handle + header row only)
+      ? 96 + bottomInset   // navigation mode: compact bar (handle + header row only)
       : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
     : Math.min(180, windowHeight * 0.22);
   const midSheetHeight = routeStart
@@ -623,6 +624,27 @@ export function NavigationMapScreen() {
     userCoordinate,
   ]);
 
+  const currentRouteProgress = useMemo(() => {
+    const navigationCoordinate = userCoordinate ?? routeStart;
+    if (!isNavigating || !navigationCoordinate || !routeCoordinates?.length) {
+      return 0;
+    }
+    return getRouteProgressMeters(navigationCoordinate, routeCoordinates);
+  }, [isNavigating, userCoordinate, routeStart, routeCoordinates]);
+
+  const remainingNavDistance = useMemo(() => {
+    if (routeDistance === undefined) return undefined;
+    if (!isNavigating) return routeDistance;
+    return Math.max(0, routeDistance - currentRouteProgress);
+  }, [routeDistance, isNavigating, currentRouteProgress]);
+
+  const remainingNavDuration = useMemo(() => {
+    if (activeDuration === undefined || routeDistance === undefined) return activeDuration;
+    if (!isNavigating || routeDistance === 0) return activeDuration;
+    const fraction = Math.max(0, (remainingNavDistance ?? routeDistance) / routeDistance);
+    return Math.max(0, Math.round(activeDuration * fraction));
+  }, [activeDuration, routeDistance, isNavigating, remainingNavDistance]);
+
   const { activeAlert: activeSignAlert } = useSignProximityAlert({
     alertDistanceMeters: 50,
     isNavigating,
@@ -926,10 +948,10 @@ export function NavigationMapScreen() {
           }
           focusRequestId={mapFocus?.requestId}
           navigationActive={
-            Platform.OS !== "web" &&
-            isNavigating &&
-            Boolean(navigationSession?.hasLiveLocation)
+            Platform.OS !== "web" && isNavigating
           }
+          userCoordinate={userCoordinate ?? routeStart}
+          hasLiveLocation={hasLiveLocation}
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
           routeSigns={filteredSigns}
@@ -1006,6 +1028,32 @@ export function NavigationMapScreen() {
               ))}
             </View>
           </SafeAreaView>
+        ) : null}
+
+        {/* Floating Re-center button during navigation */}
+        {isNavigating ? (
+          <Pressable
+            accessibilityLabel="Về giữa"
+            accessibilityRole="button"
+            onPress={() => {
+              setMapFocus((current) => ({
+                coordinate: userCoordinate ?? routeStart ?? currentLocation.coordinate,
+                requestId: (current?.requestId ?? 0) + 1,
+              }));
+            }}
+            style={({ pressed }) => [
+              styles.navRecenterButton,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+                bottom: 108 + bottomInset,
+                opacity: pressed ? 0.75 : 1,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
+            <Text style={[styles.navRecenterText, { color: theme.primary }]}>Về giữa</Text>
+          </Pressable>
         ) : null}
 
         {!isNavigating ? (
@@ -1328,29 +1376,71 @@ export function NavigationMapScreen() {
           {routeStart ? (
             /* When starting point and destination have been selected: STRICTLY FOLLOW SCREENSHOT STRUCTURE */
             <View style={styles.routeSheetContainer}>
-              {/* Header row: X on left, time+distance centred — layout swaps when navigating */}
+              {/* Header row: X on left, Google Maps ETA & distance centered, route options on right */}
               {isNavigating ? (
                 <View style={styles.routeHeaderRowNavigating}>
-                  <AppButton
-                    accessibilityLabel="Stop navigation"
+                  <Pressable
+                    accessibilityLabel="Dừng điều hướng"
+                    accessibilityRole="button"
                     onPress={handleCloseRoute}
-                    style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
-                    variant="ghost"
+                    style={({ pressed }) => [
+                      styles.navActionButton,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.border,
+                        opacity: pressed ? 0.75 : 1,
+                      },
+                    ]}
                   >
-                    <AntDesign name="close" size={18} color={theme.text} />
-                  </AppButton>
-                  <View style={styles.routeHeaderCentred}>
-                    <Text numberOfLines={1} style={[styles.headerDurationText, { color: theme.text }]}>
-                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
-                    </Text>
-                    {routeDistance !== undefined ? (
-                      <Text style={[styles.headerDistanceText, { color: theme.textSecondary }]}>
-                        {`(${formatRouteDistanceInKilometers(routeDistance)})`}
+                    <AntDesign name="close" size={20} color={theme.text} />
+                  </Pressable>
+
+                  <View style={styles.navTimeInfoContainer}>
+                    {/* Dòng trên: Estimated time + leaf icon */}
+                    <View style={styles.navEstimatedTimeRow}>
+                      <Text style={[styles.navEstimatedTimeText, { color: '#E65100' }]}>
+                        {formatRouteEstimatedTime(remainingNavDuration ?? activeDuration)}
                       </Text>
-                    ) : null}
+                      <MaterialCommunityIcons
+                        name="leaf"
+                        size={19}
+                        color="#16A34A"
+                        style={styles.navLeafIcon}
+                      />
+                    </View>
+
+                    {/* Dòng dưới: Distance • Arrival time */}
+                    <View style={styles.navSubInfoRow}>
+                      <Text style={[styles.navSubInfoText, { color: theme.textSecondary }]}>
+                        {(remainingNavDistance ?? routeDistance) !== undefined
+                          ? formatRouteNavDistance(remainingNavDistance ?? routeDistance!)
+                          : '-- km'}
+                      </Text>
+                      <Text style={[styles.navSubInfoDot, { color: theme.textSecondary }]}>•</Text>
+                      <Text style={[styles.navSubInfoText, { color: theme.textSecondary }]}>
+                        {formatRouteArrivalTime(remainingNavDuration ?? activeDuration)}
+                      </Text>
+                    </View>
                   </View>
-                  {/* Spacer to balance the X button */}
-                  <View style={styles.sheetCloseButton} />
+
+                  <Pressable
+                    accessibilityLabel="Tùy chọn lộ trình"
+                    accessibilityRole="button"
+                    onPress={() => {
+                      const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
+                      snapTo(nextIndex);
+                    }}
+                    style={({ pressed }) => [
+                      styles.navActionButton,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.border,
+                        opacity: pressed ? 0.75 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons name="routes" size={22} color={theme.text} />
+                  </Pressable>
                 </View>
               ) : (
                 <View style={styles.routeHeaderRow}>
@@ -1690,6 +1780,29 @@ function formatRouteDuration(durationInSeconds: number) {
   const minutes = totalMinutes % 60;
 
   return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
+}
+
+function formatRouteEstimatedTime(durationInSeconds: number) {
+  const totalMinutes = Math.max(1, Math.round(durationInSeconds / 60));
+  if (totalMinutes < 60) return `${totalMinutes} phút`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours} giờ ${minutes} phút` : `${hours} giờ`;
+}
+
+function formatRouteNavDistance(distanceInMeters: number) {
+  if (distanceInMeters < 1000) {
+    return `${Math.round(distanceInMeters)} m`;
+  }
+  return `${(distanceInMeters / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+function formatRouteArrivalTime(durationInSeconds: number) {
+  const arrivalDate = new Date(Date.now() + durationInSeconds * 1000);
+  const hours = arrivalDate.getHours();
+  const minutes = arrivalDate.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 const styles = StyleSheet.create({
@@ -2295,7 +2408,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.half,
+    paddingHorizontal: Spacing.half,
+    marginBottom: Spacing.one,
+  },
+  navActionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  navTimeInfoContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.two,
+  },
+  navEstimatedTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navEstimatedTimeText: {
+    fontFamily: Fonts.body,
+    fontSize: 23,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  navLeafIcon: {
+    marginLeft: 4,
+  },
+  navSubInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  navSubInfoText: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  navSubInfoDot: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  navRecenterButton: {
+    position: 'absolute',
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
+  },
+  navRecenterText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
   },
   routeHeaderCentred: {
     flex: 1,

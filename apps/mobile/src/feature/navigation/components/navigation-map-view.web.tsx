@@ -18,9 +18,14 @@ type NavigationMapViewProps = {
   destination?: PreviousLocation;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
+  navigationActive?: boolean;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeSigns?: RouteSign[];
+  showCurrentLocation?: boolean;
+  isNavigatingFeature?: boolean;
+  userCoordinate?: MapCoordinate;
+  hasLiveLocation?: boolean;
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');

@@ -1,5 +1,5 @@
-import type { MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
-import { useEffect, useRef, useState } from 'react';
+import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
@@ -12,6 +12,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
+import { calculateBearing, calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -24,6 +25,8 @@ type NavigationMapViewProps = {
   routeSigns?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
+  userCoordinate?: MapCoordinate;
+  hasLiveLocation?: boolean;
 };
 
 const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
@@ -147,6 +150,8 @@ export function NavigationMapView({
   routeSigns = [],
   showCurrentLocation = true,
   isNavigatingFeature = false,
+  userCoordinate,
+  hasLiveLocation = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
@@ -187,6 +192,71 @@ export function NavigationMapView({
       },
     } as GeoJSON.Feature<GeoJSON.LineString>)
     : null;
+
+  // Calculate forward bearing aligned with the route ahead for Google Maps-style navigation
+  const forwardBearing = useMemo(() => {
+    const origin = userCoordinate ?? routeStart;
+    return getRouteForwardBearing(origin, routeCoordinates);
+  }, [userCoordinate, routeStart, routeCoordinates]);
+
+  const cameraRef = useRef<CameraRef>(null);
+
+  // Imperatively command the camera into Google Maps 3D navigation perspective
+  useEffect(() => {
+    if (!navigationActive) return;
+
+    const origin = userCoordinate ?? routeStart ?? cameraCenter;
+    const bearing = getRouteForwardBearing(origin, routeCoordinates);
+
+    const triggerFly = () => {
+      cameraRef.current?.setStop({
+        center: origin,
+        zoom: 18,
+        pitch: 55,
+        bearing,
+        padding: {
+          bottom: 220,
+          left: 24,
+          right: 24,
+          top: 100,
+        },
+        duration: 1200,
+        easing: 'fly',
+      });
+    };
+
+    triggerFly();
+    const t1 = setTimeout(triggerFly, 150);
+    const t2 = setTimeout(triggerFly, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [navigationActive, focusRequestId]);
+
+  // Smoothly track user movement and update forward bearing during active navigation
+  useEffect(() => {
+    if (!navigationActive || !userCoordinate) return;
+
+    const bearing = getRouteForwardBearing(userCoordinate, routeCoordinates);
+
+    cameraRef.current?.setStop({
+      center: userCoordinate,
+      zoom: 18,
+      pitch: 55,
+      bearing,
+      padding: {
+        bottom: 220,
+        left: 24,
+        right: 24,
+        top: 100,
+      },
+      duration: 600,
+      easing: 'ease',
+    });
+  }, [navigationActive, userCoordinate, routeCoordinates]);
+
   if (!mapLibre) {
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
@@ -224,19 +294,22 @@ export function NavigationMapView({
     >
       {navigationActive ? (
         <Camera
-          duration={900}
+          ref={cameraRef}
+          bearing={forwardBearing}
+          center={userCoordinate ?? routeStart ?? currentLocation.coordinate}
+          duration={1200}
           easing="fly"
+          key="navigation-active-camera"
           maxZoom={19}
           minZoom={11}
           padding={{
-            bottom: 320,
+            bottom: 220,
             left: 24,
             right: 24,
-            top: 80,
+            top: 100,
           }}
-          trackUserLocation="heading"
+          pitch={55}
           zoom={18}
-          pitch={45}
         />
       ) : focusCoordinate ? (
         <Camera
@@ -309,7 +382,21 @@ export function NavigationMapView({
       ))}
 
       {navigationActive ? (
-        <UserLocation accuracy animated heading minDisplacement={1} />
+        <>
+          {hasLiveLocation ? (
+            <UserLocation accuracy animated heading minDisplacement={1} />
+          ) : (
+            <Marker
+              anchor="center"
+              id="navigation-current-location"
+              lngLat={userCoordinate ?? routeStart ?? currentLocation.coordinate}
+            >
+              <View style={styles.navLocationHalo}>
+                <View style={styles.navLocationDot} />
+              </View>
+            </Marker>
+          )}
+        </>
       ) : showCurrentLocation ? (
         <Marker
           anchor="center"
@@ -324,7 +411,7 @@ export function NavigationMapView({
         </Marker>
       ) : null}
 
-      {routeStart ? (
+      {routeStart && !navigationActive ? (
         <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
           <View style={styles.startMarker}>
             <Text style={styles.startMarkerText}>S</Text>
@@ -440,6 +527,27 @@ const styles = StyleSheet.create({
     // borderTopColor is set inline from theme
   },
   // ── Location markers ─────────────────────────────────────────────────────────
+  navLocationHalo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(26, 115, 232, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navLocationDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#1A73E8',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    elevation: 4,
+  },
   currentLocationHalo: {
     width: 58,
     height: 58,
