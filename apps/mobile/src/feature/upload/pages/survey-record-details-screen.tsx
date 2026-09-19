@@ -172,7 +172,11 @@ export function SurveyRecordDetailsScreen() {
       || (activeGpxUri !== initialBaseline!.gpxUri)
     ));
   const submissionStatus = draftQuery.data?.submission.status;
-  const isEditable = isDirty || submissionStatus === 'DRAFT' || submissionStatus === 'PENDING_CORRECTION';
+  const isEditable =
+    isDirty ||
+    submissionStatus === 'DRAFT' ||
+    submissionStatus === 'PENDING_CORRECTION' ||
+    submissionStatus === 'FAILED';
 
   // GPX fields are only relevant for video-based (VIDEO_GPX) submissions.
   // For plain image submissions we hide the GPX section entirely.

@@ -21,7 +21,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { resolveCdnUrl } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/ui/button';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
-import { useGetSurveySubmissionStatus, useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import {
+  useGetSurveySubmissionStatus,
+  useGetMySubmissions,
+  useSubmitSurveySubmission,
+} from '@/feature/upload/hooks/use-survey-submission';
 import { useTheme } from '@/hooks/use-theme';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
@@ -103,6 +107,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [isRetryModalVisible, setIsRetryModalVisible] = useState(false);
+  const [isSubmittingRetry, setIsSubmittingRetry] = useState(false);
+  const [retryError, setRetryError] = useState<string>();
+  const [successToast, setSuccessToast] = useState<string>();
+
+  const { mutateAsync: submitSubmission } = useSubmitSurveySubmission();
 
   // 1. Fetch detailed submission status including attached mediaFiles & candidates
   const {
@@ -153,6 +163,43 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
   const statusColor = getStatusColor(submission?.status || 'QUEUED');
 
+  const isFailed = submission?.status === 'FAILED';
+  const canRetry = isFailed || submission?.status === 'PENDING_CORRECTION';
+
+  const handleDirectResubmit = async () => {
+    if (!submission?.id || isSubmittingRetry) return;
+    setIsSubmittingRetry(true);
+    setRetryError(undefined);
+
+    try {
+      await submitSubmission({ submissionId: submission.id });
+      setIsRetryModalVisible(false);
+      setSuccessToast('Survey resubmitted successfully! It is now queued for processing.');
+      setTimeout(() => setSuccessToast(undefined), 4000);
+      void refetch();
+    } catch (err) {
+      console.warn('[Surveyor] Direct resubmit error:', err);
+      const msg = err instanceof Error ? err.message : 'Unable to resubmit. Please try editing details first.';
+      setRetryError(msg);
+    } finally {
+      setIsSubmittingRetry(false);
+    }
+  };
+
+  const handleEditAndResubmit = () => {
+    if (!submission?.id) return;
+    setIsRetryModalVisible(false);
+    setRetryError(undefined);
+    router.push({
+      pathname: '/work/new-survey/details',
+      params: {
+        submissionId: submission.id,
+        ...(submission.latitude != null ? { startLat: String(submission.latitude) } : {}),
+        ...(submission.longitude != null ? { startLon: String(submission.longitude) } : {}),
+      },
+    });
+  };
+
   const handleCopyId = async () => {
     if (!submission?.id) return;
     await Clipboard.setStringAsync(submission.id);
@@ -202,19 +249,50 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             ) : null}
           </View>
 
-          <Pressable
-            accessibilityLabel="Refresh submission data"
-            accessibilityRole="button"
-            hitSlop={Spacing.one}
-            onPress={() => { void refetch(); }}
-            style={styles.refreshButton}
-          >
-            {isRefetching ? (
-              <ActivityIndicator color={theme.primary} size="small" />
-            ) : (
-              <AntDesign color={theme.text} name="reload" size={18} />
-            )}
-          </Pressable>
+          <View style={styles.headerActions}>
+            {canRetry ? (
+              <Pressable
+                accessibilityLabel="Retry submission"
+                accessibilityRole="button"
+                hitSlop={Spacing.one}
+                onPress={() => {
+                  setRetryError(undefined);
+                  setIsRetryModalVisible(true);
+                }}
+                disabled={isSubmittingRetry}
+                style={[
+                  styles.retryHeaderButton,
+                  {
+                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                    borderColor: 'rgba(239, 68, 68, 0.35)',
+                  },
+                ]}
+              >
+                {isSubmittingRetry ? (
+                  <ActivityIndicator color="#EF4444" size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons color="#EF4444" name="replay" size={16} />
+                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>Retry</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              accessibilityLabel="Refresh submission data"
+              accessibilityRole="button"
+              hitSlop={Spacing.one}
+              onPress={() => { void refetch(); }}
+              style={styles.refreshButton}
+            >
+              {isRefetching ? (
+                <ActivityIndicator color={theme.primary} size="small" />
+              ) : (
+                <AntDesign color={theme.text} name="reload" size={18} />
+              )}
+            </Pressable>
+          </View>
         </View>
 
         {isStatusLoading && !submission ? (
@@ -272,10 +350,40 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </Text>
               </View>
 
-              {submission.failureReason ? (
-                <View style={[styles.failureAlert, { backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}>
-                  <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={18} />
-                  <Text style={styles.failureText}>{submission.failureReason}</Text>
+              {submission.failureReason || isFailed ? (
+                <View
+                  style={[
+                    styles.failureAlert,
+                    {
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      borderColor: 'rgba(239, 68, 68, 0.25)',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.failureAlertHeader}>
+                    <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={20} />
+                    <View style={styles.failureAlertTextWrap}>
+                      <Text style={styles.failureAlertTitle}>Submission Processing Failed</Text>
+                      <Text style={styles.failureText}>
+                        {submission.failureReason || 'An error occurred during AI processing. You can retry submitting this survey.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.failureAlertActions}>
+                    <Pressable
+                      accessibilityLabel="Resubmit survey"
+                      accessibilityRole="button"
+                      onPress={() => {
+                        setRetryError(undefined);
+                        setIsRetryModalVisible(true);
+                      }}
+                      style={[styles.failureActionRetryBtn, { backgroundColor: '#EF4444' }]}
+                    >
+                      <MaterialCommunityIcons color="#FFFFFF" name="replay" size={15} />
+                      <Text style={styles.failureActionRetryBtnText}>Resubmit Survey</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ) : null}
 
@@ -728,6 +836,110 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             </SafeAreaView>
           </View>
         </Modal>
+        {/* Floating Success Toast */}
+        {successToast ? (
+          <View pointerEvents="none" style={styles.floatingToastContainer}>
+            <View style={[styles.successToast, { backgroundColor: '#16A34A' }]}>
+              <MaterialCommunityIcons color="#FFFFFF" name="check-circle" size={18} />
+              <Text style={styles.successToastText}>{successToast}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Retry / Resubmit Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          onRequestClose={() => {
+            if (!isSubmittingRetry) {
+              setIsRetryModalVisible(false);
+              setRetryError(undefined);
+            }
+          }}
+          transparent
+          visible={isRetryModalVisible}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (!isSubmittingRetry) {
+                  setIsRetryModalVisible(false);
+                  setRetryError(undefined);
+                }
+              }}
+            />
+            <View
+              style={[
+                styles.retryModalCard,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              {/* Modal Header */}
+              <View style={styles.retryModalHeader}>
+                <View style={[styles.retryModalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  <MaterialCommunityIcons color="#EF4444" name="replay" size={26} />
+                </View>
+                <View style={styles.retryModalHeaderText}>
+                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>Resubmit Survey</Text>
+                  <Text style={[styles.retryModalSubtitle, { color: theme.placeholder }]}>
+                    #{submission?.id.slice(0, 10)} · {submission ? submissionTypeLabels[submission.submissionType] : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Modal Description */}
+              <Text style={[styles.retryModalBodyText, { color: theme.textSecondary }]}>
+                Choose how you would like to resubmit this survey. You can send it directly to be reprocessed by the AI pipeline, or edit the metadata and GPS coordinates first.
+              </Text>
+
+              {submission?.failureReason ? (
+                <View style={[styles.retryModalFailureBox, { backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}>
+                  <Text style={styles.retryModalFailureLabel}>Failure Reason:</Text>
+                  <Text style={styles.retryModalFailureText}>{submission.failureReason}</Text>
+                </View>
+              ) : null}
+
+              {retryError ? (
+                <View style={[styles.retryModalErrorBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  <MaterialCommunityIcons color="#EF4444" name="alert-circle" size={16} />
+                  <Text style={styles.retryModalErrorText}>{retryError}</Text>
+                </View>
+              ) : null}
+
+              {/* Modal Actions */}
+              <View style={styles.retryModalActions}>
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label={isSubmittingRetry ? 'Resubmitting…' : 'Resubmit Now'}
+                  onPress={handleDirectResubmit}
+                  style={styles.retryModalActionBtn}
+                  variant="primary"
+                />
+
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label="Edit Details & Resubmit"
+                  onPress={handleEditAndResubmit}
+                  style={styles.retryModalActionBtn}
+                  variant="surface"
+                />
+
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label="Cancel"
+                  onPress={() => {
+                    setIsRetryModalVisible(false);
+                    setRetryError(undefined);
+                  }}
+                  variant="ghost"
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -846,18 +1058,184 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   failureAlert: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
+    padding: 12,
     borderRadius: Rounded.md,
   },
-  failureText: {
+  failureAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  failureAlertTextWrap: {
     flex: 1,
+  },
+  failureAlertTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  failureText: {
     color: '#EF4444',
     fontFamily: Fonts.body,
     fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  failureAlertActions: {
+    marginTop: Spacing.two,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  failureActionRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
+    borderRadius: Rounded.md,
+  },
+  failureActionRetryBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  retryHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  retryHeaderButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  floatingToastContainer: {
+    position: 'absolute',
+    top: 70,
+    left: Spacing.two,
+    right: Spacing.two,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  successToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Rounded.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successToastText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
     fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.three,
+  },
+  retryModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: Rounded.xlg,
+    borderWidth: 1,
+    padding: Spacing.three,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  retryModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  retryModalIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryModalHeaderText: {
+    flex: 1,
+  },
+  retryModalTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  retryModalSubtitle: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  retryModalBodyText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: Spacing.two,
+  },
+  retryModalFailureBox: {
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.two,
+  },
+  retryModalFailureLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  retryModalFailureText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  retryModalErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.two,
+  },
+  retryModalErrorText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: '#EF4444',
+    flex: 1,
+  },
+  retryModalActions: {
+    gap: Spacing.one,
+    marginTop: Spacing.one,
+  },
+  retryModalActionBtn: {
+    minHeight: 44,
   },
   pipelineContainer: {
     flexDirection: 'row',
