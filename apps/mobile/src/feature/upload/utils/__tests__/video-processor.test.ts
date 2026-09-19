@@ -1,6 +1,7 @@
 import {
   calculateTemporalChunks,
   sliceVideoChunk,
+  prepareVideoChunk,
   MAX_BACKEND_CHUNK_BYTES,
 } from '../video-processor';
 
@@ -27,11 +28,13 @@ describe('video-processor utility', () => {
       expect(plan.chunkSize).toBeLessThanOrEqual(MAX_BACKEND_CHUNK_BYTES);
     });
 
-    it('enforces backend maximum chunk size (45MB safety threshold)', () => {
+    it('enforces backend maximum chunk size (45MB safety threshold under 52428800 bytes limit)', () => {
       // Very high bitrate video: 100MB for 1 minute
       const plan = calculateTemporalChunks(100 * 1024 * 1024, 60);
       expect(plan.chunkSize).toBeLessThanOrEqual(MAX_BACKEND_CHUNK_BYTES);
       expect(plan.totalChunks).toBeGreaterThanOrEqual(3);
+      // Ensure backend rule is strictly satisfied: totalSizeBytes <= totalChunks * 52428800
+      expect(100 * 1024 * 1024).toBeLessThanOrEqual(plan.totalChunks * 52428800);
     });
   });
 
@@ -61,6 +64,32 @@ describe('video-processor utility', () => {
       expect(mockBlob.slice).toHaveBeenCalledWith(2000, 3000, 'video/mp4');
       expect(chunk2.chunkIndex).toBe(2);
       expect(chunk2.fileName).toBe('survey.mp4.part_2');
+    });
+  });
+
+  describe('prepareVideoChunk', () => {
+    it('returns direct file reference when totalChunks is 1 without extra disk/RAM overhead', async () => {
+      const plan = {
+        totalChunks: 1,
+        chunkSize: 10000,
+        totalSizeBytes: 10000,
+        durationSeconds: 10,
+      };
+
+      const prepared = await prepareVideoChunk({
+        videoUri: 'file:///data/user/0/com.anonymous.mobile/cache/video.mp4',
+        chunkIndex: 0,
+        plan,
+        fileName: 'video.mp4',
+        sessionId: 'test-session',
+      });
+
+      expect(prepared.request.chunkIndex).toBe(0);
+      expect(prepared.request.fileName).toBe('video.mp4');
+      expect('uri' in prepared.request.file).toBe(true);
+      if ('uri' in prepared.request.file) {
+        expect(prepared.request.file.uri).toBe('file:///data/user/0/com.anonymous.mobile/cache/video.mp4');
+      }
     });
   });
 });

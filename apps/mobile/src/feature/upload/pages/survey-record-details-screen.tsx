@@ -397,6 +397,16 @@ export function SurveyRecordDetailsScreen() {
     try {
       const formattedCapturedAt = new Date(captureTimestamp).toISOString();
 
+      console.log('[Surveyor] handleSubmit started:', {
+        submissionId,
+        isVideoDraft,
+        imageUri,
+        durationSec,
+        startCoordinate: effectiveStart,
+        endCoordinate,
+        capturedAt: formattedCapturedAt,
+      });
+
       if (isVideoDraft) {
         if (!imageUri) {
           throw new Error('This draft has no video media available. Choose the file again.');
@@ -404,6 +414,7 @@ export function SurveyRecordDetailsScreen() {
 
         const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
 
+        console.log('[Surveyor] Starting executeChunkedVideoUpload...');
         // 1. Chunked video upload (1-minute temporal chunks down-res 640p + companion GPX)
         await executeChunkedVideoUpload({
           submissionId,
@@ -417,9 +428,11 @@ export function SurveyRecordDetailsScreen() {
           manualGpxUri: activeGpxUri,
           manualGpxName: activeGpxName,
           onProgress: (info) => {
+            console.log('[Surveyor] Upload progress:', info);
             setUploadProgress(info);
           },
         });
+        console.log('[Surveyor] executeChunkedVideoUpload finished.');
 
         // 2. Register zero-copy draft for high-res 4K RoI cropping
         await registerZeroCopyDraft(submissionId, imageUri, assetId);
@@ -428,6 +441,7 @@ export function SurveyRecordDetailsScreen() {
         startSmartPollingSync(submissionId, imageUri, session.accessToken);
 
         // 4. Update submission metadata with GPX_FILE and coordinates
+        console.log('[Surveyor] Updating submission metadata with GPX_FILE coordinates...');
         await updateSubmission({
           submissionId,
           request: {
@@ -438,6 +452,7 @@ export function SurveyRecordDetailsScreen() {
             note: note.trim(),
           },
         });
+        console.log('[Surveyor] Submission metadata updated successfully.');
       } else {
         // Single Image Upload Flow
         const request: CreateSubmissionDto = {
@@ -467,8 +482,10 @@ export function SurveyRecordDetailsScreen() {
       }
 
       // 5. Submit to finalize
+      console.log('[Surveyor] Finalizing submission via submitSubmission...');
       const submitted = await submitSubmission({ submissionId });
       const submissionStatus = readSubmittedStatus(submitted);
+      console.log('[Surveyor] Submission finalized:', { submissionId, submissionStatus });
       router.replace({
         pathname: '/work/survey-finish',
         params: {
@@ -477,6 +494,7 @@ export function SurveyRecordDetailsScreen() {
         },
       });
     } catch (error) {
+      console.error('[Surveyor] handleSubmit ERROR:', error);
       setSubmitError(
         error instanceof Error ? error.message : 'The survey could not be submitted. Please retry.',
       );

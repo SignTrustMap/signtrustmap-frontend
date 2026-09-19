@@ -87,15 +87,24 @@ export async function apiRequest<T>(
     const headers = new Headers(options.headers);
     if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
+    const method = options.method || "GET";
     const baseUrl = apiBaseUrl();
+    const fullUrl = `${baseUrl}${path}`;
+    console.log(`[ApiClient] -> ${method} ${fullUrl}`);
+
     let response: Response;
     try {
-        response = await fetch(`${baseUrl}${path}`, { ...options, headers });
+        response = await fetch(fullUrl, { ...options, headers });
     } catch (error) {
         if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+            console.warn(`[ApiClient] Request aborted: ${method} ${fullUrl}`);
             throw error;
         }
         const cause = error instanceof Error ? error.message : String(error);
+        console.error(`[ApiClient] NETWORK ERROR on ${method} ${fullUrl}:`, {
+            cause,
+            error,
+        });
         throw new Error(`Failed to connect to backend at ${baseUrl}: ${cause}`);
     }
 
@@ -106,15 +115,20 @@ export async function apiRequest<T>(
         try {
             body = JSON.parse(text);
         } catch {
-            body = undefined;
+            body = text;
         }
     }
 
     if (!response.ok) {
-        const err = new ApiError(
-            errorMessage(body as ApiErrorBody | undefined, response.status),
-            response.status,
-        );
+        const message = errorMessage(body as ApiErrorBody | undefined, response.status);
+        console.error(`[ApiClient] <- ${method} ${path} [HTTP ${response.status}] FAILED:`, {
+            status: response.status,
+            statusText: response.statusText,
+            url: fullUrl,
+            message,
+            body,
+        });
+        const err = new ApiError(message, response.status);
         // Notify the app that the token is no longer valid so it can redirect
         // to the login screen.
         if (response.status === 401 || response.status === 403) {
@@ -123,6 +137,7 @@ export async function apiRequest<T>(
         throw err;
     }
 
+    console.log(`[ApiClient] <- ${method} ${path} [HTTP ${response.status}] OK`);
     return body as T;
 }
 

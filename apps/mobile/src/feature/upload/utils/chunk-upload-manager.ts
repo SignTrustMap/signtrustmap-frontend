@@ -4,7 +4,12 @@ import {
   initializeSurveyUpload,
   uploadSurveyChunk,
 } from '@/api/survey-submission/survey-submission';
-import { calculateTemporalChunks, sliceVideoChunk } from './video-processor';
+import {
+  calculateTemporalChunks,
+  getVideoFileSizeBytes,
+  prepareVideoChunk,
+  MAX_BACKEND_CHUNK_BYTES,
+} from './video-processor';
 import { prepareSurveyGpx } from './survey-image';
 import { createCompanionGpxDescriptor } from './video-gps';
 
@@ -78,6 +83,8 @@ export async function executeChunkedVideoUpload(
     signal,
   } = params;
 
+  console.log(`[ChunkUpload] Starting upload pipeline: submissionId=${submissionId}, videoUri=${videoUri}, duration=${durationSeconds}s`);
+
   onProgress?.({
     currentChunk: 0,
     totalChunks: 1,
@@ -86,19 +93,15 @@ export async function executeChunkedVideoUpload(
     statusText: 'Preparing video for chunk upload...',
   });
 
-  // Read the source video Blob lazily without loading the entire file into an ArrayBuffer
-  const response = await fetch(videoUri);
-  if (!response.ok && /^https?:/i.test(videoUri)) {
-    throw new Error('Unable to read video for chunked upload.');
-  }
-  const fullBlob = await response.blob();
-
-
   const fileName = videoFileName?.trim()
     || videoUri.split('/').pop()?.split('?')[0]
     || `survey-video-${Date.now()}.mp4`;
 
-  const plan = calculateTemporalChunks(fullBlob.size, durationSeconds);
+  // Safely inspect video file size without reading entire file into memory
+  // Caps chunk size at MAX_BACKEND_CHUNK_BYTES (45MB safety margin under backend's 50MB / 52428800 bytes limit)
+  const totalSizeBytes = await getVideoFileSizeBytes(videoUri);
+  const plan = calculateTemporalChunks(totalSizeBytes, durationSeconds, MAX_BACKEND_CHUNK_BYTES);
+  console.log(`[ChunkUpload] Video file: "${fileName}", size=${totalSizeBytes} bytes, duration=${durationSeconds}s. Computed plan: ${plan.totalChunks} chunks of ~${plan.chunkSize} bytes.`);
 
   // 1. Initialize or resume video upload session
   let sessionId = existingSessionId;
@@ -106,21 +109,30 @@ export async function executeChunkedVideoUpload(
 
   if (sessionId) {
     try {
+      console.log(`[ChunkUpload] Checking existing session: ${sessionId}`);
       const sessionInfo = await getSurveyUploadSession(sessionId, accessToken, signal);
       if (sessionInfo.session.status === 'COMPLETED') {
         missingIndices = [];
+      } else if (sessionInfo.session.totalChunks !== plan.totalChunks) {
+        console.log(`[ChunkUpload] Existing session totalChunks (${sessionInfo.session.totalChunks}) does not match current plan (${plan.totalChunks}). Re-initializing fresh session.`);
+        sessionId = undefined;
       } else {
         const uploadedSet = new Set(sessionInfo.chunks.map((c) => c.chunkIndex));
         missingIndices = Array.from({ length: plan.totalChunks }, (_, i) => i).filter(
           (i) => !uploadedSet.has(i),
         );
       }
-    } catch {
+      if (sessionId) {
+        console.log(`[ChunkUpload] Resumed session ${sessionId}, missing chunks:`, missingIndices);
+      }
+    } catch (err) {
+      console.warn(`[ChunkUpload] Unable to resume session ${sessionId}, starting fresh:`, err);
       sessionId = undefined;
     }
   }
 
   if (!sessionId) {
+    console.log(`[ChunkUpload] Initializing new upload session on backend: submissionId=${submissionId}, filename=${fileName}, chunks=${plan.totalChunks}, size=${plan.totalSizeBytes}`);
     const initResult = await initializeSurveyUpload(
       submissionId,
       {
@@ -134,9 +146,10 @@ export async function executeChunkedVideoUpload(
     );
     sessionId = initResult.sessionId;
     missingIndices = Array.from({ length: plan.totalChunks }, (_, i) => i);
+    console.log(`[ChunkUpload] Initialized video upload session: sessionId=${sessionId}`);
   }
 
-  // 2. Upload missing chunks sequentially with fault isolation
+  // 2. Upload missing chunks sequentially with fault isolation & strictly low RAM usage
   const totalChunks = plan.totalChunks;
   let completedCount = totalChunks - missingIndices.length;
 
@@ -152,18 +165,37 @@ export async function executeChunkedVideoUpload(
       statusText: `Uploading video chunk ${chunkIndex + 1}/${totalChunks} (${percent}%)...`,
     });
 
-    const chunkRequest = sliceVideoChunk(fullBlob, chunkIndex, plan, fileName);
+    console.log(`[ChunkUpload] Preparing chunk ${chunkIndex + 1}/${totalChunks}...`);
+    const preparedChunk = await prepareVideoChunk({
+      videoUri,
+      chunkIndex,
+      plan,
+      fileName,
+      sessionId: sessionId!,
+    });
 
-    await retryOperation(
-      () => uploadSurveyChunk(sessionId!, chunkRequest, accessToken, signal),
-      3,
-      1200,
-    );
+    try {
+      console.log(`[ChunkUpload] Uploading chunk ${chunkIndex + 1}/${totalChunks} to sessionId=${sessionId}...`);
+      await retryOperation(
+        () => uploadSurveyChunk(sessionId!, preparedChunk.request, accessToken, signal),
+        3,
+        1200,
+      );
+      console.log(`[ChunkUpload] Chunk ${chunkIndex + 1}/${totalChunks} uploaded successfully.`);
+    } catch (chunkErr) {
+      console.error(`[ChunkUpload] Failed to upload chunk ${chunkIndex + 1}/${totalChunks}:`, chunkErr);
+      throw chunkErr;
+    } finally {
+      if (preparedChunk.cleanup) {
+        await preparedChunk.cleanup();
+      }
+    }
 
     completedCount += 1;
   }
 
   // 3. Complete video upload assembly
+  console.log(`[ChunkUpload] All ${totalChunks} chunks uploaded. Completing video assembly for sessionId=${sessionId}...`);
   onProgress?.({
     currentChunk: totalChunks,
     totalChunks,
@@ -177,6 +209,7 @@ export async function executeChunkedVideoUpload(
     2,
     1500,
   );
+  console.log(`[ChunkUpload] Video assembly completed on server for sessionId=${sessionId}.`);
 
   // 4. Companion GPX Upload (Ensures Backend VIDEO_GPX contract validation passes)
   onProgress?.({
@@ -196,8 +229,16 @@ export async function executeChunkedVideoUpload(
         durationSeconds,
       });
 
+  console.log(`[ChunkUpload] Preparing companion GPX telemetry:`, {
+    isManual: Boolean(manualGpxUri),
+    startCoordinate,
+    endCoordinate,
+    durationSeconds,
+  });
+
   const preparedGpx = await prepareSurveyGpx(gpxDescriptor);
 
+  console.log(`[ChunkUpload] Initializing GPX upload session: filename=${preparedGpx.fileName}, size=${preparedGpx.sizeBytes}`);
   const gpxInit = await initializeSurveyUpload(
     submissionId,
     {
@@ -209,9 +250,13 @@ export async function executeChunkedVideoUpload(
     accessToken,
     signal,
   );
+  console.log(`[ChunkUpload] Initialized GPX session: sessionId=${gpxInit.sessionId}`);
 
   await uploadSurveyChunk(gpxInit.sessionId, preparedGpx.chunk, accessToken, signal);
+  console.log(`[ChunkUpload] GPX chunk uploaded.`);
+
   await completeSurveyUpload(gpxInit.sessionId, accessToken, signal);
+  console.log(`[ChunkUpload] GPX upload completed on server.`);
 
   onProgress?.({
     currentChunk: totalChunks,
@@ -221,6 +266,7 @@ export async function executeChunkedVideoUpload(
     statusText: 'Upload completed successfully!',
   });
 
+  console.log(`[ChunkUpload] PIPELINE FINISHED SUCCESSFULLY! VideoSession=${sessionId}, GpxSession=${gpxInit.sessionId}`);
   return {
     videoSessionId: sessionId!,
     gpxSessionId: gpxInit.sessionId,

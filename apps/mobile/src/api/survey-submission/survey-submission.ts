@@ -1,6 +1,8 @@
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { API_PATHS } from '@/api/api';
 
-import { apiRequest, jsonApiRequest } from '@/api/api-client';
+import { apiBaseUrl, ApiError, apiRequest, jsonApiRequest } from '@/api/api-client';
 import type {
   CompleteUploadResponse,
   CreateSubmissionDto,
@@ -71,12 +73,55 @@ export function initializeSurveyUpload(
   );
 }
 
-export function uploadSurveyChunk(
+export async function uploadSurveyChunk(
   sessionId: string,
   request: UploadChunkRequest,
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<UploadChunkResponse> {
+  // On native platforms (Android & iOS), when uploading a file by local URI,
+  // use FileSystem.uploadAsync instead of fetch(FormData).
+  // Expo's fetch module throws "Unsupported FormDataPart implementation"
+  // when given a plain { uri, name, type } object in FormData.
+  if (Platform.OS !== 'web' && 'uri' in request.file) {
+    const baseUrl = apiBaseUrl();
+    const url = `${baseUrl}${API_PATHS.SUBMISSIONS}/uploads/${encodeURIComponent(sessionId)}/chunks`;
+    console.log(`[SurveyUpload] Native uploadAsync -> POST ${url} (chunkIndex=${request.chunkIndex}, file=${request.file.uri})`);
+
+    const result = await FileSystem.uploadAsync(url, request.file.uri, {
+      fieldName: 'file',
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      mimeType: request.file.type || 'video/mp4',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      parameters: {
+        chunkIndex: String(request.chunkIndex),
+        ...(request.checksum !== undefined ? { checksum: request.checksum } : {}),
+      },
+    });
+
+    let body: unknown;
+    try {
+      body = JSON.parse(result.body);
+    } catch {
+      body = result.body;
+    }
+
+    if (result.status >= 200 && result.status < 300) {
+      console.log(`[SurveyUpload] Native uploadAsync <- [HTTP ${result.status}] OK`);
+      return body as UploadChunkResponse;
+    }
+
+    console.error(`[SurveyUpload] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
+    const message = typeof body === 'object' && body && 'message' in body
+      ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
+      : `Chunk upload failed with HTTP ${result.status}`;
+    throw new ApiError(message, result.status);
+  }
+
+  // Web or Blob-based upload (e.g. expo-blob instances)
   const form = new FormData();
   if ('uri' in request.file) {
     // React Native accepts URI file descriptors; DOM FormData types only list Blob.

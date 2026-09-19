@@ -10,6 +10,9 @@
  * 5. ISO MP4 `mvhd` atom duration recovery (fixes Android MediaStore `duration: -0.001` bug)
  */
 
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+
 export type ExtractedVideoFileGps = {
   latitude: number;
   longitude: number;
@@ -577,6 +580,38 @@ export function extractMetadataFromBuffer(bytes: Uint8Array): {
   return result;
 }
 
+function base64ToUint8Array(base64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+  const globalAny = globalThis as { Buffer?: { from: (str: string, enc: string) => ArrayBufferView } };
+  if (typeof globalAny.Buffer !== 'undefined') {
+    return new Uint8Array(globalAny.Buffer.from(base64, 'base64') as unknown as ArrayLike<number>);
+  }
+  return new Uint8Array(0);
+}
+
+async function readVideoSlice(videoUri: string, position: number, length: number): Promise<Uint8Array | null> {
+  if (Platform.OS !== 'web') {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(videoUri, {
+        encoding: FileSystem.EncodingType.Base64,
+        position,
+        length,
+      });
+      return base64ToUint8Array(base64);
+    } catch {
+      // fallback to null
+    }
+  }
+  return null;
+}
+
 /**
  * Reads ArrayBuffer safely from Blob across Web and React Native environments.
  */
@@ -598,39 +633,69 @@ async function readBlobAsArrayBuffer(blob: any): Promise<ArrayBuffer> {
 
 /**
  * Reads the video container header (first 1.5MB) and footer (last 1.5MB) to extract GPS.
- * Keeps memory usage negligible (< 3 MB) even for 10 GB 4K video files.
+ * Keeps memory usage strictly negligible (< 3 MB) even for 10 GB 4K video files.
  */
 export async function extractGpsFromVideoFile(
   videoUri: string,
 ): Promise<ExtractedVideoFileGps | null> {
   try {
-    const response = await fetch(videoUri);
-    if (!response.ok && /^https?:/i.test(videoUri)) {
-      return null;
+    let size = 0;
+    if (Platform.OS !== 'web') {
+      try {
+        const info = await FileSystem.getInfoAsync(videoUri);
+        if (info.exists && typeof info.size === 'number' && info.size > 0) {
+          size = info.size;
+        }
+      } catch {}
     }
 
-    const blob = await response.blob();
-    const size = blob.size;
-    const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB covers standard moov/udta atoms
+    if (!size) {
+      try {
+        const head = await fetch(videoUri, { method: 'HEAD' });
+        const cl = head.headers.get('content-length');
+        if (cl && Number(cl) > 0) size = Number(cl);
+      } catch {}
+    }
 
+    let webBlob: any = null;
+    if (!size) {
+      const response = await fetch(videoUri);
+      if (!response.ok && /^https?:/i.test(videoUri)) {
+        return null;
+      }
+      webBlob = await response.blob();
+      size = webBlob.size;
+    }
+
+    const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB covers standard moov/udta atoms
     const buffers: Uint8Array[] = [];
 
     if (size <= CHUNK_SIZE * 2) {
-      // Small file: read entirely
-      const buf = await readBlobAsArrayBuffer(blob);
-      buffers.push(new Uint8Array(buf));
+      if (webBlob) {
+        const buf = await readBlobAsArrayBuffer(webBlob);
+        buffers.push(new Uint8Array(buf));
+      } else {
+        const full = await readVideoSlice(videoUri, 0, size);
+        if (full) buffers.push(full);
+      }
     } else {
-      // Large file: read header (moov at start) and footer (moov at end)
-      const headerBlob = blob.slice(0, CHUNK_SIZE);
-      const footerBlob = blob.slice(Math.max(0, size - CHUNK_SIZE), size);
-
-      const [headerBuf, footerBuf] = await Promise.all([
-        readBlobAsArrayBuffer(headerBlob),
-        readBlobAsArrayBuffer(footerBlob),
-      ]);
-
-      buffers.push(new Uint8Array(headerBuf));
-      buffers.push(new Uint8Array(footerBuf));
+      if (webBlob) {
+        const headerBlob = webBlob.slice(0, CHUNK_SIZE);
+        const footerBlob = webBlob.slice(Math.max(0, size - CHUNK_SIZE), size);
+        const [headerBuf, footerBuf] = await Promise.all([
+          readBlobAsArrayBuffer(headerBlob),
+          readBlobAsArrayBuffer(footerBlob),
+        ]);
+        buffers.push(new Uint8Array(headerBuf));
+        buffers.push(new Uint8Array(footerBuf));
+      } else {
+        const [headerBuf, footerBuf] = await Promise.all([
+          readVideoSlice(videoUri, 0, CHUNK_SIZE),
+          readVideoSlice(videoUri, Math.max(0, size - CHUNK_SIZE), CHUNK_SIZE),
+        ]);
+        if (headerBuf) buffers.push(headerBuf);
+        if (footerBuf) buffers.push(footerBuf);
+      }
     }
 
     let recoveredDuration: number | undefined;
@@ -652,12 +717,23 @@ export async function extractGpsFromVideoFile(
       for (const offset of chunkOffsets) {
         if (offset > 0 && offset < size) {
           try {
-            const telemetryBlob = blob.slice(offset, Math.min(size, offset + 8192));
-            const telemetryBuf = await readBlobAsArrayBuffer(telemetryBlob);
-            const chunkMeta = extractMetadataFromBuffer(new Uint8Array(telemetryBuf));
-            if (chunkMeta.gps) {
-              recoveredGps = chunkMeta.gps;
-              break;
+            if (webBlob) {
+              const telemetryBlob = webBlob.slice(offset, Math.min(size, offset + 8192));
+              const telemetryBuf = await readBlobAsArrayBuffer(telemetryBlob);
+              const chunkMeta = extractMetadataFromBuffer(new Uint8Array(telemetryBuf));
+              if (chunkMeta.gps) {
+                recoveredGps = chunkMeta.gps;
+                break;
+              }
+            } else {
+              const telemetryBuf = await readVideoSlice(videoUri, offset, 8192);
+              if (telemetryBuf) {
+                const chunkMeta = extractMetadataFromBuffer(telemetryBuf);
+                if (chunkMeta.gps) {
+                  recoveredGps = chunkMeta.gps;
+                  break;
+                }
+              }
             }
           } catch {
             // Ignore slice errors
