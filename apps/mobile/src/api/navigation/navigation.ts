@@ -17,6 +17,7 @@ export type RouteSign = {
     coordinate: MapCoordinate;
     id: string;
     imageUrl: string;
+    actualCropUrl?: string;
     name: string;
     signCode: string;
 };

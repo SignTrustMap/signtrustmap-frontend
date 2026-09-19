@@ -119,6 +119,14 @@ function SignCallout({ sign }: SignCalloutProps) {
             </Text>
           ) : null}
         </View>
+        {sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl ? (
+          <Image
+            accessibilityLabel="Ảnh thực địa camera"
+            source={{ uri: sign.actualCropUrl }}
+            style={{ width: 32, height: 32, borderRadius: 4, borderWidth: 1, borderColor: '#CBD5E1' }}
+            resizeMode="cover"
+          />
+        ) : null}
       </View>
       {/* Downward-pointing triangle arrow */}
       <View style={[styles.calloutArrow, { borderTopColor: theme.backgroundElement }]} />
@@ -392,7 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: Rounded.md,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
-    width: 200,
+    width: 230,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
