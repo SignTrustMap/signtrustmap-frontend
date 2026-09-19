@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { resolveCdnUrl } from '@/api/reviews/review-workflow';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/ui/button';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -143,8 +143,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
   const primaryVideo = videoFiles[0];
   const primaryImage = imageFiles[0];
 
-  const primaryVideoUrl = primaryVideo?.file_url ? resolveCdnUrl(primaryVideo.file_url) : undefined;
-  const primaryImageUrl = primaryImage?.file_url ? resolveCdnUrl(primaryImage.file_url) : undefined;
+  const primaryVideoUrl = primaryVideo?.file_url ? resolveS3Url(primaryVideo.file_url) : undefined;
+  const primaryImageUrl = primaryImage?.file_url ? resolveS3Url(primaryImage.file_url) : undefined;
 
   const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
 
@@ -539,7 +539,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 {mediaFiles.map((file, idx) => {
                   const isVideo = file.media_type === 'VIDEO';
                   const isImage = file.media_type === 'IMAGE';
-                  const url = resolveCdnUrl(file.file_url);
+                  const url = resolveS3Url(file.file_url);
 
                   return (
                     <Pressable
@@ -767,7 +767,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
                     const signLabel = cand.sign_type || cand.label || cand.type || `Sign #${idx + 1}`;
                     const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
-                    const resolvedImg = candidateImg ? resolveCdnUrl(candidateImg) : undefined;
+                    const resolvedImg = candidateImg ? resolveS3Url(candidateImg) : undefined;
 
                     return (
                       <View
