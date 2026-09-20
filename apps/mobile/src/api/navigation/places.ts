@@ -130,7 +130,31 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
     const trimmed = query.trim();
     if (trimmed.length < 2) return [];
 
-    // 1. Primary: Fast Photon OSM geocoder (avoids upstream 502/rate-limit blocks)
+    // 1. Primary: Internal Backend Spatial Admin Search (Official 2-tier units & legacy district aliases)
+    try {
+        const baseUrl = apiBaseUrl();
+        const res = await fetch(
+            `${baseUrl}/addresses/search?q=${encodeURIComponent(trimmed)}&limit=8`,
+            { signal },
+        );
+        if (res.ok) {
+            const spatialResults = await res.json();
+            if (Array.isArray(spatialResults) && spatialResults.length > 0) {
+                return spatialResults.map((item: any) => ({
+                    address: item.displayName,
+                    id: `spatial-${item.communeCode}`,
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                    title: item.communeName,
+                    type: 'recent' as const,
+                }));
+            }
+        }
+    } catch (spatialErr) {
+        if (signal?.aborted) throw spatialErr;
+    }
+
+    // 2. Secondary: Fast Photon OSM geocoder (for POIs and general landmarks)
     try {
         const photonResults = await searchPlacesViaPhoton(trimmed, signal);
         if (photonResults.length > 0) {
