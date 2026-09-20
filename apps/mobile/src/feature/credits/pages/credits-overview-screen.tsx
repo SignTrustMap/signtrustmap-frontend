@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -7,11 +7,22 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { TransactionList } from '../components/transaction-list';
-import { recentCreditTransactions, walletSummary } from '../data/mock-credit-data';
+import { useGetWallet } from '../hooks/use-wallet';
 
 export function CreditsOverviewScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { data: walletData, isLoading } = useGetWallet();
+
+  const balance = walletData?.wallet?.balance ?? 0;
+
+  // Map backend transactions to the shape TransactionList expects
+  const recentTransactions = (walletData?.recentTransactions ?? []).map((t) => ({
+    id: t.id,
+    title: t.description || t.transactionType,
+    amount: t.amount,
+    date: new Date(t.createdAt).toLocaleString(),
+  }));
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -23,19 +34,19 @@ export function CreditsOverviewScreen() {
           <View style={[styles.balanceCard, { backgroundColor: theme.primary }]}>
             <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Current balance</Text>
             <View style={styles.balanceRow}>
-              <Text style={[styles.balanceValue, { color: theme.onPrimary }]}>
-                {walletSummary.balance}
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator color={theme.onPrimary} size="small" />
+              ) : (
+                <Text style={[styles.balanceValue, { color: theme.onPrimary }]}>
+                  {balance}
+                </Text>
+              )}
               <Text style={[styles.balanceUnit, { color: theme.onPrimary }]}>credits</Text>
             </View>
             <View style={styles.balanceMetaRow}>
               <View>
                 <Text style={styles.metaLabel}>STATUS</Text>
-                <Text style={styles.metaValue}>{walletSummary.status}</Text>
-              </View>
-              <View style={styles.metaRight}>
-                <Text style={styles.metaLabel}>NEXT PAYOUT</Text>
-                <Text style={styles.metaValue}>{walletSummary.nextPayout}</Text>
+                <Text style={styles.metaValue}>Active</Text>
               </View>
             </View>
           </View>
@@ -51,7 +62,7 @@ export function CreditsOverviewScreen() {
               variant="ghost"
             />
           </View>
-          <TransactionList transactions={recentCreditTransactions} />
+          <TransactionList transactions={recentTransactions} />
           <AppButton
           label="＋  Add credits"
             onPress={() => router.push('/credits/top-up')}
@@ -62,6 +73,7 @@ export function CreditsOverviewScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   screen: {

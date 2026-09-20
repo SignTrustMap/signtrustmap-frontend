@@ -2,7 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
-  reportSignCandidate, undoVoteOnCandidate, skipSign
+  reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats
 } from '@/api/reviews/review';
 import { getCatalog } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
@@ -10,6 +10,7 @@ import { selectReviewHistory, selectReviewQueue } from '@/api/reviews/review-wor
 import type {
   CandidateReportParams, CandidateSignDetailsParams, CandidateVoteParams,
   CannotIdentifySignReportParams, MyReviewHistoryParams, ReportDto, ReviewQueueParams, VoteDto,
+  ReviewerStatsResponse,
 } from '@/types/reviewsType';
 
 export const reviewKeys = {
@@ -18,6 +19,7 @@ export const reviewKeys = {
   history: (accountId: string | undefined, params: MyReviewHistoryParams) => [...reviewKeys.all(accountId), 'history', params] as const,
   candidate: (accountId: string | undefined, candidateId: string | undefined) => [...reviewKeys.all(accountId), 'candidate', candidateId] as const,
   catalog: (accountId: string | undefined) => ['review-catalog', accountId] as const,
+  stats: (accountId: string | undefined) => ['reviewer-stats', accountId] as const,
 };
 
 export function useGetReviewQueue(params: ReviewQueueParams = { page: '1', pageSize: '100' }, enabled = true) {
@@ -60,7 +62,11 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
       if (!session) throw new Error('Sign in to review submissions.');
       return mutation(variables, session.accessToken);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) }),
+    onSuccess: () => {
+      // Invalidate review lists and also refresh the reviewer credit score / stats
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
+    },
   });
 }
 
@@ -103,5 +109,21 @@ export function useGetCatalog(enabled = true) {
     queryKey: reviewKeys.catalog(session?.account.id),
     queryFn: session ? ({ signal }) => getCatalog(session.accessToken, signal) : skipToken,
     enabled,
+  });
+}
+
+/**
+ * Fetches the reviewer's credit score (reliability_score), accuracy rate,
+ * streak, and vote totals. Automatically refreshed after each vote mutation.
+ */
+export function useGetMyReviewerStats(enabled = true) {
+  const { session } = useSession();
+  return useQuery<ReviewerStatsResponse>({
+    queryKey: reviewKeys.stats(session?.account.id),
+    queryFn: session
+      ? ({ signal }) => getMyReviewerStats(session.accessToken, signal)
+      : skipToken,
+    enabled,
+    staleTime: 30_000, // treat as fresh for 30 s to avoid redundant fetches during a review session
   });
 }

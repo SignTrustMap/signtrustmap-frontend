@@ -9,10 +9,12 @@ import {
     ReviewQueueParams,
     ReviewQueueResponse,
     MyReviewHistoryResponse,
+    ReviewerStatsResponse,
 } from '@/types/reviewsType';
 
 import { API_PATHS } from '@/api/api';
 import { apiRequest, jsonApiRequest } from '@/api/api-client';
+
 
 export function getMyReviewHistory(
     params: MyReviewHistoryParams,
@@ -135,4 +137,15 @@ export async function getReviewQueue(
     );
 
     return res;
+}
+
+export function getMyReviewerStats(
+    accessToken: string,
+    signal?: AbortSignal,
+) {
+    return apiRequest<ReviewerStatsResponse>(
+        `${API_PATHS.REVIEWS}/me/stats`,
+        { signal },
+        accessToken,
+    );
 }

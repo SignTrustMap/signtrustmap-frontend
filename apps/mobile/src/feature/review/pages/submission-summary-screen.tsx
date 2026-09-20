@@ -11,6 +11,7 @@ import {
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
 import { useTheme } from '@/hooks/use-theme';
+import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 
 const actionDetails: Record<
   ReviewActionType,
@@ -103,6 +104,7 @@ export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
+  const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
     (result, review) => ({ ...result, [review.action]: result[review.action] + 1 }),
     { approved: 0, declined: 0, reported: 0, skipped: 0 },
@@ -152,6 +154,9 @@ export function SubmissionSummaryScreen() {
               onPress={() => {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();
+                // Invalidate wallet balance + reviewer credit score so the
+                // home screen and nav bar show fresh data after submission.
+                invalidateWalletAndStats();
                 router.replace({
                   pathname: '/work/submission-finish',
                   params: { count: String(reviewedCount) },

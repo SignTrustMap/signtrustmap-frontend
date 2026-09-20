@@ -282,6 +282,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
+  console.log(nextSubmission)
   const reviewPosition = checkingSubmission
     ? checkedReviewIndex + 1
     : recheckingSubmission
