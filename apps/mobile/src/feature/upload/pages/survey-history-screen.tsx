@@ -215,7 +215,11 @@ export function SurveyHistoryScreen() {
             <AntDesign color={theme.text} name="arrow-left" size={22} />
           </AppButton>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-            Survey History
+            {activeTab === 'pending'
+              ? 'Pending Submissions'
+              : activeTab === 'completed'
+                ? 'Survey History'
+                : 'Survey Submissions'}
           </Text>
           <AppButton
             accessibilityLabel="Refresh survey history"

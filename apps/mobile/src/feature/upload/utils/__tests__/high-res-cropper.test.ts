@@ -40,8 +40,8 @@ describe('high-res-cropper utility', () => {
         id: 'sign-cand-01',
         timestamp_seconds: 12.5,
         box_xyxy: [0.2, 0.3, 0.5, 0.6],
-        best_frame_url: 'https://cdn.signmap.site/frames/best-01.jpg',
-        sign_crop_url: 'https://cdn.signmap.site/crops/sign-01.jpg',
+        best_frame_url: 'https://s3.signmap.site/stm-sign-crops/frames/best-01.jpg',
+        sign_crop_url: 'https://s3.signmap.site/stm-sign-crops/crops/sign-01.jpg',
       };
 
       const result = await cropHighResSignPatch(candidate, 'file:///invalid/nonexistent/video.mp4');
@@ -49,7 +49,7 @@ describe('high-res-cropper utility', () => {
       expect(result.candidateId).toBe('sign-cand-01');
       expect(result.success).toBe(true);
       expect(result.isLowResFallback).toBe(true);
-      expect(result.cropUri).toBe('https://cdn.signmap.site/frames/best-01.jpg');
+      expect(result.cropUri).toBe('https://s3.signmap.site/stm-sign-crops/frames/best-01.jpg');
     });
   });
 
@@ -59,12 +59,12 @@ describe('high-res-cropper utility', () => {
         {
           id: 'sign-1',
           timestamp_seconds: 5,
-          best_frame_url: 'https://cdn.signmap.site/frame1.jpg',
+          best_frame_url: 'https://s3.signmap.site/stm-sign-crops/frame1.jpg',
         },
         {
           id: 'sign-2',
           timestamp_seconds: 15,
-          best_frame_url: 'https://cdn.signmap.site/frame2.jpg',
+          best_frame_url: 'https://s3.signmap.site/stm-sign-crops/frame2.jpg',
         },
       ];
 
