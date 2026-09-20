@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { resolveCdnUrl } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/ui/button';
+import { AppToast } from '@/components/ui/toast';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   useGetSurveySubmissionStatus,
@@ -106,6 +107,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
   const theme = useTheme();
 
   const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<'submission' | 'surveyor' | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isRetryModalVisible, setIsRetryModalVisible] = useState(false);
   const [isSubmittingRetry, setIsSubmittingRetry] = useState(false);
@@ -200,11 +202,14 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
     });
   };
 
-  const handleCopyId = async () => {
-    if (!submission?.id) return;
-    await Clipboard.setStringAsync(submission.id);
+  const handleCopyText = async (text?: string, target?: 'submission' | 'surveyor') => {
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    if (target) {
+      setCopiedTarget(target);
+      setTimeout(() => setCopiedTarget(null), 2000);
+    }
     setCopiedToast(true);
-    setTimeout(() => setCopiedToast(false), 2000);
   };
 
   const handleOpenVideo = async (url?: string) => {
@@ -635,43 +640,94 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
               <View style={styles.metaList}>
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Submission ID</Text>
-                  <Pressable hitSlop={Spacing.half} onPress={handleCopyId} style={styles.copyRow}>
-                    <Text selectable style={[styles.metaValueMono, { color: theme.text }]}>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      selectable
+                      style={[styles.metaValueMono, { color: theme.text }]}
+                    >
                       {submission.id}
                     </Text>
-                    <MaterialCommunityIcons
-                      color={copiedToast ? '#16A34A' : theme.placeholder}
-                      name={copiedToast ? 'check' : 'content-copy'}
-                      size={15}
-                    />
-                  </Pressable>
+                    <Pressable
+                      accessibilityLabel="Copy Submission ID"
+                      hitSlop={Spacing.half}
+                      onPress={() => handleCopyText(submission.id, 'submission')}
+                      style={styles.copyButton}
+                    >
+                      <MaterialCommunityIcons
+                        color={copiedTarget === 'submission' ? '#16A34A' : theme.placeholder}
+                        name={copiedTarget === 'submission' ? 'check' : 'content-copy'}
+                        size={16}
+                      />
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Type</Text>
-                  <Text style={[styles.metaValue, { color: theme.text }]}>
-                    {submissionTypeLabels[submission.submissionType] ?? submission.submissionType}
-                  </Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.metaValue, { color: theme.text }]}
+                    >
+                      {submissionTypeLabels[submission.submissionType] ?? submission.submissionType}
+                    </Text>
+                  </View>
                 </View>
 
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Surveyor ID</Text>
-                  <Text style={[styles.metaValue, { color: theme.text }]}>{submission.surveyorId}</Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      selectable
+                      style={[styles.metaValueMono, { color: theme.text }]}
+                    >
+                      {submission.surveyorId}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Copy Surveyor ID"
+                      hitSlop={Spacing.half}
+                      onPress={() => handleCopyText(submission.surveyorId, 'surveyor')}
+                      style={styles.copyButton}
+                    >
+                      <MaterialCommunityIcons
+                        color={copiedTarget === 'surveyor' ? '#16A34A' : theme.placeholder}
+                        name={copiedTarget === 'surveyor' ? 'check' : 'content-copy'}
+                        size={16}
+                      />
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Captured At</Text>
-                  <Text style={[styles.metaValue, { color: theme.text }]}>
-                    {formatDate(submission.capturedAt ?? submission.createdAt)}
-                  </Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.metaValue, { color: theme.text }]}
+                    >
+                      {formatDate(submission.capturedAt ?? submission.createdAt)}
+                    </Text>
+                  </View>
                 </View>
 
                 {submission.latitude != null && submission.longitude != null ? (
                   <View style={styles.metaRow}>
                     <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Coordinates</Text>
-                    <Text style={[styles.metaValueMono, { color: theme.text }]}>
-                      {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
-                    </Text>
+                    <View style={styles.metaValueContainer}>
+                      <Text
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[styles.metaValueMono, { color: theme.text }]}
+                      >
+                        {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
+                      </Text>
+                    </View>
                   </View>
                 ) : null}
 
@@ -940,6 +996,16 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             </View>
           </View>
         </Modal>
+
+        {copiedToast ? (
+          <AppToast
+            duration={1500}
+            message="Copied!"
+            onDismiss={() => setCopiedToast(false)}
+            placement="bottom"
+            tone="success"
+          />
+        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -1453,11 +1519,10 @@ const styles = StyleSheet.create({
     height: 36,
   },
   metaList: {
-    gap: 10,
+    gap: 12,
   },
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: Spacing.two,
   },
@@ -1468,18 +1533,36 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     fontWeight: '600',
+    width: 105,
+    flexShrink: 0,
+  },
+  metaValueContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    gap: 8,
   },
   metaValue: {
+    flex: 1,
     fontFamily: Fonts.body,
     fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'right',
+    fontWeight: '600',
+    minWidth: 0,
   },
   metaValueMono: {
+    flex: 1,
     fontFamily: Fonts.mono,
     fontSize: 12,
     fontWeight: '600',
-    textAlign: 'right',
+    minWidth: 0,
+  },
+  copyButton: {
+    padding: 4,
+    borderRadius: Rounded.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   copyRow: {
     flexDirection: 'row',
