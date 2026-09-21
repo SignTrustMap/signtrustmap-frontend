@@ -29,7 +29,6 @@ type NavigationMapViewProps = {
   hasLiveLocation?: boolean;
 };
 
-const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
   || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
@@ -73,12 +72,12 @@ type SignCalloutProps = {
 
 function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: string }) {
   const [hasError, setHasError] = useState(false);
-  const source = imageUrl && !hasError ? { uri: imageUrl } : stopSignImage;
+  if (!imageUrl || hasError) return null;
 
   return (
     <Image
       accessibilityLabel={title}
-      source={source}
+      source={{ uri: imageUrl }}
       onError={() => setHasError(true)}
       resizeMode="contain"
       style={styles.calloutImage}
@@ -88,12 +87,12 @@ function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: strin
 
 function SignMarkerIcon({ imageUrl, name, signCode }: { imageUrl?: string; name?: string; signCode?: string }) {
   const [hasError, setHasError] = useState(false);
-  const source = imageUrl && !hasError ? { uri: imageUrl } : stopSignImage;
+  if (!imageUrl || hasError) return null;
 
   return (
     <Image
       accessibilityLabel={name || signCode}
-      source={source}
+      source={{ uri: imageUrl }}
       onError={() => setHasError(true)}
       resizeMode="contain"
       style={styles.stopSignImage}
