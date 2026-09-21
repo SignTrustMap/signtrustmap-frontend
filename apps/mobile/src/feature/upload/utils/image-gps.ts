@@ -39,7 +39,7 @@ function parseCoordinatePart(value: unknown): number | undefined {
     if (rational !== undefined && !normalized.includes(',')) return rational;
 
     const parts = normalized
-      .replace(/[\u00b0'\"]/g, ',')
+      .replace(/[\u00b0'\";]/g, ',')
       .split(',')
       .map((part) => part.trim())
       .filter(Boolean)

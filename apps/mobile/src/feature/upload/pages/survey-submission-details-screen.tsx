@@ -27,6 +27,7 @@ import {
   useGetMySubmissions,
   useSubmitSurveySubmission,
 } from '@/feature/upload/hooks/use-survey-submission';
+import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { useTheme } from '@/hooks/use-theme';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
@@ -134,6 +135,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
     }
     return undefined;
   }, [statusData, listData, submissionId]);
+
+  const locationQuery = useReverseGeocode(
+    submission?.latitude != null && submission?.longitude != null
+      ? { latitude: submission.latitude, longitude: submission.longitude }
+      : null,
+  );
 
   const mediaFiles = statusData?.mediaFiles || [];
 
@@ -717,18 +724,35 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 {submission.latitude != null && submission.longitude != null ? (
-                  <View style={styles.metaRow}>
-                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Coordinates</Text>
-                    <View style={styles.metaValueContainer}>
-                      <Text
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                        style={[styles.metaValueMono, { color: theme.text }]}
-                      >
-                        {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
-                      </Text>
+                  <>
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Coordinates</Text>
+                      <View style={styles.metaValueContainer}>
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={[styles.metaValueMono, { color: theme.text }]}
+                        >
+                          {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Address / Location</Text>
+                      <View style={styles.metaValueContainer}>
+                        <Text
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                          style={[styles.metaValue, { color: theme.text }]}
+                        >
+                          {locationQuery.isLoading
+                            ? 'Resolving address…'
+                            : locationQuery.data?.displayAddress || 'Location address unavailable'}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
                 ) : null}
 
                 {submission.note ? (
@@ -1559,7 +1583,7 @@ const styles = StyleSheet.create({
   },
   copyButton: {
     padding: 4,
-    borderRadius: Rounded.xs,
+    borderRadius: Rounded.sm,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,

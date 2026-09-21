@@ -9,5 +9,6 @@ export const API_PATHS = {
     SUBMISSIONS: '/submissions',
     REVIEWS: '/reviews',
     WALLET: '/wallet',
+    SPATIAL_RESOLVE: '/spatial/resolve',
 } as const;
 
