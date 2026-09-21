@@ -28,8 +28,6 @@ type NavigationMapViewProps = {
   hasLiveLocation?: boolean;
 };
 
-const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
-const stopSignImageUri = Asset.fromModule(stopSignImage).uri;
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
   || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
@@ -54,12 +52,15 @@ const openStreetMapStyle: StyleSpecification = {
 
 function createSignMarkerElement(sign: RouteSign) {
   const marker = document.createElement('img');
-  marker.src = sign.imageUrl || stopSignImageUri;
+  marker.src = sign.imageUrl || '';
   marker.alt = sign.name || sign.signCode;
   marker.style.width = '36px';
   marker.style.height = '36px';
   marker.style.objectFit = 'contain';
   marker.style.filter = 'drop-shadow(0 2px 3px rgba(9, 35, 60, 0.24))';
+  marker.onerror = () => {
+    marker.style.display = 'none';
+  };
 
   return marker;
 }

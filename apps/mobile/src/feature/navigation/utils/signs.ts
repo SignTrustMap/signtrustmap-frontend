@@ -6,16 +6,26 @@ const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') ?? process.en
 export const TARGET_SIGN_IMAGE_URL =
   `${S3_BASE}/stm-sign-crops/uploads/eaa2eac3-be4f-4a51-a822-6a8757978d58/f0f86c63-e05b-4baa-bae8-ae81e01a4e7d/a8a881f2-c218-4394-8b8d-7de40de1388f/uk-20mph-speed-limit-sign.jpg`;
 
-export function resolveRepresentativeSignUrl(signCode?: string): string {
-  if (!signCode) {
-    return TARGET_SIGN_IMAGE_URL;
+export function resolveRepresentativeSignUrl(nameEn?: string, signCode?: string): string {
+  if (nameEn) {
+    const slug = nameEn
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (slug) {
+      return `${S3_BASE}/stm-sign-crops/representative/${slug}.png`;
+    }
   }
-  return `${S3_BASE}/stm-sign-crops/representative/${signCode.toUpperCase().trim()}.png`;
+  if (signCode) {
+    return `${S3_BASE}/stm-sign-crops/representative/${signCode.toUpperCase().trim()}.png`;
+  }
+  return '';
 }
 
 export function resolveImageUrl(signCropUrl: string): string {
   if (!signCropUrl || signCropUrl.includes('mock/') || signCropUrl.startsWith('mock')) {
-    return TARGET_SIGN_IMAGE_URL;
+    return '';
   }
   if (signCropUrl.startsWith('https://cdn.signmap.site/')) {
     const rawPath = signCropUrl.slice('https://cdn.signmap.site/'.length).replace(/^\/+/, '');
@@ -32,12 +42,13 @@ export function resolveImageUrl(signCropUrl: string): string {
 
 export function toRouteSign(sign: VerifiedMapSign): RouteSign {
   const signCode = sign.signType?.signCode ?? '';
+  const nameEn = sign.signType?.nameEn ?? '';
   return {
     coordinate: [sign.longitude, sign.latitude],
     id: sign.id,
-    imageUrl: resolveRepresentativeSignUrl(signCode),
+    imageUrl: resolveRepresentativeSignUrl(nameEn, signCode),
     actualCropUrl: resolveImageUrl(sign.signCropUrl),
-    name: sign.signType?.nameEn || signCode || 'Traffic Sign',
+    name: nameEn || signCode || 'Traffic Sign',
     signCode: signCode,
   };
 }

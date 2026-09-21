@@ -16,7 +16,6 @@ import { useTheme } from '@/hooks/use-theme';
 
 type CatalogFilter = 'all' | number;
 
-const fallbackSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 function categoryColor(code: string) {
   const normalized = code.toUpperCase();
@@ -50,8 +49,6 @@ function SignCard({ sign }: { sign: CatalogSign }) {
     !sign.representativeImageKey.includes('signtrustmap.vn') &&
     !imageError;
 
-  const imageSource = hasValidUrl ? { uri: sign.representativeImageKey! } : fallbackSignImage;
-
   return (
     <View
       style={[
@@ -60,13 +57,15 @@ function SignCard({ sign }: { sign: CatalogSign }) {
       ]}
     >
       <View style={[styles.imageShell, { backgroundColor: theme.neutral }]}>
-        <Image
-          accessibilityLabel={`${sign.nameEn || sign.nameVi} example`}
-          contentFit="contain"
-          onError={() => setImageError(true)}
-          source={imageSource}
-          style={styles.signImage}
-        />
+        {hasValidUrl ? (
+          <Image
+            accessibilityLabel={`${sign.nameEn || sign.nameVi} example`}
+            contentFit="contain"
+            onError={() => setImageError(true)}
+            source={{ uri: sign.representativeImageKey! }}
+            style={styles.signImage}
+          />
+        ) : null}
       </View>
       <View style={styles.cardCopy}>
         <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
