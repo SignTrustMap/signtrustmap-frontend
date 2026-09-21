@@ -36,7 +36,6 @@ import type {
   SurveySubmission,
 } from '@/types/survey-submission/surveySubmissionType';
 
-const fallbackImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 const submissionTypeLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Single Image Survey',
@@ -477,13 +476,15 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.imagePressable}
                 >
-                  <Image
-                    accessibilityLabel="Survey photo submission"
-                    contentFit="cover"
-                    source={primaryImageUrl ? { uri: primaryImageUrl } : fallbackImage}
-                    style={styles.mediaImage}
-                    transition={150}
-                  />
+                  {primaryImageUrl ? (
+                    <Image
+                      accessibilityLabel="Survey photo submission"
+                      contentFit="cover"
+                      source={{ uri: primaryImageUrl }}
+                      style={styles.mediaImage}
+                      transition={150}
+                    />
+                  ) : null}
                   <View style={styles.zoomButton}>
                     <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
                     <Text style={styles.zoomButtonText}>Tap to enlarge</Text>
@@ -780,11 +781,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           },
                         ]}
                       >
-                        <Image
-                          contentFit="cover"
-                          source={resolvedImg ? { uri: resolvedImg } : fallbackImage}
-                          style={styles.candidateThumbnail}
-                        />
+                        {resolvedImg ? (
+                          <Image
+                            contentFit="cover"
+                            source={{ uri: resolvedImg }}
+                            style={styles.candidateThumbnail}
+                          />
+                        ) : null}
                         <View style={styles.candidateInfo}>
                           <Text style={[styles.candidateTitle, { color: theme.text }]} numberOfLines={1}>
                             {signLabel}
@@ -828,11 +831,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
               </Pressable>
 
-              <Image
-                contentFit="contain"
-                source={primaryImageUrl ? { uri: primaryImageUrl } : fallbackImage}
-                style={styles.zoomedImage}
-              />
+              {primaryImageUrl ? (
+                <Image
+                  contentFit="contain"
+                  source={{ uri: primaryImageUrl }}
+                  style={styles.zoomedImage}
+                />
+              ) : null}
             </SafeAreaView>
           </View>
         </Modal>

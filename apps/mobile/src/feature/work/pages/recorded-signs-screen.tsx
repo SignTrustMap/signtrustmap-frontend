@@ -7,8 +7,6 @@ import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-// Sample sign image from assets
-const SIGN_IMAGE = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 type RecordedSign = {
   id: string;
@@ -82,12 +80,7 @@ export function RecordedSignsScreen() {
               ]}
             >
               <View style={[styles.signImageWrapper, { backgroundColor: `${theme.grey}10` }]}>
-                <Image
-                  accessibilityLabel={sign.name}
-                  resizeMode="contain"
-                  source={SIGN_IMAGE}
-                  style={styles.signImage}
-                />
+                <MaterialCommunityIcons color={theme.text} name="sign-direction" size={24} />
               </View>
               <View style={styles.signInfo}>
                 <Text style={[styles.signName, { color: theme.text }]}>{sign.name}</Text>

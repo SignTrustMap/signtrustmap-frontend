@@ -20,7 +20,6 @@ export type ReviewHistoryItem = {
   submission: ReviewSubmission;
 };
 
-const fallbackImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') || process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') || 'https://s3.signmap.site';
 
 export function resolveS3Url(url?: string | null): string {
@@ -54,7 +53,7 @@ function toSubmission(candidate: ReviewCandidate): ReviewSubmission {
   const type = candidate.predictedSignType;
   const cropUrl = resolveS3Url(candidate.signCropUrl);
   const frameUrl = resolveS3Url(candidate.bestFrameUrl);
-  const imageSource = cropUrl ? { uri: cropUrl } : (frameUrl ? { uri: frameUrl } : fallbackImage);
+  const imageSource = cropUrl ? { uri: cropUrl } : (frameUrl ? { uri: frameUrl } : undefined);
   return {
     captured: formatCaptured(candidate.submission?.createdAt ?? candidate.createdAt),
     id: candidate.id,
