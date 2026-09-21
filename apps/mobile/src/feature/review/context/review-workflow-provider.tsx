@@ -131,8 +131,16 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   }, [accessToken, accountId, refetchWorkflow]);
 
   const beginSubmissionCheck = () => {
+    setPendingSubmissions((pending) => [
+      ...reviewHistory.map((item) => item.submission),
+      ...pending,
+    ]);
+    setReviewHistory([]);
     setCheckedReviewIndex(0);
-    setIsCheckingSubmission(true);
+    setIsCheckingSubmission(false);
+    setIsRecheckingSubmission(false);
+    setRecheckingReviewIndex(undefined);
+    setRecheckingPreviousAction(undefined);
   };
 
   const finishSubmissionCheck = () => {
@@ -228,13 +236,12 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const lastReview = reviewHistory[reviewHistory.length - 1];
     if (!lastReview) return false;
 
-    // Immediately restore previous card
     setReviewHistory((history) => history.slice(0, -1));
     setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
     setSessionReviewCount((count) => Math.max(0, count - 1));
 
     try {
-      if (lastReview.action !== 'reported') {
+      if (lastReview.action === 'approved' || lastReview.action === 'declined') {
         await undoVote({ params: { candidateId: lastReview.submission.id } });
       }
     } catch (err) {
@@ -245,27 +252,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const reviewCheckedSubmissionAgain = async (): Promise<boolean> => {
-    const checkedReview = reviewHistory[checkedReviewIndex];
-    if (!checkedReview) return false;
-
-    // Immediately switch card back to rechecking state
-    setReviewHistory((history) => history.filter((_, index) => index !== checkedReviewIndex));
-    setPendingSubmissions((pending) => [checkedReview.submission, ...pending]);
-    setRecheckingPreviousAction(checkedReview.action);
-    setRecheckingReviewIndex(checkedReviewIndex);
-    setCheckedReviewIndex(0);
-    setIsCheckingSubmission(false);
-    setIsRecheckingSubmission(true);
-
-    try {
-      if (checkedReview.action !== 'reported') {
-        await undoVote({ params: { candidateId: checkedReview.submission.id } });
-      }
-    } catch (err) {
-      console.warn('Failed to undo vote for recheck:', err);
-    }
-
-    return true;
+    return false;
   };
 
   const skipCurrentReview = (): Promise<boolean> => {

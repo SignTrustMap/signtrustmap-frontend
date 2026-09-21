@@ -24,7 +24,6 @@ export type NavigationSignVerifyCardProps = {
   onDismiss: () => void;
 };
 
-const defaultStopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 /**
  * A small, non-blocking floating card anchored to the bottom-right of the screen.
@@ -147,11 +146,13 @@ export function NavigationSignVerifyCard({
         {/* Sign image + info */}
         <View style={styles.signRow}>
           <View style={[styles.signImageWrap, { backgroundColor: theme.backgroundSelected }]}>
-            <Image
-              contentFit="contain"
-              source={sign?.imageUrl ? { uri: sign.imageUrl } : defaultStopSignImage}
-              style={styles.signImage}
-            />
+            {sign?.imageUrl ? (
+              <Image
+                contentFit="contain"
+                source={{ uri: sign.imageUrl }}
+                style={styles.signImage}
+              />
+            ) : null}
           </View>
           <View style={styles.signInfo}>
             <Text style={[styles.promptLabel, { color: theme.placeholder }]}>

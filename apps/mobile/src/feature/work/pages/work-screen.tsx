@@ -188,7 +188,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 onPress={() => router.push('/work/new-survey')}
                 subtitle={
                   draftCount > 0
-                    ? `${draftCount} recorded sessions on device ready to upload`
+                    ? `${draftCount} recorded drafts on device ready to upload`
                     : 'No pending local recordings'
                 }
                 urgent={draftCount > 0}
@@ -215,7 +215,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 }}
                 subtitle={
                   pendingSurveyCount > 0
-                    ? `${pendingSurveyCount} sessions awaiting AI processing and detection`
+                    ? `${pendingSurveyCount} ${pendingSurveyCount === 1 ? 'submission' : 'submissions'} awaiting AI processing and detection`
                     : 'All submitted survey recordings processed'
                 }
               />

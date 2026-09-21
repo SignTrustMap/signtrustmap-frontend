@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { resolveCdnUrl } from '@/api/reviews/review-workflow';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -38,7 +38,6 @@ import type {
   SurveySubmission,
 } from '@/types/survey-submission/surveySubmissionType';
 
-const fallbackImage = require('@/assets/images/smaple_signs/stop_sign.webp');
 
 const submissionTypeLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Single Image Survey',
@@ -152,8 +151,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
   const primaryVideo = videoFiles[0];
   const primaryImage = imageFiles[0];
 
-  const primaryVideoUrl = primaryVideo?.file_url ? resolveCdnUrl(primaryVideo.file_url) : undefined;
-  const primaryImageUrl = primaryImage?.file_url ? resolveCdnUrl(primaryImage.file_url) : undefined;
+  const primaryVideoUrl = primaryVideo?.file_url ? resolveS3Url(primaryVideo.file_url) : undefined;
+  const primaryImageUrl = primaryImage?.file_url ? resolveS3Url(primaryImage.file_url) : undefined;
 
   const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
 
@@ -489,13 +488,15 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.imagePressable}
                 >
-                  <Image
-                    accessibilityLabel="Survey photo submission"
-                    contentFit="cover"
-                    source={primaryImageUrl ? { uri: primaryImageUrl } : fallbackImage}
-                    style={styles.mediaImage}
-                    transition={150}
-                  />
+                  {primaryImageUrl ? (
+                    <Image
+                      accessibilityLabel="Survey photo submission"
+                      contentFit="cover"
+                      source={{ uri: primaryImageUrl }}
+                      style={styles.mediaImage}
+                      transition={150}
+                    />
+                  ) : null}
                   <View style={styles.zoomButton}>
                     <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
                     <Text style={styles.zoomButtonText}>Tap to enlarge</Text>
@@ -551,7 +552,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 {mediaFiles.map((file, idx) => {
                   const isVideo = file.media_type === 'VIDEO';
                   const isImage = file.media_type === 'IMAGE';
-                  const url = resolveCdnUrl(file.file_url);
+                  const url = resolveS3Url(file.file_url);
 
                   return (
                     <Pressable
@@ -847,7 +848,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
                     const signLabel = cand.sign_type || cand.label || cand.type || `Sign #${idx + 1}`;
                     const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
-                    const resolvedImg = candidateImg ? resolveCdnUrl(candidateImg) : undefined;
+                    const resolvedImg = candidateImg ? resolveS3Url(candidateImg) : undefined;
 
                     return (
                       <View
@@ -860,11 +861,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           },
                         ]}
                       >
-                        <Image
-                          contentFit="cover"
-                          source={resolvedImg ? { uri: resolvedImg } : fallbackImage}
-                          style={styles.candidateThumbnail}
-                        />
+                        {resolvedImg ? (
+                          <Image
+                            contentFit="cover"
+                            source={{ uri: resolvedImg }}
+                            style={styles.candidateThumbnail}
+                          />
+                        ) : null}
                         <View style={styles.candidateInfo}>
                           <Text style={[styles.candidateTitle, { color: theme.text }]} numberOfLines={1}>
                             {signLabel}
@@ -908,11 +911,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
               </Pressable>
 
-              <Image
-                contentFit="contain"
-                source={primaryImageUrl ? { uri: primaryImageUrl } : fallbackImage}
-                style={styles.zoomedImage}
-              />
+              {primaryImageUrl ? (
+                <Image
+                  contentFit="contain"
+                  source={{ uri: primaryImageUrl }}
+                  style={styles.zoomedImage}
+                />
+              ) : null}
             </SafeAreaView>
           </View>
         </Modal>

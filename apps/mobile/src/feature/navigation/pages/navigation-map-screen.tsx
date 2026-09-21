@@ -1009,12 +1009,14 @@ export function NavigationMapScreen() {
               <Text style={[styles.upcomingSignsPanelLabel, { color: theme.grey }]}>Ahead</Text>
               {upcomingSignsOnRoute.map((sign) => (
                 <View key={sign.id} style={styles.upcomingSignRow}>
-                  <Image
-                    accessibilityLabel={sign.name ?? 'Sign'}
-                    contentFit="contain"
-                    source={sign.imageUrl ? { uri: sign.imageUrl } : require('@/assets/images/smaple_signs/stop_sign.webp')}
-                    style={styles.upcomingSignImage}
-                  />
+                  {sign.imageUrl ? (
+                    <Image
+                      accessibilityLabel={sign.name ?? 'Sign'}
+                      contentFit="contain"
+                      source={{ uri: sign.imageUrl }}
+                      style={styles.upcomingSignImage}
+                    />
+                  ) : null}
                   <View style={styles.upcomingSignInfo}>
                     <Text numberOfLines={1} style={[styles.upcomingSignName, { color: theme.text }]}>
                       {sign.name ?? 'Sign'}

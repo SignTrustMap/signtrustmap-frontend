@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
@@ -35,9 +35,9 @@ type SubmissionReviewScreenProps = {
 type ReviewSheet = 'decline' | 'report';
 
 const declineReasons = [
-  'Poor Image Quality',
-  'Incorrect Location',
+  'Incorrect Sign Type',
   'Sign Not Found',
+  'Too Poor Image Quality',
   'Duplicate Submission',
   'Other',
 ] as const;
@@ -241,20 +241,14 @@ function ReviewBottomSheet({
 }
 
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
   const {
-    checkedReviewIndex,
-    checkingSubmission,
     completeCurrentReview,
-    finishSubmissionCheck,
-    goToNextCheckedReview,
-    goToPreviousCheckedReview,
     pendingSubmissions,
     recheckingPreviousAction,
-    recheckingReviewIndex,
     recheckingSubmission,
-    reviewCheckedSubmissionAgain,
     reviewHistory,
     totalSubmissions,
     undoLastReview,
@@ -271,26 +265,19 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     tone: 'default' | 'success';
   }>();
 
-  const checkedReview = checkingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
-  const displayedReviewAction = checkedReview?.action ?? recheckingPreviousAction;
-  const submission = checkedReview?.submission ?? pendingSubmissions[0];
-  const nextSubmission = checkingSubmission
-    ? (reviewHistory[checkedReviewIndex + 1]?.submission ?? pendingSubmissions[0])
-    : pendingSubmissions[1];
+  const displayedReviewAction = recheckingPreviousAction;
+  const submission = pendingSubmissions[0];
+  const nextSubmission = pendingSubmissions[1];
   const totalInQueue = Math.max(
     totalSubmissions,
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
   console.log(nextSubmission)
-  const reviewPosition = checkingSubmission
-    ? checkedReviewIndex + 1
-    : recheckingSubmission
-      ? (recheckingReviewIndex ?? 0) + 1
-      : Math.min(
-        reviewHistory.length + (submission ? 1 : 0),
-        totalInQueue,
-      );
+  const reviewPosition = Math.min(
+    reviewHistory.length + (submission ? 1 : 0),
+    totalInQueue,
+  );
 
   const completeReview = useCallback(
     (
@@ -298,7 +285,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       details?: { declineReason?: string; declineNote?: string },
     ) => {
       if (!submission) return;
-      const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
+      const completesReviewQueue = pendingSubmissions.length === 1;
 
       completeCurrentReview(action, details);
 
@@ -319,7 +306,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         router.replace('/work/submission-summary');
       }
     },
-    [completeCurrentReview, pendingSubmissions.length, recheckingSubmission, router, submission],
+    [completeCurrentReview, pendingSubmissions.length, router, submission],
   );
 
   const closeSheet = () => setActiveSheet(undefined);
@@ -497,7 +484,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
           <View style={styles.progressCounterRow}>
             <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
-              {checkingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
+              {submission ? 'REVIEWING' : 'REVIEWED'}{' '}
               {reviewPosition} OF {totalInQueue}
             </Text>
           </View>
@@ -655,162 +642,88 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             </View>
 
             {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
-            {checkedReview ? (
-              <View style={styles.checkedReviewFooter}>
-                <View
-                  style={[
-                    styles.reviewedStatusBanner,
-                    {
-                      backgroundColor:
-                        checkedReview.action === 'approved'
-                          ? '#E8F7ED'
-                          : checkedReview.action === 'declined'
-                            ? '#FEECEC'
-                            : checkedReview.action === 'reported'
-                              ? '#FFF1E8'
-                              : '#F1F5F9',
-                      borderColor:
-                        checkedReview.action === 'approved'
-                          ? '#16803A'
-                          : checkedReview.action === 'declined'
-                            ? Colors.danger
-                            : checkedReview.action === 'reported'
-                              ? '#C2410C'
-                              : '#64748B',
-                    },
+            <View style={styles.actionsFooter}>
+              <View style={styles.diamondContainer}>
+                {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
+                <Pressable
+                  accessibilityLabel="Skip submission (cannot identify)"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('skipped')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondTop,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.reviewedStatusLabel,
-                      {
-                        color:
-                          checkedReview.action === 'approved'
-                            ? '#16803A'
-                            : checkedReview.action === 'declined'
-                              ? Colors.danger
-                              : checkedReview.action === 'reported'
-                                ? '#C2410C'
-                                : '#64748B',
-                      },
-                    ]}
-                  >
-                    Reviewed: {checkedReview.action.toUpperCase()}
+                  <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                </Pressable>
+
+                {/* Left Button: Decline (X) */}
+                <Pressable
+                  accessibilityLabel="Decline submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('decline')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondLeft,
+                    styles.declineButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                </Pressable>
+
+                {/* Right Button: Approve (Heart) */}
+                <Pressable
+                  accessibilityLabel="Approve submission"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('approved')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondRight,
+                    styles.approveButton,
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                </Pressable>
+
+                {/* Bottom Button: Report */}
+                <Pressable
+                  accessibilityLabel="Report submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('report')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondBottom,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                </Pressable>
+              </View>
+
+              {/* Undo Action (Subtle under the buttons) */}
+              {reviewHistory.length > 0 && !recheckingSubmission ? (
+                <Pressable
+                  accessibilityLabel="Undo last review action"
+                  onPress={undoLastAction}
+                  style={styles.undoRow}
+                >
+                  <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
+                  <Text style={[styles.undoText, { color: theme.placeholder }]}>
+                    Undo last action
                   </Text>
-                </View>
-
-                <View style={styles.checkNavRow}>
-                  <AppButton
-                    disabled={checkedReviewIndex === 0}
-                    label="← Prev"
-                    onPress={goToPreviousCheckedReview}
-                    style={styles.checkNavBtn}
-                    variant="surface"
-                  />
-                  <AppButton
-                    label="Re-vote"
-                    onPress={reviewCheckedSubmissionAgain}
-                    style={styles.checkNavBtn}
-                  />
-                  <AppButton
-                    label={checkedReviewIndex >= reviewHistory.length - 1 ? 'Finish' : 'Next →'}
-                    onPress={() => {
-                      if (checkedReviewIndex >= reviewHistory.length - 1) {
-                        finishSubmissionCheck();
-                        router.replace('/work/submission-summary');
-                        return;
-                      }
-                      goToNextCheckedReview();
-                    }}
-                    style={styles.checkNavBtn}
-                    variant="surface"
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.actionsFooter}>
-                <View style={styles.diamondContainer}>
-                  {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                  <Pressable
-                    accessibilityLabel="Skip submission (cannot identify)"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('skipped')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondTop,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
-                  </Pressable>
-
-                  {/* Left Button: Decline (X) */}
-                  <Pressable
-                    accessibilityLabel="Decline submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('decline')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondLeft,
-                      styles.declineButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
-                  </Pressable>
-
-                  {/* Right Button: Approve (Heart) */}
-                  <Pressable
-                    accessibilityLabel="Approve submission"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('approved')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondRight,
-                      styles.approveButton,
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
-                  </Pressable>
-
-                  {/* Bottom Button: Report */}
-                  <Pressable
-                    accessibilityLabel="Report submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('report')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondBottom,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
-                  </Pressable>
-                </View>
-
-                {/* Undo Action (Subtle under the buttons) */}
-                {reviewHistory.length > 0 && !recheckingSubmission ? (
-                  <Pressable
-                    accessibilityLabel="Undo last review action"
-                    onPress={undoLastAction}
-                    style={styles.undoRow}
-                  >
-                    <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
-                    <Text style={[styles.undoText, { color: theme.placeholder }]}>
-                      Undo last action
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <View style={styles.undoSpacer} />
-                )}
-              </View>
-            )}
+                </Pressable>
+              ) : (
+                <View style={styles.undoSpacer} />
+              )}
+            </View>
           </View>
         ) : (
           <View style={styles.completeState}>
@@ -840,12 +753,20 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         transparent
         visible={isImageZoomed}
       >
-        <View style={styles.zoomBackdrop}>
+        <Pressable
+          accessibilityLabel="Close enlarged view"
+          onPress={() => setIsImageZoomed(false)}
+          style={styles.zoomBackdrop}
+        >
           <SafeAreaView edges={['top', 'bottom']} style={styles.zoomSafeArea}>
             <Pressable
               accessibilityLabel="Close enlarged view"
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={() => setIsImageZoomed(false)}
-              style={styles.zoomCloseBtn}
+              style={[
+                styles.zoomCloseBtn,
+                { top: Math.max(insets.top, 16) + 12 },
+              ]}
             >
               <MaterialCommunityIcons color="#FFFFFF" name="close" size={26} />
             </Pressable>
@@ -857,7 +778,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               />
             ) : null}
           </SafeAreaView>
-        </View>
+        </Pressable>
       </Modal>
 
       {/* Toast */}
@@ -1436,11 +1357,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 999,
+    elevation: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
