@@ -20,6 +20,7 @@ import {
   useUpdateSurveySubmission,
   useSubmitSurveySubmission,
 } from '@/feature/upload/hooks/use-survey-submission';
+import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
@@ -132,6 +133,9 @@ export function SurveyRecordDetailsScreen() {
   );
   const effectiveStartCoord = startCoordinate ?? selectedCoordinate ?? imageCoordinate;
   const displayCoordinate = effectiveStartCoord;
+  const startLocationQuery = useReverseGeocode(
+    effectiveStartCoord ? { latitude: effectiveStartCoord[1], longitude: effectiveStartCoord[0] } : null,
+  );
   const [focusRequestId, setFocusRequestId] = useState(1);
   const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
     imageCoordinate ? 'IMAGE_EXIF' : undefined,
@@ -189,6 +193,10 @@ export function SurveyRecordDetailsScreen() {
       && !activeGpxUri
       && !duration
     );
+
+  const endLocationQuery = useReverseGeocode(
+    !isImageSubmission && endCoordinate ? { latitude: endCoordinate[1], longitude: endCoordinate[0] } : null,
+  );
 
   const handlePickGpx = async () => {
     try {
@@ -636,6 +644,27 @@ export function SurveyRecordDetailsScreen() {
                   leadingIcon={<MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />}
                   containerStyle={styles.imageLocationInput}
                 />
+                {effectiveStartCoord ? (
+                  <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                    <View style={styles.addressResolvedHeader}>
+                      <MaterialCommunityIcons name="map-marker-radius" size={16} color="#16A34A" />
+                      <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
+                        {startLocationQuery.isLoading ? 'Resolving start location...' : 'Start Location Address'}
+                      </Text>
+                      {startLocationQuery.isLoading ? (
+                        <ActivityIndicator size="small" color="#16A34A" style={{ marginLeft: 6 }} />
+                      ) : null}
+                    </View>
+                    <Text style={[styles.addressResolvedText, { color: theme.text }]}>
+                      {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                    </Text>
+                    {startLocationQuery.data?.roadName ? (
+                      <Text style={[styles.addressRoadText, { color: '#16A34A' }]}>
+                        🛣️ {startLocationQuery.data.roadName}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
 
               {/* End Point (D) */}
@@ -673,6 +702,27 @@ export function SurveyRecordDetailsScreen() {
                   leadingIcon={<MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />}
                   containerStyle={styles.imageLocationInput}
                 />
+                {endCoordinate ? (
+                  <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                    <View style={styles.addressResolvedHeader}>
+                      <MaterialCommunityIcons name="flag-checkered" size={16} color="#DC2626" />
+                      <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
+                        {endLocationQuery.isLoading ? 'Resolving end location...' : 'End Location Address'}
+                      </Text>
+                      {endLocationQuery.isLoading ? (
+                        <ActivityIndicator size="small" color="#DC2626" style={{ marginLeft: 6 }} />
+                      ) : null}
+                    </View>
+                    <Text style={[styles.addressResolvedText, { color: theme.text }]}>
+                      {endLocationQuery.data?.displayAddress || (endLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                    </Text>
+                    {endLocationQuery.data?.roadName ? (
+                      <Text style={[styles.addressRoadText, { color: '#DC2626' }]}>
+                        🛣️ {endLocationQuery.data.roadName}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
 
               {/* Advanced GPX Accordion */}
@@ -750,6 +800,27 @@ export function SurveyRecordDetailsScreen() {
                 leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
                 containerStyle={styles.imageLocationInput}
               />
+              {effectiveStartCoord ? (
+                <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <View style={styles.addressResolvedHeader}>
+                    <MaterialCommunityIcons name="map-marker-radius" size={16} color={theme.primary} />
+                    <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
+                      {startLocationQuery.isLoading ? 'Resolving actual location...' : 'Actual Location (Address)'}
+                    </Text>
+                    {startLocationQuery.isLoading ? (
+                      <ActivityIndicator size="small" color={theme.primary} style={{ marginLeft: 6 }} />
+                    ) : null}
+                  </View>
+                  <Text style={[styles.addressResolvedText, { color: theme.text }]}>
+                    {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                  </Text>
+                  {startLocationQuery.data?.roadName ? (
+                    <Text style={[styles.addressRoadText, { color: theme.primary }]}>
+                      🛣️ {startLocationQuery.data.roadName}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
               <AppButton
                 accessibilityLabel={
                   isLocating ? 'Getting current location' : 'Use current location for this survey'
@@ -1217,5 +1288,34 @@ const styles = StyleSheet.create({
   progressMetaText: {
     fontFamily: Fonts.mono,
     fontSize: 12,
+  },
+  addressResolvedCard: {
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    padding: Spacing.two,
+    marginTop: Spacing.one,
+    gap: 4,
+  },
+  addressResolvedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  addressResolvedTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  addressResolvedText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  addressRoadText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
   },
 });

@@ -32,6 +32,7 @@ import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
 import { getMapLibre } from "@/services/maplibre";
+import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
 
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   const mapLibre = getMapLibre();
@@ -209,6 +210,7 @@ export function NavigationMapScreen() {
   }>();
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
+  const { data: walletData } = useGetWallet();
   const savedDestination = previousLocations.find(
     (location) => location.id === destinationId,
   );
@@ -785,7 +787,6 @@ export function NavigationMapScreen() {
       }
 
       coordinate = [position.coords.longitude, position.coords.latitude];
-      console.log(coordinate);
       setMapFocus((current) => ({
         coordinate,
         requestId: (current?.requestId ?? 0) + 1,
@@ -1159,13 +1160,15 @@ export function NavigationMapScreen() {
                       </Text>
                     </AppButton>
                     <AppButton
-                      accessibilityLabel="Add credits. Current balance: 24"
+                      accessibilityLabel={`Add credits. Current balance: ${walletData?.wallet?.balance ?? 0}`}
                       onPress={() => router.push('/credits/top-up')}
                       pressedOpacity={0.68}
                       style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
                       variant="ghost"
                     >
-                      <Text style={[styles.creditText, { color: theme.text }]}>24</Text>
+                      <Text style={[styles.creditText, { color: theme.text }]}>
+                        {walletData?.wallet?.balance ?? '—'}
+                      </Text>
                       <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
                         <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
                       </View>

@@ -30,6 +30,7 @@ import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { extractGpsFromVideoFile } from '@/feature/upload/utils/video-file-gps';
+import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 
 
 type SelectedSurveyMedia = {
@@ -65,7 +66,9 @@ function isValidGpsCoordinates(
     Number.isFinite(coordinates.latitude) &&
     Number.isFinite(coordinates.longitude) &&
     Math.abs(coordinates.latitude) <= 90 &&
-    Math.abs(coordinates.longitude) <= 180,
+    Math.abs(coordinates.longitude) <= 180 &&
+    // Reject (0, 0) — it's a sentinel "no GPS" value on many devices
+    !(coordinates.latitude === 0 && coordinates.longitude === 0),
   );
 }
 
@@ -174,6 +177,21 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
     const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
     if (mediaLibraryExifCoordinates) return mediaLibraryExifCoordinates;
 
+    if (asset.type === 'image') {
+      // Android scoped storage can strip GPS from the EXIF object returned by
+      // MediaLibrary.getExif() even when ACCESS_MEDIA_LOCATION is granted.
+      // Fall back to reading the GPS IFD directly from the raw JPEG bytes.
+      const fileGps = await extractGpsFromImageFile(asset.uri);
+      if (fileGps) {
+        console.log('[Surveyor] Extracted GPS data from image file EXIF:', {
+          latitude: fileGps.latitude,
+          longitude: fileGps.longitude,
+          source: 'image-file-exif',
+        });
+        return fileGps;
+      }
+    }
+
     if (asset.type === 'video') {
       const fileGps = await extractGpsFromVideoFile(asset.uri);
       if (fileGps) {
@@ -188,6 +206,24 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
 
     return null;
   } catch (error) {
+    if (asset.type === 'image') {
+      // LegacyMediaLibrary.getAssetInfoAsync can throw for files that are
+      // outside the camera roll (e.g. Downloads). Fall back to reading the
+      // GPS IFD directly from the raw JPEG bytes, which is never redacted.
+      try {
+        const fileGps = await extractGpsFromImageFile(asset.uri);
+        if (fileGps) {
+          console.log('[Surveyor] Extracted GPS data from image file EXIF (catch):', {
+            latitude: fileGps.latitude,
+            longitude: fileGps.longitude,
+            source: 'image-file-exif',
+          });
+          return fileGps;
+        }
+      } catch {
+        // continue to return null
+      }
+    }
     if (asset.type === 'video') {
       try {
         const fileGps = await extractGpsFromVideoFile(asset.uri);

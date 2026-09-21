@@ -8,4 +8,7 @@ export const API_PATHS = {
     SIGNS_ALONG_ROUTE: '/signs/along-route',
     SUBMISSIONS: '/submissions',
     REVIEWS: '/reviews',
+    WALLET: '/wallet',
+    SPATIAL_RESOLVE: '/spatial/resolve',
 } as const;
+

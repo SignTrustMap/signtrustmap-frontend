@@ -94,3 +94,13 @@ export type MyReviewHistoryResponse = {
     totalPages: number;
 };
 
+export type ReviewerStatsResponse = {
+    reviewerId: string;
+    reliabilityScore: number;
+    totalReviews: number;
+    approved: number;
+    rejected: number;
+    accuracyRate: number;
+    currentStreak: number;
+};
+

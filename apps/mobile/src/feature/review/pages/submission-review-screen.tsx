@@ -273,6 +273,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
+  console.log(nextSubmission)
   const reviewPosition = Math.min(
     reviewHistory.length + (submission ? 1 : 0),
     totalInQueue,
@@ -642,87 +643,87 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
             {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
             <View style={styles.actionsFooter}>
-                <View style={styles.diamondContainer}>
-                  {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                  <Pressable
-                    accessibilityLabel="Skip submission (cannot identify)"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('skipped')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondTop,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
-                  </Pressable>
+              <View style={styles.diamondContainer}>
+                {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
+                <Pressable
+                  accessibilityLabel="Skip submission (cannot identify)"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('skipped')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondTop,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                </Pressable>
 
-                  {/* Left Button: Decline (X) */}
-                  <Pressable
-                    accessibilityLabel="Decline submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('decline')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondLeft,
-                      styles.declineButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
-                  </Pressable>
+                {/* Left Button: Decline (X) */}
+                <Pressable
+                  accessibilityLabel="Decline submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('decline')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondLeft,
+                    styles.declineButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                </Pressable>
 
-                  {/* Right Button: Approve (Heart) */}
-                  <Pressable
-                    accessibilityLabel="Approve submission"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('approved')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondRight,
-                      styles.approveButton,
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
-                  </Pressable>
+                {/* Right Button: Approve (Heart) */}
+                <Pressable
+                  accessibilityLabel="Approve submission"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('approved')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondRight,
+                    styles.approveButton,
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                </Pressable>
 
-                  {/* Bottom Button: Report */}
-                  <Pressable
-                    accessibilityLabel="Report submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('report')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.diamondBottom,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
-                  </Pressable>
-                </View>
-
-                {/* Undo Action (Subtle under the buttons) */}
-                {reviewHistory.length > 0 && !recheckingSubmission ? (
-                  <Pressable
-                    accessibilityLabel="Undo last review action"
-                    onPress={undoLastAction}
-                    style={styles.undoRow}
-                  >
-                    <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
-                    <Text style={[styles.undoText, { color: theme.placeholder }]}>
-                      Undo last action
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <View style={styles.undoSpacer} />
-                )}
+                {/* Bottom Button: Report */}
+                <Pressable
+                  accessibilityLabel="Report submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('report')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondBottom,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                </Pressable>
               </View>
+
+              {/* Undo Action (Subtle under the buttons) */}
+              {reviewHistory.length > 0 && !recheckingSubmission ? (
+                <Pressable
+                  accessibilityLabel="Undo last review action"
+                  onPress={undoLastAction}
+                  style={styles.undoRow}
+                >
+                  <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
+                  <Text style={[styles.undoText, { color: theme.placeholder }]}>
+                    Undo last action
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.undoSpacer} />
+              )}
+            </View>
           </View>
         ) : (
           <View style={styles.completeState}>
