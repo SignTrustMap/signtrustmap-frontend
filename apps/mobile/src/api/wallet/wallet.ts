@@ -68,10 +68,11 @@ export function getWallet(accessToken: string, signal?: AbortSignal) {
   );
 }
 
-export function getTopUpPackages(signal?: AbortSignal) {
+export function getTopUpPackages(accessToken?: string, signal?: AbortSignal) {
   return apiRequest<TopUpPackage[]>(
     `${API_PATHS.WALLET}/top-up/packages`,
     { signal },
+    accessToken,
   );
 }
 

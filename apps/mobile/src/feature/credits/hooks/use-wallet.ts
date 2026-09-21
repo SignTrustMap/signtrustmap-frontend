@@ -15,7 +15,7 @@ import { reviewKeys } from '@/feature/review/hooks/use-review';
 
 export const walletKeys = {
   all: (accountId: string | undefined) => ['wallet', accountId] as const,
-  packages: () => ['wallet', 'top-up-packages'] as const,
+  packages: (accountId?: string) => ['wallet', 'top-up-packages', accountId] as const,
   paymentMethods: (accountId: string | undefined) => ['wallet', 'payment-methods', accountId] as const,
 };
 
@@ -36,12 +36,15 @@ export function useGetWallet(enabled = true) {
   });
 }
 
-// ─── Top-up packages (public, no auth needed) ─────────────────────────────────
+// ─── Top-up packages ──────────────────────────────────────────────────────────
 
 export function useGetTopUpPackages(enabled = true) {
+  const { session } = useSession();
   return useQuery<TopUpPackage[]>({
-    queryKey: walletKeys.packages(),
-    queryFn: ({ signal }) => getTopUpPackages(signal),
+    queryKey: walletKeys.packages(session?.account.id),
+    queryFn: session
+      ? ({ signal }) => getTopUpPackages(session.accessToken, signal)
+      : skipToken,
     enabled,
     staleTime: 60_000 * 5, // packages rarely change — keep for 5 min
   });

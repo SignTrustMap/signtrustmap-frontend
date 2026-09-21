@@ -130,8 +130,9 @@ export async function apiRequest<T>(
         });
         const err = new ApiError(message, response.status);
         // Notify the app that the token is no longer valid so it can redirect
-        // to the login screen.
-        if (response.status === 401 || response.status === 403) {
+        // to the login screen. Only trigger if auth credentials were provided.
+        const hadAuth = Boolean(accessToken) || headers.has("Authorization");
+        if (hadAuth && (response.status === 401 || response.status === 403)) {
             authExpiredEmitter.emit();
         }
         throw err;
