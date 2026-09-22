@@ -24,6 +24,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { getMapLibre } from "@/services/maplibre";
 import { SAME_LOCATION_MESSAGE } from "@/constants/message";
 import { areSameLocation } from "../utils/location";
+import { fetchFreshGpsPosition, GPS_UNAVAILABLE_MESSAGE } from "../utils/gps";
 
 export function NavigationStartScreen() {
   const router = useRouter();
@@ -101,30 +102,12 @@ export function NavigationStartScreen() {
   const handleSelectCurrentLocation = async () => {
     if (!destinationId) return;
 
-    let coordinate: MapCoordinate | undefined;
-
-    const mapLibre = getMapLibre();
-    if (mapLibre) {
-      try {
-        const hasPermission =
-          await mapLibre.LocationManager.requestPermissions();
-        if (hasPermission) {
-          const position = await mapLibre.LocationManager.getCurrentPosition();
-          if (position) {
-            coordinate = [position.coords.longitude, position.coords.latitude];
-          }
-        }
-      } catch {
-        // GPS unavailable
-      }
-    }
+    const coordinate = await fetchFreshGpsPosition(3500);
 
     if (!coordinate) {
-      // Could not obtain a real GPS fix — don't silently fall back to a
-      // hard-coded location. Show the picker so the user can choose manually.
-      router.push({
-        pathname: '/home/start',
-        params: destinationId ? { destinationId } : {},
+      setToast({
+        id: Date.now(),
+        message: GPS_UNAVAILABLE_MESSAGE,
       });
       return;
     }

@@ -26,8 +26,7 @@ type NavigationMapViewProps = {
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
-  /** Called with every GPS/emulator position update during live navigation. */
-  onUserLocationUpdate?: (coords: { longitude: number; latitude: number }) => void;
+  isCustomStart?: boolean;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -152,7 +151,7 @@ export function NavigationMapView({
   isNavigatingFeature = false,
   userCoordinate,
   hasLiveLocation = false,
-  onUserLocationUpdate,
+  isCustomStart = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
@@ -218,9 +217,9 @@ export function NavigationMapView({
       return;
     }
 
-    // Use the route's declared start as the camera origin so it always flies
-    // to where the journey begins, regardless of where the user physically is.
-    const origin = routeStart ?? userCoordinate ?? cameraCenter;
+    // Prioritize userCoordinate so the camera flies to the user's actual position.
+    // For custom route starts, fall back to routeStart if userCoordinate is not yet available.
+    const origin = userCoordinate ?? routeStart ?? cameraCenter;
     const bearing = getRouteForwardBearing(origin, routeCoordinates);
 
     const triggerFly = () => {
@@ -313,21 +312,25 @@ export function NavigationMapView({
       {navigationActive ? (
         <Camera
           ref={cameraRef}
-          bearing={forwardBearing}
-          center={routeStart ?? userCoordinate}
-          duration={1200}
-          easing="fly"
+          initialViewState={
+            (userCoordinate ?? routeStart)
+              ? {
+                  center: (userCoordinate ?? routeStart)!,
+                  zoom: 18,
+                  pitch: 55,
+                  bearing: forwardBearing,
+                  padding: {
+                    bottom: 220,
+                    left: 24,
+                    right: 24,
+                    top: 100,
+                  },
+                }
+              : undefined
+          }
           key="navigation-active-camera"
           maxZoom={19}
           minZoom={11}
-          padding={{
-            bottom: 220,
-            left: 24,
-            right: 24,
-            top: 100,
-          }}
-          pitch={55}
-          zoom={18}
         />
       ) : focusCoordinate ? (
         <Camera
@@ -402,11 +405,6 @@ export function NavigationMapView({
       {navigationActive ? (
         <>
           {hasLiveLocation ? (
-            // Live navigation: show the live location puck and stream position
-            // updates back to the parent via onUserLocationUpdate so that
-            // userCoordinate state (maneuver banner, off-route detection, sign
-            // proximity alerts) stays in sync with the map puck — including
-            // positions injected by the Android Emulator GPX route simulation.
             <UserLocation
               accuracy
               animated
@@ -415,11 +413,11 @@ export function NavigationMapView({
             />
           ) : null}
         </>
-      ) : showCurrentLocation && focusCoordinate ? (
+      ) : showCurrentLocation && (userCoordinate ?? focusCoordinate) ? (
         <Marker
           anchor="center"
           id="current-location"
-          lngLat={focusCoordinate}
+          lngLat={(userCoordinate ?? focusCoordinate)!}
         >
           <>
             <View style={styles.currentLocationHalo}>
@@ -429,11 +427,8 @@ export function NavigationMapView({
         </Marker>
       ) : null}
 
-      {/* Show the start marker:
-            • Always when not navigating (preview mode)
-            • During selected-location navigation (!hasLiveLocation) so the
-              user can see the declared start point on the map */}
-      {routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
+      {/* Show the start marker only when the user explicitly selected a custom start point */}
+      {isCustomStart && routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
         <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
           <View style={styles.startMarker}>
             <Text style={styles.startMarkerText}>S</Text>

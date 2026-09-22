@@ -31,54 +31,12 @@ import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
-
-async function ensureLocationPermission(): Promise<boolean> {
-  if (Platform.OS === "web") return false;
-  if (Platform.OS !== "android") return true;
-  try {
-    const fine = await PermissionsAndroid.check(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    );
-    const coarse = await PermissionsAndroid.check(
-      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-    );
-    if (fine || coarse) return true;
-
-    const res = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
-    ]);
-    return (
-      res[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] ===
-      PermissionsAndroid.RESULTS.GRANTED ||
-      res[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] ===
-      PermissionsAndroid.RESULTS.GRANTED
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function getNativeGpsStart(): Promise<MapCoordinate | null> {
-  const mapLibre = getMapLibre();
-  if (!mapLibre) return null;
-
-  try {
-    const hasPermission = await ensureLocationPermission();
-    if (!hasPermission) return null;
-
-    const position = await Promise.race([
-      mapLibre.LocationManager.getCurrentPosition(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
-    ]);
-
-    if (!position?.coords) return null;
-
-    return [position.coords.longitude, position.coords.latitude];
-  } catch {
-    return null;
-  }
-}
+import {
+  ensureLocationPermission,
+  fetchFreshGpsPosition,
+  GPS_UNAVAILABLE_MESSAGE,
+  isValidGpsLocation,
+} from "../utils/gps";
 
 export type SignCategory = 'WARNING' | 'MANDATORY' | 'PROHIBITORY' | 'INFORMATION' | 'TEMPORARY';
 
@@ -263,28 +221,63 @@ export function NavigationMapScreen() {
     destinationSubtitle,
     destinationTitle,
   ]);
-  const gpsStart = useMemo(
+  const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  const isCustomStart = Boolean(
+    startLat &&
+    startLng &&
+    startTitle !== "Current Location" &&
+    startId &&
+    startId !== "current-location"
+  );
+  const customStartCoordinate = useMemo(
     () =>
-      startLng && startLat
+      isCustomStart && startLng && startLat
         ? ([Number(startLng), Number(startLat)] as MapCoordinate)
         : undefined,
-    [startLat, startLng],
+    [isCustomStart, startLat, startLng],
   );
-  const routeStart = gpsStart;
+  const fallbackCurrentLocation = useMemo(
+    () =>
+      !isCustomStart && startLng && startLat
+        ? ([Number(startLng), Number(startLat)] as MapCoordinate)
+        : undefined,
+    [isCustomStart, startLat, startLng],
+  );
+  // Authoritative separation:
+  // - plannedRouteOrigin: used for route calculation. STABLE origin of the trip (does not move with every GPS step).
+  // - userCoordinate: device's actual current GPS location.
+  // - destination: selectedDestination.coordinate.
+  const [initialGpsOrigin, setInitialGpsOrigin] = useState<MapCoordinate | undefined>(fallbackCurrentLocation);
+
+  useEffect(() => {
+    if (fallbackCurrentLocation) {
+      setInitialGpsOrigin(fallbackCurrentLocation);
+    }
+  }, [fallbackCurrentLocation]);
+
+  const plannedRouteOrigin = isCustomStart
+    ? customStartCoordinate
+    : (fallbackCurrentLocation ?? initialGpsOrigin);
   const routeStartTitle =
     startTitle ??
-    (gpsStart ? "Current Location" : undefined);
+    (isCustomStart
+      ? "Starting point"
+      : (plannedRouteOrigin ? "Current Location" : undefined));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
-    routeKey: string;
+    destinationId: string;
+    vehicleMode: string;
   }>();
   const routeKey =
-    selectedDestination && routeStart
-      ? `${routeStart[0]},${routeStart[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
+    selectedDestination && plannedRouteOrigin
+      ? `${plannedRouteOrigin[0]},${plannedRouteOrigin[1]}:${selectedDestination.coordinate[0]},${selectedDestination.coordinate[1]}:${vehicleMode}`
       : undefined;
   const isNavigating = Boolean(
-    routeKey && navigationSession?.routeKey === routeKey,
+    navigationSession &&
+    selectedDestination &&
+    navigationSession.destinationId === selectedDestination.id &&
+    navigationSession.vehicleMode === vehicleMode,
   );
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(Spacing.two, insets.bottom);
@@ -297,12 +290,12 @@ export function NavigationMapScreen() {
   // 0: Peek range (navigation: compact bar with X + ETA; non-navigation: vehicle mode, ETA, distance)
   // 1: Mid range (standard preview with vehicle tabs, filters preview, and Start button)
   // 2: Full range (expanded view showing the full sign filter list and Start button)
-  const peekSheetHeight = routeStart
+  const peekSheetHeight = plannedRouteOrigin
     ? isNavigating
       ? 96 + bottomInset   // navigation mode: compact bar (handle + header row only)
       : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
     : Math.min(180, windowHeight * 0.22);
-  const midSheetHeight = routeStart
+  const midSheetHeight = plannedRouteOrigin
     ? Math.min(420, windowHeight * 0.52)
     : Math.min(280, windowHeight * 0.36);
   const maxSheetHeight = Math.max(
@@ -353,11 +346,17 @@ export function NavigationMapScreen() {
     }).start();
   }, [peekSheetHeight, midSheetHeight, maxSheetHeight, sheetHeightAnim]);
 
+  const hasSnappedDestinationRef = useRef(false);
   useEffect(() => {
-    if (selectedDestination) {
+    hasSnappedDestinationRef.current = false;
+  }, [selectedDestination?.id]);
+
+  useEffect(() => {
+    if (selectedDestination && !hasSnappedDestinationRef.current && !isNavigating) {
+      hasSnappedDestinationRef.current = true;
       snapTo(1);
     }
-  }, [selectedDestination, snapTo]);
+  }, [selectedDestination, isNavigating, snapTo]);
 
   const expandableContentOpacity = sheetHeightAnim.interpolate({
     inputRange: [peekSheetHeight, peekSheetHeight + 50],
@@ -458,7 +457,6 @@ export function NavigationMapScreen() {
     requestId: number;
   }>();
   const [navigationActionError, setNavigationError] = useState<string>();
-  const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
   // When the user strays off the planned route we update this to the current
   // GPS position so the route query re-fetches from the new origin.
   const [rerouteOrigin, setRerouteOrigin] = useState<MapCoordinate>();
@@ -468,16 +466,16 @@ export function NavigationMapScreen() {
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
   // Use rerouteOrigin when available (off-route rerouting), otherwise the
-  // original routeStart.  Changing rerouteOrigin changes the query key which
+  // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
   // triggers an automatic re-fetch for the new path.
-  const activeRouteOrigin = rerouteOrigin ?? routeStart;
+  const activeRouteOrigin = rerouteOrigin ?? plannedRouteOrigin;
   const { data: routeResult, error: routeError } = useGetNavigationRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
     vehicleMode,
   );
   const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
-  const hasSelectedRoute = Boolean(routeStart && selectedDestination);
+  const hasSelectedRoute = Boolean(plannedRouteOrigin && selectedDestination);
   const { data: mapSigns = [], error: boundsSignsError } = useGetSignsInBounds(
     mapBounds,
     !hasSelectedRoute,
@@ -593,7 +591,7 @@ export function NavigationMapScreen() {
     [routeCoordinates, routeSteps],
   );
   const activeManeuver = useMemo(() => {
-    const navigationCoordinate = userCoordinate ?? routeStart;
+    const navigationCoordinate = userCoordinate ?? plannedRouteOrigin;
 
     if (
       !isNavigating ||
@@ -633,18 +631,18 @@ export function NavigationMapScreen() {
     isNavigating,
     maneuverProgresses,
     routeCoordinates,
-    routeStart,
+    plannedRouteOrigin,
     routeSteps,
     userCoordinate,
   ]);
 
   const currentRouteProgress = useMemo(() => {
-    const navigationCoordinate = userCoordinate ?? routeStart;
+    const navigationCoordinate = userCoordinate ?? plannedRouteOrigin;
     if (!isNavigating || !navigationCoordinate || !routeCoordinates?.length) {
       return 0;
     }
     return getRouteProgressMeters(navigationCoordinate, routeCoordinates);
-  }, [isNavigating, userCoordinate, routeStart, routeCoordinates]);
+  }, [isNavigating, userCoordinate, plannedRouteOrigin, routeCoordinates]);
 
   const remainingNavDistance = useMemo(() => {
     if (routeDistance === undefined) return undefined;
@@ -663,14 +661,14 @@ export function NavigationMapScreen() {
     alertDistanceMeters: 50,
     isNavigating,
     signs: filteredSigns,
-    userCoordinate: userCoordinate ?? routeStart,
+    userCoordinate: userCoordinate ?? plannedRouteOrigin,
     speechLanguage: "en-US",
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
   const upcomingSignsOnRoute = useMemo(() => {
     if (!isNavigating || !routeCoordinates || filteredSigns.length === 0) return [];
-    const navigationCoordinate = userCoordinate ?? routeStart;
+    const navigationCoordinate = userCoordinate ?? plannedRouteOrigin;
     if (!navigationCoordinate) return [];
     const userProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
     const signsAhead = filteredSigns
@@ -687,42 +685,64 @@ export function NavigationMapScreen() {
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
       .slice(0, 3);
     return signsAhead;
-  }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, routeStart]);
+  }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, plannedRouteOrigin]);
 
 
   // ─── Off-route detection & auto-rerouting ───────────────────────────────────
   // Threshold: if the user drifts more than 30 m from the nearest route segment
   // during live GPS navigation, request a new route from the current position.
-  const OFF_ROUTE_THRESHOLD_METERS = 30;
+  // ─── Off-route detection & auto-rerouting ───────────────────────────────────
+  // Threshold: if the user drifts more than 45 m from the nearest route segment
+  // during live GPS navigation across 3 consecutive readings, request a new route.
+  const OFF_ROUTE_THRESHOLD_METERS = 45;
+  const consecutiveOffRouteCountRef = useRef(0);
 
   useEffect(() => {
-    if (!isNavigating || !hasLiveLocation || !userCoordinate || !routeCoordinates?.length) return;
+    if (!isNavigating || !hasLiveLocation || !userCoordinate || !routeCoordinates?.length) {
+      consecutiveOffRouteCountRef.current = 0;
+      return;
+    }
 
     const distToRoute = getDistanceToRouteMeters(userCoordinate, routeCoordinates);
     if (distToRoute <= OFF_ROUTE_THRESHOLD_METERS) {
-      // Back on route — allow the next off-route event to fire.
+      // Back on route — reset consecutive count and allow next reroute
+      consecutiveOffRouteCountRef.current = 0;
       isReroutingRef.current = false;
       return;
     }
+
+    consecutiveOffRouteCountRef.current += 1;
+    console.log(
+      `[GPS] Off-route reading (${consecutiveOffRouteCountRef.current}/3): ${distToRoute.toFixed(1)}m from route`,
+    );
+
+    if (consecutiveOffRouteCountRef.current < 3) return;
 
     // Already waiting for a reroute response — don't spam the API.
     if (isReroutingRef.current) return;
 
     isReroutingRef.current = true;
+    console.log('[GPS] Triggering auto-reroute from current GPS position:', userCoordinate);
     setRerouteOrigin([...userCoordinate]);
   }, [isNavigating, hasLiveLocation, userCoordinate, routeCoordinates]);
 
-  // Reset reroute lock whenever new route coordinates arrive
+  // Reset reroute lock and clear rerouteOrigin whenever new route coordinates arrive
   useEffect(() => {
     if (routeCoordinates?.length) {
+      if (rerouteOrigin) {
+        setInitialGpsOrigin(rerouteOrigin);
+        setRerouteOrigin(undefined);
+      }
       isReroutingRef.current = false;
+      consecutiveOffRouteCountRef.current = 0;
     }
-  }, [routeCoordinates]);
+  }, [routeCoordinates, rerouteOrigin]);
 
   // Reset reroute state whenever the core routeKey changes (new destination, etc.)
   useEffect(() => {
     setRerouteOrigin(undefined);
     isReroutingRef.current = false;
+    consecutiveOffRouteCountRef.current = 0;
     setNavigationError(undefined);
   }, [routeKey, vehicleMode]);
 
@@ -735,38 +755,79 @@ export function NavigationMapScreen() {
     }
   }, [activeManeuver?.stepIndex]);
 
-  useEffect(() => {
-    if (Platform.OS === "web" || !hasLiveLocation) return;
+  // ─── Continuous Native GPS Listener ─────────────────────────────────────────
+  // MapLibre.LocationManager is the SINGLE AUTHORITATIVE native GPS source.
+  // Active across both map preview and active navigation so userCoordinate is always fresh.
+  const isListeningGpsRef = useRef(false);
+
+  const handleLocationUpdate = useCallback((position: any) => {
+    if (!isValidGpsLocation(position)) return;
+    const { longitude, latitude, accuracy } = position.coords;
+    const timestamp = position.timestamp;
+    console.log("[GPS] location update", {
+      latitude,
+      longitude,
+      accuracy,
+      timestamp,
+    });
+    const newCoord: MapCoordinate = [longitude, latitude];
+    setUserCoordinate(newCoord);
+    setInitialGpsOrigin((prev) => prev ?? newCoord);
+  }, []);
+
+  const startGpsListening = useCallback(async () => {
+    if (Platform.OS === "web") return null;
 
     const mapLibre = getMapLibre();
-    if (!mapLibre) return;
+    if (!mapLibre) return null;
 
     try {
-      const handleLocationUpdate = (position: {
-        coords: { latitude: number; longitude: number };
-      }) => {
-        if (!position?.coords) return;
-        const { longitude, latitude } = position.coords;
-        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
-        setUserCoordinate([longitude, latitude]);
-      };
+      const hasPermission = await ensureLocationPermission();
+      if (!hasPermission) return null;
 
       mapLibre.LocationManager.setMinDisplacement(0);
-      mapLibre.LocationManager.addListener(handleLocationUpdate);
+      if (!isListeningGpsRef.current) {
+        mapLibre.LocationManager.addListener(handleLocationUpdate);
+        isListeningGpsRef.current = true;
+        console.log("[GPS] Continuous native location listener registered");
+      }
 
-      return () => {
-        mapLibre.LocationManager.removeListener(handleLocationUpdate);
-      };
-    } catch {
-      return;
+      const initialPos = await fetchFreshGpsPosition(3500);
+      if (initialPos) {
+        setUserCoordinate(initialPos);
+        setInitialGpsOrigin((prev) => prev ?? initialPos);
+        return initialPos;
+      }
+    } catch (error) {
+      console.error("[GPS] Error setting up LocationManager listener:", error);
     }
-  }, [hasLiveLocation]);
+    return null;
+  }, [handleLocationUpdate]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
+    void startGpsListening();
+
+    return () => {
+      const mapLibre = getMapLibre();
+      if (mapLibre && isListeningGpsRef.current) {
+        try {
+          mapLibre.LocationManager.removeListener(handleLocationUpdate);
+          isListeningGpsRef.current = false;
+          console.log("[GPS] Continuous native location listener removed on unmount");
+        } catch (error) {
+          console.error("[GPS] Error removing LocationManager listener:", error);
+        }
+      }
+    };
+  }, [handleLocationUpdate, startGpsListening]);
 
   const handleBeginNavigation = async () => {
     if (
       Platform.OS === "web" ||
       !selectedDestination ||
-      !routeStart ||
+      !plannedRouteOrigin ||
       !routeKey
     )
       return;
@@ -780,37 +841,40 @@ export function NavigationMapScreen() {
     setNavigationError(undefined);
 
     try {
-      const mapLibre = getMapLibre();
       const hasPermission = await ensureLocationPermission();
 
-      let initialCoord: MapCoordinate = routeStart;
-      if (hasPermission && mapLibre) {
-        try {
-          const pos = await Promise.race([
-            mapLibre.LocationManager.getCurrentPosition(),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 600)),
-          ]);
-          if (pos?.coords) {
-            initialCoord = [pos.coords.longitude, pos.coords.latitude];
-          }
-        } catch {
-          // No fix yet — initialCoord remains routeStart, listener will update on first tick
-        }
+      if (!hasPermission) {
+        setNavigationError("Location permission is required to start navigation.");
+        return;
       }
 
-      setUserCoordinate(initialCoord);
+      // Guarantee the continuous native GPS listener is active and running throughout navigation
+      await startGpsListening();
+
+      // If navigating from Current Location, ensure fresh GPS position
+      let currentCoord: MapCoordinate | null | undefined = userCoordinate;
+      if (!isCustomStart) {
+        if (!currentCoord) {
+          currentCoord = await fetchFreshGpsPosition(3500);
+        }
+
+        if (!currentCoord) {
+          setNavigationError(GPS_UNAVAILABLE_MESSAGE);
+          return;
+        }
+
+        setUserCoordinate(currentCoord);
+        setInitialGpsOrigin(currentCoord);
+      }
+
       setNavigationSession({
-        // Enable live GPS tracking whenever permission is granted, so GPX simulation
-        // or real movement updates live location and triggers off-route recalculation.
-        hasLiveLocation: Boolean(hasPermission),
-        routeKey,
+        hasLiveLocation: true,
+        destinationId: selectedDestination.id,
+        vehicleMode,
       });
-    } catch {
-      setUserCoordinate(routeStart);
-      setNavigationSession({
-        hasLiveLocation: false,
-        routeKey,
-      });
+    } catch (error) {
+      console.error("[GPS] Failed to begin navigation:", error);
+      setNavigationError(GPS_UNAVAILABLE_MESSAGE);
     } finally {
       setIsStartingNavigation(false);
     }
@@ -822,29 +886,35 @@ export function NavigationMapScreen() {
     setIsLocating(true);
 
     try {
-      let coordinate: MapCoordinate;
-
       const mapLibre = getMapLibre();
       if (!mapLibre) {
         throw new Error("Current GPS location requires a native build.");
       }
-      const hasPermission = await mapLibre.LocationManager.requestPermissions();
+      const hasPermission = await ensureLocationPermission();
 
       if (!hasPermission) {
         throw new Error("Allow location access to use your current position.");
       }
 
-      const position = await mapLibre.LocationManager.getCurrentPosition();
-      if (!position) {
-        throw new Error("Turn on GPS and try again.");
+      await startGpsListening();
+
+      let coordinate: MapCoordinate | null | undefined = userCoordinate;
+      if (!coordinate) {
+        coordinate = await fetchFreshGpsPosition(3500);
       }
 
-      coordinate = [position.coords.longitude, position.coords.latitude];
-      setMapFocus((current) => ({
+      if (!coordinate) {
+        throw new Error(GPS_UNAVAILABLE_MESSAGE);
+      }
+
+      setUserCoordinate(coordinate);
+      setInitialGpsOrigin(coordinate);
+      setMapFocus({
         coordinate,
-        requestId: (current?.requestId ?? 0) + 1,
-      }));
+        requestId: Date.now(),
+      });
     } catch (error) {
+      console.error("[GPS] handleCurrentLocation error:", error);
       setLocationToast((current) => ({
         id: (current?.id ?? 0) + 1,
         message:
@@ -858,14 +928,14 @@ export function NavigationMapScreen() {
   };
 
   const handleSwapSelectedRoute = () => {
-    if (!selectedDestination || !routeStart) return;
+    if (!selectedDestination || !plannedRouteOrigin) return;
     setNavigationSession(undefined);
     router.replace({
       pathname: '/home',
       params: {
         destinationId: startId ?? 'swapped-start',
-        destinationLat: String(routeStart[1]),
-        destinationLng: String(routeStart[0]),
+        destinationLat: String(plannedRouteOrigin[1]),
+        destinationLng: String(plannedRouteOrigin[0]),
         destinationTitle: routeStartTitle ?? 'Starting point',
         destinationSubtitle: '',
         startId: selectedDestination.id,
@@ -886,8 +956,13 @@ export function NavigationMapScreen() {
       pathname: "/home/search",
       params: {
         ...(startId ? { startId } : {}),
-        ...(startLat && startLng ? { startLat, startLng } : {}),
-        ...(startTitle ? { startTitle } : {}),
+        ...(isCustomStart && customStartCoordinate
+          ? {
+              startLat: String(customStartCoordinate[1]),
+              startLng: String(customStartCoordinate[0]),
+              startTitle: startTitle ?? 'Starting point',
+            }
+          : {}),
       },
     });
   };
@@ -895,45 +970,42 @@ export function NavigationMapScreen() {
   const handleGo = async () => {
     if (!selectedDestination) return;
 
-    // If the user has already chosen an explicit start point, go straight to
-    // navigation with that start — do NOT overwrite it with GPS.
-    if (routeStart) {
-      router.replace({
-        pathname: "/home",
-        params: {
-          destinationId: selectedDestination.id,
-          destinationLat: String(selectedDestination.coordinate[1]),
-          destinationLng: String(selectedDestination.coordinate[0]),
-          destinationSubtitle: selectedDestination.subtitle,
-          destinationTitle: selectedDestination.title,
-          startLat: String(routeStart[1]),
-          startLng: String(routeStart[0]),
-          ...(startTitle ? { startTitle } : {}),
-          ...(startId ? { startId } : {}),
-        },
-      });
+    // If the user has already chosen an explicit custom start point, keep it
+    if (isCustomStart && customStartCoordinate) {
       return;
     }
 
+    // Navigating from Current Location
     if (Platform.OS !== "web") {
-      const nativeGpsStart = await getNativeGpsStart();
+      setIsStartingNavigation(true);
+      try {
+        await startGpsListening();
 
-      if (nativeGpsStart) {
-        router.replace({
-          pathname: "/home",
-          params: {
-            destinationId: selectedDestination.id,
-            destinationLat: String(selectedDestination.coordinate[1]),
-            destinationLng: String(selectedDestination.coordinate[0]),
-            destinationSubtitle: selectedDestination.subtitle,
-            destinationTitle: selectedDestination.title,
-            startLat: String(nativeGpsStart[1]),
-            startLng: String(nativeGpsStart[0]),
-            startTitle: "Current Location",
-          },
+        let currentPos: MapCoordinate | null | undefined = userCoordinate;
+        if (!currentPos) {
+          currentPos = await fetchFreshGpsPosition(3500);
+        }
+
+        if (currentPos) {
+          setUserCoordinate(currentPos);
+          setInitialGpsOrigin(currentPos);
+          return;
+        }
+
+        setLocationToast({
+          id: Date.now(),
+          message: GPS_UNAVAILABLE_MESSAGE,
         });
-        return;
+      } catch (error) {
+        console.error("[GPS] handleGo error:", error);
+        setLocationToast({
+          id: Date.now(),
+          message: GPS_UNAVAILABLE_MESSAGE,
+        });
+      } finally {
+        setIsStartingNavigation(false);
       }
+      return;
     }
 
     if (
@@ -941,41 +1013,33 @@ export function NavigationMapScreen() {
       "geolocation" in navigator &&
       "permissions" in navigator
     ) {
-      const permission = await navigator.permissions.query({
-        name: "geolocation",
-      });
+      try {
+        const permission = await navigator.permissions.query({
+          name: "geolocation",
+        });
 
-      if (permission.state === "granted") {
-        navigator.geolocation.getCurrentPosition(
-          ({ coords }) => {
-            router.replace({
-              pathname: "/home",
-              params: {
-                destinationId: selectedDestination.id,
-                destinationLat: String(selectedDestination.coordinate[1]),
-                destinationLng: String(selectedDestination.coordinate[0]),
-                destinationSubtitle: selectedDestination.subtitle,
-                destinationTitle: selectedDestination.title,
-                startLat: String(coords.latitude),
-                startLng: String(coords.longitude),
-                startTitle: "Current Location",
-              },
-            });
-          },
-          () => {
-            router.push({
-              pathname: "/home/start",
-              params: {
-                destinationId: selectedDestination.id,
-                destinationLat: String(selectedDestination.coordinate[1]),
-                destinationLng: String(selectedDestination.coordinate[0]),
-                destinationSubtitle: selectedDestination.subtitle,
-                destinationTitle: selectedDestination.title,
-              },
-            });
-          },
-        );
-        return;
+        if (permission.state === "granted") {
+          navigator.geolocation.getCurrentPosition(
+            ({ coords }) => {
+              setUserCoordinate([coords.longitude, coords.latitude]);
+            },
+            () => {
+              router.push({
+                pathname: "/home/start",
+                params: {
+                  destinationId: selectedDestination.id,
+                  destinationLat: String(selectedDestination.coordinate[1]),
+                  destinationLng: String(selectedDestination.coordinate[0]),
+                  destinationSubtitle: selectedDestination.subtitle,
+                  destinationTitle: selectedDestination.title,
+                },
+              });
+            },
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("[GPS] Web geolocation error:", error);
       }
     }
 
@@ -997,20 +1061,16 @@ export function NavigationMapScreen() {
         <NavigationMapView
           onBoundsChange={setMapBounds}
           destination={selectedDestination}
-          focusCoordinate={
-            selectedDestination ? undefined : mapFocus?.coordinate
-          }
+          focusCoordinate={mapFocus?.coordinate}
           focusRequestId={mapFocus?.requestId}
           navigationActive={
             Platform.OS !== "web" && isNavigating
           }
-          userCoordinate={userCoordinate ?? routeStart}
+          userCoordinate={userCoordinate}
           hasLiveLocation={hasLiveLocation}
-          onUserLocationUpdate={({ longitude, latitude }) => {
-            setUserCoordinate([longitude, latitude]);
-          }}
+          isCustomStart={isCustomStart}
           routeCoordinates={routeCoordinates}
-          routeStart={routeStart}
+          routeStart={plannedRouteOrigin}
           routeSigns={filteredSigns}
           showCurrentLocation={!isNavigating}
         />
@@ -1095,7 +1155,7 @@ export function NavigationMapScreen() {
             accessibilityLabel="Center"
             accessibilityRole="button"
             onPress={() => {
-              const coord = userCoordinate ?? routeStart;
+              const coord = userCoordinate ?? plannedRouteOrigin;
               if (!coord) return;
               setMapFocus((current) => ({
                 coordinate: coord,
@@ -1120,7 +1180,7 @@ export function NavigationMapScreen() {
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
             <View style={styles.topControls}>
-              {selectedDestination && routeStart ? (
+              {selectedDestination && plannedRouteOrigin ? (
                 <View style={[styles.selectedRouteRow, { backgroundColor: theme.backgroundElement }]}>
                   <View style={styles.selectedRouteFields}>
                     <AppButton
@@ -1436,7 +1496,7 @@ export function NavigationMapScreen() {
           >
             <View style={styles.destinationSheetHandle} />
           </View>
-          {routeStart ? (
+          {plannedRouteOrigin ? (
             /* When starting point and destination have been selected: STRICTLY FOLLOW SCREENSHOT STRUCTURE */
             <View style={styles.routeSheetContainer}>
               {/* Header row: X on left, Google Maps ETA & distance centered, route options on right */}
