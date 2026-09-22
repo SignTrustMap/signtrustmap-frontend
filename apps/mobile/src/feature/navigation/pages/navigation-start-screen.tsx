@@ -16,10 +16,8 @@ import { AppToast } from "@/components/ui/toast";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import { useSession } from "@/context/session-provider";
 import {
-  currentLocation,
-  previousLocations,
   type MapCoordinate,
-} from "@/feature/navigation/data/navigation-locations";
+} from '@/types/navigation/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from "@/hooks/use-theme";
@@ -44,29 +42,25 @@ export function NavigationStartScreen() {
   }>();
   const theme = useTheme();
   const { session } = useSession();
-  const savedDestination = previousLocations.find(
-    (location) => location.id === destinationId,
-  );
   const destination = useMemo(() => {
-    if (destinationLat && destinationLng && destinationId) {
+    if (destinationLat && destinationLng) {
       return {
         coordinate: [
           Number(destinationLng),
           Number(destinationLat),
         ] as MapCoordinate,
-        id: destinationId,
+        id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
         title: destinationTitle ?? "Destination",
       };
     }
-    return savedDestination;
+    return undefined;
   }, [
     destinationId,
     destinationLat,
     destinationLng,
     destinationSubtitle,
     destinationTitle,
-    savedDestination,
   ]);
 
   const [toast, setToast] = useState<{ id: number; message: string }>();
@@ -107,7 +101,7 @@ export function NavigationStartScreen() {
   const handleSelectCurrentLocation = async () => {
     if (!destinationId) return;
 
-    let coordinate: MapCoordinate = currentLocation.coordinate;
+    let coordinate: MapCoordinate | undefined;
 
     const mapLibre = getMapLibre();
     if (mapLibre) {
@@ -121,8 +115,18 @@ export function NavigationStartScreen() {
           }
         }
       } catch {
-        // Fall back to default coordinate
+        // GPS unavailable
       }
+    }
+
+    if (!coordinate) {
+      // Could not obtain a real GPS fix — don't silently fall back to a
+      // hard-coded location. Show the picker so the user can choose manually.
+      router.push({
+        pathname: '/home/start',
+        params: destinationId ? { destinationId } : {},
+      });
+      return;
     }
 
     if (areSameLocation(coordinate, destination?.coordinate)) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Animated, BackHandler, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Animated, BackHandler, PanResponder, PermissionsAndroid, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -14,11 +14,8 @@ import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-ca
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
-  currentLocation,
-  previousLocations,
-  startLocations,
   type MapCoordinate,
-} from "@/feature/navigation/data/navigation-locations";
+} from "@/types/navigation/navigationType";
 import { useTheme } from "@/hooks/use-theme";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 
@@ -31,17 +28,51 @@ import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
+import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
+
+async function ensureLocationPermission(): Promise<boolean> {
+  if (Platform.OS === "web") return false;
+  if (Platform.OS !== "android") return true;
+  try {
+    const fine = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    );
+    const coarse = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    );
+    if (fine || coarse) return true;
+
+    const res = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    ]);
+    return (
+      res[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] ===
+      PermissionsAndroid.RESULTS.GRANTED ||
+      res[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] ===
+      PermissionsAndroid.RESULTS.GRANTED
+    );
+  } catch {
+    return false;
+  }
+}
 
 async function getNativeGpsStart(): Promise<MapCoordinate | null> {
   const mapLibre = getMapLibre();
   if (!mapLibre) return null;
 
   try {
-    const position = await mapLibre.LocationManager.getCurrentPosition();
+    const hasPermission = await ensureLocationPermission();
+    if (!hasPermission) return null;
 
-    if (!position) return null;
+    const position = await Promise.race([
+      mapLibre.LocationManager.getCurrentPosition(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
+    ]);
+
+    if (!position?.coords) return null;
 
     return [position.coords.longitude, position.coords.latitude];
   } catch {
@@ -211,34 +242,27 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
-  const savedDestination = previousLocations.find(
-    (location) => location.id === destinationId,
-  );
   const selectedDestination = useMemo(() => {
-    if (destinationLat && destinationLng && destinationId) {
+    if (destinationLat && destinationLng) {
       return {
         category: "recent" as const,
         coordinate: [
           Number(destinationLng),
           Number(destinationLat),
         ] as MapCoordinate,
-        id: destinationId,
+        id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
         title: destinationTitle ?? "Destination",
       };
     }
-    return savedDestination;
+    return undefined;
   }, [
     destinationId,
     destinationLat,
     destinationLng,
     destinationSubtitle,
     destinationTitle,
-    savedDestination,
   ]);
-  const selectedStart = startLocations.find(
-    (location) => location.id === startId,
-  );
   const gpsStart = useMemo(
     () =>
       startLng && startLat
@@ -246,13 +270,9 @@ export function NavigationMapScreen() {
         : undefined,
     [startLat, startLng],
   );
-  const routeStart = useMemo(
-    () => gpsStart ?? selectedStart?.coordinate,
-    [gpsStart, selectedStart],
-  );
+  const routeStart = gpsStart;
   const routeStartTitle =
     startTitle ??
-    selectedStart?.title ??
     (gpsStart ? "Current Location" : undefined);
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const [navigationSession, setNavigationSession] = useState<{
@@ -439,12 +459,20 @@ export function NavigationMapScreen() {
   }>();
   const [navigationActionError, setNavigationError] = useState<string>();
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
+  // When the user strays off the planned route we update this to the current
+  // GPS position so the route query re-fetches from the new origin.
+  const [rerouteOrigin, setRerouteOrigin] = useState<MapCoordinate>();
+  const isReroutingRef = useRef(false);
   // Tracks sign IDs the user has already responded to — local only, no API call.
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
+  // Use rerouteOrigin when available (off-route rerouting), otherwise the
+  // original routeStart.  Changing rerouteOrigin changes the query key which
+  // triggers an automatic re-fetch for the new path.
+  const activeRouteOrigin = rerouteOrigin ?? routeStart;
   const { data: routeResult, error: routeError } = useGetNavigationRoute(
-    routeStart,
+    activeRouteOrigin,
     selectedDestination?.coordinate,
     vehicleMode,
   );
@@ -455,7 +483,7 @@ export function NavigationMapScreen() {
     !hasSelectedRoute,
   );
   const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
-    routeStart,
+    activeRouteOrigin,
     selectedDestination?.coordinate,
     routeResult?.geometry,
   );
@@ -495,28 +523,12 @@ export function NavigationMapScreen() {
         : TARGET_SIGN_IMAGE_URL,
     }));
   }, [hasSelectedRoute, mapSigns, plannedSigns]);
-  const sampleRouteSigns = useMemo((): RouteSign[] => {
-    if (!hasSelectedRoute || !routeCoordinates || routeCoordinates.length < 2) return [];
-    const nearStart = routeCoordinates[Math.min(1, routeCoordinates.length - 1)];
-    const mid = routeCoordinates[Math.floor((routeCoordinates.length - 1) / 2)];
-    return [
-      { id: 'sample-sign-start', coordinate: nearStart, imageUrl: '', name: 'Stop', signCode: 'STOP' },
-      { id: 'sample-sign-mid', coordinate: mid, imageUrl: '', name: 'Stop', signCode: 'STOP' },
-    ];
-  }, [hasSelectedRoute, routeCoordinates]);
-
-  const signsWithSamples = useMemo(
-    () => {
-      const sampleIds = new Set(sampleRouteSigns.map((s) => s.id));
-      const deduped = visibleSigns.filter((s) => !sampleIds.has(s.id));
-      return [...sampleRouteSigns, ...deduped];
-    },
-    [sampleRouteSigns, visibleSigns],
-  );
 
   const [selectedSignCategories, setSelectedSignCategories] = useState<Set<SignCategory>>(
     () => new Set(['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION', 'TEMPORARY'])
   );
+
+  // ─── Signature counts / filter — now based directly on visibleSigns ─────────
 
   const handleToggleCategory = (category: SignCategory) => {
     setSelectedSignCategories((prev) => {
@@ -558,19 +570,19 @@ export function NavigationMapScreen() {
       INFORMATION: 0,
       TEMPORARY: 0,
     };
-    for (const sign of signsWithSamples) {
+    for (const sign of visibleSigns) {
       const cat = getSignCategory(sign);
       counts[cat] = (counts[cat] ?? 0) + 1;
     }
     return counts;
-  }, [signsWithSamples]);
+  }, [visibleSigns]);
 
   const filteredSigns = useMemo(() => {
-    return signsWithSamples.filter((sign) => {
+    return visibleSigns.filter((sign) => {
       const cat = getSignCategory(sign);
       return selectedSignCategories.has(cat);
     });
-  }, [signsWithSamples, selectedSignCategories]);
+  }, [visibleSigns, selectedSignCategories]);
   const maneuverProgresses = useMemo(
     () =>
       routeSteps?.map((step) =>
@@ -678,7 +690,39 @@ export function NavigationMapScreen() {
   }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, routeStart]);
 
 
+  // ─── Off-route detection & auto-rerouting ───────────────────────────────────
+  // Threshold: if the user drifts more than 30 m from the nearest route segment
+  // during live GPS navigation, request a new route from the current position.
+  const OFF_ROUTE_THRESHOLD_METERS = 30;
+
   useEffect(() => {
+    if (!isNavigating || !hasLiveLocation || !userCoordinate || !routeCoordinates?.length) return;
+
+    const distToRoute = getDistanceToRouteMeters(userCoordinate, routeCoordinates);
+    if (distToRoute <= OFF_ROUTE_THRESHOLD_METERS) {
+      // Back on route — allow the next off-route event to fire.
+      isReroutingRef.current = false;
+      return;
+    }
+
+    // Already waiting for a reroute response — don't spam the API.
+    if (isReroutingRef.current) return;
+
+    isReroutingRef.current = true;
+    setRerouteOrigin([...userCoordinate]);
+  }, [isNavigating, hasLiveLocation, userCoordinate, routeCoordinates]);
+
+  // Reset reroute lock whenever new route coordinates arrive
+  useEffect(() => {
+    if (routeCoordinates?.length) {
+      isReroutingRef.current = false;
+    }
+  }, [routeCoordinates]);
+
+  // Reset reroute state whenever the core routeKey changes (new destination, etc.)
+  useEffect(() => {
+    setRerouteOrigin(undefined);
+    isReroutingRef.current = false;
     setNavigationError(undefined);
   }, [routeKey, vehicleMode]);
 
@@ -701,13 +745,13 @@ export function NavigationMapScreen() {
       const handleLocationUpdate = (position: {
         coords: { latitude: number; longitude: number };
       }) => {
-        setUserCoordinate([
-          position.coords.longitude,
-          position.coords.latitude,
-        ]);
+        if (!position?.coords) return;
+        const { longitude, latitude } = position.coords;
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return;
+        setUserCoordinate([longitude, latitude]);
       };
 
-      mapLibre.LocationManager.setMinDisplacement(3);
+      mapLibre.LocationManager.setMinDisplacement(0);
       mapLibre.LocationManager.addListener(handleLocationUpdate);
 
       return () => {
@@ -737,18 +781,28 @@ export function NavigationMapScreen() {
 
     try {
       const mapLibre = getMapLibre();
-      const currentPosition = mapLibre
-        ? await mapLibre.LocationManager.getCurrentPosition()
-        : null;
+      const hasPermission = await ensureLocationPermission();
 
-      setUserCoordinate(
-        currentPosition
-          ? [currentPosition.coords.longitude, currentPosition.coords.latitude]
-          : routeStart,
-      );
+      let initialCoord: MapCoordinate = routeStart;
+      if (hasPermission && mapLibre) {
+        try {
+          const pos = await Promise.race([
+            mapLibre.LocationManager.getCurrentPosition(),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 600)),
+          ]);
+          if (pos?.coords) {
+            initialCoord = [pos.coords.longitude, pos.coords.latitude];
+          }
+        } catch {
+          // No fix yet — initialCoord remains routeStart, listener will update on first tick
+        }
+      }
 
+      setUserCoordinate(initialCoord);
       setNavigationSession({
-        hasLiveLocation: Boolean(currentPosition),
+        // Enable live GPS tracking whenever permission is granted, so GPX simulation
+        // or real movement updates live location and triggers off-route recalculation.
+        hasLiveLocation: Boolean(hasPermission),
         routeKey,
       });
     } catch {
@@ -781,7 +835,6 @@ export function NavigationMapScreen() {
       }
 
       const position = await mapLibre.LocationManager.getCurrentPosition();
-
       if (!position) {
         throw new Error("Turn on GPS and try again.");
       }
@@ -953,6 +1006,9 @@ export function NavigationMapScreen() {
           }
           userCoordinate={userCoordinate ?? routeStart}
           hasLiveLocation={hasLiveLocation}
+          onUserLocationUpdate={({ longitude, latitude }) => {
+            setUserCoordinate([longitude, latitude]);
+          }}
           routeCoordinates={routeCoordinates}
           routeStart={routeStart}
           routeSigns={filteredSigns}
@@ -1036,11 +1092,13 @@ export function NavigationMapScreen() {
         {/* Floating Re-center button during navigation */}
         {isNavigating ? (
           <Pressable
-            accessibilityLabel="Về giữa"
+            accessibilityLabel="Center"
             accessibilityRole="button"
             onPress={() => {
+              const coord = userCoordinate ?? routeStart;
+              if (!coord) return;
               setMapFocus((current) => ({
-                coordinate: userCoordinate ?? routeStart ?? currentLocation.coordinate,
+                coordinate: coord,
                 requestId: (current?.requestId ?? 0) + 1,
               }));
             }}
@@ -1055,7 +1113,7 @@ export function NavigationMapScreen() {
             ]}
           >
             <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
-            <Text style={[styles.navRecenterText, { color: theme.primary }]}>Về giữa</Text>
+            <Text style={[styles.navRecenterText, { color: theme.primary }]}>Center</Text>
           </Pressable>
         ) : null}
 
@@ -1572,7 +1630,7 @@ export function NavigationMapScreen() {
                     </Text>
                     <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
                       <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
-                        {filteredSigns.length}/{signsWithSamples.length}
+                        {filteredSigns.length}/{visibleSigns.length}
                       </Text>
                     </View>
                   </View>

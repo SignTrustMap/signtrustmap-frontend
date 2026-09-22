@@ -18,6 +18,7 @@ export function useGetNavigationRoute(
         queryFn: startCoordinate && destinationCoordinate
             ? ({ signal }) => getNavigationRoute(startCoordinate, destinationCoordinate, vehicleMode, signal)
             : skipToken,
+        placeholderData: (previousData) => previousData,
         // Keep the planned route stable while following it.
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,

@@ -31,7 +31,7 @@ import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { useTheme } from '@/hooks/use-theme';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
-import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
+import type { MapCoordinate } from '@/types/navigation/navigationType';
 import type {
   SubmissionStatus,
   SubmissionType,

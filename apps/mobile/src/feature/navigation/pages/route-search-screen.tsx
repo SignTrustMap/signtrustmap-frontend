@@ -11,9 +11,8 @@ import { AppToast } from '@/components/ui/toast';
 import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {
-  startLocations,
   type MapCoordinate,
-} from '@/feature/navigation/data/navigation-locations';
+} from '@/types/navigation/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from '@/hooks/use-theme';
@@ -36,17 +35,15 @@ export function RouteSearchScreen() {
   const [query, setQuery] = useState('');
   const { data: locations, isLoading, error } = usePlaceSuggestions(query);
   const { mutate: saveRecent } = useSaveRecentPlace();
-  const selectedStart = startLocations.find((location) => location.id === startId);
   const coordinateStart = useMemo(
     () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
     [startLat, startLng],
   );
-  const routeStart = coordinateStart ?? selectedStart?.coordinate;
+  const routeStart = coordinateStart;
 
   const handleSelectLocation = (destination: ApiPlace) => {
     if (destination.latitude == null || destination.longitude == null) return;
     const coordinate: MapCoordinate = [destination.longitude, destination.latitude];
-
     if (areSameLocation(coordinate, routeStart)) {
       setToast((currentToast) => ({
         id: (currentToast?.id ?? 0) + 1,

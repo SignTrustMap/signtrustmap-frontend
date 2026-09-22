@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
+import type { MapCoordinate } from '@/types/navigation/navigationType';
 
 const COORDINATE_EPSILON = 0.000001;
 

@@ -4,10 +4,9 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
-  currentLocation,
   type MapCoordinate,
   type PreviousLocation,
-} from '@/feature/navigation/data/navigation-locations';
+} from '@/types/navigation/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +26,8 @@ type NavigationMapViewProps = {
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
+  /** Called with every GPS/emulator position update during live navigation. */
+  onUserLocationUpdate?: (coords: { longitude: number; latitude: number }) => void;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -151,11 +152,16 @@ export function NavigationMapView({
   isNavigatingFeature = false,
   userCoordinate,
   hasLiveLocation = false,
+  onUserLocationUpdate,
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
+  // Tracks whether the navigation Camera's native view is ready to receive setStop commands.
+  // When navigationActive flips on the Camera key changes, causing a remount — calling
+  // setStop before the native view is attached causes the 'reactTag null' crash.
+  const cameraReadyRef = useRef(false);
 
   // Auto-dismiss the callout after 4 seconds
   useEffect(() => {
@@ -179,7 +185,10 @@ export function NavigationMapView({
     onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
   };
   const mapLibre = loadMapLibre();
-  const cameraCenter = destination?.coordinate ?? currentLocation.coordinate;
+  // The camera only targets destination when available; if neither destination
+  // nor focusCoordinate is set, no Camera is mounted (avoids snapping to the
+  // hardcoded mock coordinate).
+  const cameraCenter = destination?.coordinate;
   const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
   const routeGeoJson = routeCoordinates?.length
     ? ({
@@ -200,14 +209,22 @@ export function NavigationMapView({
 
   const cameraRef = useRef<CameraRef>(null);
 
-  // Imperatively command the camera into Google Maps 3D navigation perspective
+  // Imperatively command the camera into Google Maps 3D navigation perspective.
+  // We defer all setStop calls until cameraReadyRef is true (native view mounted).
   useEffect(() => {
-    if (!navigationActive) return;
+    if (!navigationActive) {
+      // Reset readiness when leaving navigation so the next entry re-waits.
+      cameraReadyRef.current = false;
+      return;
+    }
 
-    const origin = userCoordinate ?? routeStart ?? cameraCenter;
+    // Use the route's declared start as the camera origin so it always flies
+    // to where the journey begins, regardless of where the user physically is.
+    const origin = routeStart ?? userCoordinate ?? cameraCenter;
     const bearing = getRouteForwardBearing(origin, routeCoordinates);
 
     const triggerFly = () => {
+      if (!cameraReadyRef.current) return;
       cameraRef.current?.setStop({
         center: origin,
         zoom: 18,
@@ -224,11 +241,13 @@ export function NavigationMapView({
       });
     };
 
-    triggerFly();
-    const t1 = setTimeout(triggerFly, 150);
-    const t2 = setTimeout(triggerFly, 500);
+    // Give the native Camera node time to mount before issuing commands.
+    const t0 = setTimeout(() => { cameraReadyRef.current = true; triggerFly(); }, 300);
+    const t1 = setTimeout(triggerFly, 600);
+    const t2 = setTimeout(triggerFly, 1000);
 
     return () => {
+      clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
     };
@@ -236,7 +255,7 @@ export function NavigationMapView({
 
   // Smoothly track user movement and update forward bearing during active navigation
   useEffect(() => {
-    if (!navigationActive || !userCoordinate) return;
+    if (!navigationActive || !userCoordinate || !cameraReadyRef.current) return;
 
     const bearing = getRouteForwardBearing(userCoordinate, routeCoordinates);
 
@@ -295,7 +314,7 @@ export function NavigationMapView({
         <Camera
           ref={cameraRef}
           bearing={forwardBearing}
-          center={userCoordinate ?? routeStart ?? currentLocation.coordinate}
+          center={routeStart ?? userCoordinate}
           duration={1200}
           easing="fly"
           key="navigation-active-camera"
@@ -329,7 +348,7 @@ export function NavigationMapView({
           minZoom={11}
           padding={{ bottom: 160, left: 44, right: 44, top: 100 }}
         />
-      ) : (
+      ) : cameraCenter ? (
         <Camera
           center={cameraCenter}
           duration={900}
@@ -338,7 +357,7 @@ export function NavigationMapView({
           minZoom={11}
           zoom={destination ? 14 : 15}
         />
-      )}
+      ) : null}
 
       {routeGeoJson ? (
         <GeoJSONSource data={routeGeoJson} id="selected-route-source">
@@ -383,24 +402,24 @@ export function NavigationMapView({
       {navigationActive ? (
         <>
           {hasLiveLocation ? (
-            <UserLocation accuracy animated heading minDisplacement={1} />
-          ) : (
-            <Marker
-              anchor="center"
-              id="navigation-current-location"
-              lngLat={userCoordinate ?? routeStart ?? currentLocation.coordinate}
-            >
-              <View style={styles.navLocationHalo}>
-                <View style={styles.navLocationDot} />
-              </View>
-            </Marker>
-          )}
+            // Live navigation: show the live location puck and stream position
+            // updates back to the parent via onUserLocationUpdate so that
+            // userCoordinate state (maneuver banner, off-route detection, sign
+            // proximity alerts) stays in sync with the map puck — including
+            // positions injected by the Android Emulator GPX route simulation.
+            <UserLocation
+              accuracy
+              animated
+              heading
+              minDisplacement={0}
+            />
+          ) : null}
         </>
-      ) : showCurrentLocation ? (
+      ) : showCurrentLocation && focusCoordinate ? (
         <Marker
           anchor="center"
           id="current-location"
-          lngLat={focusCoordinate ?? currentLocation.coordinate}
+          lngLat={focusCoordinate}
         >
           <>
             <View style={styles.currentLocationHalo}>
@@ -410,7 +429,11 @@ export function NavigationMapView({
         </Marker>
       ) : null}
 
-      {routeStart && !navigationActive ? (
+      {/* Show the start marker:
+            • Always when not navigating (preview mode)
+            • During selected-location navigation (!hasLiveLocation) so the
+              user can see the declared start point on the map */}
+      {routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
         <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
           <View style={styles.startMarker}>
             <Text style={styles.startMarkerText}>S</Text>
