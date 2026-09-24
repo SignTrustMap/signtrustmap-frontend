@@ -1,8 +1,8 @@
 import { skipToken, useQuery } from '@tanstack/react-query';
 
 import { getSignsAlongRoute, getSignsInBounds } from '@/api/sign-map/sign-map';
-import type { MapCoordinate } from '@/types/navigation/navigationType';
-import type { FindSignsInBoundsParams, RoutePointDto } from '@/types/sign-map/signMapType';
+import type { MapCoordinate } from '@/types/navigationType';
+import type { FindSignsInBoundsParams, RoutePointDto } from '@/types/signMapType';
 import { toRouteSign } from '../utils/signs';
 
 export function useGetSignsInBounds(

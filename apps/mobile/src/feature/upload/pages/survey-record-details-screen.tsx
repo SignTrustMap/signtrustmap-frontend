@@ -13,7 +13,7 @@ import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import {
   type MapCoordinate,
-} from '@/types/navigation/navigationType';
+} from '@/types/navigationType';
 import {
   useGetSurveySubmissionStatus,
   useUpdateSurveySubmission,
@@ -22,7 +22,7 @@ import {
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
-import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
+import type { CoordinateSource, CreateSubmissionDto } from '@/types/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';

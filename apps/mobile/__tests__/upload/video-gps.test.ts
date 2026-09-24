@@ -4,7 +4,7 @@ import {
   estimateEndCoordinate,
   estimateEndPoint,
   extractVideoMetadata,
-} from '../video-gps';
+} from '@/feature/upload/utils/video-gps';
 
 
 describe('video-gps utility', () => {

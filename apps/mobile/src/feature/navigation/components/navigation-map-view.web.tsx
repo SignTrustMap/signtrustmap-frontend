@@ -7,9 +7,9 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   type MapCoordinate,
   type PreviousLocation,
-} from '@/types/navigation/navigationType';
+} from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
-import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 
 

@@ -9,7 +9,7 @@ import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
 import { useTheme } from '@/hooks/use-theme';
-import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types/survey-submission/surveySubmissionType';
+import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types/surveySubmissionType';
 
 const submissionLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Image survey',
@@ -48,12 +48,12 @@ function formatDate(value: string) {
   return Number.isNaN(date.getTime())
     ? 'Date unavailable'
     : date.toLocaleString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 }
 
 function SubmissionRow({
@@ -342,6 +342,9 @@ export function SurveyHistoryScreen() {
               label="Next"
               onPress={() => changePage(page + 1)}
               variant="surface"
+              style={(isFetching || !data || page >= data.totalPages) && {
+                borderColor: 'transparent',
+              }}
             />
           </View>
         ) : null}

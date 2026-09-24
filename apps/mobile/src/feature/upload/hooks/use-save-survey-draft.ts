@@ -5,7 +5,7 @@ import { useCompleteSurveyUpload, useCreateSurveySubmission, useInitializeSurvey
 import { prepareSurveyGpx, prepareSurveyImage, type SurveyImage } from '../utils/survey-image';
 import { readSubmissionId } from '../utils/submission-response';
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
-import type { CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
+import type { CreateSubmissionDto } from '@/types/surveySubmissionType';
 
 type DraftImage = SurveyImage & {
   submissionId: string;
@@ -78,9 +78,11 @@ export function useSaveSurveyDraft() {
       if (!draft.chunkUploaded) {
         const prepared = await prepareSurveyImage(image);
         if (!draft.sessionId) {
-          const result = await initialize.mutateAsync({ submissionId: draft.submissionId, request: {
-            originalFilename: prepared.fileName, mediaType: 'IMAGE', totalChunks: 1, totalSizeBytes: prepared.sizeBytes,
-          } });
+          const result = await initialize.mutateAsync({
+            submissionId: draft.submissionId, request: {
+              originalFilename: prepared.fileName, mediaType: 'IMAGE', totalChunks: 1, totalSizeBytes: prepared.sizeBytes,
+            }
+          });
           draft.sessionId = result.sessionId;
           await persist();
         }
@@ -99,9 +101,11 @@ export function useSaveSurveyDraft() {
       if (!draft.gpxChunkUploaded) {
         const preparedGpx = await prepareSurveyGpx({ uri: targetGpxUri, name: gpx?.name ?? draft.gpxName });
         if (!draft.gpxSessionId) {
-          const result = await initialize.mutateAsync({ submissionId: draft.submissionId, request: {
-            originalFilename: preparedGpx.fileName, mediaType: 'GPX', totalChunks: 1, totalSizeBytes: preparedGpx.sizeBytes,
-          } });
+          const result = await initialize.mutateAsync({
+            submissionId: draft.submissionId, request: {
+              originalFilename: preparedGpx.fileName, mediaType: 'GPX', totalChunks: 1, totalSizeBytes: preparedGpx.sizeBytes,
+            }
+          });
           draft.gpxSessionId = result.sessionId;
           await persist();
         }

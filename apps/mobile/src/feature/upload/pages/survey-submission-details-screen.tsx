@@ -31,12 +31,12 @@ import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { useTheme } from '@/hooks/use-theme';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
-import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { MapCoordinate } from '@/types/navigationType';
 import type {
   SubmissionStatus,
   SubmissionType,
   SurveySubmission,
-} from '@/types/survey-submission/surveySubmissionType';
+} from '@/types/surveySubmissionType';
 
 
 const submissionTypeLabels: Record<SubmissionType, string> = {
@@ -421,8 +421,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     style={[
                       styles.pipelineDot,
                       submission.status === 'COMPLETED' ||
-                      submission.totalCandidatesExtracted > 0 ||
-                      ['DETECTING', 'TRACKING', 'CLASSIFYING', 'ESTIMATING'].includes(submission.status)
+                        submission.totalCandidatesExtracted > 0 ||
+                        ['DETECTING', 'TRACKING', 'CLASSIFYING', 'ESTIMATING'].includes(submission.status)
                         ? styles.pipelineDotActive
                         : { backgroundColor: theme.border },
                     ]}
@@ -800,12 +800,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       destination={
                         isVideoSubmission && endCoord
                           ? {
-                              coordinate: endCoord,
-                              id: 'survey-end',
-                              title: 'End Point',
-                              subtitle: 'Survey Route',
-                              category: 'recent',
-                            }
+                            coordinate: endCoord,
+                            id: 'survey-end',
+                            title: 'End Point',
+                            subtitle: 'Survey Route',
+                            category: 'recent',
+                          }
                           : undefined
                       }
                       routeCoordinates={

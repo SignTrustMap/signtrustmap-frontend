@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from '@tanstack/react-query'
 import { getVehicleModes, getNavigationRoute } from '@/api/navigation/navigation'
-import type { MapCoordinate, VehicleMode } from "@/types/navigation/navigationType";
+import type { MapCoordinate, VehicleMode } from "@/types/navigationType";
 export function useGetVehicleModes() {
     return useQuery({
         queryKey: ['vehicle-modes'],

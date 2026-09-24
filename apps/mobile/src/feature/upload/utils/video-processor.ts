@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import type { UploadChunkRequest } from '@/types/survey-submission/surveySubmissionType';
+import type { UploadChunkRequest } from '@/types/surveySubmissionType';
 
 export const BACKEND_MAX_CHUNK_BYTES = 52428800; // 50 MB absolute backend limit (52,428,800 bytes)
 export const MAX_BACKEND_CHUNK_BYTES = 45 * 1024 * 1024; // 45 MB safety margin under backend's 50MB limit
@@ -90,7 +90,7 @@ export async function getVideoFileSizeBytes(videoUri: string): Promise<number> {
     if (cl && Number(cl) > 0) {
       return Number(cl);
     }
-  } catch {}
+  } catch { }
 
   // 3. Web fallback: Blob size
   if (Platform.OS === 'web') {

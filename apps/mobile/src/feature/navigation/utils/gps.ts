@@ -1,5 +1,5 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { MapCoordinate } from '@/types/navigationType';
 import { getMapLibre } from '@/services/maplibre';
 
 export const GPS_UNAVAILABLE_MESSAGE =
@@ -26,9 +26,9 @@ export async function ensureLocationPermission(): Promise<boolean> {
     ]);
     return (
       res[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] ===
-        PermissionsAndroid.RESULTS.GRANTED ||
+      PermissionsAndroid.RESULTS.GRANTED ||
       res[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] ===
-        PermissionsAndroid.RESULTS.GRANTED
+      PermissionsAndroid.RESULTS.GRANTED
     );
   } catch (error) {
     console.error('[GPS] Failed to check or request location permissions:', error);

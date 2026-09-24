@@ -15,17 +15,17 @@ import type { SignVerifyResult } from "@/components/navigation-sign-verify-card"
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
   type MapCoordinate,
-} from "@/types/navigation/navigationType";
+} from "@/types/navigationType";
 import { useTheme } from "@/hooks/use-theme";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 
 import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
-import type { VehicleMode } from '@/types/navigation/navigationType';
+import type { VehicleMode } from '@/types/navigationType';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
-import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
@@ -250,10 +250,11 @@ export function NavigationMapScreen() {
   const [initialGpsOrigin, setInitialGpsOrigin] = useState<MapCoordinate | undefined>(fallbackCurrentLocation);
 
   useEffect(() => {
-    if (fallbackCurrentLocation) {
-      setInitialGpsOrigin(fallbackCurrentLocation);
+    setInitialGpsOrigin(fallbackCurrentLocation);
+    if (selectedDestination) {
+      setMapFocus(undefined);
     }
-  }, [fallbackCurrentLocation]);
+  }, [destinationId, destinationLat, destinationLng, fallbackCurrentLocation, selectedDestination]);
 
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
@@ -666,6 +667,7 @@ export function NavigationMapScreen() {
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
+  // (reversed so the farthest upcoming sign is on top, and the closest/lowest is at the bottom)
   const upcomingSignsOnRoute = useMemo(() => {
     if (!isNavigating || !routeCoordinates || filteredSigns.length === 0) return [];
     const navigationCoordinate = userCoordinate ?? plannedRouteOrigin;
@@ -683,7 +685,8 @@ export function NavigationMapScreen() {
       })
       .filter((sign) => sign.distanceMeters > 5)
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
-      .slice(0, 3);
+      .slice(0, 3)
+      .reverse();
     return signsAhead;
   }, [isNavigating, routeCoordinates, filteredSigns, userCoordinate, plannedRouteOrigin]);
 
@@ -772,7 +775,6 @@ export function NavigationMapScreen() {
     });
     const newCoord: MapCoordinate = [longitude, latitude];
     setUserCoordinate(newCoord);
-    setInitialGpsOrigin((prev) => prev ?? newCoord);
   }, []);
 
   const startGpsListening = useCallback(async () => {
@@ -795,7 +797,6 @@ export function NavigationMapScreen() {
       const initialPos = await fetchFreshGpsPosition(3500);
       if (initialPos) {
         setUserCoordinate(initialPos);
-        setInitialGpsOrigin((prev) => prev ?? initialPos);
         return initialPos;
       }
     } catch (error) {
@@ -908,7 +909,6 @@ export function NavigationMapScreen() {
       }
 
       setUserCoordinate(coordinate);
-      setInitialGpsOrigin(coordinate);
       setMapFocus({
         coordinate,
         requestId: Date.now(),
@@ -958,10 +958,10 @@ export function NavigationMapScreen() {
         ...(startId ? { startId } : {}),
         ...(isCustomStart && customStartCoordinate
           ? {
-              startLat: String(customStartCoordinate[1]),
-              startLng: String(customStartCoordinate[0]),
-              startTitle: startTitle ?? 'Starting point',
-            }
+            startLat: String(customStartCoordinate[1]),
+            startLng: String(customStartCoordinate[0]),
+            startTitle: startTitle ?? 'Starting point',
+          }
           : {}),
       },
     });
@@ -975,10 +975,31 @@ export function NavigationMapScreen() {
       return;
     }
 
+    const destinationParams = {
+      destinationId: selectedDestination.id,
+      destinationLat: String(selectedDestination.coordinate[1]),
+      destinationLng: String(selectedDestination.coordinate[0]),
+      destinationSubtitle: selectedDestination.subtitle,
+      destinationTitle: selectedDestination.title,
+    };
+
+    const navigateToStartSelection = () => {
+      router.push({
+        pathname: "/home/start",
+        params: destinationParams,
+      });
+    };
+
     // Navigating from Current Location
     if (Platform.OS !== "web") {
       setIsStartingNavigation(true);
       try {
+        const hasPermission = await ensureLocationPermission();
+        if (!hasPermission) {
+          navigateToStartSelection();
+          return;
+        }
+
         await startGpsListening();
 
         let currentPos: MapCoordinate | null | undefined = userCoordinate;
@@ -992,16 +1013,10 @@ export function NavigationMapScreen() {
           return;
         }
 
-        setLocationToast({
-          id: Date.now(),
-          message: GPS_UNAVAILABLE_MESSAGE,
-        });
+        navigateToStartSelection();
       } catch (error) {
         console.error("[GPS] handleGo error:", error);
-        setLocationToast({
-          id: Date.now(),
-          message: GPS_UNAVAILABLE_MESSAGE,
-        });
+        navigateToStartSelection();
       } finally {
         setIsStartingNavigation(false);
       }
@@ -1021,19 +1036,12 @@ export function NavigationMapScreen() {
         if (permission.state === "granted") {
           navigator.geolocation.getCurrentPosition(
             ({ coords }) => {
-              setUserCoordinate([coords.longitude, coords.latitude]);
+              const coord: MapCoordinate = [coords.longitude, coords.latitude];
+              setUserCoordinate(coord);
+              setInitialGpsOrigin(coord);
             },
             () => {
-              router.push({
-                pathname: "/home/start",
-                params: {
-                  destinationId: selectedDestination.id,
-                  destinationLat: String(selectedDestination.coordinate[1]),
-                  destinationLng: String(selectedDestination.coordinate[0]),
-                  destinationSubtitle: selectedDestination.subtitle,
-                  destinationTitle: selectedDestination.title,
-                },
-              });
+              navigateToStartSelection();
             },
           );
           return;
@@ -1043,16 +1051,7 @@ export function NavigationMapScreen() {
       }
     }
 
-    router.push({
-      pathname: "/home/start",
-      params: {
-        destinationId: selectedDestination.id,
-        destinationLat: String(selectedDestination.coordinate[1]),
-        destinationLng: String(selectedDestination.coordinate[0]),
-        destinationSubtitle: selectedDestination.subtitle,
-        destinationTitle: selectedDestination.title,
-      },
-    });
+    navigateToStartSelection();
   };
 
   return (
@@ -1137,7 +1136,7 @@ export function NavigationMapScreen() {
                     <Text numberOfLines={1} style={[styles.upcomingSignName, { color: theme.text }]}>
                       {sign.name ?? 'Sign'}
                     </Text>
-                    <Text style={[styles.upcomingSignDist, { color: theme.grey }]}>
+                    <Text style={[styles.upcomingSignDist, { color: theme.text, fontWeight: 700 }]}>
                       {sign.distanceMeters < 1000
                         ? `${Math.round(sign.distanceMeters)} m`
                         : `${(sign.distanceMeters / 1000).toFixed(1)} km`}

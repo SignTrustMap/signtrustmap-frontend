@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { MapCoordinate } from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { apiRequest } from '@/api/api-client';
 

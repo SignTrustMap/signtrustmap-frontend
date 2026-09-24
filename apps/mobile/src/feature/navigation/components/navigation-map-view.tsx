@@ -6,9 +6,9 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type MapCoordinate,
   type PreviousLocation,
-} from '@/types/navigation/navigationType';
+} from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
-import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 import { calculateBearing, calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
@@ -315,17 +315,17 @@ export function NavigationMapView({
           initialViewState={
             (userCoordinate ?? routeStart)
               ? {
-                  center: (userCoordinate ?? routeStart)!,
-                  zoom: 18,
-                  pitch: 55,
-                  bearing: forwardBearing,
-                  padding: {
-                    bottom: 220,
-                    left: 24,
-                    right: 24,
-                    top: 100,
-                  },
-                }
+                center: (userCoordinate ?? routeStart)!,
+                zoom: 18,
+                pitch: 55,
+                bearing: forwardBearing,
+                padding: {
+                  bottom: 220,
+                  left: 24,
+                  right: 24,
+                  top: 100,
+                },
+              }
               : undefined
           }
           key="navigation-active-camera"
@@ -356,9 +356,10 @@ export function NavigationMapView({
           center={cameraCenter}
           duration={900}
           easing="fly"
+          key={`destination-${destination?.id ?? 'center'}-${cameraCenter[0]}-${cameraCenter[1]}`}
           maxZoom={19}
           minZoom={11}
-          zoom={destination ? 14 : 15}
+          zoom={15}
         />
       ) : null}
 

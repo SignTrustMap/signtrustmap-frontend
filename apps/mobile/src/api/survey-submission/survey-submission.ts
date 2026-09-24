@@ -20,7 +20,7 @@ import type {
   UploadSessionResponse,
   UpdateSubmissionDto,
   UpdateSubmissionResponse,
-} from '@/types/survey-submission/surveySubmissionType';
+} from '@/types/surveySubmissionType';
 
 /** The list is newest-first; search subsequent pages when recent items are submitted. */
 export async function getLatestSurveyDraft(accessToken: string, signal?: AbortSignal) {

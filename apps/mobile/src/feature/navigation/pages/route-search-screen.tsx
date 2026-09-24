@@ -12,7 +12,7 @@ import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {
   type MapCoordinate,
-} from '@/types/navigation/navigationType';
+} from '@/types/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from '@/hooks/use-theme';

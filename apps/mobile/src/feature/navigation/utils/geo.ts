@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { MapCoordinate } from '@/types/navigationType';
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
@@ -20,9 +20,9 @@ export function calculateDistanceMeters(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 

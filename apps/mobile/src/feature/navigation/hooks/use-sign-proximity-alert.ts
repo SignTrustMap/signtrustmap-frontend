@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { RouteSign } from '@/api/navigation/navigation';
-import type { MapCoordinate } from '@/types/navigation/navigationType';
+import type { MapCoordinate } from '@/types/navigationType';
 import { speechService } from '@/services/speech';
 import { calculateDistanceMeters } from '../utils/geo';
 

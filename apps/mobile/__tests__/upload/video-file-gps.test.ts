@@ -9,7 +9,7 @@ import {
   parseGpmfGps,
   findTelemetryChunkOffsets,
   extractMetadataFromBuffer,
-} from '../video-file-gps';
+} from '@/feature/upload/utils/video-file-gps';
 
 describe('video-file-gps utility', () => {
   describe('nmeaToDecimal', () => {
