@@ -414,11 +414,11 @@ export function NavigationMapView({
             />
           ) : null}
         </>
-      ) : showCurrentLocation && (userCoordinate ?? focusCoordinate) ? (
+      ) : showCurrentLocation && userCoordinate ? (
         <Marker
           anchor="center"
           id="current-location"
-          lngLat={(userCoordinate ?? focusCoordinate)!}
+          lngLat={userCoordinate}
         >
           <>
             <View style={styles.currentLocationHalo}>

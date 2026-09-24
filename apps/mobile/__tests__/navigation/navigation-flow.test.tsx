@@ -68,6 +68,10 @@ jest.mock('@/feature/credits/hooks/use-wallet', () => ({
   useGetWallet: jest.fn(() => ({ data: undefined })),
 }));
 
+jest.mock('@/feature/navigation/hooks/use-places', () => ({
+  usePlaceSuggestions: jest.fn(() => ({ data: [] })),
+}));
+
 // 5. Mock GPS utilities
 jest.mock('@/feature/navigation/utils/gps', () => ({
   ensureLocationPermission: jest.fn(),

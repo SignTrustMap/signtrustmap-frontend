@@ -37,6 +37,7 @@ import {
   GPS_UNAVAILABLE_MESSAGE,
   isValidGpsLocation,
 } from "../utils/gps";
+import { usePlaceSuggestions } from "../hooks/use-places";
 
 export type SignCategory = 'WARNING' | 'MANDATORY' | 'PROHIBITORY' | 'INFORMATION' | 'TEMPORARY';
 
@@ -200,6 +201,7 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
+  const { data: initLocation } = usePlaceSuggestions("")
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -256,6 +258,23 @@ export function NavigationMapScreen() {
     }
   }, [destinationId, destinationLat, destinationLng, fallbackCurrentLocation, selectedDestination]);
 
+  const hasCenteredInitialMapRef = useRef(false);
+
+  useEffect(() => {
+    if (selectedDestination || hasCenteredInitialMapRef.current) return;
+
+    if (initLocation && initLocation.length > 0) {
+      const first = initLocation[0];
+      if (first?.longitude != null && first?.latitude != null) {
+        hasCenteredInitialMapRef.current = true;
+        setMapFocus({
+          coordinate: [Number(first.longitude), Number(first.latitude)],
+          requestId: Date.now(),
+        });
+      }
+    }
+  }, [initLocation, selectedDestination]);
+
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
     : (fallbackCurrentLocation ?? initialGpsOrigin);
@@ -281,7 +300,7 @@ export function NavigationMapScreen() {
     navigationSession.vehicleMode === vehicleMode,
   );
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(Spacing.two, insets.bottom);
+  const bottomInset = Math.max(Spacing.two, insets.bottom - Spacing.two);
   const [sheetSnapIndex, setSheetSnapIndex] = useState<0 | 1 | 2>(1);
   const snapIndexRef = useRef<0 | 1 | 2>(1);
   const directionsScrollRef = useRef<ScrollView>(null);
@@ -295,10 +314,10 @@ export function NavigationMapScreen() {
     ? isNavigating
       ? 96 + bottomInset   // navigation mode: compact bar (handle + header row only)
       : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
-    : Math.min(180, windowHeight * 0.22);
+    : 110 + bottomInset;
   const midSheetHeight = plannedRouteOrigin
     ? Math.min(420, windowHeight * 0.52)
-    : Math.min(280, windowHeight * 0.36);
+    : 188 + bottomInset;
   const maxSheetHeight = Math.max(
     midSheetHeight,
     Math.min(640, windowHeight * 0.82),
@@ -1801,22 +1820,24 @@ export function NavigationMapScreen() {
           ) : (
             /* Destination selected, no start selected yet */
             <>
-              <Text
-                numberOfLines={1}
-                style={[styles.destinationTitle, styles.selectedPlaceTitle, { color: theme.text }]}
-              >
-                {selectedDestination.title}
-              </Text>
-              {selectedDestination.subtitle ? (
-                <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
-                  {selectedDestination.subtitle}
+              <View>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.destinationTitle, styles.selectedPlaceTitle, { color: theme.text }]}
+                >
+                  {selectedDestination.title}
                 </Text>
-              ) : null}
-              {navigationError ? (
-                <Text accessibilityRole="alert" style={styles.navigationError}>
-                  {navigationError}
-                </Text>
-              ) : null}
+                {selectedDestination.subtitle ? (
+                  <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+                    {selectedDestination.subtitle}
+                  </Text>
+                ) : null}
+                {navigationError ? (
+                  <Text accessibilityRole="alert" style={styles.navigationError}>
+                    {navigationError}
+                  </Text>
+                ) : null}
+              </View>
               <View style={styles.destinationActions}>
                 <AppButton
                   accessibilityLabel="Start route"
@@ -2018,7 +2039,7 @@ const styles = StyleSheet.create({
   destinationActions: {
     flexDirection: 'row',
     gap: Spacing.two,
-    marginTop: 'auto',
+    marginTop: Spacing.one,
   },
   destinationActionButton: {
     flex: 1,
@@ -2030,13 +2051,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 600,
     lineHeight: 20,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.one,
   },
   selectedPlaceTitle: {
     fontFamily: Fonts.body,
     fontSize: 22,
     fontWeight: 900,
     lineHeight: 29,
+    marginBottom: Spacing.half,
   },
   screen: {
     flex: 1,
@@ -2420,7 +2442,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 16,
     fontWeight: 900,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.half,
   },
   navigationError: {
     color: "#B42318",
