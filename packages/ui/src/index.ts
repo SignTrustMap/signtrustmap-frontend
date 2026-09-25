@@ -12,3 +12,6 @@ export { default as DataFilterBar } from './DataFilterBar'
 
 export * from './TrafficSignGraphic'
 export { default as TrafficSignGraphic } from './TrafficSignGraphic'
+
+export * from './ErrorBoundary'
+export { default as ErrorBoundary } from './ErrorBoundary'

@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { AuthProvider } from '@/features/auth/AuthContext'
 import NotAllowedPage from '@/features/auth/NotAllowedPage'
 import { AuthGuard, AdminGuard, StaffGuard } from '@/features/auth/Guards'
+import { ErrorBoundary } from '@shared/ui'
 
 // Lazy-loaded pages for bundle splitting
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
@@ -48,8 +49,9 @@ function ProtectedLayout() {
   return (
     <AuthGuard>
       <AppShell>
-        <Suspense fallback={<PageLoadingFallback />}>
-          <Routes>
+        <ErrorBoundary variant="full-page">
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Routes>
           {/* ─── Shared Overview Dashboard ─────────────────────────── */}
           <Route path="/" element={<DashboardPage />} />
 
@@ -223,6 +225,7 @@ function ProtectedLayout() {
           <Route path="*" element={<NotFound404Page />} />
         </Routes>
         </Suspense>
+        </ErrorBoundary>
       </AppShell>
     </AuthGuard>
   )
@@ -235,14 +238,16 @@ export default function App() {
         <ToastProvider>
           <AuthProvider>
             <SidebarProvider>
-              <Suspense fallback={<PageLoadingFallback />}>
-                <Routes>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/*" element={<ProtectedLayout />} />
-                </Routes>
-              </Suspense>
+              <ErrorBoundary variant="full-page">
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/*" element={<ProtectedLayout />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
             </SidebarProvider>
           </AuthProvider>
         </ToastProvider>

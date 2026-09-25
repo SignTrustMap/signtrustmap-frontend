@@ -25,6 +25,7 @@ import { ActiveLearningTab } from './components/ActiveLearningTab'
 import { ClassesTab } from './components/ClassesTab'
 import { SystemConfigTab } from './components/SystemConfigTab'
 import { CandidateEvaluationTab } from './components/CandidateEvaluationTab'
+import { ErrorBoundary } from '@shared/ui'
 
 function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / (3600 * 24))
@@ -334,6 +335,12 @@ export default function AiopsPage() {
         </button>
       </div>
 
+      {/* Tab Contents protected by ErrorBoundary */}
+      <ErrorBoundary
+        variant="card"
+        title="Module AI MLOps tạm thời gặp sự cố"
+        description="Đã xảy ra lỗi khi kết nối hoặc dựng dữ liệu từ AI Service (ai.signmap.site). Vui lòng thử lại tab này."
+      >
       {/* Tab 1: Live Hardware & AI Telemetry Stream */}
       {activeTab === 'metrics' && (
         <HardwareMetricsTab
@@ -407,6 +414,7 @@ export default function AiopsPage() {
           setCandidateStatus={setCandidateStatus}
         />
       )}
+      </ErrorBoundary>
     </div>
   )
 }

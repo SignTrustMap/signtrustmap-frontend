@@ -23,6 +23,7 @@ import { mockOpsSigns, type OpsSignItem } from '@/data'
 import { spatialService } from '@/api/services/spatial.service'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
+import { ErrorBoundary } from '@shared/ui'
 
 // Fix Leaflet default icon paths using localized assets (no external CDN dependency)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
@@ -579,7 +580,12 @@ export default function MapPage() {
 
         {/* ─── LEAFLET CANVAS ────────────────────────────────────────── */}
         <div className="flex-1 relative isolate z-0 h-full w-full overflow-hidden">
-          <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#061014]" />
+          <ErrorBoundary
+            variant="card"
+            title="Không thể khởi tạo bản đồ GIS"
+            description="Bản đồ gặp sự cố khi dựng khung vẽ. Vui lòng nhấn thử lại để tải lại module bản đồ."
+          >
+            <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#061014]" />
 
           {/* Floating Telemetry & Mode Badge */}
           <div className="absolute top-3 left-3 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#081317]/90 backdrop-blur-md border border-[#E8E4E3] dark:border-white/10 text-xs text-gray-700 dark:text-gray-300 shadow-md">
@@ -758,6 +764,7 @@ export default function MapPage() {
               </div>
             </div>
           )}
+          </ErrorBoundary>
         </div>
       </div>
     </div>

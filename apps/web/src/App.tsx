@@ -11,6 +11,7 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollToTop } from '@/components/common/ScrollToTop'
 import { opsPortalUrl } from '@/config/env'
+import { ErrorBoundary } from '@shared/ui'
 
 // Lazy-loaded pages for bundle splitting
 const Home = lazy(() => import('@/features/home/HomePage'))
@@ -165,8 +166,9 @@ function AppLayout() {
         </div>
       )}
       <main className="flex-1 w-full flex flex-col">
-        <Suspense fallback={<PageLoadingFallback />}>
-          <Routes>
+        <ErrorBoundary variant="full-page">
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Routes>
             {/* Public & Information Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/product/map" element={<ProductMap />} />
@@ -294,7 +296,8 @@ function AppLayout() {
             <Route path="*" element={<NotFound404Page />} />
           </Routes>
         </Suspense>
-      </main>
+      </ErrorBoundary>
+    </main>
       {!isBarePage && <Footer />}
       {!isBarePage && <ScrollToTop />}
     </div>

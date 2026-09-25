@@ -21,6 +21,7 @@ import { useAuth } from '@/context/AuthContext'
 import { mockSigns, signCategories, type SignItem } from '@/data'
 import { signsService } from '@/api/services/signs.service'
 import { ReportIssueModal } from './components/ReportIssueModal'
+import { ErrorBoundary } from '@shared/ui'
 
 // Fix Leaflet default marker icons using localized assets (no external CDN dependency)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
@@ -708,8 +709,13 @@ export default function ProductMap() {
                 : 'bg-white border-[#E8E4E3] shadow-xs'
             }`}
           >
-            {/* Leaflet OpenStreetMap Canvas */}
-            <div ref={mapContainerRef} className="w-full h-full z-0" />
+            <ErrorBoundary
+              variant="card"
+              title="Không thể khởi tạo bản đồ GIS"
+              description="Bản đồ gặp sự cố khi dựng khung vẽ. Vui lòng nhấn thử lại để tải lại module bản đồ."
+            >
+              {/* Leaflet OpenStreetMap Canvas */}
+              <div ref={mapContainerRef} className="w-full h-full z-0" />
 
             {/* Floating Top Controls (Recenter & Tile Mode Switcher) */}
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -903,6 +909,7 @@ export default function ProductMap() {
                 ) : null}
               </div>
             )}
+            </ErrorBoundary>
           </div>
         </div>
       </div>
@@ -916,7 +923,7 @@ export default function ProductMap() {
           setReportSignId(val)
           setSelectedSignId(val)
         }}
-        allSigns={mockSigns}
+        allSigns={signs}
         getCategoryMeta={getCategoryMeta}
       />
     </div>
