@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Blob } from 'expo-blob';
 
-import type { UploadChunkRequest } from '@/types/survey-submission/surveySubmissionType';
+import type { UploadChunkRequest } from '@/types/surveySubmissionType';
 
 export type SurveyImage = {
   fileName?: string;

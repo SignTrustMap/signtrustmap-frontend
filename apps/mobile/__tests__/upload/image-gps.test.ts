@@ -1,4 +1,4 @@
-import { extractImageGpsCoordinates } from '../image-gps';
+import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 
 describe('extractImageGpsCoordinates', () => {
   // Ho Chi Minh City approximate coordinates

@@ -12,9 +12,8 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import {
-  currentLocation,
   type MapCoordinate,
-} from '@/feature/navigation/data/navigation-locations';
+} from '@/types/navigationType';
 import {
   useGetSurveySubmissionStatus,
   useUpdateSurveySubmission,
@@ -23,7 +22,7 @@ import {
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
-import type { CoordinateSource, CreateSubmissionDto } from '@/types/survey-submission/surveySubmissionType';
+import type { CoordinateSource, CreateSubmissionDto } from '@/types/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
 import { AppInput } from '@/components/ui/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
@@ -129,7 +128,7 @@ export function SurveyRecordDetailsScreen() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | undefined>(undefined);
 
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
-    initialStartCoord ?? currentLocation.coordinate,
+    initialStartCoord,
   );
   const effectiveStartCoord = startCoordinate ?? selectedCoordinate ?? imageCoordinate;
   const displayCoordinate = effectiveStartCoord;
@@ -279,8 +278,8 @@ export function SurveyRecordDetailsScreen() {
       if (hasCoordinate) {
         const coord: MapCoordinate = [draft.longitude!, draft.latitude!];
         setSelectedCoordinate(coord);
-        setStartCoordinate((prev) => prev ?? coord);
-        setEndCoordinate((prev) => prev ?? estimateEndPoint(coord, durationSec));
+        setStartCoordinate((prev: MapCoordinate | undefined) => prev ?? coord);
+        setEndCoordinate((prev: MapCoordinate | undefined) => prev ?? estimateEndPoint(coord, durationSec));
       }
       setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
       setLocationMessage(hasCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.');
@@ -805,7 +804,7 @@ export function SurveyRecordDetailsScreen() {
                   <View style={styles.addressResolvedHeader}>
                     <MaterialCommunityIcons name="map-marker-radius" size={16} color={theme.primary} />
                     <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                      {startLocationQuery.isLoading ? 'Resolving actual location...' : 'Actual Location (Address)'}
+                      {startLocationQuery.isLoading ? 'Resolving actual location...' : 'Address'}
                     </Text>
                     {startLocationQuery.isLoading ? (
                       <ActivityIndicator size="small" color={theme.primary} style={{ marginLeft: 6 }} />

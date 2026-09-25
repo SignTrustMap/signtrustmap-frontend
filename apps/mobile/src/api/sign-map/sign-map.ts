@@ -9,7 +9,7 @@ import type {
     RouteSignsRequestDto,
     UpdateVerifiedSignDto,
     UpdateVerifiedSignResponse,
-} from '@/types/sign-map/signMapType';
+} from '@/types/signMapType';
 
 export function getSignsInBounds(
     bounds: FindSignsInBoundsParams,

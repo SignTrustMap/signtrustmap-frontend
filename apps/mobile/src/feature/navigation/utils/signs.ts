@@ -1,5 +1,5 @@
 import type { RouteSign } from '@/api/navigation/navigation';
-import type { VerifiedMapSign } from '@/types/sign-map/signMapType';
+import type { VerifiedMapSign } from '@/types/signMapType';
 
 const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') ?? process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') ?? 'https://s3.signmap.site';
 

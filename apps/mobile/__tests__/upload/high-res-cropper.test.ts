@@ -3,8 +3,8 @@ import {
   cropHighResSignPatch,
   batchCropCandidateSigns,
   type SignCandidateBox,
-} from '../high-res-cropper';
-import { handleBackgroundSilentPush } from '../crop-sync-manager';
+} from '@/feature/upload/utils/high-res-cropper';
+import { handleBackgroundSilentPush } from '@/feature/upload/utils/crop-sync-manager';
 
 describe('high-res-cropper utility', () => {
   describe('normalizeBoundingBox', () => {

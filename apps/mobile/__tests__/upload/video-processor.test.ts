@@ -3,7 +3,7 @@ import {
   sliceVideoChunk,
   prepareVideoChunk,
   MAX_BACKEND_CHUNK_BYTES,
-} from '../video-processor';
+} from '@/feature/upload/utils/video-processor';
 
 describe('video-processor utility', () => {
   describe('calculateTemporalChunks', () => {

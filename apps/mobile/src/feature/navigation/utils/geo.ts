@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
+import type { MapCoordinate } from '@/types/navigationType';
 
 const EARTH_RADIUS_METERS = 6_371_000;
 
@@ -20,9 +20,9 @@ export function calculateDistanceMeters(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -123,4 +123,52 @@ export function getRouteForwardBearing(
   }
 
   return 0;
+}
+
+/**
+ * Returns the minimum perpendicular distance (in meters) from a coordinate
+ * to the nearest segment of a route polyline. Used for off-route detection.
+ */
+export function getDistanceToRouteMeters(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
+): number {
+  if (routeCoordinates.length === 0) return 0;
+  if (routeCoordinates.length === 1) {
+    return calculateDistanceMeters(coordinate, routeCoordinates[0]);
+  }
+
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const [pLon, pLat] = coordinate;
+  const cosLat = Math.cos(toRad(pLat));
+
+  let minDistMeters = Number.POSITIVE_INFINITY;
+
+  for (let i = 1; i < routeCoordinates.length; i++) {
+    const [aLon, aLat] = routeCoordinates[i - 1];
+    const [bLon, bLat] = routeCoordinates[i];
+
+    // Project to a flat metre-space centred on segment midpoint
+    const scale = EARTH_RADIUS_METERS * toRad(1);
+    const ax = (aLon - pLon) * cosLat * scale;
+    const ay = (aLat - pLat) * scale;
+    const bx = (bLon - pLon) * cosLat * scale;
+    const by = (bLat - pLat) * scale;
+
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+
+    let dist: number;
+    if (lenSq === 0) {
+      dist = Math.hypot(ax, ay);
+    } else {
+      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+      dist = Math.hypot(ax + t * dx, ay + t * dy);
+    }
+
+    if (dist < minDistMeters) minDistMeters = dist;
+  }
+
+  return minDistMeters;
 }

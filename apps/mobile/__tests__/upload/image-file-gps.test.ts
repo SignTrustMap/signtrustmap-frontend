@@ -9,7 +9,7 @@
  * single smoke test that verifies it propagates the parsed result.
  */
 
-import { extractGpsFromJpegBuffer, extractGpsFromImageFile } from '../image-file-gps';
+import { extractGpsFromJpegBuffer, extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 
 // ─── JPEG / EXIF binary builder helpers ─────────────────────────────────────
 

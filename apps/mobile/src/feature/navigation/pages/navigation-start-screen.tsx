@@ -16,16 +16,14 @@ import { AppToast } from "@/components/ui/toast";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import { useSession } from "@/context/session-provider";
 import {
-  currentLocation,
-  previousLocations,
   type MapCoordinate,
-} from "@/feature/navigation/data/navigation-locations";
+} from '@/types/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from "@/hooks/use-theme";
-import { getMapLibre } from "@/services/maplibre";
 import { SAME_LOCATION_MESSAGE } from "@/constants/message";
 import { areSameLocation } from "../utils/location";
+import { fetchFreshGpsPosition, GPS_UNAVAILABLE_MESSAGE } from "../utils/gps";
 
 export function NavigationStartScreen() {
   const router = useRouter();
@@ -44,29 +42,25 @@ export function NavigationStartScreen() {
   }>();
   const theme = useTheme();
   const { session } = useSession();
-  const savedDestination = previousLocations.find(
-    (location) => location.id === destinationId,
-  );
   const destination = useMemo(() => {
-    if (destinationLat && destinationLng && destinationId) {
+    if (destinationLat && destinationLng) {
       return {
         coordinate: [
           Number(destinationLng),
           Number(destinationLat),
         ] as MapCoordinate,
-        id: destinationId,
+        id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
         title: destinationTitle ?? "Destination",
       };
     }
-    return savedDestination;
+    return undefined;
   }, [
     destinationId,
     destinationLat,
     destinationLng,
     destinationSubtitle,
     destinationTitle,
-    savedDestination,
   ]);
 
   const [toast, setToast] = useState<{ id: number; message: string }>();
@@ -107,22 +101,14 @@ export function NavigationStartScreen() {
   const handleSelectCurrentLocation = async () => {
     if (!destinationId) return;
 
-    let coordinate: MapCoordinate = currentLocation.coordinate;
+    const coordinate = await fetchFreshGpsPosition(3500);
 
-    const mapLibre = getMapLibre();
-    if (mapLibre) {
-      try {
-        const hasPermission =
-          await mapLibre.LocationManager.requestPermissions();
-        if (hasPermission) {
-          const position = await mapLibre.LocationManager.getCurrentPosition();
-          if (position) {
-            coordinate = [position.coords.longitude, position.coords.latitude];
-          }
-        }
-      } catch {
-        // Fall back to default coordinate
-      }
+    if (!coordinate) {
+      setToast({
+        id: Date.now(),
+        message: GPS_UNAVAILABLE_MESSAGE,
+      });
+      return;
     }
 
     if (areSameLocation(coordinate, destination?.coordinate)) {

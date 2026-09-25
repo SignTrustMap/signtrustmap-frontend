@@ -1,4 +1,4 @@
-import type { MapCoordinate, VehicleMode } from "@/types/navigation/navigationType";
+import type { MapCoordinate, VehicleMode } from "@/types/navigationType";
 import { apiRequest, jsonApiRequest } from "@/api/api-client";
 import { API_PATHS } from "@/api/api";
 

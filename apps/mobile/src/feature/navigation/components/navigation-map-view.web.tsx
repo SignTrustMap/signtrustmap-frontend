@@ -5,13 +5,13 @@ import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibr
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
-  currentLocation,
   type MapCoordinate,
   type PreviousLocation,
-} from '@/feature/navigation/data/navigation-locations';
+} from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
-import type { FindSignsInBoundsParams } from '@/types/sign-map/signMapType';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
+
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -147,7 +147,7 @@ export function NavigationMapView({
       attributionControl: {
         compact: true,
       },
-      center: currentLocation.coordinate,
+      center: destination?.coordinate ?? focusCoordinate ?? routeStart,
       container: mapContainerRef.current,
       doubleClickZoom: true,
       maxZoom: 19,
@@ -160,9 +160,11 @@ export function NavigationMapView({
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
 
-    currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
-      .setLngLat(currentLocation.coordinate)
-      .addTo(map);
+    if (focusCoordinate) {
+      currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
+        .setLngLat(focusCoordinate)
+        .addTo(map);
+    }
 
     return () => {
       destinationMarkerRef.current?.remove();
@@ -219,9 +221,15 @@ export function NavigationMapView({
   useEffect(() => {
     if (!focusCoordinate || !mapRef.current) return;
 
-    currentLocationMarkerRef.current?.setLngLat(focusCoordinate);
+    if (!currentLocationMarkerRef.current) {
+      currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
+        .setLngLat(focusCoordinate)
+        .addTo(mapRef.current);
+    } else {
+      currentLocationMarkerRef.current.setLngLat(focusCoordinate);
+    }
     mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: 16 });
-  }, [focusCoordinate, focusRequestId]);
+  }, [focusCoordinate, focusRequestId, theme.primary]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -241,11 +249,13 @@ export function NavigationMapView({
     }
 
     if (!destination) {
-      map.flyTo({
-        center: currentLocation.coordinate,
-        duration: 900,
-        zoom: 15,
-      });
+      if (focusCoordinate) {
+        map.flyTo({
+          center: focusCoordinate,
+          duration: 900,
+          zoom: 15,
+        });
+      }
       return;
     }
 

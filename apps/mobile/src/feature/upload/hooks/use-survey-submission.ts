@@ -21,7 +21,7 @@ import type {
   UpdateSubmissionDto,
   ListMySubmissionsParams,
   UploadChunkRequest,
-} from '@/types/survey-submission/surveySubmissionType';
+} from '@/types/surveySubmissionType';
 
 export const surveySubmissionKeys = {
   all: (accountId: string | undefined) => ['survey-submissions', accountId] as const,
