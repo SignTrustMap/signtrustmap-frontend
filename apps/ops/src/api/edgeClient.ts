@@ -9,7 +9,6 @@ export const edgeApiClient: AxiosInstance = axios.create({
   baseURL: AIOPS_BASE_URL,
   timeout: 15000,
   headers: {
-    'ngrok-skip-browser-warning': '69420',
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
@@ -31,7 +30,6 @@ export async function edgeFetch<T = any>(
     url: endpoint,
     timeout: timeoutMs || 15000,
     headers: {
-      'ngrok-skip-browser-warning': '69420',
       ...headers,
     },
     ...rest,

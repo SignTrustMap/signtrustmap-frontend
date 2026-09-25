@@ -24,8 +24,8 @@ export const env = {
   publicDomain: import.meta.env.VITE_PUBLIC_DOMAIN || '',
   apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || '',
   mapTileUrl:   import.meta.env.VITE_MAP_TILE_URL || '',
-  aiApiUrl:     import.meta.env.VITE_AI_API_URL || '',
-  aiopsEdgeUrl: import.meta.env.VITE_AIOPS_EDGE_URL || '',
+  aiApiUrl:     import.meta.env.VITE_AI_API_URL || 'https://ai.signmap.site',
+  aiopsEdgeUrl: import.meta.env.VITE_AI_API_URL || import.meta.env.VITE_AIOPS_EDGE_URL || 'https://ai.signmap.site',
   isDev:        import.meta.env.DEV,
   isProd:       import.meta.env.PROD,
   mode:         import.meta.env.MODE,
@@ -37,9 +37,9 @@ validateEnv(
     VITE_OPS_DOMAIN: env.opsDomain,
     VITE_PUBLIC_DOMAIN: env.publicDomain,
     VITE_API_BASE_URL: env.apiBaseUrl,
-    VITE_AIOPS_EDGE_URL: env.aiopsEdgeUrl,
+    VITE_AI_API_URL: env.aiApiUrl,
   },
-  ['VITE_OPS_DOMAIN', 'VITE_PUBLIC_DOMAIN', 'VITE_API_BASE_URL', 'VITE_AIOPS_EDGE_URL']
+  ['VITE_OPS_DOMAIN', 'VITE_PUBLIC_DOMAIN', 'VITE_API_BASE_URL', 'VITE_AI_API_URL']
 )
 
 export const opsPortalUrl = formatUrl(env.opsDomain, env.isDev)
