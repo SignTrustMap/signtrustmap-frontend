@@ -18,7 +18,11 @@
 
     /* Path alias */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@shared/ui": ["../../packages/ui/src"],
+      "@shared/ui/*": ["../../packages/ui/src/*"],
+      "@shared/types": ["../../packages/types/src"],
+      "@shared/types/*": ["../../packages/types/src/*"]
     },
 
     /* Linting */
@@ -26,5 +30,9 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "../../packages/ui/src",
+    "../../packages/types/src"
+  ]
 }
