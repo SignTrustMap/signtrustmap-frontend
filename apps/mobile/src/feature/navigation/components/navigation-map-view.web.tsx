@@ -1,4 +1,3 @@
-import { Asset } from 'expo-asset';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
@@ -140,6 +139,8 @@ export function NavigationMapView({
   const startMarkerRef = useRef<Marker | null>(null);
   const stopSignMarkersRef = useRef<Marker[]>([]);
 
+  const initialCenterRef = useRef(destination?.coordinate ?? focusCoordinate ?? routeStart);
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -147,7 +148,7 @@ export function NavigationMapView({
       attributionControl: {
         compact: true,
       },
-      center: destination?.coordinate ?? focusCoordinate ?? routeStart,
+      center: initialCenterRef.current,
       container: mapContainerRef.current,
       doubleClickZoom: true,
       maxZoom: 19,
@@ -159,12 +160,6 @@ export function NavigationMapView({
     mapRef.current = map;
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
-
-    if (focusCoordinate) {
-      currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
-        .setLngLat(focusCoordinate)
-        .addTo(map);
-    }
 
     return () => {
       destinationMarkerRef.current?.remove();
@@ -178,7 +173,7 @@ export function NavigationMapView({
       mapRef.current = null;
       map.remove();
     };
-  }, [theme.primary]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -320,7 +315,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeStart, theme.primary]);
+  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary]);
 
   return (
     <View style={styles.container}>

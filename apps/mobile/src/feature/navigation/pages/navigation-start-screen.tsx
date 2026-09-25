@@ -104,10 +104,10 @@ export function NavigationStartScreen() {
     const coordinate = await fetchFreshGpsPosition(3500);
 
     if (!coordinate) {
-      setToast({
-        id: Date.now(),
+      setToast((currentToast) => ({
+        id: (currentToast?.id ?? 0) + 1,
         message: GPS_UNAVAILABLE_MESSAGE,
-      });
+      }));
       return;
     }
 

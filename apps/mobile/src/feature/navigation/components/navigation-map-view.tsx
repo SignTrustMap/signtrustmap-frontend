@@ -11,7 +11,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
-import { calculateBearing, calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
+import { getRouteForwardBearing } from '../utils/geo';
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -207,6 +207,10 @@ export function NavigationMapView({
   }, [userCoordinate, routeStart, routeCoordinates]);
 
   const cameraRef = useRef<CameraRef>(null);
+  const navParamsRef = useRef({ cameraCenter, routeCoordinates, routeStart, userCoordinate });
+  useEffect(() => {
+    navParamsRef.current = { cameraCenter, routeCoordinates, routeStart, userCoordinate };
+  }, [cameraCenter, routeCoordinates, routeStart, userCoordinate]);
 
   // Imperatively command the camera into Google Maps 3D navigation perspective.
   // We defer all setStop calls until cameraReadyRef is true (native view mounted).
@@ -219,8 +223,14 @@ export function NavigationMapView({
 
     // Prioritize userCoordinate so the camera flies to the user's actual position.
     // For custom route starts, fall back to routeStart if userCoordinate is not yet available.
-    const origin = userCoordinate ?? routeStart ?? cameraCenter;
-    const bearing = getRouteForwardBearing(origin, routeCoordinates);
+    const {
+      cameraCenter: curCameraCenter,
+      routeCoordinates: curRouteCoordinates,
+      routeStart: curRouteStart,
+      userCoordinate: curUserCoordinate,
+    } = navParamsRef.current;
+    const origin = curUserCoordinate ?? curRouteStart ?? curCameraCenter;
+    const bearing = getRouteForwardBearing(origin, curRouteCoordinates);
 
     const triggerFly = () => {
       if (!cameraReadyRef.current) return;
@@ -293,7 +303,7 @@ export function NavigationMapView({
   return (
     <Map
       ref={mapRef}
-      onRegionDidChange={(event) => reportBounds(event.nativeEvent.bounds)}
+      onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
       onDidFinishLoadingMap={() => {
         void mapRef.current?.getBounds().then(reportBounds).catch(() => {
           // The next region change reports bounds if the map is not ready yet.

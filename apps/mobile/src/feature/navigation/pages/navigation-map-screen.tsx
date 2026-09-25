@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Animated, BackHandler, PanResponder, PermissionsAndroid, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Animated, BackHandler, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -15,13 +15,13 @@ import type { SignVerifyResult } from "@/components/navigation-sign-verify-card"
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import {
   type MapCoordinate,
+  type VehicleMode,
 } from "@/types/navigationType";
 import { useTheme } from "@/hooks/use-theme";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 
 import { NavigationMapView } from "../components/navigation-map-view";
-import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
-import type { VehicleMode } from '@/types/navigationType';
+import type { NavigationStep } from '@/api/navigation/navigation';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
