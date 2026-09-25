@@ -19,14 +19,15 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { mockSigns, signCategories, type SignItem } from '@/data'
+import { signsService } from '@/api/services/signs.service'
 import { ReportIssueModal } from './components/ReportIssueModal'
 
-// Fix Leaflet default marker icons in bundler
+// Fix Leaflet default marker icons using localized assets (no external CDN dependency)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+  iconUrl: '/leaflet/marker-icon.png',
+  shadowUrl: '/leaflet/marker-shadow.png',
 })
 
 export default function ProductMap() {
@@ -43,6 +44,9 @@ export default function ProductMap() {
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
   const markersMapRef = useRef<Record<string, L.Marker>>({})
 
+  const [signs, setSigns] = useState<SignItem[]>(mockSigns)
+  const [isLoadingGis, setIsLoadingGis] = useState(false)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSignId, setSelectedSignId] = useState<string | null>(null)
@@ -112,7 +116,7 @@ export default function ProductMap() {
     return t('map_page.tile_voyager')
   }
 
-  // Initialize Map
+  // Initialize Map & fetch dynamic viewport GIS signs
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
 
@@ -136,12 +140,57 @@ export default function ProductMap() {
 
     mapInstanceRef.current = map
 
+    // Dynamic viewport bounding box query function (No hardcoding)
+    const fetchViewportSigns = async (targetMap: L.Map) => {
+      try {
+        setIsLoadingGis(true)
+        const bounds = targetMap.getBounds()
+        const params = {
+          min_lat: bounds.getSouth(),
+          min_lon: bounds.getWest(),
+          max_lat: bounds.getNorth(),
+          max_lon: bounds.getEast(),
+        }
+        const liveSigns = await signsService.getSpatialSigns(params)
+        if (liveSigns && liveSigns.length > 0) {
+          setSigns((prev) => {
+            const mapById = new Map<string, SignItem>()
+            liveSigns.forEach((s) => mapById.set(s.id, s))
+            prev.forEach((s) => {
+              if (!mapById.has(s.id)) {
+                mapById.set(s.id, s)
+              }
+            })
+            return Array.from(mapById.values())
+          })
+        }
+      } catch (err) {
+        // Resilient fallback: keeps existing signs if backend is offline or empty
+        console.warn('[MapGIS] Live GIS fetch failed, keeping local dataset:', err)
+      } finally {
+        setIsLoadingGis(false)
+      }
+    }
+
+    const onMoveEnd = () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = setTimeout(() => {
+        fetchViewportSigns(map)
+      }, 400)
+    }
+
+    map.on('moveend', onMoveEnd)
+    // Initial fetch for the starting bounds
+    fetchViewportSigns(map)
+
     const timer = setTimeout(() => {
       map.invalidateSize()
     }, 250)
 
     return () => {
       clearTimeout(timer)
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      map.off('moveend', onMoveEnd)
       map.remove()
       mapInstanceRef.current = null
     }
@@ -169,29 +218,29 @@ export default function ProductMap() {
     tileLayerRef.current = newLayer
   }, [tileMode])
 
-  // Filter Signs
-  const filteredSigns = mockSigns.filter((sign) => {
+  // Filter Signs from dynamic state
+  const filteredSigns = signs.filter((sign) => {
     const matchCat = selectedCategory === 'ALL' || sign.category === selectedCategory
     const q = searchQuery.toLowerCase().trim()
     const matchSearch =
       !q ||
       sign.code.toLowerCase().includes(q) ||
       sign.name.toLowerCase().includes(q) ||
-      sign.location.toLowerCase().includes(q)
+      (sign.location ? sign.location.toLowerCase().includes(q) : false)
     return matchCat && matchSearch
   })
 
   // Currently selected sign object
-  const selectedSign = mockSigns.find((s) => s.id === selectedSignId) || null
+  const selectedSign = signs.find((s) => s.id === selectedSignId) || null
   const activeReportSign =
-    mockSigns.find((s) => s.id === reportSignId) ||
+    signs.find((s) => s.id === reportSignId) ||
     selectedSign ||
     filteredSigns[0] ||
-    mockSigns[0] ||
+    signs[0] ||
     null
 
   const handleOpenReport = (signId?: string) => {
-    const targetId = signId || selectedSignId || filteredSigns[0]?.id || mockSigns[0]?.id
+    const targetId = signId || selectedSignId || filteredSigns[0]?.id || signs[0]?.id
     if (targetId) {
       setReportSignId(targetId)
       setSelectedSignId(targetId)
@@ -410,7 +459,7 @@ export default function ProductMap() {
                   {t('map_page.showing_count')}
                 </span>
                 <span className="text-sm font-extrabold text-gray-900 dark:text-white font-mono">
-                  {filteredSigns.length} / {mockSigns.length}{' '}
+                  {filteredSigns.length} / {signs.length}{' '}
                   <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                     {t('map_page.signs_unit')}
                   </span>
@@ -703,9 +752,9 @@ export default function ProductMap() {
                   : 'bg-white/90 border-gray-200 text-gray-800'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className={`w-2 h-2 rounded-full ${isLoadingGis ? 'bg-amber-400 animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
               <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                {t('map_page.telemetry_live')}
+                {isLoadingGis ? 'GIS Syncing...' : t('map_page.telemetry_live')}
               </span>
               <span className="text-gray-400">•</span>
               <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">

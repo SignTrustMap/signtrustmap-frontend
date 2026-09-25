@@ -168,7 +168,7 @@ export function ReportIssueModal({
                 className="w-full"
                 options={allSigns.map((s) => ({
                   value: s.id,
-                  label: `[${s.code}] ${s.name} — ${s.location.split(',')[0]}`,
+                  label: `[${s.code}] ${s.name} — ${(s.location || `${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`).split(',')[0]}`,
                 }))}
               />
             </div>

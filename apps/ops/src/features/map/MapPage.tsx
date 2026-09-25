@@ -20,15 +20,16 @@ import {
   Funnel,
 } from '@phosphor-icons/react'
 import { mockOpsSigns, type OpsSignItem } from '@/data'
+import { spatialService } from '@/api/services/spatial.service'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 
-// Fix Leaflet default icon paths in bundlers
+// Fix Leaflet default icon paths using localized assets (no external CDN dependency)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+  iconUrl: '/leaflet/marker-icon.png',
+  shadowUrl: '/leaflet/marker-shadow.png',
 })
 
 export default function MapPage() {
@@ -40,7 +41,10 @@ export default function MapPage() {
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
 
-  // Filters & State
+  // Filters & State (Dynamic state from FastAPI GIS with fallback to mock data)
+  const [opsSigns, setOpsSigns] = useState<OpsSignItem[]>(mockOpsSigns)
+  const [isLoadingGis, setIsLoadingGis] = useState(false)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [activeGroup, setActiveGroup] = useState('ALL')
   const [activeStatus, setActiveStatus] = useState<'ALL' | 'verified' | 'flagged' | 'revalidating'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -64,16 +68,16 @@ export default function MapPage() {
   // Counts for status tabs
   const statusCounts = useMemo(() => {
     return {
-      all: mockOpsSigns.length,
-      verified: mockOpsSigns.filter((s) => s.status === 'verified').length,
-      flagged: mockOpsSigns.filter((s) => s.status === 'flagged').length,
-      revalidating: mockOpsSigns.filter((s) => s.status === 'revalidating').length,
+      all: opsSigns.length,
+      verified: opsSigns.filter((s) => s.status === 'verified').length,
+      flagged: opsSigns.filter((s) => s.status === 'flagged').length,
+      revalidating: opsSigns.filter((s) => s.status === 'revalidating').length,
     }
-  }, [])
+  }, [opsSigns])
 
   // Filtered signs
   const filteredSigns = useMemo(() => {
-    return mockOpsSigns.filter((sign) => {
+    return opsSigns.filter((sign) => {
       const matchCat = activeGroup === 'ALL' || sign.category === activeGroup
       const matchStatus = activeStatus === 'ALL' || sign.status === activeStatus
       const q = searchQuery.toLowerCase().trim()
@@ -81,12 +85,12 @@ export default function MapPage() {
         !q ||
         sign.code.toLowerCase().includes(q) ||
         sign.name.toLowerCase().includes(q) ||
-        sign.location.toLowerCase().includes(q)
+        (sign.location ? sign.location.toLowerCase().includes(q) : false)
       return matchCat && matchStatus && matchSearch
     })
-  }, [activeGroup, activeStatus, searchQuery])
+  }, [opsSigns, activeGroup, activeStatus, searchQuery])
 
-  // Initialize Map
+  // Initialize Map & Dynamic Viewport GIS querying (No hardcoding)
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
 
@@ -110,6 +114,48 @@ export default function MapPage() {
 
     mapInstanceRef.current = map
 
+    // Dynamic viewport bounding box query function
+    const fetchViewportSigns = async (targetMap: L.Map) => {
+      try {
+        setIsLoadingGis(true)
+        const bounds = targetMap.getBounds()
+        const params = {
+          min_lat: bounds.getSouth(),
+          min_lon: bounds.getWest(),
+          max_lat: bounds.getNorth(),
+          max_lon: bounds.getEast(),
+        }
+        const liveSigns = await spatialService.getSpatialGeoJsonSigns(params)
+        if (liveSigns && liveSigns.length > 0) {
+          setOpsSigns((prev) => {
+            const mapById = new Map<string, OpsSignItem>()
+            liveSigns.forEach((s) => mapById.set(s.id, s))
+            prev.forEach((s) => {
+              if (!mapById.has(s.id)) {
+                mapById.set(s.id, s)
+              }
+            })
+            return Array.from(mapById.values())
+          })
+        }
+      } catch (err) {
+        console.warn('[OpsGIS] Failed to fetch live signs from spatial GIS, using fallback dataset:', err)
+      } finally {
+        setIsLoadingGis(false)
+      }
+    }
+
+    const onMoveEnd = () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = setTimeout(() => {
+        fetchViewportSigns(map)
+      }, 400)
+    }
+
+    map.on('moveend', onMoveEnd)
+    // Initial fetch for the initial map bounds
+    fetchViewportSigns(map)
+
     const timer = setTimeout(() => {
       map.invalidateSize()
     }, 250)
@@ -119,7 +165,9 @@ export default function MapPage() {
 
     return () => {
       clearTimeout(timer)
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       window.removeEventListener('resize', handleResize)
+      map.off('moveend', onMoveEnd)
       map.remove()
       mapInstanceRef.current = null
     }
@@ -535,8 +583,10 @@ export default function MapPage() {
 
           {/* Floating Telemetry & Mode Badge */}
           <div className="absolute top-3 left-3 z-10 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/95 dark:bg-[#081317]/90 backdrop-blur-md border border-[#E8E4E3] dark:border-white/10 text-xs text-gray-700 dark:text-gray-300 shadow-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">OPENSTREETMAP GIS</span>
+            <span className={`w-2 h-2 rounded-full ${isLoadingGis ? 'bg-amber-400 animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
+            <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">
+              {isLoadingGis ? 'FASTAPI GIS SYNCING...' : 'OPENSTREETMAP GIS'}
+            </span>
             <span className="text-gray-300 dark:text-gray-600">•</span>
             <span className="font-sans text-[11px]">{t('map.telemetry')}</span>
           </div>

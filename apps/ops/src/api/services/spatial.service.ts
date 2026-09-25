@@ -1,6 +1,11 @@
-import { http, type ApiResponse } from '../client'
+import { apiClient, http, type ApiResponse } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
 import type { SpatialSignRecord } from '@/data/adminGovernanceData'
+import {
+  type OpsSignItem,
+  type SpatialSignsQueryParams,
+  mapGeoJSONFeatureToOpsSignItem,
+} from '@shared/types'
 
 export interface OverrideSpatialSignDto {
   lat: number
@@ -10,6 +15,27 @@ export interface OverrideSpatialSignDto {
 }
 
 export const spatialService = {
+  /**
+   * Phương án 1: Query FastAPI GIS (/api/v1/spatial/signs) with dynamic viewport bounding box.
+   * Returns GeoJSON FeatureCollection and maps to OpsSignItem[].
+   */
+  getSpatialGeoJsonSigns: async (params: SpatialSignsQueryParams): Promise<OpsSignItem[]> => {
+    try {
+      const response = await apiClient.get<any, any>(
+        API_ENDPOINTS.SPATIAL.SIGNS,
+        { params }
+      )
+      const features = response?.features || response?.data?.features
+      if (Array.isArray(features)) {
+        return features.map(mapGeoJSONFeatureToOpsSignItem)
+      }
+      return []
+    } catch (err) {
+      console.warn('[SpatialGIS] Failed to fetch signs in viewport from backend:', err)
+      throw err
+    }
+  },
+
   /**
    * Fetch verified road signs for GIS map and tabular inspection
    */

@@ -1,5 +1,10 @@
-import { http, type ApiResponse } from '../client'
+import { apiClient, http, type ApiResponse } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import {
+  type SignItem,
+  type SpatialSignsQueryParams,
+  mapGeoJSONFeatureToSignItem,
+} from '@shared/types'
 
 export interface TrafficSignItem {
   id: string
@@ -22,6 +27,27 @@ export interface SignsFilterParams {
 }
 
 export const signsService = {
+  /**
+   * Phương án 1: Query FastAPI GIS (/api/v1/spatial/signs) with dynamic viewport bounding box.
+   * Returns GeoJSON FeatureCollection and maps to SignItem[].
+   */
+  getSpatialSigns: async (params: SpatialSignsQueryParams): Promise<SignItem[]> => {
+    try {
+      const response = await apiClient.get<any, any>(
+        API_ENDPOINTS.SIGNS.MAP,
+        { params }
+      )
+      const features = response?.features || response?.data?.features
+      if (Array.isArray(features)) {
+        return features.map(mapGeoJSONFeatureToSignItem)
+      }
+      return []
+    } catch (err) {
+      console.warn('[SpatialGIS] Failed to fetch signs in viewport from backend:', err)
+      throw err
+    }
+  },
+
   /**
    * Fetch published signs within map boundaries or filters
    */
