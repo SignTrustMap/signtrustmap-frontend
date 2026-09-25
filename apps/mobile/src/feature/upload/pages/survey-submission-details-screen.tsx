@@ -1,0 +1,1686 @@
+import AntDesign from '@expo/vector-icons/AntDesign';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { AppButton } from '@/components/ui/button';
+import { AppToast } from '@/components/ui/toast';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import {
+  useGetSurveySubmissionStatus,
+  useGetMySubmissions,
+  useSubmitSurveySubmission,
+} from '@/feature/upload/hooks/use-survey-submission';
+import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
+import { useTheme } from '@/hooks/use-theme';
+import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
+import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
+import type { MapCoordinate } from '@/types/navigationType';
+import type {
+  SubmissionStatus,
+  SubmissionType,
+  SurveySubmission,
+} from '@/types/surveySubmissionType';
+
+
+const submissionTypeLabels: Record<SubmissionType, string> = {
+  SINGLE_IMAGE: 'Single Image Survey',
+  VIDEO_GPX: 'Video & GPX Survey',
+  LIVE_TRIP: 'Live Trip Recording',
+};
+
+const statusLabels: Record<SubmissionStatus, string> = {
+  DRAFT: 'Draft',
+  QUEUED: 'Queued for processing',
+  SYNCHRONIZING: 'Synchronizing video & GPX',
+  DETECTING: 'Detecting signs with AI',
+  TRACKING: 'Tracking signs along route',
+  ESTIMATING: 'Estimating GPS coordinates',
+  CLASSIFYING: 'Classifying sign types',
+  COMPLETED: 'Completed',
+  PARTIALLY_PROCESSED: 'Partially processed',
+  FAILED: 'Processing failed',
+  PENDING_CORRECTION: 'Needs correction',
+  NO_SIGN_DETECTED: 'No signs detected',
+  REJECTED: 'Rejected',
+};
+
+function getStatusColor(status: SubmissionStatus): { bg: string; text: string; border: string } {
+  switch (status) {
+    case 'COMPLETED':
+      return { bg: 'rgba(22, 163, 74, 0.12)', text: '#16A34A', border: 'rgba(22, 163, 74, 0.3)' };
+    case 'QUEUED':
+    case 'SYNCHRONIZING':
+    case 'DETECTING':
+    case 'TRACKING':
+    case 'ESTIMATING':
+    case 'CLASSIFYING':
+      return { bg: 'rgba(37, 99, 235, 0.12)', text: '#2563EB', border: 'rgba(37, 99, 235, 0.3)' };
+    case 'PARTIALLY_PROCESSED':
+    case 'PENDING_CORRECTION':
+      return { bg: 'rgba(217, 119, 6, 0.12)', text: '#D97706', border: 'rgba(217, 119, 6, 0.3)' };
+    case 'FAILED':
+    case 'REJECTED':
+      return { bg: 'rgba(239, 68, 68, 0.12)', text: '#EF4444', border: 'rgba(239, 68, 68, 0.3)' };
+    case 'DRAFT':
+    case 'NO_SIGN_DETECTED':
+    default:
+      return { bg: 'rgba(100, 116, 139, 0.12)', text: '#64748B', border: 'rgba(100, 116, 139, 0.3)' };
+  }
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+type SurveySubmissionDetailsScreenProps = {
+  submissionId?: string;
+};
+
+export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmissionDetailsScreenProps) {
+  const router = useRouter();
+  const theme = useTheme();
+
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<'submission' | 'surveyor' | null>(null);
+  const [copiedToast, setCopiedToast] = useState(false);
+  const [isRetryModalVisible, setIsRetryModalVisible] = useState(false);
+  const [isSubmittingRetry, setIsSubmittingRetry] = useState(false);
+  const [retryError, setRetryError] = useState<string>();
+  const [successToast, setSuccessToast] = useState<string>();
+
+  const { mutateAsync: submitSubmission } = useSubmitSurveySubmission();
+
+  // 1. Fetch detailed submission status including attached mediaFiles & candidates
+  const {
+    data: statusData,
+    isLoading: isStatusLoading,
+    isRefetching,
+    refetch,
+  } = useGetSurveySubmissionStatus(submissionId, Boolean(submissionId));
+
+  // 2. Also check list query as fallback for basic metadata
+  const { data: listData } = useGetMySubmissions({ page: '1', pageSize: '50' }, !statusData);
+
+  const submission: SurveySubmission | undefined = useMemo(() => {
+    if (statusData?.submission) return statusData.submission;
+    if (listData?.items && submissionId) {
+      return listData.items.find((item) => item.id === submissionId);
+    }
+    return undefined;
+  }, [statusData, listData, submissionId]);
+
+  const locationQuery = useReverseGeocode(
+    submission?.latitude != null && submission?.longitude != null
+      ? { latitude: submission.latitude, longitude: submission.longitude }
+      : null,
+  );
+
+  const mediaFiles = statusData?.mediaFiles || [];
+
+  // Determine media items
+  const imageFiles = mediaFiles.filter((m) => m.media_type === 'IMAGE');
+  const videoFiles = mediaFiles.filter((m) => m.media_type === 'VIDEO');
+  const gpxFiles = mediaFiles.filter((m) => m.media_type === 'GPX');
+
+  const primaryVideo = videoFiles[0];
+  const primaryImage = imageFiles[0];
+
+  const primaryVideoUrl = primaryVideo?.file_url ? resolveS3Url(primaryVideo.file_url) : undefined;
+  const primaryImageUrl = primaryImage?.file_url ? resolveS3Url(primaryImage.file_url) : undefined;
+
+  const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
+
+  const hasCoordinates =
+    submission?.latitude != null &&
+    submission?.longitude != null &&
+    Number.isFinite(submission.latitude) &&
+    Number.isFinite(submission.longitude);
+
+  const startCoord: MapCoordinate | undefined = hasCoordinates
+    ? [submission!.longitude!, submission!.latitude!]
+    : undefined;
+
+  const endCoord: MapCoordinate | undefined =
+    startCoord && isVideoSubmission ? estimateEndPoint(startCoord, 60) : undefined;
+
+  const statusColor = getStatusColor(submission?.status || 'QUEUED');
+
+  const isFailed = submission?.status === 'FAILED';
+  const canRetry = isFailed || submission?.status === 'PENDING_CORRECTION';
+
+  const handleDirectResubmit = async () => {
+    if (!submission?.id || isSubmittingRetry) return;
+    setIsSubmittingRetry(true);
+    setRetryError(undefined);
+
+    try {
+      await submitSubmission({ submissionId: submission.id });
+      setIsRetryModalVisible(false);
+      setSuccessToast('Survey resubmitted successfully! It is now queued for processing.');
+      setTimeout(() => setSuccessToast(undefined), 4000);
+      void refetch();
+    } catch (err) {
+      console.warn('[Surveyor] Direct resubmit error:', err);
+      const msg = err instanceof Error ? err.message : 'Unable to resubmit. Please try editing details first.';
+      setRetryError(msg);
+    } finally {
+      setIsSubmittingRetry(false);
+    }
+  };
+
+  const handleEditAndResubmit = () => {
+    if (!submission?.id) return;
+    setIsRetryModalVisible(false);
+    setRetryError(undefined);
+    router.push({
+      pathname: '/work/new-survey/details',
+      params: {
+        submissionId: submission.id,
+        ...(submission.latitude != null ? { startLat: String(submission.latitude) } : {}),
+        ...(submission.longitude != null ? { startLon: String(submission.longitude) } : {}),
+      },
+    });
+  };
+
+  const handleCopyText = async (text?: string, target?: 'submission' | 'surveyor') => {
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    if (target) {
+      setCopiedTarget(target);
+      setTimeout(() => setCopiedTarget(null), 2000);
+    }
+    setCopiedToast(true);
+  };
+
+  const handleOpenVideo = async (url?: string) => {
+    if (!url) return;
+    try {
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+      } else {
+        await WebBrowser.openBrowserAsync(url, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+          toolbarColor: '#0F172A',
+        });
+      }
+    } catch {
+      await Linking.openURL(url);
+    }
+  };
+
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+        {/* Top App Header */}
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <Pressable
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+            hitSlop={Spacing.one}
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <AntDesign color={theme.text} name="arrow-left" size={22} />
+          </Pressable>
+
+          <View style={styles.headerTextGroup}>
+            <Text numberOfLines={1} style={[styles.headerTitle, { color: theme.text }]}>
+              Submission Details
+            </Text>
+            {submission ? (
+              <Text numberOfLines={1} style={[styles.headerSubtitle, { color: theme.placeholder }]}>
+                #{submission.id.slice(0, 10)}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.headerActions}>
+            {canRetry ? (
+              <Pressable
+                accessibilityLabel="Retry submission"
+                accessibilityRole="button"
+                hitSlop={Spacing.one}
+                onPress={() => {
+                  setRetryError(undefined);
+                  setIsRetryModalVisible(true);
+                }}
+                disabled={isSubmittingRetry}
+                style={[
+                  styles.retryHeaderButton,
+                  {
+                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                    borderColor: 'rgba(239, 68, 68, 0.35)',
+                  },
+                ]}
+              >
+                {isSubmittingRetry ? (
+                  <ActivityIndicator color="#EF4444" size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons color="#EF4444" name="replay" size={16} />
+                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>Retry</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              accessibilityLabel="Refresh submission data"
+              accessibilityRole="button"
+              hitSlop={Spacing.one}
+              onPress={() => { void refetch(); }}
+              style={styles.refreshButton}
+            >
+              {isRefetching ? (
+                <ActivityIndicator color={theme.primary} size="small" />
+              ) : (
+                <AntDesign color={theme.text} name="reload" size={18} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {isStatusLoading && !submission ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator color={theme.primary} size="large" />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+              Loading submission details…
+            </Text>
+          </View>
+        ) : !submission ? (
+          <View style={styles.centerContainer}>
+            <MaterialCommunityIcons color={theme.placeholder} name="file-question-outline" size={48} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Submission Not Found</Text>
+            <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+              The requested survey submission could not be located or has expired.
+            </Text>
+            <AppButton
+              label="Go to Survey History"
+              onPress={() => router.replace('/work/survey-history')}
+              style={styles.emptyAction}
+              variant="primary"
+            />
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Status Hero Card */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: statusColor.border,
+                },
+              ]}
+            >
+              <View style={styles.statusRow}>
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: statusColor.bg, borderColor: statusColor.border },
+                  ]}
+                >
+                  <View style={[styles.statusDot, { backgroundColor: statusColor.text }]} />
+                  <Text style={[styles.statusPillText, { color: statusColor.text }]}>
+                    {statusLabels[submission.status] ?? submission.status}
+                  </Text>
+                </View>
+
+                <Text style={[styles.submissionDate, { color: theme.placeholder }]}>
+                  {formatDate(submission.createdAt)}
+                </Text>
+              </View>
+
+              {submission.failureReason || isFailed ? (
+                <View
+                  style={[
+                    styles.failureAlert,
+                    {
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      borderColor: 'rgba(239, 68, 68, 0.25)',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.failureAlertHeader}>
+                    <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={20} />
+                    <View style={styles.failureAlertTextWrap}>
+                      <Text style={styles.failureAlertTitle}>Submission Processing Failed</Text>
+                      <Text style={styles.failureText}>
+                        {submission.failureReason || 'An error occurred during AI processing. You can retry submitting this survey.'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.failureAlertActions}>
+                    <Pressable
+                      accessibilityLabel="Resubmit survey"
+                      accessibilityRole="button"
+                      onPress={() => {
+                        setRetryError(undefined);
+                        setIsRetryModalVisible(true);
+                      }}
+                      style={[styles.failureActionRetryBtn, { backgroundColor: '#EF4444' }]}
+                    >
+                      <MaterialCommunityIcons color="#FFFFFF" name="replay" size={15} />
+                      <Text style={styles.failureActionRetryBtnText}>Resubmit Survey</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Progress Steps Overview */}
+              <View style={styles.pipelineContainer}>
+                <View style={styles.pipelineStep}>
+                  <View style={[styles.pipelineDot, styles.pipelineDotActive]}>
+                    <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                  </View>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Uploaded</Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.pipelineLine,
+                    submission.status !== 'QUEUED' && submission.status !== 'DRAFT'
+                      ? styles.pipelineLineActive
+                      : { backgroundColor: theme.border },
+                  ]}
+                />
+
+                <View style={styles.pipelineStep}>
+                  <View
+                    style={[
+                      styles.pipelineDot,
+                      submission.status === 'COMPLETED' ||
+                        submission.totalCandidatesExtracted > 0 ||
+                        ['DETECTING', 'TRACKING', 'CLASSIFYING', 'ESTIMATING'].includes(submission.status)
+                        ? styles.pipelineDotActive
+                        : { backgroundColor: theme.border },
+                    ]}
+                  >
+                    {submission.status === 'COMPLETED' || submission.totalCandidatesExtracted > 0 ? (
+                      <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                    ) : (
+                      <View style={styles.pipelineDotInner} />
+                    )}
+                  </View>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>AI Detection</Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.pipelineLine,
+                    submission.status === 'COMPLETED'
+                      ? styles.pipelineLineActive
+                      : { backgroundColor: theme.border },
+                  ]}
+                />
+
+                <View style={styles.pipelineStep}>
+                  <View
+                    style={[
+                      styles.pipelineDot,
+                      submission.status === 'COMPLETED'
+                        ? styles.pipelineDotActive
+                        : { backgroundColor: theme.border },
+                    ]}
+                  >
+                    {submission.status === 'COMPLETED' ? (
+                      <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                    ) : null}
+                  </View>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Completed</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Media Section: Review the image or video again */}
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Survey Recording Media</Text>
+              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                {isVideoSubmission ? 'Video recording & telemetry data' : 'High-resolution survey photo'}
+              </Text>
+            </View>
+
+            {/* If Single Image: Display image with full-screen zoom */}
+            {!isVideoSubmission ? (
+              <View
+                style={[
+                  styles.mediaCard,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Enlarge survey image"
+                  accessibilityRole="button"
+                  onPress={() => setIsImageZoomed(true)}
+                  style={styles.imagePressable}
+                >
+                  {primaryImageUrl ? (
+                    <Image
+                      accessibilityLabel="Survey photo submission"
+                      contentFit="cover"
+                      source={{ uri: primaryImageUrl }}
+                      style={styles.mediaImage}
+                      transition={150}
+                    />
+                  ) : null}
+                  <View style={styles.zoomButton}>
+                    <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
+                    <Text style={styles.zoomButtonText}>Tap to enlarge</Text>
+                  </View>
+                </Pressable>
+              </View>
+            ) : (
+              /* If Video: Display video playback card */
+              <View
+                style={[
+                  styles.videoCard,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.videoThumbnailArea}>
+                  <MaterialCommunityIcons color="#FFFFFF" name="video" size={48} />
+                  <Text style={styles.videoPromptText}>Survey Video Recording</Text>
+                  {primaryVideo?.file_url ? (
+                    <Text numberOfLines={1} style={styles.videoFilename}>
+                      {primaryVideo.file_url.split('/').pop()}
+                    </Text>
+                  ) : null}
+
+                  <Pressable
+                    accessibilityLabel="Play survey video"
+                    accessibilityRole="button"
+                    onPress={() => handleOpenVideo(primaryVideoUrl)}
+                    style={styles.playButton}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="play" size={26} />
+                    <Text style={styles.playButtonText}>Play Video</Text>
+                  </Pressable>
+                </View>
+
+                {gpxFiles.length > 0 ? (
+                  <View style={[styles.gpxRow, { borderTopColor: theme.border }]}>
+                    <MaterialCommunityIcons color={theme.primary} name="crosshairs-gps" size={18} />
+                    <Text style={[styles.gpxText, { color: theme.text }]}>
+                      Attached GPX Route Log: {gpxFiles[0].file_url.split('/').pop() || 'Track log'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            {/* Extra Media Carousel Tabs if multiple files exist */}
+            {mediaFiles.length > 1 ? (
+              <View style={styles.mediaListGroup}>
+                <Text style={[styles.groupLabel, { color: theme.placeholder }]}>Attached Media Files</Text>
+                {mediaFiles.map((file, idx) => {
+                  const isVideo = file.media_type === 'VIDEO';
+                  const isImage = file.media_type === 'IMAGE';
+                  const url = resolveS3Url(file.file_url);
+
+                  return (
+                    <Pressable
+                      key={file.id || idx}
+                      onPress={() => {
+                        if (isVideo) {
+                          void handleOpenVideo(url);
+                        } else if (isImage) {
+                          setIsImageZoomed(true);
+                        }
+                      }}
+                      style={[
+                        styles.mediaFileItem,
+                        {
+                          backgroundColor: theme.backgroundElement,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        color={isVideo ? '#EF4444' : isImage ? theme.primary : '#10B981'}
+                        name={isVideo ? 'video-outline' : isImage ? 'image-outline' : 'map-marker-path'}
+                        size={22}
+                      />
+                      <View style={styles.mediaFileText}>
+                        <Text numberOfLines={1} style={[styles.mediaFileName, { color: theme.text }]}>
+                          {file.file_url.split('/').pop() || `${file.media_type} file`}
+                        </Text>
+                        <Text style={[styles.mediaFileType, { color: theme.placeholder }]}>
+                          {file.media_type} · Tap to {isVideo ? 'watch' : isImage ? 'preview' : 'view'}
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {/* Extraction & Detection Summary */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <MaterialCommunityIcons color={theme.primary} name="chart-box-outline" size={20} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Detection Results</Text>
+              </View>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statBox}>
+                  <Text style={[styles.statValue, { color: theme.primary }]}>
+                    {submission.totalCandidatesExtracted}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                    Signs Extracted
+                  </Text>
+                </View>
+
+                <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+
+                <View style={styles.statBox}>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
+                    {submission.coordinateSource || 'GPS'}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                    Telemetry Source
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Submission Metadata Details */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.cardHeader}>
+                <MaterialCommunityIcons color={theme.primary} name="information-outline" size={20} />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Submission Metadata</Text>
+              </View>
+
+              <View style={styles.metaList}>
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Submission ID</Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      selectable
+                      style={[styles.metaValueMono, { color: theme.text }]}
+                    >
+                      {submission.id}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Copy Submission ID"
+                      hitSlop={Spacing.half}
+                      onPress={() => handleCopyText(submission.id, 'submission')}
+                      style={styles.copyButton}
+                    >
+                      <MaterialCommunityIcons
+                        color={copiedTarget === 'submission' ? '#16A34A' : theme.placeholder}
+                        name={copiedTarget === 'submission' ? 'check' : 'content-copy'}
+                        size={16}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Type</Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.metaValue, { color: theme.text }]}
+                    >
+                      {submissionTypeLabels[submission.submissionType] ?? submission.submissionType}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Surveyor ID</Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      selectable
+                      style={[styles.metaValueMono, { color: theme.text }]}
+                    >
+                      {submission.surveyorId}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Copy Surveyor ID"
+                      hitSlop={Spacing.half}
+                      onPress={() => handleCopyText(submission.surveyorId, 'surveyor')}
+                      style={styles.copyButton}
+                    >
+                      <MaterialCommunityIcons
+                        color={copiedTarget === 'surveyor' ? '#16A34A' : theme.placeholder}
+                        name={copiedTarget === 'surveyor' ? 'check' : 'content-copy'}
+                        size={16}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Captured At</Text>
+                  <View style={styles.metaValueContainer}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.metaValue, { color: theme.text }]}
+                    >
+                      {formatDate(submission.capturedAt ?? submission.createdAt)}
+                    </Text>
+                  </View>
+                </View>
+
+                {submission.latitude != null && submission.longitude != null ? (
+                  <>
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Coordinates</Text>
+                      <View style={styles.metaValueContainer}>
+                        <Text
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                          style={[styles.metaValueMono, { color: theme.text }]}
+                        >
+                          {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.metaRow}>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Address / Location</Text>
+                      <View style={styles.metaValueContainer}>
+                        <Text
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                          style={[styles.metaValue, { color: theme.text }]}
+                        >
+                          {locationQuery.isLoading
+                            ? 'Resolving address…'
+                            : locationQuery.data?.displayAddress || 'Location address unavailable'}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                ) : null}
+
+                {submission.note ? (
+                  <View style={styles.metaColumn}>
+                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Surveyor Note</Text>
+                    <Text style={[styles.noteText, { color: theme.text, backgroundColor: theme.background }]}>
+                      {submission.note}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Route Map Preview */}
+            {startCoord ? (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={20} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    {isVideoSubmission ? 'Survey Route Preview (S → D)' : 'Location Preview'}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.submissionMapPlaceholder,
+                    {
+                      backgroundColor: theme.neutral,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={StyleSheet.absoluteFill}>
+                    <NavigationMapView
+                      focusCoordinate={startCoord}
+                      routeStart={isVideoSubmission ? startCoord : undefined}
+                      destination={
+                        isVideoSubmission && endCoord
+                          ? {
+                            coordinate: endCoord,
+                            id: 'survey-end',
+                            title: 'End Point',
+                            subtitle: 'Survey Route',
+                            category: 'recent',
+                          }
+                          : undefined
+                      }
+                      routeCoordinates={
+                        isVideoSubmission && startCoord && endCoord
+                          ? [startCoord, endCoord]
+                          : undefined
+                      }
+                      showCurrentLocation={false}
+                    />
+                  </View>
+                </View>
+                <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
+                  {isVideoSubmission && endCoord
+                    ? `Start (S): ${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)} → End (D): ${endCoord[1].toFixed(6)}, ${endCoord[0].toFixed(6)}`
+                    : `${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)}`}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Extracted Signs / Candidates Card */}
+            {statusData?.candidates && statusData.candidates.length > 0 ? (
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={20} />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>
+                    Detected Traffic Signs ({statusData.candidates.length})
+                  </Text>
+                </View>
+
+                <View style={styles.candidateList}>
+                  {statusData.candidates.map((cand: any, idx: number) => {
+                    const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
+                    const signLabel = cand.sign_type || cand.label || cand.type || `Sign #${idx + 1}`;
+                    const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
+                    const resolvedImg = candidateImg ? resolveS3Url(candidateImg) : undefined;
+
+                    return (
+                      <View
+                        key={cand.id || idx}
+                        style={[
+                          styles.candidateCard,
+                          {
+                            backgroundColor: theme.neutral,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                      >
+                        {resolvedImg ? (
+                          <Image
+                            contentFit="cover"
+                            source={{ uri: resolvedImg }}
+                            style={styles.candidateThumbnail}
+                          />
+                        ) : null}
+                        <View style={styles.candidateInfo}>
+                          <Text style={[styles.candidateTitle, { color: theme.text }]} numberOfLines={1}>
+                            {signLabel}
+                          </Text>
+                          {confidence != null ? (
+                            <View style={styles.confidenceBadge}>
+                              <MaterialCommunityIcons name="check-circle" size={12} color="#16A34A" />
+                              <Text style={styles.confidenceText}>Confidence: {confidence}%</Text>
+                            </View>
+                          ) : null}
+                          {cand.timestamp_ms != null ? (
+                            <Text style={[styles.candidateMeta, { color: theme.placeholder }]}>
+                              Video offset: {Math.round(cand.timestamp_ms / 1000)}s
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+          </ScrollView>
+        )}
+
+        {/* Full-Screen Image Zoom Modal */}
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setIsImageZoomed(false)}
+          transparent
+          visible={isImageZoomed}
+        >
+          <View style={styles.zoomBackdrop}>
+            <SafeAreaView style={styles.zoomSafeArea}>
+              <Pressable
+                accessibilityLabel="Close enlarged view"
+                accessibilityRole="button"
+                onPress={() => setIsImageZoomed(false)}
+                style={styles.zoomCloseBtn}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
+              </Pressable>
+
+              {primaryImageUrl ? (
+                <Image
+                  contentFit="contain"
+                  source={{ uri: primaryImageUrl }}
+                  style={styles.zoomedImage}
+                />
+              ) : null}
+            </SafeAreaView>
+          </View>
+        </Modal>
+        {/* Floating Success Toast */}
+        {successToast ? (
+          <View pointerEvents="none" style={styles.floatingToastContainer}>
+            <View style={[styles.successToast, { backgroundColor: '#16A34A' }]}>
+              <MaterialCommunityIcons color="#FFFFFF" name="check-circle" size={18} />
+              <Text style={styles.successToastText}>{successToast}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Retry / Resubmit Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          onRequestClose={() => {
+            if (!isSubmittingRetry) {
+              setIsRetryModalVisible(false);
+              setRetryError(undefined);
+            }
+          }}
+          transparent
+          visible={isRetryModalVisible}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => {
+                if (!isSubmittingRetry) {
+                  setIsRetryModalVisible(false);
+                  setRetryError(undefined);
+                }
+              }}
+            />
+            <View
+              style={[
+                styles.retryModalCard,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              {/* Modal Header */}
+              <View style={styles.retryModalHeader}>
+                <View style={[styles.retryModalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  <MaterialCommunityIcons color="#EF4444" name="replay" size={26} />
+                </View>
+                <View style={styles.retryModalHeaderText}>
+                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>Resubmit Survey</Text>
+                  <Text style={[styles.retryModalSubtitle, { color: theme.placeholder }]}>
+                    #{submission?.id.slice(0, 10)} · {submission ? submissionTypeLabels[submission.submissionType] : ''}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Modal Description */}
+              <Text style={[styles.retryModalBodyText, { color: theme.textSecondary }]}>
+                Choose how you would like to resubmit this survey. You can send it directly to be reprocessed by the AI pipeline, or edit the metadata and GPS coordinates first.
+              </Text>
+
+              {submission?.failureReason ? (
+                <View style={[styles.retryModalFailureBox, { backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}>
+                  <Text style={styles.retryModalFailureLabel}>Failure Reason:</Text>
+                  <Text style={styles.retryModalFailureText}>{submission.failureReason}</Text>
+                </View>
+              ) : null}
+
+              {retryError ? (
+                <View style={[styles.retryModalErrorBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  <MaterialCommunityIcons color="#EF4444" name="alert-circle" size={16} />
+                  <Text style={styles.retryModalErrorText}>{retryError}</Text>
+                </View>
+              ) : null}
+
+              {/* Modal Actions */}
+              <View style={styles.retryModalActions}>
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label={isSubmittingRetry ? 'Resubmitting…' : 'Resubmit Now'}
+                  onPress={handleDirectResubmit}
+                  style={styles.retryModalActionBtn}
+                  variant="primary"
+                />
+
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label="Edit Details & Resubmit"
+                  onPress={handleEditAndResubmit}
+                  style={styles.retryModalActionBtn}
+                  variant="surface"
+                />
+
+                <AppButton
+                  disabled={isSubmittingRetry}
+                  label="Cancel"
+                  onPress={() => {
+                    setIsRetryModalVisible(false);
+                    setRetryError(undefined);
+                  }}
+                  variant="ghost"
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {copiedToast ? (
+          <AppToast
+            duration={1500}
+            message="Copied!"
+            onDismiss={() => setCopiedToast(false)}
+            placement="bottom"
+            tone="success"
+          />
+        ) : null}
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextGroup: {
+    flex: 1,
+    paddingHorizontal: Spacing.one,
+  },
+  headerTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  headerSubtitle: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+  loadingText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    marginTop: Spacing.two,
+  },
+  emptyTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: Spacing.two,
+  },
+  emptySubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: Spacing.one,
+    maxWidth: 280,
+  },
+  emptyAction: {
+    marginTop: Spacing.four,
+    minWidth: 180,
+  },
+  scrollContent: {
+    padding: Spacing.three,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+    gap: Spacing.two,
+  },
+  card: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.one,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusPillText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  submissionDate: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+  },
+  failureAlert: {
+    padding: 12,
+    borderRadius: Rounded.md,
+  },
+  failureAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  failureAlertTextWrap: {
+    flex: 1,
+  },
+  failureAlertTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  failureText: {
+    color: '#EF4444',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  failureAlertActions: {
+    marginTop: Spacing.two,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  failureActionRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 7,
+    borderRadius: Rounded.md,
+  },
+  failureActionRetryBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  retryHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  retryHeaderButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  floatingToastContainer: {
+    position: 'absolute',
+    top: 70,
+    left: Spacing.two,
+    right: Spacing.two,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  successToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Rounded.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successToastText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.three,
+  },
+  retryModalCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: Rounded.xlg,
+    borderWidth: 1,
+    padding: Spacing.three,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  retryModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  retryModalIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryModalHeaderText: {
+    flex: 1,
+  },
+  retryModalTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  retryModalSubtitle: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  retryModalBodyText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: Spacing.two,
+  },
+  retryModalFailureBox: {
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.two,
+  },
+  retryModalFailureLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  retryModalFailureText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  retryModalErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.two,
+  },
+  retryModalErrorText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    color: '#EF4444',
+    flex: 1,
+  },
+  retryModalActions: {
+    gap: Spacing.one,
+    marginTop: Spacing.one,
+  },
+  retryModalActionBtn: {
+    minHeight: 44,
+  },
+  pipelineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.one,
+    paddingHorizontal: Spacing.two,
+  },
+  pipelineStep: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  pipelineDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pipelineDotActive: {
+    backgroundColor: '#16A34A',
+  },
+  pipelineDotInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  pipelineLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: 8,
+    marginBottom: 16,
+  },
+  pipelineLineActive: {
+    backgroundColor: '#16A34A',
+  },
+  pipelineLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    marginTop: Spacing.two,
+    marginBottom: Spacing.half,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  sectionSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  mediaCard: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePressable: {
+    width: '100%',
+    height: 260,
+    position: 'relative',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  zoomButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  zoomButtonText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  videoCard: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  videoThumbnailArea: {
+    height: 240,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.two,
+    gap: 8,
+  },
+  videoPromptText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  videoFilename: {
+    color: '#94A3B8',
+    fontFamily: Fonts.mono,
+    fontSize: 11,
+    maxWidth: '85%',
+  },
+  playButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 8,
+    shadowColor: '#FF4767',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  playButtonText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  gpxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: Spacing.two,
+    borderTopWidth: 1,
+  },
+  gpxText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  mediaListGroup: {
+    gap: 8,
+    marginTop: Spacing.one,
+  },
+  groupLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  mediaFileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  mediaFileText: {
+    flex: 1,
+  },
+  mediaFileName: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  mediaFileType: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Spacing.one,
+  },
+  cardTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: Spacing.one,
+  },
+  statBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontFamily: Fonts.body,
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  statLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 36,
+  },
+  metaList: {
+    gap: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  metaColumn: {
+    gap: 6,
+  },
+  metaLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+    width: 105,
+    flexShrink: 0,
+  },
+  metaValueContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    gap: 8,
+  },
+  metaValue: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 0,
+  },
+  metaValueMono: {
+    flex: 1,
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    fontWeight: '600',
+    minWidth: 0,
+  },
+  copyButton: {
+    padding: 4,
+    borderRadius: Rounded.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  noteText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    padding: 10,
+    borderRadius: Rounded.sm,
+  },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+  },
+  zoomSafeArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomedImage: {
+    width: '100%',
+    height: '85%',
+  },
+  submissionMapPlaceholder: {
+    height: 180,
+    borderRadius: Rounded.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    marginTop: Spacing.one,
+  },
+  mapCoordinateSubtext: {
+    fontFamily: Fonts.mono,
+    fontSize: 12,
+    marginTop: Spacing.half,
+  },
+  candidateList: {
+    gap: Spacing.two,
+    marginTop: Spacing.one,
+  },
+  candidateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  candidateThumbnail: {
+    width: 56,
+    height: 56,
+    borderRadius: Rounded.sm,
+  },
+  candidateInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  candidateTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confidenceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  confidenceText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  candidateMeta: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+  },
+});

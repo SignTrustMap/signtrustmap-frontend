@@ -11,6 +11,7 @@ import {
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
 import { useTheme } from '@/hooks/use-theme';
+import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 
 const actionDetails: Record<
   ReviewActionType,
@@ -33,6 +34,12 @@ const actionDetails: Record<
     label: 'Reported',
     summary: 'Reported to system staff.',
     symbol: '!',
+  },
+  skipped: {
+    color: Colors.grey,
+    label: 'Skipped',
+    summary: 'Cannot identify sign.',
+    symbol: '↷',
   },
 };
 
@@ -97,9 +104,10 @@ export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
+  const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
     (result, review) => ({ ...result, [review.action]: result[review.action] + 1 }),
-    { approved: 0, declined: 0, reported: 0 },
+    { approved: 0, declined: 0, reported: 0, skipped: 0 },
   );
 
   return (
@@ -117,6 +125,7 @@ export function SubmissionSummaryScreen() {
             <SummaryMetric action="approved" count={counts.approved} />
             <SummaryMetric action="declined" count={counts.declined} />
             <SummaryMetric action="reported" count={counts.reported} />
+            <SummaryMetric action="skipped" count={counts.skipped} />
           </View>
 
           <ScrollView
@@ -145,6 +154,9 @@ export function SubmissionSummaryScreen() {
               onPress={() => {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();
+                // Invalidate wallet balance + reviewer credit score so the
+                // home screen and nav bar show fresh data after submission.
+                invalidateWalletAndStats();
                 router.replace({
                   pathname: '/work/submission-finish',
                   params: { count: String(reviewedCount) },

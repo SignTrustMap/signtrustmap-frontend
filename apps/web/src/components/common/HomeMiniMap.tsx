@@ -23,6 +23,13 @@ export function HomeMiniMap() {
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const [tileMode, setTileMode] = useState<'osm' | 'voyager'>('osm')
 
+  const getTileLabel = (mode: 'osm' | 'voyager') => {
+    if (mode === 'osm') {
+      return t('mini_map.osm_standard')
+    }
+    return t('mini_map.voyager')
+  }
+
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
@@ -82,12 +89,12 @@ export function HomeMiniMap() {
         <div style="font-family: 'Geist', sans-serif; padding: 2px; color: #111827; min-width: 200px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <strong style="background: ${bgHex}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace;">${sign.code}</strong>
-            <span style="color: #059669; font-size: 10px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% ${t('mini_map.popup_trust', { defaultValue: 'Trust' })}</span>
+            <span style="color: #059669; font-size: 10px; font-weight: bold; font-family: monospace;">✓ ${sign.trustScore}% ${t('mini_map.popup_trust')}</span>
           </div>
           <p style="font-size: 12px; font-weight: 700; margin: 3px 0 2px 0; line-height: 1.3;">${sign.name}</p>
           <p style="font-size: 10px; color: #4b5563; margin: 0 0 4px 0;">${sign.location}</p>
           <div style="font-size: 9px; color: #6b7280; font-family: monospace; border-top: 1px solid #e5e7eb; padding-top: 4px;">
-            ${t('mini_map.popup_heading', { defaultValue: 'Hướng xe:' })} ${sign.heading}° • QCVN 41
+            ${t('mini_map.popup_heading')} ${sign.heading}° • QCVN 41
           </div>
         </div>
       `
@@ -116,10 +123,13 @@ export function HomeMiniMap() {
     const newUrl =
       tileMode === 'osm'
         ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
 
     const newLayer = L.tileLayer(newUrl, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution:
+        tileMode === 'osm'
+          ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          : 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, USGS',
       maxZoom: 19,
     }).addTo(mapInstanceRef.current)
 
@@ -162,10 +172,10 @@ export function HomeMiniMap() {
                 ? 'bg-white/10 hover:bg-white/15 text-gray-200'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200'
             }`}
-            title="Đổi lớp bản đồ"
+            title={t('common.map_layer_toggle')}
           >
             <Stack size={13} className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'} />
-            <span>{tileMode === 'osm' ? t('mini_map.osm_standard') : t('mini_map.voyager')}</span>
+            <span>{getTileLabel(tileMode)}</span>
           </button>
           <Link
             to="/product/map"
@@ -174,7 +184,7 @@ export function HomeMiniMap() {
                 ? 'bg-[#00c4de]/15 hover:bg-[#00c4de]/25 text-[#00c4de]'
                 : 'bg-teal-50 hover:bg-teal-100 text-[#007b8b]'
             }`}
-            title="Mở toàn màn hình"
+            title={t('common.fullscreen')}
           >
             <ArrowSquareOut size={14} />
           </Link>
@@ -182,7 +192,7 @@ export function HomeMiniMap() {
       </div>
 
       {/* Real Interactive Leaflet OpenStreetMap Canvas */}
-      <div className="relative flex-1 w-full h-full">
+      <div className="relative isolate z-0 flex-1 w-full h-full">
         <div ref={mapContainerRef} className="w-full h-full z-0" />
 
         {/* Floating Quick Legend */}

@@ -1,8 +1,7 @@
 import { Platform } from 'react-native';
 
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
-
-type MapLibreModule = typeof import('@maplibre/maplibre-react-native');
+import { getMapLibre } from '@/services/maplibre';
 
 const INITIAL_LOCATION_PERMISSION_REQUESTED_KEY = 'initial-location-permission-requested';
 let initialPermissionRequest: Promise<void> | undefined;
@@ -24,8 +23,8 @@ async function requestInitialLocationPermission() {
   await setStorageItemAsync(INITIAL_LOCATION_PERMISSION_REQUESTED_KEY, 'true');
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mapLibre = require('@maplibre/maplibre-react-native') as MapLibreModule;
+    const mapLibre = getMapLibre();
+    if (!mapLibre) return;
     await mapLibre.LocationManager.requestPermissions();
   } catch {
   }

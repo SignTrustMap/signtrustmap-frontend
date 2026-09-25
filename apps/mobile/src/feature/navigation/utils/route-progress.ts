@@ -1,4 +1,4 @@
-import type { MapCoordinate } from '@/feature/navigation/data/navigation-locations';
+import type { MapCoordinate } from '@/types/navigationType';
 
 const METERS_PER_DEGREE = 111_320;
 

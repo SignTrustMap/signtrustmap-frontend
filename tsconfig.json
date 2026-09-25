@@ -1,4 +1,16 @@
 {
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/web"
+    },
+    {
+      "path": "./apps/ops"
+    }
+  ],
+  "compilerOptions": {
+    "types": [
+      "jest"
+    ]
+  }
 }

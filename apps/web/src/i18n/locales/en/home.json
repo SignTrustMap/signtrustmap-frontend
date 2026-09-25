@@ -8,15 +8,15 @@
     "cta_app": "Download mobile app",
     "marquee_label": "Compatible with and powered by leading AI models & dev tools",
     "stats": {
-      "s1_stat": "Lorem Ipsum",
-      "s1_title": "Dolor Sit Amet Consectetur",
-      "s1_desc": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      "s2_stat": "Adipiscing Elit",
-      "s2_title": "Eiusmod Tempor Incididunt",
-      "s2_desc": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat.",
-      "s3_stat": "Magna Aliqua",
-      "s3_title": "Labore Et Dolore Magna",
-      "s3_desc": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit."
+      "s1_stat": "98.5%",
+      "s1_title": "AI Recognition Accuracy",
+      "s1_desc": "YOLO12 vision model combined with CLIP accurately classifies traffic signs per QCVN 41:2019 standards.",
+      "s2_stat": "150m+",
+      "s2_title": "Direction-Aware Alerts",
+      "s2_desc": "Automatically filters reverse direction signs, alerting drivers only to signage relevant to their current lane.",
+      "s3_stat": "100%",
+      "s3_title": "Verified Community Data",
+      "s3_desc": "Every traffic sign undergoes peer-review verification and consensus before official map publication."
     }
   },
   "topo": {
@@ -24,15 +24,15 @@
     "title": "From field camera to trusted navigation map",
     "subtitle": "A comprehensive pipeline solving the data latency and constant change of traffic signs in Vietnam.",
     "cards": {
-      "c1_tag": "Lorem Ipsum Tag",
-      "c1_title": "Lorem Ipsum Dolor Sit",
-      "c1_body": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.",
-      "c2_tag": "Consectetur Elit",
-      "c2_title": "Adipiscing Eiusmod Tempor",
-      "c2_body": "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia.",
-      "c3_tag": "Incididunt Labore",
-      "c3_title": "Magna Aliqua Veniam",
-      "c3_body": "Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra, est eros bibendum elit, nec luctus magna felis sollicitudin mauris."
+      "c1_tag": "Data Collection",
+      "c1_title": "Field Survey with Dashcam & GPX",
+      "c1_body": "Drivers and contributors record trip footage paired with accurate GPS telemetry on real-world routes.",
+      "c2_tag": "AI Pipeline",
+      "c2_title": "QCVN Detection & Classification",
+      "c2_body": "Automated pipeline detects sign candidate regions, crops optimal frames, and maps visual vectors.",
+      "c3_tag": "Review & Navigation",
+      "c3_title": "Fast Consensus & Smart Guidance",
+      "c3_body": "Reviewers quickly validate data, pushing trusted road signage into the live direction-aware map."
     }
   },
   "map_preview": {

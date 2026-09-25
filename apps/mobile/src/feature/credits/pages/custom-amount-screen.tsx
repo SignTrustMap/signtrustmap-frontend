@@ -8,13 +8,14 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
-import { walletSummary } from '../data/mock-credit-data';
+import { useGetWallet } from '../hooks/use-wallet';
 
 export function CustomAmountScreen() {
   const router = useRouter();
   const theme = useTheme();
   const [amount, setAmount] = useState('75');
   const numericAmount = Number(amount) || 0;
+  const { data: walletData } = useGetWallet();
 
   const addAmount = (increment: number) => {
     setAmount(String(numericAmount + increment));
@@ -35,7 +36,7 @@ export function CustomAmountScreen() {
         <View style={styles.balanceRow}>
           <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Current balance</Text>
           <Text style={[styles.balanceValue, { color: theme.text }]}>
-            {walletSummary.balance} credits
+            {walletData?.wallet?.balance ?? 0} credits
           </Text>
         </View>
         <View style={styles.amountEntry}>

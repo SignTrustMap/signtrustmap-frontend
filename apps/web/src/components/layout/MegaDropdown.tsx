@@ -3,11 +3,10 @@ import {
   DeviceMobile,
   ArrowRight,
   Brain,
-  ShieldCheck,
   Compass,
   Code,
-  Coins,
   ArrowsClockwise,
+  BookOpen,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
@@ -42,7 +41,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
       icon: <Brain size={26} weight="duotone" className="text-[#00c4de]" />,
       title: t('mega.items.ai_pipeline_title'),
       description: t('mega.items.ai_pipeline_desc'),
-      href: '/product/map',
+      href: '/docs',
       badge: t('mega.items.ai_pipeline_badge'),
       category: 'explore',
     },
@@ -55,19 +54,11 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
       category: 'apps',
     },
     {
-      icon: <ShieldCheck size={26} weight="duotone" className="text-[#00c4de]" />,
-      title: t('mega.items.reviewer_title'),
-      description: t('mega.items.reviewer_desc'),
-      href: '/product/map',
-      badge: undefined,
-      category: 'apps',
-    },
-    {
-      icon: <Coins size={26} weight="duotone" className="text-[#00c4de]" />,
-      title: t('mega.items.credit_title'),
-      description: t('mega.items.credit_desc'),
-      href: '/docs',
-      badge: t('mega.items.credit_badge'),
+      icon: <BookOpen size={26} weight="duotone" className="text-[#00c4de]" />,
+      title: t('mega.items.catalog_title'),
+      description: t('mega.items.catalog_desc'),
+      href: '/catalog',
+      badge: t('mega.items.catalog_badge'),
       category: 'apps',
     },
     {

@@ -4,11 +4,11 @@
     "slug": "signtrustmap-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app-logo-1024.png",
+    "icon": "./assets/images/app-logo.png",
     "scheme": "mobile",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/images/app-logo-1024.png",
+      "icon": "./assets/images/app-logo.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route."
       }
@@ -19,18 +19,21 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_MEDIA_LOCATION",
-        "READ_MEDIA_IMAGES"
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "CAMERA",
+        "RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/app-logo-1024.png"
+        "foregroundImage": "./assets/images/app-logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.mobile"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/app-logo-1024.png"
+      "favicon": "./assets/images/app-logo.png"
     },
     "plugins": [
       "expo-router",
@@ -38,8 +41,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "image": "./assets/images/app-logo.png",
+          "imageWidth": 120
         }
       ],
       "expo-secure-store",
@@ -58,8 +61,17 @@
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": true,
           "granularPermissions": [
-            "photo"
+            "photo",
+            "video"
           ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SignTrustMap to access your camera for real-time sign detection during Livestream.",
+          "microphonePermission": "Allow SignTrustMap to access your microphone for Livestream recording.",
+          "recordAudioAndroid": true
         }
       ],
       "@maplibre/maplibre-react-native"

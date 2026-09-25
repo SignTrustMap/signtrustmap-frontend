@@ -38,6 +38,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+scratch/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -131,3 +132,6 @@ dist-ssr/
 CLAUDE.md
 AGENTS.md
 
+# Temporary docs, project reports, and working notes
+*.docx
+/documents

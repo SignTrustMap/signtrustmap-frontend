@@ -2,29 +2,33 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import {
-  catalogSigns,
-  signCategories,
   type CatalogSign,
-  type SignCategory,
-} from '@/feature/review/data/sign-catalog';
+} from '@/api/reviews/catalog';
 import { useTheme } from '@/hooks/use-theme';
 
-type CatalogFilter = 'All Signs' | SignCategory;
+type CatalogFilter = 'all' | number;
 
-const categoryColors: Record<SignCategory, { background: string; text: string }> = {
-  Danger: { background: '#FDE8E7', text: '#B42318' },
-  Guidance: { background: '#DCFCE7', text: '#167A3D' },
-  Prohibition: { background: '#FEE2E2', text: '#B91C1C' },
-  Regulatory: { background: '#DDEBFF', text: '#175CD3' },
-  Supplementary: { background: '#F0E7FE', text: '#6938B8' },
-};
+
+function categoryColor(code: string) {
+  const normalized = code.toUpperCase();
+  if (normalized.includes('WARN') || normalized.includes('DANGER')) {
+    return { background: '#FDE8E7', text: '#B42318' };
+  }
+  if (normalized.includes('GUIDE') || normalized.includes('INFO')) {
+    return { background: '#DCFCE7', text: '#167A3D' };
+  }
+  if (normalized.includes('PROHIB')) return { background: '#FEE2E2', text: '#B91C1C' };
+  if (normalized.includes('REGUL')) return { background: '#DDEBFF', text: '#175CD3' };
+  return { background: '#F0E7FE', text: '#6938B8' };
+}
 
 function normalizeEnglishSearch(value: string) {
   return value
@@ -37,7 +41,13 @@ function normalizeEnglishSearch(value: string) {
 
 function SignCard({ sign }: { sign: CatalogSign }) {
   const theme = useTheme();
-  const categoryColor = categoryColors[sign.category];
+  const colors = categoryColor(sign.category.code);
+  const [imageError, setImageError] = useState(false);
+
+  const hasValidUrl =
+    sign.representativeImageKey &&
+    !sign.representativeImageKey.includes('signtrustmap.vn') &&
+    !imageError;
 
   return (
     <View
@@ -47,24 +57,27 @@ function SignCard({ sign }: { sign: CatalogSign }) {
       ]}
     >
       <View style={[styles.imageShell, { backgroundColor: theme.neutral }]}>
-        <Image
-          accessibilityLabel={`${sign.name} example`}
-          contentFit="cover"
-          source={sign.image}
-          style={styles.signImage}
-        />
+        {hasValidUrl ? (
+          <Image
+            accessibilityLabel={`${sign.nameEn || sign.nameVi} example`}
+            contentFit="contain"
+            onError={() => setImageError(true)}
+            source={{ uri: sign.representativeImageKey! }}
+            style={styles.signImage}
+          />
+        ) : null}
       </View>
       <View style={styles.cardCopy}>
-        <View style={[styles.categoryBadge, { backgroundColor: categoryColor.background }]}>
-          <Text style={[styles.categoryBadgeLabel, { color: categoryColor.text }]}>
-            {sign.category.toUpperCase()}
+        <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
+          <Text style={[styles.categoryBadgeLabel, { color: colors.text }]}>
+            {sign.category.nameEn.toUpperCase()}
           </Text>
         </View>
         <Text numberOfLines={1} style={[styles.signName, { color: theme.text }]}>
-          {sign.name}
+          {sign.nameEn || sign.nameVi}
         </Text>
         <Text numberOfLines={3} style={[styles.signDescription, { color: theme.textSecondary }]}>
-          {sign.description}
+          {sign.description || sign.signCode}
         </Text>
       </View>
     </View>
@@ -74,21 +87,26 @@ function SignCard({ sign }: { sign: CatalogSign }) {
 export function SignCatalogScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const [activeCategory, setActiveCategory] = useState<CatalogFilter>('All Signs');
+
+  const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
+  const { data: catalog, isPending: isLoading, error: catalogError } = useGetCatalog();
+  const categories = catalog?.categories ?? [];
+  const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
+  const error = catalogError?.message;
 
   const filteredSigns = useMemo(() => {
     const query = normalizeEnglishSearch(search);
 
     return catalogSigns.filter((sign) => {
-      const matchesCategory = activeCategory === 'All Signs' || sign.category === activeCategory;
+      const matchesCategory = activeCategory === 'all' || sign.categoryId === activeCategory;
       const searchableText = normalizeEnglishSearch(
-        `${sign.name} ${sign.category} ${sign.description}`,
+        `${sign.nameEn} ${sign.nameVi} ${sign.signCode} ${sign.category.nameEn} ${sign.description ?? ''}`,
       );
 
       return matchesCategory && (!query || searchableText.includes(query));
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, catalogSigns, search]);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -146,15 +164,15 @@ export function SignCatalogScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
           >
-            {signCategories.map((category) => {
-              const selected = activeCategory === category;
+            {[{ id: 'all' as const, nameEn: 'All Signs' }, ...categories].map((category) => {
+              const selected = activeCategory === category.id;
 
               return (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  key={category}
-                  onPress={() => setActiveCategory(category)}
+                  key={category.id}
+                  onPress={() => setActiveCategory(category.id)}
                   style={[
                     styles.filterChip,
                     {
@@ -169,14 +187,21 @@ export function SignCatalogScreen() {
                       { color: selected ? theme.onPrimary : theme.text },
                     ]}
                   >
-                    {category}
+                    {category.nameEn}
                   </Text>
                 </Pressable>
               );
             })}
           </ScrollView>
 
-          {filteredSigns.length > 0 ? (
+          {isLoading ? (
+            <ActivityIndicator color={theme.primary} size="large" style={styles.loading} />
+          ) : error ? (
+            <View style={styles.emptyState}>
+              <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>Catalog unavailable</Text>
+              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>{error}</Text>
+            </View>
+          ) : filteredSigns.length > 0 ? (
             <View style={styles.grid}>
               {filteredSigns.map((sign) => (
                 <SignCard key={sign.id} sign={sign} />
@@ -185,7 +210,7 @@ export function SignCatalogScreen() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>No signs found</Text>
-              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}> 
+              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
                 Try another English name, description, or category.
               </Text>
             </View>
@@ -279,6 +304,7 @@ const styles = StyleSheet.create({
   signName: { fontFamily: Fonts.body, fontSize: 15, fontWeight: 800, lineHeight: 20 },
   signDescription: { fontFamily: Fonts.body, fontSize: 11, fontWeight: 500, lineHeight: 15 },
   emptyState: { alignItems: 'center', gap: Spacing.one, paddingVertical: Spacing.six },
+  loading: { paddingVertical: Spacing.six },
   emptyTitle: { fontFamily: Fonts.body, fontSize: 18, fontWeight: 800 },
   emptyCopy: { fontFamily: Fonts.body, fontSize: 13, lineHeight: 18, textAlign: 'center' },
 });

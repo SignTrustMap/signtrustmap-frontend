@@ -1,31 +1,29 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  type StyleProp,
   Text,
   TextInput,
   View,
-  type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
-import { Fonts, Rounded, Spacing, Colors } from '@/constants/theme';
-import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
+import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type ReviewActionType,
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
-import { sampleReviewSubmissions } from '@/feature/review/data/sample-submissions';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -37,120 +35,28 @@ type SubmissionReviewScreenProps = {
 type ReviewSheet = 'decline' | 'report';
 
 const declineReasons = [
-  'Poor Image Quality',
-  'Incorrect Location',
+  'Incorrect Sign Type',
   'Sign Not Found',
+  'Too Poor Image Quality',
   'Duplicate Submission',
   'Other',
 ] as const;
 
 type DeclineReason = (typeof declineReasons)[number];
 
-
-function SkeletonBlock({ style }: { style: object }) {
-  return <View style={[styles.skeletonBlock, style]} />;
-}
-
 function SubmissionReviewSkeleton() {
   return (
-    <View accessibilityLabel="Loading submissions" style={styles.skeletonContent}>
-      <SkeletonBlock style={styles.skeletonImage} />
-      <View style={styles.skeletonCard}>
-        <View style={styles.skeletonTitleRow}>
-          <SkeletonBlock style={styles.skeletonTitle} />
-          <SkeletonBlock style={styles.skeletonPill} />
-        </View>
-        <SkeletonBlock style={styles.skeletonLineLong} />
-        <SkeletonBlock style={styles.skeletonLineMedium} />
-        <SkeletonBlock style={styles.skeletonLineShort} />
-      </View>
-      <View style={styles.skeletonActions}>
-        <View style={styles.skeletonActionRow}>
-          <SkeletonBlock style={styles.skeletonThumb} />
-          <View style={styles.skeletonActionCopy}>
-            <SkeletonBlock style={styles.skeletonLineLong} />
-            <SkeletonBlock style={styles.skeletonLineMedium} />
-          </View>
-        </View>
-        <SkeletonBlock style={styles.skeletonDivider} />
-        <View style={styles.skeletonActionRow}>
-          <SkeletonBlock style={styles.skeletonLargeThumb} />
-          <View style={styles.skeletonActionCopy}>
-            <SkeletonBlock style={styles.skeletonLineLong} />
-            <SkeletonBlock style={styles.skeletonLineMedium} />
-          </View>
-        </View>
+    <View accessibilityLabel="Loading submissions" style={styles.skeletonContainer}>
+      <View style={[styles.skeletonBlock, { width: '100%', height: 4, marginVertical: 8 }]} />
+      <View style={styles.skeletonCard} />
+      <View style={styles.skeletonInfoBox} />
+      <View style={styles.skeletonDiamond}>
+        <View style={[styles.skeletonCircleButton, styles.diamondTop]} />
+        <View style={[styles.skeletonCircleButton, styles.diamondLeft]} />
+        <View style={[styles.skeletonCircleButton, styles.diamondRight]} />
+        <View style={[styles.skeletonCircleButton, styles.diamondBottom]} />
       </View>
     </View>
-  );
-}
-
-function MetaItem({
-  fixedLines,
-  icon,
-  label,
-  value,
-}: {
-  fixedLines?: number;
-  icon: string;
-  label: string;
-  value: string;
-}) {
-  const theme = useTheme();
-
-  return (
-    <View style={styles.metaItem}>
-      <Text style={[styles.metaLabel, { color: theme.placeholder }]}>{label}</Text>
-      <View style={[styles.metaValueRow, fixedLines ? { height: 17 * fixedLines } : undefined]}>
-        <Text style={[styles.metaIcon, { color: theme.text }]}>{icon}</Text>
-        <Text
-          ellipsizeMode="tail"
-          numberOfLines={fixedLines}
-          style={[styles.metaValue, { color: theme.text }]}
-        >
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function ReviewAction({
-  color,
-  label,
-  onPress,
-  style,
-  symbol,
-  variant = 'outline',
-}: {
-  color: string;
-  label: string;
-  onPress: () => void;
-  style?: StyleProp<ViewStyle>;
-  symbol: string;
-  variant?: 'filled' | 'outline';
-}) {
-  return (
-    <AppButton
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={[
-        styles.decisionButton,
-        {
-          backgroundColor: variant === 'filled' ? color : 'transparent',
-          borderColor: color,
-        },
-        style,
-      ]}
-      variant="ghost"
-    >
-      <Text style={[styles.decisionSymbol, { color: variant === 'filled' ? '#FFFFFF' : color }]}>
-        {symbol}
-      </Text>
-      <Text style={[styles.decisionLabel, { color: variant === 'filled' ? '#FFFFFF' : color }]}>
-        {label}
-      </Text>
-    </AppButton>
   );
 }
 
@@ -207,7 +113,7 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Decline Reason' : 'Report Reason'}
+                {isDecline ? 'Decline Reason' : 'Report Submission'}
               </Text>
               <AppButton
                 accessibilityLabel="Close"
@@ -215,7 +121,7 @@ function ReviewBottomSheet({
                 style={styles.sheetCloseButton}
                 variant="ghost"
               >
-                <Text style={[styles.sheetCloseLabel, { color: theme.text }]}>×</Text>
+                <MaterialCommunityIcons color={theme.text} name="close" size={22} />
               </AppButton>
             </View>
 
@@ -226,7 +132,7 @@ function ReviewBottomSheet({
                 style={styles.sheetBodyScroll}
               >
                 <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Please select a reason for declining this submission. This helps improve accuracy.
+                  Please select a reason for declining this sign submission:
                 </Text>
                 <View style={styles.reasonList}>
                   {declineReasons.map((reason) => {
@@ -260,12 +166,24 @@ function ReviewBottomSheet({
                   })}
                 </View>
                 {isOther ? (
-                  <ReasonInput
-                    label="Reason"
-                    onChangeText={onChangeDeclineReasonDetail}
-                    placeholder="Please specify the reason (required)"
-                    value={declineReasonDetail}
-                  />
+                  <View style={styles.reasonInputGroup}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>
+                      Reason <Text style={{ color: Colors.danger }}>*</Text>
+                    </Text>
+                    <TextInput
+                      accessibilityLabel="Reason, required"
+                      multiline
+                      onChangeText={onChangeDeclineReasonDetail}
+                      placeholder="Please specify the reason"
+                      placeholderTextColor={theme.placeholder}
+                      style={[
+                        styles.reasonInput,
+                        { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                      ]}
+                      textAlignVertical="top"
+                      value={declineReasonDetail}
+                    />
+                  </View>
                 ) : null}
               </ScrollView>
             ) : (
@@ -274,14 +192,26 @@ function ReviewBottomSheet({
                 keyboardShouldPersistTaps="handled"
                 style={styles.sheetBodyScroll}
               >
-                <ReasonInput
-                  label="Note"
-                  onChangeText={onChangeReportNote}
-                  placeholder="Please specify the reason (required)"
-                  value={reportNote}
-                />
+                <View style={styles.reasonInputGroup}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Report Note <Text style={{ color: Colors.danger }}>*</Text>
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Report Note, required"
+                    multiline
+                    onChangeText={onChangeReportNote}
+                    placeholder="Describe the issue with this submission"
+                    placeholderTextColor={theme.placeholder}
+                    style={[
+                      styles.reasonInput,
+                      { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                    ]}
+                    textAlignVertical="top"
+                    value={reportNote}
+                  />
+                </View>
                 <Text style={[styles.reportHelper, { color: theme.placeholder }]}>
-                  Your report will be handled by system staff.
+                  Your report will be reviewed by the system administrators.
                 </Text>
               </ScrollView>
             )}
@@ -310,103 +240,74 @@ function ReviewBottomSheet({
   );
 }
 
-function ReasonInput({
-  label,
-  onChangeText,
-  placeholder,
-  value,
-}: {
-  label: string;
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  value: string;
-}) {
-  const theme = useTheme();
-
-  return (
-    <View style={styles.reasonInputGroup}>
-      <Text style={[styles.inputLabel, { color: theme.text }]}>
-        {label} <Text style={{ color: Colors.danger }}>*</Text>
-      </Text>
-      <TextInput
-        accessibilityLabel={`${label}, required`}
-        multiline
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={theme.placeholder}
-        scrollEnabled
-        style={[
-          styles.reasonInput,
-          { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
-        ]}
-        textAlignVertical="top"
-        value={value}
-      />
-    </View>
-  );
-}
-
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
   const {
-    checkedReviewIndex,
-    checkingSubmission,
     completeCurrentReview,
-    finishSubmissionCheck,
-    goToNextCheckedReview,
-    goToPreviousCheckedReview,
     pendingSubmissions,
     recheckingPreviousAction,
-    recheckingReviewIndex,
     recheckingSubmission,
-    reviewCheckedSubmissionAgain,
     reviewHistory,
+    totalSubmissions,
     undoLastReview,
   } = useReviewWorkflow();
+
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
   const [reportNote, setReportNote] = useState('');
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
     tone: 'default' | 'success';
   }>();
-  const checkedReview = checkingSubmission ? reviewHistory[checkedReviewIndex] : undefined;
-  const displayedReviewAction = checkedReview?.action ?? recheckingPreviousAction;
-  const submission = checkedReview?.submission ?? pendingSubmissions[0];
-  const reviewPosition = checkingSubmission
-    ? checkedReviewIndex + 1
-    : recheckingSubmission
-      ? (recheckingReviewIndex ?? 0) + 1
-      : Math.min(
-          reviewHistory.length + (submission ? 1 : 0),
-          sampleReviewSubmissions.length,
-        );
 
-  const completeReview = (action: ReviewActionType) => {
-    if (!submission) return;
-    const completesReviewQueue = !recheckingSubmission && pendingSubmissions.length === 1;
+  const displayedReviewAction = recheckingPreviousAction;
+  const submission = pendingSubmissions[0];
+  const nextSubmission = pendingSubmissions[1];
+  const totalInQueue = Math.max(
+    totalSubmissions,
+    reviewHistory.length + pendingSubmissions.length,
+    1,
+  );
+  console.log(nextSubmission)
+  const reviewPosition = Math.min(
+    reviewHistory.length + (submission ? 1 : 0),
+    totalInQueue,
+  );
 
-    completeCurrentReview(action);
+  const completeReview = useCallback(
+    (
+      action: ReviewActionType,
+      details?: { declineReason?: string; declineNote?: string },
+    ) => {
+      if (!submission) return;
+      const completesReviewQueue = pendingSubmissions.length === 1;
 
-    const toastMessages: Record<ReviewActionType, string> = {
-      approved: 'Sign approved',
-      declined: 'Sign declined',
-      reported: 'Sign reported',
-    };
+      completeCurrentReview(action, details);
 
-    setToast((current) => ({
-      id: (current?.id ?? 0) + 1,
-      message: toastMessages[action],
-      tone: action === 'approved' ? 'success' : 'default',
-    }));
+      const toastMessages: Record<ReviewActionType, string> = {
+        approved: 'Sign approved',
+        declined: 'Sign declined',
+        reported: 'Sign reported',
+        skipped: 'Sign skipped (cannot identify)',
+      };
 
-    if (completesReviewQueue) {
-      router.replace('/work/submission-summary');
-    }
-  };
+      setToast((current) => ({
+        id: (current?.id ?? 0) + 1,
+        message: toastMessages[action],
+        tone: action === 'approved' ? 'success' : 'default',
+      }));
+
+      if (completesReviewQueue) {
+        router.replace('/work/submission-summary');
+      }
+    },
+    [completeCurrentReview, pendingSubmissions.length, router, submission],
+  );
 
   const closeSheet = () => setActiveSheet(undefined);
 
@@ -414,7 +315,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     const canDecline = declineReason && (declineReason !== 'Other' || declineReasonDetail.trim());
     if (!canDecline) return;
 
-    completeReview('declined');
+    completeReview('declined', { declineReason, declineNote: declineReasonDetail });
     setDeclineReason(undefined);
     setDeclineReasonDetail('');
     closeSheet();
@@ -423,7 +324,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const confirmReport = () => {
     if (!reportNote.trim()) return;
 
-    completeReview('reported');
+    completeReview('reported', { declineNote: reportNote });
     setReportNote('');
     closeSheet();
   };
@@ -436,255 +337,398 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     setToast(undefined);
   };
 
+  // ---------------------------------------------------------------------------
+  // Swipe Gestures: Right -> Approve, Left -> Reject, Up -> Skip, Down -> Report
+  // ---------------------------------------------------------------------------
+  const [pan] = useState(() => new Animated.ValueXY());
+
+  useEffect(() => {
+    pan.setValue({ x: 0, y: 0 });
+  }, [submission?.id, pan]);
+
+  const rotate = pan.x.interpolate({
+    inputRange: [-240, 0, 240],
+    outputRange: ['-12deg', '0deg', '12deg'],
+    extrapolate: 'clamp',
+  });
+
+  const approveBadgeOpacity = pan.x.interpolate({
+    inputRange: [25, 90],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const declineBadgeOpacity = pan.x.interpolate({
+    inputRange: [-90, -25],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const skipBadgeOpacity = pan.y.interpolate({
+    inputRange: [-90, -25],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const reportBadgeOpacity = pan.y.interpolate({
+    inputRange: [25, 90],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return Math.abs(gestureState.dx) > 8 || Math.abs(gestureState.dy) > 8;
+        },
+        onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
+          useNativeDriver: false,
+        }),
+        onPanResponderRelease: (_, gestureState) => {
+          const { dx, dy, vx, vy } = gestureState;
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          const SWIPE_THRESHOLD = 85;
+
+          if (absDx > absDy) {
+            // Horizontal swipe: Right -> Approve, Left -> Reject
+            if (dx > SWIPE_THRESHOLD || (dx > 35 && vx > 0.4)) {
+              Animated.timing(pan, {
+                toValue: { x: 500, y: dy },
+                duration: 200,
+                useNativeDriver: false,
+              }).start(() => {
+                pan.setValue({ x: 0, y: 0 });
+                completeReview('approved');
+              });
+              return;
+            } else if (dx < -SWIPE_THRESHOLD || (dx < -35 && vx < -0.4)) {
+              Animated.timing(pan, {
+                toValue: { x: -500, y: dy },
+                duration: 200,
+                useNativeDriver: false,
+              }).start(() => {
+                pan.setValue({ x: 0, y: 0 });
+                setActiveSheet('decline');
+              });
+              return;
+            }
+          } else {
+            // Vertical swipe: Up -> Skip, Down -> Report
+            if (dy < -SWIPE_THRESHOLD || (dy < -35 && vy < -0.4)) {
+              Animated.timing(pan, {
+                toValue: { x: dx, y: -500 },
+                duration: 200,
+                useNativeDriver: false,
+              }).start(() => {
+                pan.setValue({ x: 0, y: 0 });
+                completeReview('skipped');
+              });
+              return;
+            } else if (dy > SWIPE_THRESHOLD || (dy > 35 && vy > 0.4)) {
+              Animated.timing(pan, {
+                toValue: { x: dx, y: 500 },
+                duration: 200,
+                useNativeDriver: false,
+              }).start(() => {
+                pan.setValue({ x: 0, y: 0 });
+                setActiveSheet('report');
+              });
+              return;
+            }
+          }
+
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            friction: 6,
+            tension: 50,
+            useNativeDriver: false,
+          }).start();
+        },
+      }),
+    [completeReview, pan],
+  );
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View
-          style={[
-            styles.header,
-            { backgroundColor: theme.backgroundElement, borderBottomColor: theme.border },
-          ]}
-        >
-          <AppButton
-            accessibilityLabel="Back to reviewer work"
-            hitSlop={Spacing.one}
-            onPress={() => router.back()}
-            pressedOpacity={0.7}
-            style={styles.backButton}
-            variant="ghost"
-          >
-            <SymbolView
-              fallback={<Text style={[styles.backFallback, { color: theme.text }]}>{'‹'}</Text>}
-              name={{ android: 'arrow_back', ios: 'chevron.left', web: 'arrow_back' }}
-              size={22}
-              tintColor={theme.text}
-            />
-          </AppButton>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Submission Review</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                backgroundColor: Colors.primary,
-                width: `${(reviewPosition / sampleReviewSubmissions.length) * 100}%`,
-              },
-            ]}
-          />
-        </View>
-        <View style={[styles.counterBar, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.counter, { color: theme.textSecondary }]}>
-            {checkingSubmission ? 'CHECKING' : submission ? 'REVIEWING' : 'REVIEWED'}{' '}
-            {reviewPosition} OF{' '}
-            {sampleReviewSubmissions.length}
-          </Text>
+      <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+        {/* Reviewer Progress Bar & Navigation Controls */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressTopRow}>
+            <Pressable
+              accessibilityLabel="Go back"
+              hitSlop={Spacing.one}
+              onPress={() => router.back()}
+              style={styles.backButton}
+            >
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
+            </Pressable>
+
+            <View style={styles.progressTrackWrapper}>
+              <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: `${Math.min(100, (reviewPosition / totalInQueue) * 100)}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+
+            <View style={styles.topBarSpacer} />
+          </View>
+          <View style={styles.progressCounterRow}>
+            <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
+              {submission ? 'REVIEWING' : 'REVIEWED'}{' '}
+              {reviewPosition} OF {totalInQueue}
+            </Text>
+          </View>
         </View>
 
         {state === 'loading' ? (
           <SubmissionReviewSkeleton />
         ) : submission ? (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={[styles.imageCard, { backgroundColor: theme.backgroundElement }]}>
-              <Image
-                accessibilityLabel={submission.title}
-                contentFit="cover"
-                source={submission.image}
-                style={styles.signImage}
-              />
-              <AppButton
-                accessibilityLabel="Enlarge sign image"
-                style={[styles.zoomButton, { backgroundColor: theme.backgroundElement }]}
-                variant="surface"
-              >
-                <SymbolView
-                  fallback={<Text style={[styles.zoomFallback, { color: theme.text }]}>+</Text>}
-                  name={{ android: 'zoom_in', ios: 'magnifyingglass', web: 'zoom_in' }}
-                  size={18}
-                  tintColor={theme.text}
-                />
-              </AppButton>
-            </View>
-
-            <View
-              style={[
-                styles.detailsCard,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-            >
-              <View style={styles.signTitleRow}>
-                <Text style={[styles.signTitle, { color: theme.text }]}>{submission.title}</Text>
-                {displayedReviewAction ? (
-                  <View
-                    style={[
-                      styles.signStatusBadge,
-                      {
-                        backgroundColor:
-                          displayedReviewAction === 'approved'
-                            ? '#E8F7ED'
-                            : displayedReviewAction === 'declined'
-                              ? '#FEECEC'
-                              : '#FFF1E8',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.signStatusBadgeLabel,
-                        {
-                          color:
-                            displayedReviewAction === 'approved'
-                              ? '#16803A'
-                              : displayedReviewAction === 'declined'
-                                ? Colors.danger
-                                : '#C2410C',
-                        },
-                      ]}
-                    >
-                      {displayedReviewAction === 'approved'
-                        ? 'Approved'
-                        : displayedReviewAction === 'declined'
-                          ? 'Declined'
-                          : 'Reported'}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <View style={styles.metaGrid}>
-                <MetaItem fixedLines={3} icon="⌖" label="LOCATION" value={submission.location} />
-                <MetaItem icon="♙" label="SURVEYOR ID" value={submission.surveyorId} />
-                <MetaItem icon="◷" label="CAPTURED" value={submission.captured} />
-              </View>
-            </View>
-
-            {checkedReview ? (
-              <View style={styles.checkedReviewActions}>
+          <View style={styles.mainContainer}>
+            {/* Card & Image with White Info Box */}
+            <View style={styles.cardArea}>
+              {/* Upcoming card peeking subtly on the right (like Tinder) */}
+              {nextSubmission ? (
                 <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                   style={[
-                    styles.reviewedStatus,
+                    styles.peekCard,
                     {
-                      backgroundColor:
-                        checkedReview.action === 'approved'
-                          ? '#E8F7ED'
-                          : checkedReview.action === 'declined'
-                            ? '#FEECEC'
-                            : '#FFF1E8',
-                      borderColor:
-                        checkedReview.action === 'approved'
-                          ? '#16803A'
-                          : checkedReview.action === 'declined'
-                            ? Colors.danger
-                            : '#C2410C',
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
                     },
                   ]}
                 >
-                  <Text
+                  <Image
+                    contentFit="cover"
+                    source={nextSubmission.image}
+                    style={styles.cardImage}
+                    transition={180}
+                  />
+                  <View style={styles.peekDimOverlay} />
+                </View>
+              ) : null}
+
+              {/* Active Main Card with 4-Way Swipe Gesture */}
+              <Animated.View
+                {...panResponder.panHandlers}
+                style={[
+                  styles.mainCard,
+                  Boolean(nextSubmission) && styles.mainCardOffset,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                    transform: [
+                      { translateX: pan.x },
+                      { translateY: pan.y },
+                      { rotate },
+                    ],
+                  },
+                ]}
+              >
+                <Pressable
+                  accessibilityLabel="Sign submission image. Tap to enlarge."
+                  onPress={() => setIsImageZoomed(true)}
+                  style={styles.cardInnerPressable}
+                >
+                  <Image
+                    accessibilityLabel={submission.title}
+                    contentFit="cover"
+                    source={submission.image}
+                    style={styles.cardImage}
+                    transition={180}
+                  />
+
+                  {/* Directional Swipe Badges */}
+                  <Animated.View
                     style={[
-                      styles.reviewedStatusSymbol,
-                      {
-                        color:
-                          checkedReview.action === 'approved'
-                            ? '#16803A'
-                            : checkedReview.action === 'declined'
-                              ? Colors.danger
-                              : '#C2410C',
-                      },
+                      styles.swipeBadge,
+                      styles.approveBadge,
+                      { opacity: approveBadgeOpacity },
                     ]}
                   >
-                    {checkedReview.action === 'approved'
-                      ? '✓'
-                      : checkedReview.action === 'declined'
-                        ? '×'
-                        : '!'}
-                  </Text>
-                  <View style={styles.reviewedStatusCopy}>
-                    <Text style={[styles.reviewedStatusLabel, { color: theme.text }]}> 
-                      {checkedReview.action === 'approved'
-                        ? 'Approved'
-                        : checkedReview.action === 'declined'
-                          ? 'Declined'
-                          : 'Reported'}
-                    </Text>
-                    <Text style={[styles.reviewedStatusDescription, { color: theme.textSecondary }]}> 
-                      This was your submitted review for this sign.
-                    </Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>APPROVE</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.swipeBadge,
+                      styles.declineBadge,
+                      { opacity: declineBadgeOpacity },
+                    ]}
+                  >
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>DECLINE</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.swipeBadge,
+                      styles.skipBadge,
+                      { opacity: skipBadgeOpacity },
+                    ]}
+                  >
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>SKIP</Text>
+                  </Animated.View>
+
+                  <Animated.View
+                    style={[
+                      styles.swipeBadge,
+                      styles.reportBadge,
+                      { opacity: reportBadgeOpacity },
+                    ]}
+                  >
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>REPORT</Text>
+                  </Animated.View>
+
+                  {displayedReviewAction ? (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            displayedReviewAction === 'approved'
+                              ? 'rgba(22, 128, 58, 0.9)'
+                              : displayedReviewAction === 'declined'
+                                ? 'rgba(239, 68, 68, 0.9)'
+                                : displayedReviewAction === 'reported'
+                                  ? 'rgba(249, 115, 22, 0.9)'
+                                  : 'rgba(100, 116, 139, 0.9)',
+                        },
+                      ]}
+                    >
+                      <Text style={styles.statusBadgeLabel}>
+                        {displayedReviewAction.toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Subtle zoom button */}
+                  <View style={styles.zoomButton}>
+                    <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
                   </View>
-                </View>
-                <AppButton label="Review again" onPress={reviewCheckedSubmissionAgain} />
-                <View style={styles.checkNavigation}>
-                  <AppButton
-                    disabled={checkedReviewIndex === 0}
-                    label="←  Previous"
-                    onPress={goToPreviousCheckedReview}
-                    style={[styles.checkNavigationButton, { borderColor: theme.border }]}
-                    variant="surface"
-                  />
-                  <AppButton
-                    label={checkedReviewIndex >= reviewHistory.length - 1 ? 'Finish' : 'Next  →'}
-                    onPress={() => {
-                      if (checkedReviewIndex >= reviewHistory.length - 1) {
-                        finishSubmissionCheck();
-                        router.replace('/work/submission-summary');
-                        return;
-                      }
+                </Pressable>
+              </Animated.View>
+            </View>
 
-                      goToNextCheckedReview();
-                    }}
-                    style={[styles.checkNavigationButton, { borderColor: theme.border }]}
-                    variant="surface"
-                  />
-                </View>
+            {/* Sign name textbox out of image container, between image and buttons */}
+            <View
+              style={[
+                styles.signInfoBox,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Text numberOfLines={2} style={[styles.infoBoxTitle, { color: theme.text }]}>
+                {submission.title}
+              </Text>
+              <Text numberOfLines={1} style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}>
+                {submission.captured}
+                {submission.location && submission.location !== 'Estimated GPS coordinates available'
+                  ? ` • ${submission.location}`
+                  : ''}
+              </Text>
+            </View>
+
+            {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
+            <View style={styles.actionsFooter}>
+              <View style={styles.diamondContainer}>
+                {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
+                <Pressable
+                  accessibilityLabel="Skip submission (cannot identify)"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('skipped')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondTop,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                </Pressable>
+
+                {/* Left Button: Decline (X) */}
+                <Pressable
+                  accessibilityLabel="Decline submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('decline')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondLeft,
+                    styles.declineButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                </Pressable>
+
+                {/* Right Button: Approve (Heart) */}
+                <Pressable
+                  accessibilityLabel="Approve submission"
+                  accessibilityRole="button"
+                  onPress={() => completeReview('approved')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondRight,
+                    styles.approveButton,
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                </Pressable>
+
+                {/* Bottom Button: Report */}
+                <Pressable
+                  accessibilityLabel="Report submission"
+                  accessibilityRole="button"
+                  onPress={() => setActiveSheet('report')}
+                  style={({ pressed }) => [
+                    styles.diamondButton,
+                    styles.diamondBottom,
+                    styles.neutralDiamondButton,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    pressed && styles.circleButtonPressed,
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                </Pressable>
               </View>
-            ) : (
-              <>
-                <View style={styles.primaryActions}>
-                  <ReviewAction
-                    color={theme.primary}
-                    label="Approve"
-                    onPress={() => completeReview('approved')}
-                    symbol="✓"
-                    variant="filled"
-                  />
-                </View>
 
-                <View style={styles.secondaryActions}>
-                  <ReviewAction
-                    color={Colors.danger}
-                    label="Decline"
-                    onPress={() => setActiveSheet('decline')}
-                    style={styles.secondaryButton}
-                    symbol="×"
-                  />
-                  <AppButton
-                    label="⚑  Report"
-                    onPress={() => setActiveSheet('report')}
-                    style={[styles.secondaryButton, { borderColor: theme.border }]}
-                    textStyle={styles.secondaryButtonLabel}
-                    variant="surface"
-                  />
-                </View>
-
-                {reviewHistory.length > 0 && !recheckingSubmission ? (
-                  <AppButton
-                    label="↶  Undo Last Action"
-                    onPress={undoLastAction}
-                    style={[styles.undoButton, { borderColor: theme.border }]}
-                    textStyle={styles.undoLabel}
-                    variant="surface"
-                  />
-                ) : !recheckingSubmission ? (
-                  <Text style={[styles.swipeHint, { color: theme.placeholder }]}> 
-                    SWIPE RIGHT TO APPROVE  •  SWIPE LEFT TO DECLINE
+              {/* Undo Action (Subtle under the buttons) */}
+              {reviewHistory.length > 0 && !recheckingSubmission ? (
+                <Pressable
+                  accessibilityLabel="Undo last review action"
+                  onPress={undoLastAction}
+                  style={styles.undoRow}
+                >
+                  <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
+                  <Text style={[styles.undoText, { color: theme.placeholder }]}>
+                    Undo last action
                   </Text>
-                ) : null}
-              </>
-            )}
-          </ScrollView>
+                </Pressable>
+              ) : (
+                <View style={styles.undoSpacer} />
+              )}
+            </View>
+          </View>
         ) : (
           <View style={styles.completeState}>
-            <View style={[styles.completeIcon, { backgroundColor: theme.backgroundSelected }]}>
-              <Text style={[styles.completeIconLabel, { color: theme.primary }]}>✓</Text>
+            <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
+              <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
             <Text style={[styles.completeTitle, { color: theme.text }]}>All reviews completed</Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
@@ -692,17 +736,52 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             </Text>
             {reviewHistory.length > 0 ? (
               <AppButton
-                label="↶  Undo Last Action"
-                onPress={undoLastAction}
-                style={[styles.completeUndoButton, { borderColor: theme.border }]}
-                textStyle={styles.undoLabel}
-                variant="surface"
+                label="View Summary"
+                onPress={() => router.replace('/work/submission-summary')}
+                style={styles.completeSummaryButton}
               />
             ) : null}
           </View>
         )}
       </SafeAreaView>
-      <ReviewBottomTabs activeTab="review" />
+
+      {/* Image Zoom Modal */}
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsImageZoomed(false)}
+        statusBarTranslucent
+        transparent
+        visible={isImageZoomed}
+      >
+        <Pressable
+          accessibilityLabel="Close enlarged view"
+          onPress={() => setIsImageZoomed(false)}
+          style={styles.zoomBackdrop}
+        >
+          <SafeAreaView edges={['top', 'bottom']} style={styles.zoomSafeArea}>
+            <Pressable
+              accessibilityLabel="Close enlarged view"
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+              onPress={() => setIsImageZoomed(false)}
+              style={[
+                styles.zoomCloseBtn,
+                { top: Math.max(insets.top, 16) + 12 },
+              ]}
+            >
+              <MaterialCommunityIcons color="#FFFFFF" name="close" size={26} />
+            </Pressable>
+            {submission ? (
+              <Image
+                contentFit="contain"
+                source={submission.image}
+                style={styles.zoomedImage}
+              />
+            ) : null}
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
+
+      {/* Toast */}
       {toast ? (
         <AppToast
           duration={1300}
@@ -713,6 +792,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           tone={toast.tone}
         />
       ) : null}
+
+      {/* Decline / Report Bottom Sheet */}
       <ReviewBottomSheet
         declineReason={declineReason}
         declineReasonDetail={declineReasonDetail}
@@ -732,168 +813,328 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  safeArea: { flex: 1 },
-  header: {
-    minHeight: 54,
+  screen: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  progressSection: {
+    paddingHorizontal: Spacing.two,
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  progressTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.half,
+    gap: Spacing.one,
   },
   backButton: {
-    width: 48,
-    height: 48,
-    minHeight: 48,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  backFallback: {
-    fontFamily: Fonts.body,
-    fontSize: 30,
-    fontWeight: 500,
-    lineHeight: 32,
-  },
-  headerTitle: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 18,
-    fontWeight: 800,
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  headerSpacer: { width: 48 },
-  progressTrack: { height: 3, width: '100%' },
-  progressFill: { height: '100%' },
-  counterBar: {
-    minHeight: 29,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.primary,
+    borderRadius: 18,
   },
-  counter: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: 1.2,
+  topBarSpacer: {
+    width: 36,
+    height: 36,
   },
-  content: {
+  progressTrackWrapper: {
+    flex: 1,
+  },
+  progressTrack: {
+    height: 4,
     width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    gap: Spacing.two,
-    padding: Spacing.two,
-    paddingBottom: Spacing.four,
-  },
-  imageCard: {
-    position: 'relative',
-    height: 286,
-    minHeight: 286,
-    maxHeight: 286,
-    flexShrink: 0,
+    borderRadius: 2,
     overflow: 'hidden',
-    borderRadius: Rounded.lg,
   },
-  signImage: { width: '100%', height: '100%' },
-  zoomButton: {
-    position: 'absolute',
-    right: Spacing.one,
-    bottom: Spacing.one,
-    width: 38,
-    height: 38,
-    minHeight: 38,
-    borderRadius: 19,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.14,
-    shadowRadius: 3,
-    elevation: 3,
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
   },
-  zoomFallback: { fontSize: 20, fontWeight: 700 },
-  detailsCard: {
-    gap: Spacing.three,
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    padding: Spacing.three,
-  },
-  signTitle: {
-    minWidth: 0,
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 18,
-    fontWeight: 800,
-    lineHeight: 24,
-  },
-  signTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-  signStatusBadge: { borderRadius: 11, paddingHorizontal: Spacing.one, paddingVertical: 3 },
-  signStatusBadgeLabel: { fontFamily: Fonts.body, fontSize: 10, fontWeight: 800, lineHeight: 14 },
-  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.three },
-  metaItem: { width: '50%', gap: 3, paddingRight: Spacing.one },
-  metaLabel: { fontFamily: Fonts.body, fontSize: 9, fontWeight: 800, letterSpacing: 0.65 },
-  metaValueRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
-  metaIcon: { width: 12, fontSize: 12, lineHeight: 17 },
-  metaValue: { flex: 1, fontFamily: Fonts.body, fontSize: 12, fontWeight: 600, lineHeight: 17 },
-  checkedReviewActions: { gap: Spacing.one },
-  reviewedStatus: {
-    minHeight: 62,
-    flexDirection: 'row',
+  progressCounterRow: {
     alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+    marginTop: 2,
   },
-  reviewedStatusSymbol: {
-    width: 28,
-    fontFamily: Fonts.body,
-    fontSize: 24,
-    fontWeight: 900,
-    textAlign: 'center',
-  },
-  reviewedStatusCopy: { minWidth: 0, flex: 1 },
-  reviewedStatusLabel: { fontFamily: Fonts.body, fontSize: 14, fontWeight: 800, lineHeight: 19 },
-  reviewedStatusDescription: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 500,
-    lineHeight: 16,
-  },
-  checkNavigation: { flexDirection: 'row', gap: Spacing.one },
-  checkNavigationButton: { flex: 1, minHeight: 46, borderWidth: 1 },
-  primaryActions: { gap: Spacing.one },
-  decisionButton: {
-    minHeight: 48,
-    flexDirection: 'row',
-    gap: Spacing.one,
-    borderWidth: 1.5,
-    borderRadius: Rounded.md,
-    paddingVertical: Spacing.one,
-  },
-  decisionSymbol: { fontFamily: Fonts.body, fontSize: 19, fontWeight: 800, lineHeight: 21 },
-  decisionLabel: { fontFamily: Fonts.body, fontSize: 14, fontWeight: 800 },
-  secondaryActions: { flexDirection: 'row', gap: Spacing.one },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 52,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.half,
-    paddingVertical: Spacing.one,
-  },
-  secondaryButtonLabel: { fontSize: 11, fontWeight: 600 },
-  swipeHint: {
-    paddingVertical: Spacing.three,
-    textAlign: 'center',
+  progressCounterText: {
     fontFamily: Fonts.body,
     fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: 0.65,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
-  undoButton: { minHeight: 47, borderWidth: 1, marginTop: 2 },
-  undoLabel: { fontSize: 13, fontWeight: 700 },
+  mainContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.one,
+  },
+  cardArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: Spacing.one,
+    position: 'relative',
+  },
+  mainCard: {
+    width: '88%',
+    maxWidth: 324,
+    height: '100%',
+    maxHeight: 380,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  mainCardOffset: {
+    transform: [{ translateX: -12 }],
+  },
+  peekCard: {
+    position: 'absolute',
+    width: '88%',
+    maxWidth: 324,
+    height: '100%',
+    maxHeight: 380,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    zIndex: 1,
+    transform: [{ translateX: 22 }, { scale: 0.94 }],
+    opacity: 0.82,
+    shadowColor: '#000000',
+    shadowOffset: { width: 4, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  peekDimOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardInnerPressable: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  swipeBadge: {
+    position: 'absolute',
+    borderWidth: 2.5,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    zIndex: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  swipeBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  approveBadge: {
+    top: 24,
+    left: 20,
+    borderColor: '#16A34A',
+    backgroundColor: 'rgba(22, 163, 74, 0.9)',
+    transform: [{ rotate: '-14deg' }],
+  },
+  declineBadge: {
+    top: 24,
+    right: 20,
+    borderColor: '#EF4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    transform: [{ rotate: '14deg' }],
+  },
+  skipBadge: {
+    bottom: 24,
+    alignSelf: 'center',
+    borderColor: '#2563EB',
+    backgroundColor: 'rgba(37, 99, 235, 0.9)',
+  },
+  reportBadge: {
+    top: 24,
+    alignSelf: 'center',
+    borderColor: '#F97316',
+    backgroundColor: 'rgba(249, 115, 22, 0.9)',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  statusBadgeLabel: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  signInfoBox: {
+    width: '88%',
+    maxWidth: 324,
+    alignSelf: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  infoBoxTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 17,
+    fontWeight: '800',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  infoBoxSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  zoomButton: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionsFooter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  diamondContainer: {
+    width: 168,
+    height: 168,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+  },
+  diamondButton: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diamondTop: {
+    top: 0,
+    left: 57,
+  },
+  diamondBottom: {
+    bottom: 0,
+    left: 57,
+  },
+  diamondLeft: {
+    left: 0,
+    top: 57,
+  },
+  diamondRight: {
+    right: 0,
+    top: 57,
+  },
+  circleButtonPressed: {
+    transform: [{ scale: 0.92 }],
+    opacity: 0.88,
+  },
+  neutralDiamondButton: {
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  declineButton: {
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  approveButton: {
+    backgroundColor: Colors.primary,
+    shadowColor: '#FF4767',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    elevation: 7,
+  },
+  undoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  undoText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  undoSpacer: {
+    height: 30,
+  },
+  checkedReviewFooter: {
+    gap: 10,
+    paddingVertical: Spacing.one,
+  },
+  reviewedStatusBanner: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.two,
+  },
+  reviewedStatusLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  checkNavRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  checkNavBtn: {
+    flex: 1,
+    minHeight: 44,
+  },
   completeState: {
     flex: 1,
     alignItems: 'center',
@@ -909,33 +1150,36 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     marginBottom: Spacing.one,
   },
-  completeIconLabel: { fontFamily: Fonts.body, fontSize: 30, fontWeight: 800 },
-  completeTitle: { fontFamily: Fonts.body, fontSize: 20, fontWeight: 800, lineHeight: 26 },
+  completeTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
   completeCopy: {
     maxWidth: 320,
     fontFamily: Fonts.body,
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: '500',
     lineHeight: 20,
     textAlign: 'center',
   },
-  completeUndoButton: {
-    width: '100%',
-    maxWidth: 360,
-    minHeight: 48,
-    borderWidth: 1,
-    marginTop: Spacing.three,
+  completeSummaryButton: {
+    minWidth: 200,
+    marginTop: Spacing.two,
   },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(15, 23, 42, 0.48)',
   },
-  sheetPositioner: { flex: 1, justifyContent: 'flex-end' },
+  sheetPositioner: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   sheet: {
     width: '100%',
     maxWidth: 560,
@@ -965,7 +1209,12 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.three,
     paddingRight: Spacing.half,
   },
-  sheetTitle: { flex: 1, fontFamily: Fonts.body, fontSize: 16, fontWeight: 800 },
+  sheetTitle: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    fontWeight: '800',
+  },
   sheetCloseButton: {
     width: 44,
     height: 44,
@@ -973,11 +1222,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  sheetCloseLabel: { fontFamily: Fonts.body, fontSize: 24, fontWeight: 400 },
-  sheetBody: { gap: Spacing.three, padding: Spacing.three },
-  sheetBodyScroll: { flexShrink: 1 },
-  sheetHelper: { fontFamily: Fonts.body, fontSize: 13, fontWeight: 500, lineHeight: 18 },
-  reasonList: { gap: 6 },
+  sheetBody: {
+    gap: Spacing.three,
+    padding: Spacing.three,
+  },
+  sheetBodyScroll: {
+    flexShrink: 1,
+  },
+  sheetHelper: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  reasonList: {
+    gap: 6,
+  },
   reasonOption: {
     minHeight: 44,
     flexDirection: 'row',
@@ -987,7 +1247,12 @@ const styles = StyleSheet.create({
     borderRadius: Rounded.md,
     paddingHorizontal: Spacing.two,
   },
-  reasonLabel: { flex: 1, fontFamily: Fonts.body, fontSize: 13, fontWeight: 700 },
+  reasonLabel: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   radio: {
     width: 18,
     height: 18,
@@ -996,13 +1261,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 9,
   },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  reasonInputGroup: { gap: Spacing.half },
-  inputLabel: { fontFamily: Fonts.body, fontSize: 12, fontWeight: 700 },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  reasonInputGroup: {
+    gap: Spacing.half,
+  },
+  inputLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   reasonInput: {
-    height: 92,
-    minHeight: 92,
-    maxHeight: 92,
+    height: 88,
+    minHeight: 88,
+    maxHeight: 88,
     borderWidth: 1,
     borderRadius: Rounded.md,
     paddingHorizontal: Spacing.two,
@@ -1011,7 +1286,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  reportHelper: { fontFamily: Fonts.body, fontSize: 11, fontWeight: 500, lineHeight: 16 },
+  reportHelper: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
   sheetFooter: {
     flexDirection: 'row',
     gap: Spacing.one,
@@ -1019,40 +1299,75 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingTop: Spacing.two,
   },
-  sheetFooterButton: { flex: 1, minHeight: 46, borderWidth: 1 },
-  skeletonContent: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    gap: Spacing.two,
-    padding: Spacing.two,
+  sheetFooterButton: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
   },
-  skeletonBlock: { backgroundColor: '#E2E5E8', borderRadius: Rounded.sm },
-  skeletonImage: { height: 300, width: '100%', borderRadius: Rounded.lg },
+  skeletonContainer: {
+    flex: 1,
+    padding: Spacing.three,
+    justifyContent: 'space-between',
+  },
+  skeletonBlock: {
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+  },
   skeletonCard: {
-    height: 132,
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderColor: '#D8DEE5',
-    borderRadius: Rounded.lg,
-    padding: Spacing.three,
+    width: '88%',
+    maxWidth: 324,
+    height: 300,
+    borderRadius: 24,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
   },
-  skeletonTitleRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  skeletonTitle: { width: '42%', height: 20 },
-  skeletonPill: { width: 58, height: 20, borderRadius: 10 },
-  skeletonLineLong: { width: '90%', height: 13 },
-  skeletonLineMedium: { width: '67%', height: 13 },
-  skeletonLineShort: { width: '48%', height: 13 },
-  skeletonActions: {
-    gap: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#D8DEE5',
-    borderRadius: Rounded.lg,
-    padding: Spacing.three,
+  skeletonInfoBox: {
+    height: 48,
+    width: '88%',
+    maxWidth: 324,
+    borderRadius: 18,
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'center',
+    marginVertical: 6,
   },
-  skeletonActionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  skeletonThumb: { width: 24, height: 24 },
-  skeletonLargeThumb: { width: 72, height: 72, borderRadius: Rounded.md },
-  skeletonActionCopy: { flex: 1, gap: Spacing.one },
-  skeletonDivider: { width: '100%', height: 1, borderRadius: 0 },
+  skeletonDiamond: {
+    width: 168,
+    height: 168,
+    position: 'relative',
+    alignSelf: 'center',
+    marginVertical: Spacing.two,
+  },
+  skeletonCircleButton: {
+    position: 'absolute',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#E2E8F0',
+  },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+  },
+  zoomSafeArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomCloseBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 999,
+    elevation: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomedImage: {
+    width: '100%',
+    height: '85%',
+  },
 });

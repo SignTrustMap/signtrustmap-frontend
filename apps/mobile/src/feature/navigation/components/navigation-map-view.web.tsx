@@ -1,35 +1,43 @@
 import { useEffect, useRef } from 'react';
-import { Image as ReactNativeImage, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
-  currentLocation,
   type MapCoordinate,
   type PreviousLocation,
-} from '@/feature/navigation/data/navigation-locations';
+} from '@/types/navigationType';
+import type { RouteSign } from '@/api/navigation/navigation';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 
+
 type NavigationMapViewProps = {
+  onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
   destination?: PreviousLocation;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
+  navigationActive?: boolean;
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
-  routeStopCoordinates?: MapCoordinate[];
+  routeSigns?: RouteSign[];
+  showCurrentLocation?: boolean;
+  isNavigatingFeature?: boolean;
+  userCoordinate?: MapCoordinate;
+  hasLiveLocation?: boolean;
 };
 
-const stopSignImage = require('@/assets/images/smaple_signs/stop_sign.webp');
-const stopSignImageUri = ReactNativeImage.resolveAssetSource(stopSignImage).uri;
+const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
+  || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 
 const openStreetMapStyle: StyleSpecification = {
   version: 8,
   sources: {
     osm: {
       type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tiles: [mapTileUrl],
       tileSize: 256,
-      attribution: 'OpenStreetMap contributors',
+      attribution: 'Esri, HERE, Garmin, USGS, OpenStreetMap contributors, GIS user community',
     },
   },
   layers: [
@@ -41,14 +49,17 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-function createStopSignMarkerElement() {
+function createSignMarkerElement(sign: RouteSign) {
   const marker = document.createElement('img');
-  marker.src = stopSignImageUri;
-  marker.alt = 'Stop sign';
+  marker.src = sign.imageUrl || '';
+  marker.alt = sign.name || sign.signCode;
   marker.style.width = '36px';
   marker.style.height = '36px';
   marker.style.objectFit = 'contain';
   marker.style.filter = 'drop-shadow(0 2px 3px rgba(9, 35, 60, 0.24))';
+  marker.onerror = () => {
+    marker.style.display = 'none';
+  };
 
   return marker;
 }
@@ -112,12 +123,13 @@ function createStartMarkerElement() {
 }
 
 export function NavigationMapView({
+  onBoundsChange,
   destination,
   focusCoordinate,
   focusRequestId = 0,
   routeCoordinates,
   routeStart,
-  routeStopCoordinates = [],
+  routeSigns = [],
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const destinationMarkerRef = useRef<Marker | null>(null);
@@ -127,6 +139,8 @@ export function NavigationMapView({
   const startMarkerRef = useRef<Marker | null>(null);
   const stopSignMarkersRef = useRef<Marker[]>([]);
 
+  const initialCenterRef = useRef(destination?.coordinate ?? focusCoordinate ?? routeStart);
+
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -134,7 +148,7 @@ export function NavigationMapView({
       attributionControl: {
         compact: true,
       },
-      center: currentLocation.coordinate,
+      center: initialCenterRef.current,
       container: mapContainerRef.current,
       doubleClickZoom: true,
       maxZoom: 19,
@@ -146,10 +160,6 @@ export function NavigationMapView({
     mapRef.current = map;
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
-
-    currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
-      .setLngLat(currentLocation.coordinate)
-      .addTo(map);
 
     return () => {
       destinationMarkerRef.current?.remove();
@@ -163,14 +173,58 @@ export function NavigationMapView({
       mapRef.current = null;
       map.remove();
     };
-  }, [theme.primary]);
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onBoundsChange) return;
+
+    const reportBounds = () => {
+      const bounds = map.getBounds();
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        minLon: bounds.getWest(),
+        maxLat: bounds.getNorth(),
+        maxLon: bounds.getEast(),
+      });
+    };
+    map.on('load', reportBounds);
+    map.on('moveend', reportBounds);
+    if (map.loaded()) reportBounds();
+    return () => {
+      map.off('load', reportBounds);
+      map.off('moveend', reportBounds);
+    };
+  }, [onBoundsChange, theme.primary]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const markers = routeSigns.map((sign) => (
+      new Marker({ element: createSignMarkerElement(sign) })
+        .setLngLat(sign.coordinate)
+        .addTo(map)
+    ));
+    stopSignMarkersRef.current = markers;
+    return () => {
+      markers.forEach((marker) => marker.remove());
+      stopSignMarkersRef.current = [];
+    };
+  }, [routeSigns, theme.primary]);
 
   useEffect(() => {
     if (!focusCoordinate || !mapRef.current) return;
 
-    currentLocationMarkerRef.current?.setLngLat(focusCoordinate);
+    if (!currentLocationMarkerRef.current) {
+      currentLocationMarkerRef.current = new Marker({ element: createDriverMarkerElement(theme.primary) })
+        .setLngLat(focusCoordinate)
+        .addTo(mapRef.current);
+    } else {
+      currentLocationMarkerRef.current.setLngLat(focusCoordinate);
+    }
     mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: 16 });
-  }, [focusCoordinate, focusRequestId]);
+  }, [focusCoordinate, focusRequestId, theme.primary]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -178,10 +232,8 @@ export function NavigationMapView({
     const map = mapRef.current;
     destinationMarkerRef.current?.remove();
     startMarkerRef.current?.remove();
-    stopSignMarkersRef.current.forEach((marker) => marker.remove());
     destinationMarkerRef.current = null;
     startMarkerRef.current = null;
-    stopSignMarkersRef.current = [];
 
     if (map.getLayer('selected-route-line')) {
       map.removeLayer('selected-route-line');
@@ -192,11 +244,13 @@ export function NavigationMapView({
     }
 
     if (!destination) {
-      map.flyTo({
-        center: currentLocation.coordinate,
-        duration: 900,
-        zoom: 15,
-      });
+      if (focusCoordinate) {
+        map.flyTo({
+          center: focusCoordinate,
+          duration: 900,
+          zoom: 15,
+        });
+      }
       return;
     }
 
@@ -241,14 +295,6 @@ export function NavigationMapView({
         .setLngLat(routeStart)
         .addTo(map);
 
-      if (routeStopCoordinates.length > 0) {
-        stopSignMarkersRef.current = routeStopCoordinates.map((coordinate) => (
-          new Marker({ element: createStopSignMarkerElement() })
-            .setLngLat(coordinate)
-            .addTo(map)
-        ));
-      }
-
       map.fitBounds([routeStart, destination.coordinate], {
         duration: 900,
         padding: { bottom: 160, left: 44, right: 44, top: 100 },
@@ -261,7 +307,7 @@ export function NavigationMapView({
       } else {
         map.once('load', renderRoute);
       }
-      return;
+      return () => { map.off('load', renderRoute); };
     }
 
     map.flyTo({
@@ -269,7 +315,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, routeCoordinates, routeStart, routeStopCoordinates, theme.primary]);
+  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary]);
 
   return (
     <View style={styles.container}>

@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
 import type { ReactNode } from 'react'
+import NotAllowedPage from './NotAllowedPage'
 
 // ─── AuthGuard: requires login ────────────────────────────────────
 export function AuthGuard({ children }: { children: ReactNode }) {
@@ -26,9 +27,9 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
-  // If logged in as staff, redirect away from Admin module
+  // If logged in as staff or non-admin, render in-place 403 screen (no toast, URL preserved)
   if (user?.role !== 'admin') {
-    return <Navigate to="/" replace />
+    return <NotAllowedPage />
   }
 
   return <>{children}</>
@@ -44,10 +45,11 @@ export function StaffGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />
   }
 
-  // If logged in as admin, redirect away from Staff operations
+  // If logged in as admin or non-staff, render in-place 403 screen (no toast, URL preserved)
   if (user?.role !== 'staff') {
-    return <Navigate to="/" replace />
+    return <NotAllowedPage />
   }
 
   return <>{children}</>
 }
+
