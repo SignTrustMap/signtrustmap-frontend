@@ -33,10 +33,7 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Direct Editable Form state
   const [editForm, setEditForm] = useState<AdminUserItem | null>(null)
-
-  // Send Password Reset Email state
   const [isSendingResetEmail, setIsSendingResetEmail] = useState(false)
   const [resetEmailSentInfo, setResetEmailSentInfo] = useState<{
     email: string
@@ -46,7 +43,9 @@ export default function UsersPage() {
   } | null>(null)
   const [hasCopiedResetLink, setHasCopiedResetLink] = useState(false)
 
-  // Open modal with user details ready for direct editing
+  /**
+   * Opens the user detail modal populated for direct in-place editing.
+   */
   function handleOpenUser(u: AdminUserItem) {
     setSelectedUser(u)
     setEditForm({ ...u })
@@ -88,6 +87,9 @@ export default function UsersPage() {
     currentPage * pageSize
   )
 
+  /**
+   * Toggles user account status between Active and Suspended.
+   */
   function handleToggleStatus(userId: string) {
     setUsers((prev) =>
       prev.map((u) => {
@@ -110,7 +112,9 @@ export default function UsersPage() {
     }
   }
 
-  // Enterprise Password Reset Email Dispatcher
+  /**
+   * Dispatches a simulated enterprise password reset email with temporary security token.
+   */
   function handleSendPasswordResetEmail() {
     if (!selectedUser) return
     setIsSendingResetEmail(true)
@@ -131,6 +135,9 @@ export default function UsersPage() {
     }, 600)
   }
 
+  /**
+   * Persists direct user profile modifications and synchronizes active demo account records.
+   */
   function handleSaveEdit(e?: React.FormEvent) {
     if (e) e.preventDefault()
     if (!editForm || !selectedUser) return
@@ -159,12 +166,11 @@ export default function UsersPage() {
       credits: Number(editForm.credits) || 0,
     }
 
-    // 1. Update list state
     setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? updatedUser : u)))
     setSelectedUser(updatedUser)
     setEditForm(updatedUser)
 
-    // 2. Synchronize with demo accounts in memory if it's one of the official demo users
+    // Synchronize with demo accounts in memory if it's one of the official demo users
     const demoAcc = mockOpsDemoAccounts.find(
       (a) => a.email.toLowerCase() === selectedUser.email.toLowerCase() || a.id === selectedUser.id
     )
@@ -178,6 +184,9 @@ export default function UsersPage() {
     toast.success(t('users.toast_saved', { name: updatedUser.name }))
   }
 
+  /**
+   * Resolves visual badge style and label for a user authorization role.
+   */
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':

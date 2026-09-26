@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import type { User, AuthState } from '@/types/auth'
+import type { User, AuthState } from '@shared/types'
 import { mockOpsDemoAccounts } from '@/data/mockAccounts'
 
 interface AuthContextValue extends AuthState {

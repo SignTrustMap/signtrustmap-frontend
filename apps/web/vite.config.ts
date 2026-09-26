@@ -13,5 +13,26 @@ export default defineConfig({
       '@shared/types': path.resolve(import.meta.dirname, '../../packages/types/src'),
     },
   },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'leaflet',
+      '@phosphor-icons/react',
+      'axios',
+      'i18next',
+      'react-i18next',
+    ],
+  },
+  server: {
+    warmup: {
+      clientFiles: [
+        './src/main.tsx',
+        './src/App.tsx',
+        './src/features/home/HomePage.tsx',
+      ],
+    },
+  },
 })
 
