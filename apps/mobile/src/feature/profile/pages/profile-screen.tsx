@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import type { ComponentProps } from 'react';
+import { type ComponentProps, useCallback, useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
@@ -44,6 +45,51 @@ function getInitials(displayName?: string) {
 export function ProfileScreen() {
   const { logOut, session, setRoleEnabled } = useSession();
   const theme = useTheme();
+  const { scrollTo, t } = useLocalSearchParams<{ scrollTo?: string; t?: string }>();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const signFilterRef = useRef<View>(null);
+  const overviewPanelYRef = useRef(0);
+  const signFilterRelativeYRef = useRef(0);
+
+  const performScrollToSignFilter = useCallback(() => {
+    if (scrollTo !== 'signFilter' && scrollTo !== 'sign-filter') return;
+    const computedY = overviewPanelYRef.current + signFilterRelativeYRef.current;
+    if (computedY > 0) {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, computedY - 16),
+        animated: true,
+      });
+      return;
+    }
+
+    if (signFilterRef.current && scrollViewRef.current) {
+      signFilterRef.current.measureLayout(
+        scrollViewRef.current as any,
+        (_x, y) => {
+          if (y > 0) {
+            scrollViewRef.current?.scrollTo({
+              y: Math.max(0, y - 16),
+              animated: true,
+            });
+          }
+        },
+        () => {}
+      );
+    }
+  }, [scrollTo]);
+
+  useEffect(() => {
+    if (scrollTo === 'signFilter' || scrollTo === 'sign-filter') {
+      performScrollToSignFilter();
+      const timer1 = setTimeout(performScrollToSignFilter, 150);
+      const timer2 = setTimeout(performScrollToSignFilter, 400);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
+    }
+  }, [scrollTo, t, performScrollToSignFilter]);
+
   const {
     checkForUpdates,
     closeModal,
@@ -59,7 +105,11 @@ export function ProfileScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.primary }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.hero, { backgroundColor: theme.primary }]}>
           <View
             pointerEvents="none"
@@ -106,7 +156,14 @@ export function ProfileScreen() {
           </SafeAreaView>
         </View>
 
-        <View style={[styles.overviewPanel, { backgroundColor: theme.backgroundElement }]}>
+        <View
+          collapsable={false}
+          onLayout={(e) => {
+            overviewPanelYRef.current = e.nativeEvent.layout.y;
+            performScrollToSignFilter();
+          }}
+          style={[styles.overviewPanel, { backgroundColor: theme.backgroundElement }]}
+        >
           <View style={styles.panelContent}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Account overview</Text>
 
@@ -203,7 +260,16 @@ export function ProfileScreen() {
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            <SignFilterManager />
+            <View
+              collapsable={false}
+              onLayout={(e) => {
+                signFilterRelativeYRef.current = e.nativeEvent.layout.y;
+                performScrollToSignFilter();
+              }}
+              ref={signFilterRef}
+            >
+              <SignFilterManager />
+            </View>
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
