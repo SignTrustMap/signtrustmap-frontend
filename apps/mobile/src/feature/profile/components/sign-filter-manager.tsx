@@ -159,227 +159,151 @@ export function SignFilterManager() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={styles.titleWithIcon}>
-          <MaterialCommunityIcons color={theme.primary} name="filter-variant" size={20} />
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Sign filter lists</Text>
-        </View>
-        <AppButton
-          accessibilityLabel="Create new filter list"
-          onPress={handleOpenCreate}
-          style={styles.headerAddButton}
-          variant="ghost"
-        >
-          <MaterialCommunityIcons color={theme.primary} name="plus" size={18} />
-          <Text style={[styles.headerAddText, { color: theme.primary }]}>New list</Text>
-        </AppButton>
-      </View>
-
-      <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-        Only signs from the selected list will appear on map and trigger audio alerts
-      </Text>
-
-      {/* When no presets exist: Clean Empty State */}
-      {presets.length === 0 ? (
-        <View
-          style={[
-            styles.emptyCard,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <View style={[styles.emptyIconCircle, { backgroundColor: theme.backgroundSelected }]}>
-            <MaterialCommunityIcons color={theme.primary} name="filter-outline" size={30} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            No filter lists created yet
-          </Text>
-          <Text style={[styles.emptyDescription, { color: theme.placeholder }]}>
-            Create your first custom list (e.g. &ldquo;Mandatory signs only&rdquo; or &ldquo;Mandatory and Prohibitory&rdquo;) to filter traffic signs during navigation.
-          </Text>
+      <View style={styles.sectionHeadingRow}>
+        <View style={styles.headingTitleRow}>
+          <Text style={[styles.subsectionTitle, { color: theme.text }]}>Sign filter lists</Text>
           <AppButton
-            accessibilityLabel="Create first filter list"
+            accessibilityLabel="Create new filter list"
             onPress={handleOpenCreate}
-            style={styles.emptyCtaButton}
+            style={styles.headerAddButton}
+            variant="ghost"
           >
-            <MaterialCommunityIcons color={theme.onPrimary} name="plus-circle-outline" size={18} />
-            <Text style={[styles.emptyCtaText, { color: theme.onPrimary }]}>
-              Create your first list
-            </Text>
+            <MaterialCommunityIcons color={theme.primary} name="plus" size={16} />
+            <Text style={[styles.headerAddText, { color: theme.primary }]}>New list</Text>
           </AppButton>
         </View>
-      ) : (
-        <View style={styles.presetList}>
-          {/* Option: Show all signs (No filter selected) */}
-          <Pressable
-            accessibilityLabel={`Show all signs, ${activePresetId === null ? 'currently active' : 'inactive'}`}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: activePresetId === null }}
-            onPress={() => void setActivePresetId(null)}
-            style={({ pressed }) => [
-              styles.presetCard,
-              {
-                backgroundColor:
-                  activePresetId === null ? theme.backgroundSelected : theme.background,
-                borderColor: activePresetId === null ? theme.primary : theme.border,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.radioRow}>
-                <View
-                  style={[
-                    styles.radioCircle,
-                    {
-                      borderColor: activePresetId === null ? theme.primary : theme.placeholder,
-                      backgroundColor:
-                        activePresetId === null ? theme.primary : 'transparent',
-                    },
-                  ]}
-                >
-                  {activePresetId === null ? <View style={styles.radioDot} /> : null}
-                </View>
-                <View>
-                  <Text style={[styles.presetName, { color: theme.text }]}>
-                    All signs (No filter)
-                  </Text>
-                  <Text style={[styles.presetMeta, { color: theme.textSecondary }]}>
-                    Displays and alerts all 5 sign categories
-                  </Text>
-                </View>
-              </View>
+        <Text style={[styles.subsectionDescription, { color: theme.textSecondary }]}>
+          Only signs from the selected list will appear on map and trigger audio alerts
+        </Text>
+      </View>
 
-              {activePresetId === null ? (
-                <View style={[styles.activePill, { backgroundColor: theme.primary }]}>
-                  <Text style={[styles.activePillText, { color: theme.onPrimary }]}>Active</Text>
-                </View>
-              ) : null}
-            </View>
-          </Pressable>
+      <View style={styles.roleList}>
+        {/* Option: Show all signs (No filter selected) */}
+        <AppButton
+          accessibilityLabel={`All signs (No filter), ${activePresetId === null ? 'selected' : 'not selected'}`}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: activePresetId === null }}
+          onPress={() => void setActivePresetId(null)}
+          style={[styles.overviewRow, styles.shadowRow]}
+          variant="ghost"
+        >
+          <View style={styles.iconTile}>
+            <MaterialCommunityIcons color={theme.primary} name="filter-outline" size={22} />
+          </View>
+          <View style={styles.rowCopy}>
+            <Text style={[styles.rowTitle, { color: theme.text }]}>All signs (No filter)</Text>
+            <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
+              Displays and alerts all 5 sign categories
+            </Text>
+          </View>
+          {activePresetId === null ? (
+            <MaterialCommunityIcons color={theme.primary} name="check" size={22} />
+          ) : null}
+        </AppButton>
 
-          {/* User-created Presets */}
-          {presets.map((preset) => {
-            const isActive = activePresetId === preset.id;
-            return (
-              <View
-                key={preset.id}
-                style={[
-                  styles.presetCard,
-                  {
-                    backgroundColor: isActive ? theme.backgroundSelected : theme.background,
-                    borderColor: isActive ? theme.primary : theme.border,
-                  },
-                ]}
+        {/* User-created Presets */}
+        {presets.map((preset) => {
+          const isActive = activePresetId === preset.id;
+          const categoryLabels = preset.categories
+            .map((catId) => categoryMap.get(catId)?.label)
+            .filter(Boolean)
+            .join(', ');
+
+          return (
+            <View
+              key={preset.id}
+              style={[
+                styles.presetCardWrapper,
+                styles.shadowRow,
+              ]}
+            >
+              <AppButton
+                accessibilityLabel={`${preset.name}, ${isActive ? 'selected' : 'not selected'}`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: isActive }}
+                onPress={() => void setActivePresetId(preset.id)}
+                style={styles.presetMainRow}
+                variant="ghost"
               >
-                <Pressable
-                  accessibilityLabel={`${preset.name}, ${isActive ? 'active' : 'tap to activate'}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: isActive }}
-                  onPress={() => void setActivePresetId(preset.id)}
-                  style={styles.cardSelectArea}
-                >
-                  <View style={styles.cardHeaderRow}>
-                    <View style={styles.radioRow}>
-                      <View
-                        style={[
-                          styles.radioCircle,
-                          {
-                            borderColor: isActive ? theme.primary : theme.placeholder,
-                            backgroundColor: isActive ? theme.primary : 'transparent',
-                          },
-                        ]}
-                      >
-                        {isActive ? <View style={styles.radioDot} /> : null}
-                      </View>
-                      <View style={styles.titleCol}>
-                        <Text numberOfLines={1} style={[styles.presetName, { color: theme.text }]}>
-                          {preset.name}
-                        </Text>
-                        <Text style={[styles.presetMeta, { color: theme.textSecondary }]}>
-                          {preset.categories.length}{' '}
-                          {preset.categories.length === 1 ? 'category' : 'categories'} selected
-                        </Text>
-                      </View>
-                    </View>
-
-                    {isActive ? (
-                      <View style={[styles.activePill, { backgroundColor: theme.primary }]}>
-                        <Text style={[styles.activePillText, { color: theme.onPrimary }]}>
-                          Active
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.tapToActivate, { color: theme.placeholder }]}>
-                        Tap to select
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Category Badges Preview */}
-                  <View style={styles.badgeRow}>
-                    {preset.categories.map((catId) => {
-                      const catInfo = categoryMap.get(catId);
-                      if (!catInfo) return null;
-                      return (
-                        <View
-                          key={catId}
-                          style={[styles.categoryBadge, { backgroundColor: catInfo.bgColor }]}
-                        >
-                          <MaterialCommunityIcons
-                            color={catInfo.color}
-                            name={catInfo.icon}
-                            size={12}
-                          />
-                          <Text style={[styles.categoryBadgeText, { color: catInfo.color }]}>
-                            {catInfo.label}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </Pressable>
-
-                {/* Card Actions: Rename, Edit, Delete */}
-                <View style={[styles.cardActionsRow, { borderTopColor: theme.border }]}>
-                  <Pressable
-                    accessibilityLabel={`Rename ${preset.name}`}
-                    onPress={() => handleOpenRename(preset)}
-                    style={styles.actionButton}
-                  >
-                    <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={15} />
-                    <Text style={[styles.actionButtonText, { color: theme.primary }]}>Rename</Text>
-                  </Pressable>
-
-                  <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
-
-                  <Pressable
-                    accessibilityLabel={`Edit categories for ${preset.name}`}
-                    onPress={() => handleOpenEdit(preset)}
-                    style={styles.actionButton}
-                  >
-                    <MaterialCommunityIcons color={theme.primary} name="tune-variant" size={15} />
-                    <Text style={[styles.actionButtonText, { color: theme.primary }]}>Categories</Text>
-                  </Pressable>
-
-                  <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
-
-                  <Pressable
-                    accessibilityLabel={`Delete ${preset.name}`}
-                    onPress={() => handleDeletePress(preset)}
-                    style={styles.actionButton}
-                  >
-                    <MaterialCommunityIcons color={theme.danger} name="trash-can-outline" size={15} />
-                    <Text style={[styles.actionButtonText, { color: theme.danger }]}>Delete</Text>
-                  </Pressable>
+                <View style={styles.iconTile}>
+                  <MaterialCommunityIcons color={theme.primary} name="playlist-check" size={22} />
                 </View>
+                <View style={styles.rowCopy}>
+                  <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>
+                    {preset.name}
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary }]}>
+                    {categoryLabels || `${preset.categories.length} categories`}
+                  </Text>
+                </View>
+                {isActive ? (
+                  <MaterialCommunityIcons color={theme.primary} name="check" size={22} />
+                ) : null}
+              </AppButton>
+
+              {/* Action Buttons: Rename, Categories, Delete */}
+              <View style={[styles.cardActionFooter, { borderTopColor: theme.border }]}>
+                <AppButton
+                  accessibilityLabel={`Rename ${preset.name}`}
+                  onPress={() => handleOpenRename(preset)}
+                  style={styles.actionBtn}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={14} />
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Rename</Text>
+                </AppButton>
+
+                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+
+                <AppButton
+                  accessibilityLabel={`Edit categories for ${preset.name}`}
+                  onPress={() => handleOpenEdit(preset)}
+                  style={styles.actionBtn}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons color={theme.primary} name="tune-variant" size={14} />
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Categories</Text>
+                </AppButton>
+
+                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+
+                <AppButton
+                  accessibilityLabel={`Delete ${preset.name}`}
+                  onPress={() => handleDeletePress(preset)}
+                  style={styles.actionBtn}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons color={theme.danger} name="trash-can-outline" size={14} />
+                  <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete</Text>
+                </AppButton>
               </View>
-            );
-          })}
-        </View>
-      )}
+            </View>
+          );
+        })}
+
+        {presets.length === 0 ? (
+          <View style={[styles.overviewRow, styles.shadowRow]}>
+            <View style={styles.iconTile}>
+              <MaterialCommunityIcons color={theme.primary} name="playlist-plus" size={22} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, { color: theme.text }]}>No custom lists yet</Text>
+              <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
+                Create custom lists to filter signs
+              </Text>
+            </View>
+            <AppButton
+              accessibilityLabel="Create first filter list"
+              onPress={handleOpenCreate}
+              style={[styles.emptyAddBtn, { backgroundColor: theme.backgroundSelected }]}
+              variant="ghost"
+            >
+              <MaterialCommunityIcons color={theme.primary} name="plus" size={16} />
+              <Text style={[styles.emptyAddBtnText, { color: theme.primary }]}>Create</Text>
+            </AppButton>
+          </View>
+        ) : null}
+      </View>
 
       {/* Modal: Create or Edit Preset */}
       <Modal
@@ -586,186 +510,119 @@ export function SignFilterManager() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingVertical: Spacing.two,
+  container: {},
+  sectionHeadingRow: {
+    paddingTop: Spacing.one,
+    paddingBottom: Spacing.one,
   },
-  headerRow: {
+  headingTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.half,
   },
-  titleWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
+  subsectionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: 900,
+    lineHeight: 21,
   },
-  sectionTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 16,
-    fontWeight: 700,
-  },
-  sectionSubtitle: {
+  subsectionDescription: {
     fontFamily: Fonts.body,
     fontSize: 12,
-    lineHeight: 17,
-    marginBottom: Spacing.two,
+    fontWeight: 500,
+    lineHeight: 18,
   },
   headerAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
+    minHeight: 32,
     paddingHorizontal: Spacing.one,
     paddingVertical: Spacing.half,
-    minHeight: 32,
   },
   headerAddText: {
     fontFamily: Fonts.body,
     fontSize: 13,
     fontWeight: 700,
   },
-  emptyCard: {
-    borderWidth: 1,
+  roleList: {
+    paddingTop: Spacing.half,
+  },
+  overviewRow: {
+    minHeight: 62,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: Spacing.three,
     borderRadius: Rounded.md,
-    padding: Spacing.three,
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  emptyIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
-  },
-  emptyTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 700,
-    marginBottom: Spacing.half,
-  },
-  emptyDescription: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.half,
     marginBottom: Spacing.two,
   },
-  emptyCtaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-  },
-  emptyCtaText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 700,
-  },
-  presetList: {
-    gap: Spacing.two,
-  },
-  presetCard: {
-    borderWidth: 1.5,
+  shadowRow: {
+    boxShadow: '1px 2px 3px 2px rgba(0, 0, 0, 0.1)',
+    padding: Spacing.half,
     borderRadius: Rounded.md,
-    overflow: 'hidden',
   },
-  cardSelectArea: {
-    padding: Spacing.two,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  radioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    flex: 1,
-    minWidth: 0,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+  iconTile: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: Rounded.lg,
   },
-  radioDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-  },
-  titleCol: {
+  rowCopy: {
     flex: 1,
     minWidth: 0,
   },
-  presetName: {
+  rowTitle: {
     fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: 700,
+    fontSize: 16,
+    fontWeight: 500,
+    lineHeight: 21,
   },
-  presetMeta: {
+  rowDescription: {
     fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 12,
+    fontWeight: 500,
+    lineHeight: 18,
   },
-  activePill: {
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
+  presetCardWrapper: {
+    width: '100%',
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.two,
   },
-  activePillText: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: 900,
-    textTransform: 'uppercase',
-  },
-  tapToActivate: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.half,
-    marginTop: Spacing.one,
-    paddingLeft: 28,
-  },
-  categoryBadge: {
+  presetMainRow: {
+    minHeight: 56,
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 3,
-    borderRadius: Rounded.round,
+    justifyContent: 'flex-start',
+    gap: Spacing.three,
+    borderRadius: Rounded.md,
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.half,
   },
-  categoryBadgeText: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 700,
-  },
-  cardActionsRow: {
+  cardActionFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: Spacing.half,
+    marginTop: Spacing.half,
+    paddingTop: Spacing.half,
   },
-  actionButton: {
+  actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 6,
+    minHeight: 32,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.half,
   },
-  actionButtonText: {
+  actionBtnText: {
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 600,
@@ -773,6 +630,20 @@ const styles = StyleSheet.create({
   actionDivider: {
     width: StyleSheet.hairlineWidth,
     height: 14,
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 32,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+    borderRadius: Rounded.round,
+  },
+  emptyAddBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 700,
   },
   modalOverlay: {
     flex: 1,
