@@ -3,6 +3,7 @@ import type { ComponentProps } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -199,6 +200,10 @@ export function ProfileScreen() {
                 );
               })}
             </View>
+
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            <SignFilterManager />
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
