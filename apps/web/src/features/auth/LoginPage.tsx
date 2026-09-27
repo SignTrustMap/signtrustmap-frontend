@@ -8,6 +8,10 @@ import { useAuth } from '@/context/AuthContext'
 import { env } from '@/config/env'
 import { mockDemoAccounts, type DemoUserAccount } from '@/data'
 
+/**
+ * Authentication and Login view for the Community Portal.
+ * Supports credential login, Google OAuth, and session persistence ("Remember Me").
+ */
 export default function Login() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
@@ -16,7 +20,6 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Sanitize redirect target: if coming from /login or /signup, always fallback to home '/'
   const rawFrom = (location.state as { from?: string })?.from || '/'
   const authPaths = ['/login', '/signup', '/register']
   const from = authPaths.includes(rawFrom) ? '/' : rawFrom
@@ -53,8 +56,8 @@ export default function Login() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const leftAccounts = mockDemoAccounts.slice(0, 3) // Driver, Surveyor, Reviewer
-  const rightAccounts = mockDemoAccounts.slice(3) // Staff, Admin
+  const leftAccounts = mockDemoAccounts.slice(0, 3)
+  const rightAccounts = mockDemoAccounts.slice(3)
 
   function handleSecretFill(acc: DemoUserAccount) {
     setEmail(acc.email)
@@ -66,7 +69,6 @@ export default function Login() {
   async function performLogin(targetEmail: string, targetPw: string) {
     setIsLoading(true)
     try {
-      // Ensure smooth, perceptible loading animation (at least 450ms)
       await Promise.all([
         login(targetEmail, targetPw, rememberMe),
         new Promise((resolve) => setTimeout(resolve, 450)),
@@ -92,8 +94,7 @@ export default function Login() {
   }
 
   function handleGoogleLogin() {
-    const backendUrl = env.apiBaseUrl || 'https://api.signmap.site'
-    window.location.href = `${backendUrl}/api/v1/auth/google`
+    window.location.href = `${env.apiBaseUrl}/api/v1/auth/google`
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -131,7 +132,6 @@ export default function Login() {
       className={`w-full flex-1 flex flex-col items-center justify-center px-4 pt-6 sm:pt-8 pb-12 relative overflow-hidden transition-colors ${isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
         }`}
     >
-      {/* Background Decorator */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
           src="/images/hero-wireframe.jpg"
@@ -153,7 +153,6 @@ export default function Login() {
               : 'from-[#F8F7F7]/90 via-[#F8F7F7]/60 to-[#F8F7F7]'
             }`}
         />
-        {/* Subtle coordinate dot-grid overlay (Aligned with 48px grid cells) */}
         <div
           className="absolute inset-0 opacity-[0.08]"
           style={{
@@ -164,8 +163,6 @@ export default function Login() {
         />
       </div>
 
-      {/* ─── Secret Grid Edge Trigger Cells (Aligned with 48px CSS Grid) ─── */}
-      {/* Left Edge: Community Accounts (Driver, Surveyor, Reviewer) */}
       <div
         className={`fixed left-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-r transition-all duration-300 ${isRevealed
             ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
@@ -184,7 +181,6 @@ export default function Login() {
               }`}
             aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -194,7 +190,6 @@ export default function Login() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -205,7 +200,6 @@ export default function Login() {
         ))}
       </div>
 
-      {/* Right Edge: Platform Accounts (Staff, Admin) */}
       <div
         className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-l transition-all duration-300 ${isRevealed
             ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
@@ -224,7 +218,6 @@ export default function Login() {
               }`}
             aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -234,7 +227,6 @@ export default function Login() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -245,7 +237,6 @@ export default function Login() {
         ))}
       </div>
 
-      {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
           className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
@@ -253,7 +244,6 @@ export default function Login() {
               : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
             }`}
         >
-          {/* Header */}
           <div className="flex flex-col items-center text-center mb-6">
             <Link to="/" className="inline-block mb-3 hover:scale-105 transition-transform">
               <img
@@ -273,9 +263,7 @@ export default function Login() {
             </h1>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Email Field */}
             <div>
               <label
                 htmlFor="login-email"
@@ -317,7 +305,6 @@ export default function Login() {
               )}
             </div>
 
-            {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
@@ -379,7 +366,6 @@ export default function Login() {
               )}
             </div>
 
-            {/* Remember Me Checkbox */}
             <div className="flex items-center justify-between text-xs py-0.5">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -399,7 +385,6 @@ export default function Login() {
               </label>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -418,7 +403,6 @@ export default function Login() {
               )}
             </button>
 
-            {/* Divider */}
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className={`w-full border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`} />
@@ -433,7 +417,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Google Sign In button */}
             <button
               type="button"
               onClick={handleGoogleLogin}
@@ -447,7 +430,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Footer switch link */}
           <div
             className={`text-center text-xs mt-6 pt-5 border-t ${isDark ? 'text-gray-400 border-white/10' : 'text-gray-600 border-gray-100'
               }`}
@@ -463,7 +445,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* ─── Mobile/Tablet subtle bottom corners fallback ─── */}
         <div className="md:hidden flex items-center justify-between w-full px-3 mt-3">
           <div className="flex gap-2">
             {leftAccounts.map((acc) => (

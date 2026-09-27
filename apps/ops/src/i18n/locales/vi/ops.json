@@ -1132,5 +1132,12 @@
     "desc": "Đường dẫn bạn đang tìm kiếm không tồn tại hoặc đã bị thay đổi toạ độ.",
     "btn_home": "Về Bảng Điều Khiển",
     "btn_back": "Quay Lại"
+  },
+  "unexpected_error_500": {
+    "title": "Đã Xảy Ra Lỗi Không Mong Muốn...",
+    "desc": "Hệ thống đã ghi nhận sự cố và bảo vệ phiên làm việc của bạn. Vui lòng thử tải lại hoặc quay về bảng điều khiển.",
+    "btn_retry": "Tải Lại Trang",
+    "btn_home": "Về Bảng Điều Khiển"
   }
 }
+

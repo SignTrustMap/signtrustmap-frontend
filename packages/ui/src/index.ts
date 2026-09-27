@@ -27,6 +27,9 @@ export { default as TrafficSignGraphic } from './TrafficSignGraphic'
 export * from './ErrorBoundary'
 export { default as ErrorBoundary } from './ErrorBoundary'
 
+export * from './UnexpectedErrorCanvas'
+export { default as UnexpectedErrorCanvas } from './UnexpectedErrorCanvas'
+
 export * from './Avatar'
 export { Avatar as default } from './Avatar'
 

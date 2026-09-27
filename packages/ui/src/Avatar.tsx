@@ -34,7 +34,7 @@ export function Avatar({
 }: AvatarProps) {
   return (
     <div
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none ${sizeClasses[size]} ${className}`}
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none aspect-square ${sizeClasses[size]} ${className}`}
       {...props}
     >
       {children}

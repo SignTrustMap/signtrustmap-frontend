@@ -726,6 +726,12 @@
     "btn_back": "Go Back",
     "btn_home": "Back to Home"
   },
+  "unexpected_error_500": {
+    "title": "Unexpected Error Occurred...",
+    "desc": "The system encountered an unexpected issue and protected your session. Please try reloading or return to the home page.",
+    "btn_retry": "Reload Page",
+    "btn_home": "Return Home"
+  },
   "auth_recovery": {
     "forgot_title": "Password Recovery",
     "forgot_subtitle": "SignTrustMap Member Portal",

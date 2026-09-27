@@ -7,6 +7,10 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
 import { env } from '@/config/env'
 
+/**
+ * User registration view for the Community Portal.
+ * Handles new account creation (defaults to surveyor role) and Google OAuth onboarding.
+ */
 export default function Signup() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
@@ -15,7 +19,6 @@ export default function Signup() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Sanitize redirect target: if coming from /login or /signup, always fallback to home '/'
   const rawFrom = (location.state as { from?: string })?.from || '/'
   const authPaths = ['/login', '/signup', '/register']
   const from = authPaths.includes(rawFrom) ? '/' : rawFrom
@@ -30,15 +33,13 @@ export default function Signup() {
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Field-level error states (Apple/Stripe/Shadcn standard)
   const [nameError, setNameError] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
 
   function handleGoogleSignup() {
-    const backendUrl = env.apiBaseUrl || 'https://api.signmap.site'
-    window.location.href = `${backendUrl}/api/v1/auth/google`
+    window.location.href = `${env.apiBaseUrl}/api/v1/auth/google`
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -119,7 +120,6 @@ export default function Signup() {
         isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
-      {/* Background Decorator */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
           src="/images/hero-wireframe.jpg"
@@ -146,7 +146,6 @@ export default function Signup() {
         />
       </div>
 
-      {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
           className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
@@ -155,7 +154,6 @@ export default function Signup() {
               : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
           }`}
         >
-          {/* Header */}
           <div className="flex flex-col items-center text-center mb-6">
             <Link to="/" className="inline-block mb-3 hover:scale-105 transition-transform">
               <img
@@ -179,9 +177,7 @@ export default function Signup() {
             </p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
-            {/* Name field */}
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="signup-name"
@@ -224,7 +220,6 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Email field */}
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="signup-email"
@@ -267,7 +262,6 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Phone field (optional) */}
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="signup-phone"
@@ -292,7 +286,6 @@ export default function Signup() {
               />
             </div>
 
-            {/* Password field */}
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="signup-pw"
@@ -347,7 +340,6 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Confirm Password field */}
             <div className="flex flex-col gap-1">
               <label
                 htmlFor="signup-confirm-pw"
@@ -402,7 +394,6 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Credit Welcome Bonus Pill */}
             <div
               className={`flex items-center gap-2 text-xs rounded-xl p-2.5 border transition-colors ${
                 isDark
@@ -418,7 +409,6 @@ export default function Signup() {
               </span>
             </div>
 
-            {/* Terms checkbox */}
             <div className="flex items-start gap-2.5 my-1">
               <input
                 id="signup-terms"
@@ -457,7 +447,6 @@ export default function Signup() {
               </label>
             </div>
 
-            {/* Primary Submit button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -477,7 +466,6 @@ export default function Signup() {
               )}
             </button>
 
-            {/* Centered Divider */}
             <div className="relative flex items-center justify-center my-1.5 w-full">
               <div className="absolute inset-0 flex items-center">
                 <div className={`w-full border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`} />
@@ -493,7 +481,6 @@ export default function Signup() {
               </div>
             </div>
 
-            {/* Google Sign Up button */}
             <button
               type="button"
               onClick={handleGoogleSignup}
@@ -508,7 +495,6 @@ export default function Signup() {
             </button>
           </form>
 
-          {/* Footer switch link */}
           <div
             className={`text-center text-xs mt-5 pt-4 border-t ${
               isDark ? 'text-gray-400 border-white/10' : 'text-gray-600 border-gray-100'

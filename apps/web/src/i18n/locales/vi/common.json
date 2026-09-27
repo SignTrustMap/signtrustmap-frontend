@@ -726,6 +726,12 @@
     "btn_back": "Quay Lại",
     "btn_home": "Về Trang Chủ"
   },
+  "unexpected_error_500": {
+    "title": "Đã Xảy Ra Lỗi Không Mong Muốn...",
+    "desc": "Hệ thống đã ghi nhận sự cố và bảo vệ phiên làm việc của bạn. Vui lòng thử tải lại hoặc quay về trang chủ.",
+    "btn_retry": "Tải Lại Trang",
+    "btn_home": "Về Trang Chủ"
+  },
   "auth_recovery": {
     "forgot_title": "Khôi phục Mật khẩu",
     "forgot_subtitle": "Cổng thành viên SignTrustMap",

@@ -40,6 +40,7 @@ const PrivacyPage = lazy(() => import('@/features/legal/PrivacyPage'))
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'))
 const Forbidden403Page = lazy(() => import('@/features/auth/Forbidden403Page'))
 const NotFound404Page = lazy(() => import('@/features/auth/NotFound404Page'))
+const UnexpectedError500Page = lazy(() => import('@/features/auth/UnexpectedError500Page'))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
 
@@ -181,6 +182,7 @@ function AppLayout() {
             {/* Error Routes */}
             <Route path="/403" element={<Forbidden403Page />} />
             <Route path="/404" element={<NotFound404Page />} />
+            <Route path="/500" element={<UnexpectedError500Page />} />
 
             {/* Guest-only routes: Logged in users are automatically redirected to '/' */}
             <Route

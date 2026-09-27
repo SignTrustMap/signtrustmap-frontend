@@ -14,7 +14,6 @@ import {
   BookOpen,
   Eye,
   EyeSlash,
-  Calendar,
   Copy,
   Check,
   Lock,
@@ -29,6 +28,12 @@ import { useTranslation } from 'react-i18next'
 import { opsPortalUrl } from '@/config/env'
 import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 
+/**
+ * Dedicated Account Profile view for SignTrustMap Community Portal.
+ * Enables users to review contribution statistics, edit personal information
+ * (fullName, phone via PATCH /api/v1/auth/me), update security credentials,
+ * and view accessible workspace environments.
+ */
 export default function ProfilePage() {
   const { user, updateProfile, logout } = useAuth()
   const { isDark } = useTheme()
@@ -182,7 +187,6 @@ export default function ProfilePage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* ─── Page Header ────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-white/10">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
@@ -207,9 +211,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* ─── Main 2-Column Grid ─────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: User Summary Card (4 cols) */}
           <div
             className={`lg:col-span-4 rounded-2xl border p-6 space-y-6 ${
               isDark
@@ -217,7 +219,6 @@ export default function ProfilePage() {
                 : 'bg-white border-[#E8E4E3] shadow-xs'
             }`}
           >
-            {/* Avatar & User Core */}
             <div className="flex flex-col items-center text-center space-y-3">
               <div className="relative">
                 <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
@@ -238,7 +239,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Email with copy button */}
               <button
                 type="button"
                 onClick={handleCopyEmail}
@@ -259,55 +259,49 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Member Info & Stats */}
-            <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-3 text-sm">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                  <Calendar size={14} />
-                  <span>{t('profile.member_since')}</span>
-                </span>
-                <span className="font-bold text-gray-800 dark:text-gray-200">
-                  {user.joinDate || '15/05/2026'}
-                </span>
-              </div>
-
-              {/* Credits Row */}
-              {user.role !== 'staff' && user.role !== 'admin' && (
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100 dark:border-white/5">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                    <Coins size={14} className="text-amber-500" />
-                    <span>{t('profile.credits_balance')}</span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
-                      {user.credits || 0}
+            {((user.role !== 'staff' && user.role !== 'admin') || user.trustScore !== undefined) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-3 text-sm">
+                {user.role !== 'staff' && user.role !== 'admin' && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
+                      <Coins size={14} className="text-amber-500" />
+                      <span>{t('profile.credits_balance')}</span>
                     </span>
-                    <Link
-                      to="/wallet"
-                      className="text-[11px] font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline"
-                    >
-                      {t('profile.link_wallet')}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
+                        {user.credits || 0}
+                      </span>
+                      <Link
+                        to="/wallet"
+                        className="text-[11px] font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline"
+                      >
+                        {t('profile.link_wallet')}
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Trust Score Row */}
-              {user.trustScore !== undefined && (
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100 dark:border-white/5">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                    <ShieldCheck size={14} className="text-emerald-500" />
-                    <span>{t('profile.trust_score')}</span>
-                  </span>
-                  <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                    {user.trustScore}%
-                  </span>
-                </div>
-              )}
-            </div>
+                {user.trustScore !== undefined && (
+                  <div
+                    className={`flex items-center justify-between text-xs ${
+                      user.role !== 'staff' && user.role !== 'admin'
+                        ? 'pt-2 border-t border-gray-100 dark:border-white/5'
+                        : ''
+                    }`}
+                  >
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
+                      <ShieldCheck size={14} className="text-emerald-500" />
+                      <span>{t('profile.trust_score')}</span>
+                    </span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                      {user.trustScore}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Settings Panel with Tabs (8 cols) */}
           <div
             className={`lg:col-span-8 rounded-2xl border overflow-hidden ${
               isDark
@@ -315,7 +309,6 @@ export default function ProfilePage() {
                 : 'bg-white border-[#E8E4E3] shadow-xs'
             }`}
           >
-            {/* Tab Headers */}
             <div className="flex items-center border-b border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/20 px-4 pt-2 gap-2 overflow-x-auto">
               <button
                 type="button"
@@ -363,11 +356,9 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Tab 1: General Info */}
             {activeTab === 'info' && (
               <form onSubmit={handleUpdateProfile} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-4">
-                  {/* Full Name */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_fullname')} <span className="text-rose-500 font-bold ml-0.5">*</span>
@@ -408,7 +399,6 @@ export default function ProfilePage() {
                     )}
                   </div>
 
-                  {/* Phone Number */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_phone')}
@@ -443,7 +433,6 @@ export default function ProfilePage() {
                     )}
                   </div>
 
-                  {/* Email (Read only) */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_email')}
@@ -466,7 +455,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* System Role Info */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.badge_role')}
@@ -505,11 +493,9 @@ export default function ProfilePage() {
               </form>
             )}
 
-            {/* Tab 2: Security & Password */}
             {activeTab === 'security' && (
               <form onSubmit={handleChangePassword} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-4">
-                  {/* Current Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_current_pw')} <span className="text-red-500">*</span>
@@ -537,7 +523,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* New Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_new_pw')} <span className="text-red-500">*</span>
@@ -565,7 +550,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Confirm New Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_confirm_pw')} <span className="text-red-500">*</span>
@@ -609,10 +593,8 @@ export default function ProfilePage() {
               </form>
             )}
 
-            {/* Tab 3: Workspaces & Quick Access */}
             {activeTab === 'workspaces' && (
               <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. Driver Workspace (Driver / Default) */}
                 {(!user.role || user.role === 'driver') && (
                   <Link
                     to="/product/map"
@@ -636,7 +618,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 2. Survey Studio (Surveyor Only) */}
                 {user.role === 'surveyor' && (
                   <Link
                     to="/survey"
@@ -660,7 +641,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 3. Reviewer Workspace (Reviewer Only) */}
                 {user.role === 'reviewer' && (
                   <Link
                     to="/review"
@@ -684,7 +664,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 4. Ops Portal (Admin / Staff) */}
                 {(user.role === 'admin' || user.role === 'staff') && (
                   <a
                     href={`${opsPortalUrl}/overview`}
@@ -710,7 +689,6 @@ export default function ProfilePage() {
                   </a>
                 )}
 
-                {/* 5. Standard Catalog (All users) */}
                 <Link
                   to="/catalog"
                   className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 group ${
@@ -732,7 +710,6 @@ export default function ProfilePage() {
                   </div>
                 </Link>
 
-                {/* 6. Wallet & Rewards (Non-staff) */}
                 {user.role !== 'admin' && user.role !== 'staff' && (
                   <Link
                     to="/wallet"

@@ -1,6 +1,14 @@
-// apps/ops/src/config/env.ts
-// Single source of truth for all environment variables & endpoints.
+/**
+ * Centralized environment configuration and runtime endpoint validation for Operations Command Center.
+ * Single Source of Truth for environment variables per RULE.md Section 10.
+ */
 
+/**
+ * Format domain string to full URL with protocol based on current execution mode.
+ * @param domainOrUrl Hostname or URL string
+ * @param isDev True when running in Vite development mode
+ * @returns Fully-qualified HTTP/HTTPS URL
+ */
 function formatUrl(domainOrUrl: string, isDev: boolean): string {
   if (!domainOrUrl) return ''
   if (domainOrUrl.startsWith('http://') || domainOrUrl.startsWith('https://')) {
@@ -9,6 +17,11 @@ function formatUrl(domainOrUrl: string, isDev: boolean): string {
   return isDev ? `http://${domainOrUrl}` : `https://${domainOrUrl}`
 }
 
+/**
+ * Validate required environment keys at startup.
+ * @param variables Dictionary of parsed environment values
+ * @param requiredKeys Keys that must be defined for application stability
+ */
 function validateEnv(variables: Record<string, string | undefined>, requiredKeys: string[]): void {
   const missing = requiredKeys.filter((key) => !variables[key])
   if (missing.length > 0) {
@@ -31,7 +44,6 @@ export const env = {
   mode:         import.meta.env.MODE,
 } as const
 
-// Runtime validation on startup
 validateEnv(
   {
     VITE_OPS_DOMAIN: env.opsDomain,

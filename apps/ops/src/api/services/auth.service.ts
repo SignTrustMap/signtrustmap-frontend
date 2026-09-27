@@ -4,6 +4,7 @@ import type {
   AuthLoginPayload,
   AuthSuccessResponse,
   UserProfileResponse,
+  UpdateProfilePayload,
 } from '@shared/types'
 
 /**
@@ -26,6 +27,15 @@ export const authService = {
    */
   getMe: (): Promise<UserProfileResponse> => {
     return http.get<UserProfileResponse>(API_ENDPOINTS.AUTH.ME)
+  },
+
+  /**
+   * Update profile information of the authenticated user
+   * Corresponds to PATCH /api/v1/auth/me
+   * @param payload Profile changes (fullName, phone, avatarUrl)
+   */
+  updateMe: (payload: UpdateProfilePayload): Promise<UserProfileResponse> => {
+    return http.patch<UserProfileResponse>(API_ENDPOINTS.AUTH.ME, payload)
   },
 
   /**

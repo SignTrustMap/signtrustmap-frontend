@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import type { User, AuthState } from '@shared/types'
+import type { User, AuthState, UpdateProfilePayload } from '@shared/types'
 import { normalizeBackendRole } from '@shared/types'
 import { authService } from '@/api/services/auth.service'
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
-  updateProfile: (data: Partial<User>) => void
+  updateProfile: (data: UpdateProfilePayload) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -23,6 +23,11 @@ function computeInitials(name?: string, email?: string): string {
   return (email?.slice(0, 2) || 'OP').toUpperCase()
 }
 
+/**
+ * Authentication context provider for the Operations Command Center.
+ * Enforces strict RBAC (admin/staff only), synchronizes session with NestJS auth endpoints,
+ * and enables profile updates.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(() => {
     try {
@@ -37,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch {
-      // ignore
+      // Intentionally suppressed: unauthenticated guest fallback
     }
     return {
       user: null,
@@ -61,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const primaryRole = normalizeBackendRole(res.user.roles)
 
-      // Strict RBAC check for Operations Portal: Only ADMIN and STAFF are authorized
       if (primaryRole !== 'admin' && primaryRole !== 'staff') {
         throw new Error(`FORBIDDEN_COMMUNITY_ROLE:${primaryRole}`)
       }
@@ -70,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: res.user.id,
         name: res.user.fullName || res.user.email.split('@')[0],
         email: res.user.email,
+        phone: (res.user as any).phone || undefined,
         role: primaryRole,
         avatar: (res.user as any).avatarUrl || undefined,
         initials: computeInitials(res.user.fullName, res.user.email),
@@ -102,16 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const updateProfile = useCallback((data: Partial<User>) => {
-    setState((s) => {
-      if (!s.user) return s
-      const updated: User = { ...s.user, ...data }
-      localStorage.setItem(OPS_USER_STORAGE_KEY, JSON.stringify(updated))
-      return { ...s, user: updated }
-    })
+  const updateProfile = useCallback(async (data: UpdateProfilePayload) => {
+    try {
+      const updated = await authService.updateMe(data)
+      setState((prev) => {
+        if (!prev.user) return prev
+        const newUser: User = {
+          ...prev.user,
+          name: updated.fullName || prev.user.name,
+          phone: updated.phone || undefined,
+          avatar: updated.avatarUrl || prev.user.avatar,
+        }
+        localStorage.setItem(OPS_USER_STORAGE_KEY, JSON.stringify(newUser))
+        return { ...prev, user: newUser }
+      })
+    } catch (err) {
+      console.error('Failed to update ops profile:', err)
+      throw err
+    }
   }, [])
 
-  // Session verification on mount against real backend
   useEffect(() => {
     async function restoreSession() {
       const token = localStorage.getItem('stm_access_token')
@@ -133,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: profile.id,
           name: profile.fullName || profile.email.split('@')[0],
           email: profile.email,
+          phone: profile.phone || undefined,
           role: primaryRole,
           avatar: profile.avatarUrl || undefined,
           initials: computeInitials(profile.fullName, profile.email),
@@ -141,7 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(OPS_USER_STORAGE_KEY, JSON.stringify(syncedUser))
         setState({ user: syncedUser, isLoading: false, isAuthenticated: true })
       } catch (err: any) {
-        // If 401 Unauthorized, token has expired, logout
         if (err?.statusCode === 401 || err?.status === 401) {
           logout()
         }
@@ -151,7 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     restoreSession()
   }, [logout])
 
-  // Listen for global unauthorized events from Axios to logout gracefully without hard reload
   useEffect(() => {
     const handleUnauthorized = () => {
       logout()
@@ -167,6 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * Access the active authentication session, role, and actions in the Operations Portal.
+ * @throws Error if invoked outside of an AuthProvider tree.
+ */
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

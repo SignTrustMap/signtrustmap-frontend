@@ -24,11 +24,15 @@ function sanitizeName(name: string): string {
   return name ? name.replace(/\s*\([^)]*\)/g, '').trim() : name
 }
 
+/**
+ * Authentication context provider for the Community Portal.
+ * Hydrates active sessions across tabs, listens for soft 401 unauthorized events,
+ * and exposes authentication methods (login, register, OAuth, profile updates).
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<DemoUserAccount | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // 1. Session Hydration: Restore session from localStorage or sessionStorage on mount
   useEffect(() => {
     async function restoreSession() {
       try {
@@ -43,7 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(parsed)
         }
 
-        // If active token exists, verify in background with GET /api/v1/auth/me
         if (token) {
           try {
             const profile = await authService.getMe()
@@ -67,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const storage = isLocal ? localStorage : sessionStorage
             storage.setItem(USER_STORAGE_KEY, JSON.stringify(refreshedUser))
           } catch {
-            // If token has expired or is invalid, the 401 interceptor will handle clearing
+            // Suppressed: expired tokens handled by 401 interceptor
           }
         }
       } catch (e) {
@@ -80,7 +83,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     restoreSession()
   }, [])
 
-  // 2. Soft 401 Unauthorized handling (prevents hard full-page reload - RULE 6.4)
   useEffect(() => {
     const handleUnauthorized = () => {
       setUser(null)
@@ -93,7 +95,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
   }, [])
 
-  // 3. Multi-Tab Synchronization: Sync login/logout across browser tabs
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === USER_STORAGE_KEY || e.key === TOKEN_STORAGE_KEY) {
@@ -105,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             setUser(JSON.parse(stored))
           } catch {
-            // ignore
+            // Suppressed invalid storage payload
           }
         }
       }
@@ -114,9 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
-  // Save session helper respecting "Remember Me"
   const saveSession = useCallback((userAccount: DemoUserAccount, accessToken: string, rememberMe: boolean = true) => {
-    // Clean opposite storage to avoid duplicate out-of-sync tokens
     if (rememberMe) {
       sessionStorage.removeItem(USER_STORAGE_KEY)
       sessionStorage.removeItem(TOKEN_STORAGE_KEY)
@@ -131,13 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userAccount)
   }, [])
 
-  // Login handler: calls real NestJS API with demo account fallback for Easter egg
   const login = useCallback(
     async (email: string, password?: string, rememberMe: boolean = true): Promise<DemoUserAccount> => {
       const cleanEmail = email.trim()
       const cleanPw = password || 'password123'
 
-      // Attempt authenticating with backend NestJS API
       const res = await authService.login({
         email: cleanEmail,
         password: cleanPw,
@@ -163,11 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [saveSession]
   )
 
-  // Register handler: calls real NestJS API
   const register = useCallback(
     async (payload: AuthRegisterPayload, rememberMe: boolean = true): Promise<DemoUserAccount> => {
       const res = await authService.register(payload)
-      const primaryRole = 'surveyor' // Default role granted to new registrants by backend
+      const primaryRole = 'surveyor'
       const registeredUser: DemoUserAccount = {
         id: res.user.id,
         role: primaryRole,
@@ -187,7 +183,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [saveSession]
   )
 
-  // Google OAuth ID token login handler
   const loginWithGoogleToken = useCallback(
     async (idToken: string, rememberMe: boolean = true): Promise<DemoUserAccount> => {
       const res = await authService.googleTokenLogin(idToken)
@@ -272,6 +267,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * Hook to access current authentication state and actions in Community Portal.
+ * @throws Error if invoked outside of AuthProvider.
+ */
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {

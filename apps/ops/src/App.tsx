@@ -14,6 +14,7 @@ const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
 const NotFound404Page = lazy(() => import('@/features/auth/NotFound404Page'))
+const UnexpectedError500Page = lazy(() => import('@/features/auth/UnexpectedError500Page'))
 
 const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'))
 const UsersPage = lazy(() => import('@/features/users/UsersPage'))
@@ -222,6 +223,7 @@ function ProtectedLayout() {
           {/* Error Routes & Catch-all (Rendered within AppShell right viewport, keeping left sidebar intact) */}
           <Route path="/403" element={<NotAllowedPage />} />
           <Route path="/404" element={<NotFound404Page />} />
+          <Route path="/500" element={<UnexpectedError500Page />} />
           <Route path="*" element={<NotFound404Page />} />
         </Routes>
         </Suspense>
@@ -255,3 +257,4 @@ export default function App() {
     </BrowserRouter>
   )
 }
+

@@ -1132,5 +1132,12 @@
     "desc": "The page you are looking for does not exist or has been moved.",
     "btn_home": "Back to Dashboard",
     "btn_back": "Go Back"
+  },
+  "unexpected_error_500": {
+    "title": "Unexpected Error Occurred...",
+    "desc": "The system encountered an unexpected issue and protected your session. Please try reloading or return to dashboard.",
+    "btn_retry": "Reload Page",
+    "btn_home": "Back to Dashboard"
   }
 }
+
