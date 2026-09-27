@@ -6,10 +6,12 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/api/v1/auth/login',
     REGISTER: '/api/v1/auth/register',
-    LOGOUT: '/api/v1/auth/logout',
     ME: '/api/v1/auth/me',
-    REFRESH_TOKEN: '/api/v1/auth/refresh-token',
+    GOOGLE: '/api/v1/auth/google',
+    GOOGLE_CALLBACK: '/api/v1/auth/google/callback',
     FORGOT_PASSWORD: '/api/v1/auth/forgot-password',
+    VERIFY_OTP: '/api/v1/auth/verify-otp',
+    RESEND_OTP: '/api/v1/auth/resend-otp',
     RESET_PASSWORD: '/api/v1/auth/reset-password',
   },
   USER: {

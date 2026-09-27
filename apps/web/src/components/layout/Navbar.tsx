@@ -6,6 +6,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
 import { UserDropdownMenu } from './UserDropdownMenu'
+import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 
 export function Navbar() {
   const { isDark } = useTheme()
@@ -177,17 +178,10 @@ export function Navbar() {
                     }`}
                   >
                     {/* Avatar */}
-                    {user.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="w-8 h-8 rounded-full object-cover border border-[#00c4de] shrink-0"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-[#00c4de]/20 text-[#00c4de] flex items-center justify-center font-bold text-xs shrink-0">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <Avatar size="sm" className="border border-[#00c4de] shrink-0">
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                    </Avatar>
 
                     {/* Name (Top, 2 words) & Role (Bottom) - Full name in tooltip */}
                     <div

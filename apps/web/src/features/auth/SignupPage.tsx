@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeSlash, CircleNotch, CheckCircle } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CircleNotch, CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
+import { env } from '@/config/env'
 
 export default function Signup() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
-  const { login, updateProfile } = useAuth()
+  const { register } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -19,42 +22,92 @@ export default function Signup() {
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
+
+  // Field-level error states (Apple/Stripe/Shadcn standard)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
+
+  function handleGoogleSignup() {
+    const backendUrl = env.apiBaseUrl || 'https://api.signmap.site'
+    window.location.href = `${backendUrl}/api/v1/auth/google`
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
+    let hasError = false
 
-    if (password.length < 8) {
-      setError(t('auth.signup.password_too_short'))
-      return
+    const cleanName = name.trim()
+    if (!cleanName) {
+      setNameError(t('auth.signup.name_required'))
+      hasError = true
+    } else {
+      setNameError(null)
     }
 
-    if (password !== confirmPassword) {
-      setError(t('auth.signup.password_mismatch'))
-      return
+    const cleanEmail = email.trim()
+    if (!cleanEmail) {
+      setEmailError(t('auth.signup.email_required'))
+      hasError = true
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        setEmailError(t('auth.signup.email_invalid'))
+        hasError = true
+      } else {
+        setEmailError(null)
+      }
+    }
+
+    if (!password) {
+      setPasswordError(t('auth.signup.password_required'))
+      hasError = true
+    } else if (password.length < 8) {
+      setPasswordError(t('auth.signup.password_too_short'))
+      hasError = true
+    } else {
+      setPasswordError(null)
+    }
+
+    if (!confirmPassword) {
+      setConfirmPasswordError(t('auth.signup.password_required'))
+      hasError = true
+    } else if (password !== confirmPassword) {
+      setConfirmPasswordError(t('auth.signup.password_mismatch'))
+      hasError = true
+    } else {
+      setConfirmPasswordError(null)
     }
 
     if (!agreeTerms) {
-      setError(t('auth.signup.terms_error'))
+      toast.error(t('auth.signup.terms_error'))
       return
     }
 
+    if (hasError) return
+
     setIsLoading(true)
     try {
-      await login(email, password)
-      if (name.trim()) {
-        updateProfile({ name: name.trim() })
-      }
+      await Promise.all([
+        register({
+          fullName: cleanName,
+          email: cleanEmail,
+          password,
+          phone: phone.trim() || undefined,
+        }),
+        new Promise((resolve) => setTimeout(resolve, 450)),
+      ])
       navigate(from, { replace: true })
-    } catch {
-      setError(t('auth.signup.error_default'))
+    } catch (err: any) {
+      toast.error(err?.message || t('auth.signup.error_default'))
     } finally {
       setIsLoading(false)
     }
@@ -96,7 +149,7 @@ export default function Signup() {
       {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
-          className={`rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${
+          className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
             isDark
               ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
               : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
@@ -136,22 +189,39 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                {t('auth.signup.name_label')}
+                {t('auth.signup.name_label')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
               </label>
               <input
                 id="signup-name"
                 type="text"
-                required
                 autoComplete="name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  if (nameError) setNameError(null)
+                }}
                 placeholder={t('auth.signup.name_placeholder')}
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all ${
-                  isDark
-                    ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                    : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'signup-name-error' : undefined}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all outline-none ${
+                  nameError
+                    ? isDark
+                      ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                      : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                    : isDark
+                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                 }`}
               />
+              {nameError && (
+                <p
+                  id="signup-name-error"
+                  className="mt-1 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{nameError}</span>
+                </p>
+              )}
             </div>
 
             {/* Email field */}
@@ -162,20 +232,62 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                {t('auth.signup.email_label')}
+                {t('auth.signup.email_label')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
               </label>
               <input
                 id="signup-email"
                 type="email"
-                required
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (emailError) setEmailError(null)
+                }}
                 placeholder="name@example.com"
-                className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all ${
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'signup-email-error' : undefined}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all outline-none ${
+                  emailError
+                    ? isDark
+                      ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                      : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                    : isDark
+                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
+                }`}
+              />
+              {emailError && (
+                <p
+                  id="signup-email-error"
+                  className="mt-1 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{emailError}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Phone field (optional) */}
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="signup-phone"
+                className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
+              >
+                {t('auth.signup.phone_label')}
+              </label>
+              <input
+                id="signup-phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={t('auth.signup.phone_placeholder')}
+                className={`w-full px-4 py-2.5 text-sm rounded-xl border transition-all outline-none ${
                   isDark
-                    ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                    : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                    ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                    : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                 }`}
               />
             </div>
@@ -188,21 +300,29 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                {t('auth.signup.password_label')}
+                {t('auth.signup.password_label')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
                 <input
                   id="signup-pw"
                   type={showPw ? 'text' : 'password'}
-                  required
                   autoComplete="new-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (passwordError) setPasswordError(null)
+                  }}
                   placeholder={t('auth.signup.password_placeholder')}
-                  className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all ${
-                    isDark
-                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                  aria-invalid={!!passwordError}
+                  aria-describedby={passwordError ? 'signup-pw-error' : undefined}
+                  className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all outline-none ${
+                    passwordError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                   }`}
                 />
                 <button
@@ -216,6 +336,15 @@ export default function Signup() {
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {passwordError && (
+                <p
+                  id="signup-pw-error"
+                  className="mt-1 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{passwordError}</span>
+                </p>
+              )}
             </div>
 
             {/* Confirm Password field */}
@@ -226,21 +355,29 @@ export default function Signup() {
                   isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
-                {t('auth.signup.confirm_password_label')}
+                {t('auth.signup.confirm_password_label')} <span className="text-rose-500 font-bold ml-0.5" aria-hidden="true">*</span>
               </label>
               <div className="relative">
                 <input
                   id="signup-confirm-pw"
                   type={showConfirmPw ? 'text' : 'password'}
-                  required
                   autoComplete="new-password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value)
+                    if (confirmPasswordError) setConfirmPasswordError(null)
+                  }}
                   placeholder={t('auth.signup.confirm_password_placeholder')}
-                  className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all ${
-                    isDark
-                      ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:outline-none focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20'
+                  aria-invalid={!!confirmPasswordError}
+                  aria-describedby={confirmPasswordError ? 'signup-confirm-pw-error' : undefined}
+                  className={`w-full px-4 py-2.5 pr-10 text-sm rounded-xl border transition-all outline-none ${
+                    confirmPasswordError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'border-white/15 bg-black/40 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'border-gray-300 bg-gray-50/70 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                   }`}
                 />
                 <button
@@ -254,6 +391,15 @@ export default function Signup() {
                   {showConfirmPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {confirmPasswordError && (
+                <p
+                  id="signup-confirm-pw-error"
+                  className="mt-1 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{confirmPasswordError}</span>
+                </p>
+              )}
             </div>
 
             {/* Credit Welcome Bonus Pill */}
@@ -311,22 +457,10 @@ export default function Signup() {
               </label>
             </div>
 
-            {error && (
-              <p
-                className={`text-xs rounded-xl p-3 border ${
-                  isDark
-                    ? 'text-red-400 bg-red-950/40 border-red-800/60'
-                    : 'text-red-600 bg-red-50 border-red-200'
-                }`}
-              >
-                {error}
-              </p>
-            )}
-
             {/* Primary Submit button */}
             <button
               type="submit"
-              disabled={isLoading || !name || !email || !password || !confirmPassword}
+              disabled={isLoading}
               className={`w-full py-3.5 font-bold text-sm rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 isDark
                   ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/25'
@@ -362,12 +496,7 @@ export default function Signup() {
             {/* Google Sign Up button */}
             <button
               type="button"
-              onClick={() => {
-                setName('Demo User')
-                setEmail('user@gmail.com')
-                setPassword('oauth-password')
-                setConfirmPassword('oauth-password')
-              }}
+              onClick={handleGoogleSignup}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                 isDark
                   ? 'border-white/15 bg-white/5 hover:bg-white/10 text-white'

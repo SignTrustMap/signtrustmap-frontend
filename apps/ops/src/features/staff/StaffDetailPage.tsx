@@ -102,7 +102,7 @@ export default function StaffDetailPage() {
           </div>
           <div>
             <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_phone')}</span>
-            <p className="font-bold text-gray-900 dark:text-white mt-1">+84 (0) 912 345 678</p>
+            <p className="font-bold text-gray-900 dark:text-white mt-1">0912 345 678</p>
           </div>
           <div>
             <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_assigned_area')}</span>

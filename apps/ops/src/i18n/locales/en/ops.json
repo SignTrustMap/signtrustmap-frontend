@@ -24,7 +24,7 @@
     "empty_filter": "No user accounts match the selected filters.",
     "modal_title": "Account Information",
     "lbl_name": "Full Name",
-    "lbl_email": "Email Address",
+    "lbl_email": "Email",
     "lbl_phone": "Phone Number",
     "lbl_location": "Location / Region",
     "lbl_role": "Role",

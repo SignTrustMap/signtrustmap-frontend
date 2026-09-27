@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CircleNotch, WarningCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
+import { env } from '@/config/env'
 import { mockDemoAccounts, type DemoUserAccount } from '@/data'
 
 export default function Login() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const { login } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -20,9 +23,11 @@ export default function Login() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [rememberMe, setRememberMe] = useState(true)
   const [showPw, setShowPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const ctrlPressTimesRef = useRef<number[]>([])
 
@@ -53,30 +58,72 @@ export default function Login() {
 
   function handleSecretFill(acc: DemoUserAccount) {
     setEmail(acc.email)
-    setPassword(acc.password)
-    setError('')
+    setPassword(acc.password || '')
+    setEmailError(null)
+    setPasswordError(null)
   }
 
   async function performLogin(targetEmail: string, targetPw: string) {
-    setError('')
     setIsLoading(true)
     try {
-      await login(targetEmail, targetPw)
+      // Ensure smooth, perceptible loading animation (at least 450ms)
+      await Promise.all([
+        login(targetEmail, targetPw, rememberMe),
+        new Promise((resolve) => setTimeout(resolve, 450)),
+      ])
       navigate(from, { replace: true })
-    } catch {
-      setError(t('auth.login.error_default'))
+    } catch (err: any) {
+      let msg = t('auth.login.error_default')
+      const rawMsg = err?.message || ''
+      if (
+        rawMsg.toLowerCase().includes('invalid credentials') ||
+        rawMsg.toLowerCase().includes('unauthorized') ||
+        rawMsg.toLowerCase().includes('không tìm thấy') ||
+        rawMsg.toLowerCase().includes('sai mật khẩu')
+      ) {
+        msg = t('auth.login.error_default')
+      } else if (rawMsg) {
+        msg = rawMsg
+      }
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }
   }
 
+  function handleGoogleLogin() {
+    const backendUrl = env.apiBaseUrl || 'https://api.signmap.site'
+    window.location.href = `${backendUrl}/api/v1/auth/google`
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!email.trim()) {
-      setError(t('auth.login.email_required'))
-      return
+    let hasError = false
+    const cleanEmail = email.trim()
+
+    if (!cleanEmail) {
+      setEmailError(t('auth.login.email_required'))
+      hasError = true
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        setEmailError(t('auth.login.email_invalid', { defaultValue: 'Địa chỉ email không đúng định dạng.' }))
+        hasError = true
+      } else {
+        setEmailError(null)
+      }
     }
-    await performLogin(email, password)
+
+    if (!password) {
+      setPasswordError(t('auth.login.password_required', { defaultValue: 'Vui lòng nhập mật khẩu.' }))
+      hasError = true
+    } else {
+      setPasswordError(null)
+    }
+
+    if (hasError) return
+
+    await performLogin(cleanEmail, password)
   }
 
   return (
@@ -201,7 +248,7 @@ export default function Login() {
       {/* Main Container */}
       <div className="w-full max-w-[460px] relative z-10 mx-auto">
         <div
-          className={`rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
+          className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
               ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
               : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
             }`}
@@ -227,35 +274,47 @@ export default function Login() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
-            )}
-
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* Email Field */}
             <div>
               <label
                 htmlFor="login-email"
-                className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${isDark ? 'text-gray-300' : 'text-gray-700'
-                  }`}
+                className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
               >
                 {t('auth.login.email_label')}
               </label>
               <input
                 id="login-email"
                 type="email"
-                required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (emailError) setEmailError(null)
+                }}
                 placeholder="name@company.com"
-                className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${isDark
-                    ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                    : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
-                  }`}
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'login-email-error' : undefined}
+                className={`w-full px-4 py-3 rounded-xl border text-sm transition-all outline-none ${
+                  emailError
+                    ? isDark
+                      ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                      : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                    : isDark
+                      ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
+                }`}
               />
+              {emailError && (
+                <p
+                  id="login-email-error"
+                  className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{emailError}</span>
+                </p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -263,8 +322,9 @@ export default function Login() {
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="login-password"
-                  className={`text-xs font-bold uppercase tracking-wide font-mono ${isDark ? 'text-gray-300' : 'text-gray-700'
-                    }`}
+                  className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                    isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}
                 >
                   {t('auth.login.password_label')}
                 </label>
@@ -281,14 +341,23 @@ export default function Login() {
                 <input
                   id="login-password"
                   type={showPw ? 'text' : 'password'}
-                  required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (passwordError) setPasswordError(null)
+                  }}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${isDark
-                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
-                    }`}
+                  aria-invalid={!!passwordError}
+                  aria-describedby={passwordError ? 'login-password-error' : undefined}
+                  className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-all outline-none ${
+                    passwordError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
+                  }`}
                 />
                 <button
                   type="button"
@@ -299,6 +368,35 @@ export default function Login() {
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {passwordError && (
+                <p
+                  id="login-password-error"
+                  className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{passwordError}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center justify-between text-xs py-0.5">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="login-remember-me"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className={`w-4 h-4 rounded transition-colors cursor-pointer ${
+                    isDark
+                      ? 'border-white/20 bg-white/5 accent-[#00c4de]'
+                      : 'border-gray-300 accent-[#007b8b]'
+                  }`}
+                />
+                <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                  {t('auth.login.remember_me')}
+                </span>
+              </label>
             </div>
 
             {/* Submit Button */}
@@ -338,7 +436,7 @@ export default function Login() {
             {/* Google Sign In button */}
             <button
               type="button"
-              onClick={() => performLogin('driver@signtrustmap.com', 'password123')}
+              onClick={handleGoogleLogin}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${isDark
                   ? 'border-white/15 bg-white/5 hover:bg-white/10 text-white'
                   : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-800 shadow-gray-200/50'

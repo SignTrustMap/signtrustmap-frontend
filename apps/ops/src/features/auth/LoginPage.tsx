@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Globe,
+  WarningCircle,
 } from '@phosphor-icons/react'
 
 export default function LoginPage() {
@@ -27,8 +28,9 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const ctrlPressTimesRef = useRef<number[]>([])
 
@@ -64,17 +66,33 @@ export default function LoginPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    if (!email.trim()) {
-      setError(t('login.email_required', { defaultValue: 'Vui lòng nhập email tài khoản' }))
-      return
+    let hasError = false
+    const cleanEmail = email.trim()
+
+    if (!cleanEmail) {
+      setEmailError(t('login.email_required'))
+      hasError = true
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        setEmailError(t('login.email_invalid'))
+        hasError = true
+      } else {
+        setEmailError(null)
+      }
     }
+
     if (!password) {
-      setError(t('login.password_required', { defaultValue: 'Vui lòng nhập mật khẩu' }))
-      return
+      setPasswordError(t('login.password_required'))
+      hasError = true
+    } else {
+      setPasswordError(null)
     }
+
+    if (hasError) return
+
     try {
-      await login(email, password)
+      await login(cleanEmail, password)
       const next = params.get('next') ?? null
       const isAdmin = email.toLowerCase().includes('admin')
       if (next) {
@@ -91,8 +109,9 @@ export default function LoginPage() {
         msg = t('login.forbidden_desc')
       } else if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
         msg = t('login.err_invalid_credentials')
+      } else if (err instanceof Error && err.message) {
+        msg = err.message
       }
-      setError(msg)
       toast.error(msg)
     }
   }
@@ -103,7 +122,8 @@ export default function LoginPage() {
   function handleSecretFill(acc: DemoAccount) {
     setEmail(acc.email)
     setPassword(acc.password)
-    setError('')
+    setEmailError(null)
+    setPasswordError(null)
   }
 
   return (
@@ -336,7 +356,7 @@ export default function LoginPage() {
 
           {/* ─── Main Login Card ───────────────────────────────────────── */}
           <div
-            className={`w-full max-w-[460px] rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${
+            className={`w-full max-w-[460px] rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
               isDark
                 ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
                 : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
@@ -364,14 +384,7 @@ export default function LoginPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                  <span>⚠️</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Email field */}
               <div>
                 <label
@@ -386,19 +399,33 @@ export default function LoginPage() {
                 <input
                   id="ops-email"
                   type="email"
-                  required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value)
-                    setError('')
+                    if (emailError) setEmailError(null)
                   }}
                   placeholder="staff@signtrustmap.site"
-                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${
-                    isDark
-                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                  aria-invalid={!!emailError}
+                  aria-describedby={emailError ? 'ops-email-error' : undefined}
+                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-all outline-none ${
+                    emailError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                   }`}
                 />
+                {emailError && (
+                  <p
+                    id="ops-email-error"
+                    className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                  >
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{emailError}</span>
+                  </p>
+                )}
               </div>
 
               {/* Password field */}
@@ -425,17 +452,22 @@ export default function LoginPage() {
                   <input
                     id="ops-password"
                     type={showPw ? 'text' : 'password'}
-                    required
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value)
-                      setError('')
+                      if (passwordError) setPasswordError(null)
                     }}
                     placeholder="••••••••"
-                    className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${
-                      isDark
-                        ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                        : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                    aria-invalid={!!passwordError}
+                    aria-describedby={passwordError ? 'ops-password-error' : undefined}
+                    className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-all outline-none ${
+                      passwordError
+                        ? isDark
+                          ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                          : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                        : isDark
+                          ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                     }`}
                   />
                   <button
@@ -449,6 +481,15 @@ export default function LoginPage() {
                     {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                {passwordError && (
+                  <p
+                    id="ops-password-error"
+                    className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                  >
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{passwordError}</span>
+                  </p>
+                )}
               </div>
 
               {/* Submit Button */}
@@ -499,7 +540,6 @@ export default function LoginPage() {
                 onClick={() => {
                   setEmail('staff@signtrustmap.com')
                   setPassword('password123')
-                  setError('')
                 }}
                 className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                   isDark

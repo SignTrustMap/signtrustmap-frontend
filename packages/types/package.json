@@ -1,5 +1,5 @@
 {
-  "name": "@signtrustmap/types",
+  "name": "@shared/types",
   "version": "1.0.0",
   "private": true,
   "type": "module",

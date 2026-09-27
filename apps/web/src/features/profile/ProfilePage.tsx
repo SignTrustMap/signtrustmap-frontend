@@ -18,12 +18,16 @@ import {
   Copy,
   Check,
   Lock,
+  CircleNotch,
+  WarningCircle,
 } from '@phosphor-icons/react'
+import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { opsPortalUrl } from '@/config/env'
+import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 
 export default function ProfilePage() {
   const { user, updateProfile, logout } = useAuth()
@@ -33,6 +37,10 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = useState<'info' | 'security' | 'workspaces'>('info')
   const [name, setName] = useState(user?.name || '')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -40,6 +48,20 @@ export default function ProfilePage() {
   const [showNewPw, setShowNewPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    if (phoneError) setPhoneError(null)
+  }
+
+  const handlePhoneBlur = () => {
+    const trimmed = phone.trim()
+    if (trimmed && !isValidVietnamPhone(trimmed)) {
+      setPhoneError(t('profile.phone_invalid'))
+    } else {
+      setPhoneError(null)
+    }
+  }
 
   if (!user) {
     return null
@@ -52,14 +74,41 @@ export default function ProfilePage() {
     setTimeout(() => setCopiedEmail(false), 2000)
   }
 
-  const handleUpdateName = (e: FormEvent) => {
+  const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) {
-      toast.error(t('profile.name_required'))
-      return
+    let hasError = false
+    const cleanName = name.trim()
+    if (!cleanName) {
+      setNameError(t('profile.name_required'))
+      hasError = true
+    } else {
+      setNameError(null)
     }
-    updateProfile({ name: name.trim() })
-    toast.success(t('profile.save_success'))
+
+    const trimmedPhone = phone.trim()
+    if (trimmedPhone && !isValidVietnamPhone(trimmedPhone)) {
+      setPhoneError(t('profile.phone_invalid'))
+      hasError = true
+    } else {
+      setPhoneError(null)
+    }
+
+    if (hasError) return
+
+    setIsSaving(true)
+    try {
+      const normalizedPhone = trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined
+      await updateProfile({
+        name: cleanName,
+        phone: normalizedPhone,
+      })
+      setPhoneError(null)
+      toast.success(t('profile.save_success'))
+    } catch (err: any) {
+      toast.error(err?.message || t('profile.save_error'))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -171,17 +220,10 @@ export default function ProfilePage() {
             {/* Avatar & User Core */}
             <div className="flex flex-col items-center text-center space-y-3">
               <div className="relative">
-                {user.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-[#00c4de] shadow-md"
-                  />
-                ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center font-extrabold text-3xl border-4 border-[#00c4de]">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
                 <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#071317]" />
               </div>
 
@@ -323,28 +365,82 @@ export default function ProfilePage() {
 
             {/* Tab 1: General Info */}
             {activeTab === 'info' && (
-              <form onSubmit={handleUpdateName} className="p-6 sm:p-8 space-y-6">
+              <form onSubmit={handleUpdateProfile} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-4">
                   {/* Full Name */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
-                      {t('profile.label_fullname')} <span className="text-red-500">*</span>
+                      {t('profile.label_fullname')} <span className="text-rose-500 font-bold ml-0.5">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      maxLength={100}
+                      onChange={(e) => {
+                        setName(e.target.value)
+                        if (nameError) setNameError(null)
+                      }}
+                      onBlur={() => {
+                        if (!name.trim()) setNameError(t('profile.name_required'))
+                      }}
                       placeholder={t('profile.placeholder_fullname')}
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors outline-none ${
-                        isDark
-                          ? 'bg-black/30 border-white/15 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                          : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                      aria-invalid={!!nameError}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all outline-none ${
+                        nameError
+                          ? isDark
+                            ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                            : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                          : isDark
+                          ? 'bg-black/30 border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {t('profile.fullname_helper')}
-                    </p>
+                    {nameError ? (
+                      <p className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150">
+                        <WarningCircle size={14} weight="fill" className="shrink-0" />
+                        <span>{nameError}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {t('profile.fullname_helper')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Phone Number */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
+                      {t('profile.label_phone')}
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      maxLength={15}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      onBlur={handlePhoneBlur}
+                      placeholder={t('profile.placeholder_phone')}
+                      aria-invalid={!!phoneError}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all outline-none ${
+                        phoneError
+                          ? isDark
+                            ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                            : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                          : isDark
+                          ? 'bg-black/30 border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                      }`}
+                    />
+                    {phoneError ? (
+                      <p className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150">
+                        <WarningCircle size={14} weight="fill" className="shrink-0" />
+                        <span>{phoneError}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {t('profile.phone_helper')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Email (Read only) */}
@@ -389,13 +485,21 @@ export default function ProfilePage() {
                 <div className="pt-4 border-t border-gray-200 dark:border-white/10 flex justify-end">
                   <button
                     type="submit"
-                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer ${
+                    disabled={isSaving}
+                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                       isDark
                         ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/20'
                         : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
                     }`}
                   >
-                    {t('profile.btn_save')}
+                    {isSaving ? (
+                      <>
+                        <CircleNotch size={16} className="animate-spin" />
+                        <span>{t('profile.saving')}</span>
+                      </>
+                    ) : (
+                      <span>{t('profile.btn_save')}</span>
+                    )}
                   </button>
                 </div>
               </form>

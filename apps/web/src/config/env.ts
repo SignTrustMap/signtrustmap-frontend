@@ -22,7 +22,7 @@ function validateEnv(variables: Record<string, string | undefined>, requiredKeys
 export const env = {
   opsDomain:    import.meta.env.VITE_OPS_DOMAIN || '',
   publicDomain: import.meta.env.VITE_PUBLIC_DOMAIN || '',
-  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || '',
+  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || 'https://api.signmap.site',
   mapTileUrl:   import.meta.env.VITE_MAP_TILE_URL || '',
   aiApiUrl:     import.meta.env.VITE_AI_API_URL || 'https://ai.signmap.site',
   isDev:        import.meta.env.DEV,
