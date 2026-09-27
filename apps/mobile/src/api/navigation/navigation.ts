@@ -20,6 +20,11 @@ export type RouteSign = {
     actualCropUrl?: string;
     name: string;
     signCode: string;
+    freshnessScore?: number;
+    status?: string;
+    roadName?: string;
+    displayAddress?: string;
+    lastVerifiedAt?: string;
 };
 
 type DirectionsResponse = {

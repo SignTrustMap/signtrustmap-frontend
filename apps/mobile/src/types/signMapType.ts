@@ -61,6 +61,11 @@ export type VerifiedMapSign = {
     longitude: number;
     signCropUrl: string;
     signType: { nameEn: string; signCode: string };
+    freshnessScore?: number;
+    status?: VerifiedSignStatus;
+    lastVerifiedAt?: string;
+    roadName?: string;
+    displayAddress?: string;
 };
 
 export type FindSignsInBoundsResponse = { signs: VerifiedMapSign[] };

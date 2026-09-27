@@ -50,5 +50,10 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     actualCropUrl: resolveImageUrl(sign.signCropUrl),
     name: nameEn || signCode || 'Traffic Sign',
     signCode: signCode,
+    freshnessScore: sign.freshnessScore,
+    status: sign.status,
+    roadName: sign.roadName,
+    displayAddress: sign.displayAddress,
+    lastVerifiedAt: sign.lastVerifiedAt,
   };
 }

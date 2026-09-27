@@ -287,7 +287,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 count={2}
                 icon="map-search-outline"
                 label="Revalidation Map"
-                onPress={() => router.replace('/home')}
+                onPress={() => router.push('/work/revalidation-map' as any)}
                 subtitle="View the map to verify reported sign discrepancies"
               />
             </View>
