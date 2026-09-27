@@ -60,7 +60,7 @@ export type VerifiedMapSign = {
     latitude: number;
     longitude: number;
     signCropUrl: string;
-    signType: { nameEn: string; signCode: string };
+    signType: { nameEn: string; signCode: string; nameVi?: string };
     freshnessScore?: number;
     status?: VerifiedSignStatus;
     lastVerifiedAt?: string;
