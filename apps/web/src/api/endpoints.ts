@@ -48,4 +48,13 @@ export const API_ENDPOINTS = {
     REVALIDATION_LIST: '/api/v1/tasks/revalidations',
     SUBMIT_VOTE: (taskId: string) => `/api/v1/tasks/revalidations/${taskId}/vote`,
   },
+  NAVIGATION: {
+    ROUTING_DIRECTIONS: '/api/v1/routing/directions',
+    VEHICLE_MODES: '/api/v1/routing/vehicle-modes',
+    SIGNS_ALONG_ROUTE: '/api/v1/signs/along-route',
+    SIGNS_IN_BOUNDS: '/api/v1/signs',
+    ADDRESS_SEARCH: '/api/v1/addresses/search',
+    SAVED_PLACES: '/api/v1/places/saved',
+    RECENT_SEARCHES: '/api/v1/places/recent-searches',
+  },
 } as const

@@ -164,7 +164,7 @@ function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
       {!isBarePage && (
-        <div className="sticky top-0 z-40 w-full">
+        <div className="sticky top-0 z-[100] w-full">
           <AnnouncementBar />
           <Navbar />
         </div>

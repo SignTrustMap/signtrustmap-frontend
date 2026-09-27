@@ -283,3 +283,47 @@ html.light ::-webkit-scrollbar-thumb {
   color: #ffffff !important;
 }
 
+/* ─── Mobile-Style Sign Callout Popup ──────────────────────────── */
+.sign-callout-leaflet-popup .leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.sign-callout-leaflet-popup .leaflet-popup-content {
+  margin: 0 !important;
+  line-height: normal !important;
+}
+
+.sign-callout-leaflet-popup .leaflet-popup-tip-container {
+  margin-top: -2px !important;
+}
+
+/* ─── Google Maps Minimalist Attribution Bar ────────────────────── */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(6px);
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  color: #64748b !important;
+  border-top-left-radius: 8px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  margin: 0 !important;
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(7, 19, 23, 0.75) !important;
+  color: #94a3b8 !important;
+}
+
+.leaflet-control-attribution a {
+  color: inherit !important;
+  text-decoration: none !important;
+  font-weight: 500;
+}
+
+.leaflet-control-attribution a:hover {
+  text-decoration: underline !important;
+}
+

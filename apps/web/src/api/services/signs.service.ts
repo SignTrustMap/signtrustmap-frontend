@@ -3,8 +3,12 @@ import { API_ENDPOINTS } from '../endpoints'
 import {
   type SignItem,
   type SpatialSignsQueryParams,
+  type FindSignsInBoundsParams,
+  type RouteSign,
+  type VerifiedMapSign,
   mapGeoJSONFeatureToSignItem,
 } from '@shared/types'
+import { toRouteSign } from '@/features/product/utils/signUrlHelpers'
 
 export interface TrafficSignItem {
   id: string
@@ -27,6 +31,34 @@ export interface SignsFilterParams {
 }
 
 export const signsService = {
+  /**
+   * Fetch verified traffic signs within bounding box coordinates from NestJS backend (/signs).
+   * Exact endpoint used by mobile app.
+   */
+  getSignsInBounds: async (bounds: FindSignsInBoundsParams): Promise<RouteSign[]> => {
+    try {
+      const params = new URLSearchParams({
+        minLat: String(bounds.minLat),
+        minLon: String(bounds.minLon),
+        maxLat: String(bounds.maxLat),
+        maxLon: String(bounds.maxLon),
+      })
+      if (bounds.limit) params.set('limit', String(bounds.limit))
+
+      const response = await apiClient.get<any, { signs?: VerifiedMapSign[]; count?: number }>(
+        `${API_ENDPOINTS.NAVIGATION.SIGNS_IN_BOUNDS}?${params.toString()}`
+      )
+
+      if (Array.isArray(response?.signs)) {
+        return response.signs.map(toRouteSign)
+      }
+      return []
+    } catch (err) {
+      console.warn('[Signs] Failed to fetch signs in bounds from NestJS backend:', err)
+      return []
+    }
+  },
+
   /**
    * Phương án 1: Query FastAPI GIS (/api/v1/spatial/signs) with dynamic viewport bounding box.
    * Returns GeoJSON FeatureCollection and maps to SignItem[].

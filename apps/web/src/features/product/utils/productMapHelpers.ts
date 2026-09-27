@@ -180,3 +180,238 @@ export function createSignMarker({
 
   return marker
 }
+
+import type { RouteSign } from '@shared/types'
+
+interface CreateRouteSignMarkerParams {
+  sign: RouteSign
+  isDark: boolean
+  onSelect: (sign: RouteSign) => void
+}
+
+/**
+ * Creates a Leaflet Marker matching Mobile Navigation UX:
+ * - Uses representative sign icon from S3 CDN.
+ * - Displays Mobile-identical Sign Callout (Representative Icon, Sign Name, Sign Code, and Field Crop Thumbnail).
+ */
+export function createRouteSignMarker({
+  sign,
+  isDark,
+  onSelect,
+}: CreateRouteSignMarkerParams): L.Marker {
+  const iconUrl = sign.imageUrl || '/leaflet/marker-icon.png'
+  const signTitle = sign.name || sign.signCode || 'Biển báo giao thông'
+  const signCode = sign.signCode || ''
+
+  const customIcon = L.divIcon({
+    className: 'custom-mobile-sign-marker',
+    html: `
+      <div style="
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
+        transition: transform 0.18s ease;
+      "
+      onmouseover="this.style.transform='scale(1.15)';"
+      onmouseout="this.style.transform='scale(1)';"
+      >
+        <img
+          src="${iconUrl}"
+          alt="${signTitle}"
+          style="width: 36px; height: 36px; object-fit: contain; pointer-events: none;"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div style="
+          display: none;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #007b8b;
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 11px;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #ffffff;
+        ">
+          ${signCode || '🚦'}
+        </div>
+      </div>
+    `,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
+    popupAnchor: [0, -20],
+  })
+
+  // Leaflet uses [latitude, longitude]
+  const marker = L.marker([sign.coordinate[1], sign.coordinate[0]], { icon: customIcon })
+
+  const cardBg = isDark ? '#071317' : '#ffffff'
+  const textColor = isDark ? '#f8fafc' : '#09233c'
+  const subColor = isDark ? '#94a3b8' : '#64748b'
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#e2e8f0'
+  const badgeBg = isDark ? '#142a30' : '#f1f5f9'
+  const badgeText = isDark ? '#38bdf8' : '#0284c7'
+
+  const actualCropHtml = sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl
+    ? `
+      <div style="display: flex; flex-direction: column; align-items: center; margin-left: 8px;">
+        <img
+          src="${sign.actualCropUrl}"
+          alt="Ảnh thực địa camera"
+          title="Click để phóng to ảnh thực địa camera"
+          data-crop-preview="${sign.actualCropUrl}"
+          style="
+            width: 38px;
+            height: 38px;
+            border-radius: 6px;
+            border: 1px solid ${borderColor};
+            object-fit: cover;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+          "
+        />
+        <span style="font-size: 9px; color: ${subColor}; margin-top: 2px; font-weight: 600;">Ảnh thực địa</span>
+      </div>
+    `
+    : ''
+
+  const popupHtml = `
+    <div style="
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 10px 12px;
+      background: ${cardBg};
+      color: ${textColor};
+      border-radius: 14px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+      border: 1px solid ${borderColor};
+      min-width: 220px;
+      max-width: 280px;
+    ">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <img
+          src="${iconUrl}"
+          alt="${signTitle}"
+          style="width: 36px; height: 36px; object-fit: contain; flex-shrink: 0;"
+          onerror="this.style.display='none';"
+        />
+        <div style="flex: 1; min-width: 0;">
+          <div style="
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.3;
+            color: ${textColor};
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+          ">
+            ${signTitle}
+          </div>
+          ${
+            signCode
+              ? `
+            <div style="margin-top: 3px;">
+              <span style="
+                display: inline-block;
+                background: ${badgeBg};
+                color: ${badgeText};
+                padding: 1px 6px;
+                border-radius: 4px;
+                font-size: 10.5px;
+                font-family: monospace;
+                font-weight: 700;
+              ">
+                ${signCode}
+              </span>
+            </div>
+          `
+              : ''
+          }
+        </div>
+        ${actualCropHtml}
+      </div>
+    </div>
+  `
+
+  marker.bindPopup(popupHtml, {
+    closeButton: false,
+    className: 'sign-callout-leaflet-popup',
+    offset: [0, -18],
+    autoPan: true,
+  })
+
+  marker.on('click', () => {
+    onSelect(sign)
+  })
+
+  return marker
+}
+
+/**
+ * Creates a Leaflet marker representing the user's current GPS location with a pulsing halo.
+ * Visually identical to mobile's driver location indicator (pulsing cyan/teal halo with solid dot).
+ */
+export function createCurrentLocationMarker(
+  lat: number,
+  lng: number,
+  isDark: boolean
+): L.Marker {
+  const primaryColor = isDark ? '#00c4de' : '#007b8b'
+  const haloColor = isDark ? 'rgba(0, 196, 222, 0.2)' : 'rgba(0, 123, 139, 0.16)'
+  const pulseColor = isDark ? 'rgba(0, 196, 222, 0.35)' : 'rgba(0, 123, 139, 0.28)'
+
+  const customIcon = L.divIcon({
+    className: 'current-location-marker-container',
+    html: `
+      <div style="
+        width: 52px;
+        height: 52px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      ">
+        <div style="
+          position: absolute;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: ${haloColor};
+          border: 1px solid ${primaryColor}40;
+        "></div>
+        <div style="
+          position: absolute;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: ${pulseColor};
+          animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        "></div>
+        <div style="
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: ${primaryColor};
+          border: 2.5px solid #ffffff;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+          position: relative;
+          z-index: 2;
+        "></div>
+      </div>
+    `,
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
+  })
+
+  return L.marker([lat, lng], {
+    icon: customIcon,
+    zIndexOffset: 1000,
+  })
+}
+

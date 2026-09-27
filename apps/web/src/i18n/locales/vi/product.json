@@ -79,14 +79,18 @@
   },
   "map_page": {
     "eyebrow": "HẠ TẦNG BẢN ĐỒ GIS • CHUẨN QCVN 41:2019/BGTVT",
-    "title": "Bản Đồ Không Gian Biển Báo Giao Thông",
+    "title": "Bản Đồ Biển Báo Giao Thông",
     "subtitle": "Tra cứu, kiểm tra vị trí và dữ liệu góc hướng áp dụng của biển báo trên nền tảng OpenStreetMap.",
+    "subtitle_auth": "Tra cứu điểm đến, khảo sát lộ trình và theo dõi biển báo trên tuyến di chuyển",
+    "subtitle_guest": "Khám phá trực tiếp vị trí các biển báo giao thông đã được chuẩn hóa",
     "search_placeholder": "Tìm theo mã biển báo, tên biển hoặc tuyến đường...",
     "group_label": "Nhóm:",
     "showing_count": "Hiển thị:",
     "signs_unit": "biển",
-    "tile_osm": "OpenStreetMap",
-    "tile_voyager": "Bản đồ Esri",
+    "tile_osm": "Bản đồ OSM",
+    "tile_voyager": "Bản đồ đường phố (Esri)",
+    "my_location": "Vị trí của tôi",
+    "recenter_route": "Xem lộ trình",
     "telemetry_live": "OPENSTREETMAP LIVE",
     "telemetry_standard": "WGS 84 • QCVN 41:2019",
     "sign_list_title": "Danh sách biển báo",
@@ -138,6 +142,13 @@
       "btn_submitting": "Đang gửi báo cáo...",
       "btn_submit": "Gửi Báo Cáo Sự Cố",
       "toast_success": "Đã gửi báo cáo sự cố biển {{code}}! Đội ngũ vận hành sẽ kiểm tra xác minh."
+    },
+    "guest_banner": {
+      "aria_label": "Thông báo chế độ khách vãng lai",
+      "title": "CHẾ ĐỘ KHÁCH VÃNG LAI",
+      "desc": "Bạn đang xem bản đồ công khai. Đăng nhập để mở khóa thanh tìm kiếm địa điểm, lộ trình và danh sách biển báo dọc đường.",
+      "btn_login": "Đăng nhập ngay",
+      "close_tooltip": "Đóng thông báo"
     },
     "groups": {
       "ALL": "Tất cả",

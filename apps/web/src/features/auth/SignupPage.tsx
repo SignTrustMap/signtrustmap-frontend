@@ -144,6 +144,14 @@ export default function Signup() {
               : 'from-[#F8F7F7]/90 via-[#F8F7F7]/60 to-[#F8F7F7]'
           }`}
         />
+        <div
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, #00c4de 1px, transparent 1px), linear-gradient(to right, #00c4de 1px, transparent 1px), linear-gradient(to bottom, #00c4de 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
       </div>
 
       <div className="w-full max-w-md relative z-10 mx-auto">

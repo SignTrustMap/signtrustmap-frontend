@@ -79,14 +79,18 @@
   },
   "map_page": {
     "eyebrow": "GIS MAP INFRASTRUCTURE • QCVN 41:2019/BGTVT STANDARD",
-    "title": "Spatial Traffic Sign Map",
+    "title": "Traffic Signs Map",
     "subtitle": "Query, inspect positions and direction-aware telemetry of traffic signs on OpenStreetMap.",
+    "subtitle_auth": "Search destinations, preview route telemetry, and follow road signs along your journey",
+    "subtitle_guest": "Explore standardized traffic sign positions and verified telemetry directly on the map",
     "search_placeholder": "Search by sign code (P.102, R.301...), name or street...",
     "group_label": "Group:",
     "showing_count": "Showing:",
     "signs_unit": "signs",
-    "tile_osm": "OpenStreetMap",
-    "tile_voyager": "Esri Streets",
+    "tile_osm": "OSM Map",
+    "tile_voyager": "Street Map (Esri)",
+    "my_location": "My Location",
+    "recenter_route": "View Route",
     "telemetry_live": "OPENSTREETMAP LIVE",
     "telemetry_standard": "WGS 84 • QCVN 41:2019",
     "sign_list_title": "Traffic Signs Directory",
@@ -138,6 +142,13 @@
       "btn_submitting": "Submitting report...",
       "btn_submit": "Submit Issue Report",
       "toast_success": "Issue report submitted for sign {{code}}! Operations team will investigate."
+    },
+    "guest_banner": {
+      "aria_label": "Guest Mode Notification",
+      "title": "GUEST MODE",
+      "desc": "You are viewing the public map. Sign in to unlock place search, routing, and signs along the route.",
+      "btn_login": "Sign In Now",
+      "close_tooltip": "Dismiss notification"
     },
     "groups": {
       "ALL": "All",
