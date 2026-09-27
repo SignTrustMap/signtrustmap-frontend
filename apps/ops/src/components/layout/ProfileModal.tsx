@@ -197,12 +197,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/70'}`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="relative shrink-0">
+              <div className="shrink-0">
                 <Avatar size="xl" className="border-2 border-[#00c4de] shadow-md">
                   <AvatarImage src={user.avatar} alt={user.name} />
                   <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#071317]" />
               </div>
 
               <div className="min-w-0 flex-1 space-y-1.5">

@@ -200,13 +200,10 @@ export default function ProfilePage() {
             }`}
           >
             <div className="flex flex-col items-center text-center space-y-3">
-              <div className="relative">
-                <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-                </Avatar>
-                <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#071317]" />
-              </div>
+              <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
+                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              </Avatar>
 
               <div className="space-y-1 w-full">
                 <h2 className="text-xl font-extrabold text-gray-900 dark:text-white break-words">
