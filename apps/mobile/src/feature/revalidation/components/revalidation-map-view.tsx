@@ -1,5 +1,5 @@
 import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { RouteSign } from '@/api/navigation/navigation';
@@ -13,10 +13,13 @@ export type RevalidationMapViewProps = {
   signs?: RouteSign[];
   selectedSignId?: string | null;
   onSignPress?: (sign: RouteSign) => void;
+  onMapPress?: () => void;
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
   userCoordinate?: MapCoordinate;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
+  zoomLevel?: number;
+  zoomRequestId?: number;
 };
 
 const mapTileUrl =
@@ -50,10 +53,13 @@ export function RevalidationMapView({
   signs = [],
   selectedSignId,
   onSignPress,
+  onMapPress,
   onBoundsChange,
   userCoordinate,
   focusCoordinate,
   focusRequestId = 0,
+  zoomLevel,
+  zoomRequestId = 0,
 }: RevalidationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
@@ -81,6 +87,15 @@ export function RevalidationMapView({
 
   const { Camera, Map, Marker } = mapLibre;
 
+  useEffect(() => {
+    if (zoomLevel === undefined || !cameraRef.current) return;
+    cameraRef.current.setStop({
+      zoom: zoomLevel,
+      duration: 600,
+      easing: 'ease',
+    });
+  }, [zoomLevel, zoomRequestId]);
+
   return (
     <Map
       attribution
@@ -92,6 +107,7 @@ export function RevalidationMapView({
       onDidFinishLoadingMap={() => {
         void mapRef.current?.getBounds().then(reportBounds).catch(() => {});
       }}
+      onPress={() => onMapPress?.()}
       onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) =>
         reportBounds(event.nativeEvent.bounds)
       }
@@ -109,7 +125,7 @@ export function RevalidationMapView({
           maxZoom={19}
           minZoom={10}
           ref={cameraRef}
-          zoom={16.5}
+          zoom={zoomLevel ?? 16.5}
         />
       ) : userCoordinate ? (
         <Camera
@@ -120,7 +136,7 @@ export function RevalidationMapView({
           maxZoom={19}
           minZoom={10}
           ref={cameraRef}
-          zoom={15.5}
+          zoom={zoomLevel ?? 15.5}
         />
       ) : (
         <Camera
@@ -130,7 +146,7 @@ export function RevalidationMapView({
           maxZoom={19}
           minZoom={10}
           ref={cameraRef}
-          zoom={14}
+          zoom={zoomLevel ?? 14}
         />
       )}
 
@@ -150,14 +166,6 @@ export function RevalidationMapView({
         );
       })}
 
-      {/* User Current Location Indicator */}
-      {userCoordinate ? (
-        <Marker anchor="center" id="reval-current-location" lngLat={userCoordinate}>
-          <View style={styles.currentLocationHalo}>
-            <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
-          </View>
-        </Marker>
-      ) : null}
     </Map>
   );
 }
@@ -167,23 +175,6 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-  },
-  currentLocationHalo: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(6, 113, 235, 0.22)',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  currentLocationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   fallback: {
     flex: 1,

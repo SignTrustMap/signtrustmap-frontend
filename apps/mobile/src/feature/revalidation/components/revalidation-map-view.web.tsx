@@ -13,10 +13,13 @@ export type RevalidationMapViewProps = {
   signs?: RouteSign[];
   selectedSignId?: string | null;
   onSignPress?: (sign: RouteSign) => void;
+  onMapPress?: () => void;
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
   userCoordinate?: MapCoordinate;
   focusCoordinate?: MapCoordinate;
   focusRequestId?: number;
+  zoomLevel?: number;
+  zoomRequestId?: number;
 };
 
 const mapTileUrl =
@@ -126,42 +129,27 @@ function createWebSignMarkerElement(sign: RouteSign, isSelected: boolean, onClic
   return container;
 }
 
-function createUserLocationMarkerElement(primaryColor: string) {
-  const marker = document.createElement('div');
-  marker.style.width = '26px';
-  marker.style.height = '26px';
-  marker.style.borderRadius = '13px';
-  marker.style.background = 'rgba(6, 113, 235, 0.22)';
-  marker.style.border = '1.5px solid #FFFFFF';
-  marker.style.display = 'flex';
-  marker.style.alignItems = 'center';
-  marker.style.justifyContent = 'center';
-
-  const dot = document.createElement('div');
-  dot.style.width = '12px';
-  dot.style.height = '12px';
-  dot.style.borderRadius = '6px';
-  dot.style.background = primaryColor;
-  dot.style.border = '2px solid #FFFFFF';
-  marker.appendChild(dot);
-
-  return marker;
-}
-
 export function RevalidationMapView({
   signs = [],
   selectedSignId,
   onSignPress,
+  onMapPress,
   onBoundsChange,
   userCoordinate,
   focusCoordinate,
   focusRequestId = 0,
+  zoomLevel,
+  zoomRequestId = 0,
 }: RevalidationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const signMarkersRef = useRef<Marker[]>([]);
-  const userMarkerRef = useRef<Marker | null>(null);
+  const onMapPressRef = useRef(onMapPress);
+
+  useEffect(() => {
+    onMapPressRef.current = onMapPress;
+  }, [onMapPress]);
 
   const initialCenter = userCoordinate ?? focusCoordinate ?? [106.6955, 10.7769];
 
@@ -183,9 +171,13 @@ export function RevalidationMapView({
 
     map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
 
+    const handleMapClick = () => {
+      onMapPressRef.current?.();
+    };
+    map.on('click', handleMapClick);
+
     return () => {
-      userMarkerRef.current?.remove();
-      userMarkerRef.current = null;
+      map.off('click', handleMapClick);
       signMarkersRef.current.forEach((m) => m.remove());
       signMarkersRef.current = [];
       mapRef.current = null;
@@ -242,33 +234,17 @@ export function RevalidationMapView({
     };
   }, [signs, selectedSignId, onSignPress]);
 
-  // Update User Marker
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (!userCoordinate) {
-      userMarkerRef.current?.remove();
-      userMarkerRef.current = null;
-      return;
-    }
-
-    if (!userMarkerRef.current) {
-      userMarkerRef.current = new Marker({
-        element: createUserLocationMarkerElement(theme.primary),
-      })
-        .setLngLat(userCoordinate)
-        .addTo(map);
-    } else {
-      userMarkerRef.current.setLngLat(userCoordinate);
-    }
-  }, [userCoordinate, theme.primary]);
-
   // Focus Coordinate FlyTo
   useEffect(() => {
     if (!focusCoordinate || !mapRef.current) return;
-    mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: 16.5 });
-  }, [focusCoordinate, focusRequestId]);
+    mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: zoomLevel ?? 16.5 });
+  }, [focusCoordinate, focusRequestId, zoomLevel]);
+
+  // Zoom Level change
+  useEffect(() => {
+    if (zoomLevel === undefined || !mapRef.current) return;
+    mapRef.current.easeTo({ zoom: zoomLevel, duration: 600 });
+  }, [zoomLevel, zoomRequestId]);
 
   return <View ref={mapContainerRef as any} style={styles.map} />;
 }

@@ -21,12 +21,14 @@ interface RevalidationSignDetailsCardProps {
   sign: RouteSign;
   onClose: () => void;
   onRevalidate?: (sign: RouteSign) => void;
+  onCardHeightChange?: (height: number) => void;
 }
 
 export function RevalidationSignDetailsCard({
   sign,
   onClose,
   onRevalidate,
+  onCardHeightChange,
 }: RevalidationSignDetailsCardProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -146,6 +148,9 @@ export function RevalidationSignDetailsCard({
 
   return (
     <Animated.View
+      onLayout={(e) => onCardHeightChange?.(e.nativeEvent.layout.height)}
+      onStartShouldSetResponder={() => true}
+      onTouchEnd={(e) => e.stopPropagation()}
       style={[
         styles.cardContainer,
         {
