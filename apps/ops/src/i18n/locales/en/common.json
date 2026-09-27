@@ -61,6 +61,7 @@
     "credits_approval": "Credit Approvals"
   },
   "common": {
+    "loading_page": "Loading page...",
     "toggle_sidebar": "Collapse / Expand menu",
     "expand_sidebar": "Expand menu",
     "collapse_sidebar": "Collapse menu",

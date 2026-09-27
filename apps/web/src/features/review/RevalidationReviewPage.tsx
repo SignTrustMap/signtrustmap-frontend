@@ -17,6 +17,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { mockRevalidationCandidates, type RevalidationCandidate } from '@/data'
+import { PageHeader } from '@shared/ui'
 
 type ImageViewMode = 'crop' | 'context'
 
@@ -143,43 +144,46 @@ export function RevalidationReviewPage() {
       }`}
     >
       <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 space-y-4 text-left">
-        {/* ─── Top Bar: Navigation & Progress ─────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200 dark:border-white/10">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/review"
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
-                isDark
-                  ? 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10 hover:text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-200'
-              }`}
-            >
-              <ArrowLeft size={15} weight="bold" />
-              <span>{t('reviewer.btn_back_to_hub')}</span>
-            </Link>
+        {/* ─── Top Bar: Navigation & Progress (Standardized via PageHeader) ───── */}
+        <PageHeader
+          title={
+            <div className="flex items-center gap-3">
+              <Link
+                to="/review"
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
+                  isDark
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10 hover:text-white'
+                    : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-200'
+                }`}
+              >
+                <ArrowLeft size={15} weight="bold" />
+                <span>{t('reviewer.btn_back_to_hub')}</span>
+              </Link>
 
-            <div className="h-4 w-px bg-gray-200 dark:bg-white/10 hidden sm:block" />
+              <div className="h-4 w-px bg-gray-200 dark:bg-white/10 hidden sm:block" />
 
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30">
-                {t('reviewer.queue_reval_badge')}
-              </span>
-              <span className="text-xs font-bold text-gray-900 dark:text-gray-100 font-mono">
-                {t('reviewer.progress_counter', {
-                  current: candidates.length > 0 ? currentIndex + 1 : 0,
-                  total: candidates.length,
-                })}
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-extrabold text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30">
+                  {t('reviewer.queue_reval_badge')}
+                </span>
+                <span className="text-sm font-bold text-gray-900 dark:text-gray-100 font-mono">
+                  {t('reviewer.progress_counter', {
+                    current: candidates.length > 0 ? currentIndex + 1 : 0,
+                    total: candidates.length,
+                  })}
+                </span>
+              </div>
+            </div>
+          }
+          actions={
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+              <span className="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-white/5 px-3 py-1 rounded-lg border border-gray-200 dark:border-white/10 font-mono text-[11px]">
+                {t('reviewer.reval_hotkey_tip')}
               </span>
             </div>
-          </div>
-
-          {/* Clean Hotkey Tip */}
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-            <span className="inline-flex items-center gap-1.5 bg-gray-100 dark:bg-white/5 px-3 py-1 rounded-lg border border-gray-200 dark:border-white/10 font-mono text-[11px]">
-              {t('reviewer.reval_hotkey_tip')}
-            </span>
-          </div>
-        </div>
+          }
+          bordered
+        />
 
         {/* ─── Main Comparison Screen (Split View) ───────────────────────────── */}
         {!currentCandidate ? (

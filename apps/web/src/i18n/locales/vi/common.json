@@ -1,5 +1,6 @@
 {
   "common": {
+    "loading_page": "Đang tải trang...",
     "close": "Đóng",
     "copy": "Sao chép",
     "copied": "Đã sao chép",

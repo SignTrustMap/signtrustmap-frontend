@@ -237,7 +237,7 @@ export default function Login() {
         ))}
       </div>
 
-      <div className="w-full max-w-[460px] relative z-10 mx-auto">
+      <div className="w-full max-w-md relative z-10 mx-auto">
         <div
           className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
               ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'

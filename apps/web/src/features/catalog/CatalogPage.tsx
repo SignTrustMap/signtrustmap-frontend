@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { mockTrafficCatalog, type TrafficCatalogSign } from '@/data'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
+import { PageHeader } from '@/components/common/PageHeader'
 import { CatalogDetailModal } from './components/CatalogDetailModal'
 import { ProposeSignModal } from './components/ProposeSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
@@ -258,17 +259,11 @@ export default function CatalogPage() {
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10 text-left">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('catalog.title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl leading-relaxed">
-              {t('catalog.subtitle')}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+        <PageHeader
+          title={t('catalog.title')}
+          subtitle={t('catalog.subtitle')}
+          bordered
+          actions={
             <div
               className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border transition-colors ${
                 isDark
@@ -287,8 +282,8 @@ export default function CatalogPage() {
                 </span>
               </div>
             </div>
-          </div>
-        </div>
+          }
+        />
 
         <div
           className={`rounded-2xl border p-4 sm:p-5 text-left transition-colors ${

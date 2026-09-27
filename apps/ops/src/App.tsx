@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { SidebarProvider } from '@/context/SidebarContext'
@@ -36,11 +37,14 @@ const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
 const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
 
 function PageLoadingFallback() {
+  const { t } = useTranslation('common')
   return (
     <div className="flex items-center justify-center min-h-[50vh] w-full">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 rounded-full border-2 border-[#00c4de]/20 border-t-[#00c4de] animate-spin" />
-        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">Đang tải trang...</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">
+          {t('common.loading_page', 'Đang tải trang...')}
+        </span>
       </div>
     </div>
   )

@@ -332,13 +332,13 @@ export default function LoginPage() {
         </div>
       </header>
 
-      <div className="h-16 sm:h-[72px] shrink-0 pointer-events-none" aria-hidden="true" />
+      <div className="h-16 sm:h-18 shrink-0 pointer-events-none" aria-hidden="true" />
 
       <main className="relative z-20 flex-1 flex items-center justify-center px-4 py-8 w-full">
-        <div className="relative w-full max-w-[1280px] flex flex-col items-center justify-center">
+        <div className="relative w-full max-w-7xl flex flex-col items-center justify-center">
 
           <div
-            className={`w-full max-w-[460px] rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
+            className={`w-full max-w-md rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
               isDark
                 ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
                 : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
@@ -532,7 +532,7 @@ export default function LoginPage() {
             </form>
           </div>
 
-          <div className="md:hidden flex items-center justify-between w-full max-w-[460px] px-3 mt-3">
+          <div className="md:hidden flex items-center justify-between w-full max-w-md px-3 mt-3">
             <div className="flex gap-2">
               {unauthorizedAccounts.map((acc) => (
                 <button

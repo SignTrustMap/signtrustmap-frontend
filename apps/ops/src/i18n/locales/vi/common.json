@@ -61,6 +61,7 @@
     "credits_approval": "Xét duyệt Credits"
   },
   "common": {
+    "loading_page": "Đang tải trang...",
     "toggle_sidebar": "Thu hẹp / Mở rộng menu",
     "expand_sidebar": "Mở rộng menu",
     "collapse_sidebar": "Thu hẹp menu",

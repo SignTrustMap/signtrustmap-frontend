@@ -187,7 +187,7 @@ export function ReviewerMiniMap({
           isDark ? 'bg-white/[0.03] border-white/10 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'
         }`}
       >
-        <span className="flex items-center gap-1.5 font-bold truncate max-w-[200px] text-gray-900 dark:text-gray-100">
+        <span className="flex items-center gap-1.5 font-bold truncate max-w-52 text-gray-900 dark:text-gray-100">
           <MapPin size={13} className="text-red-500 shrink-0" weight="fill" />
           <span className="truncate">{roadName}</span>
         </span>

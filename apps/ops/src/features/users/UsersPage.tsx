@@ -584,7 +584,7 @@ export default function UsersPage() {
                       }
                       options={roleOptions}
                       className="w-full"
-                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-[38px]"
+                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-10"
                     />
                   </div>
 
@@ -603,7 +603,7 @@ export default function UsersPage() {
                       }
                       options={statusOptions}
                       className="w-full"
-                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-[38px]"
+                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-10"
                     />
                   </div>
 

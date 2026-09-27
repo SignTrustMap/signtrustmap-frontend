@@ -1,5 +1,6 @@
 {
   "common": {
+    "loading_page": "Loading page...",
     "close": "Close",
     "copy": "Copy",
     "copied": "Copied",

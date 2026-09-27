@@ -384,7 +384,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                     {t('profile.badge_role', { defaultValue: 'Vai trò hệ thống' })}
                   </label>
-                  <div className={`flex items-center gap-2.5 h-[42px] px-3.5 rounded-xl border ${
+                  <div className={`flex items-center gap-2.5 h-10 px-3.5 rounded-xl border ${
                     isDark
                       ? 'border-white/10 bg-white/5'
                       : 'border-gray-200 bg-gray-50'

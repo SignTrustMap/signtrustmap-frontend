@@ -24,6 +24,7 @@ import {
 } from '@/data'
 import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
 import { ReviewHistoryDrawer } from './components/ReviewHistoryDrawer'
+import { PageHeader } from '@shared/ui'
 
 export function ReviewerHubPage() {
   const { t } = useTranslation('common')
@@ -65,51 +66,46 @@ export function ReviewerHubPage() {
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* ─── 1. Page Header ─────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-white/10 text-left">
-          <div className="space-y-1.5">
-            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-              {t('reviewer.hub_title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed">
-              {t('reviewer.hub_subtitle')}
-            </p>
-          </div>
+        {/* ─── 1. Page Header (Standardized via PageHeader) ─────────────────── */}
+        <PageHeader
+          title={t('reviewer.hub_title')}
+          subtitle={t('reviewer.hub_subtitle')}
+          bordered
+          actions={
+            <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={() => setShowNewSignModal(true)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
+                  isDark
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/15'
+                    : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-200'
+                }`}
+              >
+                <PlusCircle size={17} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
+                <span>{t('reviewer.btn_report_new')}</span>
+              </button>
 
-          {/* Quick Header Actions (Removed Standard Catalog button per user instruction) */}
-          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowNewSignModal(true)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
-                isDark
-                  ? 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/15'
-                  : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-200'
-              }`}
-            >
-              <PlusCircle size={17} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
-              <span>{t('reviewer.btn_report_new')}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowHistoryDrawer(true)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
-                isDark
-                  ? 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/15'
-                  : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-200'
-              }`}
-            >
-              <ClockCounterClockwise size={17} weight="bold" className="text-amber-500 dark:text-amber-400" />
-              <span>{t('reviewer.btn_open_history')}</span>
-              {historyItems.length > 0 && (
-                <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de]">
-                  {historyItems.length}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
+              <button
+                type="button"
+                onClick={() => setShowHistoryDrawer(true)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98] ${
+                  isDark
+                    ? 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/15'
+                    : 'bg-white hover:bg-gray-50 text-gray-800 border-gray-200'
+                }`}
+              >
+                <ClockCounterClockwise size={17} weight="bold" className="text-amber-500 dark:text-amber-400" />
+                <span>{t('reviewer.btn_open_history')}</span>
+                {historyItems.length > 0 && (
+                  <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de]">
+                    {historyItems.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          }
+        />
 
         {/* ─── 2. Top Stats Strip ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

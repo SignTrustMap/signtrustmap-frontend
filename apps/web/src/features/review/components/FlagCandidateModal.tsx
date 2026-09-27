@@ -170,7 +170,7 @@ export function FlagCandidateModal({
         </div>
 
         {/* Reason Selector Grid */}
-        <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
           {reasons.map((item) => {
             const isSelected = selectedReason === item.code
             const IconComponent = item.icon

@@ -25,7 +25,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { opsPortalUrl } from '@/config/env'
-import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
+import { Avatar, AvatarImage, AvatarFallback, getInitials, PageHeader } from '@shared/ui'
 
 /**
  * Dedicated Account Profile view for SignTrustMap Community Portal.
@@ -182,14 +182,11 @@ export default function ProfilePage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="pb-2 border-b border-gray-200 dark:border-white/10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            {t('profile.modal_title')}
-          </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {t('profile.subtitle')}
-          </p>
-        </div>
+        <PageHeader
+          title={t('profile.modal_title')}
+          subtitle={t('profile.subtitle')}
+          bordered
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div
@@ -227,7 +224,7 @@ export default function ProfilePage() {
                 title={t('profile.copy_email')}
               >
                 <Envelope size={15} className="text-gray-500 dark:text-gray-400 shrink-0" />
-                <span className="truncate max-w-[200px]">{user.email}</span>
+                <span className="truncate max-w-52">{user.email}</span>
                 {copiedEmail ? (
                   <Check size={14} className="text-emerald-500 font-bold shrink-0" />
                 ) : (

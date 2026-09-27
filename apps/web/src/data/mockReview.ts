@@ -235,6 +235,8 @@ export const mockReviewerMetrics = {
   creditsEarned: 890,
 }
 
+export type ReviewerMetrics = typeof mockReviewerMetrics
+
 export const mockReviewSessionHistory: ReviewHistoryItem[] = [
   {
     id: 'HIST-101',

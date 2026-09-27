@@ -61,7 +61,7 @@ export function Footer() {
                 Sign<span className={isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'}>Trust</span>Map
               </span>
             </Link>
-            <p className={`text-xs leading-relaxed max-w-[220px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className={`text-xs leading-relaxed max-w-56 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               {t('footer.description')}
             </p>
 
@@ -78,7 +78,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className={`w-8 h-8 flex items-center justify-center rounded-[8px] border transition-colors ${
+                  className={`w-8 h-8 flex items-center justify-center rounded-md border transition-colors ${
                     isDark
                       ? 'border-white/10 text-gray-400 hover:text-[#00c4de] hover:border-[#00c4de]/40 bg-white/[0.02]'
                       : 'border-gray-200 text-gray-600 hover:text-[#007b8b] hover:border-[#007b8b]/40 bg-gray-50'

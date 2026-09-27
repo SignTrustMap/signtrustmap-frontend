@@ -19,6 +19,7 @@ import {
 import { SurveyDetailModal } from './components'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
+import { PageHeader } from '@/components/common/PageHeader'
 
 export default function SurveyHistoryPage() {
   const { isDark } = useTheme()
@@ -180,43 +181,39 @@ export default function SurveyHistoryPage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* ─── Page Header (Matching ProfilePage style) ────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('survey.history_title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('survey.history_subtitle')}
-            </p>
-          </div>
+        {/* ─── Page Header (Standardized via PageHeader) ───────────────────── */}
+        <PageHeader
+          title={t('survey.history_title')}
+          subtitle={t('survey.history_subtitle')}
+          bordered
+          actions={
+            <>
+              <Link
+                to="/survey/revalidation"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
+                  isDark
+                    ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
+                    : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
+                }`}
+              >
+                <ClockCounterClockwise size={16} weight="bold" />
+                <span>{t('survey.btn_revalidation')}</span>
+              </Link>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <Link
-              to="/survey/revalidation"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
-                isDark
-                  ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
-                  : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
-              }`}
-            >
-              <ClockCounterClockwise size={16} weight="bold" />
-              <span>{t('survey.btn_revalidation')}</span>
-            </Link>
-
-            <Link
-              to="/survey"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
-                isDark
-                  ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                  : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
-              }`}
-            >
-              <Plus size={16} weight="bold" />
-              <span>{t('survey.btn_new_survey')}</span>
-            </Link>
-          </div>
-        </div>
+              <Link
+                to="/survey"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
+                  isDark
+                    ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
+                    : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                }`}
+              >
+                <Plus size={16} weight="bold" />
+                <span>{t('survey.btn_new_survey')}</span>
+              </Link>
+            </>
+          }
+        />
 
         {/* ─── 4 Clean, Unified KPI Summary Cards ──────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -407,7 +404,7 @@ export default function SurveyHistoryPage() {
                         </div>
                       </div>
 
-                      <div className="text-right min-w-[70px]">
+                      <div className="text-right min-w-18">
                         <span className="text-[11px] uppercase font-bold tracking-wider text-gray-600 dark:text-gray-400 block">
                           Credits
                         </span>

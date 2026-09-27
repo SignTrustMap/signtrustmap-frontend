@@ -660,7 +660,7 @@ export default function MapPage() {
                     <span className="text-[10px] font-mono text-gray-400 uppercase mb-1.5 block truncate">
                       {t('map.sec_camera_crop')}
                     </span>
-                    <div className="relative rounded-lg overflow-hidden flex-1 min-h-[56px] bg-black border border-gray-200 dark:border-white/10">
+                    <div className="relative rounded-lg overflow-hidden flex-1 min-h-14 bg-black border border-gray-200 dark:border-white/10">
                       <img
                         src={selectedSign.imageUrl}
                         alt={selectedSign.name}

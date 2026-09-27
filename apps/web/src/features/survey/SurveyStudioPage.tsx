@@ -22,6 +22,7 @@ import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { mockSurveySubmissions } from '@/data'
 import { PhotoLocationPicker } from './components'
+import { PageHeader } from '@shared/ui'
 
 export default function SurveyStudioPage() {
   const { isDark } = useTheme()
@@ -187,44 +188,39 @@ export default function SurveyStudioPage() {
       }`}
     >
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-6 text-left">
-        {/* ─── Page Header (Matching ProfilePage & SurveyHistoryPage) ──────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('survey.title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl leading-relaxed">
-              {t('survey.subtitle')}
-            </p>
-          </div>
+        {/* ─── Page Header (Standardized via PageHeader) ───────────────────── */}
+        <PageHeader
+          title={t('survey.title')}
+          subtitle={t('survey.subtitle')}
+          bordered
+          actions={
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Link
+                to="/survey/revalidation"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
+                  isDark
+                    ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
+                    : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
+                }`}
+              >
+                <ClockCounterClockwise size={16} weight="bold" />
+                <span>{t('survey.btn_revalidation')}</span>
+              </Link>
 
-          {/* Header Action Buttons */}
-          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
-            <Link
-              to="/survey/revalidation"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
-                isDark
-                  ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
-                  : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
-              }`}
-            >
-              <ClockCounterClockwise size={16} weight="bold" />
-              <span>{t('survey.btn_revalidation')}</span>
-            </Link>
-
-            <Link
-              to="/survey/history"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
-                isDark
-                  ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
-                  : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-800'
-              }`}
-            >
-              <Clock size={16} />
-              <span>{t('survey.btn_view_history')}</span>
-            </Link>
-          </div>
-        </div>
+              <Link
+                to="/survey/history"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
+                  isDark
+                    ? 'bg-white/5 hover:bg-white/10 border-white/15 text-gray-200'
+                    : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-800'
+                }`}
+              >
+                <Clock size={16} />
+                <span>{t('survey.btn_view_history')}</span>
+              </Link>
+            </div>
+          }
+        />
 
         {/* ─── Compact Contributor Reward Policy Strip ─────────────────────── */}
         <div
@@ -423,7 +419,7 @@ export default function SurveyStudioPage() {
                         <VideoCamera size={26} weight="bold" />
                       </div>
 
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white truncate max-w-[220px]">
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white truncate max-w-56">
                         {videoFile ? videoFile.name : t('survey.drop_video_title')}
                       </span>
                       <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
@@ -471,7 +467,7 @@ export default function SurveyStudioPage() {
                         <MapPin size={26} weight="bold" />
                       </div>
 
-                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white truncate max-w-[220px]">
+                      <span className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white truncate max-w-56">
                         {gpxFile ? gpxFile.name : t('survey.drop_gpx_title')}
                       </span>
                       <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">

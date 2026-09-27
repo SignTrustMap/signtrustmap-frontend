@@ -205,7 +205,7 @@ export default function SurveyRevalidationPage() {
         actions={
           <div className="flex items-center gap-3 shrink-0">
             <div
-              className={`p-3 rounded-2xl border text-center min-w-[120px] ${
+              className={`p-3 rounded-2xl border text-center min-w-32 ${
                 isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3] shadow-xs'
               }`}
             >
@@ -218,7 +218,7 @@ export default function SurveyRevalidationPage() {
             </div>
 
             <div
-              className={`p-3 rounded-2xl border text-center min-w-[120px] ${
+              className={`p-3 rounded-2xl border text-center min-w-32 ${
                 isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3] shadow-xs'
               }`}
             >
@@ -257,7 +257,7 @@ export default function SurveyRevalidationPage() {
               { value: 'I', label: t('survey.reval.filter_category_i') },
             ]}
             size="sm"
-            className="min-w-[145px]"
+            className="min-w-36"
           />
 
           {/* Priority Dropdown */}
@@ -271,7 +271,7 @@ export default function SurveyRevalidationPage() {
               { value: 'Normal', label: t('survey.reval.filter_priority_normal') },
             ]}
             size="sm"
-            className="min-w-[160px]"
+            className="min-w-40"
           />
 
           {/* View Mode Toggle */}

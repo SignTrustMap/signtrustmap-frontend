@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { I18nProvider } from '@/context/I18nContext'
@@ -45,11 +45,14 @@ const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
 
 function PageLoadingFallback() {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-center min-h-[50vh] w-full">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 rounded-full border-2 border-[#00c4de]/20 border-t-[#00c4de] animate-spin" />
-        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">Đang tải trang...</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">
+          {t('common.loading_page', 'Đang tải trang...')}
+        </span>
       </div>
     </div>
   )

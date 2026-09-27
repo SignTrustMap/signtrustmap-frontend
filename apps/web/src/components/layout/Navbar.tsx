@@ -188,7 +188,7 @@ export function Navbar() {
                       className="text-left flex flex-col justify-center leading-none"
                       title={user.name}
                     >
-                      <span className={`text-xs font-bold block leading-none truncate max-w-[130px] ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      <span className={`text-xs font-bold block leading-none truncate max-w-32 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {getShortName(user.name)}
                       </span>
                       <span className={`text-[10px] font-mono capitalize block leading-none mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
