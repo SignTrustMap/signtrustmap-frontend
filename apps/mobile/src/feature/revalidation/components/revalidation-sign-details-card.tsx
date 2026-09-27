@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  LayoutAnimation,
+  PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -12,10 +16,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
-import { Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface RevalidationSignDetailsCardProps {
   sign: RouteSign;
@@ -33,16 +41,18 @@ export function RevalidationSignDetailsCard({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
+  const [isExpanded, setIsExpanded] = useState(true);
   const [cropError, setCropError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
 
-  // Smooth entrance animation
-  const slideAnim = useRef(new Animated.Value(60)).current;
+  // Entrance slide animation
+  const slideAnim = useRef(new Animated.Value(50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    slideAnim.setValue(60);
+    setIsExpanded(true);
+    slideAnim.setValue(50);
     opacityAnim.setValue(0);
     Animated.parallel([
       Animated.spring(slideAnim, {
@@ -54,7 +64,7 @@ export function RevalidationSignDetailsCard({
       }),
       Animated.timing(opacityAnim, {
         toValue: 1,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start();
@@ -63,11 +73,31 @@ export function RevalidationSignDetailsCard({
   const { scorePercent, isStale, isModerate, isFresh } = getFreshnessInfo(sign);
   const displayScore = scorePercent ?? 75;
 
-  // Determine Semantic Status Info
+  // Toggle expand / collapse
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsExpanded((prev) => !prev);
+  };
+
+  // Drag handle pan responder to expand / collapse
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy < -20 && !isExpanded) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setIsExpanded(true);
+        } else if (gestureState.dy > 20 && isExpanded) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setIsExpanded(false);
+        }
+      },
+    }),
+  ).current;
+
+  // Semantic Status
   const normalizedStatus = (sign.status || '').toUpperCase();
-  const isExplicitActive = normalizedStatus === 'ACTIVE';
   const isExplicitRetired = normalizedStatus === 'RETIRED';
-  const isExplicitModerated = normalizedStatus === 'MODERATED_OVERRIDE';
 
   let statusConfig: {
     label: string;
@@ -85,17 +115,9 @@ export function RevalidationSignDetailsCard({
       text: '#4B5563',
       icon: 'archive-cancel-outline',
     };
-  } else if (isExplicitModerated) {
-    statusConfig = {
-      label: 'Moderated Override',
-      bg: '#F5F3FF',
-      border: '#DDD6FE',
-      text: '#7C3AED',
-      icon: 'shield-account',
-    };
   } else if (isStale || normalizedStatus === 'STALE') {
     statusConfig = {
-      label: 'Stale · Re-evaluation Needed',
+      label: 'Needs Re-evaluation',
       bg: '#FEF2F2',
       border: '#FECACA',
       text: '#DC2626',
@@ -111,7 +133,7 @@ export function RevalidationSignDetailsCard({
     };
   } else {
     statusConfig = {
-      label: isExplicitActive ? 'Active & Verified' : 'Active Sign',
+      label: 'Active & Verified',
       bg: '#ECFDF5',
       border: '#A7F3D0',
       text: '#059669',
@@ -122,28 +144,30 @@ export function RevalidationSignDetailsCard({
   const freshnessColor = isStale ? '#EF4444' : isModerate ? '#F59E0B' : '#10B981';
 
   const hasSubmittedCrop = Boolean(
-    sign.actualCropUrl &&
-    sign.actualCropUrl !== sign.imageUrl &&
-    !cropError,
+    sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl && !cropError,
   );
+
+  // Clear Action CTA wording
+  const primaryCtaText = isStale
+    ? 'Revalidate Sign'
+    : isFresh
+      ? 'View Sign Details'
+      : 'Inspect & Revalidate';
 
   const handleAction = async () => {
     setIsSubmitting(true);
-
     // =========================================================================
-    // TODO: Implement action API call (e.g. submit revalidation evidence,
-    // upload field photos, or create re-evaluation task) once backend APIs are provided.
+    // TODO: Implement action API call (submit revalidation evidence / trigger re-evaluation task)
+    // once backend APIs are provided.
     // =========================================================================
-
     if (onRevalidate) {
       onRevalidate(sign);
     }
-
     setTimeout(() => {
       setIsSubmitting(false);
       setSubmittedMessage('Revalidation request registered. API integration pending.');
       setTimeout(() => setSubmittedMessage(null), 3500);
-    }, 600);
+    }, 500);
   };
 
   return (
@@ -152,522 +176,687 @@ export function RevalidationSignDetailsCard({
       onStartShouldSetResponder={() => true}
       onTouchEnd={(e) => e.stopPropagation()}
       style={[
-        styles.cardContainer,
+        styles.sheetContainer,
         {
           backgroundColor: theme.backgroundElement,
           borderColor: theme.border,
-          bottom: Math.max(16, insets.bottom + 8),
+          bottom: Math.max(14, insets.bottom + 8),
           transform: [{ translateY: slideAnim }],
           opacity: opacityAnim,
         },
       ]}
     >
-      {/* Drag handle pill */}
-      <View style={styles.dragHandleWrap}>
-        <View style={styles.dragHandle} />
+      {/* Draggable Top Handle */}
+      <View {...panResponder.panHandlers} style={styles.dragHandleBar}>
+        <View style={styles.dragPill} />
       </View>
 
-      {/* Header Section */}
-      <View style={styles.headerSection}>
-        <View style={styles.headerMain}>
-          {/* Sign Name + Status Badge */}
-          <View style={styles.titleWithStatusRow}>
-            <Text numberOfLines={1} style={[styles.signTitle, { color: theme.text }]}>
-              {sign.name || sign.signCode || 'Traffic Sign'}
+      {/* ================================================================= */}
+      {/* COLLAPSED STATE (Compact peek row)                                 */}
+      {/* ================================================================= */}
+      {!isExpanded ? (
+        <Pressable
+          accessibilityLabel="Expand sign details"
+          accessibilityRole="button"
+          onPress={toggleExpanded}
+          style={styles.collapsedRow}
+        >
+          {/* Sign Icon in 40x40 circle */}
+          <View style={[styles.compactIconBox, { backgroundColor: theme.background }]}>
+            {sign.imageUrl ? (
+              <Image
+                contentFit="contain"
+                source={{ uri: sign.imageUrl }}
+                style={styles.compactSignImg}
+              />
+            ) : (
+              <MaterialCommunityIcons color="#0671EB" name="traffic-light" size={22} />
+            )}
+          </View>
+
+          {/* Title + Location + Freshness */}
+          <View style={styles.collapsedInfo}>
+            <View style={styles.collapsedTitleRow}>
+              <Text numberOfLines={1} style={[styles.compactSignName, { color: theme.text }]}>
+                {sign.name || sign.signCode || 'Traffic Sign'}
+              </Text>
+              <View
+                style={[
+                  styles.collapsedStatusPill,
+                  { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
+                ]}
+              >
+                <Text style={[styles.collapsedStatusText, { color: statusConfig.text }]}>
+                  {statusConfig.label}
+                </Text>
+              </View>
+            </View>
+
+            <Text numberOfLines={1} style={[styles.compactLocation, { color: theme.grey }]}>
+              {sign.displayAddress || sign.roadName || 'Tan My, Ho Chi Minh City'}
             </Text>
 
-            {/* Status Badge right next to Sign Name */}
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
-              ]}
-            >
-              <MaterialCommunityIcons
-                color={statusConfig.text}
-                name={statusConfig.icon}
-                size={12}
-              />
-              <Text style={[styles.statusBadgeText, { color: statusConfig.text }]}>
-                {statusConfig.label}
+            <View style={styles.compactMetaRow}>
+              <View style={[styles.freshnessMiniDot, { backgroundColor: freshnessColor }]} />
+              <Text style={[styles.compactFreshnessText, { color: theme.grey }]}>
+                Freshness: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{displayScore}%</Text>
               </Text>
             </View>
           </View>
 
-          {/* Location / Road Name */}
-          <View style={styles.locationRow}>
-            <MaterialCommunityIcons color={theme.placeholder} name="map-marker-outline" size={13} />
-            <Text numberOfLines={1} style={[styles.locationText, { color: theme.placeholder }]}>
-              {sign.signCode && sign.signCode !== sign.name ? `${sign.signCode} · ` : ''}
-              {sign.displayAddress || sign.roadName || `${sign.coordinate[1].toFixed(5)}° N, ${sign.coordinate[0].toFixed(5)}° E`}
-            </Text>
+          {/* Quick CTA to Expand */}
+          <View style={styles.inspectButton}>
+            <Text style={styles.inspectButtonText}>Inspect</Text>
+            <MaterialCommunityIcons color="#0671EB" name="chevron-right" size={16} />
           </View>
-        </View>
-
-        {/* Close Button */}
-        <Pressable
-          accessibilityLabel="Close sign details"
-          accessibilityRole="button"
-          hitSlop={12}
-          onPress={onClose}
-          style={styles.closeButton}
-        >
-          <MaterialCommunityIcons color={theme.grey} name="close-circle-outline" size={24} />
         </Pressable>
-      </View>
+      ) : null}
 
-      <ScrollView
-        bounces={false}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ================================================================= */}
-        {/* DUAL COMPARISON GRID: Map Standard Sign VS Submitted Field Photo  */}
-        {/* ================================================================= */}
-        <View style={styles.comparisonGrid}>
-          {/* Card 1: Map Sign Image (Standard) */}
-          <View
-            style={[
-              styles.imageCard,
-              {
-                backgroundColor: theme.backgroundSelected,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            {/* Clear Header Label */}
-            <View style={styles.imageCardHeader}>
-              <View style={[styles.labelPill, { backgroundColor: `${theme.primary}16` }]}>
-                <MaterialCommunityIcons color={theme.primary} name="map-legend" size={13} />
-                <Text style={[styles.labelText, { color: theme.primary }]}>Map Sign</Text>
-              </View>
-              <Text style={[styles.imageTagSub, { color: theme.grey }]}>Standard</Text>
-            </View>
-
-            {/* Image Preview Box */}
-            <View style={styles.imageBox}>
+      {/* ================================================================= */}
+      {/* EXPANDED STATE (Full verification information)                    */}
+      {/* ================================================================= */}
+      {isExpanded ? (
+        <ScrollView
+          bounces={false}
+          contentContainerStyle={styles.expandedContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Row: Icon, Title, Status, Close */}
+          <View style={styles.expandedHeader}>
+            <View style={[styles.expandedIconBox, { backgroundColor: theme.background }]}>
               {sign.imageUrl ? (
                 <Image
-                  accessibilityLabel={`Standard graphic for ${sign.name}`}
                   contentFit="contain"
                   source={{ uri: sign.imageUrl }}
-                  style={styles.mapStandardImage}
-                  transition={200}
+                  style={styles.expandedSignImg}
                 />
               ) : (
-                <View style={styles.noImageBox}>
-                  <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={22} />
-                  <Text style={[styles.noImageText, { color: theme.grey }]}>No graphic</Text>
-                </View>
+                <MaterialCommunityIcons color="#0671EB" name="traffic-light" size={24} />
               )}
             </View>
 
-            <Text numberOfLines={1} style={[styles.imageFooterNote, { color: theme.grey }]}>
-              Official standard graphic
-            </Text>
+            <View style={styles.expandedTitleCol}>
+              <View style={styles.titleWithBadge}>
+                <Text numberOfLines={1} style={[styles.expandedTitleText, { color: theme.text }]}>
+                  {sign.name || sign.signCode || 'Traffic Sign'}
+                </Text>
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    color={statusConfig.text}
+                    name={statusConfig.icon}
+                    size={11}
+                  />
+                  <Text style={[styles.statusPillText, { color: statusConfig.text }]}>
+                    {statusConfig.label}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.expandedLocationRow}>
+                <MaterialCommunityIcons
+                  color={theme.placeholder}
+                  name="map-marker-outline"
+                  size={12}
+                />
+                <Text numberOfLines={1} style={[styles.expandedLocationText, { color: theme.placeholder }]}>
+                  {sign.displayAddress || sign.roadName || 'Tan My, Ho Chi Minh City'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons: Collapse and Close */}
+            <View style={styles.headerActionBtns}>
+              <Pressable
+                accessibilityLabel="Collapse sign details"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={toggleExpanded}
+                style={styles.collapseToggle}
+              >
+                <MaterialCommunityIcons color={theme.grey} name="chevron-down" size={20} />
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="Close sign details"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={onClose}
+                style={styles.collapseToggle}
+              >
+                <MaterialCommunityIcons color={theme.grey} name="close" size={18} />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Card 2: Submitted Sign Image (Field Capture) */}
-          <View
-            style={[
-              styles.imageCard,
-              {
-                backgroundColor: theme.backgroundSelected,
-                borderColor: hasSubmittedCrop ? '#93C5FD' : theme.border,
-              },
-            ]}
-          >
-            {/* Clear Header Label */}
-            <View style={styles.imageCardHeader}>
+          {/* =============================================================== */}
+          {/* COMPACT EVIDENCE SECTION                                        */}
+          {/* =============================================================== */}
+          <View style={[styles.evidenceSection, { backgroundColor: theme.background }]}>
+            <View style={styles.evidenceHeaderRow}>
+              <Text style={[styles.evidenceSectionTitle, { color: theme.grey }]}>
+                EVIDENCE COMPARISON
+              </Text>
+              {/* Visual Comparison Badge */}
               <View
                 style={[
-                  styles.labelPill,
+                  styles.comparisonBadge,
                   {
-                    backgroundColor: hasSubmittedCrop ? 'rgba(37, 99, 235, 0.12)' : 'rgba(100, 116, 139, 0.12)',
+                    backgroundColor: isStale
+                      ? '#FEF2F2'
+                      : isFresh
+                        ? '#ECFDF5'
+                        : '#FFFBEB',
+                    borderColor: isStale
+                      ? '#FECACA'
+                      : isFresh
+                        ? '#A7F3D0'
+                        : '#FDE68A',
                   },
                 ]}
               >
                 <MaterialCommunityIcons
-                  color={hasSubmittedCrop ? '#2563EB' : theme.grey}
-                  name="camera-outline"
+                  color={isStale ? '#DC2626' : isFresh ? '#059669' : '#D97706'}
+                  name={isStale ? 'alert-circle-outline' : isFresh ? 'check-circle-outline' : 'help-circle-outline'}
                   size={12}
                 />
                 <Text
                   style={[
-                    styles.labelText,
-                    { color: hasSubmittedCrop ? '#2563EB' : theme.grey },
+                    styles.comparisonBadgeText,
+                    {
+                      color: isStale ? '#DC2626' : isFresh ? '#059669' : '#D97706',
+                    },
                   ]}
                 >
-                  Submitted Sign
+                  {isStale
+                    ? 'Review required'
+                    : isFresh
+                      ? 'Matches official sign'
+                      : 'Verify match'}
                 </Text>
               </View>
-              <Text style={[styles.imageTagSub, { color: theme.grey }]}>Field Crop</Text>
             </View>
 
-            {/* Image Preview Box */}
-            <View style={styles.imageBox}>
-              {hasSubmittedCrop ? (
-                <Image
-                  accessibilityLabel={`Submitted camera crop for ${sign.name}`}
-                  contentFit="cover"
-                  onError={() => setCropError(true)}
-                  source={{ uri: sign.actualCropUrl }}
-                  style={styles.fieldCropImage}
-                  transition={200}
-                />
-              ) : (
-                <View style={styles.placeholderBox}>
-                  <MaterialCommunityIcons
-                    color={theme.placeholder}
-                    name="camera-off-outline"
-                    size={22}
-                  />
-                  <Text style={[styles.placeholderText, { color: theme.placeholder }]}>
-                    No field photo
-                  </Text>
-                  <Text style={[styles.placeholderSub, { color: theme.placeholder }]}>
-                    Needs on-site capture
+            {/* Compact Comparison Grid */}
+            <View style={styles.evidenceGrid}>
+              {/* Box 1: Official Standard Sign */}
+              <View style={[styles.evidenceBox, { borderColor: theme.border }]}>
+                <Text style={[styles.evidenceBoxLabel, { color: theme.grey }]}>
+                  OFFICIAL SIGN
+                </Text>
+                <View style={styles.evidenceImageFrame}>
+                  {sign.imageUrl ? (
+                    <Image
+                      contentFit="contain"
+                      source={{ uri: sign.imageUrl }}
+                      style={styles.standardImg}
+                    />
+                  ) : (
+                    <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={20} />
+                  )}
+                </View>
+              </View>
+
+              {/* Compare Indicator Icon */}
+              <View style={styles.compareArrowBox}>
+                <MaterialCommunityIcons color="#0671EB" name="swap-horizontal" size={18} />
+              </View>
+
+              {/* Box 2: Latest Submitted Crop */}
+              <View
+                style={[
+                  styles.evidenceBox,
+                  styles.submittedBox,
+                  { borderColor: hasSubmittedCrop ? '#93C5FD' : theme.border },
+                ]}
+              >
+                <View style={styles.submittedLabelRow}>
+                  <Text style={[styles.evidenceBoxLabel, { color: '#0671EB' }]}>
+                    LATEST SUBMISSION
                   </Text>
                 </View>
-              )}
-            </View>
-
-            <Text numberOfLines={1} style={[styles.imageFooterNote, { color: theme.grey }]}>
-              {hasSubmittedCrop ? 'Latest camera crop' : 'Awaiting surveyor photo'}
-            </Text>
-          </View>
-        </View>
-
-        {/* ================================================================= */}
-        {/* FRESHNESS & AUDIT INFO BAR                                        */}
-        {/* ================================================================= */}
-        <View
-          style={[
-            styles.freshnessCard,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <View style={styles.freshnessTopRow}>
-            <View style={styles.freshnessMetricLabel}>
-              <MaterialCommunityIcons color={freshnessColor} name="shield-refresh-outline" size={17} />
-              <Text style={[styles.freshnessTitle, { color: theme.text }]}>Freshness Quality</Text>
-            </View>
-            <View style={styles.scorePill}>
-              <Text style={[styles.scoreValue, { color: freshnessColor }]}>
-                {displayScore}%
-              </Text>
+                <View style={styles.evidenceImageFrame}>
+                  {hasSubmittedCrop ? (
+                    <Image
+                      contentFit="cover"
+                      onError={() => setCropError(true)}
+                      source={{ uri: sign.actualCropUrl }}
+                      style={styles.cropImg}
+                    />
+                  ) : (
+                    <View style={styles.noCropBox}>
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="camera-off-outline"
+                        size={18}
+                      />
+                      <Text style={[styles.noCropText, { color: theme.placeholder }]}>
+                        No surveyor photo
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* Progress bar meter */}
-          <View style={[styles.meterTrack, { backgroundColor: `${theme.grey}25` }]}>
-            <View
-              style={[
-                styles.meterFill,
-                {
-                  backgroundColor: freshnessColor,
-                  width: `${Math.min(100, Math.max(6, displayScore))}%`,
-                },
-              ]}
-            />
-          </View>
-
-          <View style={styles.freshnessDetailRow}>
+          {/* =============================================================== */}
+          {/* FRESHNESS INFORMATION & AUDIT DATE                              */}
+          {/* =============================================================== */}
+          <View style={styles.freshnessInfoRow}>
+            <View style={styles.freshnessCol}>
+              <View style={styles.freshnessMeterHeader}>
+                <Text style={[styles.freshnessLabel, { color: theme.text }]}>
+                  Freshness Quality
+                </Text>
+                <Text style={[styles.freshnessScoreValue, { color: freshnessColor }]}>
+                  {displayScore}%
+                </Text>
+              </View>
+              {/* Progress Bar */}
+              <View style={[styles.meterTrack, { backgroundColor: '#E2E8F0' }]}>
+                <View
+                  style={[
+                    styles.meterFill,
+                    {
+                      backgroundColor: freshnessColor,
+                      width: `${Math.min(100, Math.max(8, displayScore))}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
 
             {sign.lastVerifiedAt ? (
-              <Text style={[styles.lastVerifiedDate, { color: theme.grey }]}>
-                Last checked: {sign.lastVerifiedAt.split('T')[0]}
-              </Text>
+              <View style={styles.lastCheckedCol}>
+                <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>Last checked</Text>
+                <Text style={[styles.lastCheckedValue, { color: theme.text }]}>
+                  {sign.lastVerifiedAt.split('T')[0]}
+                </Text>
+              </View>
             ) : null}
           </View>
-        </View>
 
-        {/* Feedback message banner if triggered */}
-        {submittedMessage ? (
-          <View style={styles.feedbackBanner}>
-            <MaterialCommunityIcons color="#0671eb" name="information" size={18} />
-            <Text style={styles.feedbackText}>{submittedMessage}</Text>
+          {/* Feedback message banner if triggered */}
+          {submittedMessage ? (
+            <View style={styles.feedbackBanner}>
+              <MaterialCommunityIcons color="#0671EB" name="information" size={16} />
+              <Text style={styles.feedbackText}>{submittedMessage}</Text>
+            </View>
+          ) : null}
+
+          {/* =============================================================== */}
+          {/* PRIMARY ACTION CTA                                               */}
+          {/* =============================================================== */}
+          <View style={styles.ctaRow}>
+            <AppButton
+              accessibilityLabel={primaryCtaText}
+              disabled={isSubmitting}
+              onPress={handleAction}
+              style={[
+                styles.primaryCtaBtn,
+                { backgroundColor: isStale ? '#0671EB' : '#0671EB' },
+              ]}
+              variant="primary"
+            >
+              <MaterialCommunityIcons
+                color="#FFFFFF"
+                name={isStale ? 'camera-retake-outline' : 'shield-check-outline'}
+                size={18}
+              />
+              <Text style={styles.primaryCtaText}>{primaryCtaText}</Text>
+            </AppButton>
           </View>
-        ) : null}
-
-        {/* ================================================================= */}
-        {/* ACTION BUTTONS                                                    */}
-        {/* ================================================================= */}
-        <View style={styles.actionRow}>
-          <AppButton
-            accessibilityLabel="Revalidate sign on-site"
-            disabled={isSubmitting}
-            onPress={handleAction}
-            style={[
-              styles.primaryActionBtn,
-              { backgroundColor: isStale ? '#EF4444' : theme.primary },
-            ]}
-            variant="primary"
-          >
-            <MaterialCommunityIcons color="#FFFFFF" name="camera-retake-outline" size={19} />
-            <Text style={styles.primaryActionText}>
-              {isStale ? 'Revalidate This Sign' : 'Inspect & Update Sign'}
-            </Text>
-          </AppButton>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      ) : null}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  sheetContainer: {
     position: 'absolute',
     left: 14,
     right: 14,
-    maxHeight: '56%',
-    borderRadius: 20,
-    borderWidth: 1.2,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.20,
-    shadowRadius: 12,
-    elevation: 10,
+    maxHeight: '74%',
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 8,
     zIndex: 20,
     overflow: 'hidden',
   },
-  dragHandleWrap: {
+  dragHandleBar: {
     alignItems: 'center',
-    paddingTop: 6,
-    paddingBottom: 2,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  dragHandle: {
+  dragPill: {
     width: 32,
-    height: 3.5,
+    height: 4,
     borderRadius: 2,
     backgroundColor: '#CBD5E1',
   },
-  headerSection: {
+  // Collapsed Peek
+  collapsedRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.one,
-    paddingBottom: Spacing.two,
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    paddingTop: 4,
+    gap: 12,
   },
-  headerMain: {
+  compactIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  compactSignImg: {
+    width: 26,
+    height: 26,
+  },
+  collapsedInfo: {
     flex: 1,
-    paddingRight: Spacing.two,
     gap: 2,
   },
-  titleWithStatusRow: {
+  collapsedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  compactSignName: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  collapsedStatusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  collapsedStatusText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  compactLocation: {
+    fontSize: 12,
+  },
+  compactMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 1,
+  },
+  freshnessMiniDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  compactFreshnessText: {
+    fontSize: 11,
+  },
+  inspectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 113, 235, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    gap: 2,
+  },
+  inspectButtonText: {
+    color: '#0671EB',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  // Expanded Content
+  expandedContent: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    gap: 12,
+  },
+  expandedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  expandedIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  expandedSignImg: {
+    width: 28,
+    height: 28,
+  },
+  expandedTitleCol: {
+    flex: 1,
+    gap: 2,
+  },
+  titleWithBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    gap: 3,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  signTitle: {
+  expandedTitleText: {
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
-  locationRow: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  locationText: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  closeButton: {
-    padding: 2,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.three,
-    gap: Spacing.two,
-  },
-  comparisonGrid: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  imageCard: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 7,
-    gap: 5,
-  },
-  imageCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  labelPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    borderWidth: 1,
     gap: 3,
   },
-  labelText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.1,
-  },
-  imageTagSub: {
+  statusPillText: {
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  imageBox: {
-    height: 72,
-    width: '100%',
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+  expandedLocationRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    gap: 3,
+  },
+  expandedLocationText: {
+    fontSize: 11,
+  },
+  headerActionBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  collapseToggle: {
+    padding: 4,
+  },
+  // Evidence Section
+  evidenceSection: {
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  mapStandardImage: {
-    width: 48,
-    height: 48,
+  evidenceHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  fieldCropImage: {
+  evidenceSectionTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  comparisonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    gap: 3,
+  },
+  comparisonBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  evidenceGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  evidenceBox: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 6,
+    gap: 4,
+    alignItems: 'center',
+  },
+  submittedBox: {
+    backgroundColor: '#FAFCFF',
+  },
+  evidenceBoxLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  submittedLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  evidenceImageFrame: {
+    height: 60,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
+  },
+  standardImg: {
+    width: 44,
+    height: 44,
+  },
+  cropImg: {
     width: '100%',
     height: '100%',
   },
-  noImageBox: {
+  noCropBox: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
   },
-  noImageText: {
-    fontSize: 10,
+  noCropText: {
+    fontSize: 9,
     fontWeight: '600',
   },
-  placeholderBox: {
+  compareArrowBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 4,
-    gap: 1,
   },
-  placeholderText: {
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 1,
+  // Freshness Row
+  freshnessInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    gap: 16,
   },
-  placeholderSub: {
-    fontSize: 8,
-    textAlign: 'center',
+  freshnessCol: {
+    flex: 1,
+    gap: 4,
   },
-  imageFooterNote: {
-    fontSize: 9,
-    textAlign: 'center',
-  },
-  freshnessCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: Spacing.two,
-    gap: 6,
-  },
-  freshnessTopRow: {
+  freshnessMeterHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  freshnessMetricLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  freshnessTitle: {
+  freshnessLabel: {
     fontSize: 12,
     fontWeight: '700',
   },
-  scorePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: '900',
+  freshnessScoreValue: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   meterTrack: {
-    height: 7,
-    borderRadius: 3.5,
+    height: 5,
+    borderRadius: 2.5,
     overflow: 'hidden',
     width: '100%',
   },
   meterFill: {
     height: '100%',
-    borderRadius: 3.5,
+    borderRadius: 2.5,
   },
-  freshnessDetailRow: {
-    gap: 2,
+  lastCheckedCol: {
+    alignItems: 'flex-end',
+    gap: 1,
   },
-  freshnessDesc: {
+  lastCheckedLabel: {
+    fontSize: 10,
+  },
+  lastCheckedValue: {
     fontSize: 11,
-    fontWeight: '600',
-  },
-  lastVerifiedDate: {
-    fontSize: 11,
+    fontWeight: '700',
   },
   feedbackBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFF6FF',
-    padding: 10,
-    borderRadius: 10,
-    gap: 8,
+    padding: 8,
+    borderRadius: 8,
+    gap: 6,
   },
   feedbackText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#1E40AF',
     fontWeight: '500',
     flex: 1,
   },
-  actionRow: {
-    flexDirection: 'row',
+  ctaRow: {
     marginTop: 2,
   },
-  primaryActionBtn: {
-    flex: 1,
+  primaryCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
     gap: 8,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowColor: '#0671EB',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  primaryActionText: {
+  primaryCtaText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.2,
   },

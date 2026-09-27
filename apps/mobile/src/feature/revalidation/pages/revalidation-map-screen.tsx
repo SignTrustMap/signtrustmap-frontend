@@ -157,6 +157,14 @@ export function RevalidationMapScreen() {
     return rawSigns.filter((s) => getFreshnessInfo(s).isStale).length;
   }, [rawSigns]);
 
+  const moderateCount = useMemo(() => {
+    return rawSigns.filter((s) => getFreshnessInfo(s).isModerate).length;
+  }, [rawSigns]);
+
+  const freshCount = useMemo(() => {
+    return rawSigns.filter((s) => getFreshnessInfo(s).isFresh).length;
+  }, [rawSigns]);
+
   const handleRevalidateAction = (sign: RouteSign) => {
     // =========================================================================
     // TODO: Implement action API call (submit revalidation evidence / trigger re-evaluation task)
@@ -182,7 +190,7 @@ export function RevalidationMapScreen() {
         zoomRequestId={zoomRequestId}
       />
 
-      {/* Floating Header UI */}
+      {/* Compact Floating Header UI */}
       <SafeAreaView edges={['top']} pointerEvents="box-none" style={styles.topOverlay}>
         <View
           style={[
@@ -190,42 +198,39 @@ export function RevalidationMapScreen() {
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
-              shadowColor: '#09233C',
             },
           ]}
         >
+          {/* Top Row: Back button + Title & Nearby Count */}
           <View style={styles.headerTopRow}>
-            {/* Back Button */}
-            <AppButton
+            <Pressable
               accessibilityLabel="Back to Work"
+              accessibilityRole="button"
+              hitSlop={8}
               onPress={() => router.back()}
-              style={styles.backButton}
-              variant="ghost"
+              style={[styles.backButton, { backgroundColor: theme.background }]}
             >
-              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
-            </AppButton>
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={18} />
+            </Pressable>
 
-            {/* Header Titles */}
             <View style={styles.titleContainer}>
-              <Text style={[styles.headerTitle, { color: theme.text }]}>Revalidation Map</Text>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Revalidation</Text>
               <Text style={[styles.headerSubtitle, { color: theme.grey }]}>
-                {rawSigns.length > 0
-                  ? `${rawSigns.length} signs in view · ${staleCount} need re-evaluation`
-                  : 'Pan map to inspect sign freshness'}
+                {rawSigns.length} signs nearby
               </Text>
             </View>
           </View>
 
-          {/* Freshness Filter Chips */}
+          {/* Compact Segmented Filter Pills */}
           <View style={styles.filterRow}>
-            <AppButton
-              accessibilityLabel="Show all signs"
+            <Pressable
+              accessibilityLabel={`Show all ${rawSigns.length} signs`}
+              accessibilityRole="button"
               onPress={() => setActiveFilter('ALL')}
               style={[
                 styles.filterChip,
-                activeFilter === 'ALL' && [styles.filterChipActive, { backgroundColor: theme.primary }],
+                activeFilter === 'ALL' && styles.filterChipActive,
               ]}
-              variant="ghost"
             >
               <Text
                 style={[
@@ -233,80 +238,72 @@ export function RevalidationMapScreen() {
                   { color: activeFilter === 'ALL' ? '#FFFFFF' : theme.text },
                 ]}
               >
-                All ({rawSigns.length})
+                All {rawSigns.length}
               </Text>
-            </AppButton>
+            </Pressable>
 
-            <AppButton
-              accessibilityLabel="Show signs needing re-evaluation"
+            <Pressable
+              accessibilityLabel={`Show ${staleCount} signs needing review`}
+              accessibilityRole="button"
               onPress={() => setActiveFilter('NEEDS_REVALIDATION')}
               style={[
                 styles.filterChip,
-                activeFilter === 'NEEDS_REVALIDATION' && [
-                  styles.filterChipActive,
-                  { backgroundColor: '#EF4444' },
-                ],
+                activeFilter === 'NEEDS_REVALIDATION' && styles.filterChipActive,
               ]}
-              variant="ghost"
             >
-              <MaterialCommunityIcons
-                color={activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#EF4444'}
-                name="alert-circle"
-                size={14}
-              />
               <Text
                 style={[
                   styles.filterChipText,
-                  { color: activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#EF4444' },
+                  {
+                    color: activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#EF4444',
+                  },
                 ]}
               >
-                Needs Re-eval ({staleCount})
+                Needs review {staleCount}
               </Text>
-            </AppButton>
+            </Pressable>
 
-            <AppButton
-              accessibilityLabel="Show moderate signs"
+            <Pressable
+              accessibilityLabel={`Show ${moderateCount} moderate signs`}
+              accessibilityRole="button"
               onPress={() => setActiveFilter('MODERATE')}
               style={[
                 styles.filterChip,
-                activeFilter === 'MODERATE' && [
-                  styles.filterChipActive,
-                  { backgroundColor: '#F59E0B' },
-                ],
+                activeFilter === 'MODERATE' && styles.filterChipActive,
               ]}
-              variant="ghost"
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  { color: activeFilter === 'MODERATE' ? '#FFFFFF' : theme.text },
+                  {
+                    color: activeFilter === 'MODERATE' ? '#FFFFFF' : theme.text,
+                  },
                 ]}
               >
-                Moderate
+                Moderate {moderateCount}
               </Text>
-            </AppButton>
+            </Pressable>
 
-            <AppButton
-              accessibilityLabel="Show fresh signs"
+            <Pressable
+              accessibilityLabel={`Show ${freshCount} fresh signs`}
+              accessibilityRole="button"
               onPress={() => setActiveFilter('FRESH')}
               style={[
                 styles.filterChip,
-                activeFilter === 'FRESH' && [
-                  styles.filterChipActive,
-                  { backgroundColor: '#10B981' },
-                ],
+                activeFilter === 'FRESH' && styles.filterChipActive,
               ]}
-              variant="ghost"
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  { color: activeFilter === 'FRESH' ? '#FFFFFF' : theme.text },
+                  {
+                    color: activeFilter === 'FRESH' ? '#FFFFFF' : theme.text,
+                  },
                 ]}
               >
-                Fresh
+                Fresh {freshCount}
               </Text>
-            </AppButton>
+            </Pressable>
           </View>
         </View>
       </SafeAreaView>
@@ -462,14 +459,16 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.one,
   },
   headerCard: {
-    borderRadius: Rounded.lg ?? 16,
-    padding: Spacing.three,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    gap: Spacing.two,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    gap: 8,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -477,12 +476,13 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 0,
   },
   titleContainer: {
     flex: 1,
@@ -493,27 +493,23 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   headerSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 1,
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: 6,
     flexWrap: 'wrap',
-    marginTop: 2,
   },
   filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: 'rgba(150, 150, 150, 0.12)',
-    gap: 4,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
   },
   filterChipActive: {
-    backgroundColor: '#0671eb',
+    backgroundColor: '#0671EB',
   },
   filterChipText: {
     fontSize: 11,
@@ -524,19 +520,22 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 30,
     alignItems: 'flex-end',
-    gap: 12,
+    gap: 10,
   },
   floatingCircleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1.2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 4,
   },
   zoomIndicatorBadge: {
     position: 'absolute',

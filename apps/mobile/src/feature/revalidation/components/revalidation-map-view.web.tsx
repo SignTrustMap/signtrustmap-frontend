@@ -45,38 +45,62 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-function createWebSignMarkerElement(sign: RouteSign, isSelected: boolean, onClick: () => void) {
+function createWebSignMarkerElement(
+  sign: RouteSign,
+  isSelected: boolean,
+  isDimmed: boolean,
+  onClick: () => void,
+) {
   const container = document.createElement('div');
   container.style.position = 'relative';
-  container.style.width = '42px';
-  container.style.height = '42px';
+  container.style.width = '44px';
+  container.style.height = '44px';
   container.style.display = 'flex';
   container.style.alignItems = 'center';
   container.style.justifyContent = 'center';
   container.style.cursor = 'pointer';
+  container.style.transition = 'transform 0.18s ease, opacity 0.18s ease';
 
-  const { scorePercent, isStale, isModerate, isFresh } = getFreshnessInfo(sign);
+  if (isSelected) {
+    container.style.transform = 'scale(1.18)';
+    container.style.zIndex = '10';
+  } else if (isDimmed) {
+    container.style.opacity = '0.55';
+    container.style.transform = 'scale(0.92)';
+  }
+
+  // Selected Halo Ring
+  if (isSelected) {
+    const halo = document.createElement('div');
+    halo.style.position = 'absolute';
+    halo.style.width = '44px';
+    halo.style.height = '44px';
+    halo.style.borderRadius = '22px';
+    halo.style.border = '2.5px solid #0671EB';
+    halo.style.background = 'rgba(6, 113, 235, 0.16)';
+    container.appendChild(halo);
+  }
+
+  const { isStale, isModerate, isFresh } = getFreshnessInfo(sign);
 
   const bubble = document.createElement('div');
-  bubble.style.width = '36px';
-  bubble.style.height = '36px';
+  bubble.style.width = '34px';
+  bubble.style.height = '34px';
   bubble.style.borderRadius = '50%';
   bubble.style.background = '#FFFFFF';
   bubble.style.display = 'flex';
   bubble.style.alignItems = 'center';
   bubble.style.justifyContent = 'center';
-  bubble.style.boxShadow = '0 3px 6px rgba(9, 35, 60, 0.28)';
+  bubble.style.boxShadow = isSelected
+    ? '0 4px 10px rgba(6, 113, 235, 0.35)'
+    : '0 2px 5px rgba(0, 0, 0, 0.15)';
   bubble.style.border = isSelected
-    ? '3px solid #2563EB'
+    ? '2px solid #0671EB'
     : isStale
-      ? '2.5px solid #EF4444'
+      ? '1.5px solid #EF4444'
       : isModerate
-        ? '2px solid #F59E0B'
-        : '2px solid #0671eb';
-  bubble.style.transition = 'transform 0.15s ease';
-  if (isSelected) {
-    bubble.style.transform = 'scale(1.15)';
-  }
+        ? '1.5px solid #F59E0B'
+        : '1.5px solid #CBD5E1';
 
   const img = document.createElement('img');
   img.src = sign.imageUrl || '';
@@ -90,35 +114,47 @@ function createWebSignMarkerElement(sign: RouteSign, isSelected: boolean, onClic
   bubble.appendChild(img);
   container.appendChild(bubble);
 
-  // Freshness Indicator Badge
-  if (isStale || isModerate || isFresh) {
+  // Subtle state indicator
+  if (isStale) {
     const badge = document.createElement('div');
     badge.style.position = 'absolute';
-    badge.style.top = '0px';
-    badge.style.right = '0px';
-    badge.style.height = '16px';
-    badge.style.minWidth = '16px';
-    badge.style.borderRadius = '8px';
+    badge.style.top = '2px';
+    badge.style.right = '2px';
+    badge.style.width = '12px';
+    badge.style.height = '12px';
+    badge.style.borderRadius = '6px';
     badge.style.border = '1.5px solid #FFFFFF';
+    badge.style.background = '#EF4444';
     badge.style.display = 'flex';
     badge.style.alignItems = 'center';
     badge.style.justifyContent = 'center';
     badge.style.fontSize = '8px';
-    badge.style.fontWeight = 'bold';
+    badge.style.fontWeight = '900';
     badge.style.color = '#FFFFFF';
-    badge.style.padding = '0 2px';
-
-    if (isStale) {
-      badge.style.background = '#EF4444';
-      badge.textContent = '!';
-    } else if (isModerate) {
-      badge.style.background = '#F59E0B';
-      badge.textContent = `${scorePercent}%`;
-    } else {
-      badge.style.background = '#10B981';
-      badge.textContent = '✓';
-    }
+    badge.textContent = '!';
     container.appendChild(badge);
+  } else if (isModerate) {
+    const dot = document.createElement('div');
+    dot.style.position = 'absolute';
+    dot.style.top = '3px';
+    dot.style.right = '3px';
+    dot.style.width = '9px';
+    dot.style.height = '9px';
+    dot.style.borderRadius = '4.5px';
+    dot.style.border = '1.5px solid #FFFFFF';
+    dot.style.background = '#F59E0B';
+    container.appendChild(dot);
+  } else if (isFresh) {
+    const dot = document.createElement('div');
+    dot.style.position = 'absolute';
+    dot.style.top = '3px';
+    dot.style.right = '3px';
+    dot.style.width = '9px';
+    dot.style.height = '9px';
+    dot.style.borderRadius = '4.5px';
+    dot.style.border = '1.5px solid #FFFFFF';
+    dot.style.background = '#10B981';
+    container.appendChild(dot);
   }
 
   container.addEventListener('click', (e) => {
@@ -218,7 +254,8 @@ export function RevalidationMapView({
 
     const markers = signs.map((sign) => {
       const isSelected = selectedSignId === sign.id;
-      const el = createWebSignMarkerElement(sign, isSelected, () => {
+      const isDimmed = Boolean(selectedSignId && !isSelected);
+      const el = createWebSignMarkerElement(sign, isSelected, isDimmed, () => {
         onSignPress?.(sign);
       });
       return new Marker({ element: el })

@@ -6,6 +6,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 interface RevalidationSignMarkerProps {
   sign: RouteSign;
   isSelected?: boolean;
+  isDimmed?: boolean;
 }
 
 export function getFreshnessInfo(sign: RouteSign) {
@@ -33,13 +34,26 @@ export function getFreshnessInfo(sign: RouteSign) {
   };
 }
 
-export function RevalidationSignMarker({ sign, isSelected = false }: RevalidationSignMarkerProps) {
+export function RevalidationSignMarker({
+  sign,
+  isSelected = false,
+  isDimmed = false,
+}: RevalidationSignMarkerProps) {
   const [hasError, setHasError] = useState(false);
-  const { scorePercent, isStale, isModerate, isFresh } = getFreshnessInfo(sign);
+  const { isStale, isModerate, isFresh } = getFreshnessInfo(sign);
 
   return (
-    <View style={[styles.container, isSelected && styles.containerSelected]}>
-      {/* Sign Icon Circle — matching navigation flow */}
+    <View
+      style={[
+        styles.container,
+        isSelected && styles.containerSelected,
+        isDimmed && styles.containerDimmed,
+      ]}
+    >
+      {/* Outer Blue Focus Ring when selected */}
+      {isSelected ? <View style={styles.selectedHalo} /> : null}
+
+      {/* Main Sign Icon Bubble */}
       <View
         style={[
           styles.markerBubble,
@@ -51,29 +65,25 @@ export function RevalidationSignMarker({ sign, isSelected = false }: Revalidatio
         {sign.imageUrl && !hasError ? (
           <Image
             accessibilityLabel={sign.name || sign.signCode}
-            source={{ uri: sign.imageUrl }}
             onError={() => setHasError(true)}
             resizeMode="contain"
+            source={{ uri: sign.imageUrl }}
             style={styles.signImage}
           />
         ) : (
-          <MaterialCommunityIcons color="#09233C" name="traffic-light" size={20} />
+          <MaterialCommunityIcons color="#09233C" name="traffic-light" size={18} />
         )}
       </View>
 
-      {/* Freshness Indicator Badge on top-right corner */}
+      {/* Subtle State Indicators on Top-Right Corner */}
       {isStale ? (
         <View style={[styles.indicatorBadge, styles.badgeStale]}>
-          <MaterialCommunityIcons color="#FFFFFF" name="alert" size={10} />
+          <Text style={styles.badgeExclamation}>!</Text>
         </View>
       ) : isModerate ? (
-        <View style={[styles.indicatorBadge, styles.badgeModerate]}>
-          <Text style={styles.badgeText}>{scorePercent}%</Text>
-        </View>
+        <View style={[styles.indicatorDot, styles.dotModerate]} />
       ) : isFresh ? (
-        <View style={[styles.indicatorBadge, styles.badgeFresh]}>
-          <MaterialCommunityIcons color="#FFFFFF" name="check" size={8} />
-        </View>
+        <View style={[styles.indicatorDot, styles.dotFresh]} />
       ) : null}
     </View>
   );
@@ -87,69 +97,93 @@ const styles = StyleSheet.create({
     height: 44,
   },
   containerSelected: {
-    transform: [{ scale: 1.15 }],
+    transform: [{ scale: 1.18 }],
+    zIndex: 10,
+  },
+  containerDimmed: {
+    opacity: 0.55,
+    transform: [{ scale: 0.92 }],
+  },
+  selectedHalo: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2.5,
+    borderColor: '#0671EB',
+    backgroundColor: 'rgba(6, 113, 235, 0.16)',
   },
   markerBubble: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#0671eb',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   markerBubbleStale: {
     borderColor: '#EF4444',
-    borderWidth: 2.5,
   },
   markerBubbleModerate: {
     borderColor: '#F59E0B',
-    borderWidth: 2,
   },
   markerBubbleSelected: {
-    borderColor: '#2563EB',
-    borderWidth: 3,
-    backgroundColor: '#EFF6FF',
-    shadowOpacity: 0.45,
-    shadowRadius: 6,
-    elevation: 8,
+    borderColor: '#0671EB',
+    borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 6,
   },
   signImage: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
   },
   indicatorBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
+    top: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
-    elevation: 5,
+    elevation: 4,
   },
   badgeStale: {
     backgroundColor: '#EF4444',
   },
-  badgeModerate: {
-    backgroundColor: '#F59E0B',
-  },
-  badgeFresh: {
-    backgroundColor: '#10B981',
-  },
-  badgeText: {
+  badgeExclamation: {
     color: '#FFFFFF',
     fontSize: 8,
-    fontWeight: '700',
+    fontWeight: '900',
+    lineHeight: 9,
+    textAlign: 'center',
+  },
+  indicatorDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+  },
+  dotModerate: {
+    backgroundColor: '#F59E0B',
+  },
+  dotFresh: {
+    backgroundColor: '#10B981',
   },
 });

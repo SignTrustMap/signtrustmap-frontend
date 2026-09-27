@@ -153,6 +153,7 @@ export function RevalidationMapView({
       {/* Render Verified Signs with Freshness Indicators */}
       {signs.map((sign) => {
         const isSelected = selectedSignId === sign.id;
+        const isDimmed = Boolean(selectedSignId && !isSelected);
         return (
           <Marker
             anchor="center"
@@ -161,7 +162,7 @@ export function RevalidationMapView({
             lngLat={sign.coordinate}
             onPress={() => onSignPress?.(sign)}
           >
-            <RevalidationSignMarker isSelected={isSelected} sign={sign} />
+            <RevalidationSignMarker isDimmed={isDimmed} isSelected={isSelected} sign={sign} />
           </Marker>
         );
       })}
