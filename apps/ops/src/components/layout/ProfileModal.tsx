@@ -1,10 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   User,
   Envelope,
   Key,
-  SignOut,
   Eye,
   EyeSlash,
   Copy,
@@ -33,11 +31,10 @@ interface ProfileModalProps {
  * (fullName, phone) via NestJS backend, and update security credentials.
  */
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { user, updateProfile, logout } = useAuth()
+  const { user, updateProfile } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
-  const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
   const [name, setName] = useState(user?.name || '')
@@ -158,12 +155,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setNewPw('')
     setConfirmPw('')
     toast.success(t('profile.pw_change_success', { defaultValue: 'Đã đổi mật khẩu thành công!' }))
-  }
-
-  const handleLogout = () => {
-    onClose()
-    logout()
-    navigate('/login', { replace: true })
   }
 
   const getRoleBadge = (role?: string) => {
@@ -505,24 +496,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           )}
         </div>
 
-        <div className={`p-4 sm:p-5 border-t flex items-center justify-between gap-3 ${
+        <div className={`p-4 sm:p-5 border-t flex items-center justify-end gap-3 ${
           isDark
             ? 'border-white/10 bg-white/[0.02]'
             : 'border-gray-100 bg-gray-50/70'
         }`}>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer ${
-              isDark
-                ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-            }`}
-          >
-            <SignOut size={16} weight="bold" />
-            <span>{t('profile.btn_logout', { defaultValue: 'Đăng xuất tài khoản' })}</span>
-          </button>
-
           <div className="flex items-center gap-2.5">
             <button
               type="button"

@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Coins,
   Key,
-  SignOut,
   CheckCircle,
   Sparkle,
   VideoCamera,
@@ -35,7 +34,7 @@ import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
  * and view accessible workspace environments.
  */
 export default function ProfilePage() {
-  const { user, updateProfile, logout } = useAuth()
+  const { user, updateProfile } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
@@ -133,10 +132,6 @@ export default function ProfilePage() {
     toast.success(t('profile.pw_change_success'))
   }
 
-  const handleLogout = () => {
-    logout('/')
-  }
-
   const getRoleBadge = (role: string) => {
     const r = (role || '').trim().toLowerCase()
     switch (r) {
@@ -187,28 +182,13 @@ export default function ProfilePage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('profile.modal_title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('profile.subtitle')}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer self-start sm:self-auto ${
-              isDark
-                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
-                : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
-            }`}
-          >
-            <SignOut size={16} weight="bold" />
-            <span>{t('profile.btn_logout')}</span>
-          </button>
+        <div className="pb-2 border-b border-gray-200 dark:border-white/10">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            {t('profile.modal_title')}
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {t('profile.subtitle')}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
