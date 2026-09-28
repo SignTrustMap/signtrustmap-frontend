@@ -64,9 +64,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const selectedRole = availableRoles.includes(activeRole) ? activeRole : 'driver';
 
-  // Live queries for surveyor and reviewer counts
-  const { data: pendingData } = useGetMyPendingSubmissions(Boolean(session));
-  const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, Boolean(session));
+  const isSurveyorActive = Boolean(session && selectedRole === 'surveyor');
+  const isReviewerActive = Boolean(session && selectedRole === 'reviewer');
+
+  // Live queries for surveyor and reviewer counts run only for their active section
+  const { data: pendingData } = useGetMyPendingSubmissions(isSurveyorActive);
+  const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewerActive);
 
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
@@ -74,7 +77,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const { data: mySubmissionsData } = useGetMySubmissions(
     { page: '1', pageSize: '10' },
-    Boolean(session && selectedRole === 'surveyor'),
+    isSurveyorActive,
   );
 
   const pendingSubmissionsList = useMemo(() => {

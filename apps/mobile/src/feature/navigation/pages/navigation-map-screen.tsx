@@ -38,7 +38,6 @@ import {
   GPS_UNAVAILABLE_MESSAGE,
   isValidGpsLocation,
 } from "../utils/gps";
-import { usePlaceSuggestions } from "../hooks/use-places";
 import {
   SIGN_CATEGORIES,
   type SignCategory,
@@ -74,7 +73,6 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
-  const { data: initLocation } = usePlaceSuggestions("")
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -136,17 +134,14 @@ export function NavigationMapScreen() {
   useEffect(() => {
     if (selectedDestination || hasCenteredInitialMapRef.current) return;
 
-    if (initLocation && initLocation.length > 0) {
-      const first = initLocation[0];
-      if (first?.longitude != null && first?.latitude != null) {
-        hasCenteredInitialMapRef.current = true;
-        setMapFocus({
-          coordinate: [Number(first.longitude), Number(first.latitude)],
-          requestId: Date.now(),
-        });
-      }
+    if (userCoordinate) {
+      hasCenteredInitialMapRef.current = true;
+      setMapFocus({
+        coordinate: userCoordinate,
+        requestId: Date.now(),
+      });
     }
-  }, [initLocation, selectedDestination]);
+  }, [selectedDestination, userCoordinate]);
 
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
