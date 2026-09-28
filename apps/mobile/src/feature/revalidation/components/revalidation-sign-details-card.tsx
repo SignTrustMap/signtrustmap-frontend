@@ -20,6 +20,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
+import { formatDate } from '@/utils/format-date';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -148,26 +149,12 @@ export function RevalidationSignDetailsCard({
   );
 
   // Clear Action CTA wording
-  const primaryCtaText = isStale
-    ? 'Revalidate Sign'
-    : isFresh
-      ? 'View Sign Details'
-      : 'Inspect & Revalidate';
+  const primaryCtaText = 'Inspect'
 
-  const handleAction = async () => {
-    setIsSubmitting(true);
-    // =========================================================================
-    // TODO: Implement action API call (submit revalidation evidence / trigger re-evaluation task)
-    // once backend APIs are provided.
-    // =========================================================================
+  const handleAction = () => {
     if (onRevalidate) {
       onRevalidate(sign);
     }
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmittedMessage('Revalidation request registered. API integration pending.');
-      setTimeout(() => setSubmittedMessage(null), 3500);
-    }, 500);
   };
 
   return (
@@ -233,7 +220,7 @@ export function RevalidationSignDetailsCard({
             </View>
 
             <Text numberOfLines={1} style={[styles.compactLocation, { color: theme.grey }]}>
-              {sign.displayAddress || sign.roadName || 'Tan My, Ho Chi Minh City'}
+              {sign.displayAddress || sign.roadName || 'No Location Available'}
             </Text>
 
             <View style={styles.compactMetaRow}>
@@ -476,7 +463,7 @@ export function RevalidationSignDetailsCard({
               <View style={styles.lastCheckedCol}>
                 <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>Last checked</Text>
                 <Text style={[styles.lastCheckedValue, { color: theme.text }]}>
-                  {sign.lastVerifiedAt.split('T')[0]}
+                  {formatDate(sign.lastVerifiedAt)}
                 </Text>
               </View>
             ) : null}

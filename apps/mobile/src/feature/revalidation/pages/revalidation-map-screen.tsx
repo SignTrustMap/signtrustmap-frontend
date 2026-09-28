@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppButton } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import { RevalidationSignDetailsCard } from '../components/revalidation-sign-det
 type FreshnessFilter = 'ALL' | 'NEEDS_REVALIDATION' | 'MODERATE' | 'FRESH';
 
 const ZOOM_THRESHOLDS = [
-  { id: 'detail', label: '18.5x', name: 'Detail', zoom: 18.5, icon: 'magnify-plus-outline', desc: 'Poles & signs' },
+  { id: 'detail', label: '17.5x', name: 'Detail', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Poles & signs' },
   { id: 'street', label: '16.5x', name: 'Street', zoom: 16.5, icon: 'road-variant', desc: 'Street level' },
   { id: 'area', label: '14.5x', name: 'Area', zoom: 14.5, icon: 'home-city-outline', desc: 'Neighborhood' },
   { id: 'city', label: '12.0x', name: 'City', zoom: 12.0, icon: 'city-variant-outline', desc: 'City overview' },
@@ -35,10 +35,18 @@ const ZOOM_THRESHOLDS = [
 
 type ZoomThresholdId = (typeof ZOOM_THRESHOLDS)[number]['id'];
 
+type RevalidationMapParams = {
+  selectedSignId?: string;
+  snapLon?: string;
+  snapLat?: string;
+  snapRequestId?: string;
+};
+
 export function RevalidationMapScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<RevalidationMapParams>();
 
   const [bounds, setBounds] = useState<FindSignsInBoundsParams>();
   const [selectedSign, setSelectedSign] = useState<RouteSign | null>(null);
@@ -61,20 +69,45 @@ export function RevalidationMapScreen() {
   // Fetch verified signs within current map bounds
   const { data: rawSigns = [] } = useGetSignsInBounds(bounds, true);
 
-  // Initial user location fetch
+  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return)
   useEffect(() => {
     let isMounted = true;
     void fetchFreshGpsPosition().then((pos) => {
       if (isMounted && pos) {
         setUserCoordinate(pos);
-        setFocusCoordinate(pos);
-        setFocusRequestId((prev) => prev + 1);
+        if (!params.snapLon || !params.snapLat) {
+          setFocusCoordinate(pos);
+          setFocusRequestId((prev) => prev + 1);
+        }
       }
     });
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [params.snapLon, params.snapLat]);
+
+  // Snap camera and restore selection when navigating back from Inspect & Revalidate screen
+  useEffect(() => {
+    if (params.snapLon && params.snapLat) {
+      const lon = parseFloat(params.snapLon);
+      const lat = parseFloat(params.snapLat);
+      if (!Number.isNaN(lon) && !Number.isNaN(lat)) {
+        setFocusCoordinate([lon, lat]);
+        setFocusRequestId((prev) => prev + 1);
+        setZoomLevel(17.5);
+        setActiveZoomId('detail');
+      }
+    }
+  }, [params.snapLon, params.snapLat, params.snapRequestId]);
+
+  useEffect(() => {
+    if (params.selectedSignId && rawSigns.length > 0) {
+      const found = rawSigns.find((s) => s.id === params.selectedSignId);
+      if (found) {
+        setSelectedSign(found);
+      }
+    }
+  }, [params.selectedSignId, rawSigns]);
 
   // Smoothly animate floating buttons up/down relative to sign details card
   useEffect(() => {
@@ -166,12 +199,25 @@ export function RevalidationMapScreen() {
   }, [rawSigns]);
 
   const handleRevalidateAction = (sign: RouteSign) => {
-    // =========================================================================
-    // TODO: Implement action API call (submit revalidation evidence / trigger re-evaluation task)
-    // once the backend APIs are provided.
-    // Example: await submitRevalidationEvidence(sign.id, { latitude, longitude, image });
-    // =========================================================================
-    console.log('[Revalidation] Action triggered for sign:', sign.id, sign.signCode);
+    router.push({
+      pathname: '/work/inspect-revalidate',
+      params: {
+        signId: sign.id,
+        signCode: sign.signCode,
+        name: sign.name,
+        nameVi: sign.nameVi || '',
+        nameEn: sign.nameEn || '',
+        latitude: String(sign.coordinate[1]),
+        longitude: String(sign.coordinate[0]),
+        imageUrl: sign.imageUrl || '',
+        actualCropUrl: sign.actualCropUrl || '',
+        freshnessScore: sign.freshnessScore !== undefined ? String(sign.freshnessScore) : '',
+        status: sign.status || '',
+        roadName: sign.roadName || '',
+        displayAddress: sign.displayAddress || '',
+        lastVerifiedAt: sign.lastVerifiedAt || '',
+      },
+    });
   };
 
   return (
