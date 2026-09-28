@@ -7,8 +7,8 @@ import {
   GuestCtaBanner,
   DestinationSearchBar,
   NavigationRoutePanel,
+  PlaceDetailCard,
   CropImagePreviewModal,
-  ActiveNavigationBanner,
 } from './components'
 import { useProductMap } from './hooks/useProductMap'
 
@@ -35,14 +35,17 @@ export default function ProductMap() {
     isLoadingGis,
     userCoordinate,
     selectedDestination,
+    isPlaceDetailOpen,
+    isLoadingRoute,
     activeRoute,
     routeSigns,
     vehicleMode,
-    isNavigating,
-    setIsNavigating,
     previewCropUrl,
     setPreviewCropUrl,
     handleSelectDestination,
+    handleRequestDirections,
+    handleClosePlaceDetail,
+    handleBackToPlaceDetail,
     handleChangeVehicleMode,
     handleClearRoute,
     handleRecenter,
@@ -93,19 +96,8 @@ export default function ProductMap() {
             {/* Leaflet Canvas */}
             <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-            {/* TOP-CENTER: Active Navigation Banner (WHEN IN ACTIVE NAVIGATION MODE) */}
-            {isNavigating && activeRoute && (
-              <ActiveNavigationBanner
-                route={activeRoute}
-                routeSigns={routeSigns}
-                onStopNavigation={() => setIsNavigating(false)}
-                onFocusStepLocation={handleFocusStep}
-                isDark={isDark}
-              />
-            )}
-
-            {/* TOP-LEFT: Floating Destination Search Bar (ONLY FOR AUTHENTICATED USERS & NOT NAVIGATING) */}
-            {isAuthenticated && !isNavigating && (
+            {/* TOP-LEFT: Floating Destination Search Bar (FOR AUTHENTICATED USERS) */}
+            {isAuthenticated && (
               <div className="absolute top-4 left-4 z-[1000] w-full max-w-md">
                 <DestinationSearchBar
                   selectedDestination={selectedDestination}
@@ -134,7 +126,20 @@ export default function ProductMap() {
             {/* BOTTOM-LEFT: Guest Invitation Banner (ONLY FOR GUEST USERS) */}
             {!isAuthenticated && <GuestCtaBanner isDark={isDark} />}
 
-            {/* BOTTOM-RIGHT: Navigation Route Info Panel (WHEN ROUTE IS ACTIVE) */}
+            {/* TOP-LEFT: Place Detail Card (WHEN DESTINATION IS SELECTED & NOT ROUTING) */}
+            {isPlaceDetailOpen && selectedDestination && !activeRoute && (
+              <PlaceDetailCard
+                place={selectedDestination}
+                userCoordinate={userCoordinate}
+                onRequestDirections={handleRequestDirections}
+                onClose={handleClosePlaceDetail}
+                onCenterMap={handleRecenter}
+                isLoadingRoute={isLoadingRoute}
+                isDark={isDark}
+              />
+            )}
+
+            {/* TOP-LEFT: Navigation Route Info Panel (WHEN ROUTE IS ACTIVE) */}
             {activeRoute && selectedDestination && (
               <NavigationRoutePanel
                 route={activeRoute}
@@ -143,9 +148,9 @@ export default function ProductMap() {
                 vehicleMode={vehicleMode}
                 onChangeVehicleMode={handleChangeVehicleMode}
                 onClearRoute={handleClearRoute}
+                onBackToPlace={handleBackToPlaceDetail}
                 onFocusSign={handleFocusSign}
-                isNavigating={isNavigating}
-                onToggleNavigation={() => setIsNavigating((prev) => !prev)}
+                onFocusStep={handleFocusStep}
                 isDark={isDark}
               />
             )}

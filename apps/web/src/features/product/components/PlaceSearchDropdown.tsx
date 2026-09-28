@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { type ApiPlace } from '@shared/types'
 import {
   Clock,
@@ -27,6 +28,7 @@ export function PlaceSearchDropdown({
   onSelectPlace,
   isDark,
 }: PlaceSearchDropdownProps) {
+  const { t } = useTranslation('product')
   const isTyping = query.trim().length >= 2
 
   const getPlaceIcon = (place: ApiPlace) => {
@@ -57,12 +59,14 @@ export function PlaceSearchDropdown({
           {isSearching ? (
             <div className="flex items-center justify-center gap-2 py-6 text-xs text-gray-400">
               <SpinnerGap className="w-4 h-4 animate-spin text-[#007b8b] dark:text-[#00c4de]" />
-              <span>Đang tìm kiếm địa điểm...</span>
+              <span>{t('map_page.searching_places', 'Đang tìm kiếm địa điểm...')}</span>
             </div>
           ) : searchResults.length > 0 ? (
             <div className="space-y-1">
               <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                Kết quả tìm kiếm ({searchResults.length})
+                {t('map_page.search_results_count', 'Kết quả tìm kiếm ({{count}})', {
+                  count: searchResults.length,
+                })}
               </div>
               {searchResults.map((item) => (
                 <button
@@ -87,7 +91,9 @@ export function PlaceSearchDropdown({
             </div>
           ) : (
             <div className="py-6 text-center text-xs text-gray-400">
-              Không tìm thấy địa điểm phù hợp với &quot;{query}&quot;
+              {t('map_page.no_places_found', 'Không tìm thấy địa điểm phù hợp với "{{query}}"', {
+                query,
+              })}
             </div>
           )}
         </div>
@@ -98,7 +104,7 @@ export function PlaceSearchDropdown({
           {savedPlaces.length > 0 && (
             <div className="pb-2">
               <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                Địa điểm đã lưu
+                {t('map_page.saved_places', 'Địa điểm đã lưu')}
               </div>
               <div className="space-y-1">
                 {savedPlaces.map((item) => (
@@ -129,7 +135,7 @@ export function PlaceSearchDropdown({
           {recentSearches.length > 0 ? (
             <div className={savedPlaces.length > 0 ? 'pt-2' : ''}>
               <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                Tìm kiếm gần đây
+                {t('map_page.recent_searches', 'Tìm kiếm gần đây')}
               </div>
               <div className="space-y-1">
                 {recentSearches.map((item) => (
@@ -156,7 +162,10 @@ export function PlaceSearchDropdown({
             </div>
           ) : savedPlaces.length === 0 ? (
             <div className="py-6 text-center text-xs text-gray-400">
-              Nhập tên đường, phường/xã hoặc quận/huyện để bắt đầu tìm đường.
+              {t(
+                'map_page.search_prompt',
+                'Nhập tên đường, phường/xã hoặc địa danh để bắt đầu tìm kiếm.'
+              )}
             </div>
           ) : null}
         </div>

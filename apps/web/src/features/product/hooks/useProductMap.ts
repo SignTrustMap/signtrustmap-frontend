@@ -50,11 +50,17 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
 
   // Navigation state
   const [selectedDestination, setSelectedDestination] = useState<ApiPlace | null>(null)
+  const [isPlaceDetailOpen, setIsPlaceDetailOpen] = useState(false)
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false)
   const [activeRoute, setActiveRoute] = useState<NavigationRoute | null>(null)
   const [routeSigns, setRouteSigns] = useState<RouteSign[]>([])
   const [vehicleMode, setVehicleMode] = useState<VehicleModeId>('DRIVING')
-  const [isNavigating, setIsNavigating] = useState(false)
   const [previewCropUrl, setPreviewCropUrl] = useState<string | null>(null)
+
+  const activeRouteRef = useRef<NavigationRoute | null>(null)
+  useEffect(() => {
+    activeRouteRef.current = activeRoute
+  }, [activeRoute])
 
   // Keep ref synchronized without causing map re-initialization
   useEffect(() => {
@@ -71,7 +77,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
   const fetchViewportSigns = useCallback(async (targetMap: L.Map) => {
     try {
       setIsLoadingGis(true)
-      const bounds = targetMap.getBounds()
+      const bounds = targetMap.getBounds().pad(0.1)
       const signs = await signsService.getSignsInBounds({
         minLat: bounds.getSouth(),
         minLon: bounds.getWest(),
@@ -92,6 +98,36 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
       }
     } catch (err) {
       console.warn('[MapGIS] Live signs in bounds fetch failed:', err)
+    } finally {
+      setIsLoadingGis(false)
+    }
+  }, [])
+
+  // ─── Fetch Signs Directly Around Coordinates (/signs) ──────────────────────
+  const fetchSignsAroundCoordinate = useCallback(async (lat: number, lon: number) => {
+    try {
+      setIsLoadingGis(true)
+      const delta = 0.02 // ~2km bounding box
+      const signs = await signsService.getSignsInBounds({
+        minLat: lat - delta,
+        minLon: lon - delta,
+        maxLat: lat + delta,
+        maxLon: lon + delta,
+        limit: 120,
+      })
+
+      if (signs && signs.length > 0) {
+        setMapSigns((prev) => {
+          const signMap = new Map<string, RouteSign>()
+          signs.forEach((s) => signMap.set(s.id, s))
+          prev.forEach((s) => {
+            if (!signMap.has(s.id)) signMap.set(s.id, s)
+          })
+          return Array.from(signMap.values())
+        })
+      }
+    } catch (err) {
+      console.warn('[MapGIS] Signs around coordinate fetch failed:', err)
     } finally {
       setIsLoadingGis(false)
     }
@@ -127,13 +163,13 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     mapInstanceRef.current = map
 
     const onMoveEnd = () => {
-      // Don't auto-fetch viewport bounds if actively viewing a planned route
-      if (selectedDestinationRef.current) return
+      // Don't auto-fetch viewport bounds if actively viewing a planned route corridor
+      if (activeRouteRef.current) return
 
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = setTimeout(() => {
         fetchViewportSigns(map)
-      }, 400)
+      }, 350)
     }
 
     map.on('moveend', onMoveEnd)
@@ -244,31 +280,54 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     return () => container.removeEventListener('click', handleContainerClick)
   }, [])
 
-  // ─── Render Traffic Sign Markers on Map ────────────────────────────────────
+  // ─── Render Traffic Sign Markers on Map (With Smart Reconciliation) ────────
   const visibleSigns = activeRoute ? routeSigns : mapSigns
+  const prevIsDarkRef = useRef(isDark)
+  const prevActiveRouteRef = useRef(activeRoute)
 
   useEffect(() => {
     if (!mapInstanceRef.current || !markersLayerRef.current) return
 
-    markersLayerRef.current.clearLayers()
-    markersMapRef.current = {}
+    const currentLayer = markersLayerRef.current
+    const currentMarkers = markersMapRef.current
 
+    // If theme changed or switching in/out of a route, do a full reset
+    const themeChanged = prevIsDarkRef.current !== isDark
+    const routeChanged = Boolean(prevActiveRouteRef.current) !== Boolean(activeRoute)
+
+    if (themeChanged || routeChanged) {
+      prevIsDarkRef.current = isDark
+      prevActiveRouteRef.current = activeRoute
+      currentLayer.clearLayers()
+      markersMapRef.current = {}
+    }
+
+    const newSignIds = new Set(visibleSigns.map((s) => s.id))
+
+    // 1. Remove markers no longer in visibleSigns (unless popup is actively open on it)
+    for (const [id, marker] of Object.entries(currentMarkers)) {
+      if (!newSignIds.has(id)) {
+        if (!marker.isPopupOpen()) {
+          currentLayer.removeLayer(marker)
+          delete currentMarkers[id]
+        }
+      }
+    }
+
+    // 2. Add new signs without re-creating existing markers
     visibleSigns.forEach((sign) => {
+      if (currentMarkers[sign.id]) {
+        // Marker already exists on map; keep its instance and active popup intact!
+        return
+      }
+
       const marker = createRouteSignMarker({
         sign,
         isDark,
-        onSelect: (selected) => {
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.panTo([selected.coordinate[1], selected.coordinate[0]], {
-              animate: true,
-              duration: 0.5,
-            })
-          }
-        },
       })
 
-      markersLayerRef.current?.addLayer(marker)
-      markersMapRef.current[sign.id] = marker
+      currentLayer.addLayer(marker)
+      currentMarkers[sign.id] = marker
     })
   }, [visibleSigns, isDark, activeRoute])
 
@@ -278,89 +337,98 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
 
     routeLayerRef.current.clearLayers()
 
-    if (
-      !activeRoute ||
-      !selectedDestination ||
-      !selectedDestination.latitude ||
-      !selectedDestination.longitude
-    ) {
+    if (!selectedDestination || selectedDestination.latitude == null || selectedDestination.longitude == null) {
       return
     }
 
-    // Convert route coordinates to Leaflet [lat, lng] format
-    const latLngs = activeRoute.coordinates.map(
-      (coord): [number, number] => [coord[1], coord[0]]
-    )
-
-    // Route Polyline
-    const polyline = L.polyline(latLngs, {
-      color: isDark ? '#00c4de' : '#007b8b',
-      weight: 6,
-      opacity: 0.9,
-      lineCap: 'round',
-      lineJoin: 'round',
-    })
-    routeLayerRef.current.addLayer(polyline)
-
-    // Start Marker (S)
-    const startCoord = latLngs[0]
-    if (startCoord) {
-      const startIcon = L.divIcon({
-        className: 'route-start-marker',
-        html: `
-          <div style="
-            width: 26px; height: 26px; border-radius: 50%;
-            background: #1767D2; color: #ffffff;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 900; font-size: 11px; font-family: monospace;
-            border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-          ">S</div>
-        `,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13],
-      })
-      const startMarker = L.marker(startCoord, { icon: startIcon })
-      routeLayerRef.current.addLayer(startMarker)
-    }
-
-    // Destination Marker (D)
+    // Always render Destination Marker (Google Maps Style Pin) when a destination is chosen
     const destCoord: [number, number] = [
       selectedDestination.latitude,
       selectedDestination.longitude,
     ]
     const destIcon = L.divIcon({
-      className: 'route-dest-marker',
+      className: 'route-dest-pin-marker',
       html: `
         <div style="
-          width: 28px; height: 28px; border-radius: 50%;
-          background: #148594; color: #ffffff;
-          display: flex; align-items: center; justify-content: center;
-          font-weight: 900; font-size: 12px; font-family: monospace;
-          border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-        ">D</div>
+          width: 32px;
+          height: 42px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          animation: mapPinDrop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        ">
+          <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 5px rgba(0,0,0,0.38)); overflow: visible;">
+            <ellipse cx="16" cy="41" rx="7" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+            <path d="M16 0C7.163 0 0 7.163 0 16c0 11.4 14.2 24.3 15.3 25.4.38.36 1.02.36 1.4 0C17.8 40.3 32 27.4 32 16 32 7.163 24.837 0 16 0z" fill="#EA4335"/>
+            <path d="M16 1C7.716 1 1 7.716 1 16c0 10.8 13.5 23.2 14.7 24.3.17.16.43.16.6 0C17.5 39.2 31 26.8 31 16 31 7.716 24.284 1 16 1z" stroke="#B31412" stroke-width="1.2" fill="none"/>
+            <circle cx="16" cy="15.5" r="5.5" fill="#7A0000"/>
+          </svg>
+        </div>
       `,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
+      iconSize: [32, 42],
+      iconAnchor: [16, 42],
+      popupAnchor: [0, -42],
     })
     const destMarker = L.marker(destCoord, { icon: destIcon })
+    if (selectedDestination.title) {
+      destMarker.bindTooltip(selectedDestination.title, {
+        direction: 'top',
+        offset: [0, -42],
+      })
+    }
     routeLayerRef.current.addLayer(destMarker)
 
-    // Fit map bounds to show entire route with padding
-    mapInstanceRef.current.fitBounds(polyline.getBounds(), {
-      padding: [80, 80],
-      maxZoom: 17,
-      duration: 0.8,
-    })
+    // If an active route is calculated, also render start marker, polyline, and fit bounds
+    if (activeRoute && activeRoute.coordinates.length > 0) {
+      const latLngs = activeRoute.coordinates.map(
+        (coord): [number, number] => [coord[1], coord[0]]
+      )
+
+      const polyline = L.polyline(latLngs, {
+        color: isDark ? '#00c4de' : '#007b8b',
+        weight: 6,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round',
+      })
+      routeLayerRef.current.addLayer(polyline)
+
+      const startCoord = latLngs[0]
+      if (startCoord) {
+        const startIcon = L.divIcon({
+          className: 'route-start-marker',
+          html: `
+            <div style="
+              width: 26px; height: 26px; border-radius: 50%;
+              background: #1767D2; color: #ffffff;
+              display: flex; align-items: center; justify-content: center;
+              font-weight: 900; font-size: 11px; font-family: monospace;
+              border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+            ">S</div>
+          `,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        })
+        const startMarker = L.marker(startCoord, { icon: startIcon })
+        routeLayerRef.current.addLayer(startMarker)
+      }
+    }
   }, [activeRoute, selectedDestination, isDark])
 
   // ─── Destination Selection & Route Planning ────────────────────────────────
   const calculateRoute = useCallback(
-    async (place: ApiPlace, mode: VehicleModeId = vehicleMode) => {
+    async (
+      place: ApiPlace,
+      mode: VehicleModeId = vehicleMode,
+      animateCameraTransition = true
+    ) => {
       setSelectedDestination(place)
       if (place.latitude == null || place.longitude == null) return
 
       try {
         setIsLoadingGis(true)
+        setIsLoadingRoute(true)
 
         // Use live user location if available, otherwise prompt GPS or fallback to center
         let userOrigin: [number, number]
@@ -385,27 +453,119 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
         // Fetch route directions for selected vehicle mode
         const route = await navigationService.getDirections(userOrigin, destCoord, mode)
         setActiveRoute(route)
+        setIsPlaceDetailOpen(false)
 
-        // Fetch signs along route
-        const signs = await navigationService.getSignsAlongRoute(route.geometry)
-        setRouteSigns(signs)
+        // Google Maps Camera Motion:
+        // 1. Dời camera qua vị trí hiện tại của người dùng (User GPS)
+        // 2. Sau đó zoom out mở rộng tầm nhìn để thấy toàn bộ tuyến đường (fitBounds)
+        if (mapInstanceRef.current) {
+          const map = mapInstanceRef.current
+          const originLat = userOrigin[1]
+          const originLng = userOrigin[0]
+
+          if (animateCameraTransition) {
+            // Bước 1: Lướt camera qua vị trí hiện tại
+            map.flyTo([originLat, originLng], 15, {
+              duration: 0.8,
+              easeLinearity: 0.3,
+            })
+
+            // Bước 2: Sau khi lướt về vị trí hiện tại, zoom out bao quát toàn bộ lộ trình
+            setTimeout(() => {
+              if (mapInstanceRef.current) {
+                const latLngs = route.coordinates.map(
+                  (c): [number, number] => [c[1], c[0]]
+                )
+                mapInstanceRef.current.fitBounds(L.latLngBounds(latLngs), {
+                  padding: [80, 80],
+                  maxZoom: 17,
+                  duration: 1.2,
+                })
+              }
+            }, 650)
+          } else {
+            // Khi đổi phương tiện: chỉ fitBounds trực tiếp
+            const latLngs = route.coordinates.map(
+              (c): [number, number] => [c[1], c[0]]
+            )
+            map.fitBounds(L.latLngBounds(latLngs), {
+              padding: [80, 80],
+              maxZoom: 17,
+              duration: 0.8,
+            })
+          }
+        }
+
+        // Fetch signs along route (safely catch if backend endpoint is unavailable)
+        try {
+          const signs = await navigationService.getSignsAlongRoute(route.geometry)
+          setRouteSigns(signs)
+        } catch (signErr) {
+          console.warn('[Navigation] Signs along route note:', signErr)
+          setRouteSigns([])
+        }
       } catch (err) {
         console.warn('[Navigation] Route calculation failed:', err)
       } finally {
         setIsLoadingGis(false)
+        setIsLoadingRoute(false)
       }
     },
     [vehicleMode, userCoordinate]
   )
 
   const handleSelectDestination = (place: ApiPlace) => {
-    calculateRoute(place, vehicleMode)
+    setSelectedDestination(place)
+    setIsPlaceDetailOpen(true)
+    setActiveRoute(null)
+    setRouteSigns([])
+    if (mapInstanceRef.current && place.latitude != null && place.longitude != null) {
+      mapInstanceRef.current.flyTo([place.latitude, place.longitude], 16, {
+        duration: 1.2,
+        easeLinearity: 0.25,
+      })
+      fetchSignsAroundCoordinate(place.latitude, place.longitude)
+    }
+  }
+
+  const handleRequestDirections = () => {
+    if (selectedDestination) {
+      calculateRoute(selectedDestination, vehicleMode, true)
+    }
+  }
+
+  const handleClosePlaceDetail = () => {
+    setIsPlaceDetailOpen(false)
+    setSelectedDestination(null)
+    setActiveRoute(null)
+    setRouteSigns([])
+    if (mapInstanceRef.current) {
+      fetchViewportSigns(mapInstanceRef.current)
+    }
+  }
+
+  const handleBackToPlaceDetail = () => {
+    setActiveRoute(null)
+    setRouteSigns([])
+    setIsPlaceDetailOpen(true)
+    if (
+      mapInstanceRef.current &&
+      selectedDestination?.latitude != null &&
+      selectedDestination?.longitude != null
+    ) {
+      mapInstanceRef.current.flyTo(
+        [selectedDestination.latitude, selectedDestination.longitude],
+        16,
+        { duration: 0.8 }
+      )
+      fetchSignsAroundCoordinate(selectedDestination.latitude, selectedDestination.longitude)
+    }
   }
 
   const handleChangeVehicleMode = (newMode: VehicleModeId) => {
     setVehicleMode(newMode)
-    if (selectedDestination) {
-      calculateRoute(selectedDestination, newMode)
+    if (selectedDestination && activeRoute) {
+      calculateRoute(selectedDestination, newMode, false)
     }
   }
 
@@ -413,7 +573,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     setActiveRoute(null)
     setSelectedDestination(null)
     setRouteSigns([])
-    setIsNavigating(false)
+    setIsPlaceDetailOpen(false)
     if (mapInstanceRef.current) {
       fetchViewportSigns(mapInstanceRef.current)
     }
@@ -504,14 +664,17 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     isLoadingGis,
     userCoordinate,
     selectedDestination,
+    isPlaceDetailOpen,
+    isLoadingRoute,
     activeRoute,
     routeSigns,
     vehicleMode,
-    isNavigating,
-    setIsNavigating,
     previewCropUrl,
     setPreviewCropUrl,
     handleSelectDestination,
+    handleRequestDirections,
+    handleClosePlaceDetail,
+    handleBackToPlaceDetail,
     handleChangeVehicleMode,
     handleClearRoute,
     handleRecenter,

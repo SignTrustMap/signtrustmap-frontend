@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import type { TFunction } from 'i18next'
 import type { SignItem } from '@/data'
+import type { RouteSign } from '@shared/types'
 import type { CategoryMeta } from '../components/ProductMapSidebar'
 
 // Fix Leaflet default marker icons using localized assets
@@ -181,12 +182,10 @@ export function createSignMarker({
   return marker
 }
 
-import type { RouteSign } from '@shared/types'
-
 interface CreateRouteSignMarkerParams {
   sign: RouteSign
   isDark: boolean
-  onSelect: (sign: RouteSign) => void
+  onSelect?: (sign: RouteSign) => void
 }
 
 /**
@@ -345,9 +344,11 @@ export function createRouteSignMarker({
     autoPan: true,
   })
 
-  marker.on('click', () => {
-    onSelect(sign)
-  })
+  if (onSelect) {
+    marker.on('click', () => {
+      onSelect(sign)
+    })
+  }
 
   return marker
 }
@@ -413,5 +414,92 @@ export function createCurrentLocationMarker(
     icon: customIcon,
     zIndexOffset: 1000,
   })
+}
+
+export interface PlaceCategoryInfo {
+  label: string
+  colorClass: string
+}
+
+export function detectCategory(title: string, address?: string | null): PlaceCategoryInfo {
+  const text = `${title || ''} ${address || ''}`.toLowerCase()
+
+  if (
+    text.includes('mall') ||
+    text.includes('takashimaya') ||
+    text.includes('vincom') ||
+    text.includes('aeon') ||
+    text.includes('plaza') ||
+    text.includes('trung tâm thương mại') ||
+    text.includes('tttm')
+  ) {
+    return {
+      label: 'Trung tâm thương mại',
+      colorClass: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+    }
+  }
+
+  if (
+    text.includes('bệnh viện') ||
+    text.includes('phòng khám') ||
+    text.includes('viện y') ||
+    text.includes('trạm y tế') ||
+    text.includes('hospital')
+  ) {
+    return {
+      label: 'Y tế & Bệnh viện',
+      colorClass: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+    }
+  }
+
+  if (
+    text.includes('trường') ||
+    text.includes('đại học') ||
+    text.includes('cao đẳng') ||
+    text.includes('thpt') ||
+    text.includes('tiểu học') ||
+    text.includes('mầm non') ||
+    text.includes('học viện')
+  ) {
+    return {
+      label: 'Giáo dục & Đào tạo',
+      colorClass: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+    }
+  }
+
+  if (
+    text.includes('quán') ||
+    text.includes('cà phê') ||
+    text.includes('cafe') ||
+    text.includes('coffee') ||
+    text.includes('nhà hàng') ||
+    text.includes('bún') ||
+    text.includes('phở') ||
+    text.includes('trà')
+  ) {
+    return {
+      label: 'Ẩm thực & Dịch vụ',
+      colorClass: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
+    }
+  }
+
+  if (
+    text.includes('tòa nhà') ||
+    text.includes('tower') ||
+    text.includes('building') ||
+    text.includes('công ty') ||
+    text.includes('văn phòng')
+  ) {
+    return {
+      label: 'Tòa nhà & Cơ quan',
+      colorClass: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+    }
+  }
+
+  return {
+    label: 'Địa điểm & Tuyến đường',
+    colorClass:
+      'text-[#007b8b] dark:text-[#00c4de] bg-[#007b8b]/10 dark:bg-[#00c4de]/10 border-[#007b8b]/20 dark:border-[#00c4de]/20',
+  }
 }
 

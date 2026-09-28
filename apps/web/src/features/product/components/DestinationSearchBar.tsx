@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MagnifyingGlass, X, NavigationArrow } from '@phosphor-icons/react'
 import type { ApiPlace } from '@shared/types'
 import { placesService } from '@/api/services/places.service'
@@ -17,7 +18,8 @@ export function DestinationSearchBar({
   onClearDestination,
   isDark,
 }: DestinationSearchBarProps) {
-  const [query, setQuery] = useState('')
+  const { t } = useTranslation('product')
+  const [query, setQuery] = useState(selectedDestination?.title || '')
   const [isOpen, setIsOpen] = useState(false)
   const [savedPlaces, setSavedPlaces] = useState<ApiPlace[]>([])
   const [recentSearches, setRecentSearches] = useState<ApiPlace[]>([])
@@ -25,7 +27,17 @@ export function DestinationSearchBar({
   const [isSearching, setIsSearching] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const isInputFocusedRef = useRef(false)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Synchronize search input text when selectedDestination changes externally
+  useEffect(() => {
+    if (!selectedDestination) {
+      setQuery('')
+    } else if (!isInputFocusedRef.current && selectedDestination.title) {
+      setQuery(selectedDestination.title)
+    }
+  }, [selectedDestination])
 
   // Load initial saved & recent places
   const loadUserPlaces = useCallback(async () => {
@@ -102,6 +114,16 @@ export function DestinationSearchBar({
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
 
+    // When the user clears the search text, immediately dismiss route & destination panels
+    if (val.trim() === '') {
+      setSearchResults([])
+      setIsSearching(false)
+      if (selectedDestination) {
+        onClearDestination()
+      }
+      return
+    }
+
     if (val.trim().length < 2) {
       setSearchResults([])
       setIsSearching(false)
@@ -167,22 +189,29 @@ export function DestinationSearchBar({
           onChange={(e) => handleQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
+            isInputFocusedRef.current = true
             setIsOpen(true)
             loadUserPlaces()
             if (query.trim().length >= 2 && searchResults.length === 0 && !isSearching) {
               executeSearch(query)
             }
           }}
-          placeholder="Bạn muốn đi đâu? (Tìm kiếm địa điểm)..."
+          onBlur={() => {
+            isInputFocusedRef.current = false
+          }}
+          placeholder={t(
+            'map_page.destination_search_placeholder',
+            'Tìm kiếm trên SignTrustMap'
+          )}
           className="flex-1 bg-transparent text-xs sm:text-sm font-medium outline-hidden placeholder:text-gray-400 placeholder:text-xs"
         />
 
-        {query ? (
+        {query || selectedDestination ? (
           <button
             type="button"
             onClick={handleClear}
             className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer"
-            title="Xóa tìm kiếm"
+            title={t('map_page.clear_search', 'Xóa tìm kiếm')}
           >
             <X className="w-4 h-4" />
           </button>
