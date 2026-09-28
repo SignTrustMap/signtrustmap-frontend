@@ -309,7 +309,7 @@ export function ReportIssueModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 font-mono">
-                  Vĩ độ (Lat)
+                  {t('map_page.report_modal.latitude')}
                 </label>
                 <input
                   type="text"
@@ -322,7 +322,7 @@ export function ReportIssueModal({
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 font-mono">
-                  Kinh độ (Lng)
+                  {t('map_page.report_modal.longitude')}
                 </label>
                 <input
                   type="text"

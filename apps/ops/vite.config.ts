@@ -10,6 +10,7 @@ export default defineConfig({
       '@': resolve(import.meta.dirname, './src'),
       '@shared/ui': resolve(import.meta.dirname, '../../packages/ui/src'),
       '@shared/types': resolve(import.meta.dirname, '../../packages/types/src'),
+      '@shared/map': resolve(import.meta.dirname, '../../packages/map/src'),
     },
   },
   optimizeDeps: {

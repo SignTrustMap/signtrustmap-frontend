@@ -56,5 +56,6 @@ export const API_ENDPOINTS = {
     ADDRESS_SEARCH: '/api/v1/addresses/search',
     SAVED_PLACES: '/api/v1/places/saved',
     RECENT_SEARCHES: '/api/v1/places/recent-searches',
+    RECENT_SEARCH_DETAIL: (id: string) => `/api/v1/places/recent-searches/${id}`,
   },
 } as const

@@ -49,6 +49,22 @@ export const API_ENDPOINTS = {
     OVERRIDE: (id: string) => `/api/v1/spatial/signs/${id}/override`,
     DELETE_MALICIOUS: (id: string) => `/api/v1/spatial/signs/${id}`,
   },
+  SIGNS: {
+    MAP: '/api/v1/spatial/signs',
+    DETAIL: (id: string) => `/api/v1/spatial/signs/${id}`,
+    NEARBY: '/api/v1/spatial/signs/nearby',
+    REPORT_ISSUE: (id: string) => `/api/v1/spatial/signs/${id}/report`,
+  },
+  NAVIGATION: {
+    ROUTING_DIRECTIONS: '/api/v1/routing/directions',
+    VEHICLE_MODES: '/api/v1/routing/vehicle-modes',
+    SIGNS_ALONG_ROUTE: '/api/v1/signs/along-route',
+    SIGNS_IN_BOUNDS: '/api/v1/signs',
+    ADDRESS_SEARCH: '/api/v1/addresses/search',
+    SAVED_PLACES: '/api/v1/places/saved',
+    RECENT_SEARCHES: '/api/v1/places/recent-searches',
+    RECENT_SEARCH_DETAIL: (id: string) => `/api/v1/places/recent-searches/${id}`,
+  },
   ESCALATIONS: {
     BASE: '/api/v1/escalations',
     DETAIL: (caseId: string) => `/api/v1/escalations/${caseId}`,

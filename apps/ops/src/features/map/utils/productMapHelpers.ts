@@ -1,10 +1,15 @@
 import L from 'leaflet'
 import type { TFunction } from 'i18next'
-import type { SignItem } from '@/data'
-import type { RouteSign } from '@shared/types'
-import type { CategoryMeta } from '../components/ProductMapSidebar'
+import type { RouteSign, SignItem } from '@shared/types'
 
 export { setupLeafletDefaultIcons } from '@shared/map'
+
+export interface CategoryMeta {
+  code: string
+  name: string
+  bgHex: string
+  badgeClass: string
+}
 
 
 export function getCategoryMeta(cat: string, t: TFunction): CategoryMeta {

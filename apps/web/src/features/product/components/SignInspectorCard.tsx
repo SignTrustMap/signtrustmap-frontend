@@ -51,7 +51,7 @@ export function SignInspectorCard({
           </span>
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30">
             <CheckCircle size={13} weight="bold" />
-            {selectedSign.trustScore}% Trust
+            {selectedSign.trustScore}% {t('mini_map.popup_trust')}
           </span>
           <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
             {categoryMeta.name}

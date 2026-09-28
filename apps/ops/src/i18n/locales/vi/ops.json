@@ -1036,7 +1036,14 @@
     "card_empty_title": "Không tìm thấy biển báo",
     "card_empty_desc": "Thử đổi từ khóa tìm kiếm hoặc chọn nhóm biển báo khác.",
     "showing_signs_count": "Hiển thị {{count}} biển báo",
-    "quick_filter_status": "Lọc trạng thái:"
+    "quick_filter_status": "Lọc trạng thái:",
+    "thinning_active": "Lọc thưa chống lag",
+    "thinning_all": "Hiện 100% biển",
+    "btn_thinning_on": "Chế độ lọc thưa thông minh đang bật",
+    "btn_thinning_off": "Đang hiển thị toàn bộ 100% biển báo",
+    "signs_unit": "biển",
+    "hud_live": "GIS LIVE",
+    "hud_standard": "WGS 84 • QCVN 41:2019"
   },
   "staff": {
     "title": "Quản lý nhân sự & Người dùng",

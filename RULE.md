@@ -11,6 +11,7 @@
      - `apps/ops`: Trung tâm chỉ huy (**Ops Command Center**) dành cho Nhân viên vận hành (Staff) và Quản trị viên (Admin).
      - `packages/types`: Gói hợp đồng kiểu dữ liệu chung (**@shared/types**).
      - `packages/ui`: Thư viện Design Tokens và thành phần giao diện cơ sở (**@shared/ui**).
+     - `packages/map`: Nền tảng bản đồ Leaflet, thuật toán GIS & Collision Thinning dùng chung (**@shared/map**).
 
 2. **Nguyên tắc Ranh giới Nghiêm ngặt (Zero Cross-App Dependency):**
    - **Tuyệt đối CẤM** `apps/web` import mã nguồn, components hoặc kiểu dữ liệu trực tiếp từ `apps/ops` và ngược lại.

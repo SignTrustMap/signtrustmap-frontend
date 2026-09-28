@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { AnimatePresence } from 'motion/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { ErrorBoundary, PageHeader } from '@shared/ui'
@@ -65,17 +66,11 @@ export default function ProductMap() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Page Header */}
         <PageHeader
-          title={t('map_page.title', 'Bản Đồ Biển Báo Giao Thông')}
+          title={t('map_page.title')}
           subtitle={
             isAuthenticated
-              ? t(
-                  'map_page.subtitle_auth',
-                  'Tra cứu điểm đến, khảo sát lộ trình và theo dõi biển báo trên tuyến di chuyển'
-                )
-              : t(
-                  'map_page.subtitle_guest',
-                  'Khám phá trực tiếp vị trí các biển báo giao thông đã được chuẩn hóa'
-                )
+              ? t('map_page.subtitle_auth')
+              : t('map_page.subtitle_guest')
           }
           bordered
         />
@@ -90,8 +85,8 @@ export default function ProductMap() {
         >
           <ErrorBoundary
             variant="card"
-            title="Không thể khởi tạo bản đồ GIS"
-            description="Bản đồ gặp sự cố khi dựng khung vẽ. Vui lòng nhấn thử lại để tải lại module bản đồ."
+            title={t('map_page.error_boundary_title')}
+            description={t('map_page.error_boundary_desc')}
           >
             {/* Leaflet Canvas */}
             <div ref={mapContainerRef} className="w-full h-full z-0" />
@@ -126,34 +121,39 @@ export default function ProductMap() {
             {/* BOTTOM-LEFT: Guest Invitation Banner (ONLY FOR GUEST USERS) */}
             {!isAuthenticated && <GuestCtaBanner isDark={isDark} />}
 
-            {/* TOP-LEFT: Place Detail Card (WHEN DESTINATION IS SELECTED & NOT ROUTING) */}
-            {isPlaceDetailOpen && selectedDestination && !activeRoute && (
-              <PlaceDetailCard
-                place={selectedDestination}
-                userCoordinate={userCoordinate}
-                onRequestDirections={handleRequestDirections}
-                onClose={handleClosePlaceDetail}
-                onCenterMap={handleRecenter}
-                isLoadingRoute={isLoadingRoute}
-                isDark={isDark}
-              />
-            )}
+            {/* Left Panels with smooth enter & exit transitions */}
+            <AnimatePresence mode="wait">
+              {/* TOP-LEFT: Place Detail Card (WHEN DESTINATION IS SELECTED & NOT ROUTING) */}
+              {isPlaceDetailOpen && selectedDestination && !activeRoute && (
+                <PlaceDetailCard
+                  key={`place-${selectedDestination.id || selectedDestination.title}`}
+                  place={selectedDestination}
+                  userCoordinate={userCoordinate}
+                  onRequestDirections={handleRequestDirections}
+                  onClose={handleClosePlaceDetail}
+                  onCenterMap={handleRecenter}
+                  isLoadingRoute={isLoadingRoute}
+                  isDark={isDark}
+                />
+              )}
 
-            {/* TOP-LEFT: Navigation Route Info Panel (WHEN ROUTE IS ACTIVE) */}
-            {activeRoute && selectedDestination && (
-              <NavigationRoutePanel
-                route={activeRoute}
-                destination={selectedDestination}
-                routeSigns={routeSigns}
-                vehicleMode={vehicleMode}
-                onChangeVehicleMode={handleChangeVehicleMode}
-                onClearRoute={handleClearRoute}
-                onBackToPlace={handleBackToPlaceDetail}
-                onFocusSign={handleFocusSign}
-                onFocusStep={handleFocusStep}
-                isDark={isDark}
-              />
-            )}
+              {/* TOP-LEFT: Navigation Route Info Panel (WHEN ROUTE IS ACTIVE) */}
+              {activeRoute && selectedDestination && (
+                <NavigationRoutePanel
+                  key={`route-${selectedDestination.id || selectedDestination.title}`}
+                  route={activeRoute}
+                  destination={selectedDestination}
+                  routeSigns={routeSigns}
+                  vehicleMode={vehicleMode}
+                  onChangeVehicleMode={handleChangeVehicleMode}
+                  onClearRoute={handleClearRoute}
+                  onBackToPlace={handleBackToPlaceDetail}
+                  onFocusSign={handleFocusSign}
+                  onFocusStep={handleFocusStep}
+                  isDark={isDark}
+                />
+              )}
+            </AnimatePresence>
           </ErrorBoundary>
         </div>
       </div>

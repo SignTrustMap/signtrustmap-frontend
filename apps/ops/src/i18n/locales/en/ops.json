@@ -1036,7 +1036,14 @@
     "card_empty_title": "No traffic signs found",
     "card_empty_desc": "Try adjusting your search query or sign category filters.",
     "showing_signs_count": "Showing {{count}} signs",
-    "quick_filter_status": "Filter status:"
+    "quick_filter_status": "Filter status:",
+    "thinning_active": "Collision Thinning",
+    "thinning_all": "Show 100% Signs",
+    "btn_thinning_on": "Smart collision thinning is active",
+    "btn_thinning_off": "Showing 100% signs without thinning",
+    "signs_unit": "signs",
+    "hud_live": "GIS LIVE",
+    "hud_standard": "WGS 84 • QCVN 41:2019"
   },
   "staff": {
     "title": "User & Staff Management",
