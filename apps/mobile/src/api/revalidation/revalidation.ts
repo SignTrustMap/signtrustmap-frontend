@@ -241,9 +241,6 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
   let score = 0.55;
   if (task.currentTrustScore !== undefined && Number.isFinite(task.currentTrustScore)) {
     score = task.currentTrustScore > 1 ? task.currentTrustScore / 100 : task.currentTrustScore;
-    if (score >= 0.6) {
-      score = 0.55;
-    }
   }
 
   return {
@@ -352,6 +349,9 @@ export async function submitRevalidationEvidence(
   accessToken?: string,
   signal?: AbortSignal,
 ): Promise<SubmitRevalidationEvidenceResponse> {
+  // Resolve token: caller may pass one in, otherwise read from storage
+  const token = accessToken ?? (await getStoredAccessToken());
+
   try {
     const formData = new FormData();
     formData.append('latitude', String(data.latitude));
@@ -376,7 +376,7 @@ export async function submitRevalidationEvidence(
         body: formData,
         signal,
       },
-      accessToken,
+      token,
     );
     return res;
   } catch (err) {

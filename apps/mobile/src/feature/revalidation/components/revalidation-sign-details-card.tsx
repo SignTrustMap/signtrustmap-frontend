@@ -119,30 +119,30 @@ export function RevalidationSignDetailsCard({
   } else if (isStale || normalizedStatus === 'STALE') {
     statusConfig = {
       label: 'Needs Re-evaluation',
-      bg: '#FEF2F2',
-      border: '#FECACA',
-      text: '#DC2626',
+      bg: '#FFF1F2',
+      border: '#FDA4AF',
+      text: '#BE123C',
       icon: 'alert-circle',
     };
   } else if (isModerate) {
     statusConfig = {
       label: 'Moderate Freshness',
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-      text: '#D97706',
+      bg: '#FFF7ED',
+      border: '#FDBA74',
+      text: '#C2410C',
       icon: 'clock-alert-outline',
     };
   } else {
     statusConfig = {
       label: 'Active & Verified',
       bg: '#ECFDF5',
-      border: '#A7F3D0',
-      text: '#059669',
+      border: '#6EE7B7',
+      text: '#047857',
       icon: 'check-decagram',
     };
   }
 
-  const freshnessColor = isStale ? '#EF4444' : isModerate ? '#F59E0B' : '#10B981';
+  const freshnessColor = isStale ? '#B91C1C' : isModerate ? '#C2410C' : '#047857';
 
   const hasSubmittedCrop = Boolean(
     sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl && !cropError,
@@ -335,20 +335,20 @@ export function RevalidationSignDetailsCard({
                   styles.comparisonBadge,
                   {
                     backgroundColor: isStale
-                      ? '#FEF2F2'
+                      ? '#FFF1F2'
                       : isFresh
                         ? '#ECFDF5'
-                        : '#FFFBEB',
+                        : '#FFF7ED',
                     borderColor: isStale
-                      ? '#FECACA'
+                      ? '#FDA4AF'
                       : isFresh
-                        ? '#A7F3D0'
-                        : '#FDE68A',
+                        ? '#6EE7B7'
+                        : '#FDBA74',
                   },
                 ]}
               >
                 <MaterialCommunityIcons
-                  color={isStale ? '#DC2626' : isFresh ? '#059669' : '#D97706'}
+                  color={isStale ? '#BE123C' : isFresh ? '#047857' : '#C2410C'}
                   name={isStale ? 'alert-circle-outline' : isFresh ? 'check-circle-outline' : 'help-circle-outline'}
                   size={12}
                 />
@@ -356,7 +356,7 @@ export function RevalidationSignDetailsCard({
                   style={[
                     styles.comparisonBadgeText,
                     {
-                      color: isStale ? '#DC2626' : isFresh ? '#059669' : '#D97706',
+                      color: isStale ? '#BE123C' : isFresh ? '#047857' : '#C2410C',
                     },
                   ]}
                 >

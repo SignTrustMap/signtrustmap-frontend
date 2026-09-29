@@ -19,12 +19,12 @@ export function getFreshnessInfo(sign: RouteSign) {
       : undefined;
 
   const isStale =
-    sign.status === 'STALE' ||
     sign.status === 'RETIRED' ||
-    (scorePercent !== undefined && scorePercent < 60);
+    (scorePercent !== undefined && scorePercent < 50) ||
+    (scorePercent === undefined && sign.status === 'STALE');
 
-  const isModerate = scorePercent !== undefined && scorePercent >= 60 && scorePercent < 80;
-  const isFresh = scorePercent !== undefined && scorePercent >= 80;
+  const isModerate = !isStale && scorePercent !== undefined && scorePercent >= 50 && scorePercent < 80;
+  const isFresh = !isStale && scorePercent !== undefined && scorePercent >= 80;
 
   return {
     scorePercent,
@@ -129,10 +129,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   markerBubbleStale: {
-    borderColor: '#EF4444',
+    borderColor: '#E11D48',
   },
   markerBubbleModerate: {
-    borderColor: '#F59E0B',
+    borderColor: '#EA580C',
   },
   markerBubbleSelected: {
     borderColor: '#0671EB',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   badgeStale: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#E11D48',
   },
   badgeExclamation: {
     color: '#FFFFFF',
@@ -181,9 +181,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dotModerate: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#EA580C',
   },
   dotFresh: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#059669',
   },
 });

@@ -411,7 +411,7 @@ export function RevalidationMapScreen() {
                 style={[
                   styles.filterChipText,
                   {
-                    color: activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#EF4444',
+                    color: activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#E11D48',
                   },
                 ]}
               >
@@ -545,7 +545,7 @@ export function RevalidationMapScreen() {
           }}
           style={[
             styles.floatingCircleButton,
-            isSignListOpen && { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+            isSignListOpen && { borderColor: '#E11D48', backgroundColor: 'rgba(225, 29, 72, 0.08)' },
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
@@ -554,12 +554,12 @@ export function RevalidationMapScreen() {
           ]}
         >
           <MaterialCommunityIcons
-            color={isSignListOpen ? '#EF4444' : theme.text}
+            color={isSignListOpen ? '#E11D48' : theme.text}
             name={isSignListOpen ? 'close' : 'format-list-bulleted'}
             size={22}
           />
           {staleSigns.length > 0 && !isSignListOpen ? (
-            <View style={[styles.zoomIndicatorBadge, { backgroundColor: '#EF4444' }]}>
+            <View style={[styles.zoomIndicatorBadge, { backgroundColor: '#E11D48' }]}>
               <Text style={styles.zoomIndicatorText}>{staleSigns.length}</Text>
             </View>
           ) : null}
@@ -637,7 +637,7 @@ export function RevalidationMapScreen() {
           <View style={styles.signListHeader}>
             <View style={styles.signListHeaderLeft}>
               <View style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
-                <MaterialCommunityIcons color="#EF4444" name="alert-decagram-outline" size={18} />
+                <MaterialCommunityIcons color="#E11D48" name="alert-decagram-outline" size={18} />
               </View>
               <View>
                 <Text style={[styles.signListTitle, { color: theme.text }]}>Needs Revalidation</Text>
@@ -687,7 +687,7 @@ export function RevalidationMapScreen() {
                     ]}
                   >
                     {/* Sign image or placeholder */}
-                    <View style={[styles.signListRowImage, { borderColor: '#EF4444' }]}>
+                    <View style={[styles.signListRowImage, { borderColor: '#E11D48' }]}>
                       {item.imageUrl ? (
                         <Image
                           resizeMode="contain"
@@ -1028,6 +1028,6 @@ const styles = StyleSheet.create({
   signListScoreText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#EF4444',
+    color: '#E11D48',
   },
 });

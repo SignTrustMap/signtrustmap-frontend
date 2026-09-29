@@ -24,6 +24,7 @@ import type { ImagePickerAsset } from 'expo-image-picker';
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useSession } from '@/context/session-provider';
 import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
@@ -105,40 +106,40 @@ const CONDITION_PRESETS = [
 
 /**
  * Resolves color styling and icon for freshness score:
- * - 100% / >=80%: Green
- * - <80%: Light Yellow
- * - <50%: Yellow
- * - <=30%: Danger (Red)
+ * - ≥80%: Healthy (emerald green)
+ * - 50–79%: Moderate (warm amber)
+ * - 31–49%: Warning (deep orange)
+ * - ≤30%: Critical (red)
  */
 function getFreshnessStyle(score: number) {
   if (score >= 80) {
     return {
       bg: '#ECFDF5',
-      border: '#A7F3D0',
-      text: '#059669',
+      border: '#6EE7B7',
+      text: '#047857',
       icon: 'check-circle-outline' as const,
     };
   }
   if (score >= 50) {
     return {
-      bg: '#FEFCE8',
-      border: '#FEF08A',
-      text: '#CA8A04',
-      icon: 'clock-outline' as const,
+      bg: '#FFF7ED',
+      border: '#FDBA74',
+      text: '#C2410C',
+      icon: 'clock-alert-outline' as const,
     };
   }
   if (score > 30) {
     return {
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-      text: '#D97706',
+      bg: '#FFF1F2',
+      border: '#FDA4AF',
+      text: '#BE123C',
       icon: 'alert-circle-outline' as const,
     };
   }
   return {
     bg: '#FEF2F2',
-    border: '#FECACA',
-    text: '#DC2626',
+    border: '#FCA5A5',
+    text: '#B91C1C',
     icon: 'shield-alert-outline' as const,
   };
 }
@@ -146,6 +147,7 @@ function getFreshnessStyle(score: number) {
 export function InspectRevalidateScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { session } = useSession();
   const params = useLocalSearchParams<InspectRevalidateParams>();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -492,6 +494,7 @@ export function InspectRevalidateScreen() {
             mimeType: selectedMedia.mimeType,
           }
           : undefined,
+        session?.accessToken,
       );
 
       setSubmitSuccess(true);
