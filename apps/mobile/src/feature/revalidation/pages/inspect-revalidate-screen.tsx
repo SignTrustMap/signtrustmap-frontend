@@ -63,7 +63,7 @@ const MAX_PROXIMITY_METERS = 50;
 /**
  * Calculates surface distance in meters between two lat/lon points using the Haversine formula
  */
-function calculateDistanceMeters(
+export function calculateDistanceMeters(
   lat1: number,
   lon1: number,
   lat2: number,
@@ -82,7 +82,7 @@ function calculateDistanceMeters(
   return Math.round(R * c);
 }
 
-function isValidGpsCoordinates(
+export function isValidGpsCoordinates(
   coords: ImageGpsCoordinates | null | undefined,
 ): coords is ImageGpsCoordinates {
   return Boolean(
@@ -95,7 +95,7 @@ function isValidGpsCoordinates(
   );
 }
 
-const CONDITION_PRESETS = [
+export const CONDITION_PRESETS = [
   { id: 'INTACT', label: 'Good condition' },
   { id: 'OBSCURED', label: 'Obscured by trees' },
   { id: 'DAMAGED', label: 'Damaged / Tilted' },
@@ -111,7 +111,7 @@ const CONDITION_PRESETS = [
  * - 31–49%: Warning (deep orange)
  * - ≤30%: Critical (red)
  */
-function getFreshnessStyle(score: number) {
+export function getFreshnessStyle(score: number) {
   if (score >= 80) {
     return {
       bg: '#ECFDF5',

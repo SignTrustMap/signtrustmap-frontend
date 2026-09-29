@@ -116,7 +116,7 @@ export function RevalidationSignDetailsCard({
       text: '#4B5563',
       icon: 'archive-cancel-outline',
     };
-  } else if (isStale || normalizedStatus === 'STALE') {
+  } else if (isStale) {
     statusConfig = {
       label: 'Needs Re-evaluation',
       bg: '#FFF1F2',
