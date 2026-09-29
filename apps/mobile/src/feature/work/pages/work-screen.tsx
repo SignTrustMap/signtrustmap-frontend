@@ -9,7 +9,13 @@ import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { useGetReviewQueue } from '@/feature/review/hooks/use-review';
-import { useGetMyPendingSubmissions, useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import {
+  useGetMyPendingSubmissions,
+  useGetMySubmissions,
+  useGetMySurveyStats,
+} from '@/feature/upload/hooks/use-survey-submission';
+import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
+import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -70,10 +76,46 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   // Live queries for surveyor and reviewer counts run only for their active section
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyorActive);
   const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewerActive);
+  const { data: surveyStats } = useGetMySurveyStats(isSurveyorActive);
+  const { data: firstRevalSign } = useGetFirstRevalidationSign(undefined, isSurveyorActive);
 
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
+  const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 1;
+
+  const handleOpenRevalidationMap = async () => {
+    let targetSign = firstRevalSign;
+    if (!targetSign) {
+      try {
+        targetSign = await fetchFirstRevalidationSign();
+      } catch {
+        targetSign = null;
+      }
+    }
+
+    if (targetSign) {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          selectedSignId: targetSign.id,
+          snapLon: String(targetSign.coordinate[0]),
+          snapLat: String(targetSign.coordinate[1]),
+          snapRequestId: String(Date.now()),
+          signJson: JSON.stringify(targetSign),
+        },
+      });
+    } else {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          snapRequestId: String(Date.now()),
+        },
+      });
+    }
+  };
 
   const { data: mySubmissionsData } = useGetMySubmissions(
     { page: '1', pageSize: '10' },
@@ -287,10 +329,10 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               {/* Standout Action: Revalidation Map */}
               <WorkActionCard
                 accentColor="#10B981"
-                count={2}
+                count={revalidationTaskCount}
                 icon="map-search-outline"
                 label="Revalidation Map"
-                onPress={() => router.push('/work/revalidation-map' as any)}
+                onPress={handleOpenRevalidationMap}
                 subtitle="View the map to verify reported sign discrepancies"
               />
             </View>

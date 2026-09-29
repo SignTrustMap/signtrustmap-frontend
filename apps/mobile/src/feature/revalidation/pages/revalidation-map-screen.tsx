@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -11,14 +13,16 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { AppButton } from '@/components/ui/button';
-import { Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
+import type { FindTasksInBoundsParams } from '@/types/revalidationType';
 import { useGetSignsInBounds } from '@/feature/navigation/hooks/use-signs';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { revalidationTaskToRouteSign } from '@/api/revalidation/revalidation';
+import { useGetRevalidationTasksInBounds } from '../hooks/use-revalidation';
 
 import { RevalidationMapView } from '../components/revalidation-map-view';
 import { getFreshnessInfo } from '../components/revalidation-sign-marker';
@@ -40,6 +44,9 @@ type RevalidationMapParams = {
   snapLon?: string;
   snapLat?: string;
   snapRequestId?: string;
+  autoSelectFirst?: string;
+  signJson?: string;
+  filter?: FreshnessFilter;
 };
 
 export function RevalidationMapScreen() {
@@ -48,34 +55,118 @@ export function RevalidationMapScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<RevalidationMapParams>();
 
+  // Pre-parse signJson if supplied for instant first-frame snapping & display
+  const initialSign = useMemo<RouteSign | null>(() => {
+    if (params.signJson) {
+      try {
+        return JSON.parse(params.signJson) as RouteSign;
+      } catch (err) {
+        console.warn('Failed to parse signJson parameter:', err);
+      }
+    }
+    return null;
+  }, [params.signJson]);
+
   const [bounds, setBounds] = useState<FindSignsInBoundsParams>();
-  const [selectedSign, setSelectedSign] = useState<RouteSign | null>(null);
+  const [overrideSign, setOverrideSign] = useState<RouteSign | null | undefined>(undefined);
   const [userCoordinate, setUserCoordinate] = useState<MapCoordinate>();
-  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate>();
-  const [focusRequestId, setFocusRequestId] = useState(0);
-  const [activeFilter, setActiveFilter] = useState<FreshnessFilter>('ALL');
+
+  const initialFocusCoord = useMemo<MapCoordinate | undefined>(() => {
+    if (params.snapLon && params.snapLat) {
+      const lon = parseFloat(params.snapLon);
+      const lat = parseFloat(params.snapLat);
+      if (!Number.isNaN(lon) && !Number.isNaN(lat)) {
+        return [lon, lat];
+      }
+    }
+    if (initialSign) {
+      return initialSign.coordinate;
+    }
+    return undefined;
+  }, [params.snapLon, params.snapLat, initialSign]);
+
+  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate | undefined>(initialFocusCoord);
+  const [focusRequestId, setFocusRequestId] = useState(initialFocusCoord ? 1 : 0);
+  const [activeFilter, setActiveFilter] = useState<FreshnessFilter>(() => {
+    if (params.filter) return params.filter;
+    if (params.autoSelectFirst === 'true' || initialSign) return 'NEEDS_REVALIDATION';
+    return 'ALL';
+  });
 
   // Zoom control state
-  const [zoomLevel, setZoomLevel] = useState<number>(16.5);
+  const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 16.5);
   const [zoomRequestId, setZoomRequestId] = useState(0);
-  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>('street');
+  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(initialFocusCoord ? 'detail' : 'street');
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSignListOpen, setIsSignListOpen] = useState(false);
 
   // Dynamic positioning for floating buttons above sign details
   const [detailsCardHeight, setDetailsCardHeight] = useState(0);
-  const buttonsTranslateY = useRef(new Animated.Value(0)).current;
+  const [buttonsTranslateY] = useState(() => new Animated.Value(0));
 
   // Fetch verified signs within current map bounds
-  const { data: rawSigns = [] } = useGetSignsInBounds(bounds, true);
+  const { data: boundsSigns = [] } = useGetSignsInBounds(bounds, true);
 
-  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return)
+  const taskBounds = useMemo<FindTasksInBoundsParams | undefined>(() => {
+    if (!bounds) return undefined;
+    return {
+      minLat: bounds.minLat,
+      minLon: bounds.minLon,
+      maxLat: bounds.maxLat,
+      maxLon: bounds.maxLon,
+    };
+  }, [bounds]);
+
+  // Fetch revalidation tasks within current map bounds
+  const { data: revalTasks = [] } = useGetRevalidationTasksInBounds(taskBounds, true);
+
+  // Unified list of signs: verified map signs + converted revalidation tasks
+  const rawSigns = useMemo(() => {
+    const signMap = new Map<string, RouteSign>();
+
+    for (const sign of boundsSigns) {
+      signMap.set(sign.id, sign);
+    }
+
+    for (const task of revalTasks) {
+      const converted = revalidationTaskToRouteSign(task);
+      signMap.set(converted.id, converted);
+    }
+
+    if (initialSign && !signMap.has(initialSign.id)) {
+      signMap.set(initialSign.id, initialSign);
+    }
+
+    return Array.from(signMap.values());
+  }, [boundsSigns, revalTasks, initialSign]);
+
+  // Derive selectedSign dynamically: user override > initialSign > selectedSignId > autoSelectFirst
+  const selectedSign = useMemo<RouteSign | null>(() => {
+    if (overrideSign !== undefined) {
+      return overrideSign;
+    }
+    if (initialSign) {
+      return initialSign;
+    }
+    if (params.selectedSignId && rawSigns.length > 0) {
+      const found = rawSigns.find((s) => s.id === params.selectedSignId);
+      if (found) return found;
+    }
+    if (params.autoSelectFirst === 'true' && rawSigns.length > 0) {
+      const firstStale = rawSigns.find((s) => getFreshnessInfo(s).isStale);
+      return firstStale || rawSigns[0] || null;
+    }
+    return null;
+  }, [overrideSign, initialSign, params.selectedSignId, params.autoSelectFirst, rawSigns]);
+
+  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return or work card)
   useEffect(() => {
     let isMounted = true;
     void fetchFreshGpsPosition().then((pos) => {
       if (isMounted && pos) {
         setUserCoordinate(pos);
-        if (!params.snapLon || !params.snapLat) {
+        if (!params.snapLon && !params.snapLat && !initialSign) {
           setFocusCoordinate(pos);
           setFocusRequestId((prev) => prev + 1);
         }
@@ -84,14 +175,15 @@ export function RevalidationMapScreen() {
     return () => {
       isMounted = false;
     };
-  }, [params.snapLon, params.snapLat]);
+  }, [params.snapLon, params.snapLat, initialSign]);
 
-  // Snap camera and restore selection when navigating back from Inspect & Revalidate screen
+  // Snap camera and restore selection when navigating with coordinates
   useEffect(() => {
     if (params.snapLon && params.snapLat) {
       const lon = parseFloat(params.snapLon);
       const lat = parseFloat(params.snapLat);
       if (!Number.isNaN(lon) && !Number.isNaN(lat)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFocusCoordinate([lon, lat]);
         setFocusRequestId((prev) => prev + 1);
         setZoomLevel(17.5);
@@ -100,26 +192,23 @@ export function RevalidationMapScreen() {
     }
   }, [params.snapLon, params.snapLat, params.snapRequestId]);
 
-  useEffect(() => {
-    if (params.selectedSignId && rawSigns.length > 0) {
-      const found = rawSigns.find((s) => s.id === params.selectedSignId);
-      if (found) {
-        setSelectedSign(found);
-      }
-    }
-  }, [params.selectedSignId, rawSigns]);
+  // Automatically snap map camera when a sign is selected
+  const lastSnappedSignIdRef = useRef<string | null>(null);
 
-  // Smoothly animate floating buttons up/down relative to sign details card
   useEffect(() => {
-    if (!selectedSign) {
-      setDetailsCardHeight(0);
+    if (selectedSign && selectedSign.id !== lastSnappedSignIdRef.current) {
+      lastSnappedSignIdRef.current = selectedSign.id;
+      setFocusCoordinate(selectedSign.coordinate);
+      setFocusRequestId((prev) => prev + 1);
+      setZoomLevel(17.5);
+      setActiveZoomId('detail');
     }
   }, [selectedSign]);
 
+  // Smoothly animate floating buttons up/down relative to sign details card
   useEffect(() => {
-    const targetOffset = selectedSign
-      ? -((detailsCardHeight > 0 ? detailsCardHeight : 240) + 12)
-      : 0;
+    const effectiveHeight = selectedSign ? (detailsCardHeight > 0 ? detailsCardHeight : 240) : 0;
+    const targetOffset = selectedSign ? -(effectiveHeight + 12) : 0;
 
     Animated.spring(buttonsTranslateY, {
       toValue: targetOffset,
@@ -160,30 +249,34 @@ export function RevalidationMapScreen() {
 
   const handleSignPress = useCallback((sign: RouteSign) => {
     lastSignPressTimeRef.current = Date.now();
-    setSelectedSign((prev) => (prev?.id === sign.id ? null : sign));
+    setOverrideSign((prev) => {
+      const current = prev !== undefined ? prev : selectedSign;
+      return current?.id === sign.id ? null : sign;
+    });
     setFocusCoordinate(sign.coordinate);
     setFocusRequestId((prev) => prev + 1);
     setIsZoomMenuOpen(false);
-  }, []);
+  }, [selectedSign]);
 
   const handleMapPress = useCallback(() => {
     if (Date.now() - lastSignPressTimeRef.current < 300) {
       return;
     }
-    setSelectedSign(null);
+    setOverrideSign(null);
     setIsZoomMenuOpen(false);
   }, []);
 
   // Filter signs based on active freshness tab
   const filteredSigns = useMemo(() => {
     return rawSigns.filter((sign) => {
+      if (selectedSign && sign.id === selectedSign.id) return true;
       const { isStale, isModerate, isFresh } = getFreshnessInfo(sign);
       if (activeFilter === 'NEEDS_REVALIDATION') return isStale;
       if (activeFilter === 'MODERATE') return isModerate;
       if (activeFilter === 'FRESH') return isFresh;
       return true;
     });
-  }, [rawSigns, activeFilter]);
+  }, [rawSigns, activeFilter, selectedSign]);
 
   // Statistics for header summary
   const staleCount = useMemo(() => {
@@ -197,6 +290,23 @@ export function RevalidationMapScreen() {
   const freshCount = useMemo(() => {
     return rawSigns.filter((s) => getFreshnessInfo(s).isFresh).length;
   }, [rawSigns]);
+
+  // Signs that need revalidation, sorted by freshness score ascending (worst first)
+  const staleSigns = useMemo(() => {
+    return rawSigns
+      .filter((s) => getFreshnessInfo(s).isStale)
+      .sort((a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0));
+  }, [rawSigns]);
+
+  const handleSignListItemPress = useCallback((sign: RouteSign) => {
+    setIsSignListOpen(false);
+    setOverrideSign(sign);
+    setFocusCoordinate(sign.coordinate);
+    setFocusRequestId((prev) => prev + 1);
+    setZoomLevel(17.5);
+    setActiveZoomId('detail');
+    setIsZoomMenuOpen(false);
+  }, []);
 
   const handleRevalidateAction = (sign: RouteSign) => {
     router.push({
@@ -425,11 +535,44 @@ export function RevalidationMapScreen() {
           </View>
         ) : null}
 
+        {/* Button 0: Toggle Sign List Panel */}
+        <Pressable
+          accessibilityLabel={`Show list of ${staleSigns.length} signs needing revalidation`}
+          accessibilityRole="button"
+          onPress={() => {
+            setIsSignListOpen((prev) => !prev);
+            setIsZoomMenuOpen(false);
+          }}
+          style={[
+            styles.floatingCircleButton,
+            isSignListOpen && { borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+              shadowColor: '#09233C',
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            color={isSignListOpen ? '#EF4444' : theme.text}
+            name={isSignListOpen ? 'close' : 'format-list-bulleted'}
+            size={22}
+          />
+          {staleSigns.length > 0 && !isSignListOpen ? (
+            <View style={[styles.zoomIndicatorBadge, { backgroundColor: '#EF4444' }]}>
+              <Text style={styles.zoomIndicatorText}>{staleSigns.length}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+
         {/* Button 1: Modify Zoom Level by Selectable Threshold */}
         <Pressable
           accessibilityLabel="Modify map zoom level by selectable threshold"
           accessibilityRole="button"
-          onPress={() => setIsZoomMenuOpen((prev) => !prev)}
+          onPress={() => {
+            setIsZoomMenuOpen((prev) => !prev);
+            setIsSignListOpen(false);
+          }}
           style={[
             styles.floatingCircleButton,
             isZoomMenuOpen && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
@@ -478,11 +621,123 @@ export function RevalidationMapScreen() {
         </Pressable>
       </Animated.View>
 
+      {/* Sign List Panel */}
+      {isSignListOpen ? (
+        <View
+          style={[
+            styles.signListPanel,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+              bottom: Math.max(16, insets.bottom + 8),
+            },
+          ]}
+        >
+          {/* Panel Header */}
+          <View style={styles.signListHeader}>
+            <View style={styles.signListHeaderLeft}>
+              <View style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+                <MaterialCommunityIcons color="#EF4444" name="alert-decagram-outline" size={18} />
+              </View>
+              <View>
+                <Text style={[styles.signListTitle, { color: theme.text }]}>Needs Revalidation</Text>
+                <Text style={[styles.signListSubtitle, { color: theme.grey }]}>
+                  {staleSigns.length} {staleSigns.length === 1 ? 'sign' : 'signs'} require on-site verification
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              accessibilityLabel="Close sign list"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setIsSignListOpen(false)}
+              style={[styles.signListCloseBtn, { backgroundColor: theme.background }]}
+            >
+              <MaterialCommunityIcons color={theme.grey} name="close" size={16} />
+            </Pressable>
+          </View>
+
+          {/* Divider */}
+          <View style={[styles.signListDivider, { backgroundColor: theme.border }]} />
+
+          {/* Scrollable Sign List */}
+          {staleSigns.length === 0 ? (
+            <View style={styles.signListEmpty}>
+              <MaterialCommunityIcons color={theme.grey} name="check-circle-outline" size={32} />
+              <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
+                No signs need revalidation in this area
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={staleSigns}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => {
+                const info = getFreshnessInfo(item);
+                const isActive = selectedSign?.id === item.id;
+                return (
+                  <Pressable
+                    accessibilityLabel={`Go to sign ${item.signCode || item.name}`}
+                    accessibilityRole="button"
+                    onPress={() => handleSignListItemPress(item)}
+                    style={[
+                      styles.signListRow,
+                      isActive && { backgroundColor: 'rgba(6, 113, 235, 0.06)' },
+                      { borderBottomColor: theme.border },
+                    ]}
+                  >
+                    {/* Sign image or placeholder */}
+                    <View style={[styles.signListRowImage, { borderColor: '#EF4444' }]}>
+                      {item.imageUrl ? (
+                        <Image
+                          resizeMode="contain"
+                          source={{ uri: item.imageUrl }}
+                          style={styles.signListRowImg}
+                        />
+                      ) : (
+                        <MaterialCommunityIcons color="#94A3B8" name="sign-caution" size={18} />
+                      )}
+                    </View>
+
+                    {/* Sign info */}
+                    <View style={styles.signListRowInfo}>
+                      <View style={styles.signListRowTop}>
+                        <Text numberOfLines={1} style={[styles.signListRowName, { color: theme.text }]}>
+                          {item.signCode || 'Sign'}
+                        </Text>
+                        {info.scorePercent !== undefined ? (
+                          <View style={[styles.signListScoreBadge, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+                            <Text style={styles.signListScoreText}>{info.scorePercent}%</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text numberOfLines={1} style={[styles.signListRowLabel, { color: theme.text }]}>
+                        {item.name || item.signCode || 'Unknown sign'}
+                      </Text>
+                      {item.roadName ? (
+                        <Text numberOfLines={1} style={[styles.signListRowRoad, { color: theme.placeholder }]}>
+                          {item.roadName}
+                        </Text>
+                      ) : null}
+                    </View>
+
+                    {/* Chevron */}
+                    <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={18} />
+                  </Pressable>
+                );
+              }}
+              showsVerticalScrollIndicator={false}
+              style={styles.signListScroll}
+            />
+          )}
+        </View>
+      ) : null}
+
       {/* Selected Sign Details Bottom Card */}
-      {selectedSign ? (
+      {selectedSign && !isSignListOpen ? (
         <RevalidationSignDetailsCard
           onCardHeightChange={setDetailsCardHeight}
-          onClose={() => setSelectedSign(null)}
+          onClose={() => setOverrideSign(null)}
           onRevalidate={handleRevalidateAction}
           sign={selectedSign}
         />
@@ -647,5 +902,132 @@ const styles = StyleSheet.create({
   zoomLevelPillText: {
     fontSize: 10,
     fontWeight: '800',
+  },
+
+  /* ── Sign List Panel ──────────────────────────────────── */
+  signListPanel: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    maxHeight: 380,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 10,
+    zIndex: 25,
+    overflow: 'hidden',
+  },
+  signListHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  signListHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  signListHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signListTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  signListSubtitle: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  signListCloseBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  signListDivider: {
+    height: 1,
+    marginHorizontal: 14,
+  },
+  signListScroll: {
+    flexGrow: 0,
+  },
+  signListEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 8,
+  },
+  signListEmptyText: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  signListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  signListRowImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  signListRowImg: {
+    width: 26,
+    height: 26,
+  },
+  signListRowInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  signListRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  signListRowName: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.1,
+  },
+  signListRowLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  signListRowRoad: {
+    fontSize: 11,
+  },
+  signListScoreBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  signListScoreText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#EF4444',
   },
 });

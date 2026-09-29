@@ -3,11 +3,48 @@ import { StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
-import { useGetMyPendingSubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useGetMyPendingSubmissions, useGetMySurveyStats } from '@/feature/upload/hooks/use-survey-submission';
+import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
+import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
 
 export function SurveyorWorkPanel() {
   const router = useRouter();
   const { data: pending } = useGetMyPendingSubmissions();
+  const { data: stats } = useGetMySurveyStats();
+  const { data: firstSign } = useGetFirstRevalidationSign();
+
+  const handleOpenRevalidationMap = async () => {
+    let targetSign = firstSign;
+    if (!targetSign) {
+      try {
+        targetSign = await fetchFirstRevalidationSign();
+      } catch {
+        targetSign = null;
+      }
+    }
+
+    if (targetSign) {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          selectedSignId: targetSign.id,
+          snapLon: String(targetSign.coordinate[0]),
+          snapLat: String(targetSign.coordinate[1]),
+          snapRequestId: String(Date.now()),
+          signJson: JSON.stringify(targetSign),
+        },
+      });
+    } else {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          snapRequestId: String(Date.now()),
+        },
+      });
+    }
+  };
 
   return (
     <View style={styles.panel}>
@@ -24,9 +61,9 @@ export function SurveyorWorkPanel() {
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
       />
       <WorkActionCard
-        count={2}
+        count={stats?.revalidationAvailable ?? 1}
         label="Revalidation Map"
-        onPress={() => router.replace('/home')}
+        onPress={handleOpenRevalidationMap}
         symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}
       />
     </View>

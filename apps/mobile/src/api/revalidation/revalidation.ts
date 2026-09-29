@@ -1,7 +1,10 @@
 import { API_PATHS } from '@/api/api';
 import { apiRequest } from '@/api/api-client';
+import { getStorageItemAsync } from '@/hooks/use-storage';
 import { getSignCategory } from '@/constants/sign-categories';
 import { resolveImageUrl, resolveRepresentativeSignUrl } from '@/feature/navigation/utils/signs';
+import type { RouteSign } from '@/api/navigation/navigation';
+import type { MapCoordinate } from '@/types/navigationType';
 import type {
   FindTasksInBoundsParams,
   RevalidationTaskItem,
@@ -9,6 +12,22 @@ import type {
   TaskPriority,
   TaskStatus,
 } from '@/types/revalidationType';
+
+/**
+ * Reads the JWT access token that the SessionProvider stores under the
+ * 'session' key in SecureStore / localStorage.  Returns undefined when the
+ * user is not logged in or the stored value cannot be parsed.
+ */
+async function getStoredAccessToken(): Promise<string | undefined> {
+  try {
+    const raw = await getStorageItemAsync('session');
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { accessToken?: string };
+    return parsed?.accessToken || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export const FALLBACK_REVALIDATION_TASKS: RevalidationTaskItem[] = [
   {
@@ -173,6 +192,7 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
 export async function getRevalidationTasksInBounds(
   bounds: FindTasksInBoundsParams,
   signal?: AbortSignal,
+  accessToken?: string,
 ): Promise<RevalidationTaskItem[]> {
   const params = new URLSearchParams({
     min_lat: String(bounds.minLat),
@@ -184,10 +204,14 @@ export async function getRevalidationTasksInBounds(
   if (bounds.status) params.append('status', bounds.status);
   if (bounds.priority) params.append('priority', bounds.priority);
 
+  // Resolve token: caller may pass one in, otherwise read from storage
+  const token = accessToken ?? (await getStoredAccessToken());
+
   try {
     const res = await apiRequest<RevalidationTasksInBoundsResponse>(
       `${API_PATHS.REVALIDATION_TASKS_MAP}?${params}`,
       { signal },
+      token,
     );
     if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
       return res.items.map(toRevalidationTaskItem);
@@ -202,6 +226,100 @@ export async function getRevalidationTasksInBounds(
     const withinLon = task.longitude >= bounds.minLon && task.longitude <= bounds.maxLon;
     return withinLat && withinLon;
   });
+}
+
+/**
+ * Transforms a RevalidationTaskItem into a standard RouteSign for rendering on map & details card.
+ */
+export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSign {
+  const code = task.code || 'Traffic Sign';
+  const name = task.name || code;
+  const repUrl = task.representativeUrl || resolveRepresentativeSignUrl(name, code);
+  const rawCrop = task.historicalCropUrl;
+  const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
+
+  let score = 0.55;
+  if (task.currentTrustScore !== undefined && Number.isFinite(task.currentTrustScore)) {
+    score = task.currentTrustScore > 1 ? task.currentTrustScore / 100 : task.currentTrustScore;
+    if (score >= 0.6) {
+      score = 0.55;
+    }
+  }
+
+  return {
+    coordinate: [task.longitude, task.latitude],
+    id: task.verifiedSignId || task.id,
+    imageUrl: repUrl,
+    actualCropUrl: resolvedCrop,
+    name,
+    nameVi: task.name,
+    nameEn: task.name,
+    signCode: code,
+    freshnessScore: score,
+    status: 'STALE',
+    roadName: task.roadName || 'Ho Chi Minh City, Vietnam',
+    displayAddress: task.roadName || 'Ho Chi Minh City, Vietnam',
+    lastVerifiedAt: task.lastVerifiedDate,
+  };
+}
+
+/**
+ * Fetches the first available sign that needs revalidation.
+ * Prioritizes active revalidation tasks in user's area or Vietnam, with guaranteed fallback.
+ */
+export async function fetchFirstRevalidationSign(
+  userCoordinate?: MapCoordinate,
+  signal?: AbortSignal,
+): Promise<RouteSign | null> {
+  // Read token once for all sub-requests in this call
+  const token = await getStoredAccessToken();
+
+  if (userCoordinate && Number.isFinite(userCoordinate[0]) && Number.isFinite(userCoordinate[1])) {
+    const [lon, lat] = userCoordinate;
+    try {
+      const nearTasks = await getRevalidationTasksInBounds(
+        {
+          minLat: lat - 0.45,
+          minLon: lon - 0.45,
+          maxLat: lat + 0.45,
+          maxLon: lon + 0.45,
+          pageSize: 10,
+        },
+        signal,
+        token,
+      );
+      if (nearTasks.length > 0) {
+        return revalidationTaskToRouteSign(nearTasks[0]);
+      }
+    } catch {
+      // fallback to broad search
+    }
+  }
+
+  try {
+    const broadTasks = await getRevalidationTasksInBounds(
+      {
+        minLat: 8.0,
+        minLon: 102.0,
+        maxLat: 24.0,
+        maxLon: 110.0,
+        pageSize: 10,
+      },
+      signal,
+      token,
+    );
+    if (broadTasks.length > 0) {
+      return revalidationTaskToRouteSign(broadTasks[0]);
+    }
+  } catch (err) {
+    console.warn('fetchFirstRevalidationSign broad query failed:', err);
+  }
+
+  if (FALLBACK_REVALIDATION_TASKS.length > 0) {
+    return revalidationTaskToRouteSign(FALLBACK_REVALIDATION_TASKS[0]);
+  }
+
+  return null;
 }
 
 export type SubmitRevalidationEvidenceDto = {
