@@ -101,8 +101,9 @@ export function RevalidationMapScreen() {
   const [isLocating, setIsLocating] = useState(false);
   const [isSignListOpen, setIsSignListOpen] = useState(false);
 
-  // Dynamic positioning for floating buttons above sign details
+  // Dynamic positioning for floating buttons above sign details or sign list
   const [detailsCardHeight, setDetailsCardHeight] = useState(0);
+  const [signListHeight, setSignListHeight] = useState(0);
   const [buttonsTranslateY] = useState(() => new Animated.Value(0));
 
   // Fetch verified signs within current map bounds
@@ -214,10 +215,16 @@ export function RevalidationMapScreen() {
     }
   }, [selectedSign]);
 
-  // Smoothly animate floating buttons up/down relative to sign details card
+  // Smoothly animate floating buttons up/down relative to sign details card or sign list panel
   useEffect(() => {
-    const effectiveHeight = selectedSign ? (detailsCardHeight > 0 ? detailsCardHeight : 240) : 0;
-    const targetOffset = selectedSign ? -(effectiveHeight + 12) : 0;
+    let targetOffset = 0;
+    if (isSignListOpen) {
+      const effectiveListHeight = signListHeight > 0 ? signListHeight : 240;
+      targetOffset = -(effectiveListHeight + 12);
+    } else if (selectedSign) {
+      const effectiveHeight = detailsCardHeight > 0 ? detailsCardHeight : 240;
+      targetOffset = -(effectiveHeight + 12);
+    }
 
     Animated.spring(buttonsTranslateY, {
       toValue: targetOffset,
@@ -226,7 +233,7 @@ export function RevalidationMapScreen() {
       stiffness: 220,
       useNativeDriver: true,
     }).start();
-  }, [selectedSign, detailsCardHeight, buttonsTranslateY]);
+  }, [isSignListOpen, signListHeight, selectedSign, detailsCardHeight, buttonsTranslateY]);
 
   // Snap to current location handler
   const handleSnapLocation = useCallback(() => {
@@ -641,6 +648,7 @@ export function RevalidationMapScreen() {
       {/* Sign List Panel */}
       {isSignListOpen ? (
         <View
+          onLayout={(e) => setSignListHeight(e.nativeEvent.layout.height)}
           style={[
             styles.signListPanel,
             {

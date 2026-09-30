@@ -218,16 +218,6 @@ export function RevalidationSignDetailsCard({
               <Text numberOfLines={1} style={[styles.compactSignName, { color: theme.text }]}>
                 {sign.name || sign.signCode || 'Traffic Sign'}
               </Text>
-              <View
-                style={[
-                  styles.collapsedStatusPill,
-                  { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
-                ]}
-              >
-                <Text style={[styles.collapsedStatusText, { color: statusConfig.text }]}>
-                  {statusConfig.label}
-                </Text>
-              </View>
             </View>
 
             <Text numberOfLines={1} style={[styles.compactLocation, { color: theme.grey }]}>
@@ -262,17 +252,7 @@ export function RevalidationSignDetailsCard({
         >
           {/* Header Row: Icon, Title, Status, Close */}
           <View style={styles.expandedHeader}>
-            <View style={[styles.expandedIconBox, { backgroundColor: theme.background }]}>
-              {sign.imageUrl ? (
-                <Image
-                  contentFit="contain"
-                  source={{ uri: sign.imageUrl }}
-                  style={styles.expandedSignImg}
-                />
-              ) : (
-                <MaterialCommunityIcons color="#0671EB" name="traffic-light" size={24} />
-              )}
-            </View>
+
 
             <View style={styles.expandedTitleCol}>
               <View style={styles.titleWithBadge}>
@@ -281,7 +261,6 @@ export function RevalidationSignDetailsCard({
                 </Text>
                 <View
                   style={[
-                    styles.statusPill,
                     { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
                   ]}
                 >
@@ -290,9 +269,6 @@ export function RevalidationSignDetailsCard({
                     name={statusConfig.icon}
                     size={11}
                   />
-                  <Text style={[styles.statusPillText, { color: statusConfig.text }]}>
-                    {statusConfig.label}
-                  </Text>
                 </View>
               </View>
 
@@ -303,88 +279,54 @@ export function RevalidationSignDetailsCard({
                   size={12}
                 />
                 <Text numberOfLines={1} style={[styles.expandedLocationText, { color: theme.placeholder }]}>
-                  {sign.displayAddress || sign.roadName || 'Tan My, Ho Chi Minh City'}
+                  {sign.displayAddress || sign.roadName || 'No location data.'}
                 </Text>
               </View>
             </View>
 
             {/* Action Buttons: Collapse and Close */}
             <View style={styles.headerActionBtns}>
-              <Pressable
+              <AppButton
                 accessibilityLabel="Collapse sign details"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={toggleExpanded}
-                style={styles.collapseToggle}
+                style={[styles.collapseToggle, {
+                  paddingHorizontal: Spacing.one
+                }]}
+                variant='ghost'
               >
                 <MaterialCommunityIcons color={theme.grey} name="chevron-down" size={20} />
-              </Pressable>
+              </AppButton>
 
-              <Pressable
+              <AppButton
                 accessibilityLabel="Close sign details"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={onClose}
-                style={styles.collapseToggle}
+                style={[styles.collapseToggle, {
+                  paddingHorizontal: Spacing.one
+                }]}
+                variant='ghost'
               >
                 <MaterialCommunityIcons color={theme.grey} name="close" size={18} />
-              </Pressable>
+              </AppButton>
             </View>
           </View>
 
           {/* =============================================================== */}
           {/* COMPACT EVIDENCE SECTION                                        */}
           {/* =============================================================== */}
-          <View style={[styles.evidenceSection, { backgroundColor: theme.background }]}>
-            <View style={styles.evidenceHeaderRow}>
-              <Text style={[styles.evidenceSectionTitle, { color: theme.grey }]}>
-                EVIDENCE COMPARISON
-              </Text>
-              {/* Visual Comparison Badge */}
-              <View
-                style={[
-                  styles.comparisonBadge,
-                  {
-                    backgroundColor: isStale
-                      ? '#FFF1F2'
-                      : isFresh
-                        ? '#ECFDF5'
-                        : '#FFF7ED',
-                    borderColor: isStale
-                      ? '#FDA4AF'
-                      : isFresh
-                        ? '#6EE7B7'
-                        : '#FDBA74',
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={isStale ? '#BE123C' : isFresh ? '#047857' : '#C2410C'}
-                  name={isStale ? 'alert-circle-outline' : isFresh ? 'check-circle-outline' : 'help-circle-outline'}
-                  size={12}
-                />
-                <Text
-                  style={[
-                    styles.comparisonBadgeText,
-                    {
-                      color: isStale ? '#BE123C' : isFresh ? '#047857' : '#C2410C',
-                    },
-                  ]}
-                >
-                  {isStale
-                    ? 'Review required'
-                    : isFresh
-                      ? 'Matches official sign'
-                      : 'Verify match'}
-                </Text>
-              </View>
-            </View>
 
+          <Text style={[styles.evidenceSectionTitle, { color: theme.text }]}>
+            EVIDENCE COMPARISON
+          </Text>
+          <View style={[styles.evidenceSection, { borderColor: "#666" }]}>
             {/* Compact Comparison Grid */}
-            <View style={styles.evidenceGrid}>
+            <View style={[styles.evidenceGrid, { paddingVertical: 0 }]}>
               {/* Box 1: Official Standard Sign */}
-              <View style={[styles.evidenceBox, { borderColor: theme.border }]}>
-                <Text style={[styles.evidenceBoxLabel, { color: theme.grey }]}>
+              <View style={[styles.evidenceBox, { borderColor: 'transparent' }]}>
+                <Text style={[styles.evidenceBoxLabel, { color: theme.text }]}>
                   OFFICIAL SIGN
                 </Text>
                 <View style={styles.evidenceImageFrame}>
@@ -400,22 +342,19 @@ export function RevalidationSignDetailsCard({
                 </View>
               </View>
 
-              {/* Compare Indicator Icon */}
-              <View style={styles.compareArrowBox}>
-                <MaterialCommunityIcons color="#0671EB" name="swap-horizontal" size={18} />
-              </View>
+              {/* Divider  */}
+              <View style={styles.horizontalDivider} />
 
               {/* Box 2: Latest Submitted Crop */}
               <View
                 style={[
                   styles.evidenceBox,
-                  styles.submittedBox,
-                  { borderColor: hasSubmittedCrop ? '#93C5FD' : theme.border },
+                  { borderColor: 'transparent' },
                 ]}
               >
                 <View style={styles.submittedLabelRow}>
                   <Text style={[styles.evidenceBoxLabel, { color: '#0671EB' }]}>
-                    LATEST SUBMISSION
+                    SIGN SUBMISSION
                   </Text>
                 </View>
                 <View style={styles.evidenceImageFrame}>
@@ -446,11 +385,10 @@ export function RevalidationSignDetailsCard({
           {/* =============================================================== */}
           {/* SURVEYOR REVIEWS & COMMUNITY SUBMISSIONS SECTION                */}
           {/* =============================================================== */}
-          <View style={[styles.reviewsSection, { backgroundColor: theme.background }]}>
+          <View style={[styles.reviewsSection, { backgroundColor: 'transparent' }]}>
             <View style={styles.reviewsLeftRow}>
               <View
                 style={[
-                  styles.reviewsIconBox,
                   {
                     backgroundColor: evidenceCount > 0 ? '#EFF6FF' : '#F8FAFC',
                     borderColor: evidenceCount > 0 ? '#BFDBFE' : '#E2E8F0',
@@ -470,17 +408,9 @@ export function RevalidationSignDetailsCard({
                     {isLoadingEvidences
                       ? 'Checking reviews...'
                       : evidenceCount > 0
-                        ? `${evidenceCount} surveyor review${evidenceCount > 1 ? 's' : ''} posted`
+                        ? `${evidenceCount} surveyor review${evidenceCount > 1 ? 's' : ''} have posted about this sign`
                         : 'No surveyor reviews yet'}
                   </Text>
-                  {evidenceCount > 0 ? (
-                    <View style={styles.verifiedCountBadge}>
-                      <MaterialCommunityIcons color="#047857" name="check-decagram" size={12} />
-                      <Text style={styles.verifiedCountBadgeText}>
-                        {evidenceCount} verified
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
 
                 <Text numberOfLines={1} style={[styles.reviewsSubtext, { color: theme.placeholder }]}>
@@ -492,48 +422,17 @@ export function RevalidationSignDetailsCard({
                         : 'On-site evidence awaiting peer confirmation'
                       : 'Be the first surveyor to inspect this location and earn bounty'}
                 </Text>
+
               </View>
             </View>
-
-            {evidenceCount > 0 && evidences.some((e) => Boolean(e.mediaUrl)) ? (
-              <View style={styles.evidenceThumbnailsRow}>
-                {evidences
-                  .filter((e) => Boolean(e.mediaUrl))
-                  .slice(0, 4)
-                  .map((item, idx) => (
-                    <View key={item.id || idx} style={styles.thumbnailWrapper}>
-                      <Image
-                        contentFit="cover"
-                        source={{ uri: resolveS3Url(item.mediaUrl) }}
-                        style={styles.evidenceThumbImg}
-                      />
-                      <View
-                        style={[
-                          styles.thumbTypePill,
-                          {
-                            backgroundColor:
-                              item.evidenceType === 'REMOVED' ? '#FEF2F2' : '#F0FDF4',
-                            borderColor:
-                              item.evidenceType === 'REMOVED' ? '#FECACA' : '#BBF7D0',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.thumbTypePillText,
-                            {
-                              color:
-                                item.evidenceType === 'REMOVED' ? '#DC2626' : '#16A34A',
-                            },
-                          ]}
-                        >
-                          {item.evidenceType === 'REMOVED' ? 'Missing' : 'Active'}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-              </View>
-            ) : null}
+            <View style={{ marginTop: Spacing.two }}>
+              <Text style={{
+                fontSize: 12,
+                color: theme.placeholder
+              }}>
+                Note: You will not receive credits for signs that have already been reviewed correctly.
+              </Text>
+            </View>
           </View>
 
           {/* =============================================================== */}
@@ -785,9 +684,9 @@ const styles = StyleSheet.create({
   evidenceSection: {
     borderRadius: 12,
     padding: 10,
+    paddingVertical: 0,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   evidenceHeaderRow: {
     flexDirection: 'row',
@@ -817,6 +716,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  horizontalDivider: {
+    height: '100%',
+    width: 1,
+    backgroundColor: '#000',
+  },
   evidenceBox: {
     flex: 1,
     borderRadius: 10,
@@ -826,9 +730,7 @@ const styles = StyleSheet.create({
     gap: 4,
     alignItems: 'center',
   },
-  submittedBox: {
-    backgroundColor: '#FAFCFF',
-  },
+
   evidenceBoxLabel: {
     fontSize: 9,
     fontWeight: '800',
@@ -845,7 +747,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 6,
-    backgroundColor: '#F8FAFC',
     overflow: 'hidden',
   },
   standardImg: {
@@ -853,7 +754,7 @@ const styles = StyleSheet.create({
     height: 44,
   },
   cropImg: {
-    width: '100%',
+    width: '50%',
     height: '100%',
   },
   noCropBox: {
@@ -864,10 +765,6 @@ const styles = StyleSheet.create({
   noCropText: {
     fontSize: 9,
     fontWeight: '600',
-  },
-  compareArrowBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   // Freshness Row
   freshnessInfoRow: {
@@ -955,8 +852,9 @@ const styles = StyleSheet.create({
   reviewsSection: {
     borderRadius: 12,
     padding: 10,
+    paddingHorizontal: 0,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'transparent'
   },
   reviewsLeftRow: {
     flexDirection: 'row',

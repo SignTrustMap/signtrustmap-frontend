@@ -471,59 +471,6 @@ export function RevalidationReviewScreen() {
                     transition={180}
                   />
 
-                  {/* Image Source Segmented Switch Header */}
-                  <View style={styles.imageSourceToggleContainer}>
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setViewMode('evidence');
-                      }}
-                      style={[
-                        styles.imageSourcePill,
-                        viewMode === 'evidence' && styles.imageSourcePillActive,
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        color={viewMode === 'evidence' ? '#FFFFFF' : '#CBD5E1'}
-                        name="camera"
-                        size={12}
-                      />
-                      <Text
-                        style={[
-                          styles.imageSourcePillText,
-                          viewMode === 'evidence' && styles.imageSourcePillTextActive,
-                        ]}
-                      >
-                        Surveyor Photo
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setViewMode('baseline');
-                      }}
-                      style={[
-                        styles.imageSourcePill,
-                        viewMode === 'baseline' && styles.imageSourcePillActive,
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        color={viewMode === 'baseline' ? '#FFFFFF' : '#CBD5E1'}
-                        name="book-open-outline"
-                        size={12}
-                      />
-                      <Text
-                        style={[
-                          styles.imageSourcePillText,
-                          viewMode === 'baseline' && styles.imageSourcePillTextActive,
-                        ]}
-                      >
-                        Baseline Sign
-                      </Text>
-                    </Pressable>
-                  </View>
-
                   {/* Directional Swipe Badges */}
                   <Animated.View
                     style={[styles.swipeBadge, styles.activeBadge, { opacity: activeBadgeOpacity }]}
