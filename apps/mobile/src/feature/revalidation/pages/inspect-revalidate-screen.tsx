@@ -28,7 +28,7 @@ import { useSession } from '@/context/session-provider';
 import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
-import { submitRevalidationEvidence } from '@/api/revalidation/revalidation';
+import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -159,8 +159,8 @@ export function InspectRevalidateScreen() {
   const signName = params.name || params.nameVi || params.nameEn || 'Sign Inspection';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
   const targetLon = params.longitude ? parseFloat(params.longitude) : undefined;
-  const targetImageUrl = params.imageUrl;
-  const targetCropUrl = params.actualCropUrl;
+  const targetImageUrl = params.imageUrl ? resolveS3Url(params.imageUrl) : undefined;
+  const targetCropUrl = params.actualCropUrl ? resolveS3Url(params.actualCropUrl) : undefined;
   const rawScore = params.freshnessScore ? parseFloat(params.freshnessScore) : 65;
   const freshnessScore = Number.isFinite(rawScore)
     ? rawScore <= 1

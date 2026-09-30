@@ -3,7 +3,10 @@ import { apiBaseUrl, ApiError, apiRequest } from '@/api/api-client';
 import { getStorageItemAsync } from '@/hooks/use-storage';
 import { getSignCategory } from '@/constants/sign-categories';
 import { resolveImageUrl, resolveRepresentativeSignUrl } from '@/feature/navigation/utils/signs';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { Platform } from 'react-native';
+
+export { resolveS3Url };
 import * as FileSystem from 'expo-file-system/legacy';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
@@ -254,11 +257,36 @@ export async function getTaskEvidences(
       { signal },
       token,
     );
-    return Array.isArray(res) ? res : [];
+    if (!Array.isArray(res)) return [];
+    return res.map((row: any) => ({
+      id: row.id,
+      taskId: row.task_id ?? row.taskId,
+      surveyorId: row.user_id ?? row.userId ?? row.surveyorId,
+      mediaUrl: resolveS3Url(row.media_url ?? row.mediaUrl),
+      evidenceType: row.evidence_type ?? row.evidenceType ?? 'STILL_ACTIVE',
+      submittedAt: row.submitted_at ?? row.submittedAt,
+      capturedAt: row.captured_at ?? row.capturedAt ?? row.submitted_at ?? row.submittedAt,
+      locationWkt: row.location_wkt ?? row.locationWkt,
+      distanceMeters: row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
+      note: row.note,
+      status: row.status,
+    }));
   } catch (err) {
     console.warn(`[Revalidation] Failed to fetch evidences for task ${taskId}:`, err);
     return [];
   }
+}
+
+function normalizeEvidenceResponse(body: unknown): SubmitRevalidationEvidenceResponse {
+  const res = body as SubmitRevalidationEvidenceResponse;
+  if (res && typeof res === 'object') {
+    const rawUrl = res.mediaUrl ?? (res as any).media_url;
+    return {
+      ...res,
+      mediaUrl: rawUrl ? resolveS3Url(rawUrl) : undefined,
+    };
+  }
+  return res;
 }
 
 export async function submitRevalidationEvidence(
@@ -320,7 +348,7 @@ export async function submitRevalidationEvidence(
 
       if (result.status >= 200 && result.status < 300) {
         console.log(`[Revalidation] Native uploadAsync <- [HTTP ${result.status}] OK`);
-        return body as SubmitRevalidationEvidenceResponse;
+        return normalizeEvidenceResponse(body);
       }
 
       // If 404 "not found", taskIdOrSignId might be a verifiedSignId rather than a taskId.
@@ -363,7 +391,7 @@ export async function submitRevalidationEvidence(
             }
             if (retryResult.status >= 200 && retryResult.status < 300) {
               console.log(`[Revalidation] Retry uploadAsync <- [HTTP ${retryResult.status}] OK`);
-              return retryBody as SubmitRevalidationEvidenceResponse;
+              return normalizeEvidenceResponse(retryBody);
             }
             result = retryResult;
             body = retryBody;
@@ -415,7 +443,7 @@ export async function submitRevalidationEvidence(
       },
       token,
     );
-    return res;
+    return normalizeEvidenceResponse(res);
   } catch (err) {
     console.error('[Revalidation] Remote evidence submit failed:', err);
     throw err;
@@ -444,7 +472,24 @@ export async function getRevalidationEvidenceQueue(
       token,
     );
     if (res?.items && Array.isArray(res.items)) {
-      return res;
+      return {
+        ...res,
+        items: res.items.map((item) => ({
+          ...item,
+          verifiedSign: item.verifiedSign
+            ? {
+                ...item.verifiedSign,
+                signCropUrl: resolveS3Url(item.verifiedSign.signCropUrl),
+              }
+            : item.verifiedSign,
+          evidence: item.evidence
+            ? {
+                ...item.evidence,
+                mediaUrl: resolveS3Url(item.evidence.mediaUrl),
+              }
+            : item.evidence,
+        })),
+      };
     }
   } catch (err) {
     console.warn('[Revalidation] Failed to fetch evidence queue from server:', err);

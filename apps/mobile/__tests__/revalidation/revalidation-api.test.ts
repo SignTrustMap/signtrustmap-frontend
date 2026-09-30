@@ -396,6 +396,22 @@ describe('Revalidation API Module', () => {
       expect(result[0].evidenceType).toBe('STILL_ACTIVE');
     });
 
+    it('normalizes relative media_url to full S3 CDN URL', async () => {
+      const mockRawEvidences = [
+        {
+          id: 'ev-raw-1',
+          task_id: 'task-123',
+          media_url: 'revalidation/task-123/crop-photo.jpg',
+          evidence_type: 'STILL_ACTIVE',
+          submitted_at: '2026-09-28T14:30:00Z',
+        },
+      ];
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRawEvidences);
+
+      const result = await getTaskEvidences('task-123');
+      expect(result[0].mediaUrl).toBe('https://s3.signmap.site/stm-sign-crops/revalidation/task-123/crop-photo.jpg');
+    });
+
     it('returns empty array when api request fails or throws', async () => {
       (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Network disconnected'));
 
@@ -486,6 +502,30 @@ describe('Revalidation API Module', () => {
         expect.objectContaining({ method: 'POST' }),
         'mock-stored-jwt-token',
       );
+    });
+
+    it('normalizes relative mediaUrl returned by backend upload to full S3 CDN URL', async () => {
+      const mockRawUploadResponse = {
+        id: 'evidence-1001',
+        taskId: 'task-101',
+        mediaUrl: 'revalidation/task-101/new-evidence.jpg',
+        status: 'EVALUATING',
+        latitude: 10.7769,
+        longitude: 106.7009,
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockRawUploadResponse),
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/new-evidence.jpg',
+        fileName: 'new-evidence.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      const result = await submitRevalidationEvidence('task-101', dto, mediaFile);
+      expect(result.mediaUrl).toBe('https://s3.signmap.site/stm-sign-crops/revalidation/task-101/new-evidence.jpg');
     });
 
     it('throws error when remote submit fails', async () => {

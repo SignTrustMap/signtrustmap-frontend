@@ -22,6 +22,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -57,7 +58,8 @@ export function RevalidationSignDetailsCard({
   const evidenceCount = evidences.length;
   const latestEvidence = evidenceCount > 0 ? evidences[0] : null;
 
-  const displaySubmittedCrop = sign.actualCropUrl || latestEvidence?.mediaUrl;
+  const rawCrop = sign.actualCropUrl || latestEvidence?.mediaUrl;
+  const displaySubmittedCrop = rawCrop ? resolveS3Url(rawCrop) : undefined;
   const hasSubmittedCrop = Boolean(displaySubmittedCrop && !cropError);
 
   // Entrance slide animation
@@ -502,7 +504,7 @@ export function RevalidationSignDetailsCard({
                     <View key={item.id || idx} style={styles.thumbnailWrapper}>
                       <Image
                         contentFit="cover"
-                        source={{ uri: item.mediaUrl }}
+                        source={{ uri: resolveS3Url(item.mediaUrl) }}
                         style={styles.evidenceThumbImg}
                       />
                       <View

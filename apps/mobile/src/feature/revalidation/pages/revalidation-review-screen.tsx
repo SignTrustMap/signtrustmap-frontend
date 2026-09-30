@@ -31,6 +31,7 @@ import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
 
@@ -365,10 +366,11 @@ export function RevalidationReviewScreen() {
   );
 
   // Active displayed image URI
-  const displayImageUri =
+  const rawImageUri =
     viewMode === 'evidence'
       ? currentItem?.evidence.mediaUrl || currentItem?.verifiedSign.signCropUrl
       : currentItem?.verifiedSign.signCropUrl || currentItem?.evidence.mediaUrl;
+  const displayImageUri = resolveS3Url(rawImageUri);
 
   const scorePercent =
     currentItem?.verifiedSign.freshnessScore !== undefined
@@ -435,7 +437,7 @@ export function RevalidationReviewScreen() {
                 >
                   <Image
                     contentFit="cover"
-                    source={{ uri: nextItem.evidence.mediaUrl || nextItem.verifiedSign.signCropUrl }}
+                    source={{ uri: resolveS3Url(nextItem.evidence.mediaUrl || nextItem.verifiedSign.signCropUrl) }}
                     style={styles.cardImage}
                     transition={180}
                   />
