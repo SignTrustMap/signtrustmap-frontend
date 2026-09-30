@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
@@ -32,10 +34,125 @@ import {
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { voteOnRevalidationEvidence } from '@/api/revalidation/revalidation';
+import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
 
 type SheetType = 'changed' | 'removed' | 'unclear';
+
+const revalSummaryActionDetails: Record<
+  RevalidationReviewAction,
+  { color: string; label: string; summary: string; symbol: string }
+> = {
+  STILL_ACTIVE: {
+    color: '#16A34A',
+    label: 'Still Active',
+    summary: 'Confirmed still active on-site.',
+    symbol: '✓',
+  },
+  REMOVED: {
+    color: Colors.danger,
+    label: 'Removed',
+    summary: 'Confirmed removed from site.',
+    symbol: '×',
+  },
+  CHANGED: {
+    color: '#F97316',
+    label: 'Changed',
+    summary: 'Sign type or details changed.',
+    symbol: '⇄',
+  },
+  UNCLEAR: {
+    color: '#2563EB',
+    label: 'Unclear',
+    summary: 'Cannot identify sign / unclear.',
+    symbol: '?',
+  },
+};
+
+function RevalSummaryMetric({ action, count }: { action: RevalidationReviewAction; count: number }) {
+  const theme = useTheme();
+  const details = revalSummaryActionDetails[action];
+
+  return (
+    <View
+      style={[
+        styles.summaryMetric,
+        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+      ]}
+    >
+      <View style={[styles.summaryMetricSymbol, { borderColor: details.color }]}>
+        <Text style={[styles.summaryMetricSymbolLabel, { color: details.color }]}>{details.symbol}</Text>
+      </View>
+      <Text style={[styles.summaryMetricCount, { color: theme.text }]}>{count}</Text>
+      <Text style={[styles.summaryMetricLabel, { color: details.color }]}>
+        {details.label.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+function RevalReviewedSignRow({
+  record,
+}: {
+  record: {
+    item: RevalidationQueueEvidenceItem;
+    action: RevalidationReviewAction;
+    note?: string;
+  };
+}) {
+  const theme = useTheme();
+  const details = revalSummaryActionDetails[record.action];
+  const imageUri = record.item.evidence.mediaUrl || record.item.verifiedSign.signCropUrl;
+
+  return (
+    <View
+      style={[
+        styles.summarySignRow,
+        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+      ]}
+    >
+      {imageUri ? (
+        <Image
+          accessibilityLabel={record.item.verifiedSign.signCode}
+          contentFit="cover"
+          source={{ uri: resolveS3Url(imageUri) }}
+          style={styles.summarySignImage}
+        />
+      ) : (
+        <View
+          style={[
+            styles.summarySignImage,
+            { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' },
+          ]}
+        >
+          <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={24} />
+        </View>
+      )}
+      <View style={styles.summarySignCopy}>
+        <Text numberOfLines={1} style={[styles.summarySignName, { color: theme.text }]}>
+          {record.item.verifiedSign.nameVi ||
+            record.item.verifiedSign.nameEn ||
+            record.item.verifiedSign.signCode ||
+            'Traffic Sign'}
+        </Text>
+        <Text numberOfLines={1} style={[styles.summarySignLocation, { color: theme.textSecondary }]}>
+          {record.item.verifiedSign.signCode}
+          {record.item.evidence.distanceMeters != null
+            ? ` • ${record.item.evidence.distanceMeters}m from original location`
+            : ' • Proximity verified'}
+        </Text>
+        <Text numberOfLines={1} style={[styles.summarySignSummary, { color: theme.placeholder }]}>
+          {record.note ? `Note: ${record.note}` : details.summary}
+        </Text>
+      </View>
+      <View style={[styles.summaryStatusBadge, { backgroundColor: `${details.color}18` }]}>
+        <Text style={[styles.summaryStatusLabel, { color: details.color }]}>{details.label}</Text>
+      </View>
+    </View>
+  );
+}
 
 function RevalidationReviewSkeleton() {
   return (
@@ -174,10 +291,16 @@ export function RevalidationReviewScreen() {
   const { data: queueResponse, isLoading } = useGetRevalidationEvidenceQueue({ page: 1, pageSize: 30 });
   const voteMutation = useVoteOnRevalidationEvidence();
 
+  const queryClient = useQueryClient();
+  const invalidateWalletAndStats = useInvalidateWalletAndStats();
+
   // Local state for queue manipulation and review progress
   const [items, setItems] = useState<RevalidationQueueEvidenceItem[]>([]);
-  const [history, setHistory] = useState<Array<{ item: RevalidationQueueEvidenceItem; action: RevalidationReviewAction }>>([]);
+  const [history, setHistory] = useState<
+    Array<{ item: RevalidationQueueEvidenceItem; action: RevalidationReviewAction; note?: string }>
+  >([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -201,33 +324,24 @@ export function RevalidationReviewScreen() {
   const reviewPosition = Math.min(history.length + (currentItem ? 1 : 0), Math.max(totalCount, 1));
   const progressPercent = Math.min(100, (reviewPosition / Math.max(totalCount, 1)) * 100);
 
+  const counts = useMemo(() => {
+    return history.reduce<Record<RevalidationReviewAction, number>>(
+      (res, rev) => ({ ...res, [rev.action]: (res[rev.action] || 0) + 1 }),
+      { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+    );
+  }, [history]);
+
   // ---------------------------------------------------------------------------
-  // Action Handler
+  // Action Handler: collects review in history, ready for summary submission
   // ---------------------------------------------------------------------------
   const handleVote = useCallback(
     (action: RevalidationReviewAction, note?: string) => {
       if (!currentItem) return;
 
-      const evidenceId = currentItem.evidenceId;
-      const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
-        STILL_ACTIVE: 'STILL_ACTIVE',
-        REMOVED: 'REMOVED',
-        CHANGED: 'CHANGED',
-        UNCLEAR: 'UNCLEAR',
-      };
-
-      const dto: EvidenceVoteDto = {
-        decision: decisionMap[action],
-        note: note || undefined,
-      };
-
-      // Optimistically advance queue
+      // Optimistically advance queue and hold vote for review summary
       setItems((prev) => prev.slice(1));
-      setHistory((prev) => [...prev, { item: currentItem, action }]);
+      setHistory((prev) => [...prev, { item: currentItem, action, note }]);
       setViewMode('evidence');
-
-      // Submit vote to backend
-      voteMutation.mutate({ evidenceId, dto });
 
       const messages: Record<RevalidationReviewAction, string> = {
         STILL_ACTIVE: 'Confirmed: Sign Still Active',
@@ -242,7 +356,7 @@ export function RevalidationReviewScreen() {
         tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
       }));
     },
-    [currentItem, voteMutation],
+    [currentItem],
   );
 
   const handleUndo = () => {
@@ -252,6 +366,61 @@ export function RevalidationReviewScreen() {
     setHistory((prev) => prev.slice(0, -1));
     setItems((prev) => [last.item, ...prev]);
     setToast(undefined);
+  };
+
+  const handleCheckEvaluation = () => {
+    // Return all reviewed items back to the queue to review or adjust
+    setItems(history.map((h) => h.item));
+    setHistory([]);
+    setToast(undefined);
+  };
+
+  const handleSubmitAllVotes = async () => {
+    if (history.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const results = await Promise.allSettled(
+        history.map(async ({ item, action, note }) => {
+          const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
+            STILL_ACTIVE: 'STILL_ACTIVE',
+            REMOVED: 'REMOVED',
+            CHANGED: 'CHANGED',
+            UNCLEAR: 'UNCLEAR',
+          };
+          return voteOnRevalidationEvidence(item.evidenceId, {
+            decision: decisionMap[action],
+            note: note || undefined,
+          });
+        }),
+      );
+
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0 && failed.length === results.length) {
+        throw new Error('All votes failed to submit');
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+      void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+      invalidateWalletAndStats();
+
+      const reviewedCount = history.length;
+      setHistory([]);
+      setItems([]);
+      router.replace({
+        pathname: '/work/submission-finish',
+        params: { count: String(reviewedCount) },
+      });
+    } catch (err) {
+      console.error('[RevalidationReview] Submit all votes failed:', err);
+      setToast({
+        id: Date.now(),
+        message: 'Submission failed. Please check your connection and retry.',
+        tone: 'default',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -382,43 +551,44 @@ export function RevalidationReviewScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* Top Progress Bar & Navigation Controls */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressTopRow}>
-            <Pressable
-              accessibilityLabel="Go back"
-              hitSlop={Spacing.one}
-              onPress={() => router.back()}
-              style={styles.backButton}
-            >
-              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
-            </Pressable>
+        {/* Top Progress Bar & Navigation Controls (Active Evaluation Mode Only) */}
+        {currentItem ? (
+          <View style={styles.progressSection}>
+            <View style={styles.progressTopRow}>
+              <Pressable
+                accessibilityLabel="Go back"
+                hitSlop={Spacing.one}
+                onPress={() => router.back()}
+                style={styles.backButton}
+              >
+                <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
+              </Pressable>
 
-            <View style={styles.progressTrackWrapper}>
-              <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      backgroundColor: theme.primary,
-                      width: `${progressPercent}%`,
-                    },
-                  ]}
-                />
+              <View style={styles.progressTrackWrapper}>
+                <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        backgroundColor: theme.primary,
+                        width: `${progressPercent}%`,
+                      },
+                    ]}
+                  />
+                </View>
               </View>
+
+              <View style={styles.topBarSpacer} />
             </View>
-
-            <View style={styles.topBarSpacer} />
+            <View style={styles.progressCounterRow}>
+              <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
+                EVALUATING EVIDENCE {reviewPosition} OF {Math.max(totalCount, 1)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.progressCounterRow}>
-            <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
-              {currentItem ? 'EVALUATING EVIDENCE' : 'EVALUATION COMPLETED'}{' '}
-              {reviewPosition} OF {Math.max(totalCount, 1)}
-            </Text>
-          </View>
-        </View>
+        ) : null}
 
-        {isLoading && items.length === 0 ? (
+        {isLoading && items.length === 0 && history.length === 0 ? (
           <RevalidationReviewSkeleton />
         ) : currentItem ? (
           <View style={styles.mainContainer}>
@@ -514,14 +684,11 @@ export function RevalidationReviewScreen() {
                 },
               ]}
             >
-              {/* Row 1: Sign Code & Name with Surveyor Stated Status */}
+              {/* Row 1: Sign Name with Surveyor Stated Status */}
               <View style={styles.infoTopRow}>
                 <View style={styles.infoCodeContainer}>
                   <Text numberOfLines={1} style={[styles.infoSignCode, { color: theme.text }]}>
-                    {currentItem.verifiedSign.signCode}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.infoSignName, { color: theme.textSecondary }]}>
-                    {currentItem.verifiedSign.nameVi || currentItem.verifiedSign.nameEn || 'Traffic Sign'}
+                    {currentItem.verifiedSign.nameVi || currentItem.verifiedSign.nameEn || currentItem.verifiedSign.signCode || 'Traffic Sign'}
                   </Text>
                 </View>
 
@@ -556,7 +723,7 @@ export function RevalidationReviewScreen() {
                   <MaterialCommunityIcons color={theme.placeholder} name="map-marker-distance" size={15} />
                   <Text style={[styles.telemetryText, { color: theme.placeholder }]}>
                     {currentItem.evidence.distanceMeters != null
-                      ? `${currentItem.evidence.distanceMeters}m from pole`
+                      ? `${currentItem.evidence.distanceMeters}m from original location`
                       : 'Proximity verified'}
                   </Text>
                 </View>
@@ -572,24 +739,23 @@ export function RevalidationReviewScreen() {
               {/* Row 3: Consensus Progress, Reward Credits & Baseline Freshness */}
               <View style={[styles.metricsDivider, { backgroundColor: theme.border }]} />
               <View style={styles.metricsRow}>
-                <View style={[styles.metricPill, { backgroundColor: `${theme.primary}12` }]}>
+                {/* <View style={[styles.metricPill, { backgroundColor: `${theme.primary}12` }]}>
                   <MaterialCommunityIcons color={theme.primary} name="vote-outline" size={14} />
                   <Text style={[styles.metricPillText, { color: theme.primary }]}>
                     {currentItem.currentVoteCount} / 3 votes
                   </Text>
-                </View>
+                </View> */}
 
-                <View style={[styles.metricPill, { backgroundColor: '#F0FDF4' }]}>
+                {/* <View style={[styles.metricPill, { backgroundColor: '#F0FDF4' }]}>
                   <MaterialCommunityIcons color="#16A34A" name="gift-outline" size={14} />
                   <Text style={[styles.metricPillText, { color: '#16A34A' }]}>
                     +{currentItem.rewardCredits} credits
                   </Text>
-                </View>
+                </View> */}
 
-                <View style={[styles.metricPill, { backgroundColor: '#FFF7ED' }]}>
-                  <MaterialCommunityIcons color="#C2410C" name="speedometer" size={14} />
+                <View style={[styles.metricPill]}>
                   <Text style={[styles.metricPillText, { color: '#C2410C' }]}>
-                    Score: {scorePercent}%
+                    Sign Remaining Score: {scorePercent}%
                   </Text>
                 </View>
               </View>
@@ -607,11 +773,11 @@ export function RevalidationReviewScreen() {
                     styles.diamondButton,
                     styles.diamondTop,
                     styles.neutralDiamondButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: '#F59E0B' },
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                     pressed && styles.circleButtonPressed,
                   ]}
                 >
-                  <MaterialCommunityIcons color="#D97706" name="swap-horizontal" size={26} />
+                  <MaterialCommunityIcons color={theme.text} name="swap-horizontal" size={26} />
                 </Pressable>
 
                 {/* Left Button: CONFIRM REMOVED (X) */}
@@ -638,7 +804,7 @@ export function RevalidationReviewScreen() {
                   style={({ pressed }) => [
                     styles.diamondButton,
                     styles.diamondRight,
-                    styles.approveButton,
+                    { backgroundColor: theme.primary, borderColor: theme.border },
                     pressed && styles.circleButtonPressed,
                   ]}
                 >
@@ -662,15 +828,73 @@ export function RevalidationReviewScreen() {
                 </Pressable>
               </View>
 
-              {/* Undo Action */}
-              {history.length > 0 ? (
-                <Pressable accessibilityLabel="Undo last review vote" onPress={handleUndo} style={styles.undoRow}>
-                  <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
-                  <Text style={[styles.undoText, { color: theme.placeholder }]}>Undo last vote</Text>
-                </Pressable>
-              ) : (
-                <View style={styles.undoSpacer} />
-              )}
+              {/* Undo Button in Bottom Right Corner */}
+              <Pressable
+                accessibilityLabel="Undo last review vote"
+                accessibilityRole="button"
+                disabled={history.length === 0}
+                hitSlop={8}
+                onPress={handleUndo}
+                style={({ pressed }) => [
+                  styles.undoCornerButton,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                    opacity: history.length > 0 ? 1 : 0.35,
+                  },
+                  pressed && history.length > 0 && styles.circleButtonPressed,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  color={history.length > 0 ? theme.text : theme.placeholder}
+                  name="undo-variant"
+                  size={22}
+                />
+              </Pressable>
+            </View>
+          </View>
+        ) : history.length > 0 ? (
+          /* Revalidation Summary Screen (mirrors reviewer flow) */
+          <View style={styles.summaryContent}>
+            <View style={styles.summaryHeading}>
+              <Text style={[styles.summaryTitle, { color: theme.text }]}>Revalidation Summary</Text>
+              <Text style={[styles.summarySubtitle, { color: theme.textSecondary }]}>
+                Today • {history.length} {history.length === 1 ? 'sign' : 'signs'} evaluated
+              </Text>
+            </View>
+
+            <View style={styles.summaryMetrics}>
+              <RevalSummaryMetric action="STILL_ACTIVE" count={counts.STILL_ACTIVE} />
+              <RevalSummaryMetric action="REMOVED" count={counts.REMOVED} />
+              <RevalSummaryMetric action="CHANGED" count={counts.CHANGED} />
+              <RevalSummaryMetric action="UNCLEAR" count={counts.UNCLEAR} />
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.summaryReviewListContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.summaryReviewList}
+            >
+              {history.map((record, index) => (
+                <RevalReviewedSignRow key={`${record.item.evidenceId}-${index}`} record={record} />
+              ))}
+            </ScrollView>
+
+            <View style={styles.summaryFooterActions}>
+              <AppButton
+                disabled={isSubmitting}
+                label="Check evaluation"
+                onPress={handleCheckEvaluation}
+                style={[styles.summaryCheckButton, { borderColor: theme.primary }]}
+                textStyle={{ color: theme.primary }}
+                variant="surface"
+              />
+              <AppButton
+                disabled={isSubmitting}
+                label={isSubmitting ? 'Submitting...' : 'Submit'}
+                onPress={handleSubmitAllVotes}
+                style={styles.summarySubmitButton}
+              />
             </View>
           </View>
         ) : (
@@ -1056,6 +1280,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
+    position: 'relative',
+    width: '100%',
+  },
+  undoCornerButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   diamondContainer: {
     width: 168,
@@ -1110,8 +1352,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   approveButton: {
-    backgroundColor: '#16A34A',
-    shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
@@ -1166,6 +1406,63 @@ const styles = StyleSheet.create({
     minWidth: 200,
     marginTop: Spacing.two,
   },
+
+  /* ── Summary Screen Styles (Reviewer Flow Match) ──────────── */
+  summaryContent: {
+    width: '100%',
+    maxWidth: 600,
+    flex: 1,
+    alignSelf: 'center',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  summaryHeading: { gap: 2 },
+  summaryTitle: { fontFamily: Fonts.body, fontSize: 24, fontWeight: '900', lineHeight: 31 },
+  summarySubtitle: { fontFamily: Fonts.body, fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  summaryMetrics: { flexDirection: 'row', gap: Spacing.one },
+  summaryMetric: {
+    minWidth: 0,
+    flex: 1,
+    gap: Spacing.half,
+    borderWidth: 1,
+    borderRadius: Rounded.lg,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.three,
+  },
+  summaryMetricSymbol: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderRadius: 10,
+  },
+  summaryMetricSymbolLabel: { fontFamily: Fonts.body, fontSize: 13, fontWeight: '900', lineHeight: 15 },
+  summaryMetricCount: { fontFamily: Fonts.body, fontSize: 23, fontWeight: '900', lineHeight: 28 },
+  summaryMetricLabel: { fontFamily: Fonts.body, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  summaryReviewList: { flex: 1 },
+  summaryReviewListContent: { gap: Spacing.one },
+  summarySignRow: {
+    minHeight: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.lg,
+    padding: Spacing.one,
+  },
+  summarySignImage: { width: 66, height: 66, flexShrink: 0, borderRadius: Rounded.md },
+  summarySignCopy: { minWidth: 0, flex: 1, gap: 2 },
+  summarySignName: { fontFamily: Fonts.body, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  summarySignLocation: { fontFamily: Fonts.body, fontSize: 11, fontWeight: '500', lineHeight: 15 },
+  summarySignSummary: { fontFamily: Fonts.body, fontSize: 10, fontWeight: '500', lineHeight: 14 },
+  summaryStatusBadge: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  summaryStatusLabel: { fontFamily: Fonts.body, fontSize: 9, fontWeight: '800' },
+  summaryFooterActions: { gap: Spacing.one, marginTop: 'auto' },
+  summaryCheckButton: { minHeight: 48, borderWidth: 1 },
+  summarySubmitButton: { minHeight: 50 },
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
