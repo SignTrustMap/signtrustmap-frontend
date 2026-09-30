@@ -12,5 +12,6 @@ export const API_PATHS = {
     SPATIAL_RESOLVE: '/spatial/resolve',
     REVALIDATION_TASKS: '/revalidation/tasks',
     REVALIDATION_TASKS_MAP: '/revalidation/tasks/map',
+    REVALIDATION_EVIDENCE_QUEUE: '/revalidation/evidence/queue',
 } as const;
 

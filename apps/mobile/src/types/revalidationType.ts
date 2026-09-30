@@ -74,3 +74,78 @@ export interface RevalidationFilterState {
   category: RevalidationFilterCategory;
   searchQuery: string;
 }
+
+export type RevalDecision =
+  | 'UNCHANGED'
+  | 'STILL_ACTIVE'
+  | 'CHANGED'
+  | 'MISSING'
+  | 'REMOVED'
+  | 'UNCLEAR'
+  | 'INVALID';
+
+export interface RevalidationQueueEvidenceItem {
+  evidenceId: string;
+  taskId: string;
+  verifiedSign: {
+    id: string;
+    signCode: string;
+    nameVi?: string;
+    nameEn?: string;
+    signCropUrl?: string;
+    lastVerifiedAt?: string;
+    freshnessScore?: number;
+  };
+  evidence: {
+    mediaUrl?: string;
+    evidenceType: 'STILL_ACTIVE' | 'REMOVED' | string;
+    submittedAt: string;
+    latitude: number;
+    longitude: number;
+    distanceMeters: number | null;
+  };
+  currentVoteCount: number;
+  taskStatus: string;
+  rewardCredits: number;
+}
+
+export interface RevalidationEvidenceQueueResponse {
+  items: RevalidationQueueEvidenceItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface EvidenceVoteDto {
+  decision: RevalDecision | string;
+  suggestedSignTypeId?: number;
+  note?: string;
+}
+
+export interface EvidenceVoteResponse {
+  vote: {
+    id: string;
+    evidenceId: string;
+    reviewerId: string;
+    decision: string;
+    suggestedSignTypeId: number | null;
+    note: string | null;
+    decidedAt: string;
+  };
+  consensus: {
+    evaluated: boolean;
+    reason?: string;
+    totalVotes?: number;
+    minVotesRequired?: number;
+    winningDecision?: string;
+    voteCounts?: Record<string, number>;
+    signAction?: string;
+    escalatedToModeration?: boolean;
+    creditedSubmitters?: number;
+    creditedReviewers?: number;
+    rewardPerSubmitter?: number;
+    taskId?: string;
+  } | null;
+}
+

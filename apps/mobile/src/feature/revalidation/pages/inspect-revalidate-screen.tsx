@@ -476,9 +476,14 @@ export function InspectRevalidateScreen() {
     setIsSubmitting(true);
     setSubmitError(undefined);
 
-    const lat = detectedGps?.latitude ?? targetLat ?? 10.7769;
-    const lon = detectedGps?.longitude ?? targetLon ?? 106.7009;
+    const lat = detectedGps?.latitude;
+    const lon = detectedGps?.longitude;
     const targetTaskId = taskId || signId;
+
+    if (!lat || !lon) {
+      setSubmitError('Location is required to submit evidence.');
+      return;
+    }
 
     try {
       await submitRevalidationEvidence(
@@ -503,7 +508,7 @@ export function InspectRevalidateScreen() {
       setSubmitSuccess(true);
       setTimeout(() => {
         handleNavigateBack();
-      }, 1600);
+      }, 1400);
     } catch (err) {
       console.error('[InspectRevalidate] Submission failed:', err);
       setSubmitError(err instanceof Error ? err.message : 'Evidence submission failed. Please try again.');

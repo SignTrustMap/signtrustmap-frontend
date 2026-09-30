@@ -15,7 +15,10 @@ import {
   useGetMySurveyStats,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
-import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  useGetFirstRevalidationSign,
+  useGetRevalidationEvidenceQueue,
+} from '@/feature/revalidation/hooks/use-revalidation';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -76,12 +79,17 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   // Live queries for surveyor and reviewer counts run only for their active section
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyorActive);
   const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewerActive);
+  const { data: revalEvidenceQueue } = useGetRevalidationEvidenceQueue(
+    { page: 1, pageSize: 1 },
+    isReviewerActive,
+  );
   const { data: surveyStats } = useGetMySurveyStats(isSurveyorActive);
   const { data: firstRevalSign } = useGetFirstRevalidationSign(undefined, isSurveyorActive);
 
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
+  const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 1;
 
   const handleOpenRevalidationMap = async () => {
@@ -368,6 +376,16 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 </View>
                 <MaterialCommunityIcons color={theme.onPrimary} name="chevron-right" size={24} />
               </AppButton>
+
+              {/* Action Card: Pending Revalidation Evidence */}
+              <WorkActionCard
+                accentColor="#0284C7"
+                count={revalEvidenceCount}
+                icon="clipboard-check-outline"
+                label="Pending Revalidation Evidence"
+                onPress={() => router.push('/work/submission-review')}
+                subtitle="Review on-site surveyor evidence submissions and cast consensus votes"
+              />
 
               {/* Secondary Standout Action: Sign Catalog */}
               <WorkActionCard

@@ -8,7 +8,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type {
+  EvidenceVoteDto,
+  EvidenceVoteResponse,
   FindTasksInBoundsParams,
+  RevalidationEvidenceQueueResponse,
   RevalidationTaskItem,
   RevalidationTasksInBoundsResponse,
   TaskPriority,
@@ -554,4 +557,65 @@ export async function submitRevalidationEvidence(
       status: 'EVALUATING',
     };
   }
+}
+
+/**
+ * Fetches the queue of revalidation evidence awaiting reviewer consensus.
+ * Automatically excludes evidence the requesting reviewer has already judged or submitted.
+ */
+export async function getRevalidationEvidenceQueue(
+  params?: { page?: number; pageSize?: number },
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationEvidenceQueueResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const searchParams = new URLSearchParams({
+    page: String(params?.page ?? 1),
+    pageSize: String(params?.pageSize ?? 20),
+  });
+
+  try {
+    const res = await apiRequest<RevalidationEvidenceQueueResponse>(
+      `${API_PATHS.REVALIDATION_EVIDENCE_QUEUE}?${searchParams.toString()}`,
+      { signal },
+      token,
+    );
+    if (res && Array.isArray(res.items)) {
+      return res;
+    }
+  } catch (err) {
+    console.warn('[Revalidation] Failed to fetch evidence queue from server:', err);
+  }
+
+  return {
+    items: [],
+    total: 0,
+    page: params?.page ?? 1,
+    pageSize: params?.pageSize ?? 20,
+    totalPages: 0,
+  };
+}
+
+/**
+ * Casts a consensus vote on a submitted revalidation evidence item.
+ */
+export async function voteOnRevalidationEvidence(
+  evidenceId: string,
+  dto: EvidenceVoteDto,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<EvidenceVoteResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest<EvidenceVoteResponse>(
+    `/revalidation/evidence/${encodeURIComponent(evidenceId)}/vote`,
+    {
+      method: 'POST',
+      body: JSON.stringify(dto),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal,
+    },
+    token,
+  );
 }
