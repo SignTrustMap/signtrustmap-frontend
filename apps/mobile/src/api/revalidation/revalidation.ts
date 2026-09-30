@@ -12,6 +12,7 @@ import type {
   EvidenceVoteResponse,
   FindTasksInBoundsParams,
   RevalidationEvidenceQueueResponse,
+  RevalidationQueueEvidenceItem,
   RevalidationTaskItem,
   RevalidationTasksInBoundsResponse,
   TaskPriority,
@@ -33,123 +34,6 @@ async function getStoredAccessToken(): Promise<string | undefined> {
     return undefined;
   }
 }
-
-export const FALLBACK_REVALIDATION_TASKS: RevalidationTaskItem[] = [
-  {
-    id: 'reval-001',
-    verifiedSignId: 'sign-v001',
-    code: 'P.102',
-    name: 'Cấm đi ngược chiều',
-    roadName: 'Đường Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh',
-    category: 'PROHIBITORY',
-    priority: 'URGENT',
-    status: 'OPEN',
-    staleDays: 95,
-    latitude: 10.7769,
-    longitude: 106.7009,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1572733957971-e945c78673fb?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('NO ENTRY', 'P.102'),
-    lastVerifiedDate: '2025-12-10',
-    currentTrustScore: 62,
-    reason: 'Đã quá hạn 90 ngày và có 2 tài xế báo cáo bị che khuất bởi nhánh cây.',
-    rewardCredits: 45,
-  },
-  {
-    id: 'reval-002',
-    verifiedSignId: 'sign-v002',
-    code: 'P.130',
-    name: 'Cấm quay đầu xe',
-    roadName: 'Đường Lê Lợi giao Pasteur, Quận 1, TP. Hồ Chí Minh',
-    category: 'PROHIBITORY',
-    priority: 'HIGH',
-    status: 'OPEN',
-    staleDays: 74,
-    latitude: 10.7735,
-    longitude: 106.6990,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('NO U TURN', 'P.130'),
-    lastVerifiedDate: '2026-01-02',
-    currentTrustScore: 71,
-    reason: 'Chu kỳ kiểm định định kỳ (70+ ngày), khu vực thi công tuyến metro hoàn trả mặt đường.',
-    rewardCredits: 35,
-  },
-  {
-    id: 'reval-003',
-    verifiedSignId: 'sign-v003',
-    code: 'W.207a',
-    name: 'Giao nhau với đường không ưu tiên',
-    roadName: 'Đại lộ Võ Văn Kiệt, Quận 5, TP. Hồ Chí Minh',
-    category: 'WARNING',
-    priority: 'NORMAL',
-    status: 'OPEN',
-    staleDays: 62,
-    latitude: 10.7554,
-    longitude: 106.6781,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('CROSSROAD WITH NON PRIORITY ROAD', 'W.207a'),
-    lastVerifiedDate: '2026-01-14',
-    currentTrustScore: 84,
-    reason: 'Kiểm tra định kỳ 60 ngày để duy trì Trust Score trên 80%.',
-    rewardCredits: 25,
-  },
-  {
-    id: 'reval-004',
-    verifiedSignId: 'sign-v004',
-    code: 'R.301a',
-    name: 'Hướng đi phải theo (Đi thẳng)',
-    roadName: 'Đường Điện Biên Phủ, Quận Bình Thạnh, TP. Hồ Chí Minh',
-    category: 'MANDATORY',
-    priority: 'URGENT',
-    status: 'OPEN',
-    staleDays: 102,
-    latitude: 10.7981,
-    longitude: 106.7145,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1584467541268-b040f83be3fd?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('GO STRAIGHT', 'R.301a'),
-    lastVerifiedDate: '2025-12-03',
-    currentTrustScore: 54,
-    reason: 'Tài xế báo cáo biển bị mờ phản quang vào ban đêm, cần khảo sát lại góc chụp mới.',
-    rewardCredits: 50,
-  },
-  {
-    id: 'reval-005',
-    verifiedSignId: 'sign-v005',
-    code: 'I.401',
-    name: 'Bắt đầu đường ưu tiên',
-    roadName: 'Đường Phạm Văn Đồng, TP. Thủ Đức, TP. Hồ Chí Minh',
-    category: 'INFORMATION',
-    priority: 'NORMAL',
-    status: 'OPEN',
-    staleDays: 65,
-    latitude: 10.8222,
-    longitude: 106.6890,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('PRIORITY ROAD', 'I.401'),
-    lastVerifiedDate: '2026-01-20',
-    currentTrustScore: 88,
-    reason: 'Kiểm định định kỳ tuyến đường vành đai.',
-    rewardCredits: 20,
-  },
-  {
-    id: 'reval-006',
-    verifiedSignId: 'sign-v006',
-    code: 'P.124a',
-    name: 'Cấm quay đầu xe ô tô',
-    roadName: 'Đường Nam Kỳ Khởi Nghĩa, Quận 3, TP. Hồ Chí Minh',
-    category: 'PROHIBITORY',
-    priority: 'HIGH',
-    status: 'OPEN',
-    staleDays: 82,
-    latitude: 10.7812,
-    longitude: 106.6934,
-    historicalCropUrl: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?w=600&auto=format&fit=crop&q=60',
-    representativeUrl: resolveRepresentativeSignUrl('NO U TURN CARS', 'P.124a'),
-    lastVerifiedDate: '2025-12-25',
-    currentTrustScore: 68,
-    reason: 'Báo cáo biển bị xiêu vẹo sau giông bão, cần chụp xác thực tình trạng.',
-    rewardCredits: 40,
-  },
-];
 
 function normalizePriority(raw?: string): TaskPriority {
   const upper = (raw ?? '').toUpperCase();
@@ -222,15 +106,10 @@ export async function getRevalidationTasksInBounds(
       return res.items.map(toRevalidationTaskItem);
     }
   } catch (err) {
-    console.warn('getRevalidationTasksInBounds failed or returned empty; using fallback tasks', err);
+    console.warn('getRevalidationTasksInBounds failed or returned empty:', err);
   }
 
-  // Filter fallback tasks within bounds if provided
-  return FALLBACK_REVALIDATION_TASKS.filter((task) => {
-    const withinLat = task.latitude >= bounds.minLat && task.latitude <= bounds.maxLat;
-    const withinLon = task.longitude >= bounds.minLon && task.longitude <= bounds.maxLon;
-    return withinLat && withinLon;
-  });
+  return [];
 }
 
 /**
@@ -268,7 +147,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
 
 /**
  * Fetches the first available sign that needs revalidation.
- * Prioritizes active revalidation tasks in user's area or Vietnam, with guaranteed fallback.
+ * Prioritizes active revalidation tasks in user's area or Vietnam.
  */
 export async function fetchFirstRevalidationSign(
   userCoordinate?: MapCoordinate,
@@ -316,10 +195,6 @@ export async function fetchFirstRevalidationSign(
     }
   } catch (err) {
     console.warn('fetchFirstRevalidationSign broad query failed:', err);
-  }
-
-  if (FALLBACK_REVALIDATION_TASKS.length > 0) {
-    return revalidationTaskToRouteSign(FALLBACK_REVALIDATION_TASKS[0]);
   }
 
   return null;
@@ -542,20 +417,8 @@ export async function submitRevalidationEvidence(
     );
     return res;
   } catch (err) {
-    console.warn('[Revalidation] Remote evidence submit failed, using fallback success confirmation:', err);
-    // Graceful fallback for local development or mock signs without active task ID
-    return {
-      id: `evidence-${Date.now()}`,
-      taskId: taskIdOrSignId,
-      mediaUrl: mediaFile?.uri || data.mediaUrl,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      distanceMeters: 5,
-      maxProximityMeters: 50,
-      dailySubmissionLimit: 5,
-      remainingDailySubmissions: 4,
-      status: 'EVALUATING',
-    };
+    console.error('[Revalidation] Remote evidence submit failed:', err);
+    throw err;
   }
 }
 
@@ -580,7 +443,7 @@ export async function getRevalidationEvidenceQueue(
       { signal },
       token,
     );
-    if (res && Array.isArray(res.items)) {
+    if (res?.items && Array.isArray(res.items)) {
       return res;
     }
   } catch (err) {
@@ -619,3 +482,4 @@ export async function voteOnRevalidationEvidence(
     token,
   );
 }
+

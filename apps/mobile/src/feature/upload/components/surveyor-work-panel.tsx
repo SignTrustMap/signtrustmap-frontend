@@ -61,7 +61,7 @@ export function SurveyorWorkPanel() {
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
       />
       <WorkActionCard
-        count={stats?.revalidationAvailable ?? 1}
+        count={stats?.revalidationAvailable ?? 0}
         label="Revalidation Map"
         onPress={handleOpenRevalidationMap}
         symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}

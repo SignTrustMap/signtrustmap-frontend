@@ -5,7 +5,6 @@ import {
   fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
-  FALLBACK_REVALIDATION_TASKS,
 } from '@/api/revalidation/revalidation';
 import type { RevalidationTaskItem } from '@/types/revalidationType';
 import * as apiClient from '@/api/api-client';
@@ -259,28 +258,21 @@ describe('Revalidation API Module', () => {
       expect(storage.getStorageItemAsync).not.toHaveBeenCalled();
     });
 
-    it('falls back to filtered FALLBACK_REVALIDATION_TASKS when apiRequest fails', async () => {
+    it('returns empty array when apiRequest fails', async () => {
       (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Network failure'));
 
       const tasks = await getRevalidationTasksInBounds(testBounds);
 
-      // Should return items from FALLBACK_REVALIDATION_TASKS that fit within testBounds
       expect(Array.isArray(tasks)).toBe(true);
-      expect(tasks.length).toBeGreaterThan(0);
-      for (const t of tasks) {
-        expect(t.latitude).toBeGreaterThanOrEqual(testBounds.minLat);
-        expect(t.latitude).toBeLessThanOrEqual(testBounds.maxLat);
-        expect(t.longitude).toBeGreaterThanOrEqual(testBounds.minLon);
-        expect(t.longitude).toBeLessThanOrEqual(testBounds.maxLon);
-      }
+      expect(tasks.length).toBe(0);
     });
 
-    it('falls back to FALLBACK_REVALIDATION_TASKS when API returns empty items', async () => {
+    it('returns empty array when API returns empty items', async () => {
       (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ items: [] });
 
       const tasks = await getRevalidationTasksInBounds(testBounds);
       expect(Array.isArray(tasks)).toBe(true);
-      expect(tasks.length).toBeGreaterThan(0);
+      expect(tasks.length).toBe(0);
     });
   });
 
@@ -338,16 +330,13 @@ describe('Revalidation API Module', () => {
       expect(sign?.signCode).toBe('W.207a');
     });
 
-    it('falls back to FALLBACK_REVALIDATION_TASKS[0] when all API queries fail', async () => {
-      // User coordinates far from HCMC fallbacks so near search yields 0 fallbacks
+    it('returns null when all API queries fail', async () => {
       const userCoord: [number, number] = [105.85, 21.03];
       (apiClient.apiRequest as jest.Mock).mockRejectedValue(new Error('Complete offline'));
 
       const sign = await fetchFirstRevalidationSign(userCoord);
 
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe(FALLBACK_REVALIDATION_TASKS[0].verifiedSignId);
-      expect(sign?.signCode).toBe(FALLBACK_REVALIDATION_TASKS[0].code);
+      expect(sign).toBeNull();
     });
 
     it('works without userCoordinate provided', async () => {
@@ -499,18 +488,10 @@ describe('Revalidation API Module', () => {
       );
     });
 
-    it('returns graceful fallback confirmation when remote submit fails', async () => {
+    it('throws error when remote submit fails', async () => {
       (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Server 500 error'));
 
-      const result = await submitRevalidationEvidence('task-offline', dto);
-
-      expect(result).toBeDefined();
-      expect(result.id).toMatch(/^evidence-/);
-      expect(result.taskId).toBe('task-offline');
-      expect(result.status).toBe('EVALUATING');
-      expect(result.latitude).toBe(dto.latitude);
-      expect(result.longitude).toBe(dto.longitude);
-      expect(result.distanceMeters).toBe(5);
+      await expect(submitRevalidationEvidence('task-offline', dto)).rejects.toThrow('Server 500 error');
     });
   });
 });

@@ -90,7 +90,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const pendingSurveyCount = pendingData?.pending ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
   const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
-  const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 1;
+  const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
 
   const handleOpenRevalidationMap = async () => {
     let targetSign = firstRevalSign;
@@ -383,7 +383,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 count={revalEvidenceCount}
                 icon="clipboard-check-outline"
                 label="Pending Revalidation Evidence"
-                onPress={() => router.push('/work/submission-review')}
+                onPress={() => router.push('/work/revalidation-review')}
                 subtitle="Review on-site surveyor evidence submissions and cast consensus votes"
               />
 
