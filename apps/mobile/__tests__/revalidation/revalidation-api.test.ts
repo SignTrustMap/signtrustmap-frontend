@@ -3,23 +3,43 @@ import {
   revalidationTaskToRouteSign,
   getRevalidationTasksInBounds,
   fetchFirstRevalidationSign,
+  getTaskEvidences,
   submitRevalidationEvidence,
   FALLBACK_REVALIDATION_TASKS,
 } from '@/api/revalidation/revalidation';
 import type { RevalidationTaskItem } from '@/types/revalidationType';
 import * as apiClient from '@/api/api-client';
 import * as storage from '@/hooks/use-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Mock dependencies
-jest.mock('@/api/api-client', () => ({
-  apiRequest: jest.fn(),
-  apiBaseUrl: jest.fn(() => 'https://api.signmap.site/api/v1'),
-}));
+jest.mock('@/api/api-client', () => {
+  class MockApiError extends Error {
+    statusCode: number;
+    constructor(msg: string, code: number) {
+      super(msg);
+      this.statusCode = code;
+    }
+  }
+  return {
+    apiRequest: jest.fn(),
+    apiBaseUrl: jest.fn(() => 'https://api.signmap.site/api/v1'),
+    ApiError: MockApiError,
+  };
+});
 
 jest.mock('@/hooks/use-storage', () => ({
   getStorageItemAsync: jest.fn(),
   setStorageItemAsync: jest.fn(),
   removeStorageItemAsync: jest.fn(),
+}));
+
+jest.mock('expo-file-system/legacy', () => ({
+  uploadAsync: jest.fn(),
+  FileSystemUploadType: {
+    MULTIPART: 0,
+    BINARY_CONTENT: 1,
+  },
 }));
 
 describe('Revalidation API Module', () => {
@@ -142,6 +162,7 @@ describe('Revalidation API Module', () => {
       const routeSign = revalidationTaskToRouteSign(baseTask);
 
       expect(routeSign.id).toBe('sign-100');
+      expect(routeSign.taskId).toBe('reval-1');
       expect(routeSign.coordinate).toEqual([106.7009, 10.7769]);
       expect(routeSign.signCode).toBe('P.102');
       expect(routeSign.name).toBe('Cấm đi ngược chiều');
@@ -352,6 +373,49 @@ describe('Revalidation API Module', () => {
     });
   });
 
+  describe('getTaskEvidences', () => {
+    it('fetches evidence reviews for a task with authorization header', async () => {
+      const mockEvidences = [
+        {
+          id: 'ev-1',
+          taskId: 'task-123',
+          mediaUrl: 'https://cdn.example.com/signs/crop1.jpg',
+          evidenceType: 'STILL_ACTIVE',
+          capturedAt: '2026-09-28T14:30:00Z',
+          distanceMeters: 4.2,
+        },
+        {
+          id: 'ev-2',
+          taskId: 'task-123',
+          mediaUrl: 'https://cdn.example.com/signs/crop2.jpg',
+          evidenceType: 'STILL_ACTIVE',
+          capturedAt: '2026-09-27T10:15:00Z',
+          distanceMeters: 2.1,
+        },
+      ];
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockEvidences);
+
+      const result = await getTaskEvidences('task-123');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-123/evidences',
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('ev-1');
+      expect(result[0].evidenceType).toBe('STILL_ACTIVE');
+    });
+
+    it('returns empty array when api request fails or throws', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Network disconnected'));
+
+      const result = await getTaskEvidences('task-error');
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('submitRevalidationEvidence', () => {
     const dto = {
       latitude: 10.7769,
@@ -369,7 +433,10 @@ describe('Revalidation API Module', () => {
         status: 'EVALUATING',
         remainingDailySubmissions: 3,
       };
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockSuccessResponse);
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
 
       const mediaFile = {
         uri: 'file:///data/evidence.jpg',
@@ -386,14 +453,25 @@ describe('Revalidation API Module', () => {
 
       expect(result.id).toBe('evidence-999');
       expect(result.status).toBe('EVALUATING');
-      expect(apiClient.apiRequest).toHaveBeenCalledWith(
-        '/revalidation/tasks/task-101/evidence',
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        'https://api.signmap.site/api/v1/revalidation/tasks/task-101/evidence',
+        'file:///data/evidence.jpg',
         expect.objectContaining({
-          method: 'POST',
-          body: expect.any(FormData),
+          fieldName: 'file',
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          mimeType: 'image/jpeg',
+          headers: {
+            Authorization: 'Bearer custom-auth-token',
+          },
+          parameters: expect.objectContaining({
+            latitude: '10.7769',
+            longitude: '106.7009',
+            evidenceType: 'STILL_ACTIVE',
+          }),
         }),
-        'custom-auth-token',
       );
+      expect((FileSystem.uploadAsync as jest.Mock).mock.calls[0][2].parameters.note).toBeUndefined();
     });
 
     it('submits evidence with mediaUrl when no file is passed, auto-resolving token from storage', async () => {

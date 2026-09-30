@@ -131,11 +131,20 @@ export function RevalidationMapScreen() {
 
     for (const task of revalTasks) {
       const converted = revalidationTaskToRouteSign(task);
-      signMap.set(converted.id, converted);
+      const existing = signMap.get(converted.id);
+      signMap.set(converted.id, {
+        ...(existing ?? {}),
+        ...converted,
+      });
     }
 
-    if (initialSign && !signMap.has(initialSign.id)) {
-      signMap.set(initialSign.id, initialSign);
+    if (initialSign) {
+      const existing = signMap.get(initialSign.id);
+      signMap.set(initialSign.id, {
+        ...(existing ?? {}),
+        ...initialSign,
+        taskId: initialSign.taskId ?? existing?.taskId,
+      });
     }
 
     return Array.from(signMap.values());
@@ -280,7 +289,9 @@ export function RevalidationMapScreen() {
 
   // Statistics for header summary
   const staleCount = useMemo(() => {
-    return rawSigns.filter((s) => getFreshnessInfo(s).isStale).length;
+    return rawSigns.filter(
+      (s) => Boolean(s.taskId) || s.status === 'STALE' || getFreshnessInfo(s).isStale,
+    ).length;
   }, [rawSigns]);
 
   const moderateCount = useMemo(() => {
@@ -294,7 +305,7 @@ export function RevalidationMapScreen() {
   // Signs that need revalidation, sorted by freshness score ascending (worst first)
   const staleSigns = useMemo(() => {
     return rawSigns
-      .filter((s) => getFreshnessInfo(s).isStale)
+      .filter((s) => Boolean(s.taskId) || s.status === 'STALE' || getFreshnessInfo(s).isStale)
       .sort((a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0));
   }, [rawSigns]);
 
@@ -309,10 +320,16 @@ export function RevalidationMapScreen() {
   }, []);
 
   const handleRevalidateAction = (sign: RouteSign) => {
+    const matchedTask = sign.taskId
+      ? undefined
+      : revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
+    const resolvedTaskId = sign.taskId || matchedTask?.id || '';
+
     router.push({
       pathname: '/work/inspect-revalidate',
       params: {
         signId: sign.id,
+        taskId: resolvedTaskId,
         signCode: sign.signCode,
         name: sign.name,
         nameVi: sign.nameVi || '',
@@ -740,6 +757,12 @@ export function RevalidationMapScreen() {
           onClose={() => setOverrideSign(null)}
           onRevalidate={handleRevalidateAction}
           sign={selectedSign}
+          taskId={
+            selectedSign.taskId ||
+            revalTasks.find(
+              (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
+            )?.id
+          }
         />
       ) : null}
     </View>

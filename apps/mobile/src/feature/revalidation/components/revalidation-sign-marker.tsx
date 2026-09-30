@@ -19,6 +19,7 @@ export function getFreshnessInfo(sign: RouteSign) {
       : undefined;
 
   const isStale =
+    Boolean(sign.taskId) ||
     sign.status === 'RETIRED' ||
     (scorePercent !== undefined && scorePercent < 50) ||
     (scorePercent === undefined && sign.status === 'STALE');

@@ -27,6 +27,7 @@ export type RouteSign = {
     roadName?: string;
     displayAddress?: string;
     lastVerifiedAt?: string;
+    taskId?: string;
 };
 
 type DirectionsResponse = {

@@ -48,6 +48,17 @@ jest.mock('@/hooks/use-theme', () => ({
   }),
 }));
 
+jest.mock('@/feature/revalidation/hooks/use-revalidation', () => {
+  const actual = jest.requireActual('@/feature/revalidation/hooks/use-revalidation');
+  return {
+    ...actual,
+    useGetTaskEvidences: jest.fn(() => ({
+      data: [],
+      isLoading: false,
+    })),
+  };
+});
+
 describe('Revalidation Flow: Business Logic & UI Verification', () => {
   const createMockSign = (overrides?: Partial<RouteSign>): RouteSign => ({
     id: 'sign-test-1',

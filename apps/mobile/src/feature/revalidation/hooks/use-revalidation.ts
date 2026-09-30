@@ -3,6 +3,7 @@ import { skipToken, useQuery } from '@tanstack/react-query';
 import {
   fetchFirstRevalidationSign,
   getRevalidationTasksInBounds,
+  getTaskEvidences,
 } from '@/api/revalidation/revalidation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type { FindTasksInBoundsParams } from '@/types/revalidationType';
@@ -46,5 +47,16 @@ export function useGetFirstRevalidationSign(
       : skipToken,
     enabled,
     staleTime: 60_000,
+  });
+}
+
+export function useGetTaskEvidences(taskId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['task-evidences', taskId],
+    queryFn: enabled && taskId
+      ? ({ signal }) => getTaskEvidences(taskId, signal)
+      : skipToken,
+    enabled: Boolean(enabled && taskId),
+    staleTime: 30_000,
   });
 }

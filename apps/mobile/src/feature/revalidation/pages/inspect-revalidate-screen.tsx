@@ -32,6 +32,7 @@ import { submitRevalidationEvidence } from '@/api/revalidation/revalidation';
 
 export type InspectRevalidateParams = {
   signId?: string;
+  taskId?: string;
   signCode?: string;
   name?: string;
   nameVi?: string;
@@ -153,6 +154,7 @@ export function InspectRevalidateScreen() {
 
   // Carried target sign metadata
   const signId = params.signId || 'sign-target';
+  const taskId = params.taskId;
   const signCode = params.signCode || 'Traffic Sign';
   const signName = params.name || params.nameVi || params.nameEn || 'Sign Inspection';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
@@ -476,10 +478,11 @@ export function InspectRevalidateScreen() {
 
     const lat = detectedGps?.latitude ?? targetLat ?? 10.7769;
     const lon = detectedGps?.longitude ?? targetLon ?? 106.7009;
+    const targetTaskId = taskId || signId;
 
     try {
       await submitRevalidationEvidence(
-        signId,
+        targetTaskId,
         {
           latitude: lat,
           longitude: lon,

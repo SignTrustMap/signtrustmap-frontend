@@ -21,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
+import { useGetTaskEvidences } from '../hooks/use-revalidation';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -28,6 +29,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 interface RevalidationSignDetailsCardProps {
   sign: RouteSign;
+  taskId?: string;
   onClose: () => void;
   onRevalidate?: (sign: RouteSign) => void;
   onCardHeightChange?: (height: number) => void;
@@ -35,6 +37,7 @@ interface RevalidationSignDetailsCardProps {
 
 export function RevalidationSignDetailsCard({
   sign,
+  taskId: propTaskId,
   onClose,
   onRevalidate,
   onCardHeightChange,
@@ -46,6 +49,16 @@ export function RevalidationSignDetailsCard({
   const [cropError, setCropError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+
+  const resolvedTaskId =
+    propTaskId || sign.taskId || (sign.id.startsWith('reval-') ? sign.id : undefined);
+  const { data: evidences = [], isLoading: isLoadingEvidences } =
+    useGetTaskEvidences(resolvedTaskId);
+  const evidenceCount = evidences.length;
+  const latestEvidence = evidenceCount > 0 ? evidences[0] : null;
+
+  const displaySubmittedCrop = sign.actualCropUrl || latestEvidence?.mediaUrl;
+  const hasSubmittedCrop = Boolean(displaySubmittedCrop && !cropError);
 
   // Entrance slide animation
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -144,12 +157,8 @@ export function RevalidationSignDetailsCard({
 
   const freshnessColor = isStale ? '#B91C1C' : isModerate ? '#C2410C' : '#047857';
 
-  const hasSubmittedCrop = Boolean(
-    sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl && !cropError,
-  );
-
   // Clear Action CTA wording
-  const primaryCtaText = 'Inspect'
+  const primaryCtaText = 'Inspect';
 
   const handleAction = () => {
     if (onRevalidate) {
@@ -412,7 +421,7 @@ export function RevalidationSignDetailsCard({
                     <Image
                       contentFit="cover"
                       onError={() => setCropError(true)}
-                      source={{ uri: sign.actualCropUrl }}
+                      source={{ uri: displaySubmittedCrop }}
                       style={styles.cropImg}
                     />
                   ) : (
@@ -430,6 +439,99 @@ export function RevalidationSignDetailsCard({
                 </View>
               </View>
             </View>
+          </View>
+
+          {/* =============================================================== */}
+          {/* SURVEYOR REVIEWS & COMMUNITY SUBMISSIONS SECTION                */}
+          {/* =============================================================== */}
+          <View style={[styles.reviewsSection, { backgroundColor: theme.background }]}>
+            <View style={styles.reviewsLeftRow}>
+              <View
+                style={[
+                  styles.reviewsIconBox,
+                  {
+                    backgroundColor: evidenceCount > 0 ? '#EFF6FF' : '#F8FAFC',
+                    borderColor: evidenceCount > 0 ? '#BFDBFE' : '#E2E8F0',
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  color={evidenceCount > 0 ? '#0671EB' : theme.placeholder}
+                  name={evidenceCount > 0 ? 'account-group-outline' : 'message-text-clock-outline'}
+                  size={16}
+                />
+              </View>
+
+              <View style={styles.reviewsTextCol}>
+                <View style={styles.reviewsHeadlineRow}>
+                  <Text style={[styles.reviewsHeadlineText, { color: theme.text }]}>
+                    {isLoadingEvidences
+                      ? 'Checking reviews...'
+                      : evidenceCount > 0
+                        ? `${evidenceCount} surveyor review${evidenceCount > 1 ? 's' : ''} posted`
+                        : 'No surveyor reviews yet'}
+                  </Text>
+                  {evidenceCount > 0 ? (
+                    <View style={styles.verifiedCountBadge}>
+                      <MaterialCommunityIcons color="#047857" name="check-decagram" size={12} />
+                      <Text style={styles.verifiedCountBadgeText}>
+                        {evidenceCount} verified
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <Text numberOfLines={1} style={[styles.reviewsSubtext, { color: theme.placeholder }]}>
+                  {isLoadingEvidences
+                    ? 'Loading community submissions...'
+                    : evidenceCount > 0
+                      ? latestEvidence?.capturedAt
+                        ? `Latest review submitted on ${formatDate(latestEvidence.capturedAt)}`
+                        : 'On-site evidence awaiting peer confirmation'
+                      : 'Be the first surveyor to inspect this location and earn bounty'}
+                </Text>
+              </View>
+            </View>
+
+            {evidenceCount > 0 && evidences.some((e) => Boolean(e.mediaUrl)) ? (
+              <View style={styles.evidenceThumbnailsRow}>
+                {evidences
+                  .filter((e) => Boolean(e.mediaUrl))
+                  .slice(0, 4)
+                  .map((item, idx) => (
+                    <View key={item.id || idx} style={styles.thumbnailWrapper}>
+                      <Image
+                        contentFit="cover"
+                        source={{ uri: item.mediaUrl }}
+                        style={styles.evidenceThumbImg}
+                      />
+                      <View
+                        style={[
+                          styles.thumbTypePill,
+                          {
+                            backgroundColor:
+                              item.evidenceType === 'REMOVED' ? '#FEF2F2' : '#F0FDF4',
+                            borderColor:
+                              item.evidenceType === 'REMOVED' ? '#FECACA' : '#BBF7D0',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.thumbTypePillText,
+                            {
+                              color:
+                                item.evidenceType === 'REMOVED' ? '#DC2626' : '#16A34A',
+                            },
+                          ]}
+                        >
+                          {item.evidenceType === 'REMOVED' ? 'Missing' : 'Active'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+              </View>
+            ) : null}
           </View>
 
           {/* =============================================================== */}
@@ -846,5 +948,95 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.2,
+  },
+  // Reviews Section
+  reviewsSection: {
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  reviewsLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reviewsIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewsTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  reviewsHeadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reviewsHeadlineText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  verifiedCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    gap: 2,
+  },
+  verifiedCountBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  reviewsSubtext: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  evidenceThumbnailsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  thumbnailWrapper: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  evidenceThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbTypePill: {
+    position: 'absolute',
+    bottom: 2,
+    left: 2,
+    right: 2,
+    paddingVertical: 1,
+    borderRadius: 3,
+    borderWidth: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbTypePillText: {
+    fontSize: 8,
+    fontWeight: '700',
   },
 });

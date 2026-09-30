@@ -1,8 +1,10 @@
 import { API_PATHS } from '@/api/api';
-import { apiRequest } from '@/api/api-client';
+import { apiBaseUrl, ApiError, apiRequest } from '@/api/api-client';
 import { getStorageItemAsync } from '@/hooks/use-storage';
 import { getSignCategory } from '@/constants/sign-categories';
 import { resolveImageUrl, resolveRepresentativeSignUrl } from '@/feature/navigation/utils/signs';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type {
@@ -246,6 +248,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
   return {
     coordinate: [task.longitude, task.latitude],
     id: task.verifiedSignId || task.id,
+    taskId: task.id,
     imageUrl: repUrl,
     actualCropUrl: resolvedCrop,
     name,
@@ -326,6 +329,7 @@ export type SubmitRevalidationEvidenceDto = {
   note?: string;
   condition?: string;
   mediaUrl?: string;
+  evidenceType?: 'STILL_ACTIVE' | 'REMOVED';
 };
 
 export type SubmitRevalidationEvidenceResponse = {
@@ -342,6 +346,43 @@ export type SubmitRevalidationEvidenceResponse = {
   status?: string;
 };
 
+export type RevalidationEvidenceItem = {
+  id: string;
+  taskId?: string;
+  mediaUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  capturedAt?: string;
+  evidenceType?: 'STILL_ACTIVE' | 'REMOVED' | string;
+  status?: string;
+  createdAt?: string;
+  distanceMeters?: number;
+  surveyorId?: string;
+  note?: string;
+};
+
+/**
+ * Fetches the list of evidence submissions (reviews) posted for a specific revalidation task.
+ */
+export async function getTaskEvidences(
+  taskId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationEvidenceItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<RevalidationEvidenceItem[]>(
+      `/revalidation/tasks/${encodeURIComponent(taskId)}/evidences`,
+      { signal },
+      token,
+    );
+    return Array.isArray(res) ? res : [];
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch evidences for task ${taskId}:`, err);
+    return [];
+  }
+}
+
 export async function submitRevalidationEvidence(
   taskIdOrSignId: string,
   data: SubmitRevalidationEvidenceDto,
@@ -351,20 +392,138 @@ export async function submitRevalidationEvidence(
 ): Promise<SubmitRevalidationEvidenceResponse> {
   // Resolve token: caller may pass one in, otherwise read from storage
   const token = accessToken ?? (await getStoredAccessToken());
+  const evidenceType: 'STILL_ACTIVE' | 'REMOVED' = data.evidenceType ?? (
+    data.condition === 'REMOVED' || data.condition === 'MISSING'
+      ? 'REMOVED'
+      : 'STILL_ACTIVE'
+  );
 
   try {
+    const isLocalFile = Boolean(
+      Platform.OS !== 'web' &&
+      mediaFile?.uri &&
+      !mediaFile.uri.startsWith('http://') &&
+      !mediaFile.uri.startsWith('https://')
+    );
+
+    // On native platforms (Android & iOS), when uploading a local file by URI,
+    // use FileSystem.uploadAsync instead of fetch(FormData).
+    // React Native / Expo's modern fetch throws "Unsupported FormDataPart implementation"
+    // when given a plain { uri, name, type } object in FormData.
+    if (isLocalFile && mediaFile?.uri) {
+      const baseUrl = apiBaseUrl();
+      const url = `${baseUrl}/revalidation/tasks/${encodeURIComponent(taskIdOrSignId)}/evidence`;
+      console.log(`[Revalidation] Native uploadAsync -> POST ${url} (file=${mediaFile.uri})`);
+
+      const parameters: Record<string, string> = {
+        latitude: String(data.latitude),
+        longitude: String(data.longitude),
+        evidenceType,
+      };
+      if (data.capturedAt) parameters.capturedAt = data.capturedAt;
+
+      let result = await FileSystem.uploadAsync(url, mediaFile.uri, {
+        fieldName: 'file',
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        mimeType: mediaFile.mimeType || 'image/jpeg',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        parameters,
+      });
+
+      let body: unknown;
+      try {
+        body = JSON.parse(result.body);
+      } catch {
+        body = result.body;
+      }
+
+      if (result.status >= 200 && result.status < 300) {
+        console.log(`[Revalidation] Native uploadAsync <- [HTTP ${result.status}] OK`);
+        return body as SubmitRevalidationEvidenceResponse;
+      }
+
+      // If 404 "not found", taskIdOrSignId might be a verifiedSignId rather than a taskId.
+      // Attempt to look up the active revalidation task in bounds matching this sign.
+      if (result.status === 404) {
+        console.warn(`[Revalidation] Task ${taskIdOrSignId} returned 404. Attempting to look up active task by verified sign ID...`);
+        try {
+          const tasks = await getRevalidationTasksInBounds(
+            {
+              minLat: data.latitude - 0.05,
+              maxLat: data.latitude + 0.05,
+              minLon: data.longitude - 0.05,
+              maxLon: data.longitude + 0.05,
+              pageSize: 50,
+            },
+            signal,
+            token,
+          );
+          const matched = tasks.find(
+            (t) => t.verifiedSignId === taskIdOrSignId || t.id === taskIdOrSignId,
+          );
+          if (matched && matched.id !== taskIdOrSignId) {
+            console.log(`[Revalidation] Found matching task ID ${matched.id} for sign ${taskIdOrSignId}, re-uploading...`);
+            const retryUrl = `${baseUrl}/revalidation/tasks/${encodeURIComponent(matched.id)}/evidence`;
+            const retryResult = await FileSystem.uploadAsync(retryUrl, mediaFile.uri, {
+              fieldName: 'file',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              mimeType: mediaFile.mimeType || 'image/jpeg',
+              headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              parameters,
+            });
+            let retryBody: unknown;
+            try {
+              retryBody = JSON.parse(retryResult.body);
+            } catch {
+              retryBody = retryResult.body;
+            }
+            if (retryResult.status >= 200 && retryResult.status < 300) {
+              console.log(`[Revalidation] Retry uploadAsync <- [HTTP ${retryResult.status}] OK`);
+              return retryBody as SubmitRevalidationEvidenceResponse;
+            }
+            result = retryResult;
+            body = retryBody;
+          }
+        } catch (resolveErr) {
+          console.warn('[Revalidation] Failed to auto-resolve active task:', resolveErr);
+        }
+      }
+
+      console.error(`[Revalidation] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
+      const message = typeof body === 'object' && body && 'message' in body
+        ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
+        : `Evidence upload failed with HTTP ${result.status}`;
+      throw new ApiError(message, result.status);
+    }
+
+    // Web or URL-only fallback (no local file to stream)
     const formData = new FormData();
     formData.append('latitude', String(data.latitude));
     formData.append('longitude', String(data.longitude));
+    formData.append('evidenceType', evidenceType);
     if (data.capturedAt) formData.append('capturedAt', data.capturedAt);
-    if (data.note) formData.append('note', data.note);
 
     if (mediaFile) {
-      formData.append('file', {
-        uri: mediaFile.uri,
-        name: mediaFile.fileName || 'evidence.jpg',
-        type: mediaFile.mimeType || 'image/jpeg',
-      } as any);
+      if (typeof File !== 'undefined' && (mediaFile as unknown) instanceof File) {
+        formData.append('file', mediaFile as unknown as Blob);
+      } else if (mediaFile.uri && (mediaFile.uri.startsWith('blob:') || mediaFile.uri.startsWith('data:'))) {
+        const blob = await fetch(mediaFile.uri).then((r) => r.blob());
+        formData.append('file', blob, mediaFile.fileName || 'evidence.jpg');
+      } else if (mediaFile.uri && (mediaFile.uri.startsWith('http://') || mediaFile.uri.startsWith('https://'))) {
+        formData.append('mediaUrl', mediaFile.uri);
+      } else {
+        formData.append('file', {
+          uri: mediaFile.uri,
+          name: mediaFile.fileName || 'evidence.jpg',
+          type: mediaFile.mimeType || 'image/jpeg',
+        } as any);
+      }
     } else if (data.mediaUrl) {
       formData.append('mediaUrl', data.mediaUrl);
     }
