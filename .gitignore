@@ -135,3 +135,5 @@ AGENTS.md
 # Temporary docs, project reports, and working notes
 *.docx
 /documents
+sample/
+

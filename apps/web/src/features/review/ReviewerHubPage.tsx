@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ShieldCheck,
@@ -22,6 +22,7 @@ import {
   mockReviewSessionHistory,
   type ReviewHistoryItem,
 } from '@/data'
+import { reviewsService } from '@/api/services/reviews.service'
 import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
 import { ReviewHistoryDrawer } from './components/ReviewHistoryDrawer'
 import { PageHeader } from '@shared/ui'
@@ -30,19 +31,79 @@ export function ReviewerHubPage() {
   const { t } = useTranslation('common')
   const { isDark } = useTheme()
 
-  const [stats] = useState(mockReviewerMetrics)
+  const [stats, setStats] = useState(mockReviewerMetrics)
   const [showNewSignModal, setShowNewSignModal] = useState(false)
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false)
   const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>(mockReviewSessionHistory)
+  const [livePendingCount, setLivePendingCount] = useState<number | null>(null)
 
-  const pendingCandidateCount = mockReviewCandidates.filter((c) => c.status === 'Pending').length
+  useEffect(() => {
+    let active = true
+
+    reviewsService
+      .getMyStats()
+      .then((res) => {
+        if (active && res) {
+          setStats((prev) => ({
+            ...prev,
+            reliabilityScore: res.reliabilityScore ?? prev.reliabilityScore,
+            consensusAccuracy: res.accuracyRate ?? prev.consensusAccuracy,
+            totalReviewed: res.totalReviews ?? prev.totalReviewed,
+            approvedCount: res.approved ?? prev.approvedCount,
+            rejectedCount: res.rejected ?? prev.rejectedCount,
+          }))
+        }
+      })
+      .catch(() => {})
+
+    reviewsService
+      .getMyHistory({ pageSize: 20 })
+      .then((res) => {
+        if (active && res?.items && res.items.length > 0) {
+          const mapped: ReviewHistoryItem[] = res.items.map((item) => ({
+            id: item.candidateId,
+            candidateId: item.candidateId,
+            signCode: item.candidate?.predictedSignType?.signCode || 'P.102',
+            signName: item.candidate?.predictedSignType?.nameVi || 'Biển báo',
+            action: item.vote === 1 ? 'Approved' : 'Rejected',
+            timestamp: new Date(item.reviewedAt).toLocaleTimeString('vi-VN'),
+            mode: 'candidate',
+          }))
+          setHistoryItems(mapped)
+        }
+      })
+      .catch(() => {})
+
+    reviewsService
+      .getReviewQueue({ page: 1, pageSize: 1 })
+      .then((res) => {
+        if (active && res?.total !== undefined) {
+          setLivePendingCount(res.total)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const pendingCandidateCount =
+    livePendingCount !== null
+      ? livePendingCount
+      : mockReviewCandidates.filter((c) => c.status === 'Pending').length
   const urgentCandidateCount = mockReviewCandidates.filter(
     (c) => c.status === 'Pending' && c.confidence >= 0.4 && c.confidence <= 0.75
   ).length
   const pendingRevalCount = mockRevalidationCandidates.length
 
-  const handleUndoHistoryItem = (itemOrId: ReviewHistoryItem | string) => {
+  const handleUndoHistoryItem = async (itemOrId: ReviewHistoryItem | string) => {
     const id = typeof itemOrId === 'string' ? itemOrId : itemOrId.id
+    try {
+      await reviewsService.undoVote(id)
+    } catch {
+      // Graceful offline
+    }
     setHistoryItems((prev) => prev.filter((item) => item.id !== id))
   }
 

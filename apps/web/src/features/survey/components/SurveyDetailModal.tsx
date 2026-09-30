@@ -1,22 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   X,
   MapPin,
-  Clock,
-  CheckCircle,
   WarningCircle,
   Coins,
   Compass,
-  Check,
-  CircleNotch,
   ArrowCounterClockwise,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '@/components/common/Modal'
 import { SurveyRouteMap } from './SurveyRouteMap'
+import { SurveyCandidatesList } from './SurveyCandidatesList'
+import { SurveyLivePipelineStepper } from './SurveyLivePipelineStepper'
+import { submissionsService } from '@/api/services/submissions.service'
 import type { SurveySubmissionItem, ExtractedCandidateItem } from '@/data'
+import type { SubmissionStatus } from '@shared/types'
 
 interface SurveyDetailModalProps {
   isOpen: boolean
@@ -38,6 +38,53 @@ export function SurveyDetailModal({
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const [selectedCandidate, setSelectedCandidate] = useState<ExtractedCandidateItem | null>(null)
+  const [liveStatus, setLiveStatus] = useState<SubmissionStatus | null>(null)
+  const [liveFailureReason, setLiveFailureReason] = useState<string | null>(null)
+
+  // Determine pipeline status
+  const currentPipelineStatus: SubmissionStatus =
+    liveStatus ||
+    (submission?.stage?.toUpperCase() as SubmissionStatus) ||
+    (submission?.status === 'Completed'
+      ? 'COMPLETED'
+      : submission?.status === 'Failed'
+      ? 'FAILED'
+      : 'DETECTING')
+
+  // Real-time polling when submission is in an active processing state
+  useEffect(() => {
+    if (!isOpen || !submission?.id) return
+
+    let isMounted = true
+
+    const fetchStatus = async () => {
+      try {
+        const res = await submissionsService.getSubmissionStatus(submission.id)
+        if (isMounted && res?.submission) {
+          setLiveStatus(res.submission.status)
+          if (res.submission.failureReason) setLiveFailureReason(res.submission.failureReason)
+        }
+      } catch {
+        // Fallback to static props if offline or mock id
+      }
+    }
+
+    fetchStatus()
+
+    const isProcessing =
+      submission.status === 'Processing' ||
+      !['COMPLETED', 'FAILED', 'REJECTED'].includes(currentPipelineStatus)
+
+    let interval: ReturnType<typeof setInterval> | null = null
+    if (isProcessing) {
+      interval = setInterval(fetchStatus, 5000)
+    }
+
+    return () => {
+      isMounted = false
+      if (interval) clearInterval(interval)
+    }
+  }, [isOpen, submission?.id, submission?.status, currentPipelineStatus])
 
   if (!submission) return null
 
@@ -112,7 +159,7 @@ export function SurveyDetailModal({
         </div>
 
         {/* ─── Failure Alert Box (if failed) ───────────────────────────── */}
-        {submission.status === 'Failed' && submission.failureReason && (
+        {submission.status === 'Failed' && (submission.failureReason || liveFailureReason) && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-500/40 text-red-900 dark:text-red-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <WarningCircle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" weight="fill" />
@@ -121,7 +168,7 @@ export function SurveyDetailModal({
                   {t('survey.failure_notice_title')}
                 </h5>
                 <p className="text-xs mt-0.5 leading-relaxed">
-                  {submission.failureReason}
+                  {liveFailureReason || submission.failureReason}
                 </p>
               </div>
             </div>
@@ -135,43 +182,12 @@ export function SurveyDetailModal({
           </div>
         )}
 
-        {/* ─── 5 Pipeline Stages ───────────────────────────────────────── */}
-        <div className="space-y-2">
-          <span className="text-xs font-bold uppercase text-gray-600 dark:text-gray-400 tracking-wider">
-            {t('survey.pipeline_title')}
-          </span>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {[
-              { name: t('survey.pipeline_gps_sync'), done: submission.status !== 'Failed', active: false },
-              { name: t('survey.pipeline_yolo'), done: submission.progressPercent >= 40, active: submission.progressPercent < 40 && submission.status === 'Processing' },
-              { name: t('survey.pipeline_botsort'), done: submission.progressPercent >= 60, active: submission.progressPercent >= 40 && submission.progressPercent < 60 },
-              { name: t('survey.pipeline_gps_pin'), done: submission.progressPercent >= 80, active: submission.progressPercent >= 60 && submission.progressPercent < 80 },
-              { name: t('survey.pipeline_clip'), done: submission.status === 'Completed', active: submission.progressPercent >= 80 && submission.status === 'Processing' },
-            ].map((step, idx) => (
-              <div
-                key={idx}
-                className={`p-2.5 rounded-xl border text-center text-xs font-bold transition-all ${
-                  submission.status === 'Failed' && idx === 0
-                    ? isDark ? 'bg-red-900/30 border-red-500/40 text-red-300' : 'bg-red-50 border-red-200 text-red-800'
-                    : step.done
-                    ? isDark ? 'bg-emerald-900/30 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                    : step.active
-                    ? isDark ? 'bg-[#00c4de]/20 border-[#00c4de] text-[#00c4de] animate-pulse' : 'bg-[#007b8b]/15 border-[#007b8b] text-[#007b8b]'
-                    : isDark ? 'bg-white/5 border-white/10 text-gray-500' : 'bg-gray-100 border-gray-200 text-gray-500'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-1">
-                  {step.done ? (
-                    <Check size={13} weight="bold" />
-                  ) : step.active ? (
-                    <CircleNotch size={13} className="animate-spin" />
-                  ) : null}
-                  <span className="truncate">{step.name}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* ─── AI Pipeline Monitor ────────────────────────────────────── */}
+        <SurveyLivePipelineStepper
+          status={currentPipelineStatus}
+          isDark={isDark}
+          failureReason={liveFailureReason || submission.failureReason}
+        />
 
         {/* ─── Route Trajectory Map ────────────────────────────────────── */}
         {submission.routePoints && submission.routePoints.length > 0 && (
@@ -212,146 +228,12 @@ export function SurveyDetailModal({
             </div>
           </div>
 
-          {submission.candidates && submission.candidates.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
-              {submission.candidates.map((cand) => {
-                const isSelected = selectedCandidate?.id === cand.id
-
-                let catBadgeClass = isDark
-                  ? 'bg-red-900/40 text-red-200 border-red-500/50'
-                  : 'bg-red-100 text-red-900 border-red-300'
-                if (cand.category === 'W') {
-                  catBadgeClass = isDark
-                    ? 'bg-amber-900/40 text-amber-200 border-amber-500/50'
-                    : 'bg-amber-100 text-amber-950 border-amber-300'
-                }
-                if (cand.category === 'R') {
-                  catBadgeClass = isDark
-                    ? 'bg-blue-900/40 text-blue-200 border-blue-500/50'
-                    : 'bg-blue-100 text-blue-900 border-blue-300'
-                }
-                if (cand.category === 'I') {
-                  catBadgeClass = isDark
-                    ? 'bg-cyan-900/40 text-cyan-200 border-cyan-500/50'
-                    : 'bg-cyan-100 text-cyan-950 border-cyan-300'
-                }
-
-                return (
-                  <div
-                    key={cand.id}
-                    onClick={() => setSelectedCandidate(cand)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                      isSelected
-                        ? isDark
-                          ? 'bg-[#00c4de]/10 border-[#00c4de] ring-1 ring-[#00c4de]'
-                          : 'bg-[#007b8b]/10 border-[#007b8b] ring-1 ring-[#007b8b]'
-                        : isDark
-                        ? 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06]'
-                        : 'bg-gray-50/70 border-gray-200 hover:bg-gray-100/80'
-                    }`}
-                  >
-                    {/* Header: Code & Review Status */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold border ${catBadgeClass}`}>
-                          {cand.signCode}
-                        </span>
-                        <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400">
-                          #{cand.id}
-                        </span>
-                      </div>
-
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                          cand.reviewStatus === 'Approved'
-                            ? isDark
-                              ? 'bg-emerald-900/40 text-emerald-200 border-emerald-500/50'
-                              : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                            : cand.reviewStatus === 'Pending'
-                            ? isDark
-                              ? 'bg-amber-900/40 text-amber-200 border-amber-500/50'
-                              : 'bg-amber-100 text-amber-950 border-amber-300'
-                            : isDark
-                            ? 'bg-red-900/40 text-red-200 border-red-500/50'
-                            : 'bg-red-100 text-red-900 border-red-300'
-                        }`}
-                      >
-                        {cand.reviewStatus === 'Approved' ? (
-                          <CheckCircle size={12} weight="bold" />
-                        ) : cand.reviewStatus === 'Pending' ? (
-                          <Clock size={12} />
-                        ) : (
-                          <WarningCircle size={12} />
-                        )}
-                        <span>
-                          {cand.reviewStatus === 'Approved'
-                            ? t('survey.candidate_status_approved')
-                            : cand.reviewStatus === 'Pending'
-                            ? t('survey.candidate_status_pending')
-                            : t('survey.candidate_status_rejected')}
-                        </span>
-                      </span>
-                    </div>
-
-                    {/* Sign Name */}
-                    <h5 className="font-bold text-sm text-gray-900 dark:text-white line-clamp-1 mb-2">
-                      {cand.signName}
-                    </h5>
-
-                    {/* Confidence bar */}
-                    <div className="space-y-1 mb-2.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">
-                          {t('survey.candidate_confidence')}
-                        </span>
-                        <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de]">
-                          {Math.round(cand.confidence * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10">
-                        <div
-                          className="h-full bg-[#007b8b] dark:bg-[#00c4de] rounded-full"
-                          style={{ width: `${Math.round(cand.confidence * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Details */}
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-white/10 font-medium">
-                      <div>
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 block uppercase">
-                          {t('survey.candidate_frame')}
-                        </span>
-                        <span className="font-mono font-bold text-gray-800 dark:text-gray-200">
-                          {cand.timestampStr}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 block uppercase">
-                          {t('survey.candidate_distance')}
-                        </span>
-                        <span className="font-mono font-bold text-gray-800 dark:text-gray-200">
-                          {cand.distanceMeters}m
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 block uppercase">
-                          {t('survey.candidate_direction')}
-                        </span>
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">
-                          {cand.trafficDirection}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="p-8 rounded-xl border border-dashed border-gray-300 dark:border-white/15 text-center text-gray-500 dark:text-gray-400 text-xs">
-              {t('survey.candidates_empty')}
-            </div>
-          )}
+          <SurveyCandidatesList
+            candidates={submission.candidates || []}
+            selectedCandidateId={selectedCandidate?.id}
+            onSelectCandidate={(cand) => setSelectedCandidate(cand)}
+            isDark={isDark}
+          />
         </div>
 
         {/* ─── Bottom Summary Row ───────────────────────────────────────── */}

@@ -21,7 +21,7 @@ export interface ApiResponse<T = any> {
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: env.apiBaseUrl,
-  timeout: 20000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -35,6 +35,13 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // When sending FormData, delete Content-Type to let browser / Axios
+    // automatically generate the multipart/form-data boundary parameter
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type']
+    }
+
     return config
   },
   (error) => Promise.reject(error)
@@ -78,7 +85,10 @@ apiClient.interceptors.response.use(
     // Extract readable error message from NestJS (handles string or ValidationPipe array)
     const errData = error.response?.data
     let readableMessage = error.message || 'Lỗi kết nối máy chủ'
-    if (errData?.message) {
+
+    if (error.code === 'ECONNABORTED' || (error.message && error.message.toLowerCase().includes('timeout'))) {
+      readableMessage = 'Quá thời gian chờ phản hồi từ máy chủ (Request Timeout). Vui lòng thử lại.'
+    } else if (errData?.message) {
       readableMessage = Array.isArray(errData.message)
         ? errData.message.join('. ')
         : String(errData.message)

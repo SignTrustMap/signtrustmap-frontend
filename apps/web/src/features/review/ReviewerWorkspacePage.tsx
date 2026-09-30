@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  CheckCircle,
   PlusCircle,
   ClockCounterClockwise,
   Sparkle,
@@ -18,8 +17,11 @@ import {
   type ReviewHistoryItem,
   type FlagReasonCode,
 } from '@/data'
+import { reviewsService } from '@/api/services/reviews.service'
+import { resolveMediaUrl } from './utils/resolveMediaUrl'
 import { PageHeader } from '@/components/common/PageHeader'
 import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
+import { useReviewHotkeys } from './hooks/useReviewHotkeys'
 import {
   FlagCandidateModal,
   RevalidationWorkspacePanel,
@@ -28,6 +30,8 @@ import {
   ReviewerQueueFilterBar,
   CandidateWorkspaceCard,
   ReviewerCatalogModal,
+  DeclineCandidateModal,
+  SubmissionSummaryView,
   type QueueFilterType,
   type CatalogCategoryFilter,
 } from './components'
@@ -55,12 +59,71 @@ export default function ReviewerWorkspacePage() {
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCat, setCatalogCat] = useState<CatalogCategoryFilter>('all')
   const [showFlagModal, setShowFlagModal] = useState(false)
+  const [showDeclineModal, setShowDeclineModal] = useState(false)
   const [showNewSignModal, setShowNewSignModal] = useState(false)
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false)
 
   // Metrics & History State
   const [stats, setStats] = useState(mockReviewerMetrics)
   const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>([])
+
+  // Load live queue and stats from API
+  useEffect(() => {
+    let active = true
+
+    reviewsService
+      .getReviewQueue({ page: 1, pageSize: 30 })
+      .then((res) => {
+        if (!active) return
+        if (res?.items && res.items.length > 0) {
+          const mapped: CandidateToReview[] = res.items.map((item, idx) => {
+            const type = item.predictedSignType
+            const crop = resolveMediaUrl(item.signCropUrl)
+            const frame = resolveMediaUrl(item.bestFrameUrl)
+            return {
+              id: item.id,
+              sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
+              yoloTrackId: idx + 1,
+              code: type?.signCode || 'P.102',
+              suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
+              category: (type?.signCode?.charAt(0) || 'P') as any,
+              confidence: 0.88,
+              lat: item.submission?.latitude ?? 10.7769,
+              lng: item.submission?.longitude ?? 106.7009,
+              roadName: 'Đường khảo sát (Camera GPS)',
+              directionHeading: 45,
+              trafficFlowDirection: 'Northbound',
+              estimatedDistanceMeters: 12.5,
+              cropImageUrl: crop || '/images/mock-crop.jpg',
+              contextImageUrl: frame || crop || '/images/mock-context.jpg',
+              status: 'Pending',
+            }
+          })
+          setCandidates(mapped)
+        }
+      })
+      .catch(() => {})
+
+    reviewsService
+      .getMyStats()
+      .then((res) => {
+        if (active && res) {
+          setStats((prev) => ({
+            ...prev,
+            reliabilityScore: res.reliabilityScore ?? prev.reliabilityScore,
+            consensusAccuracy: res.accuracyRate ?? prev.consensusAccuracy,
+            totalReviewed: res.totalReviews ?? prev.totalReviewed,
+            approvedCount: res.approved ?? prev.approvedCount,
+            rejectedCount: res.rejected ?? prev.rejectedCount,
+          }))
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Filter candidate queue according to Active Learning criteria
   const filteredCandidates = useMemo(() => {
@@ -133,6 +196,20 @@ export default function ReviewerWorkspacePage() {
         mode: 'candidate',
       }
       setHistoryItems((prev) => [historyEntry, ...prev])
+
+      // Asynchronously record vote in backend API
+      if (action === 'flag') {
+        reviewsService
+          .reportCandidate(candidateId, { reason: flagNotes || 'Flagged candidate' })
+          .catch(() => {})
+      } else {
+        reviewsService
+          .castVote(candidateId, {
+            vote: action === 'approve' ? 1 : -1,
+            suggestedSignTypeId: correctedCode ? Number(correctedCode) || undefined : undefined,
+          })
+          .catch(() => {})
+      }
 
       if (action === 'approve') {
         toast.success(
@@ -265,51 +342,76 @@ export default function ReviewerWorkspacePage() {
         setRevalIndex((i) => Math.max(0, i - 1))
       }
 
+      if (item.candidateId) {
+        reviewsService.undoVote(item.candidateId).catch(() => {})
+      }
+
       setHistoryItems((prev) => prev.filter((h) => h.id !== item.id))
       toast.info(`${t('reviewer.toast_undone')} ${item.candidateId}`)
     },
     [t, toast]
   )
 
-  // Keyboard Shortcuts for Candidate Review
-  useEffect(() => {
-    if (activeMode !== 'candidate') return
-    if (showCatalogModal || showFlagModal || showNewSignModal || showHistoryDrawer || !currentCandidate) return
+  // Quick Undo Last Action
+  const handleUndoLast = useCallback(() => {
+    if (historyItems.length === 0) return
+    handleUndo(historyItems[0])
+  }, [historyItems, handleUndo])
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  // Skip Candidate (Mobile Parity: Skip current sign)
+  const handleSkip = useCallback(() => {
+    if (!currentCandidate) return
+    const candidateId = currentCandidate.id
+    const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 
-      if (e.key === 'a' || e.key === 'A') {
-        handleCandidateDecision('approve')
-      } else if (e.key === 'r' || e.key === 'R') {
-        handleCandidateDecision('reject')
-      } else if (e.key === 'c' || e.key === 'C') {
-        setShowCatalogModal(true)
-      } else if (e.key === 'f' || e.key === 'F') {
-        setShowFlagModal(true)
-      } else if (e.key === 'Tab') {
-        e.preventDefault()
-        setActiveView((v) => (v === 'crop' ? 'context' : 'crop'))
-      } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
-        setCurrentIndex((i) => i - 1)
-      } else if (e.key === 'ArrowRight' && currentIndex < filteredCandidates.length - 1) {
-        setCurrentIndex((i) => i + 1)
-      }
+    const historyEntry: ReviewHistoryItem = {
+      id: `HIST-${Date.now()}`,
+      candidateId,
+      signCode: currentCandidate.code,
+      signName: currentCandidate.suggestedName,
+      action: 'Skipped',
+      timestamp: now,
+      mode: 'candidate',
     }
+    setHistoryItems((prev) => [historyEntry, ...prev])
+    reviewsService.skipCandidate(candidateId).catch(() => {})
+    toast.info(t('reviewer.toast_skipped'))
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    activeMode,
-    currentCandidate,
-    currentIndex,
-    filteredCandidates.length,
-    handleCandidateDecision,
-    showCatalogModal,
-    showFlagModal,
-    showNewSignModal,
-    showHistoryDrawer,
-  ])
+    if (currentIndex < filteredCandidates.length - 1) {
+      setCurrentIndex((i) => i + 1)
+    } else {
+      setCurrentIndex(filteredCandidates.length)
+    }
+  }, [currentCandidate, currentIndex, filteredCandidates.length, t, toast])
+
+  // Confirm Decline from DeclineCandidateModal
+  const handleConfirmDecline = useCallback(
+    (reason: string, detail?: string) => {
+      setShowDeclineModal(false)
+      handleCandidateDecision('reject', undefined, detail ? `${reason}: ${detail}` : reason)
+    },
+    [handleCandidateDecision]
+  )
+
+  // Keyboard Shortcuts (Hotkeys 1/A, 2/R, 3/C, 4/S, F, Space, Ctrl+Z)
+  useReviewHotkeys(
+    {
+      onApprove: () => handleCandidateDecision('approve'),
+      onReject: () => setShowDeclineModal(true),
+      onSuggest: () => setShowCatalogModal(true),
+      onSkip: handleSkip,
+      onFlag: () => setShowFlagModal(true),
+      onToggleView: () => setActiveView((v) => (v === 'crop' ? 'context' : 'crop')),
+      onUndo: handleUndoLast,
+    },
+    activeMode === 'candidate' &&
+      !showCatalogModal &&
+      !showFlagModal &&
+      !showDeclineModal &&
+      !showNewSignModal &&
+      !showHistoryDrawer &&
+      Boolean(currentCandidate)
+  )
 
   // Filter catalog by search query & category tab
   const filteredCatalog = useMemo(() => {
@@ -464,9 +566,15 @@ export default function ReviewerWorkspacePage() {
                     activeView={activeView}
                     isDark={isDark}
                     onViewChange={setActiveView}
-                    onDecision={(action) => handleCandidateDecision(action)}
+                    onDecision={(action) =>
+                      action === 'approve' ? handleCandidateDecision('approve') : setShowDeclineModal(true)
+                    }
+                    onOpenDecline={() => setShowDeclineModal(true)}
+                    onSkip={handleSkip}
                     onOpenCatalog={() => setShowCatalogModal(true)}
                     onOpenFlag={() => setShowFlagModal(true)}
+                    onUndo={handleUndoLast}
+                    canUndo={historyItems.length > 0}
                     onPrev={() => setCurrentIndex((i) => Math.max(0, i - 1))}
                     onNext={() =>
                       setCurrentIndex((i) => Math.min(filteredCandidates.length - 1, i + 1))
@@ -475,19 +583,11 @@ export default function ReviewerWorkspacePage() {
                     canNext={currentIndex < filteredCandidates.length - 1}
                   />
                 ) : (
-                  <div className="text-center py-20">
-                    <CheckCircle
-                      size={56}
-                      className="text-emerald-500 mx-auto mb-4"
-                      weight="fill"
-                    />
-                    <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                      {t('reviewer.queue_clear_title')}
-                    </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      {t('reviewer.queue_clear_desc')}
-                    </p>
-                  </div>
+                  <SubmissionSummaryView
+                    historyItems={historyItems}
+                    isDark={isDark}
+                    onRecheckSubmission={() => setCurrentIndex(0)}
+                  />
                 )}
               </div>
             ) : (
@@ -518,6 +618,19 @@ export default function ReviewerWorkspacePage() {
           onSelectSign={(signCode) => handleCandidateDecision('approve', signCode)}
           onOpenNewSignModal={() => setShowNewSignModal(true)}
         />
+
+        {/* ─── 5.1 Decline Candidate Modal (Mobile Parity) ──────────── */}
+        {currentCandidate && (
+          <DeclineCandidateModal
+            isOpen={showDeclineModal}
+            onClose={() => setShowDeclineModal(false)}
+            candidateId={currentCandidate.id}
+            signCode={currentCandidate.code}
+            isDark={isDark}
+            onConfirmDecline={handleConfirmDecline}
+            onOpenCatalog={() => setShowCatalogModal(true)}
+          />
+        )}
 
         {/* ─── 6. Flag Candidate Modal ───────────────────────────────── */}
         {currentCandidate && (

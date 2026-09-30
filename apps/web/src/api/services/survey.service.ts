@@ -18,7 +18,7 @@ export const surveyService = {
    */
   uploadVideo: (formData: FormData) => {
     return http.post<ApiResponse<{ jobId: string }>>(API_ENDPOINTS.SURVEY.UPLOAD_VIDEO, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
     })
   },
 
@@ -27,7 +27,7 @@ export const surveyService = {
    */
   uploadPhoto: (formData: FormData) => {
     return http.post<ApiResponse<{ candidateId: string }>>(API_ENDPOINTS.SURVEY.UPLOAD_PHOTO, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
     })
   },
 
@@ -36,7 +36,7 @@ export const surveyService = {
    */
   uploadGpx: (formData: FormData) => {
     return http.post<ApiResponse<{ trajectoryId: string }>>(API_ENDPOINTS.SURVEY.UPLOAD_GPX, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
     })
   },
 

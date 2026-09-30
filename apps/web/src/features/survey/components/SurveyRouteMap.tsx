@@ -41,13 +41,12 @@ export function SurveyRouteMap({
       scrollWheelZoom: false,
     })
 
-    const tileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+    const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 
     L.tileLayer(tileUrl, {
       maxZoom: 19,
-      subdomains: 'abcd',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      className: isDark ? 'dark-tiles' : '',
     }).addTo(map)
 
     const layerGroup = L.layerGroup().addTo(map)

@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: res.user.email,
         name: res.user.fullName,
         avatar: (res.user as any).avatarUrl || undefined,
-        credits: 50,
+        credits: 0,
         trustScore: 80,
         joinDate: new Date().toLocaleDateString('vi-VN'),
       }

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeSlash, CircleNotch, CheckCircle, WarningCircle } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CircleNotch, WarningCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
@@ -402,20 +402,6 @@ export default function Signup() {
               )}
             </div>
 
-            <div
-              className={`flex items-center gap-2 text-xs rounded-xl p-2.5 border transition-colors ${
-                isDark
-                  ? 'text-gray-300 bg-white/5 border-white/10'
-                  : 'text-teal-900 bg-teal-50 border-teal-200'
-              }`}
-            >
-              <CheckCircle size={18} weight="fill" className={isDark ? 'text-[#00c4de] shrink-0' : 'text-[#007b8b] shrink-0'} />
-              <span>
-                {t('auth.signup.credits_bonus_prefix')}
-                <strong>{t('auth.signup.credits_bonus_highlight')}</strong>
-                {t('auth.signup.credits_bonus_suffix')}
-              </span>
-            </div>
 
             <div className="flex items-start gap-2.5 my-1">
               <input

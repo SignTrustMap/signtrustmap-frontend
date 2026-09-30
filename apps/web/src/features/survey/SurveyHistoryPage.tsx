@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckCircle,
@@ -16,6 +16,7 @@ import {
   mockSurveySubmissions,
   type SurveySubmissionItem,
 } from '@/data'
+import { submissionsService } from '@/api/services/submissions.service'
 import { SurveyDetailModal } from './components'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
@@ -24,7 +25,74 @@ import { PageHeader } from '@/components/common/PageHeader'
 export default function SurveyHistoryPage() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
-  const [submissions] = useState<SurveySubmissionItem[]>(mockSurveySubmissions)
+  const [submissions, setSubmissions] = useState<SurveySubmissionItem[]>(mockSurveySubmissions)
+
+  useEffect(() => {
+    let active = true
+    submissionsService
+      .getMySubmissions({ page: 1, pageSize: 50 })
+      .then((res) => {
+        if (!active) return
+        if (res?.items && res.items.length > 0) {
+          const mapped: SurveySubmissionItem[] = res.items.map((sub) => {
+            const isVideo = sub.submissionType === 'VIDEO_GPX'
+            const statusMap: Record<string, any> = {
+              COMPLETED: 'Completed',
+              QUEUED: 'Processing',
+              SYNCHRONIZING: 'Processing',
+              DETECTING: 'Processing',
+              TRACKING: 'Processing',
+              ESTIMATING: 'Processing',
+              CLASSIFYING: 'Processing',
+              FAILED: 'Failed',
+              REJECTED: 'Failed',
+              PENDING_CORRECTION: 'PartiallyProcessed',
+              NO_SIGN_DETECTED: 'NoSignDetected',
+              DRAFT: 'Processing',
+            }
+
+            const stageMap: Record<string, SurveySubmissionItem['stage']> = {
+              SYNCHRONIZING: 'sync',
+              DETECTING: 'yolo_detect',
+              TRACKING: 'botsort_track',
+              ESTIMATING: 'geo_project',
+              CLASSIFYING: 'clip_classify',
+            }
+
+            return {
+              id: sub.id,
+              tripName: sub.note || (isVideo ? 'Khảo sát camera hành trình' : 'Khảo sát ảnh chụp đường bộ'),
+              route: sub.latitude && sub.longitude ? `${sub.latitude.toFixed(4)}, ${sub.longitude.toFixed(4)}` : 'HCMC Urban Corridor',
+              mediaType: isVideo ? 'video_gpx' : 'photo_gps',
+              videoFileName: isVideo ? 'dashcam_trip.mp4' : undefined,
+              photoFileName: !isVideo ? 'sign_photo.jpg' : undefined,
+              fileSizeMb: isVideo ? 245.5 : 3.8,
+              durationSec: isVideo ? 600 : undefined,
+              distanceKm: isVideo ? 5.2 : undefined,
+              uploadDate: new Date(sub.createdAt).toLocaleString('vi-VN'),
+              status: statusMap[sub.status] || 'Processing',
+              stage: stageMap[sub.status] || 'sync',
+              progressPercent: sub.status === 'COMPLETED' ? 100 : 50,
+              detectedSignsCount: sub.totalCandidatesExtracted || 0,
+              validatedSignsCount: sub.status === 'COMPLETED' ? sub.totalCandidatesExtracted : 0,
+              rewardCredits: (sub.totalCandidatesExtracted || 0) * 10,
+              candidates: [],
+            }
+          })
+          setSubmissions(mapped)
+        } else {
+          setSubmissions(mockSurveySubmissions)
+        }
+      })
+      .catch((err) => {
+        console.warn('[SurveyHistoryPage] Failed to fetch submissions, using mock:', err)
+        if (active) setSubmissions(mockSurveySubmissions)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Selected submission to show in modal
   const [modalSubmission, setModalSubmission] = useState<SurveySubmissionItem | null>(null)

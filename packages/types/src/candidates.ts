@@ -105,3 +105,68 @@ export interface ReviewHistoryItem {
   cropImageUrl: string
   rewardCredits: number
 }
+
+export interface VoteDto {
+  vote: 1 | -1
+  suggestedSignTypeId?: number
+  declineReason?: string
+  declineNote?: string
+}
+
+export interface ReportDto {
+  reason: string
+}
+
+export interface ReviewCandidate {
+  id: string
+  submissionId: string
+  signCropUrl?: string
+  bestFrameUrl?: string
+  createdAt: string
+  predictedSignType?: {
+    id: number
+    signCode: string
+    nameVi: string
+    nameEn: string
+  }
+  submission?: {
+    surveyorId?: string
+    createdAt?: string
+    latitude?: number | null
+    longitude?: number | null
+  }
+}
+
+export interface ReviewQueueResponse {
+  items: ReviewCandidate[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+export interface MyReviewHistoryResponse {
+  items: {
+    candidateId: string
+    candidate: ReviewCandidate
+    vote: number
+    declineReason?: string | null
+    declineNote?: string | null
+    reviewedAt: string
+  }[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+export interface ReviewerStatsResponse {
+  reviewerId: string
+  reliabilityScore: number
+  totalReviews: number
+  approved: number
+  rejected: number
+  accuracyRate: number
+  currentStreak: number
+}
+

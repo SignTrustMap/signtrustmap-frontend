@@ -67,7 +67,7 @@ export interface ReviewHistoryItem {
   candidateId: string
   signCode: string
   signName: string
-  action: 'Approved' | 'Rejected' | 'Corrected' | 'Flagged' | 'Confirmed' | 'Updated' | 'Retired' | 'Unclear'
+  action: 'Approved' | 'Rejected' | 'Corrected' | 'Flagged' | 'Skipped' | 'Confirmed' | 'Updated' | 'Retired' | 'Unclear'
   timestamp: string
   details?: string
   mode: 'candidate' | 'revalidation'
