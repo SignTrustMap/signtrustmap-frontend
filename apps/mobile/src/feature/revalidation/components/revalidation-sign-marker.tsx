@@ -19,10 +19,9 @@ export function getFreshnessInfo(sign: RouteSign) {
       : undefined;
 
   const isStale =
-    Boolean(sign.taskId) ||
     sign.status === 'RETIRED' ||
     (scorePercent !== undefined && scorePercent < 50) ||
-    (scorePercent === undefined && sign.status === 'STALE');
+    (scorePercent === undefined && (sign.status === 'STALE' || Boolean(sign.taskId)));
 
   const isModerate = !isStale && scorePercent !== undefined && scorePercent >= 50 && scorePercent < 80;
   const isFresh = !isStale && scorePercent !== undefined && scorePercent >= 80;

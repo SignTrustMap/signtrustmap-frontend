@@ -131,15 +131,15 @@ export function RevalidationSignDetailsCard({
       text: '#4B5563',
       icon: 'archive-cancel-outline',
     };
-  } else if (isStale) {
+  } else if (isFresh || displayScore >= 80) {
     statusConfig = {
-      label: 'Needs Re-evaluation',
-      bg: '#FFF1F2',
-      border: '#FDA4AF',
-      text: '#BE123C',
-      icon: 'alert-circle',
+      label: 'Active & Verified',
+      bg: '#ECFDF5',
+      border: '#6EE7B7',
+      text: '#047857',
+      icon: 'check-decagram',
     };
-  } else if (isModerate) {
+  } else if (isModerate || displayScore >= 50) {
     statusConfig = {
       label: 'Moderate Freshness',
       bg: '#FFF7ED',
@@ -149,15 +149,20 @@ export function RevalidationSignDetailsCard({
     };
   } else {
     statusConfig = {
-      label: 'Active & Verified',
-      bg: '#ECFDF5',
-      border: '#6EE7B7',
-      text: '#047857',
-      icon: 'check-decagram',
+      label: 'Needs Re-evaluation',
+      bg: '#FFF1F2',
+      border: '#FDA4AF',
+      text: '#BE123C',
+      icon: 'alert-circle',
     };
   }
 
-  const freshnessColor = isStale ? '#B91C1C' : isModerate ? '#C2410C' : '#047857';
+  const freshnessColor =
+    displayScore >= 80 && !isExplicitRetired
+      ? '#047857'
+      : displayScore >= 50 && !isExplicitRetired
+        ? '#C2410C'
+        : '#B91C1C';
 
   // Clear Action CTA wording
   const primaryCtaText = 'Inspect';

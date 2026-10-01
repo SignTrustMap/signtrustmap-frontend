@@ -34,7 +34,6 @@ import {
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
-import { voteOnRevalidationEvidence } from '@/api/revalidation/revalidation';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
@@ -300,7 +299,6 @@ export function RevalidationReviewScreen() {
     Array<{ item: RevalidationQueueEvidenceItem; action: RevalidationReviewAction; note?: string }>
   >([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -332,15 +330,17 @@ export function RevalidationReviewScreen() {
   }, [history]);
 
   // ---------------------------------------------------------------------------
-  // Action Handler: collects review in history, ready for summary submission
+  // Action Handler: immediately calls vote API upon swipe or action confirmation
   // ---------------------------------------------------------------------------
   const handleVote = useCallback(
     (action: RevalidationReviewAction, note?: string) => {
       if (!currentItem) return;
 
-      // Optimistically advance queue and hold vote for review summary
+      const itemToVote = currentItem;
+
+      // 1. Optimistically advance queue and store in history for summary metrics
       setItems((prev) => prev.slice(1));
-      setHistory((prev) => [...prev, { item: currentItem, action, note }]);
+      setHistory((prev) => [...prev, { item: itemToVote, action, note }]);
       setViewMode('evidence');
 
       const messages: Record<RevalidationReviewAction, string> = {
@@ -355,72 +355,54 @@ export function RevalidationReviewScreen() {
         message: messages[action],
         tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
       }));
-    },
-    [currentItem],
-  );
 
-  const handleUndo = () => {
-    const last = history[history.length - 1];
-    if (!last) return;
+      // 2. Immediately dispatch vote API call for this evidence
+      const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
+        STILL_ACTIVE: 'STILL_ACTIVE',
+        REMOVED: 'REMOVED',
+        CHANGED: 'CHANGED',
+        UNCLEAR: 'UNCLEAR',
+      };
 
-    setHistory((prev) => prev.slice(0, -1));
-    setItems((prev) => [last.item, ...prev]);
-    setToast(undefined);
-  };
-
-  const handleCheckEvaluation = () => {
-    // Return all reviewed items back to the queue to review or adjust
-    setItems(history.map((h) => h.item));
-    setHistory([]);
-    setToast(undefined);
-  };
-
-  const handleSubmitAllVotes = async () => {
-    if (history.length === 0 || isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      const results = await Promise.allSettled(
-        history.map(async ({ item, action, note }) => {
-          const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
-            STILL_ACTIVE: 'STILL_ACTIVE',
-            REMOVED: 'REMOVED',
-            CHANGED: 'CHANGED',
-            UNCLEAR: 'UNCLEAR',
-          };
-          return voteOnRevalidationEvidence(item.evidenceId, {
+      voteMutation.mutate(
+        {
+          evidenceId: itemToVote.evidenceId,
+          dto: {
             decision: decisionMap[action],
             note: note || undefined,
-          });
-        }),
+          },
+        },
+        {
+          onSuccess: () => {
+            invalidateWalletAndStats();
+          },
+          onError: (err: any) => {
+            console.error('[RevalidationReview] Vote API failed for evidence:', itemToVote.evidenceId, err);
+            setToast({
+              id: Date.now(),
+              message: err?.message || 'Vote failed to record. Please check your connection.',
+              tone: 'default',
+            });
+          },
+        },
       );
+    },
+    [currentItem, invalidateWalletAndStats, voteMutation],
+  );
 
-      const failed = results.filter((r) => r.status === 'rejected');
-      if (failed.length > 0 && failed.length === results.length) {
-        throw new Error('All votes failed to submit');
-      }
+  const handleFinishReviews = () => {
+    const reviewedCount = history.length;
+    void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+    void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
+    void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+    invalidateWalletAndStats();
 
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
-      void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
-      void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
-      invalidateWalletAndStats();
-
-      const reviewedCount = history.length;
-      setHistory([]);
-      setItems([]);
-      router.replace({
-        pathname: '/work/submission-finish',
-        params: { count: String(reviewedCount) },
-      });
-    } catch (err) {
-      console.error('[RevalidationReview] Submit all votes failed:', err);
-      setToast({
-        id: Date.now(),
-        message: 'Submission failed. Please check your connection and retry.',
-        tone: 'default',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    setHistory([]);
+    setItems([]);
+    router.replace({
+      pathname: '/work/submission-finish',
+      params: { count: String(reviewedCount) },
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -827,30 +809,6 @@ export function RevalidationReviewScreen() {
                   <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
                 </Pressable>
               </View>
-
-              {/* Undo Button in Bottom Right Corner */}
-              <Pressable
-                accessibilityLabel="Undo last review vote"
-                accessibilityRole="button"
-                disabled={history.length === 0}
-                hitSlop={8}
-                onPress={handleUndo}
-                style={({ pressed }) => [
-                  styles.undoCornerButton,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                    opacity: history.length > 0 ? 1 : 0.35,
-                  },
-                  pressed && history.length > 0 && styles.circleButtonPressed,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={history.length > 0 ? theme.text : theme.placeholder}
-                  name="undo-variant"
-                  size={22}
-                />
-              </Pressable>
             </View>
           </View>
         ) : history.length > 0 ? (
@@ -882,17 +840,15 @@ export function RevalidationReviewScreen() {
 
             <View style={styles.summaryFooterActions}>
               <AppButton
-                disabled={isSubmitting}
-                label="Check evaluation"
-                onPress={handleCheckEvaluation}
-                style={[styles.summaryCheckButton, { borderColor: theme.primary }]}
-                textStyle={{ color: theme.primary }}
+                label="Back to Work"
+                onPress={() => router.back()}
+                style={[styles.summaryCheckButton, { borderColor: theme.border }]}
+                textStyle={{ color: theme.textSecondary }}
                 variant="surface"
               />
               <AppButton
-                disabled={isSubmitting}
-                label={isSubmitting ? 'Submitting...' : 'Submit'}
-                onPress={handleSubmitAllVotes}
+                label="Submit"
+                onPress={handleFinishReviews}
                 style={styles.summarySubmitButton}
               />
             </View>

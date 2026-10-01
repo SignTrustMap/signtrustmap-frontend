@@ -141,7 +141,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     nameEn: task.name,
     signCode: code,
     freshnessScore: score,
-    status: 'STALE',
+    status: score < 0.5 ? 'STALE' : score < 0.8 ? 'MODERATE' : 'ACTIVE',
     roadName: task.roadName || 'Ho Chi Minh City, Vietnam',
     displayAddress: task.roadName || 'Ho Chi Minh City, Vietnam',
     lastVerifiedAt: task.lastVerifiedDate,

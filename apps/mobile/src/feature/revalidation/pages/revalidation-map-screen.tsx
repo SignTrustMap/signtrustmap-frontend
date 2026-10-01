@@ -89,7 +89,12 @@ export function RevalidationMapScreen() {
   const [focusRequestId, setFocusRequestId] = useState(initialFocusCoord ? 1 : 0);
   const [activeFilter, setActiveFilter] = useState<FreshnessFilter>(() => {
     if (params.filter) return params.filter;
-    if (params.autoSelectFirst === 'true' || initialSign) return 'NEEDS_REVALIDATION';
+    if (initialSign) {
+      const info = getFreshnessInfo(initialSign);
+      if (info.isFresh) return 'FRESH';
+      if (info.isModerate) return 'MODERATE';
+      return 'NEEDS_REVALIDATION';
+    }
     return 'ALL';
   });
 
@@ -296,9 +301,7 @@ export function RevalidationMapScreen() {
 
   // Statistics for header summary
   const staleCount = useMemo(() => {
-    return rawSigns.filter(
-      (s) => Boolean(s.taskId) || s.status === 'STALE' || getFreshnessInfo(s).isStale,
-    ).length;
+    return rawSigns.filter((s) => getFreshnessInfo(s).isStale).length;
   }, [rawSigns]);
 
   const moderateCount = useMemo(() => {
@@ -312,7 +315,7 @@ export function RevalidationMapScreen() {
   // Signs that need revalidation, sorted by freshness score ascending (worst first)
   const staleSigns = useMemo(() => {
     return rawSigns
-      .filter((s) => Boolean(s.taskId) || s.status === 'STALE' || getFreshnessInfo(s).isStale)
+      .filter((s) => getFreshnessInfo(s).isStale)
       .sort((a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0));
   }, [rawSigns]);
 
