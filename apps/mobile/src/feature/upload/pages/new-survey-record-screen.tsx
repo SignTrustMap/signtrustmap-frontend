@@ -1,5 +1,8 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as MediaLibrary from 'expo-media-library';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -123,7 +126,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
   }
 
   try {
-    const MediaLibrary = await import('expo-media-library');
     const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
 
     console.log('[Surveyor] Media location permission:', {
@@ -421,8 +423,6 @@ export function NewSurveyRecordScreen() {
         return;
       }
 
-      const ImagePicker = await import('expo-image-picker');
-
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
         defaultTab: 'photos',
@@ -490,7 +490,6 @@ export function NewSurveyRecordScreen() {
   const handlePickGpx = async () => {
     setGpxPickerError(undefined);
     try {
-      const DocumentPicker = await import('expo-document-picker');
       const result = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
         multiple: false,
