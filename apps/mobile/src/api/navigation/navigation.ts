@@ -19,7 +19,15 @@ export type RouteSign = {
     imageUrl: string;
     actualCropUrl?: string;
     name: string;
+    nameVi?: string;
+    nameEn?: string;
     signCode: string;
+    freshnessScore?: number;
+    status?: string;
+    roadName?: string;
+    displayAddress?: string;
+    lastVerifiedAt?: string;
+    taskId?: string;
 };
 
 type DirectionsResponse = {
