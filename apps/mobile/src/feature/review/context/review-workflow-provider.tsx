@@ -21,7 +21,7 @@ export type CompletedReview = {
   submission: ReviewSubmission;
 };
 
-type ReviewWorkflowContextValue = {
+export type ReviewWorkflowContextValue = {
   beginSubmissionCheck: () => void;
   checkedReviewIndex: number;
   checkingSubmission: boolean;
@@ -47,7 +47,7 @@ type ReviewWorkflowContextValue = {
   undoLastReview: () => Promise<boolean>;
 };
 
-const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
+export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
 
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();

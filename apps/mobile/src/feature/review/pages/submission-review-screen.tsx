@@ -274,7 +274,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
-  console.log(nextSubmission)
   const reviewPosition = Math.min(
     reviewHistory.length + (submission ? 1 : 0),
     totalInQueue,
