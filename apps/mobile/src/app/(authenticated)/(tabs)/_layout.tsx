@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AppBottomTabs } from '@/components/app-bottom-tabs';
 import { NavigationActiveProvider, useNavigationActive } from '@/context/navigation-active-provider';
+import { SignFilterProvider } from '@/context/sign-filter-provider';
 
 type AppTabRoute = '/home' | '/work' | '/profile';
 
@@ -32,7 +33,9 @@ function AppTabsContent() {
 export default function AppTabsLayout() {
   return (
     <NavigationActiveProvider>
-      <AppTabsContent />
+      <SignFilterProvider>
+        <AppTabsContent />
+      </SignFilterProvider>
     </NavigationActiveProvider>
   );
 }

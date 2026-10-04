@@ -19,6 +19,7 @@ import {
 } from "@/types/navigationType";
 import { useTheme } from "@/hooks/use-theme";
 import { useNavigationActive } from "@/context/navigation-active-provider";
+import { useSignFilter } from "@/context/sign-filter-provider";
 
 import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep } from '@/api/navigation/navigation';
@@ -37,142 +38,13 @@ import {
   GPS_UNAVAILABLE_MESSAGE,
   isValidGpsLocation,
 } from "../utils/gps";
-import { usePlaceSuggestions } from "../hooks/use-places";
+import {
+  SIGN_CATEGORIES,
+  type SignCategory,
+  getSignCategory,
+} from "@/constants/sign-categories";
 
-export type SignCategory = 'WARNING' | 'MANDATORY' | 'PROHIBITORY' | 'INFORMATION' | 'TEMPORARY';
-
-export const SIGN_CATEGORIES: {
-  id: SignCategory;
-  label: string;
-  sublabel: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  color: string;
-  bgColor: string;
-}[] = [
-    {
-      id: 'PROHIBITORY',
-      label: 'Prohibitory',
-      sublabel: 'No entry, turns, speed limits',
-      icon: 'cancel',
-      color: '#EF4444',
-      bgColor: 'rgba(239, 68, 68, 0.14)',
-    },
-    {
-      id: 'WARNING',
-      label: 'Warning',
-      sublabel: 'Curves, hazards, crossings',
-      icon: 'alert',
-      color: '#F59E0B',
-      bgColor: 'rgba(245, 158, 11, 0.14)',
-    },
-    {
-      id: 'MANDATORY',
-      label: 'Mandatory',
-      sublabel: 'Required direction, min speed',
-      icon: 'arrow-right-circle',
-      color: '#3B82F6',
-      bgColor: 'rgba(59, 130, 246, 0.14)',
-    },
-    {
-      id: 'INFORMATION',
-      label: 'Information',
-      sublabel: 'Priority road, one-way, facilities',
-      icon: 'information-outline',
-      color: '#10B981',
-      bgColor: 'rgba(16, 185, 129, 0.14)',
-    },
-    {
-      id: 'TEMPORARY',
-      label: 'Temporary',
-      sublabel: 'Roadworks, detours, repairs',
-      icon: 'traffic-cone',
-      color: '#F97316',
-      bgColor: 'rgba(249, 115, 22, 0.14)',
-    },
-  ];
-
-export function getSignCategory(sign: { signCode?: string; name?: string }): SignCategory {
-  const code = (sign.signCode ?? '').toUpperCase().trim();
-  const name = (sign.name ?? '').toUpperCase().trim();
-
-  if (
-    code.startsWith('T.') ||
-    code.startsWith('T-') ||
-    code.startsWith('TEMP') ||
-    name.includes('TEMP') ||
-    name.includes('ROADWORK') ||
-    name.includes('CONSTRUCTION') ||
-    name.includes('TẠM THỜI')
-  ) {
-    return 'TEMPORARY';
-  }
-
-  if (
-    code.startsWith('P.') ||
-    code.startsWith('P-') ||
-    code === 'STOP' ||
-    code.startsWith('PROHIB') ||
-    name.includes('STOP') ||
-    name.includes('NO ENTRY') ||
-    name.includes('PROHIB') ||
-    name.includes('SPEED LIMIT') ||
-    name.includes('CẤM')
-  ) {
-    return 'PROHIBITORY';
-  }
-
-  if (
-    code.startsWith('W.') ||
-    code.startsWith('W-') ||
-    code.startsWith('WARN') ||
-    name.includes('WARN') ||
-    name.includes('DANGER') ||
-    name.includes('HAZARD') ||
-    name.includes('CURVE') ||
-    name.includes('CROSSING') ||
-    name.includes('INTERSECTION') ||
-    name.includes('NGUY HIỂM') ||
-    name.includes('CẢNH BÁO')
-  ) {
-    return 'WARNING';
-  }
-
-  if (
-    code.startsWith('R.') ||
-    code.startsWith('R-') ||
-    code.startsWith('MAND') ||
-    name.includes('MAND') ||
-    name.includes('COMPULSORY') ||
-    name.includes('ROUNDABOUT') ||
-    name.includes('HIỆU LỆNH')
-  ) {
-    return 'MANDATORY';
-  }
-
-  if (
-    code.startsWith('I.') ||
-    code.startsWith('I-') ||
-    code.startsWith('G.') ||
-    code.startsWith('G-') ||
-    code.startsWith('INFO') ||
-    name.includes('INFO') ||
-    name.includes('GUIDE') ||
-    name.includes('PARKING') ||
-    name.includes('PRIORITY') ||
-    name.includes('ONE WAY') ||
-    name.includes('CHỈ DẪN')
-  ) {
-    return 'INFORMATION';
-  }
-
-  if (code.startsWith('W')) return 'WARNING';
-  if (code.startsWith('P')) return 'PROHIBITORY';
-  if (code.startsWith('R')) return 'MANDATORY';
-  if (code.startsWith('I') || code.startsWith('G')) return 'INFORMATION';
-  if (code.startsWith('T')) return 'TEMPORARY';
-
-  return 'WARNING';
-}
+export { SIGN_CATEGORIES, type SignCategory, getSignCategory };
 
 export function NavigationMapScreen() {
   const router = useRouter();
@@ -201,7 +73,6 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
-  const { data: initLocation } = usePlaceSuggestions("")
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -263,17 +134,14 @@ export function NavigationMapScreen() {
   useEffect(() => {
     if (selectedDestination || hasCenteredInitialMapRef.current) return;
 
-    if (initLocation && initLocation.length > 0) {
-      const first = initLocation[0];
-      if (first?.longitude != null && first?.latitude != null) {
-        hasCenteredInitialMapRef.current = true;
-        setMapFocus({
-          coordinate: [Number(first.longitude), Number(first.latitude)],
-          requestId: Date.now(),
-        });
-      }
+    if (userCoordinate) {
+      hasCenteredInitialMapRef.current = true;
+      setMapFocus({
+        coordinate: userCoordinate,
+        requestId: Date.now(),
+      });
     }
-  }, [initLocation, selectedDestination]);
+  }, [selectedDestination, userCoordinate]);
 
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
@@ -542,14 +410,34 @@ export function NavigationMapScreen() {
     }));
   }, [hasSelectedRoute, mapSigns, plannedSigns]);
 
-  const [selectedSignCategories, setSelectedSignCategories] = useState<Set<SignCategory>>(
+  const {
+    activeCategories,
+    activePresetId,
+    presets,
+    setActivePresetId,
+  } = useSignFilter();
+
+  const [filterViewMode, setFilterViewMode] = useState<'lists' | 'categories'>('lists');
+  const [manualCategories, setManualCategories] = useState<Set<SignCategory>>(
     () => new Set(['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION', 'TEMPORARY'])
   );
 
-  // ─── Signature counts / filter — now based directly on visibleSigns ─────────
+  const handleToggleFilterViewMode = useCallback(() => {
+    setFilterViewMode((current) => {
+      const next = current === 'lists' ? 'categories' : 'lists';
+      if (next === 'categories') {
+        if (activeCategories && activeCategories.size > 0) {
+          setManualCategories(new Set(activeCategories));
+        } else {
+          setManualCategories(new Set(SIGN_CATEGORIES.map((c) => c.id)));
+        }
+      }
+      return next;
+    });
+  }, [activeCategories]);
 
-  const handleToggleCategory = (category: SignCategory) => {
-    setSelectedSignCategories((prev) => {
+  const handleToggleManualCategory = useCallback((category: SignCategory) => {
+    setManualCategories((prev) => {
       const next = new Set(prev);
       if (next.has(category)) {
         next.delete(category);
@@ -558,16 +446,12 @@ export function NavigationMapScreen() {
       }
       return next;
     });
-  };
+  }, []);
 
-  const handleToggleAllCategories = () => {
-    setSelectedSignCategories((prev) => {
-      if (prev.size === SIGN_CATEGORIES.length) {
-        return new Set();
-      }
-      return new Set(SIGN_CATEGORIES.map((c) => c.id));
-    });
-  };
+  const handleSelectPreset = useCallback((id: string | null) => {
+    setFilterViewMode('lists');
+    void setActivePresetId(id);
+  }, [setActivePresetId]);
 
   const handleLivestreamPress = useCallback(async () => {
     // Request camera permission
@@ -580,27 +464,26 @@ export function NavigationMapScreen() {
     router.push('/(authenticated)/(tabs)/livestream');
   }, [router]);
 
-  const signCategoryCounts = useMemo(() => {
-    const counts: Record<SignCategory, number> = {
-      WARNING: 0,
-      MANDATORY: 0,
-      PROHIBITORY: 0,
-      INFORMATION: 0,
-      TEMPORARY: 0,
-    };
-    for (const sign of visibleSigns) {
-      const cat = getSignCategory(sign);
-      counts[cat] = (counts[cat] ?? 0) + 1;
-    }
-    return counts;
-  }, [visibleSigns]);
-
   const filteredSigns = useMemo(() => {
+    if (filterViewMode === 'categories') {
+      if (manualCategories.size === SIGN_CATEGORIES.length) {
+        return visibleSigns;
+      }
+      return visibleSigns.filter((sign) => {
+        const cat = getSignCategory(sign);
+        return manualCategories.has(cat);
+      });
+    }
+
+    // Lists mode:
+    if (!activeCategories || activePresetId === null) {
+      return visibleSigns;
+    }
     return visibleSigns.filter((sign) => {
       const cat = getSignCategory(sign);
-      return selectedSignCategories.has(cat);
+      return activeCategories.has(cat);
     });
-  }, [visibleSigns, selectedSignCategories]);
+  }, [filterViewMode, manualCategories, visibleSigns, activeCategories, activePresetId]);
   const maneuverProgresses = useMemo(
     () =>
       routeSteps?.map((step) =>
@@ -1195,6 +1078,84 @@ export function NavigationMapScreen() {
           </Pressable>
         ) : null}
 
+        {/* Floating Quick-Preset Bar during active navigation (Driver-friendly UX) */}
+        {isNavigating && presets.length > 0 ? (
+          <View
+            style={[
+              styles.navDrivingFilterContainer,
+              { bottom: 158 + bottomInset },
+            ]}
+          >
+            <ScrollView
+              contentContainerStyle={styles.navDrivingFilterScrollContent}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              <Pressable
+                accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'currently active' : 'tap to select'}`}
+                accessibilityRole="button"
+                onPress={() => void setActivePresetId(null)}
+                style={({ pressed }) => [
+                  styles.navDrivingChip,
+                  {
+                    backgroundColor:
+                      activePresetId === null ? theme.primary : theme.backgroundElement,
+                    borderColor: activePresetId === null ? theme.primary : theme.border,
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  color={activePresetId === null ? theme.onPrimary : theme.text}
+                  name={activePresetId === null ? 'check' : 'filter-variant'}
+                  size={16}
+                />
+                <Text
+                  style={[
+                    styles.navDrivingChipText,
+                    { color: activePresetId === null ? theme.onPrimary : theme.text },
+                  ]}
+                >
+                  All signs
+                </Text>
+              </Pressable>
+
+              {presets.map((preset) => {
+                const isActive = activePresetId === preset.id;
+                return (
+                  <Pressable
+                    accessibilityLabel={`${preset.name} filter, ${isActive ? 'currently active' : 'tap to select'}`}
+                    accessibilityRole="button"
+                    key={preset.id}
+                    onPress={() => void setActivePresetId(preset.id)}
+                    style={({ pressed }) => [
+                      styles.navDrivingChip,
+                      {
+                        backgroundColor: isActive ? theme.primary : theme.backgroundElement,
+                        borderColor: isActive ? theme.primary : theme.border,
+                        opacity: pressed ? 0.75 : 1,
+                      },
+                    ]}
+                  >
+                    {isActive ? (
+                      <MaterialCommunityIcons color={theme.onPrimary} name="check" size={16} />
+                    ) : null}
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.navDrivingChipText,
+                        { color: isActive ? theme.onPrimary : theme.text },
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
             <View style={styles.topControls}>
@@ -1360,60 +1321,200 @@ export function NavigationMapScreen() {
               >
                 <View style={[styles.homeFilterHeader, { borderBottomColor: theme.border }]}>
                   <View style={styles.homeFilterTitleRow}>
-                    <MaterialCommunityIcons name="filter-variant" size={16} color={theme.primary} />
-                    <Text style={[styles.homeFilterTitle, { color: theme.text }]}>Sign Filters</Text>
+                    <Text style={[styles.homeFilterTitle, { color: theme.text }]}>
+                      {filterViewMode === 'lists' ? 'Sign Filter' : 'Sign Categories'}
+                    </Text>
                   </View>
                   <AppButton
-                    accessibilityLabel="Toggle all sign categories"
-                    onPress={handleToggleAllCategories}
+                    accessibilityLabel={
+                      filterViewMode === 'lists'
+                        ? 'Switch to category filters'
+                        : 'Switch to filter lists'
+                    }
+                    onPress={handleToggleFilterViewMode}
                     style={styles.homeFilterToggleAllButton}
                     variant="ghost"
                   >
                     <Text style={[styles.homeFilterToggleAllText, { color: theme.primary }]}>
-                      {selectedSignCategories.size === SIGN_CATEGORIES.length ? 'Clear all' : 'Select all'}
+                      {filterViewMode === 'lists' ? 'Filter' : 'Lists'}
                     </Text>
                   </AppButton>
                 </View>
 
-                <View style={styles.homeFilterCategoryList}>
-                  {SIGN_CATEGORIES.map((cat) => {
-                    const isSelected = selectedSignCategories.has(cat.id);
-                    const count = signCategoryCounts[cat.id] ?? 0;
-                    return (
+                {filterViewMode === 'lists' ? (
+                  <>
+                    <ScrollView style={styles.homeFilterPresetsScroll} showsVerticalScrollIndicator={false}>
+                      {/* Option 1: All Signs (No Filter) */}
                       <Pressable
-                        key={cat.id}
-                        accessibilityLabel={`${cat.label} signs, ${count} on map, ${isSelected ? 'selected' : 'unselected'}`}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: isSelected }}
-                        onPress={() => handleToggleCategory(cat.id)}
+                        accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'selected' : 'not selected'}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: activePresetId === null }}
+                        onPress={() => handleSelectPreset(null)}
                         style={({ pressed }) => [
                           styles.homeFilterRow,
                           {
-                            backgroundColor: isSelected ? theme.backgroundSelected : 'transparent',
+                            backgroundColor: activePresetId === null ? theme.backgroundSelected : 'transparent',
                             opacity: pressed ? 0.7 : 1,
                           },
                         ]}
                       >
-                        <View style={[styles.homeFilterIconBadge, { backgroundColor: cat.bgColor }]}>
-                          <MaterialCommunityIcons name={cat.icon} size={16} color={cat.color} />
+                        <View style={[styles.homeFilterIconBadge, { backgroundColor: theme.backgroundSelected }]}>
+                          <MaterialCommunityIcons name="filter-outline" size={16} color={theme.primary} />
                         </View>
-                        <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
-                          {cat.label}
-                        </Text>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
+                            All signs (No filter)
+                          </Text>
+                        </View>
                         <View
                           style={[
-                            styles.homeFilterCheckbox,
-                            isSelected
-                              ? { backgroundColor: cat.color, borderColor: cat.color }
+                            styles.homeFilterRadio,
+                            activePresetId === null
+                              ? { backgroundColor: theme.primary, borderColor: theme.primary }
                               : { backgroundColor: 'transparent', borderColor: theme.border },
                           ]}
                         >
-                          {isSelected ? <AntDesign name="check" size={11} color="#FFFFFF" /> : null}
+                          {activePresetId === null ? <View style={styles.homeFilterRadioDot} /> : null}
                         </View>
                       </Pressable>
-                    );
-                  })}
-                </View>
+
+                      {/* User-saved Presets */}
+                      {presets.map((preset) => {
+                        const isSelected = activePresetId === preset.id;
+                        return (
+                          <Pressable
+                            key={preset.id}
+                            accessibilityLabel={`${preset.name}, ${isSelected ? 'selected' : 'not selected'}`}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: isSelected }}
+                            onPress={() => handleSelectPreset(preset.id)}
+                            style={({ pressed }) => [
+                              styles.homeFilterRow,
+                              {
+                                backgroundColor: isSelected ? theme.backgroundSelected : 'transparent',
+                                opacity: pressed ? 0.7 : 1,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.homeFilterIconBadge, { backgroundColor: theme.backgroundSelected }]}>
+                              <MaterialCommunityIcons name="playlist-check" size={16} color={theme.primary} />
+                            </View>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
+                                {preset.name}
+                              </Text>
+                              <Text style={[styles.homeFilterRowSublabel, { color: theme.textSecondary }]}>
+                                {preset.categories.length}{' '}
+                                {preset.categories.length === 1 ? 'category.' : 'categories.'}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.homeFilterRadio,
+                                isSelected
+                                  ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                                  : { backgroundColor: 'transparent', borderColor: theme.border },
+                              ]}
+                            >
+                              {isSelected ? <View style={styles.homeFilterRadioDot} /> : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+
+                      {presets.length === 0 ? (
+                        <View style={styles.homeFilterEmptyPrompt}>
+                          <Text style={[styles.homeFilterEmptyText, { color: theme.placeholder }]}>
+                            No custom filter lists created yet.
+                          </Text>
+                          <AppButton
+                            accessibilityLabel="Create filter list in Profile"
+                            onPress={() => {
+                              setIsHomeSignFilterOpen(false);
+                              router.push({
+                                pathname: '/(authenticated)/(tabs)/profile',
+                                params: { scrollTo: 'signFilter', t: Date.now().toString() },
+                              });
+                            }}
+                            style={styles.homeFilterCreateBtn}
+                            variant="surface"
+                          >
+                            <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
+                            <Text style={[styles.homeFilterCreateBtnText, { color: theme.primary }]}>
+                              Create list in Profile
+                            </Text>
+                          </AppButton>
+                        </View>
+                      ) : null}
+                    </ScrollView>
+
+                    {/* Manage underline text under the list */}
+                    <Pressable
+                      accessibilityLabel="Manage filter lists in Profile"
+                      accessibilityRole="link"
+                      onPress={() => {
+                        setIsHomeSignFilterOpen(false);
+                        router.push({
+                          pathname: '/(authenticated)/(tabs)/profile',
+                          params: { scrollTo: 'signFilter', t: Date.now().toString() },
+                        });
+                      }}
+                      style={({ pressed }) => [
+                        styles.homeFilterManageRow,
+                        { opacity: pressed ? 0.6 : 1 },
+                      ]}
+                    >
+                      <Text style={[styles.homeFilterManageText, { color: theme.primary }]}>
+                        Manage
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  /* Categories view: directly filter sign categories without creating a list */
+                  <View style={styles.homeFilterCategoryList}>
+                    {SIGN_CATEGORIES.map((cat) => {
+                      const isSelected = manualCategories.has(cat.id);
+                      return (
+                        <Pressable
+                          key={cat.id}
+                          accessibilityLabel={`${cat.label} signs, ${isSelected ? 'selected' : 'unselected'}`}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: isSelected }}
+                          onPress={() => handleToggleManualCategory(cat.id)}
+                          style={({ pressed }) => [
+                            styles.homeFilterRow,
+                            {
+                              backgroundColor: isSelected ? theme.backgroundSelected : 'transparent',
+                              opacity: pressed ? 0.7 : 1,
+                            },
+                          ]}
+                        >
+                          <View style={[styles.homeFilterIconBadge, { backgroundColor: cat.bgColor }]}>
+                            <MaterialCommunityIcons name={cat.icon} size={16} color={cat.color} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
+                              {cat.label}
+                            </Text>
+                            <Text style={[styles.homeFilterRowSublabel, { color: theme.textSecondary }]}>
+                              {cat.sublabel}
+                            </Text>
+                          </View>
+                          <View
+                            style={[
+                              styles.homeFilterCheckbox,
+                              isSelected
+                                ? { backgroundColor: cat.color, borderColor: cat.color }
+                                : { backgroundColor: 'transparent', borderColor: theme.border },
+                            ]}
+                          >
+                            {isSelected ? <AntDesign name="check" size={11} color="#FFFFFF" /> : null}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             ) : null}
 
@@ -1446,7 +1547,7 @@ export function NavigationMapScreen() {
                     size={22}
                     color={isHomeSignFilterOpen ? theme.primary : theme.text}
                   />
-                  {selectedSignCategories.size < SIGN_CATEGORIES.length ? (
+                  {(activePresetId !== null || (filterViewMode === 'categories' && manualCategories.size < SIGN_CATEGORIES.length)) ? (
                     <View
                       style={[
                         styles.filterActiveBadge,
@@ -1482,6 +1583,76 @@ export function NavigationMapScreen() {
           </SafeAreaView>
         ) : null}
       </View>
+
+      {/* Quick Filter Chip Bar for Drivers while Navigating */}
+      {isNavigating && presets.length > 0 ? (
+        <View style={[styles.navDrivingFilterContainer, { bottom: insets.bottom + 90 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.navDrivingFilterScrollContent}
+          >
+            <Pressable
+              accessibilityLabel="Driver filter: All signs"
+              onPress={() => handleSelectPreset(null)}
+              style={({ pressed }) => [
+                styles.navDrivingChip,
+                {
+                  backgroundColor: activePresetId === null ? theme.primary : theme.backgroundElement,
+                  borderColor: activePresetId === null ? theme.primary : theme.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="filter-outline"
+                size={16}
+                color={activePresetId === null ? '#FFFFFF' : theme.primary}
+              />
+              <Text
+                style={[
+                  styles.navDrivingChipText,
+                  { color: activePresetId === null ? '#FFFFFF' : theme.text },
+                ]}
+              >
+                All
+              </Text>
+            </Pressable>
+            {presets.map((preset) => {
+              const isSelected = activePresetId === preset.id;
+              return (
+                <Pressable
+                  key={preset.id}
+                  accessibilityLabel={`Driver filter: ${preset.name}`}
+                  onPress={() => handleSelectPreset(preset.id)}
+                  style={({ pressed }) => [
+                    styles.navDrivingChip,
+                    {
+                      backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
+                      borderColor: isSelected ? theme.primary : theme.border,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="playlist-check"
+                    size={16}
+                    color={isSelected ? '#FFFFFF' : theme.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.navDrivingChipText,
+                      { color: isSelected ? '#FFFFFF' : theme.text },
+                    ]}
+                  >
+                    {preset.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {selectedDestination ? (
         <Animated.View
@@ -1702,9 +1873,8 @@ export function NavigationMapScreen() {
                 {/* Sign filter section: filter by WARNING, MANDATORY, PROHIBITORY, INFORMATION, TEMPORARY */}
                 <View style={styles.signFilterHeader}>
                   <View style={styles.signFilterTitleGroup}>
-                    <MaterialCommunityIcons name="filter-variant" size={18} color={theme.primary} />
                     <Text style={[styles.signFilterTitle, { color: theme.text }]}>
-                      Filter
+                      {filterViewMode === 'lists' ? 'Sign Filter' : 'Sign Categories'}
                     </Text>
                     <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
                       <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
@@ -1713,13 +1883,17 @@ export function NavigationMapScreen() {
                     </View>
                   </View>
                   <AppButton
-                    accessibilityLabel="Toggle all sign categories"
-                    onPress={handleToggleAllCategories}
+                    accessibilityLabel={
+                      filterViewMode === 'lists'
+                        ? 'Switch to category filters'
+                        : 'Switch to filter lists'
+                    }
+                    onPress={handleToggleFilterViewMode}
                     style={styles.toggleAllButton}
                     variant="ghost"
                   >
                     <Text style={[styles.toggleAllText, { color: theme.primary }]}>
-                      {selectedSignCategories.size === SIGN_CATEGORIES.length ? 'Clear all' : 'Select all'}
+                      {filterViewMode === 'lists' ? 'Filter' : 'Lists'}
                     </Text>
                   </AppButton>
                 </View>
@@ -1730,70 +1904,237 @@ export function NavigationMapScreen() {
                   showsVerticalScrollIndicator
                   style={styles.signFilterScrollView}
                 >
-                  {SIGN_CATEGORIES.map((cat) => {
-                    const isSelected = selectedSignCategories.has(cat.id);
-                    const count = signCategoryCounts[cat.id] ?? 0;
-                    return (
+                  {filterViewMode === 'lists' ? (
+                    <>
+                      {/* Option 1: All signs (No filter) */}
                       <Pressable
-                        key={cat.id}
-                        accessibilityLabel={`${cat.label} signs filter, ${count} signs on map, ${isSelected ? 'enabled' : 'disabled'}`}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: isSelected }}
-                        onPress={() => handleToggleCategory(cat.id)}
+                        accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'selected' : 'not selected'}`}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: activePresetId === null }}
+                        onPress={() => handleSelectPreset(null)}
                         style={({ pressed }) => [
                           styles.signFilterCard,
                           {
-                            backgroundColor: isSelected
-                              ? theme.backgroundSelected
-                              : theme.backgroundElement,
-                            borderColor: isSelected ? cat.color : theme.border,
+                            backgroundColor:
+                              activePresetId === null ? theme.backgroundSelected : theme.backgroundElement,
+                            borderColor: activePresetId === null ? theme.primary : theme.border,
                             opacity: pressed ? 0.75 : 1,
                           },
                         ]}
                       >
-                        <View style={[styles.signCatIconBadge, { backgroundColor: cat.bgColor }]}>
-                          <MaterialCommunityIcons name={cat.icon} size={22} color={cat.color} />
+                        <View style={[styles.signCatIconBadge, { backgroundColor: theme.backgroundSelected }]}>
+                          <MaterialCommunityIcons name="filter-outline" size={20} color={theme.primary} />
                         </View>
                         <View style={styles.signCatInfo}>
                           <View style={styles.signCatTitleRow}>
                             <Text style={[styles.signCatLabel, { color: theme.text }]}>
-                              {cat.label}
+                              All signs (No filter)
                             </Text>
-                            <View
-                              style={[
-                                styles.signCountBadge,
-                                { backgroundColor: isSelected ? cat.color : theme.border },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.signCountText,
-                                  { color: isSelected ? '#FFFFFF' : theme.textSecondary },
-                                ]}
-                              >
-                                {count}
+                            <View style={[styles.signCountBadge, { backgroundColor: theme.primary }]}>
+                              <Text style={[styles.signCountText, { color: '#FFFFFF' }]}>
+                                {visibleSigns.length}
                               </Text>
                             </View>
                           </View>
-                          <Text numberOfLines={1} style={[styles.signCatSublabel, { color: theme.textSecondary }]}>
-                            {cat.sublabel}
-                          </Text>
                         </View>
                         <View
                           style={[
                             styles.signCatCheckbox,
-                            isSelected
-                              ? { backgroundColor: cat.color, borderColor: cat.color }
+                            activePresetId === null
+                              ? { backgroundColor: theme.primary, borderColor: theme.primary }
                               : { backgroundColor: 'transparent', borderColor: theme.border },
                           ]}
                         >
-                          {isSelected ? (
+                          {activePresetId === null ? (
                             <AntDesign name="check" size={14} color="#FFFFFF" />
                           ) : null}
                         </View>
                       </Pressable>
-                    );
-                  })}
+
+                      {/* User presets */}
+                      {presets.map((preset) => {
+                        const isSelected = activePresetId === preset.id;
+                        const matchingCount = visibleSigns.filter((s) =>
+                          preset.categories.includes(getSignCategory(s))
+                        ).length;
+                        return (
+                          <Pressable
+                            key={preset.id}
+                            accessibilityLabel={`${preset.name} filter list, ${isSelected ? 'selected' : 'not selected'}`}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: isSelected }}
+                            onPress={() => handleSelectPreset(preset.id)}
+                            style={({ pressed }) => [
+                              styles.signFilterCard,
+                              {
+                                backgroundColor: isSelected
+                                  ? theme.backgroundSelected
+                                  : theme.backgroundElement,
+                                borderColor: isSelected ? theme.primary : theme.border,
+                                opacity: pressed ? 0.75 : 1,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.signCatIconBadge, { backgroundColor: theme.backgroundSelected }]}>
+                              <MaterialCommunityIcons name="playlist-check" size={22} color={theme.primary} />
+                            </View>
+                            <View style={styles.signCatInfo}>
+                              <View style={styles.signCatTitleRow}>
+                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                                  {preset.name}
+                                </Text>
+                                <View
+                                  style={[
+                                    styles.signCountBadge,
+                                    { backgroundColor: isSelected ? theme.primary : theme.border },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.signCountText,
+                                      { color: isSelected ? '#FFFFFF' : theme.textSecondary },
+                                    ]}
+                                  >
+                                    {matchingCount}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text numberOfLines={1} style={[styles.signCatSublabel, { color: theme.textSecondary }]}>
+                                {preset.categories.length}{' '}
+                                {preset.categories.length === 1 ? 'category.' : 'categories.'}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.signCatCheckbox,
+                                isSelected
+                                  ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                                  : { backgroundColor: 'transparent', borderColor: theme.border },
+                              ]}
+                            >
+                              {isSelected ? (
+                                <AntDesign name="check" size={14} color="#FFFFFF" />
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+
+                      {presets.length === 0 ? (
+                        <View style={styles.sheetFilterEmptyContainer}>
+                          <Text style={[styles.sheetFilterEmptyText, { color: theme.placeholder }]}>
+                            No custom filter lists created yet.
+                          </Text>
+                          <AppButton
+                            accessibilityLabel="Create filter list in Profile"
+                            onPress={() =>
+                              router.push({
+                                pathname: '/(authenticated)/(tabs)/profile',
+                                params: { scrollTo: 'signFilter', t: Date.now().toString() },
+                              })
+                            }
+                            style={styles.sheetFilterCreateBtn}
+                            variant="surface"
+                          >
+                            <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
+                            <Text style={[styles.sheetFilterCreateBtnText, { color: theme.primary }]}>
+                              Create list in Profile
+                            </Text>
+                          </AppButton>
+                        </View>
+                      ) : null}
+
+                      {/* Manage underline text under the list */}
+                      <Pressable
+                        accessibilityLabel="Manage filter lists in Profile"
+                        accessibilityRole="link"
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(authenticated)/(tabs)/profile',
+                            params: { scrollTo: 'signFilter', t: Date.now().toString() },
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.sheetFilterManageRow,
+                          { opacity: pressed ? 0.6 : 1 },
+                        ]}
+                      >
+                        <Text style={[styles.sheetFilterManageText, { color: theme.primary }]}>
+                          Manage
+                        </Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    /* Categories view: directly filter sign categories without creating a list */
+                    <>
+                      {SIGN_CATEGORIES.map((cat) => {
+                        const isSelected = manualCategories.has(cat.id);
+                        const matchingCount = visibleSigns.filter(
+                          (s) => getSignCategory(s) === cat.id
+                        ).length;
+                        return (
+                          <Pressable
+                            key={cat.id}
+                            accessibilityLabel={`${cat.label} signs, ${isSelected ? 'selected' : 'unselected'}`}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: isSelected }}
+                            onPress={() => handleToggleManualCategory(cat.id)}
+                            style={({ pressed }) => [
+                              styles.signFilterCard,
+                              {
+                                backgroundColor: isSelected
+                                  ? theme.backgroundSelected
+                                  : theme.backgroundElement,
+                                borderColor: isSelected ? cat.color : theme.border,
+                                opacity: pressed ? 0.75 : 1,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.signCatIconBadge, { backgroundColor: cat.bgColor }]}>
+                              <MaterialCommunityIcons name={cat.icon} size={22} color={cat.color} />
+                            </View>
+                            <View style={styles.signCatInfo}>
+                              <View style={styles.signCatTitleRow}>
+                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                                  {cat.label}
+                                </Text>
+                                <View
+                                  style={[
+                                    styles.signCountBadge,
+                                    { backgroundColor: isSelected ? cat.color : theme.border },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.signCountText,
+                                      { color: isSelected ? '#FFFFFF' : theme.textSecondary },
+                                    ]}
+                                  >
+                                    {matchingCount}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text numberOfLines={1} style={[styles.signCatSublabel, { color: theme.textSecondary }]}>
+                                {cat.sublabel}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.signCatCheckbox,
+                                isSelected
+                                  ? { backgroundColor: cat.color, borderColor: cat.color }
+                                  : { backgroundColor: 'transparent', borderColor: theme.border },
+                              ]}
+                            >
+                              {isSelected ? (
+                                <AntDesign name="check" size={14} color="#FFFFFF" />
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  )}
                 </ScrollView>
               </Animated.View>
 
@@ -2853,5 +3194,128 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 900,
+  },
+  navDrivingFilterContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  navDrivingFilterScrollContent: {
+    paddingHorizontal: Spacing.two,
+    gap: Spacing.one,
+    alignItems: 'center',
+  },
+  navDrivingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: Spacing.two,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  navDrivingChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  homeFilterPresetsScroll: {
+    maxHeight: 280,
+  },
+  homeFilterRowSublabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  homeFilterRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeFilterRadioDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  homeFilterEmptyPrompt: {
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  homeFilterEmptyText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  homeFilterCreateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+  },
+  homeFilterCreateBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sheetFilterEmptyContainer: {
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  sheetFilterEmptyText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  sheetFilterCreateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.half,
+  },
+  sheetFilterCreateBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  homeFilterManageRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Spacing.one,
+    paddingBottom: 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+    marginTop: 4,
+  },
+  homeFilterManageText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  sheetFilterManageRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.one,
+    marginTop: Spacing.half,
+  },
+  sheetFilterManageText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

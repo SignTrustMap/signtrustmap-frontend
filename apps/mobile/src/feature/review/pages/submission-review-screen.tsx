@@ -246,6 +246,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const theme = useTheme();
   const {
     completeCurrentReview,
+    isLoading,
     pendingSubmissions,
     recheckingPreviousAction,
     recheckingSubmission,
@@ -490,7 +491,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
         </View>
 
-        {state === 'loading' ? (
+        {state === 'loading' || (isLoading && pendingSubmissions.length === 0) ? (
           <SubmissionReviewSkeleton />
         ) : submission ? (
           <View style={styles.mainContainer}>

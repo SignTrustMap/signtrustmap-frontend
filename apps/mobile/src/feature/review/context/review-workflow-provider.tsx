@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useSegments } from 'expo-router';
 import {
   useGetReviewQueue,
   useGetReviewHistory,
@@ -68,11 +69,15 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [isRecheckingSubmission, setIsRecheckingSubmission] = useState(false);
   const [recheckingReviewIndex, setRecheckingReviewIndex] = useState<number>();
   const [recheckingPreviousAction, setRecheckingPreviousAction] = useState<ReviewActionType>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
   const hasLoadedRef = useRef(false);
+
+  const segments = useSegments();
+  const rawSegments = segments as string[];
+  const isReviewActive = rawSegments.includes('submission-review') || rawSegments.includes('submission-summary');
 
   const refetchWorkflow = useCallback(async () => {
     const [queueResult, historyResult] = await Promise.all([
@@ -106,11 +111,14 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       hasLoadedRef.current = false;
       return;
     }
-    // Only load initial queue once per login/account session, preventing background
-    // cache invalidations from wiping out ongoing reviewer swiping progress
+    // Only load initial queue when actively on a review screen, preventing background
+    // cache invalidations and calls when browsing other work tabs or app sections
+    if (!isReviewActive) return;
+
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
 
+    setIsLoading(true);
     let active = true;
     refetchWorkflow()
       .then((data) => {
@@ -128,7 +136,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [accessToken, accountId, refetchWorkflow]);
+  }, [accessToken, accountId, isReviewActive, refetchWorkflow]);
 
   const beginSubmissionCheck = () => {
     setPendingSubmissions((pending) => [

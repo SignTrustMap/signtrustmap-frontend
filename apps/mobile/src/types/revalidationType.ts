@@ -1,0 +1,151 @@
+import type { SignCategory } from '@/constants/sign-categories';
+
+export type TaskPriority = 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW';
+
+export type TaskStatus = 'OPEN' | 'EVALUATING' | 'CLOSED' | 'EXPIRED';
+
+export interface RevalidationTaskItem {
+  id: string;
+  verifiedSignId: string;
+  code: string;
+  name: string;
+  roadName?: string;
+  category: SignCategory;
+  priority: TaskPriority;
+  status: TaskStatus;
+  staleDays: number;
+  latitude: number;
+  longitude: number;
+  historicalCropUrl?: string;
+  representativeUrl?: string;
+  lastVerifiedDate?: string;
+  currentTrustScore?: number;
+  reason: string;
+  rewardCredits: number;
+}
+
+export type FindTasksInBoundsParams = {
+  minLat: number;
+  minLon: number;
+  maxLat: number;
+  maxLon: number;
+  status?: TaskStatus | string;
+  priority?: TaskPriority | string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type RevalidationTasksInBoundsResponse = {
+  items: Array<{
+    id: string;
+    verified_sign_id?: string;
+    verifiedSignId?: string;
+    status: string;
+    priority: string;
+    reason?: string;
+    reward_credits?: number;
+    rewardCredits?: number;
+    latitude: number;
+    longitude: number;
+    sign_crop_url?: string;
+    signCropUrl?: string;
+    sign_code?: string;
+    signCode?: string;
+    name_en?: string;
+    nameEn?: string;
+    name_vi?: string;
+    nameVi?: string;
+    freshness_score?: number;
+    freshnessScore?: number;
+    created_at?: string;
+    createdAt?: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export type RevalidationFilterPriority = 'ALL' | TaskPriority;
+export type RevalidationFilterCategory = 'ALL' | SignCategory;
+
+export interface RevalidationFilterState {
+  priority: RevalidationFilterPriority;
+  category: RevalidationFilterCategory;
+  searchQuery: string;
+}
+
+export type RevalDecision =
+  | 'UNCHANGED'
+  | 'STILL_ACTIVE'
+  | 'CHANGED'
+  | 'MISSING'
+  | 'REMOVED'
+  | 'UNCLEAR'
+  | 'INVALID';
+
+export interface RevalidationQueueEvidenceItem {
+  evidenceId: string;
+  taskId: string;
+  verifiedSign: {
+    id: string;
+    signCode: string;
+    nameVi?: string;
+    nameEn?: string;
+    signCropUrl?: string;
+    lastVerifiedAt?: string;
+    freshnessScore?: number;
+  };
+  evidence: {
+    mediaUrl?: string;
+    evidenceType: 'STILL_ACTIVE' | 'REMOVED' | string;
+    submittedAt: string;
+    latitude: number;
+    longitude: number;
+    distanceMeters: number | null;
+  };
+  currentVoteCount: number;
+  taskStatus: string;
+  rewardCredits: number;
+}
+
+export interface RevalidationEvidenceQueueResponse {
+  items: RevalidationQueueEvidenceItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface EvidenceVoteDto {
+  decision: RevalDecision | string;
+  suggestedSignTypeId?: number;
+  note?: string;
+}
+
+export interface EvidenceVoteResponse {
+  vote: {
+    id: string;
+    evidenceId: string;
+    reviewerId: string;
+    decision: string;
+    suggestedSignTypeId: number | null;
+    note: string | null;
+    decidedAt: string;
+  };
+  consensus: {
+    evaluated: boolean;
+    reason?: string;
+    totalVotes?: number;
+    minVotesRequired?: number;
+    winningDecision?: string;
+    voteCounts?: Record<string, number>;
+    signAction?: string;
+    escalatedToModeration?: boolean;
+    creditedSubmitters?: number;
+    creditedReviewers?: number;
+    rewardPerSubmitter?: number;
+    taskId?: string;
+  } | null;
+}
+
