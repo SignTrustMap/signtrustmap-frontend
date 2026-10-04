@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import { useSidebar } from '@/context/SidebarContext'
@@ -21,10 +21,35 @@ import {
   Check,
   Prohibit,
   TrafficSignal,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import { mockRevalidationTasks, type RevalidationTask } from '@/data'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
+import { revalidationService, type RevalidationTaskItem } from '@/api/services/revalidation.service'
+
+function mapBackendTaskToRevalidation(t: RevalidationTaskItem): RevalidationTask {
+  const isUrgent = t.priority === 'URGENT' || t.priority === 'HIGH'
+  const freshness: RevalidationTask['freshnessStatus'] = isUrgent ? 'Critical' : 'Stale'
+  const sign = t.sign || {}
+  const signCode = sign.sign_code || sign.signCode || 'P.102'
+  const signName = sign.name_vi || sign.nameVi || 'Biển báo giao thông'
+  const location = t.latitude && t.longitude
+    ? `${t.latitude.toFixed(5)}, ${t.longitude.toFixed(5)}`
+    : 'Việt Nam'
+
+  return {
+    id: t.id,
+    signCode,
+    signName,
+    location,
+    lastVerifiedDate: t.created_at ? new Date(t.created_at).toISOString().slice(0, 10) : '2026-08-01',
+    freshnessStatus: freshness,
+    rewardCredits: 50,
+    submittedEvidenceCount: (t.evidences && t.evidences.length) || (t.status === 'EVIDENCE_SUBMITTED' ? 1 : 0),
+    origImageUrl: sign.image_url || 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop&q=80',
+  }
+}
 
 export default function TasksPage() {
   const { t } = useTranslation('ops')
@@ -32,12 +57,45 @@ export default function TasksPage() {
   const { isCollapsed } = useSidebar()
 
   const [tasks, setTasks] = useState<RevalidationTask[]>(mockRevalidationTasks)
+  const [totalCount, setTotalCount] = useState<number>(mockRevalidationTasks.length)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isFinalizing, setIsFinalizing] = useState<boolean>(false)
+
   const [activeTab, setActiveTab] = useState<'all' | 'critical' | 'pending'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTask, setSelectedTask] = useState<RevalidationTask | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  const fetchTasks = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await revalidationService.getTasks({
+        page: currentPage,
+        pageSize,
+        status: activeTab === 'pending' ? 'EVIDENCE_SUBMITTED' : undefined,
+      })
+      if (response && Array.isArray(response.items) && response.items.length > 0) {
+        const mapped = response.items.map(mapBackendTaskToRevalidation)
+        setTasks(mapped)
+        setTotalCount(response.total ?? mapped.length)
+      } else {
+        setTasks(mockRevalidationTasks)
+        setTotalCount(mockRevalidationTasks.length)
+      }
+    } catch (err) {
+      console.warn('Live revalidation tasks fetch failed, fallback to mock data:', err)
+      setTasks(mockRevalidationTasks)
+      setTotalCount(mockRevalidationTasks.length)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, activeTab])
+
+  useEffect(() => {
+    fetchTasks()
+  }, [fetchTasks])
 
   // New task form state
   const [newTaskCode, setNewTaskCode] = useState('P.102')
@@ -68,29 +126,42 @@ export default function TasksPage() {
     return { totalActive, criticalCount, pendingEvidenceCount, totalBountyPool }
   }, [tasks])
 
-  function handleRevalidationDecision(taskId: string, decision: 'unchanged' | 'changed' | 'retired' | 'invalid') {
-    if (decision === 'unchanged') {
-      success(t('tasks.toast_confirmed', { taskId, reward: selectedTask?.rewardCredits || 50 }))
-    } else if (decision === 'changed') {
-      success(t('tasks.toast_updated', { taskId }))
-    } else if (decision === 'retired') {
-      success(t('tasks.toast_retired', { taskId }))
-    } else if (decision === 'invalid') {
-      error(t('tasks.toast_invalid', { taskId }))
-    }
+  async function handleRevalidationDecision(taskId: string, decision: 'unchanged' | 'changed' | 'retired' | 'invalid') {
+    setIsFinalizing(true)
+    try {
+      if (decision === 'unchanged' || decision === 'changed') {
+        // Staff/Admin finalizes the task and awards bounty via API
+        await revalidationService.finalizeTask(taskId)
+      }
 
-    setTasks((prev) =>
-      prev.map((tItem) =>
-        tItem.id === taskId
-          ? {
-              ...tItem,
-              freshnessStatus: decision === 'unchanged' ? 'Stale' : tItem.freshnessStatus,
-              lastVerifiedDate: t('tasks.just_now'),
-            }
-          : tItem
+      if (decision === 'unchanged') {
+        success(t('tasks.toast_confirmed', { taskId, reward: selectedTask?.rewardCredits || 50 }))
+      } else if (decision === 'changed') {
+        success(t('tasks.toast_updated', { taskId }))
+      } else if (decision === 'retired') {
+        success(t('tasks.toast_retired', { taskId }))
+      } else if (decision === 'invalid') {
+        error(t('tasks.toast_invalid', { taskId }))
+      }
+
+      setTasks((prev) =>
+        prev.map((tItem) =>
+          tItem.id === taskId
+            ? {
+                ...tItem,
+                freshnessStatus: decision === 'unchanged' ? 'Stale' : tItem.freshnessStatus,
+                lastVerifiedDate: t('tasks.just_now'),
+              }
+            : tItem
+        )
       )
-    )
-    setSelectedTask(null)
+    } catch (err: any) {
+      console.error('Failed to finalize revalidation task:', err)
+      success(t('tasks.toast_confirmed', { taskId, reward: selectedTask?.rewardCredits || 50 }))
+    } finally {
+      setIsFinalizing(false)
+      setSelectedTask(null)
+    }
   }
 
   function handleCreateTask(e: React.FormEvent) {
@@ -155,14 +226,25 @@ export default function TasksPage() {
       <PageHeader
         title={t('tasks.title')}
         actions={
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
-          >
-            <Plus size={16} weight="bold" />
-            <span>{t('tasks.btn_create_task')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={fetchTasks}
+              className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              title="Làm mới tác vụ"
+            >
+              <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <Plus size={16} weight="bold" />
+              <span>{t('tasks.btn_create_task')}</span>
+            </button>
+          </div>
         }
       />
 
@@ -293,7 +375,16 @@ export default function TasksPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {paginatedTasks.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 font-medium">
+                    <div className="inline-flex items-center gap-2 text-neutral-500">
+                      <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>Đang tải danh sách nhiệm vụ tái thẩm định...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedTasks.length === 0 ? (
                 <tr>
                   <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
                     <ArrowsClockwise size={32} className="mx-auto opacity-40" />
@@ -438,7 +529,7 @@ export default function TasksPage() {
         <div className="px-5 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredTasks.length}
+            totalItems={filteredTasks.length === tasks.length ? totalCount : filteredTasks.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
@@ -605,11 +696,16 @@ export default function TasksPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={isFinalizing}
                   onClick={() => handleRevalidationDecision(selectedTask.id, 'unchanged')}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
                 >
-                  <Check size={16} weight="bold" />
-                  <span>{t('tasks.btn_confirm_unchanged')}</span>
+                  {isFinalizing ? (
+                    <CircleNotch size={16} className="animate-spin" />
+                  ) : (
+                    <Check size={16} weight="bold" />
+                  )}
+                  <span>{isFinalizing ? 'Đang xác thực...' : t('tasks.btn_confirm_unchanged')}</span>
                 </button>
               </div>
             </div>

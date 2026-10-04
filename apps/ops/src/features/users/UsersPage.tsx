@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -17,15 +17,47 @@ import {
   PaperPlaneTilt,
   Copy,
   Check,
+  ArrowsClockwise,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import { mockAdminUsers, type AdminUserItem } from '@/data/adminGovernanceData'
 import { mockOpsDemoAccounts } from '@/data/mockAccounts'
+import { userService, type BackendUserItem } from '@/api/services/user.service'
+
+function mapBackendUserToAdminItem(u: BackendUserItem): AdminUserItem {
+  const primaryRole = (u.roles && u.roles.length > 0 ? u.roles[0].toLowerCase() : 'driver') as AdminUserItem['role']
+  const status = u.status === 'ACTIVE' ? 'Active' : 'Suspended'
+
+  return {
+    id: u.id,
+    name: u.full_name || u.email.split('@')[0],
+    email: u.email,
+    phone: u.phone || '',
+    role: primaryRole,
+    status: status,
+    location: 'Toàn quốc',
+    department: u.roles && u.roles.length > 0 ? u.roles.join(', ') : 'Thành viên hệ thống',
+    avatar: u.avatar_url || '',
+    joinedAt: u.created_at ? new Date(u.created_at).toISOString().slice(0, 10) : '2026-01-01',
+    lastActive: u.updated_at ? new Date(u.updated_at).toLocaleDateString('vi-VN') : 'Gần đây',
+    credits: 0,
+    reliabilityScore: 0.95,
+    reviewsCount: 0,
+    surveysSubmitted: 0,
+    moderationHandled: 0,
+    distanceTraveled: '0 km',
+  }
+}
 
 export default function UsersPage() {
   const { t } = useTranslation(['ops', 'common'])
   const toast = useToast()
 
   const [users, setUsers] = useState<AdminUserItem[]>(mockAdminUsers)
+  const [totalCount, setTotalCount] = useState<number>(mockAdminUsers.length)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -42,6 +74,38 @@ export default function UsersPage() {
     tokenLink: string
   } | null>(null)
   const [hasCopiedResetLink, setHasCopiedResetLink] = useState(false)
+
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await userService.getUsers({
+        page: currentPage,
+        pageSize,
+        search: searchTerm.trim() || undefined,
+        role: roleFilter !== 'all' ? roleFilter.toUpperCase() : undefined,
+        status: statusFilter !== 'all' ? statusFilter.toUpperCase() : undefined,
+      })
+
+      if (response && Array.isArray(response.items) && response.items.length > 0) {
+        const mapped = response.items.map(mapBackendUserToAdminItem)
+        setUsers(mapped)
+        setTotalCount(response.total ?? mapped.length)
+      } else {
+        setUsers(mockAdminUsers)
+        setTotalCount(mockAdminUsers.length)
+      }
+    } catch (err) {
+      console.warn('Live users fetch failed, fallback to mock data:', err)
+      setUsers(mockAdminUsers)
+      setTotalCount(mockAdminUsers.length)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, searchTerm, roleFilter, statusFilter])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
 
   /**
    * Opens the user detail modal populated for direct in-place editing.
@@ -88,27 +152,36 @@ export default function UsersPage() {
   )
 
   /**
-   * Toggles user account status between Active and Suspended.
+   * Toggles user account status between Active and Suspended via live API.
    */
-  function handleToggleStatus(userId: string) {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active'
-          if (nextStatus === 'Active') {
-            toast.success(t('users.toast_unlocked', { name: u.name }))
-          } else {
-            toast.warning(t('users.toast_locked', { name: u.name }))
-          }
-          return { ...u, status: nextStatus }
-        }
-        return u
+  async function handleToggleStatus(userId: string) {
+    const targetUser = users.find((u) => u.id === userId)
+    if (!targetUser) return
+    const nextStatus = targetUser.status === 'Active' ? 'Suspended' : 'Active'
+    const backendStatus = nextStatus === 'Active' ? 'ACTIVE' : 'SUSPENDED'
+
+    try {
+      await userService.updateStatus(userId, {
+        status: backendStatus,
+        reason: `Trạng thái được cập nhật bởi Admin từ Ops Portal (${nextStatus})`,
       })
-    )
-    if (selectedUser?.id === userId) {
-      const nextStatus = selectedUser.status === 'Active' ? 'Suspended' : 'Active'
-      setSelectedUser((prev) => (prev ? { ...prev, status: nextStatus } : null))
-      setEditForm((prev) => (prev ? { ...prev, status: nextStatus } : null))
+
+      if (nextStatus === 'Active') {
+        toast.success(t('users.toast_unlocked', { name: targetUser.name }))
+      } else {
+        toast.warning(t('users.toast_locked', { name: targetUser.name }))
+      }
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, status: nextStatus } : u))
+      )
+      if (selectedUser?.id === userId) {
+        setSelectedUser((prev) => (prev ? { ...prev, status: nextStatus } : null))
+        setEditForm((prev) => (prev ? { ...prev, status: nextStatus } : null))
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle status:', err)
+      toast.error(err?.message || 'Không thể cập nhật trạng thái người dùng trên máy chủ')
     }
   }
 
@@ -136,9 +209,9 @@ export default function UsersPage() {
   }
 
   /**
-   * Persists direct user profile modifications and synchronizes active demo account records.
+   * Persists direct user profile modifications and synchronizes live backend API.
    */
-  function handleSaveEdit(e?: React.FormEvent) {
+  async function handleSaveEdit(e?: React.FormEvent) {
     if (e) e.preventDefault()
     if (!editForm || !selectedUser) return
 
@@ -155,33 +228,58 @@ export default function UsersPage() {
       return
     }
 
-    const updatedUser: AdminUserItem = {
-      ...editForm,
-      name: editForm.name.trim(),
-      email: editForm.email.trim(),
-      phone: editForm.phone?.trim() || '',
-      location: editForm.location?.trim() || '',
-      department: editForm.department?.trim() || '',
-      avatar: editForm.avatar?.trim() || '',
-      credits: Number(editForm.credits) || 0,
+    setIsSubmitting(true)
+    try {
+      // 1. Assign role if role changed
+      if (editForm.role !== selectedUser.role) {
+        await userService.assignRole(selectedUser.id, {
+          roleCode: editForm.role.toUpperCase(),
+          isActive: true,
+        })
+      }
+
+      // 2. Update status if status changed
+      if (editForm.status !== selectedUser.status) {
+        const backendStatus = editForm.status === 'Active' ? 'ACTIVE' : 'SUSPENDED'
+        await userService.updateStatus(selectedUser.id, {
+          status: backendStatus,
+          reason: `Admin cập nhật thông tin tài khoản (${editForm.status})`,
+        })
+      }
+
+      const updatedUser: AdminUserItem = {
+        ...editForm,
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone?.trim() || '',
+        location: editForm.location?.trim() || '',
+        department: editForm.department?.trim() || '',
+        avatar: editForm.avatar?.trim() || '',
+        credits: Number(editForm.credits) || 0,
+      }
+
+      setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? updatedUser : u)))
+      setSelectedUser(updatedUser)
+      setEditForm(updatedUser)
+
+      // Synchronize with demo accounts in memory if it's one of the official demo users
+      const demoAcc = mockOpsDemoAccounts.find(
+        (a) => a.email.toLowerCase() === selectedUser.email.toLowerCase() || a.id === selectedUser.id
+      )
+      if (demoAcc) {
+        demoAcc.name = updatedUser.name
+        demoAcc.email = updatedUser.email
+        if (updatedUser.avatar) demoAcc.avatar = updatedUser.avatar
+      }
+
+      handleCloseModal()
+      toast.success(t('users.toast_saved', { name: updatedUser.name }))
+    } catch (err: any) {
+      console.error('Failed to save user:', err)
+      toast.error(err?.message || 'Không thể lưu thay đổi người dùng trên máy chủ')
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? updatedUser : u)))
-    setSelectedUser(updatedUser)
-    setEditForm(updatedUser)
-
-    // Synchronize with demo accounts in memory if it's one of the official demo users
-    const demoAcc = mockOpsDemoAccounts.find(
-      (a) => a.email.toLowerCase() === selectedUser.email.toLowerCase() || a.id === selectedUser.id
-    )
-    if (demoAcc) {
-      demoAcc.name = updatedUser.name
-      demoAcc.email = updatedUser.email
-      if (updatedUser.avatar) demoAcc.avatar = updatedUser.avatar
-    }
-
-    handleCloseModal()
-    toast.success(t('users.toast_saved', { name: updatedUser.name }))
   }
 
   /**
@@ -238,8 +336,21 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* Page Title Only - Clean & Minimalist */}
-      <PageHeader title={t('users.title')} />
+      {/* Page Title & Refresh */}
+      <PageHeader
+        title={t('users.title')}
+        actions={
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={fetchUsers}
+            className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            title="Làm mới danh sách"
+          >
+            <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        }
+      />
 
       {/* Unified Filter and Search Bar */}
       <DataFilterBar
@@ -286,7 +397,16 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-white/5">
-              {paginatedUsers.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-neutral-400 font-medium">
+                    <div className="inline-flex items-center gap-2 text-neutral-500">
+                      <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>Đang tải danh sách người dùng từ hệ thống...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedUsers.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-neutral-400 font-medium">
                     {t('users.empty_filter')}
@@ -418,7 +538,7 @@ export default function UsersPage() {
         <div className="px-6 py-4 border-t border-neutral-100 dark:border-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredUsers.length}
+            totalItems={filteredUsers.length === users.length ? totalCount : filteredUsers.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
@@ -713,10 +833,15 @@ export default function UsersPage() {
 
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                      disabled={isSubmitting}
+                      className="px-5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] disabled:opacity-50 text-white dark:text-black font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
-                      <FloppyDisk size={14} weight="bold" />
-                      <span>{t('users.btn_save')}</span>
+                      {isSubmitting ? (
+                        <CircleNotch size={14} className="animate-spin" />
+                      ) : (
+                        <FloppyDisk size={14} weight="bold" />
+                      )}
+                      <span>{isSubmitting ? 'Đang lưu...' : t('users.btn_save')}</span>
                     </button>
                   </div>
                 </div>

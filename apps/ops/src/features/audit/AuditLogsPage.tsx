@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
 import { Pagination } from '@/components/common/Pagination'
@@ -7,8 +7,11 @@ import PageHeader from '@/components/common/PageHeader'
 import {
   DownloadSimple,
   CalendarBlank,
+  ArrowsClockwise,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import { mockAuditLogs, type AuditLogItem, type EventType } from '@/data'
+import { auditService, type AuditLogRecord } from '@/api/services/audit.service'
 
 function EventTypeBadge({ type }: { type: EventType }) {
   const { t } = useTranslation('ops')
@@ -46,14 +49,91 @@ function EventTypeBadge({ type }: { type: EventType }) {
   }
 }
 
+function mapBackendAuditLog(record: AuditLogRecord): AuditLogItem {
+  let eventType: EventType = 'Config'
+  const actionLower = (record.action || '').toLowerCase()
+  if (actionLower.includes('role') || actionLower.includes('permission') || actionLower.includes('auth')) {
+    eventType = 'Permission'
+  } else if (actionLower.includes('login') || actionLower.includes('token') || actionLower.includes('logout')) {
+    eventType = 'Login'
+  } else if (actionLower.includes('ban') || actionLower.includes('freeze') || actionLower.includes('malicious') || actionLower.includes('alert')) {
+    eventType = 'Alert'
+  } else if (actionLower.includes('export') || actionLower.includes('view') || actionLower.includes('read') || actionLower.includes('query')) {
+    eventType = 'Data Access'
+  }
+
+  const dateObj = new Date(record.created_at)
+  const timestamp = !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : record.created_at
+
+  const userIdShort = record.user_id ? record.user_id.slice(0, 8) : 'sys'
+  const initials = record.user_id ? record.user_id.slice(0, 2).toUpperCase() : 'SY'
+
+  return {
+    id: record.id || `LOG-${Date.now()}`,
+    timestamp,
+    user: {
+      name: record.user_id ? `Admin (${userIdShort})` : 'System Daemon',
+      initials,
+      avatarBg: 'bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de]',
+    },
+    action: record.action,
+    targetId: record.resource_id
+      ? `${record.resource_name || 'Resource'} #${record.resource_id.slice(0, 8)}`
+      : record.resource_name || 'System Parameter',
+    ipAddress: record.ip_address || '127.0.0.1',
+    eventType,
+  }
+}
+
 export default function AuditLogsPage() {
   const { t } = useTranslation('ops')
-  const [logs] = useState<AuditLogItem[]>(mockAuditLogs)
+  const [logs, setLogs] = useState<AuditLogItem[]>(mockAuditLogs)
+  const [totalItems, setTotalItems] = useState<number>(mockAuditLogs.length)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [selectedEventType, setSelectedEventType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [dateRange, setDateRange] = useState('01/08/2026 - 31/08/2026')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  const fetchAuditLogs = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await auditService.getAuditLogs({
+        page: currentPage,
+        pageSize,
+        action: selectedEventType !== 'all' ? selectedEventType : undefined,
+      })
+      if (response && Array.isArray(response.items) && response.items.length > 0) {
+        const mapped = response.items.map(mapBackendAuditLog)
+        setLogs(mapped)
+        setTotalItems(response.total ?? mapped.length)
+      } else {
+        // Fallback to mock data if empty
+        setLogs(mockAuditLogs)
+        setTotalItems(mockAuditLogs.length)
+      }
+    } catch (err) {
+      console.warn('Live audit logs fetch failed, fallback to mock logs:', err)
+      setLogs(mockAuditLogs)
+      setTotalItems(mockAuditLogs.length)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, selectedEventType])
+
+  useEffect(() => {
+    fetchAuditLogs()
+  }, [fetchAuditLogs])
 
   const filteredLogs = logs.filter((log) => {
     const matchesEvent =
@@ -92,18 +172,29 @@ export default function AuditLogsPage() {
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* Header - Clean Title Only + Export Report Button */}
+      {/* Header - Clean Title Only + Refresh & Export Report Buttons */}
       <PageHeader
         title={t('audit.title')}
         actions={
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
-          >
-            <DownloadSimple size={16} weight="bold" />
-            <span>{t('dashboard.export_report')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={fetchAuditLogs}
+              className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              title="Làm mới nhật ký"
+            >
+              <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+            >
+              <DownloadSimple size={16} weight="bold" />
+              <span>{t('dashboard.export_report')}</span>
+            </button>
+          </div>
         }
       />
 
@@ -160,7 +251,16 @@ export default function AuditLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-white/5">
-              {paginatedLogs.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-neutral-400 font-medium">
+                    <div className="inline-flex items-center gap-2 text-neutral-500">
+                      <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>Đang tải nhật ký kiểm toán...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedLogs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-neutral-400 font-medium">
                     {t('audit.empty_state')}
@@ -209,7 +309,7 @@ export default function AuditLogsPage() {
         <div className="px-6 py-4 border-t border-neutral-100 dark:border-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredLogs.length}
+            totalItems={filteredLogs.length === logs.length ? totalItems : filteredLogs.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {

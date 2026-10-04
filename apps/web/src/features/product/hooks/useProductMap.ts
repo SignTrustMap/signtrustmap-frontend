@@ -140,10 +140,24 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
 
-    // Center initially on HCMC center; will smoothly pan to user GPS when fixed
+    // Center on query params if provided (e.g. from /review or direct links), otherwise default to HCMC
+    const urlParams = new URLSearchParams(window.location.search)
+    const qLat = parseFloat(urlParams.get('lat') || '')
+    const qLng = parseFloat(urlParams.get('lng') || '')
+    const hasInitialCoord = !isNaN(qLat) && !isNaN(qLng)
+
+    if (hasInitialCoord) {
+      hasAutoCenteredRef.current = true
+    }
+
+    const initialCenter: [number, number] = hasInitialCoord
+      ? [qLat, qLng]
+      : [10.7769, 106.7009]
+    const initialZoom = hasInitialCoord ? 17 : 15
+
     const map = L.map(mapContainerRef.current, {
-      center: [10.7769, 106.7009],
-      zoom: 15,
+      center: initialCenter,
+      zoom: initialZoom,
       zoomControl: false,
     })
 
@@ -151,6 +165,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     const initialTile = L.tileLayer(ESRI_TILE_URL, {
       attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS',
       maxZoom: 19,
+      className: isDark ? 'dark-tiles' : '',
     }).addTo(map)
     tileLayerRef.current = initialTile
 
@@ -274,10 +289,24 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
     const newLayer = L.tileLayer(newUrl, {
       attribution: newAttribution,
       maxZoom: 19,
+      className: isDark ? 'dark-tiles' : '',
     }).addTo(mapInstanceRef.current)
 
     tileLayerRef.current = newLayer
   }, [tileMode])
+
+  // ─── Synchronize Dark Mode Tiles Class ────────────────────────────────────
+  useEffect(() => {
+    if (!tileLayerRef.current) return
+    const container = tileLayerRef.current.getContainer()
+    if (container) {
+      if (isDark) {
+        container.classList.add('dark-tiles')
+      } else {
+        container.classList.remove('dark-tiles')
+      }
+    }
+  }, [isDark])
 
   // ─── Listen to Crop Preview Click in Leaflet Popups ────────────────────────
   useEffect(() => {
@@ -435,15 +464,18 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
           className: 'route-start-marker',
           html: `
             <div style="
-              width: 26px; height: 26px; border-radius: 50%;
-              background: #1767D2; color: #ffffff;
+              width: 22px; height: 22px;
               display: flex; align-items: center; justify-content: center;
-              font-weight: 900; font-size: 11px; font-family: monospace;
-              border: 2px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-            ">S</div>
+            ">
+              <div style="
+                width: 14px; height: 14px; border-radius: 50%;
+                background: #1767D2;
+                border: 2.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+              "></div>
+            </div>
           `,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
         })
         const startMarker = L.marker(startCoord, { icon: startIcon })
         routeLayerRef.current.addLayer(startMarker)

@@ -16,25 +16,32 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockReviewerMetrics,
-  mockReviewCandidates,
-  mockRevalidationCandidates,
-  mockReviewSessionHistory,
   type ReviewHistoryItem,
+  type ReviewerMetrics,
 } from '@/data'
 import { reviewsService } from '@/api/services/reviews.service'
 import { NewSignTypeModal } from '@/features/survey/components/NewSignTypeModal'
 import { ReviewHistoryDrawer } from './components/ReviewHistoryDrawer'
 import { PageHeader } from '@shared/ui'
 
+const defaultReviewerMetrics: ReviewerMetrics = {
+  reliabilityScore: 1.0,
+  consensusAccuracy: 100,
+  accuracyPercent: 100,
+  totalReviewed: 0,
+  approvedCount: 0,
+  rejectedCount: 0,
+  creditsEarned: 0,
+}
+
 export function ReviewerHubPage() {
   const { t } = useTranslation('common')
   const { isDark } = useTheme()
 
-  const [stats, setStats] = useState(mockReviewerMetrics)
+  const [stats, setStats] = useState<ReviewerMetrics>(defaultReviewerMetrics)
   const [showNewSignModal, setShowNewSignModal] = useState(false)
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false)
-  const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>(mockReviewSessionHistory)
+  const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>([])
   const [livePendingCount, setLivePendingCount] = useState<number | null>(null)
 
   useEffect(() => {
@@ -44,10 +51,12 @@ export function ReviewerHubPage() {
       .getMyStats()
       .then((res) => {
         if (active && res) {
+          const accuracy = res.accuracyRate != null ? Math.round(res.accuracyRate * 100) : 100
           setStats((prev) => ({
             ...prev,
             reliabilityScore: res.reliabilityScore ?? prev.reliabilityScore,
-            consensusAccuracy: res.accuracyRate ?? prev.consensusAccuracy,
+            consensusAccuracy: accuracy,
+            accuracyPercent: accuracy,
             totalReviewed: res.totalReviews ?? prev.totalReviewed,
             approvedCount: res.approved ?? prev.approvedCount,
             rejectedCount: res.rejected ?? prev.rejectedCount,
@@ -88,14 +97,9 @@ export function ReviewerHubPage() {
     }
   }, [])
 
-  const pendingCandidateCount =
-    livePendingCount !== null
-      ? livePendingCount
-      : mockReviewCandidates.filter((c) => c.status === 'Pending').length
-  const urgentCandidateCount = mockReviewCandidates.filter(
-    (c) => c.status === 'Pending' && c.confidence >= 0.4 && c.confidence <= 0.75
-  ).length
-  const pendingRevalCount = mockRevalidationCandidates.length
+  const pendingCandidateCount = livePendingCount !== null ? livePendingCount : 0
+  const urgentCandidateCount = 0
+  const pendingRevalCount = 0
 
   const handleUndoHistoryItem = async (itemOrId: ReviewHistoryItem | string) => {
     const id = typeof itemOrId === 'string' ? itemOrId : itemOrId.id
@@ -413,46 +417,52 @@ export function ReviewerHubPage() {
             </button>
           </div>
 
-          <div className="divide-y divide-gray-100 dark:divide-white/5">
-            {historyItems.map((item) => {
-              const badgeClass = getActionBadgeClass(item.action)
-              return (
-                <div key={item.id} className="py-3 flex items-center justify-between gap-4 text-xs">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono font-black px-2.5 py-1 rounded-md bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white shrink-0 text-xs border border-gray-200 dark:border-white/10">
-                      {item.signCode}
-                    </span>
-                    <div className="truncate">
-                      <p className="font-bold text-gray-900 dark:text-white truncate text-xs sm:text-sm">
-                        {item.signName}
-                      </p>
-                      {item.details && (
-                        <p className="text-[11px] text-gray-600 dark:text-gray-400 truncate">
-                          {item.details}
+          {historyItems.length > 0 ? (
+            <div className="divide-y divide-gray-100 dark:divide-white/5">
+              {historyItems.map((item) => {
+                const badgeClass = getActionBadgeClass(item.action)
+                return (
+                  <div key={item.id} className="py-3 flex items-center justify-between gap-4 text-xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono font-black px-2.5 py-1 rounded-md bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white shrink-0 text-xs border border-gray-200 dark:border-white/10">
+                        {item.signCode}
+                      </span>
+                      <div className="truncate">
+                        <p className="font-bold text-gray-900 dark:text-white truncate text-xs sm:text-sm">
+                          {item.signName}
                         </p>
-                      )}
+                        {item.details && (
+                          <p className="text-[11px] text-gray-600 dark:text-gray-400 truncate">
+                            {item.details}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}`}>
+                        {item.action}
+                      </span>
+                      <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400 hidden sm:inline">
+                        {item.timestamp}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleUndoHistoryItem(item.id)}
+                        className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                      >
+                        {t('reviewer.btn_undo')}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}`}>
-                      {item.action}
-                    </span>
-                    <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400 hidden sm:inline">
-                      {item.timestamp}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleUndoHistoryItem(item.id)}
-                      className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                    >
-                      {t('reviewer.btn_undo')}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-xs text-gray-500">
+              {t('reviewer.no_history_in_session', 'Chưa có hoạt động thẩm định nào trong phiên này.')}
+            </div>
+          )}
         </div>
       </div>
 

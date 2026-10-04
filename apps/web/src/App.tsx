@@ -24,9 +24,6 @@ const AboutPage = lazy(() => import('@/features/about/AboutPage'))
 const SurveyStudioPage = lazy(() => import('@/features/survey/SurveyStudioPage'))
 const SurveyHistoryPage = lazy(() => import('@/features/survey/SurveyHistoryPage'))
 const SurveyRevalidationPage = lazy(() => import('@/features/survey/SurveyRevalidationPage'))
-const ReviewerHubPage = lazy(() =>
-  import('@/features/review/ReviewerHubPage').then((m) => ({ default: m.ReviewerHubPage }))
-)
 const CandidateReviewPage = lazy(() =>
   import('@/features/review/CandidateReviewPage').then((m) => ({ default: m.CandidateReviewPage }))
 )
@@ -164,7 +161,7 @@ function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
       {!isBarePage && (
-        <div className="sticky top-0 z-[100] w-full">
+        <div className="sticky top-0 z-[1100] w-full">
           <AnnouncementBar />
           <Navbar />
         </div>
@@ -243,12 +240,12 @@ function AppLayout() {
               }
             />
 
-            {/* Reviewer Workspace Routes */}
+            {/* Reviewer Workspace Routes - Direct Focus Mode */}
             <Route
               path="/review"
               element={
                 <RoleRoute allow={['reviewer']}>
-                  <ReviewerHubPage />
+                  <CandidateReviewPage />
                 </RoleRoute>
               }
             />

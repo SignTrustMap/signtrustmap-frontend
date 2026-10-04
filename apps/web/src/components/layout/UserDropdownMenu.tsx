@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import {
   BookOpen,
   VideoCamera,
-  Clock,
   ClockCounterClockwise,
   Coins,
   ShieldCheck,
@@ -88,11 +87,6 @@ export function UserDropdownMenu({ isOpen, onClose }: UserDropdownMenuProps) {
             label: t('nav.survey_revalidation'),
             href: '/survey/revalidation',
             icon: <ClockCounterClockwise size={18} weight="duotone" className="text-teal-600 dark:text-teal-400" />,
-          },
-          {
-            label: t('nav.survey_history'),
-            href: '/survey/history',
-            icon: <Clock size={18} weight="duotone" className="text-[#007b8b] dark:text-[#00c4de]" />,
           },
           {
             label: t('nav.catalog'),

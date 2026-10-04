@@ -273,3 +273,19 @@
    - **Nguyên tắc Chống Rò rỉ Phân quyền (Zero Information Leak / Anti-Role Enumeration):**
      - Tuyệt đối **không** hiển thị các chuỗi thông báo kỹ thuật dạng debug (như `vai trò reviewer`, `quyền surveyor`) hay in email thô trên giao diện lỗi.
      - Luôn dùng văn phong trung lập, lịch sự và bảo mật theo chuẩn quốc tế (OWASP Top 10): *"Khu vực hạn chế phân quyền. Trang bạn đang cố gắng truy cập bị giới hạn quyền hạn. Vui lòng liên hệ với quản trị viên hệ thống."*
+
+---
+
+## 13. QUY TẮC HIỂN THỊ DỮ LIỆU TRỰC QUAN & TỐI GIẢN DỮ LIỆU KỸ THUẬT (USER-CENTRIC & VISUAL-FIRST UI)
+
+1. **Nguyên tắc Triệt tiêu Dữ liệu Phi Trực quan (Zero Raw Technical Clutter):**
+   - Tuyệt đối **CẤM** hiển thị các thông tin kỹ thuật thô không cần thiết ra giao diện người dùng phổ thông (Web Portal, Mobile App, Surveyor, Reviewer, Contributor):
+     - **Tọa độ GPS (`lat, lng`):** Cho phép hiển thị tọa độ GPS khi phục vụ xác nhận dữ liệu geotag EXIF/GPX, điểm xuất phát/kết thúc trên bản đồ và thông tin khảo sát thực địa. Luôn kết hợp cùng ghim bản đồ tương tác (Map Pin) hoặc tên đường hành chính giải mã.
+     - **Không hiển thị ID / UUID / Reference Code nội bộ:** Không in `Reference c8ddd75d`, `Submission ID`, `Asset ID` trên thẻ tóm tắt, dialog hoàn tất hoặc danh sách. Thay bằng tên tệp media gốc, mốc thời gian ghi nhận thân thiện và badge trạng thái có màu sắc ngữ nghĩa.
+     - **Không hiển thị Mã hiệu biển báo / Mã lỗi thô:** Tránh hiện mã trơ trọi như `W.201a`, `P.102`. Phải ánh xạ thành tên biển báo chuẩn tiếng Việt theo QCVN 41:2019 kèm icon minh họa. Thông báo lỗi phải thân thiện và hướng dẫn cách khắc phục.
+     - **Không hiển thị Log/Telemetry ngầm:** Bỏ các tên tệp tự sinh (`...-companion.gpx`), cờ `GPS: Locked` thừa thãi trên màn hình chi tiết. Thẻ tóm tắt tệp chỉ hiển thị: Tên clip, Dung lượng (MB), Thời lượng (s/phút), và tọa độ khi cần.
+
+2. **Ngoại lệ Duy nhất (The ONLY Allowed Exceptions):**
+   - Chỉ được phép hiển thị ID, mã code kỹ thuật và dữ liệu nội bộ tại các **Bảng quản trị chuyên sâu của Quản trị viên (Admin) và Nhân viên vận hành (Staff)** trong `apps/ops` (ví dụ: Audit Logs, CSDL Biển báo GIS chi tiết, Danh sách Người dùng, MLOps Task Diagnostics).
+   - Khi hiển thị tại khu vực quản trị, bắt buộc dùng `font-mono text-xs`, rút gọn chuỗi (`id.slice(0, 8)...`), có nút copy nhanh hoặc đặt trong Tooltip/Modal chi tiết kỹ thuật.
+

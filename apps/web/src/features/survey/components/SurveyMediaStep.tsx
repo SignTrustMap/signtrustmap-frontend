@@ -1,11 +1,10 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   VideoCamera,
   Camera,
-  Compass,
   CheckCircle,
   WarningCircle,
+  CircleNotch,
   FileText,
 } from '@phosphor-icons/react'
 import { Button } from '@shared/ui'
@@ -14,41 +13,44 @@ interface SurveyMediaStepProps {
   mode: 'video_gpx' | 'photo_gps'
   onModeChange: (mode: 'video_gpx' | 'photo_gps') => void
   videoFile: File | null
-  gpxFile: File | null
   photoFile: File | null
   photoPreview: string | null
   hasAutoGps: boolean
-  photoLat: number
-  photoLng: number
+  photoLat?: number
+  photoLng?: number
   gpxPointsCount?: number
+  isAnalyzingGps?: boolean
   onPhotoSelect: (file: File) => void
   onVideoSelect: (file: File) => void
-  onGpxSelect: (file: File) => void
   onNext: () => void
   isDark: boolean
+  gpxFile?: File | null
+  onGpxSelect?: (file: File) => void
 }
 
 export function SurveyMediaStep({
   mode,
   onModeChange,
   videoFile,
-  gpxFile,
   photoFile,
   photoPreview,
   hasAutoGps,
   photoLat,
   photoLng,
   gpxPointsCount,
+  isAnalyzingGps = false,
   onPhotoSelect,
   onVideoSelect,
-  onGpxSelect,
   onNext,
   isDark,
 }: SurveyMediaStepProps) {
   const { t } = useTranslation('common')
-  const [showAdvancedGpx, setShowAdvancedGpx] = useState(false)
-
   const isMediaSelected = mode === 'video_gpx' ? Boolean(videoFile) : Boolean(photoFile)
+  const hasRequiredGps =
+    mode === 'video_gpx'
+      ? Boolean(hasAutoGps)
+      : Boolean(hasAutoGps && photoLat != null && photoLng != null)
+  const canProceed = Boolean(isMediaSelected && hasRequiredGps && !isAnalyzingGps)
 
   return (
     <div className="space-y-6">
@@ -119,95 +121,53 @@ export function SurveyMediaStep({
             </label>
           </div>
 
-          {/* Video GPS / Companion GPX Card (Mobile Parity) */}
+          {/* Video GPS / Companion GPX Card */}
           {videoFile && (
-            <div
-              className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
-                hasAutoGps || gpxFile
-                  ? isDark
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : isDark
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
-              }`}
-            >
-              {hasAutoGps || gpxFile ? (
-                <CheckCircle size={22} weight="bold" className="shrink-0 mt-0.5" />
-              ) : (
-                <WarningCircle size={22} weight="bold" className="shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 text-xs">
-                <p className="font-bold">
-                  {hasAutoGps || gpxFile
-                    ? t('survey.gps_detected_title')
-                    : t('survey.no_gps_title')}
-                </p>
-                <p className="opacity-90 mt-0.5">
-                  {hasAutoGps || gpxFile
-                    ? t('survey.gps_detected_desc', {
-                        lat: photoLat.toFixed(5),
-                        lng: photoLng.toFixed(5),
-                      })
-                    : t('survey.no_gps_desc')}
-                </p>
-                {!hasAutoGps && !gpxFile && (
-                  <p className="mt-1.5 text-[11px] opacity-75 italic">
-                    💡 Bạn vẫn có thể bấm &quot;{t('survey.btn_next_step')}&quot; bên dưới để chọn toạ độ trên bản đồ.
-                  </p>
-                )}
+            isAnalyzingGps ? (
+              <div className="p-3.5 sm:p-4 rounded-xl border flex items-center gap-3 transition-colors bg-[#007b8b]/5 dark:bg-[#00c4de]/5 border-[#007b8b]/20 dark:border-[#00c4de]/20 text-[#007b8b] dark:text-[#00c4de]">
+                <CircleNotch size={20} className="animate-spin shrink-0" />
+                <div className="text-xs">
+                  <p className="font-bold">{t('survey.checking_gps_title', 'Đang kiểm tra tọa độ GPS...')}</p>
+                  <p className="opacity-80 text-[11px] mt-0.5">{t('survey.checking_gps_desc', 'Hệ thống đang quét siêu dữ liệu vị trí nhúng trong tệp.')}</p>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Advanced GPX & Companion Telemetry Toggle (Mobile Parity) */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setShowAdvancedGpx((prev) => !prev)}
-              className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer flex items-center gap-1.5"
-            >
-              <Compass size={16} weight="bold" />
-              <span>
-                {showAdvancedGpx
-                  ? t('survey.advanced_gpx_hide')
-                  : t('survey.advanced_gpx_toggle')}
-              </span>
-            </button>
-
-            {showAdvancedGpx && (
+            ) : (
               <div
-                className={`mt-3 p-5 rounded-2xl border-2 border-dashed text-center flex flex-col items-center justify-center transition-all ${
-                  gpxFile
+                className={`p-3.5 sm:p-4 rounded-xl border flex items-start gap-3 transition-colors ${
+                  hasAutoGps
                     ? isDark
-                      ? 'border-[#00c4de] bg-[#00c4de]/5'
-                      : 'border-[#007b8b] bg-[#007b8b]/5'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-800'
                     : isDark
-                    ? 'border-white/15 bg-white/[0.02]'
-                    : 'border-gray-300 bg-gray-50'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
                 }`}
               >
-                <Compass size={28} className="mb-1 text-[#007b8b] dark:text-[#00c4de]" weight="bold" />
-                <span className="text-xs font-extrabold text-gray-900 dark:text-white truncate max-w-sm">
-                  {gpxFile ? gpxFile.name : t('survey.drop_gpx_title')}
-                </span>
-                <span className="text-[11px] text-gray-500 mt-0.5">
-                  {gpxPointsCount
-                    ? `${gpxPointsCount} toạ độ hành trình sẵn sàng`
-                    : t('survey.gpx_format_hint')}
-                </span>
-                <label className="mt-3 px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors bg-white/10 hover:bg-white/15 border border-white/10">
-                  <span>{gpxFile ? t('survey.btn_change_gpx') : t('survey.btn_select_gpx')}</span>
-                  <input
-                    type="file"
-                    accept=".gpx,application/gpx+xml,.jpg,.jpeg,.png,.json"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && onGpxSelect(e.target.files[0])}
-                  />
-                </label>
+                {hasAutoGps ? (
+                  <CheckCircle size={22} weight="bold" className="shrink-0 mt-0.5 text-emerald-500" />
+                ) : (
+                  <WarningCircle size={20} weight="bold" className="shrink-0 mt-0.5 text-amber-500" />
+                )}
+                <div className="flex-1 text-xs">
+                  <p className="font-bold">
+                    {hasAutoGps
+                      ? 'Đã nhận diện toạ độ GPS từ video'
+                      : t('survey.no_gps_title')}
+                  </p>
+                  <p className="opacity-90 mt-0.5 leading-relaxed">
+                    {hasAutoGps
+                      ? gpxPointsCount
+                        ? `Lộ trình gồm ${gpxPointsCount} toạ độ hành trình sẵn sàng trình chiếu.`
+                        : t('survey.gps_detected_desc', {
+                            lat: photoLat != null ? photoLat.toFixed(5) : '',
+                            lng: photoLng != null ? photoLng.toFixed(5) : '',
+                          })
+                      : t('survey.no_gps_desc')}
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
+            )
+          )}
         </div>
       ) : (
         /* Photo Mode */
@@ -257,36 +217,48 @@ export function SurveyMediaStep({
 
           {/* Photo EXIF GPS Card (Mobile Parity) */}
           {photoFile && (
-            <div
-              className={`p-4 rounded-xl border flex items-start gap-3 transition-colors ${
-                hasAutoGps
-                  ? isDark
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : isDark
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
-              }`}
-            >
-              {hasAutoGps ? (
-                <CheckCircle size={22} weight="bold" className="shrink-0 mt-0.5" />
-              ) : (
-                <WarningCircle size={22} weight="bold" className="shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 text-xs">
-                <p className="font-bold">
-                  {hasAutoGps ? t('survey.gps_detected_title') : t('survey.no_gps_title')}
-                </p>
-                <p className="opacity-90 mt-0.5">
-                  {hasAutoGps
-                    ? t('survey.gps_detected_desc', {
-                        lat: photoLat.toFixed(5),
-                        lng: photoLng.toFixed(5),
-                      })
-                    : t('survey.no_gps_desc')}
-                </p>
+            isAnalyzingGps ? (
+              <div className="p-3.5 sm:p-4 rounded-xl border flex items-center gap-3 transition-colors bg-[#007b8b]/5 dark:bg-[#00c4de]/5 border-[#007b8b]/20 dark:border-[#00c4de]/20 text-[#007b8b] dark:text-[#00c4de]">
+                <CircleNotch size={20} className="animate-spin shrink-0" />
+                <div className="text-xs">
+                  <p className="font-bold">{t('survey.checking_gps_title', 'Đang kiểm tra tọa độ GPS...')}</p>
+                  <p className="opacity-80 text-[11px] mt-0.5">{t('survey.checking_gps_desc', 'Hệ thống đang quét siêu dữ liệu vị trí nhúng trong tệp.')}</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div
+                className={`p-3.5 sm:p-4 rounded-xl border flex items-start gap-3 transition-colors ${
+                  hasAutoGps
+                    ? isDark
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : isDark
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}
+              >
+                {hasAutoGps ? (
+                  <CheckCircle size={22} weight="bold" className="shrink-0 mt-0.5 text-emerald-500" />
+                ) : (
+                  <WarningCircle size={20} weight="bold" className="shrink-0 mt-0.5 text-amber-500" />
+                )}
+                <div className="flex-1 text-xs">
+                  <p className="font-bold">
+                    {hasAutoGps
+                      ? t('survey.gps_detected_title')
+                      : t('survey.photo_no_gps_title', 'Ảnh không có toạ độ GPS')}
+                  </p>
+                  <p className="opacity-90 mt-0.5 leading-relaxed">
+                    {hasAutoGps
+                      ? t('survey.gps_detected_desc', {
+                          lat: photoLat != null ? photoLat.toFixed(5) : '',
+                          lng: photoLng != null ? photoLng.toFixed(5) : '',
+                        })
+                      : t('survey.photo_no_gps_desc', 'Ảnh cần có toạ độ GPS trong dữ liệu EXIF để nộp khảo sát.')}
+                  </p>
+                </div>
+              </div>
+            )
           )}
         </div>
       )}
@@ -297,7 +269,7 @@ export function SurveyMediaStep({
           type="button"
           variant="primary"
           size="lg"
-          disabled={!isMediaSelected}
+          disabled={!canProceed}
           onClick={onNext}
         >
           {t('survey.btn_next_step')}

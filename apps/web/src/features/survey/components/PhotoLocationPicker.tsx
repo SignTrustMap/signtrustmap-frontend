@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { NavigationArrow, ArrowsOutSimple, Plus, Minus } from '@phosphor-icons/react'
+import { ArrowsOutSimple, Plus, Minus } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { setupLeafletDefaultIcons } from '@shared/map'
 
@@ -11,11 +10,12 @@ setupLeafletDefaultIcons()
 
 interface PhotoLocationPickerProps {
   mode?: 'video_gpx' | 'photo_gps'
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
   endLat?: number
   endLng?: number
-  onChangeLocation: (lat: number, lng: number) => void
+  routeCoordinates?: [number, number][]
+  onChangeLocation?: (lat: number, lng: number) => void
   onChangeEndLocation?: (lat: number, lng: number) => void
   height?: string
 }
@@ -26,41 +26,49 @@ export function PhotoLocationPicker({
   lng,
   endLat,
   endLng,
-  onChangeLocation,
-  onChangeEndLocation,
+  routeCoordinates,
   height = '320px',
 }: PhotoLocationPickerProps) {
-  const { t } = useTranslation('common')
   const { isDark } = useTheme()
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const startMarkerRef = useRef<L.Marker | null>(null)
   const endMarkerRef = useRef<L.Marker | null>(null)
   const polylineRef = useRef<L.Polyline | null>(null)
+  const lastCenterRef = useRef<[number, number] | null>(null)
 
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
 
-    const initialCenter: [number, number] = [lat, lng]
+    const initialCenter: [number, number] =
+      lat != null && lng != null ? [lat, lng] : [10.7769, 106.7009]
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
-      zoom: 15,
+      zoom: lat != null && lng != null ? 15 : 13,
       zoomControl: false,
       attributionControl: false,
-      scrollWheelZoom: false,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
     })
 
-    // OpenStreetMap free tile server with dark filter in dark mode
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Esri World Street Map (Identical to Web ProductMap & Mobile)
+    const ESRI_TILE_URL =
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+    L.tileLayer(ESRI_TILE_URL, {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS',
       className: isDark ? 'dark-tiles' : '',
     }).addTo(map)
 
     mapInstanceRef.current = map
 
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+    }, 200)
+
     return () => {
+      clearTimeout(timer)
       map.remove()
       mapInstanceRef.current = null
       startMarkerRef.current = null
@@ -76,6 +84,25 @@ export function PhotoLocationPicker({
 
     const isVideo = mode === 'video_gpx'
 
+    // If coordinates are not yet set
+    if (lat == null || lng == null) {
+      if (startMarkerRef.current) {
+        startMarkerRef.current.remove()
+        startMarkerRef.current = null
+      }
+      if (endMarkerRef.current) {
+        endMarkerRef.current.remove()
+        endMarkerRef.current = null
+      }
+      if (polylineRef.current) {
+        polylineRef.current.remove()
+        polylineRef.current = null
+      }
+
+      map.off('click')
+      return
+    }
+
     // Clean up previous markers if mode changed
     if (!isVideo && endMarkerRef.current) {
       endMarkerRef.current.remove()
@@ -86,276 +113,259 @@ export function PhotoLocationPicker({
       polylineRef.current = null
     }
 
-    // 1. Start Marker (Green S badge for video, Red pin for photo)
+    // 1. Start Marker (Green dot for video start, Red pin from /product/map for photo)
+    const effectiveLat = routeCoordinates && routeCoordinates.length > 0 ? routeCoordinates[0][0] : lat!
+    const effectiveLng = routeCoordinates && routeCoordinates.length > 0 ? routeCoordinates[0][1] : lng!
+    const isRealTrack = Boolean(routeCoordinates && routeCoordinates.length > 1)
+
     const startIconHtml = isVideo
       ? `
         <div style="
-          background: #16a34a;
-          color: white;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: 3px solid #ffffff;
-          box-shadow: 0 4px 14px rgba(22, 163, 74, 0.5);
+          width: 22px;
+          height: 22px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 900;
-          font-family: monospace;
-          font-size: 15px;
+          cursor: default;
         ">
-          S
+          <div style="
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #10b981;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+          "></div>
         </div>
       `
       : `
         <div style="
-          background: #ef4444;
           width: 32px;
-          height: 32px;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          border: 2px solid #ffffff;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          height: 42px;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: white;
+          cursor: default;
+          animation: mapPinDrop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         ">
-          <div style="transform: rotate(45deg); width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
+          <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 5px rgba(0,0,0,0.38)); overflow: visible;">
+            <ellipse cx="16" cy="41" rx="7" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+            <path d="M16 0C7.163 0 0 7.163 0 16c0 11.4 14.2 24.3 15.3 25.4.38.36 1.02.36 1.4 0C17.8 40.3 32 27.4 32 16 32 7.163 24.837 0 16 0z" fill="#EA4335"/>
+            <path d="M16 1C7.716 1 1 7.716 1 16c0 10.8 13.5 23.2 14.7 24.3.17.16.43.16.6 0C17.5 39.2 31 26.8 31 16 31 7.716 24.284 1 16 1z" stroke="#B31412" stroke-width="1.2" fill="none"/>
+            <circle cx="16" cy="15.5" r="5.5" fill="#7A0000"/>
+          </svg>
         </div>
       `
 
     const startIcon = L.divIcon({
-      className: 'survey-start-marker',
+      className: isVideo ? 'survey-start-marker' : 'route-dest-pin-marker',
       html: startIconHtml,
-      iconSize: isVideo ? [32, 32] : [32, 32],
-      iconAnchor: isVideo ? [16, 16] : [16, 32],
+      iconSize: isVideo ? [22, 22] : [32, 42],
+      iconAnchor: isVideo ? [11, 11] : [16, 42],
     })
 
     if (!startMarkerRef.current) {
-      const marker = L.marker([lat, lng], {
+      const marker = L.marker([effectiveLat, effectiveLng], {
         icon: startIcon,
-        draggable: true,
+        draggable: false,
       }).addTo(map)
-
-      marker.on('dragend', () => {
-        const pos = marker.getLatLng()
-        onChangeLocation(Number(pos.lat.toFixed(6)), Number(pos.lng.toFixed(6)))
-      })
 
       startMarkerRef.current = marker
     } else {
       startMarkerRef.current.setIcon(startIcon)
-      startMarkerRef.current.setLatLng([lat, lng])
+      startMarkerRef.current.setLatLng([effectiveLat, effectiveLng])
     }
 
-    // 2. End Marker & Polyline (For Video Mode)
-    if (isVideo && endLat != null && endLng != null) {
+    // 2. End Marker & Polyline (For Video Mode: Google Maps Destination Pin from /product/map)
+    const effectiveEndLat =
+      routeCoordinates && routeCoordinates.length > 0
+        ? routeCoordinates[routeCoordinates.length - 1][0]
+        : endLat
+    const effectiveEndLng =
+      routeCoordinates && routeCoordinates.length > 0
+        ? routeCoordinates[routeCoordinates.length - 1][1]
+        : endLng
+
+    if (isVideo && effectiveEndLat != null && effectiveEndLng != null) {
       const endIconHtml = `
         <div style="
-          background: #dc2626;
-          color: white;
           width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: 3px solid #ffffff;
-          box-shadow: 0 4px 14px rgba(220, 38, 38, 0.5);
+          height: 42px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: 900;
-          font-family: monospace;
-          font-size: 15px;
+          cursor: default;
+          animation: mapPinDrop 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         ">
-          D
+          <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 5px rgba(0,0,0,0.38)); overflow: visible;">
+            <ellipse cx="16" cy="41" rx="7" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+            <path d="M16 0C7.163 0 0 7.163 0 16c0 11.4 14.2 24.3 15.3 25.4.38.36 1.02.36 1.4 0C17.8 40.3 32 27.4 32 16 32 7.163 24.837 0 16 0z" fill="#EA4335"/>
+            <path d="M16 1C7.716 1 1 7.716 1 16c0 10.8 13.5 23.2 14.7 24.3.17.16.43.16.6 0C17.5 39.2 31 26.8 31 16 31 7.716 24.284 1 16 1z" stroke="#B31412" stroke-width="1.2" fill="none"/>
+            <circle cx="16" cy="15.5" r="5.5" fill="#7A0000"/>
+          </svg>
         </div>
       `
       const endIcon = L.divIcon({
-        className: 'survey-end-marker',
+        className: 'route-dest-pin-marker',
         html: endIconHtml,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [32, 42],
+        iconAnchor: [16, 42],
       })
 
       if (!endMarkerRef.current) {
-        const marker = L.marker([endLat, endLng], {
+        const marker = L.marker([effectiveEndLat, effectiveEndLng], {
           icon: endIcon,
-          draggable: true,
+          draggable: false,
         }).addTo(map)
-
-        marker.on('dragend', () => {
-          const pos = marker.getLatLng()
-          onChangeEndLocation?.(Number(pos.lat.toFixed(6)), Number(pos.lng.toFixed(6)))
-        })
 
         endMarkerRef.current = marker
       } else {
-        endMarkerRef.current.setLatLng([endLat, endLng])
+        endMarkerRef.current.setIcon(endIcon)
+        endMarkerRef.current.setLatLng([effectiveEndLat, effectiveEndLng])
       }
 
-      // Draw Polyline connecting S -> D
-      const points: [number, number][] = [
-        [lat, lng],
-        [endLat, endLng],
-      ]
+      // Draw Polyline for Video Route (Full GPX Trajectory if available, else S -> D)
+      const points: [number, number][] = isRealTrack
+        ? routeCoordinates!
+        : [
+            [effectiveLat, effectiveLng],
+            [effectiveEndLat, effectiveEndLng],
+          ]
 
       if (!polylineRef.current) {
         const polyline = L.polyline(points, {
           color: isDark ? '#00c4de' : '#007b8b',
           weight: 5,
-          opacity: 0.85,
-          dashArray: '8, 8',
+          opacity: 0.9,
+          dashArray: isRealTrack ? undefined : '8, 8',
           lineCap: 'round',
           lineJoin: 'round',
         }).addTo(map)
         polylineRef.current = polyline
+        if (isRealTrack) {
+          map.fitBounds(polyline.getBounds(), { padding: [35, 35], maxZoom: 17 })
+        }
       } else {
         polylineRef.current.setLatLngs(points)
         polylineRef.current.setStyle({
           color: isDark ? '#00c4de' : '#007b8b',
+          dashArray: isRealTrack ? undefined : '8, 8',
+          opacity: 0.9,
         })
-      }
-
-      // Fit bounds to show both S and D
-      try {
-        const bounds = L.latLngBounds([
-          [lat, lng],
-          [endLat, endLng],
-        ])
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 })
-      } catch {
-        // Ignore zoom errors on rapid updates
+        if (isRealTrack && polylineRef.current) {
+          map.fitBounds(polylineRef.current.getBounds(), { padding: [35, 35], maxZoom: 17 })
+        }
       }
     } else {
-      map.panTo([lat, lng])
-    }
-
-    // Map Click Listener
-    const handleMapClick = (e: L.LeafletMouseEvent) => {
-      // In photo mode: moves marker
-      if (!isVideo) {
-        startMarkerRef.current?.setLatLng(e.latlng)
-        onChangeLocation(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)))
+      if (endMarkerRef.current) {
+        endMarkerRef.current.remove()
+        endMarkerRef.current = null
+      }
+      if (polylineRef.current) {
+        polylineRef.current.remove()
+        polylineRef.current = null
+      }
+      // Pan to new coordinate if updated from external without interrupting zoom
+      const prev = lastCenterRef.current
+      if (!prev || Math.abs(prev[0] - effectiveLat) > 0.0001 || Math.abs(prev[1] - effectiveLng) > 0.0001) {
+        lastCenterRef.current = [effectiveLat, effectiveLng]
+        map.panTo([effectiveLat, effectiveLng])
       }
     }
 
     map.off('click')
-    map.on('click', handleMapClick)
-  }, [mode, lat, lng, endLat, endLng, isDark])
+  }, [mode, lat, lng, endLat, endLng, routeCoordinates, isDark])
 
-  const handleGetCurrentLocation = () => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const newLat = Number(pos.coords.latitude.toFixed(6))
-          const newLng = Number(pos.coords.longitude.toFixed(6))
-          onChangeLocation(newLat, newLng)
-          mapInstanceRef.current?.setView([newLat, newLng], 16)
-        },
-        () => {
-          // Fallback to central HCMC
-          const fallbackLat = 10.7769
-          const fallbackLng = 106.7009
-          onChangeLocation(fallbackLat, fallbackLng)
-          mapInstanceRef.current?.setView([fallbackLat, fallbackLng], 16)
-        }
-      )
+  const handleZoomIn = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const map = mapInstanceRef.current
+    if (map) {
+      map.setZoom(map.getZoom() + 1)
     }
   }
 
-  const handleZoomIn = () => {
-    mapInstanceRef.current?.zoomIn()
+  const handleZoomOut = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const map = mapInstanceRef.current
+    if (map) {
+      map.setZoom(map.getZoom() - 1)
+    }
   }
 
-  const handleZoomOut = () => {
-    mapInstanceRef.current?.zoomOut()
-  }
-
-  const handleResetView = () => {
+  const handleResetView = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     const map = mapInstanceRef.current
     if (!map) return
-    if (mode === 'video_gpx' && endLat != null && endLng != null) {
+    if (mode === 'video_gpx' && lat != null && lng != null && endLat != null && endLng != null) {
       const bounds = L.latLngBounds([
         [lat, lng],
         [endLat, endLng],
       ])
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 })
-    } else {
+    } else if (lat != null && lng != null) {
       map.setView([lat, lng], 16)
     }
   }
+
+  const hasLocation = lat != null && lng != null
 
   return (
     <div className="relative isolate z-0 rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-sm">
       <div ref={mapContainerRef} style={{ height, width: '100%' }} />
 
-      {/* Sleek Floating Map Controls (Top Right) */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 p-1 rounded-xl border shadow-md backdrop-blur-md transition-colors bg-white/95 dark:bg-black/85 border-gray-200 dark:border-white/15">
-        <button
-          type="button"
-          onClick={handleZoomIn}
-          title="Phóng to"
-          className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-        >
-          <Plus size={14} weight="bold" />
-        </button>
-
-        <button
-          type="button"
-          onClick={handleZoomOut}
-          title="Thu nhỏ"
-          className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-        >
-          <Minus size={14} weight="bold" />
-        </button>
-
-        <div className="w-px h-4 bg-gray-200 dark:bg-white/15 mx-0.5" />
-
-        <button
-          type="button"
-          onClick={handleResetView}
-          title="Thu phóng toàn tuyến"
-          className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 transition-colors cursor-pointer"
-        >
-          <ArrowsOutSimple size={14} weight="bold" />
-        </button>
-
-        <button
-          type="button"
-          onClick={handleGetCurrentLocation}
-          title={t('survey.btn_get_current_loc', 'Lấy GPS hiện tại')}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#007b8b]/10 dark:bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] hover:bg-[#007b8b]/20 dark:hover:bg-[#00c4de]/20 text-xs font-bold transition-colors cursor-pointer"
-        >
-          <NavigationArrow size={13} weight="bold" />
-          <span className="hidden sm:inline">{t('survey.lbl_current_loc', 'GPS')}</span>
-        </button>
-      </div>
-
-      {/* Legend badge bottom left */}
-      <div
-        className={`absolute bottom-3 left-3 px-3 py-1.5 rounded-xl text-[11px] font-mono border backdrop-blur-md z-10 flex items-center gap-2.5 transition-colors ${
-          isDark
-            ? 'bg-black/80 border-white/15 text-gray-300'
-            : 'bg-white/90 border-gray-200 text-gray-700 shadow-sm'
-        }`}
-      >
-        {mode === 'video_gpx' ? (
-          <>
-            <span className="flex items-center gap-1 font-bold">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a] inline-block shadow-xs" />
-              <span>S: Bắt đầu</span>
-            </span>
-            <span className="flex items-center gap-1 font-bold">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] inline-block shadow-xs" />
-              <span>D: Kết thúc</span>
-            </span>
-            <span className="text-[10px] text-gray-400 hidden sm:inline">
-              • Kéo thả điểm để chỉnh toạ độ
-            </span>
-          </>
-        ) : (
-          <span className="font-medium">Kéo thả ghim để chỉnh toạ độ</span>
+      {/* Floating Map Controls: Bottom Right Stack */}
+      <div className="absolute right-3.5 bottom-3.5 z-[1000] flex flex-col items-center gap-2 pointer-events-auto">
+        {/* Recenter Route Bounds (Only for Video with Both S & D) */}
+        {mode === 'video_gpx' && hasLocation && endLat != null && endLng != null && (
+          <button
+            type="button"
+            onClick={handleResetView}
+            title="Thu phóng toàn tuyến"
+            className={`w-9 h-9 rounded-xl border shadow-md flex items-center justify-center transition-colors cursor-pointer active:scale-95 ${
+              isDark
+                ? 'bg-[#071317] border-white/10 text-gray-200 hover:bg-white/10'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <ArrowsOutSimple size={16} weight="bold" />
+          </button>
         )}
+
+        {/* Zoom In & Zoom Out Stack (Google Maps Style) */}
+        <div
+          className={`flex flex-col rounded-xl border shadow-md overflow-hidden ${
+            isDark
+              ? 'bg-[#071317] border-white/10 text-gray-100'
+              : 'bg-white border-gray-200 text-gray-800'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className={`w-9 h-8 flex items-center justify-center transition-colors cursor-pointer active:bg-gray-200 dark:active:bg-white/20 ${
+              isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+            }`}
+            title="Phóng to"
+          >
+            <Plus size={16} weight="bold" />
+          </button>
+
+          <div className={`w-full h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
+
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className={`w-9 h-8 flex items-center justify-center transition-colors cursor-pointer active:bg-gray-200 dark:active:bg-white/20 ${
+              isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+            }`}
+            title="Thu nhỏ"
+          >
+            <Minus size={16} weight="bold" />
+          </button>
+        </div>
       </div>
     </div>
   )

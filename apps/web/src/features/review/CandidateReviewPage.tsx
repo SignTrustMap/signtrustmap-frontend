@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { PageHeader } from '@shared/ui'
+import { ClockCounterClockwise } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockReviewCandidates,
   mockTrafficCatalog,
   type CandidateToReview,
   type FlagReasonCode,
@@ -15,19 +15,17 @@ import { resolveMediaUrl } from './utils/resolveMediaUrl'
 import { useReviewHotkeys } from './hooks/useReviewHotkeys'
 import {
   CandidateWorkspaceCard,
-  ReviewerQueueFilterBar,
   ReviewerCatalogModal,
   FlagCandidateModal,
   DeclineCandidateModal,
   SubmissionSummaryView,
-  type QueueFilterType,
   type CatalogCategoryFilter,
 } from './components'
 
 /**
  * CandidateReviewPage orchestrates the Community Peer Review workflow for unverified traffic signs.
- * Implements mobile-parity: 4 core actions (Approve, Decline modal with 5 reasons, Skip, Report),
- * Keyboard Hotkeys (1/A, 2/R, 3/C, 4/S, F, Space, Ctrl+Z), and Submission Summary at queue completion.
+ * Implements exact mobile parity: 4 core actions (Approve, Decline modal with 5 reasons, Skip, Report),
+ * sleek progress indicator, Keyboard Hotkeys (1/A, 2/R, 3/C, 4/S, F, Space, Ctrl+Z), and Submission Summary at queue completion.
  */
 export function CandidateReviewPage() {
   const { t } = useTranslation('common')
@@ -37,7 +35,6 @@ export function CandidateReviewPage() {
   const [candidates, setCandidates] = useState<CandidateToReview[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [activeView, setActiveView] = useState<'crop' | 'context'>('crop')
-  const [filterMode, setFilterMode] = useState<QueueFilterType>('all')
   const [isLoading, setIsLoading] = useState(true)
 
   // Session History for Submission Summary
@@ -50,9 +47,10 @@ export function CandidateReviewPage() {
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
 
-  // 1. Fetch review queue from backend API with fallback to mock data
+  // 1. Fetch review queue from backend API directly
   useEffect(() => {
     let active = true
+    setIsLoading(true)
     reviewsService
       .getReviewQueue({ page: 1, pageSize: 50 })
       .then((res) => {
@@ -69,26 +67,26 @@ export function CandidateReviewPage() {
               code: type?.signCode || 'P.102',
               suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
               category: (type?.signCode?.charAt(0) || 'P') as any,
-              confidence: 0.88,
+              confidence: (item as any).confidenceScore ?? (item as any).confidence ?? 0.88,
               lat: item.submission?.latitude ?? 10.7769,
               lng: item.submission?.longitude ?? 106.7009,
               roadName: 'Đường khảo sát (Camera GPS)',
               directionHeading: 45,
               trafficFlowDirection: 'Northbound',
               estimatedDistanceMeters: 12.5,
-              cropImageUrl: crop || '/images/mock-crop.jpg',
-              contextImageUrl: frame || crop || '/images/mock-context.jpg',
+              cropImageUrl: crop || '',
+              contextImageUrl: frame || '',
               status: 'Pending',
             }
           })
           setCandidates(mapped)
         } else {
-          setCandidates(mockReviewCandidates)
+          setCandidates([])
         }
       })
       .catch((err) => {
-        console.warn('[CandidateReviewPage] Failed to fetch queue from API, falling back to mock:', err)
-        if (active) setCandidates(mockReviewCandidates)
+        console.warn('[CandidateReviewPage] Failed to fetch queue from API:', err)
+        if (active) setCandidates([])
       })
       .finally(() => {
         if (active) setIsLoading(false)
@@ -99,20 +97,51 @@ export function CandidateReviewPage() {
     }
   }, [])
 
-  // Filter candidate queue according to Active Learning criteria
-  const filteredCandidates = useMemo(() => {
-    return candidates.filter((c) => {
-      if (filterMode === 'all') return true
-      if (filterMode === 'uncertain') return c.confidence >= 0.4 && c.confidence <= 0.75
-      if (filterMode === 'confident') return c.confidence > 0.75
-      if (filterMode === 'P') return c.category === 'P'
-      if (filterMode === 'W') return c.category === 'W'
-      if (filterMode === 'R') return c.category === 'R'
-      return true
-    })
-  }, [candidates, filterMode])
+  const currentCandidate = candidates[currentIndex] || null
 
-  const currentCandidate = filteredCandidates[currentIndex] || null
+  const handleRefreshQueue = useCallback(() => {
+    setIsLoading(true)
+    reviewsService
+      .getReviewQueue({ page: 1, pageSize: 50 })
+      .then((res) => {
+        if (res?.items && res.items.length > 0) {
+          const mapped: CandidateToReview[] = res.items.map((item, index) => {
+            const type = item.predictedSignType
+            const crop = resolveMediaUrl(item.signCropUrl)
+            const frame = resolveMediaUrl(item.bestFrameUrl)
+            return {
+              id: item.id,
+              sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
+              yoloTrackId: index + 1,
+              code: type?.signCode || 'P.102',
+              suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
+              category: (type?.signCode?.charAt(0) || 'P') as any,
+              confidence: (item as any).confidenceScore ?? (item as any).confidence ?? 0.88,
+              lat: item.submission?.latitude ?? 10.7769,
+              lng: item.submission?.longitude ?? 106.7009,
+              roadName: 'Đường khảo sát (Camera GPS)',
+              directionHeading: 45,
+              trafficFlowDirection: 'Northbound',
+              estimatedDistanceMeters: 12.5,
+              cropImageUrl: crop || '',
+              contextImageUrl: frame || '',
+              status: 'Pending',
+            }
+          })
+          setCandidates(mapped)
+          setCurrentIndex(0)
+        } else {
+          setCandidates([])
+        }
+      })
+      .catch((err) => {
+        console.warn('[CandidateReviewPage] Failed to fetch queue:', err)
+        setCandidates([])
+      })
+      .finally(() => {
+        setIsLoading(false)
+      })
+  }, [])
 
   // Filter Catalog Modal Signs
   const filteredCatalog = useMemo(() => {
@@ -354,52 +383,102 @@ export function CandidateReviewPage() {
     <div className={`min-h-screen pb-12 transition-colors ${isDark ? 'bg-[#030708]' : 'bg-[#F8F7F7]'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         <PageHeader
-          title={t('reviewer.title_page', t('reviewer.title'))}
-          subtitle={t('reviewer.subtitle_page', t('reviewer.subtitle'))}
+          title={t('reviewer.title_page', 'Thẩm định Biển báo')}
+          subtitle={t('reviewer.subtitle_page', 'Xác thực các biển báo do AI nhận diện từ video/ảnh khảo sát')}
+          actions={
+            <button
+              type="button"
+              onClick={handleRefreshQueue}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                isDark
+                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-300'
+                  : 'bg-white hover:bg-gray-100 border-gray-200 text-gray-700 shadow-xs'
+              }`}
+            >
+              <ClockCounterClockwise size={15} />
+              <span>Làm mới</span>
+            </button>
+          }
         />
 
-        {currentCandidate && (
-          <ReviewerQueueFilterBar
-            filterMode={filterMode}
-            totalCandidates={candidates.length}
-            isDark={isDark}
-            onFilterChange={(mode) => {
-              setFilterMode(mode)
-              setCurrentIndex(0)
-            }}
-          />
+        {/* Sleek Mobile-like Queue Progress Bar */}
+        {candidates.length > 0 && currentCandidate && (
+          <div
+            className={`space-y-2 p-3.5 sm:p-4 rounded-2xl border transition-colors ${
+              isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-mono font-bold">
+              <span className="text-gray-600 dark:text-gray-400">
+                Tiến trình thẩm định:{' '}
+                <strong className="text-gray-900 dark:text-white">{currentIndex + 1}</strong> / {candidates.length} biển báo
+              </span>
+              <span className="text-[#007b8b] dark:text-[#00c4de] font-black">
+                {Math.round(((currentIndex + 1) / candidates.length) * 100)}%
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-linear-to-r from-[#007b8b] to-[#00c4de] transition-all duration-300 rounded-full"
+                style={{ width: `${Math.round(((currentIndex + 1) / candidates.length) * 100)}%` }}
+              />
+            </div>
+          </div>
         )}
 
         {isLoading ? (
-          <div className="h-96 flex items-center justify-center">
+          <div className="h-96 flex flex-col items-center justify-center gap-3">
             <div className="w-8 h-8 border-4 border-[#00c4de] border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-gray-500 font-medium">Đang tải danh sách biển báo chờ duyệt...</p>
           </div>
         ) : currentCandidate ? (
           <CandidateWorkspaceCard
             candidate={currentCandidate}
             currentIndex={currentIndex}
-            totalCandidates={filteredCandidates.length}
+            totalCandidates={candidates.length}
             activeView={activeView}
             isDark={isDark}
             onViewChange={setActiveView}
             onDecision={(act) => (act === 'approve' ? handleApprove() : setShowDeclineModal(true))}
             onOpenDecline={() => setShowDeclineModal(true)}
             onSkip={handleSkip}
-            onOpenCatalog={() => setShowCatalogModal(true)}
             onOpenFlag={() => setShowFlagModal(true)}
             onUndo={handleUndo}
             canUndo={sessionHistory.length > 0}
-            onPrev={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-            onNext={() => setCurrentIndex((i) => Math.min(filteredCandidates.length - 1, i + 1))}
-            canPrev={currentIndex > 0}
-            canNext={currentIndex < filteredCandidates.length - 1}
           />
-        ) : (
+        ) : sessionHistory.length > 0 ? (
           <SubmissionSummaryView
             historyItems={sessionHistory}
             isDark={isDark}
             onRecheckSubmission={() => setCurrentIndex(0)}
           />
+        ) : (
+          <div
+            className={`py-16 px-6 text-center rounded-2xl border space-y-4 ${
+              isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200'
+            }`}
+          >
+            <div className="max-w-md mx-auto space-y-1">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                Hàng đợi thẩm định đang trống
+              </h3>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Hiện tại không có biển báo nào cần thẩm định. Khi có dữ liệu khảo sát mới được tải lên và phân tích bởi AI, các biển báo sẽ hiển thị tại đây.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefreshQueue}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                isDark
+                  ? 'bg-white/5 hover:bg-white/10 border-white/10 text-[#00c4de]'
+                  : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-[#007b8b]'
+              }`}
+            >
+              <ClockCounterClockwise size={15} />
+              <span>Kiểm tra lại hàng đợi</span>
+            </button>
+          </div>
         )}
 
         {/* Modal: Decline with mobile reasons */}

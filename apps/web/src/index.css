@@ -39,15 +39,15 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
-  background-color: #030708;
-  color: #f3f4f6;
+  background-color: #F8F7F7;
+  color: #111827;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: #030708;
-  color: #f3f4f6;
+  background-color: #F8F7F7;
+  color: #111827;
   line-height: 1.6;
   overflow-x: clip;
 }
@@ -57,6 +57,12 @@ html.disable-transitions *,
 html.disable-transitions *::before,
 html.disable-transitions *::after {
   transition: none !important;
+}
+
+/* ─── Dark Mode Base Overrides ──────────────────────────────────── */
+html.dark, html.dark body {
+  background-color: #030708;
+  color: #f3f4f6;
 }
 
 /* ─── Light Mode Overrides (Strictly based on DESIGN.md: #F8F7F7) ─ */
@@ -328,7 +334,11 @@ html.light ::-webkit-scrollbar-thumb {
 }
 
 /* ─── Google Maps Destination Pin Marker ───────────────────────── */
-.route-dest-pin-marker {
+.route-dest-pin-marker,
+.survey-start-marker,
+.survey-end-marker,
+.survey-modal-marker,
+.route-start-marker {
   background: transparent !important;
   border: none !important;
 }

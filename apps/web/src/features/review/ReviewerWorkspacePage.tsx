@@ -8,14 +8,12 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockReviewCandidates,
-  mockRevalidationCandidates,
-  mockReviewerMetrics,
   mockTrafficCatalog,
   type CandidateToReview,
   type RevalidationCandidate,
   type ReviewHistoryItem,
   type FlagReasonCode,
+  type ReviewerMetrics,
 } from '@/data'
 import { reviewsService } from '@/api/services/reviews.service'
 import { resolveMediaUrl } from './utils/resolveMediaUrl'
@@ -36,6 +34,16 @@ import {
   type CatalogCategoryFilter,
 } from './components'
 
+const defaultReviewerMetrics: ReviewerMetrics = {
+  reliabilityScore: 1.0,
+  consensusAccuracy: 100,
+  accuracyPercent: 100,
+  totalReviewed: 0,
+  approvedCount: 0,
+  rejectedCount: 0,
+  creditsEarned: 0,
+}
+
 export default function ReviewerWorkspacePage() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
@@ -44,14 +52,15 @@ export default function ReviewerWorkspacePage() {
   // Workspace Mode: 'candidate' (Flow 4) | 'revalidation' (Flow 8)
   const [activeMode, setActiveMode] = useState<'candidate' | 'revalidation'>('candidate')
 
-  // Candidate Review State
-  const [candidates, setCandidates] = useState<CandidateToReview[]>(mockReviewCandidates)
+  // Candidate Review State (Clean Live API Queue)
+  const [candidates, setCandidates] = useState<CandidateToReview[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [activeView, setActiveView] = useState<'crop' | 'context'>('crop')
   const [filterMode, setFilterMode] = useState<QueueFilterType>('all')
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Revalidation Review State
-  const [revalCandidates, setRevalCandidates] = useState<RevalidationCandidate[]>(mockRevalidationCandidates)
+  // Revalidation Review State (Live API Queue)
+  const [revalCandidates, setRevalCandidates] = useState<RevalidationCandidate[]>([])
   const [revalIndex, setRevalIndex] = useState(0)
 
   // Modals & Drawers
@@ -64,15 +73,16 @@ export default function ReviewerWorkspacePage() {
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false)
 
   // Metrics & History State
-  const [stats, setStats] = useState(mockReviewerMetrics)
+  const [stats, setStats] = useState<ReviewerMetrics>(defaultReviewerMetrics)
   const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>([])
 
   // Load live queue and stats from API
   useEffect(() => {
     let active = true
+    setIsLoading(true)
 
     reviewsService
-      .getReviewQueue({ page: 1, pageSize: 30 })
+      .getReviewQueue({ page: 1, pageSize: 50 })
       .then((res) => {
         if (!active) return
         if (res?.items && res.items.length > 0) {
@@ -94,24 +104,34 @@ export default function ReviewerWorkspacePage() {
               directionHeading: 45,
               trafficFlowDirection: 'Northbound',
               estimatedDistanceMeters: 12.5,
-              cropImageUrl: crop || '/images/mock-crop.jpg',
-              contextImageUrl: frame || crop || '/images/mock-context.jpg',
+              cropImageUrl: crop || '',
+              contextImageUrl: frame || '',
               status: 'Pending',
             }
           })
           setCandidates(mapped)
+        } else {
+          setCandidates([])
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.warn('[ReviewerWorkspacePage] Failed to fetch live review queue:', err)
+        if (active) setCandidates([])
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
 
     reviewsService
       .getMyStats()
       .then((res) => {
         if (active && res) {
+          const accuracy = res.accuracyRate != null ? Math.round(res.accuracyRate * 100) : 100
           setStats((prev) => ({
             ...prev,
             reliabilityScore: res.reliabilityScore ?? prev.reliabilityScore,
-            consensusAccuracy: res.accuracyRate ?? prev.consensusAccuracy,
+            consensusAccuracy: accuracy,
+            accuracyPercent: accuracy,
             totalReviewed: res.totalReviews ?? prev.totalReviewed,
             approvedCount: res.approved ?? prev.approvedCount,
             rejectedCount: res.rejected ?? prev.rejectedCount,
@@ -548,17 +568,24 @@ export default function ReviewerWorkspacePage() {
           <div className="p-4 sm:p-6 space-y-5">
             {activeMode === 'candidate' ? (
               <div className="space-y-4">
-                <ReviewerQueueFilterBar
-                  filterMode={filterMode}
-                  totalCandidates={candidates.length}
-                  isDark={isDark}
-                  onFilterChange={(mode) => {
-                    setFilterMode(mode)
-                    setCurrentIndex(0)
-                  }}
-                />
+                {candidates.length > 0 && (
+                  <ReviewerQueueFilterBar
+                    filterMode={filterMode}
+                    totalCandidates={candidates.length}
+                    isDark={isDark}
+                    onFilterChange={(mode) => {
+                      setFilterMode(mode)
+                      setCurrentIndex(0)
+                    }}
+                  />
+                )}
 
-                {currentCandidate ? (
+                {isLoading ? (
+                  <div className="h-96 flex flex-col items-center justify-center gap-3">
+                    <div className="w-9 h-9 border-4 border-[#00c4de] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-gray-500 font-medium">Đang tải danh sách biển báo chờ duyệt...</p>
+                  </div>
+                ) : currentCandidate ? (
                   <CandidateWorkspaceCard
                     candidate={currentCandidate}
                     currentIndex={currentIndex}
@@ -582,15 +609,78 @@ export default function ReviewerWorkspacePage() {
                     canPrev={currentIndex > 0}
                     canNext={currentIndex < filteredCandidates.length - 1}
                   />
-                ) : (
+                ) : historyItems.length > 0 ? (
                   <SubmissionSummaryView
                     historyItems={historyItems}
                     isDark={isDark}
                     onRecheckSubmission={() => setCurrentIndex(0)}
                   />
+                ) : (
+                  <div
+                    className={`py-16 px-6 text-center rounded-2xl border space-y-4 ${
+                      isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-[#007b8b]/10 dark:bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center">
+                      <Sparkle size={30} weight="duotone" />
+                    </div>
+                    <div className="max-w-md mx-auto space-y-1">
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                        Hàng đợi thẩm định đang trống
+                      </h3>
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        Hiện tại không có biển báo nào đang chờ bạn thẩm định. Biển báo trích xuất từ camera khảo sát và livestream sẽ tự động xuất hiện tại đây khi AI phân tích xong.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLoading(true)
+                        reviewsService
+                          .getReviewQueue({ page: 1, pageSize: 50 })
+                          .then((res) => {
+                            if (res?.items && res.items.length > 0) {
+                              const mapped: CandidateToReview[] = res.items.map((item, idx) => {
+                                const type = item.predictedSignType
+                                const crop = resolveMediaUrl(item.signCropUrl)
+                                const frame = resolveMediaUrl(item.bestFrameUrl)
+                                return {
+                                  id: item.id,
+                                  sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
+                                  yoloTrackId: idx + 1,
+                                  code: type?.signCode || 'P.102',
+                                  suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
+                                  category: (type?.signCode?.charAt(0) || 'P') as any,
+                                  confidence: 0.88,
+                                  lat: item.submission?.latitude ?? 10.7769,
+                                  lng: item.submission?.longitude ?? 106.7009,
+                                  roadName: 'Đường khảo sát (Camera GPS)',
+                                  directionHeading: 45,
+                                  trafficFlowDirection: 'Northbound',
+                                  estimatedDistanceMeters: 12.5,
+                                  cropImageUrl: crop || '',
+                                  contextImageUrl: frame || '',
+                                  status: 'Pending',
+                                }
+                              })
+                              setCandidates(mapped)
+                            }
+                          })
+                          .finally(() => setIsLoading(false))
+                      }}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                        isDark
+                          ? 'bg-white/5 hover:bg-white/10 border-white/10 text-[#00c4de]'
+                          : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-[#007b8b]'
+                      }`}
+                    >
+                      <ClockCounterClockwise size={15} />
+                      <span>Kiểm tra lại hàng đợi</span>
+                    </button>
+                  </div>
                 )}
               </div>
-            ) : (
+            ) : revalCandidates.length > 0 ? (
               <RevalidationWorkspacePanel
                 candidate={currentReval}
                 currentIndex={revalIndex}
@@ -601,6 +691,24 @@ export default function ReviewerWorkspacePage() {
                 canPrev={revalIndex > 0}
                 canNext={revalIndex < revalCandidates.length - 1}
               />
+            ) : (
+              <div
+                className={`py-16 px-6 text-center rounded-2xl border space-y-4 ${
+                  isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200'
+                }`}
+              >
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                  <ClockCounterClockwise size={30} weight="duotone" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Chưa có nhiệm vụ tái thẩm định
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Hiện tại chưa có biển báo nào cần xác minh thay đổi thực địa hoặc kiểm tra định kỳ.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </div>

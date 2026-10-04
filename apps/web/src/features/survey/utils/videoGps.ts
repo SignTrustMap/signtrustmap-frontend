@@ -18,6 +18,7 @@ export interface ExtractedVideoFileGps {
   longitude: number
   durationSeconds?: number
   capturedAt?: string
+  trackPoints?: [latitude: number, longitude: number][]
   source: 'camm' | 'quicktime_xyz' | 'nmea_rmc' | 'nmea_gga' | 'gpp_loci' | 'gopro_gpmf' | 'text_key_value'
 }
 
@@ -80,7 +81,9 @@ export function parseIso6709(text: string): { latitude: number; longitude: numbe
  */
 export function parseNmeaSentences(
   text: string
-): { latitude: number; longitude: number; source: 'nmea_rmc' | 'nmea_gga' } | null {
+): { latitude: number; longitude: number; trackPoints?: [latitude: number, longitude: number][]; source: 'nmea_rmc' | 'nmea_gga' } | null {
+  const points: [latitude: number, longitude: number][] = []
+
   // 1. Check RMC sentences: $GPRMC,hhmmss.ss,status,lat,N/S,lon,E/W,...
   const rmcRegex = /\$G[PNBLA]RMC,\s*[^,]*,\s*([AV]),\s*(\d{2,4}\.\d+),\s*([NSns]),\s*(\d{3,5}\.\d+),\s*([EWew])/g
   let rmcMatch: RegExpExecArray | null
@@ -103,7 +106,16 @@ export function parseNmeaSentences(
       Math.abs(lon) <= 180 &&
       !(lat === 0 && lon === 0)
     ) {
-      return { latitude: lat, longitude: lon, source: 'nmea_rmc' }
+      points.push([lat, lon])
+    }
+  }
+
+  if (points.length > 0) {
+    return {
+      latitude: points[0][0],
+      longitude: points[0][1],
+      trackPoints: points.length > 1 ? points : undefined,
+      source: 'nmea_rmc',
     }
   }
 
@@ -127,7 +139,16 @@ export function parseNmeaSentences(
       Math.abs(lon) <= 180 &&
       !(lat === 0 && lon === 0)
     ) {
-      return { latitude: lat, longitude: lon, source: 'nmea_gga' }
+      points.push([lat, lon])
+    }
+  }
+
+  if (points.length > 0) {
+    return {
+      latitude: points[0][0],
+      longitude: points[0][1],
+      trackPoints: points.length > 1 ? points : undefined,
+      source: 'nmea_gga',
     }
   }
 
@@ -551,30 +572,45 @@ export function buildCompanionGpxXml(params: {
   endCoordinate: [longitude: number, latitude: number]
   capturedAt: string
   durationSeconds?: number
+  trackPoints?: [latitude: number, longitude: number][]
 }): string {
-  const { startCoordinate, endCoordinate, capturedAt, durationSeconds = 60 } = params
+  const { startCoordinate, endCoordinate, capturedAt, durationSeconds = 60, trackPoints } = params
   const startDate = new Date(capturedAt)
   const validStartDate = Number.isNaN(startDate.getTime()) ? new Date() : startDate
-  const startTimeISO = validStartDate.toISOString()
-
   const durationMs = Math.max(1, durationSeconds) * 1000
-  const endDate = new Date(validStartDate.getTime() + durationMs)
-  const endTimeISO = endDate.toISOString()
 
-  const [startLon, startLat] = startCoordinate
-  const [endLon, endLat] = endCoordinate
+  let trkpts = ''
+  if (trackPoints && trackPoints.length > 1) {
+    trkpts = trackPoints
+      .map((pt, idx) => {
+        const pointTime = new Date(
+          validStartDate.getTime() + (idx / (trackPoints.length - 1)) * durationMs
+        ).toISOString()
+        return `<trkpt lat="${pt[0].toFixed(6)}" lon="${pt[1].toFixed(6)}">
+        <time>${pointTime}</time>
+      </trkpt>`
+      })
+      .join('\n      ')
+  } else {
+    const startTimeISO = validStartDate.toISOString()
+    const endDate = new Date(validStartDate.getTime() + durationMs)
+    const endTimeISO = endDate.toISOString()
+    const [startLon, startLat] = startCoordinate
+    const [endLon, endLat] = endCoordinate
+    trkpts = `<trkpt lat="${startLat.toFixed(6)}" lon="${startLon.toFixed(6)}">
+        <time>${startTimeISO}</time>
+      </trkpt>
+      <trkpt lat="${endLat.toFixed(6)}" lon="${endLon.toFixed(6)}">
+        <time>${endTimeISO}</time>
+      </trkpt>`
+  }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="SignTrustMap Web" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
     <name>Survey Video Track</name>
     <trkseg>
-      <trkpt lat="${startLat.toFixed(6)}" lon="${startLon.toFixed(6)}">
-        <time>${startTimeISO}</time>
-      </trkpt>
-      <trkpt lat="${endLat.toFixed(6)}" lon="${endLon.toFixed(6)}">
-        <time>${endTimeISO}</time>
-      </trkpt>
+      ${trkpts}
     </trkseg>
   </trk>
 </gpx>`.trim()
@@ -589,6 +625,7 @@ export function createCompanionGpxFile(params: {
   capturedAt: string
   durationSeconds?: number
   fileName?: string
+  trackPoints?: [latitude: number, longitude: number][]
 }): File {
   const xml = buildCompanionGpxXml(params)
   const name = params.fileName || `companion-track-${Date.now()}.gpx`
@@ -671,6 +708,7 @@ export async function extractGpsFromVideoFile(file: File): Promise<ExtractedVide
         longitude: recoveredGps.longitude,
         durationSeconds: recoveredDuration || 60,
         capturedAt,
+        trackPoints: (recoveredGps as any).trackPoints,
         source: recoveredGps.source,
       }
     }

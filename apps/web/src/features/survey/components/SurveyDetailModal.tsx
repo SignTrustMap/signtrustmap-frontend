@@ -40,6 +40,7 @@ export function SurveyDetailModal({
   const [selectedCandidate, setSelectedCandidate] = useState<ExtractedCandidateItem | null>(null)
   const [liveStatus, setLiveStatus] = useState<SubmissionStatus | null>(null)
   const [liveFailureReason, setLiveFailureReason] = useState<string | null>(null)
+  const [liveCandidates, setLiveCandidates] = useState<ExtractedCandidateItem[]>([])
 
   // Determine pipeline status
   const currentPipelineStatus: SubmissionStatus =
@@ -63,6 +64,35 @@ export function SurveyDetailModal({
         if (isMounted && res?.submission) {
           setLiveStatus(res.submission.status)
           if (res.submission.failureReason) setLiveFailureReason(res.submission.failureReason)
+
+          if (res.candidates && Array.isArray(res.candidates) && res.candidates.length > 0) {
+            const mapped: ExtractedCandidateItem[] = res.candidates.map((c: any, idx: number) => {
+              const signType = c.predictedSignType
+              const sec = c.timestampSec ?? idx * 5
+              const mins = Math.floor(sec / 60)
+              const remainingSec = sec % 60
+              const timestampStr = `${String(mins).padStart(2, '0')}:${String(remainingSec).padStart(2, '0')}`
+
+              return {
+                id: c.id || `CAND-${idx}`,
+                signCode: signType?.signCode || c.code || 'P.102',
+                signName: signType?.nameVi || signType?.nameEn || c.name || 'Biển báo',
+                category: (signType?.signCode?.charAt(0) || c.category || 'P') as any,
+                confidence: c.confidence ?? 0.88,
+                cropFrameSec: sec,
+                timestampStr,
+                lat: c.latitude ?? submission.routePoints?.[0]?.[0] ?? 10.7769,
+                lng: c.longitude ?? submission.routePoints?.[0]?.[1] ?? 106.7009,
+                trafficDirection: c.trafficDirection || 'Northbound',
+                distanceMeters: c.distanceMeters ?? 12.5,
+                reviewStatus: c.status === 'APPROVED' ? 'Approved' : c.status === 'REJECTED' ? 'Rejected' : 'Pending',
+                reviewCount: c.reviewCount ?? 1,
+                reviewerVoteRatio: c.reviewerVoteRatio,
+                cropImageUrl: c.signCropUrl || c.cropUrl || '',
+              }
+            })
+            setLiveCandidates(mapped)
+          }
         }
       } catch {
         // Fallback to static props if offline or mock id
@@ -89,6 +119,7 @@ export function SurveyDetailModal({
   if (!submission) return null
 
   const badge = getStatusBadge(submission.status)
+  const displayCandidates = liveCandidates.length > 0 ? liveCandidates : (submission.candidates || [])
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-4xl" topSpacing="pt-6 sm:pt-10 pb-8 sm:pb-12">
@@ -204,7 +235,7 @@ export function SurveyDetailModal({
 
             <SurveyRouteMap
               routePoints={submission.routePoints}
-              candidates={submission.candidates || []}
+              candidates={displayCandidates}
               selectedCandidateId={selectedCandidate?.id}
               onSelectCandidate={(cand) => setSelectedCandidate(cand)}
               height="280px"
@@ -219,7 +250,7 @@ export function SurveyDetailModal({
               <h3 className="text-base font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
                 <span>{t('survey.candidates_title')}</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950/60 text-cyan-900 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-500/40">
-                  {submission.candidates?.length || 0} {t('survey.lbl_signs_stat')}
+                  {displayCandidates.length} {t('survey.lbl_signs_stat')}
                 </span>
               </h3>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
@@ -229,7 +260,7 @@ export function SurveyDetailModal({
           </div>
 
           <SurveyCandidatesList
-            candidates={submission.candidates || []}
+            candidates={displayCandidates}
             selectedCandidateId={selectedCandidate?.id}
             onSelectCandidate={(cand) => setSelectedCandidate(cand)}
             isDark={isDark}

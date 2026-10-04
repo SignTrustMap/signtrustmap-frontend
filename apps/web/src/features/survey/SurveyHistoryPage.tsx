@@ -13,7 +13,6 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockSurveySubmissions,
   type SurveySubmissionItem,
 } from '@/data'
 import { submissionsService } from '@/api/services/submissions.service'
@@ -25,10 +24,12 @@ import { PageHeader } from '@/components/common/PageHeader'
 export default function SurveyHistoryPage() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
-  const [submissions, setSubmissions] = useState<SurveySubmissionItem[]>(mockSurveySubmissions)
+  const [submissions, setSubmissions] = useState<SurveySubmissionItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     let active = true
+    setIsLoading(true)
     submissionsService
       .getMySubmissions({ page: 1, pageSize: 50 })
       .then((res) => {
@@ -62,7 +63,7 @@ export default function SurveyHistoryPage() {
             return {
               id: sub.id,
               tripName: sub.note || (isVideo ? 'Khảo sát camera hành trình' : 'Khảo sát ảnh chụp đường bộ'),
-              route: sub.latitude && sub.longitude ? `${sub.latitude.toFixed(4)}, ${sub.longitude.toFixed(4)}` : 'HCMC Urban Corridor',
+              route: sub.latitude && sub.longitude ? `${sub.latitude.toFixed(4)}, ${sub.longitude.toFixed(4)}` : 'Tọa độ khảo sát',
               mediaType: isVideo ? 'video_gpx' : 'photo_gps',
               videoFileName: isVideo ? 'dashcam_trip.mp4' : undefined,
               photoFileName: !isVideo ? 'sign_photo.jpg' : undefined,
@@ -81,12 +82,15 @@ export default function SurveyHistoryPage() {
           })
           setSubmissions(mapped)
         } else {
-          setSubmissions(mockSurveySubmissions)
+          setSubmissions([])
         }
       })
       .catch((err) => {
-        console.warn('[SurveyHistoryPage] Failed to fetch submissions, using mock:', err)
-        if (active) setSubmissions(mockSurveySubmissions)
+        console.warn('[SurveyHistoryPage] Failed to fetch submissions:', err)
+        if (active) setSubmissions([])
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
       })
 
     return () => {
@@ -414,7 +418,12 @@ export default function SurveyHistoryPage() {
 
           {/* List of Submissions */}
           <div className="divide-y divide-gray-200 dark:divide-white/10">
-            {paginatedSubmissions.length > 0 ? (
+            {isLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-4 border-[#00c4de] border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs text-gray-500 font-medium">Đang tải lịch sử khảo sát...</p>
+              </div>
+            ) : paginatedSubmissions.length > 0 ? (
               paginatedSubmissions.map((sub) => {
                 const badge = getStatusBadge(sub.status)
 
@@ -501,6 +510,31 @@ export default function SurveyHistoryPage() {
                   </div>
                 )
               })
+            ) : submissions.length === 0 ? (
+              <div className="py-16 px-6 text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-[#007b8b]/10 dark:bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center">
+                  <VideoCamera size={30} weight="duotone" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Chưa có khảo sát nào
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Bạn chưa có bản ghi khảo sát nào được nộp. Hãy tải lên video hành trình hoặc ảnh chụp biển báo kèm GPS để bắt đầu đóng góp dữ liệu.
+                  </p>
+                </div>
+                <Link
+                  to="/survey"
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isDark
+                      ? 'bg-[#00c4de] text-black hover:bg-[#00c4de]/90 font-black'
+                      : 'bg-[#007b8b] text-white hover:bg-[#007b8b]/90 font-black'
+                  }`}
+                >
+                  <Plus size={16} weight="bold" />
+                  <span>Tạo khảo sát mới</span>
+                </Link>
+              </div>
             ) : (
               <div className="p-12 text-center text-gray-500 dark:text-gray-400 text-sm space-y-2">
                 <p>{t('survey.no_trips_found')}</p>

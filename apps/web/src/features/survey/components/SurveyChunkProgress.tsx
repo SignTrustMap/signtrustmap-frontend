@@ -24,7 +24,7 @@ export function SurveyChunkProgress({
       case 'initializing':
         return 'Khởi tạo phiên tải lên...'
       case 'uploading_video':
-        return `Đang tải lên video (Khối ${progress.currentChunk ?? 1}/${progress.totalChunks ?? 1})`
+        return 'Đang tải lên video'
       case 'uploading_gpx':
         return 'Đang tải lên dữ liệu hành trình GPX...'
       case 'completing':
@@ -50,7 +50,7 @@ export function SurveyChunkProgress({
               {getStepLabel()}
             </p>
             <p className="text-xs text-gray-500 font-mono mt-0.5">
-              {progress.bytesUploaded && progress.totalBytes
+              {typeof progress.bytesUploaded === 'number' && typeof progress.totalBytes === 'number' && progress.totalBytes > 0
                 ? `${(progress.bytesUploaded / (1024 * 1024)).toFixed(1)} MB / ${(progress.totalBytes / (1024 * 1024)).toFixed(1)} MB`
                 : `${progress.percent}%`}
             </p>

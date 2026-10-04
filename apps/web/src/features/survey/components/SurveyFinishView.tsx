@@ -11,7 +11,7 @@ interface SurveyFinishViewProps {
 }
 
 export function SurveyFinishView({
-  submissionId,
+  submissionId: _submissionId,
   status = 'QUEUED',
   isDark: _isDark,
   onReset,
@@ -38,13 +38,13 @@ export function SurveyFinishView({
           )}
         </p>
 
-        {submissionId && (
-          <p className="font-mono text-xs text-gray-500 font-bold pt-1">
-            Reference {submissionId.slice(0, 8)} •{' '}
-            <span className="text-[#007b8b] dark:text-[#00c4de] uppercase font-black">
-              {status}
+        {status && (
+          <div className="pt-2 flex justify-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#007b8b]/10 dark:bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/20 dark:border-[#00c4de]/20 uppercase">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Trạng thái: {status}
             </span>
-          </p>
+          </div>
         )}
       </div>
 

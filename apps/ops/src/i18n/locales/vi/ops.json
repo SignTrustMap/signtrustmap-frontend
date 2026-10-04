@@ -342,7 +342,18 @@
     "lbl_pkg_name": "Tên gói nạp",
     "ph_pkg_name": "Nhập tên gói nạp (VD: Gói Tiêu chuẩn)...",
     "btn_confirm": "Xác nhận",
-    "btn_cancel": "Hủy"
+    "btn_cancel": "Hủy",
+    "sec_dynamic_rules": "Cơ chế Thưởng Động (Dynamic Reward Rules Engine)",
+    "lbl_activity_type": "Hoạt động đóng góp",
+    "lbl_base_amount": "Thưởng cơ bản",
+    "lbl_daily_limit": "Hạn mức/ngày",
+    "lbl_rule_status": "Trạng thái",
+    "btn_add_rule": "Thêm luật thưởng",
+    "modal_add_rule_title": "Thêm Luật Thưởng Hoạt Động",
+    "modal_edit_rule_title": "Chỉnh Sửa Luật Thưởng",
+    "toast_rule_updated": "Đã cập nhật luật thưởng thành công!",
+    "toast_rule_toggled": "Đã đổi trạng thái luật thưởng thành công!",
+    "toast_rule_created": "Đã thêm luật thưởng mới thành công!"
   },
   "mlops": {
     "title": "Mô hình AI & Huấn luyện",

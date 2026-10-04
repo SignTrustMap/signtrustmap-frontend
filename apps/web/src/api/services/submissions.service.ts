@@ -19,7 +19,8 @@ import type {
 
 export const BACKEND_MAX_CHUNK_BYTES = 52428800 // 50 MB absolute backend limit (52,428,800 bytes)
 export const MAX_BACKEND_CHUNK_BYTES = 45 * 1024 * 1024 // 45 MB safety margin under backend's 50MB limit
-export const DEFAULT_1MIN_CHUNK_BYTES = 10 * 1024 * 1024 // 10 MB estimated for 1 min of 640p/720p
+export const DEFAULT_CHUNK_BYTES = 35 * 1024 * 1024 // 35 MB chunk size for high-speed & stable connections
+export const DEFAULT_1MIN_CHUNK_BYTES = DEFAULT_CHUNK_BYTES
 
 export type ChunkPlan = {
   totalChunks: number
@@ -29,29 +30,29 @@ export type ChunkPlan = {
 }
 
 /**
- * Calculates temporal 1-minute chunks for an up to 8-hour survey video (exact parity with Mobile).
- * Adheres directly to the Mobile specification:
- * - Temporal chunk: 1 minute per chunk
- * - Target chunk size: 10 MB (DEFAULT_1MIN_CHUNK_BYTES) matching Mobile standard
+ * Calculates chunks for media upload, optimized for modern high-speed networks.
+ * Uses larger chunk sizes (up to 35-40 MB) to reduce HTTP roundtrips while strictly honoring backend limits:
+ * - Chunk size up to 45 MB safety margin (< 52,428,800 bytes absolute backend limit)
  * - Maximum video duration: 8 hours (28,800s)
+ * - Max chunks per session: 5000
  */
 export function calculateTemporalChunks(
   fileSizeBytes: number,
   durationSeconds = 60,
-  maxChunkSizeBytes = DEFAULT_1MIN_CHUNK_BYTES
+  maxChunkSizeBytes = DEFAULT_CHUNK_BYTES
 ): ChunkPlan {
   const safeDuration =
     Number.isFinite(durationSeconds) && durationSeconds > 0
       ? Math.min(28800, durationSeconds) // Cap at 8 hours
       : 60
 
-  // 1 minute per temporal chunk
-  let totalChunks = Math.max(1, Math.ceil(safeDuration / 60))
+  // Calculate chunks based on target chunk size (up to 35 MB) for fast & stable networks
+  let totalChunks = Math.max(1, Math.ceil(fileSizeBytes / maxChunkSizeBytes))
   let chunkSize = Math.ceil(fileSizeBytes / totalChunks)
 
-  // Guarantee that chunk size does not exceed the target 10 MB chunk size (Mobile standard)
-  if (chunkSize > maxChunkSizeBytes) {
-    totalChunks = Math.ceil(fileSizeBytes / maxChunkSizeBytes)
+  // Guard against exceeding MAX_BACKEND_CHUNK_BYTES (45 MB)
+  if (chunkSize > MAX_BACKEND_CHUNK_BYTES) {
+    totalChunks = Math.ceil(fileSizeBytes / MAX_BACKEND_CHUNK_BYTES)
     chunkSize = Math.ceil(fileSizeBytes / totalChunks)
   }
 

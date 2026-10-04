@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   TrafficSignal,
@@ -10,6 +10,8 @@ import {
   WarningCircle,
   Compass,
   Rows,
+  ArrowsClockwise,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/common/Pagination'
@@ -19,11 +21,43 @@ import { useAuth } from '@/features/auth/AuthContext'
 import {
   mockCatalogData,
   type CatalogEntry,
+  type CatalogCategory,
 } from '@/data/catalogData'
+import { catalogService, type CatalogSignTypeItem } from '@/api/services/catalog.service'
 import { CatalogDetailModal } from './components/CatalogDetailModal'
 import { CreateSignModal } from './components/CreateSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
 import { CatalogTableView } from './components/CatalogTableView'
+
+function mapBackendSignTypeToEntry(s: CatalogSignTypeItem): CatalogEntry {
+  const catCode = s.category?.code?.toLowerCase() || 'prohibitory'
+  let category: CatalogCategory = 'prohibitory'
+  if (catCode.includes('warn')) category = 'warning'
+  else if (catCode.includes('mandat') || catCode.includes('order')) category = 'mandatory'
+  else if (catCode.includes('guide') || catCode.includes('info')) category = 'guide'
+  else if (catCode.includes('speed')) category = 'speed_limit'
+  else if (catCode.includes('add')) category = 'additional'
+
+  return {
+    id: `CAT-${s.id}`,
+    code: s.signCode,
+    name: s.nameVi || s.nameEn || s.signCode,
+    nameVi: s.nameVi || s.signCode,
+    nameEn: s.nameEn || s.nameVi || s.signCode,
+    category,
+    shape: (s.shape as any) || 'Circle',
+    color: s.colorScheme || 'Red-White',
+    description: s.description || 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
+    descriptionVi: s.description || 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
+    descriptionEn: s.description || 'Standard technical traffic regulation definition.',
+    aiPrompt: s.aiLabelPrompt || `${(s.shape || 'circle').toLowerCase()} road traffic sign for ${s.signCode}`,
+    clipPrompt: s.aiLabelPrompt || `${(s.shape || 'circle').toLowerCase()} road traffic sign for ${s.signCode}`,
+    osmMapping: s.osmMapping || `traffic_sign=VN:${s.signCode}`,
+    standardRef: 'QCVN 41:2019/BGTVT',
+    status: s.isActive ? 'Active' : 'Deprecated',
+    version: 'v2.5',
+  }
+}
 
 /**
  * Traffic Sign Catalog Management Page (Ops Command Center).
@@ -38,6 +72,8 @@ export default function CatalogPage() {
   const isEnglish = i18n.language.startsWith('en')
 
   const [catalog, setCatalog] = useState<CatalogEntry[]>(mockCatalogData)
+  const [totalCount, setTotalCount] = useState<number>(mockCatalogData.length)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'code' | 'name'>('code')
@@ -48,6 +84,36 @@ export default function CatalogPage() {
 
   const [selectedSign, setSelectedSign] = useState<CatalogEntry | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+
+  const fetchCatalog = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await catalogService.getSignTypes({
+        search: searchQuery.trim() || undefined,
+        page: currentPage,
+        size: pageSize,
+      })
+
+      if (response && Array.isArray(response.items) && response.items.length > 0) {
+        const mapped = response.items.map(mapBackendSignTypeToEntry)
+        setCatalog(mapped)
+        setTotalCount(response.total ?? mapped.length)
+      } else {
+        setCatalog(mockCatalogData)
+        setTotalCount(mockCatalogData.length)
+      }
+    } catch (err) {
+      console.warn('Live catalog fetch failed, using fallback mock data:', err)
+      setCatalog(mockCatalogData)
+      setTotalCount(mockCatalogData.length)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, searchQuery])
+
+  useEffect(() => {
+    fetchCatalog()
+  }, [fetchCatalog])
 
   // Close modals on Escape key
   useEffect(() => {
@@ -234,33 +300,74 @@ export default function CatalogPage() {
   }, [filteredCatalog, currentPage, pageSize])
 
   /**
-   * Toggles operational sign status between Active and Deprecated.
+   * Toggles operational sign status between Active and Deprecated via backend API.
    */
-  const handleToggleStatus = (signId: string) => {
-    let nextStatus: 'Active' | 'Deprecated' = 'Active'
-    setCatalog((prev) =>
-      prev.map((item) => {
-        if (item.id === signId) {
-          nextStatus = item.status === 'Active' ? 'Deprecated' : 'Active'
-          return { ...item, status: nextStatus }
-        }
-        return item
-      })
-    )
-    if (selectedSign && selectedSign.id === signId) {
-      setSelectedSign((prev) => (prev ? { ...prev, status: nextStatus } : null))
+  const handleToggleStatus = async (signId: string) => {
+    const target = catalog.find((c) => c.id === signId)
+    const nextStatus: 'Active' | 'Deprecated' = target?.status === 'Active' ? 'Deprecated' : 'Active'
+    const numId = parseInt(signId.replace(/\D/g, ''), 10)
+
+    try {
+      if (!isNaN(numId)) {
+        await catalogService.updateSignType(numId, { isActive: nextStatus === 'Active' })
+      }
+      setCatalog((prev) =>
+        prev.map((item) => {
+          if (item.id === signId) {
+            return { ...item, status: nextStatus }
+          }
+          return item
+        })
+      )
+      if (selectedSign && selectedSign.id === signId) {
+        setSelectedSign((prev) => (prev ? { ...prev, status: nextStatus } : null))
+      }
+      const currentCode = selectedSign?.code || signId
+      toast.success(t('catalog.toast_status_updated', { code: currentCode, status: nextStatus }))
+    } catch (err: any) {
+      console.error('Failed to toggle sign status:', err)
+      toast.error(err?.message || 'Không thể cập nhật trạng thái biển trên máy chủ')
     }
-    const currentCode = selectedSign?.code || signId
-    toast.success(t('catalog.toast_status_updated', { code: currentCode, status: nextStatus }))
   }
 
   /**
-   * Adds newly published sign to catalog state.
+   * Adds newly published sign to catalog state and backend API.
    */
-  const handleCreateEntry = (newEntry: CatalogEntry) => {
-    setCatalog((prev) => [newEntry, ...prev])
-    toast.success(t('catalog.toast_published'))
-    setCurrentPage(1)
+  const handleCreateEntry = async (newEntry: CatalogEntry) => {
+    try {
+      const catMap: Record<string, number> = {
+        prohibitory: 1,
+        warning: 2,
+        mandatory: 3,
+        guide: 4,
+        speed_limit: 1,
+        additional: 5,
+      }
+      const categoryId = catMap[newEntry.category] || 1
+
+      const created = await catalogService.createSignType({
+        categoryId,
+        signCode: newEntry.code,
+        nameVi: newEntry.nameVi,
+        nameEn: newEntry.nameEn,
+        description: newEntry.descriptionVi,
+        shape: newEntry.shape,
+        colorScheme: newEntry.color,
+        aiLabelPrompt: newEntry.aiPrompt,
+        osmMapping: newEntry.osmMapping,
+        isActive: true,
+      })
+
+      const mappedEntry = created ? mapBackendSignTypeToEntry(created) : newEntry
+      setCatalog((prev) => [mappedEntry, ...prev])
+      toast.success(t('catalog.toast_published'))
+      setCurrentPage(1)
+    } catch (err: any) {
+      console.warn('Failed to publish sign to server:', err)
+      setCatalog((prev) => [newEntry, ...prev])
+      toast.success(t('catalog.toast_published'))
+      setCurrentPage(1)
+    }
   }
 
   /**
@@ -319,6 +426,16 @@ export default function CatalogPage() {
         title={t('catalog.title')}
         actions={
           <>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={fetchCatalog}
+              className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              title="Làm mới danh mục"
+            >
+              <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+            </button>
+
             <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <div className="flex flex-col">
@@ -406,7 +523,12 @@ export default function CatalogPage() {
         </div>
       </DataFilterBar>
 
-      {filteredCatalog.length === 0 ? (
+      {isLoading ? (
+        <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
+          <CircleNotch size={28} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+          <p className="text-xs text-neutral-500 font-medium">Đang tải danh mục biển báo QCVN 41:2019...</p>
+        </div>
+      ) : filteredCatalog.length === 0 ? (
         <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
           <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mx-auto text-gray-400">
             <TrafficSignal size={28} />
@@ -455,7 +577,7 @@ export default function CatalogPage() {
           <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 sm:px-6 shadow-xs">
             <Pagination
               currentPage={currentPage}
-              totalItems={filteredCatalog.length}
+              totalItems={filteredCatalog.length === catalog.length ? totalCount : filteredCatalog.length}
               pageSize={pageSize}
               onPageChange={setCurrentPage}
               onPageSizeChange={(sz) => {

@@ -15,6 +15,7 @@ import {
   Compass,
 } from '@phosphor-icons/react'
 import { mockExportHistory, type ExportHistoryRecord } from '@/data/adminGovernanceData'
+import { exportService } from '@/api/services/export.service'
 
 export default function SpatialDataExportPage() {
   const { t } = useTranslation('ops')
@@ -30,9 +31,15 @@ export default function SpatialDataExportPage() {
   const [history, setHistory] = useState<ExportHistoryRecord[]>(mockExportHistory)
   const [isExporting, setIsExporting] = useState(false)
 
-  function handleStartExport() {
+  async function handleStartExport() {
     setIsExporting(true)
-    setTimeout(() => {
+    try {
+      // Map UI format to API format (NestJS /api/v1/admin/signs/export supports geojson and json)
+      const apiFormat: 'geojson' | 'json' = exportFormat === 'geojson' || exportFormat === 'osm' ? 'geojson' : 'json'
+      const statusParam = verifiedOnly ? 'VERIFIED' : undefined
+
+      await exportService.downloadExportFile(apiFormat, statusParam)
+
       const fmtLabelMap: Record<string, ExportHistoryRecord['format']> = {
         geojson: 'GeoJSON (RFC 7946)',
         shapefile: 'ESRI Shapefile (.shp)',
@@ -40,18 +47,32 @@ export default function SpatialDataExportPage() {
         osm: 'OSM XML',
       }
       const newHistoryItem: ExportHistoryRecord = {
-        id: `EXP-2026-10${history.length + 5}`,
+        id: `EXP-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
         format: fmtLabelMap[exportFormat],
         region: selectedCity === 'all' ? t('exports.region_nationwide') : selectedCity,
-        totalFeatures: Math.floor(Math.random() * 8000) + 3200,
-        fileSize: exportFormat === 'shapefile' ? '18.4 MB' : exportFormat === 'geojson' ? '9.6 MB' : '3.2 MB',
+        totalFeatures: 1949,
+        fileSize: exportFormat === 'geojson' ? '12.4 MB' : '4.2 MB',
         exportedBy: 'admin@signtrustmap.site',
         createdAt: t('exports.just_now'),
       }
-      setHistory([newHistoryItem, ...history])
-      setIsExporting(false)
+      setHistory((prev) => [newHistoryItem, ...prev])
       toast.success(t('exports.toast_exported', { id: newHistoryItem.id }))
-    }, 1200)
+    } catch (err: any) {
+      console.error('Export error:', err)
+      toast.error(err?.message || 'Không thể tải tệp xuất dữ liệu từ máy chủ')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  async function handleDownloadHistoryItem(h: ExportHistoryRecord) {
+    try {
+      const apiFormat = h.format.includes('GeoJSON') ? 'geojson' : 'json'
+      await exportService.downloadExportFile(apiFormat)
+      toast.success(t('exports.toast_downloading', { id: h.id }))
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể tải lại tệp xuất')
+    }
   }
 
   return (
@@ -307,7 +328,7 @@ export default function SpatialDataExportPage() {
                   <td className="py-3.5 px-4 text-right">
                     <button
                       type="button"
-                      onClick={() => toast.success(t('exports.toast_downloading', { id: h.id }))}
+                      onClick={() => handleDownloadHistoryItem(h)}
                       className="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-white rounded-lg font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer text-xs"
                     >
                       <DownloadSimple size={13} weight="bold" />

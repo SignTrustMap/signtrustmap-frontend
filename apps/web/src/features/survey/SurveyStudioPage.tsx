@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Compass, WarningCircle } from '@phosphor-icons/react'
+import { ClockCounterClockwise, WarningCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
@@ -44,13 +44,14 @@ export default function SurveyStudioPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   // Coordinates & Trajectory
-  const [photoLat, setPhotoLat] = useState(10.7769)
-  const [photoLng, setPhotoLng] = useState(106.7009)
-  const [endLat, setEndLat] = useState(10.781)
-  const [endLng, setEndLng] = useState(106.705)
+  const [photoLat, setPhotoLat] = useState<number | undefined>(undefined)
+  const [photoLng, setPhotoLng] = useState<number | undefined>(undefined)
+  const [endLat, setEndLat] = useState<number | undefined>(undefined)
+  const [endLng, setEndLng] = useState<number | undefined>(undefined)
   const [durationSeconds, setDurationSeconds] = useState(60)
   const [note, setNote] = useState('')
   const [hasAutoGps, setHasAutoGps] = useState(false)
+  const [isAnalyzingGps, setIsAnalyzingGps] = useState(false)
   const [gpxPointsCount, setGpxPointsCount] = useState<number | undefined>()
 
   // Chunked Upload State
@@ -77,7 +78,14 @@ export default function SurveyStudioPage() {
   const [submittedStatus, setSubmittedStatus] = useState<string>('QUEUED')
   const [error, setError] = useState('')
 
-  const isMediaValid = mode === 'video_gpx' ? Boolean(videoFile) : Boolean(photoFile)
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([])
+
+  const hasRequiredGps =
+    mode === 'video_gpx'
+      ? Boolean(videoFile && hasAutoGps)
+      : Boolean(photoFile && hasAutoGps && photoLat != null && photoLng != null)
+
+  const isMediaValid = !isAnalyzingGps && hasRequiredGps
 
   const handleStepClick = (targetStep: SurveyStudioStep) => {
     if (isUploading) return
@@ -90,6 +98,12 @@ export default function SurveyStudioPage() {
     if (targetStep === 'details') {
       if (isMediaValid) {
         setCurrentStep('details')
+      } else {
+        if (mode === 'photo_gps' && photoFile && !hasAutoGps) {
+          toast.warning('Ảnh không chứa toạ độ GPS trong dữ liệu EXIF.')
+        } else if (mode === 'video_gpx' && videoFile && !hasAutoGps) {
+          toast.warning('Video không chứa dữ liệu toạ độ GPS trong metadata/telemetry.')
+        }
       }
       return
     }
@@ -101,34 +115,80 @@ export default function SurveyStudioPage() {
     }
   }
 
+  const handleModeChange = (newMode: 'video_gpx' | 'photo_gps') => {
+    setMode(newMode)
+    setVideoFile(null)
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setGpxFile(null)
+    setGpxPointsCount(undefined)
+    setRouteCoordinates([])
+    setHasAutoGps(false)
+    setIsAnalyzingGps(false)
+    setPhotoLat(undefined)
+    setPhotoLng(undefined)
+    setEndLat(undefined)
+    setEndLng(undefined)
+  }
+
   // Handle Photo Selection with automatic EXIF GPS extraction
   const handlePhotoSelect = async (file: File) => {
     setPhotoFile(file)
+    // Clear any previous GPX file and GPS state
+    setGpxFile(null)
+    setGpxPointsCount(undefined)
+    setHasAutoGps(false)
+    setIsAnalyzingGps(true)
+
     const reader = new FileReader()
     reader.onloadend = () => {
       setPhotoPreview(reader.result as string)
     }
     reader.readAsDataURL(file)
 
-    const meta = await extractImageFileMetadata(file)
-    if (meta.latitude && meta.longitude) {
-      setPhotoLat(meta.latitude)
-      setPhotoLng(meta.longitude)
-      setHasAutoGps(true)
-      if (meta.capturedAt) {
-        setCapturedAt(meta.capturedAt)
+    try {
+      const meta = await extractImageFileMetadata(file)
+      if (meta.latitude && meta.longitude) {
+        setPhotoLat(meta.latitude)
+        setPhotoLng(meta.longitude)
+        setHasAutoGps(true)
+        if (meta.capturedAt) {
+          setCapturedAt(meta.capturedAt)
+        }
+        const end = estimateEndCoordinate(meta.longitude, meta.latitude, 60)
+        setEndLng(end[0])
+        setEndLat(end[1])
+      } else {
+        setHasAutoGps(false)
+        setGpxFile(null)
+        setGpxPointsCount(undefined)
+        setPhotoLat(undefined)
+        setPhotoLng(undefined)
+        setEndLat(undefined)
+        setEndLng(undefined)
       }
-      const end = estimateEndCoordinate(meta.longitude, meta.latitude, 60)
-      setEndLng(end[0])
-      setEndLat(end[1])
-    } else {
+    } catch (err) {
+      console.warn('[SurveyStudio] Failed to inspect image EXIF:', err)
       setHasAutoGps(false)
+      setPhotoLat(undefined)
+      setPhotoLng(undefined)
+      setEndLat(undefined)
+      setEndLng(undefined)
+    } finally {
+      setIsAnalyzingGps(false)
     }
   }
 
   // Handle Video Selection with container GPS extraction (QuickTime, NMEA, camm, GPMF, loci)
   const handleVideoSelect = async (file: File) => {
     setVideoFile(file)
+    // Clear any previous GPX file and GPS state
+    setGpxFile(null)
+    setGpxPointsCount(undefined)
+    setRouteCoordinates([])
+    setHasAutoGps(false)
+    setIsAnalyzingGps(true)
+
     try {
       const meta = await extractGpsFromVideoFile(file)
       const dur = meta?.durationSeconds || 60
@@ -142,91 +202,72 @@ export default function SurveyStudioPage() {
           setCapturedAt(meta.capturedAt)
         }
 
-        const end = estimateEndCoordinate(meta.longitude, meta.latitude, dur)
-        setEndLng(end[0])
-        setEndLat(end[1])
+        if (meta.trackPoints && meta.trackPoints.length > 1) {
+          setRouteCoordinates(meta.trackPoints)
+          const lastPt = meta.trackPoints[meta.trackPoints.length - 1]
+          setEndLat(lastPt[0])
+          setEndLng(lastPt[1])
+          setGpxPointsCount(meta.trackPoints.length)
 
-        // Auto-generate companion GPX file from video telemetry if no manual GPX attached yet
-        const companionGpx = createCompanionGpxFile({
-          startCoordinate: [meta.longitude, meta.latitude],
-          endCoordinate: end,
-          capturedAt: meta.capturedAt || capturedAt || new Date().toISOString(),
-          durationSeconds: dur,
-          fileName: `${file.name.replace(/\.[^/.]+$/, '')}-companion.gpx`,
-        })
-        setGpxFile(companionGpx)
-        setGpxPointsCount(2)
+          const companionGpx = createCompanionGpxFile({
+            startCoordinate: [meta.longitude, meta.latitude],
+            endCoordinate: [lastPt[1], lastPt[0]],
+            trackPoints: meta.trackPoints,
+            capturedAt: meta.capturedAt || capturedAt || new Date().toISOString(),
+            durationSeconds: dur,
+            fileName: `${file.name.replace(/\.[^/.]+$/, '')}-telemetry.gpx`,
+          })
+          setGpxFile(companionGpx)
+        } else {
+          const end = estimateEndCoordinate(meta.longitude, meta.latitude, dur)
+          setEndLng(end[0])
+          setEndLat(end[1])
+          setRouteCoordinates([[meta.latitude, meta.longitude], [end[1], end[0]]])
+
+          // Auto-generate companion GPX file from video telemetry
+          const companionGpx = createCompanionGpxFile({
+            startCoordinate: [meta.longitude, meta.latitude],
+            endCoordinate: end,
+            capturedAt: meta.capturedAt || capturedAt || new Date().toISOString(),
+            durationSeconds: dur,
+            fileName: `${file.name.replace(/\.[^/.]+$/, '')}-companion.gpx`,
+          })
+          setGpxFile(companionGpx)
+          setGpxPointsCount(2)
+        }
       } else {
         setHasAutoGps(false)
-        const end = estimateEndCoordinate(photoLng, photoLat, dur)
-        setEndLng(end[0])
-        setEndLat(end[1])
+        setGpxFile(null)
+        setGpxPointsCount(undefined)
+        setRouteCoordinates([])
+        setPhotoLat(undefined)
+        setPhotoLng(undefined)
+        setEndLat(undefined)
+        setEndLng(undefined)
       }
     } catch (err) {
       console.warn('[SurveyStudio] Failed to inspect video file for GPS:', err)
       setHasAutoGps(false)
+      setGpxFile(null)
+      setGpxPointsCount(undefined)
+      setRouteCoordinates([])
+      setPhotoLat(undefined)
+      setPhotoLng(undefined)
+      setEndLat(undefined)
+      setEndLng(undefined)
+    } finally {
+      setIsAnalyzingGps(false)
     }
   }
 
-  // Handle GPX / Companion Telemetry Selection (supports .gpx, companion frame .jpg, and .json)
+  // Handle GPX Trajectory Selection (Strictly .gpx)
   const handleGpxSelect = async (file: File) => {
     try {
-      // 1. If companion image (e.g. frame_000505.jpg), extract EXIF/JSON GPS & create companion GPX
-      if (file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name)) {
-        const meta = await extractImageFileMetadata(file)
-        if (meta.latitude && meta.longitude) {
-          setPhotoLat(meta.latitude)
-          setPhotoLng(meta.longitude)
-          setHasAutoGps(true)
-          if (meta.capturedAt) {
-            setCapturedAt(meta.capturedAt)
-          }
-          const companionGpx = createCompanionGpxFile({
-            startCoordinate: [meta.longitude, meta.latitude],
-            endCoordinate: estimateEndCoordinate(meta.longitude, meta.latitude, 60),
-            capturedAt: meta.capturedAt || capturedAt || new Date().toISOString(),
-            durationSeconds: 60,
-            fileName: `${file.name.replace(/\.[^/.]+$/, '')}-companion.gpx`,
-          })
-          setGpxFile(companionGpx)
-          setGpxPointsCount(2)
-          toast.success(
-            `Đã trích xuất toạ độ GPS từ ảnh chụp kèm (${meta.latitude.toFixed(5)}, ${meta.longitude.toFixed(5)})`,
-            t('survey.gps_detected_title')
-          )
-          return
-        } else {
-          toast.warning('Ảnh chụp kèm không chứa siêu dữ liệu toạ độ GPS.')
-          return
-        }
+      if (!file.name.toLowerCase().endsWith('.gpx') && !file.type.includes('gpx')) {
+        toast.warning('Vui lòng chọn tệp hành trình định dạng .gpx')
+        return
       }
 
-      // 2. If companion JSON telemetry file
-      if (file.type.includes('json') || file.name.endsWith('.json')) {
-        const text = await file.text()
-        const cLatMatch = /(?:c_lat|latitude|lat)[\s"':=]+([+-]?\d{1,2}\.\d{4,})/i.exec(text)
-        const cLonMatch = /(?:c_lon|longitude|lon)[\s"':=]+([+-]?\d{1,3}\.\d{4,})/i.exec(text)
-        if (cLatMatch && cLonMatch) {
-          const lat = Number.parseFloat(cLatMatch[1])
-          const lon = Number.parseFloat(cLonMatch[1])
-          setPhotoLat(lat)
-          setPhotoLng(lon)
-          setHasAutoGps(true)
-          const companionGpx = createCompanionGpxFile({
-            startCoordinate: [lon, lat],
-            endCoordinate: estimateEndCoordinate(lon, lat, 60),
-            capturedAt: capturedAt || new Date().toISOString(),
-            durationSeconds: 60,
-            fileName: `${file.name.replace(/\.[^/.]+$/, '')}-companion.gpx`,
-          })
-          setGpxFile(companionGpx)
-          setGpxPointsCount(2)
-          toast.success(`Đã trích xuất toạ độ GPS từ file JSON (${lat.toFixed(5)}, ${lon.toFixed(5)})`, t('survey.gps_detected_title'))
-          return
-        }
-      }
-
-      // 3. Standard GPX file
       setGpxFile(file)
       const parsed = await parseGpxFile(file)
       if (parsed.firstPoint) {
@@ -234,6 +275,14 @@ export default function SurveyStudioPage() {
         setPhotoLng(parsed.firstPoint.longitude)
         setGpxPointsCount(parsed.totalPoints)
         setHasAutoGps(true)
+        if (parsed.lastPoint) {
+          setEndLat(parsed.lastPoint.latitude)
+          setEndLng(parsed.lastPoint.longitude)
+        }
+        if (parsed.coordinates && parsed.coordinates.length > 0) {
+          const latLngs: [number, number][] = parsed.coordinates.map(([lon, lat]) => [lat, lon])
+          setRouteCoordinates(latLngs)
+        }
         if (parsed.startTime) {
           setCapturedAt(parsed.startTime)
         }
@@ -243,8 +292,8 @@ export default function SurveyStudioPage() {
         )
       }
     } catch (err) {
-      console.warn('[SurveyStudio] Failed to parse GPX/companion file:', err)
-      toast.error('Không thể đọc file toạ độ. Vui lòng kiểm tra định dạng.')
+      console.warn('[SurveyStudio] Failed to parse GPX file:', err)
+      toast.error('Không thể đọc file toạ độ GPX. Vui lòng kiểm tra định dạng.')
     }
   }
 
@@ -252,6 +301,26 @@ export default function SurveyStudioPage() {
   const handleUpload = async () => {
     if (isUploading) return
     setError('')
+
+    if (!hasRequiredGps) {
+      if (mode === 'photo_gps') {
+        setError('Ảnh bắt buộc phải có dữ liệu toạ độ GPS (EXIF) để nộp.')
+        toast.warning('Ảnh không chứa toạ độ GPS trong dữ liệu EXIF.')
+      } else {
+        setError('Video bắt buộc phải có dữ liệu toạ độ GPS (telemetry) để nộp.')
+        toast.warning('Video không chứa dữ liệu toạ độ GPS trong metadata/telemetry.')
+      }
+      setCurrentStep('media')
+      return
+    }
+
+    if (photoLat == null || photoLng == null) {
+      setError('Vui lòng chọn hoặc nhập toạ độ vị trí khảo sát trước khi gửi.')
+      toast.warning('Vui lòng chọn hoặc nhập toạ độ vị trí khảo sát')
+      setCurrentStep('details')
+      return
+    }
+
     setIsUploading(true)
     setIsPaused(false)
     isPausedRef.current = false
@@ -271,10 +340,13 @@ export default function SurveyStudioPage() {
 
       let finalGpx = isVideo ? gpxFile : undefined
       // Auto-synthesize companion GPX if video without separate GPX file
-      if (isVideo && !finalGpx) {
+      if (isVideo && !finalGpx && photoLng != null && photoLat != null) {
+        const finalEndLng = endLng ?? photoLng
+        const finalEndLat = endLat ?? photoLat
         finalGpx = createCompanionGpxFile({
           startCoordinate: [photoLng, photoLat],
-          endCoordinate: [endLng, endLat],
+          endCoordinate: [finalEndLng, finalEndLat],
+          trackPoints: routeCoordinates.length > 1 ? routeCoordinates : undefined,
           capturedAt: capturedAt || new Date().toISOString(),
           durationSeconds: durationSeconds || 60,
           fileName: `${targetFile.name.replace(/\.[^/.]+$/, '')}-companion.gpx`,
@@ -324,6 +396,10 @@ export default function SurveyStudioPage() {
     setGpxFile(null)
     setPhotoFile(null)
     setPhotoPreview(null)
+    setPhotoLat(undefined)
+    setPhotoLng(undefined)
+    setEndLat(undefined)
+    setEndLng(undefined)
     setNote('')
     setChunkProgress({ step: 'initializing', percent: 0 })
     setError('')
@@ -340,9 +416,9 @@ export default function SurveyStudioPage() {
               variant="outline"
               size="md"
               onClick={() => navigate('/survey/history')}
-              leftIcon={<Compass size={18} weight="bold" />}
+              leftIcon={<ClockCounterClockwise size={18} weight="bold" />}
             >
-              {t('survey.btn_view_telemetry')}
+              {t('nav.survey_history', 'Lịch sử khảo sát')}
             </Button>
           }
         />
@@ -473,19 +549,30 @@ export default function SurveyStudioPage() {
           {currentStep === 'media' && (
             <SurveyMediaStep
               mode={mode}
-              onModeChange={setMode}
+              onModeChange={handleModeChange}
               videoFile={videoFile}
               gpxFile={gpxFile}
               photoFile={photoFile}
               photoPreview={photoPreview}
               hasAutoGps={hasAutoGps}
+              isAnalyzingGps={isAnalyzingGps}
               photoLat={photoLat}
               photoLng={photoLng}
               gpxPointsCount={gpxPointsCount}
               onPhotoSelect={handlePhotoSelect}
               onVideoSelect={handleVideoSelect}
               onGpxSelect={handleGpxSelect}
-              onNext={() => setCurrentStep('details')}
+              onNext={() => {
+                if (isMediaValid) {
+                  setCurrentStep('details')
+                } else {
+                  if (mode === 'photo_gps' && photoFile && !hasAutoGps) {
+                    toast.warning('Ảnh không chứa toạ độ GPS trong dữ liệu EXIF.')
+                  } else if (mode === 'video_gpx' && videoFile && !hasAutoGps) {
+                    toast.warning('Video không chứa dữ liệu toạ độ GPS trong metadata/telemetry.')
+                  }
+                }
+              }}
               isDark={isDark}
             />
           )}
@@ -494,7 +581,6 @@ export default function SurveyStudioPage() {
             <SurveyDetailsStep
               mode={mode}
               videoFile={videoFile}
-              gpxFile={gpxFile}
               photoFile={photoFile}
               photoPreview={photoPreview}
               capturedAt={capturedAt}
@@ -503,21 +589,13 @@ export default function SurveyStudioPage() {
               lng={photoLng}
               endLat={endLat}
               endLng={endLng}
+              routeCoordinates={routeCoordinates}
               durationSeconds={durationSeconds}
               hasAutoGps={hasAutoGps}
               isUploading={isUploading}
               isDark={isDark}
               onCapturedAtChange={setCapturedAt}
               onNoteChange={setNote}
-              onChangeLocation={(lat, lng) => {
-                setPhotoLat(lat)
-                setPhotoLng(lng)
-              }}
-              onChangeEndLocation={(lat, lng) => {
-                setEndLat(lat)
-                setEndLng(lng)
-              }}
-              onGpxSelect={handleGpxSelect}
               onBack={() => setCurrentStep('media')}
               onSubmit={handleUpload}
             />
