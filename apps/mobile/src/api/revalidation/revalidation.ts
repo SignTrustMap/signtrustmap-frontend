@@ -61,6 +61,29 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
   const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
   const repUrl = resolveRepresentativeSignUrl(raw.name_en || raw.nameEn, code);
 
+  const rawAny = raw as any;
+  const rawLat =
+    raw.latitude ??
+    rawAny.lat ??
+    rawAny.location?.lat ??
+    rawAny.location?.latitude ??
+    rawAny.y;
+  const rawLon =
+    raw.longitude ??
+    rawAny.lon ??
+    rawAny.lng ??
+    rawAny.location?.lon ??
+    rawAny.location?.lng ??
+    rawAny.location?.longitude ??
+    rawAny.x;
+
+  const parsedLat = Number(rawLat);
+  const parsedLon = Number(rawLon);
+  const latitude =
+    Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : 10.7769;
+  const longitude =
+    Number.isFinite(parsedLon) && parsedLon >= -180 && parsedLon <= 180 ? parsedLon : 106.6955;
+
   return {
     id: raw.id,
     verifiedSignId: raw.verified_sign_id || raw.verifiedSignId || raw.id,
@@ -70,8 +93,8 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
     priority: normalizePriority(raw.priority),
     status: normalizeStatus(raw.status),
     staleDays: raw.created_at ? Math.max(1, Math.round((Date.now() - new Date(raw.created_at).getTime()) / (1000 * 3600 * 24))) : 60,
-    latitude: Number(raw.latitude),
-    longitude: Number(raw.longitude),
+    latitude,
+    longitude,
     historicalCropUrl: resolvedCrop,
     representativeUrl: repUrl,
     lastVerifiedDate: raw.created_at || raw.createdAt,
@@ -202,8 +225,13 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     score = task.currentTrustScore > 1 ? task.currentTrustScore / 100 : task.currentTrustScore;
   }
 
+  const rawLat = Number(task.latitude);
+  const rawLon = Number(task.longitude);
+  const validLat = Number.isFinite(rawLat) && rawLat >= -90 && rawLat <= 90 ? rawLat : 10.7769;
+  const validLon = Number.isFinite(rawLon) && rawLon >= -180 && rawLon <= 180 ? rawLon : 106.6955;
+
   return {
-    coordinate: [task.longitude, task.latitude],
+    coordinate: [validLon, validLat],
     id: task.verifiedSignId || task.id,
     taskId: task.id,
     imageUrl: repUrl,

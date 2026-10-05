@@ -49,6 +49,21 @@ function loadMapLibre(): MapLibreModule | null {
   return getMapLibre();
 }
 
+function isValidCoordinate(coord?: MapCoordinate): coord is [number, number] {
+  return (
+    Array.isArray(coord) &&
+    coord.length === 2 &&
+    typeof coord[0] === 'number' &&
+    typeof coord[1] === 'number' &&
+    Number.isFinite(coord[0]) &&
+    Number.isFinite(coord[1]) &&
+    coord[0] >= -180 &&
+    coord[0] <= 180 &&
+    coord[1] >= -90 &&
+    coord[1] <= 90
+  );
+}
+
 export function RevalidationMapView({
   signs = [],
   selectedSignId,
@@ -116,7 +131,7 @@ export function RevalidationMapView({
       touchPitch={false}
       touchRotate
     >
-      {focusCoordinate ? (
+      {isValidCoordinate(focusCoordinate) ? (
         <Camera
           center={focusCoordinate}
           duration={700}
@@ -127,7 +142,7 @@ export function RevalidationMapView({
           ref={cameraRef}
           zoom={zoomLevel ?? 16.5}
         />
-      ) : userCoordinate ? (
+      ) : isValidCoordinate(userCoordinate) ? (
         <Camera
           center={userCoordinate}
           duration={800}
@@ -151,21 +166,23 @@ export function RevalidationMapView({
       )}
 
       {/* Render Verified Signs with Freshness Indicators */}
-      {signs.map((sign) => {
-        const isSelected = selectedSignId === sign.id;
-        const isDimmed = Boolean(selectedSignId && !isSelected);
-        return (
-          <Marker
-            anchor="center"
-            id={`reval-sign-${sign.id}`}
-            key={sign.id}
-            lngLat={sign.coordinate}
-            onPress={() => onSignPress?.(sign)}
-          >
-            <RevalidationSignMarker isDimmed={isDimmed} isSelected={isSelected} sign={sign} />
-          </Marker>
-        );
-      })}
+      {signs
+        .filter((sign) => isValidCoordinate(sign.coordinate))
+        .map((sign) => {
+          const isSelected = selectedSignId === sign.id;
+          const isDimmed = Boolean(selectedSignId && !isSelected);
+          return (
+            <Marker
+              anchor="center"
+              id={`reval-sign-${sign.id}`}
+              key={sign.id}
+              lngLat={sign.coordinate}
+              onPress={() => onSignPress?.(sign)}
+            >
+              <RevalidationSignMarker isDimmed={isDimmed} isSelected={isSelected} sign={sign} />
+            </Marker>
+          );
+        })}
 
     </Map>
   );

@@ -228,10 +228,16 @@ export function RevalidationMapScreen() {
   useEffect(() => {
     if (selectedSign && selectedSign.id !== lastSnappedSignIdRef.current) {
       lastSnappedSignIdRef.current = selectedSign.id;
-      setFocusCoordinate(selectedSign.coordinate);
-      setFocusRequestId((prev) => prev + 1);
-      setZoomLevel(17.5);
-      setActiveZoomId('detail');
+      if (
+        Array.isArray(selectedSign.coordinate) &&
+        Number.isFinite(selectedSign.coordinate[0]) &&
+        Number.isFinite(selectedSign.coordinate[1])
+      ) {
+        setFocusCoordinate(selectedSign.coordinate);
+        setFocusRequestId((prev) => prev + 1);
+        setZoomLevel(17.5);
+        setActiveZoomId('detail');
+      }
     }
   }, [selectedSign]);
 
@@ -357,10 +363,16 @@ export function RevalidationMapScreen() {
   const handleSignListItemPress = useCallback((sign: RouteSign) => {
     setIsSignListOpen(false);
     setOverrideSign(sign);
-    setFocusCoordinate(sign.coordinate);
-    setFocusRequestId((prev) => prev + 1);
-    setZoomLevel(17.5);
-    setActiveZoomId('detail');
+    if (
+      Array.isArray(sign.coordinate) &&
+      Number.isFinite(sign.coordinate[0]) &&
+      Number.isFinite(sign.coordinate[1])
+    ) {
+      setFocusCoordinate(sign.coordinate);
+      setFocusRequestId((prev) => prev + 1);
+      setZoomLevel(17.5);
+      setActiveZoomId('detail');
+    }
     setIsZoomMenuOpen(false);
   }, []);
 
