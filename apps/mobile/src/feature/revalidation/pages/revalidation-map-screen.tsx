@@ -22,7 +22,10 @@ import type { FindTasksInBoundsParams } from '@/types/revalidationType';
 import { useGetSignsInBounds } from '@/feature/navigation/hooks/use-signs';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { revalidationTaskToRouteSign } from '@/api/revalidation/revalidation';
-import { useGetRevalidationTasksInBounds } from '../hooks/use-revalidation';
+import {
+  useGetAllRevalidationTasks,
+  useGetRevalidationTasksInBounds,
+} from '../hooks/use-revalidation';
 
 import { RevalidationMapView } from '../components/revalidation-map-view';
 import { getFreshnessInfo } from '../components/revalidation-sign-marker';
@@ -111,6 +114,9 @@ export function RevalidationMapScreen() {
   const [signListHeight, setSignListHeight] = useState(0);
   const [buttonsTranslateY] = useState(() => new Animated.Value(0));
 
+  // Fetch all revalidation tasks from backend (global, independent of viewport)
+  const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } = useGetAllRevalidationTasks(true);
+
   // Fetch verified signs within current map bounds
   const { data: boundsSigns = [] } = useGetSignsInBounds(bounds, true);
 
@@ -135,6 +141,15 @@ export function RevalidationMapScreen() {
       signMap.set(sign.id, sign);
     }
 
+    for (const task of allRevalTasks) {
+      const converted = revalidationTaskToRouteSign(task);
+      const existing = signMap.get(converted.id);
+      signMap.set(converted.id, {
+        ...(existing ?? {}),
+        ...converted,
+      });
+    }
+
     for (const task of revalTasks) {
       const converted = revalidationTaskToRouteSign(task);
       const existing = signMap.get(converted.id);
@@ -154,7 +169,7 @@ export function RevalidationMapScreen() {
     }
 
     return Array.from(signMap.values());
-  }, [boundsSigns, revalTasks, initialSign]);
+  }, [boundsSigns, allRevalTasks, revalTasks, initialSign]);
 
   // Derive selectedSign dynamically: user override > initialSign > selectedSignId > autoSelectFirst
   const selectedSign = useMemo<RouteSign | null>(() => {
@@ -299,10 +314,37 @@ export function RevalidationMapScreen() {
     });
   }, [rawSigns, activeFilter, selectedSign]);
 
+  // Signs that need revalidation, sorted by freshness score ascending (worst first)
+  const staleSigns = useMemo(() => {
+    const staleMap = new Map<string, RouteSign>();
+
+    // 1. Ensure all revalidation tasks from backend are present
+    for (const task of allRevalTasks) {
+      const sign = revalidationTaskToRouteSign(task);
+      staleMap.set(sign.id, sign);
+    }
+
+    // 2. Also include any other stale signs in rawSigns (e.g. from viewport or initialSign)
+    for (const sign of rawSigns) {
+      if (getFreshnessInfo(sign).isStale) {
+        const existing = staleMap.get(sign.id);
+        staleMap.set(sign.id, {
+          ...(existing ?? {}),
+          ...sign,
+          taskId: sign.taskId ?? existing?.taskId,
+        });
+      }
+    }
+
+    return Array.from(staleMap.values()).sort(
+      (a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0),
+    );
+  }, [allRevalTasks, rawSigns]);
+
   // Statistics for header summary
   const staleCount = useMemo(() => {
-    return rawSigns.filter((s) => getFreshnessInfo(s).isStale).length;
-  }, [rawSigns]);
+    return staleSigns.length;
+  }, [staleSigns]);
 
   const moderateCount = useMemo(() => {
     return rawSigns.filter((s) => getFreshnessInfo(s).isModerate).length;
@@ -310,13 +352,6 @@ export function RevalidationMapScreen() {
 
   const freshCount = useMemo(() => {
     return rawSigns.filter((s) => getFreshnessInfo(s).isFresh).length;
-  }, [rawSigns]);
-
-  // Signs that need revalidation, sorted by freshness score ascending (worst first)
-  const staleSigns = useMemo(() => {
-    return rawSigns
-      .filter((s) => getFreshnessInfo(s).isStale)
-      .sort((a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0));
   }, [rawSigns]);
 
   const handleSignListItemPress = useCallback((sign: RouteSign) => {
@@ -332,7 +367,8 @@ export function RevalidationMapScreen() {
   const handleRevalidateAction = (sign: RouteSign) => {
     const matchedTask = sign.taskId
       ? undefined
-      : revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
+      : allRevalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id) ||
+        revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
     const resolvedTaskId = sign.taskId || matchedTask?.id || '';
 
     router.push({
@@ -689,11 +725,18 @@ export function RevalidationMapScreen() {
           <View style={[styles.signListDivider, { backgroundColor: theme.border }]} />
 
           {/* Scrollable Sign List */}
-          {staleSigns.length === 0 ? (
+          {isLoadingAllTasks && staleSigns.length === 0 ? (
+            <View style={styles.signListEmpty}>
+              <ActivityIndicator color={theme.primary} size="small" />
+              <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
+                Loading revalidation signs...
+              </Text>
+            </View>
+          ) : staleSigns.length === 0 ? (
             <View style={styles.signListEmpty}>
               <MaterialCommunityIcons color={theme.grey} name="check-circle-outline" size={32} />
               <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
-                No signs need revalidation in this area
+                No signs need revalidation
               </Text>
             </View>
           ) : (
@@ -770,6 +813,9 @@ export function RevalidationMapScreen() {
           sign={selectedSign}
           taskId={
             selectedSign.taskId ||
+            allRevalTasks.find(
+              (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
+            )?.id ||
             revalTasks.find(
               (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
             )?.id

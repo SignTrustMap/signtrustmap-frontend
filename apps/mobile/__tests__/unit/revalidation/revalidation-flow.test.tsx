@@ -317,4 +317,74 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       expect(onCloseMock).toHaveBeenCalled();
     });
   });
+
+  describe('Global Revalidation Tasks List Logic', () => {
+    it('ensures backend revalidation tasks are always present in stale list regardless of viewport', () => {
+      // Signs returned from map bounds (e.g. only 1 active sign in current viewport)
+      const boundsSigns: RouteSign[] = [
+        createMockSign({ id: 'viewport-sign-1', signCode: 'W.201a', freshnessScore: 0.95, status: 'ACTIVE' }),
+      ];
+
+      // Revalidation tasks from backend (located anywhere in the city/country)
+      const allBackendTasks = [
+        {
+          id: 'task-global-1',
+          verifiedSignId: 'sign-far-1',
+          code: 'P.102',
+          name: 'Đường cấm',
+          category: 'PROHIBITORY' as const,
+          priority: 'HIGH' as const,
+          status: 'OPEN' as const,
+          staleDays: 45,
+          latitude: 10.82,
+          longitude: 106.65,
+          reason: 'Stale sign',
+          rewardCredits: 30,
+          currentTrustScore: 0,
+        },
+        {
+          id: 'task-global-2',
+          verifiedSignId: 'sign-far-2',
+          code: 'P.124a',
+          name: 'Cấm quay đầu xe',
+          category: 'PROHIBITORY' as const,
+          priority: 'NORMAL' as const,
+          status: 'OPEN' as const,
+          staleDays: 60,
+          latitude: 10.72,
+          longitude: 106.71,
+          reason: 'Stale sign',
+          rewardCredits: 30,
+          currentTrustScore: 0,
+        },
+      ];
+
+      // Reconstruct the screen's staleSigns merge logic
+      const { revalidationTaskToRouteSign } = require('@/api/revalidation/revalidation');
+      const staleMap = new Map<string, RouteSign>();
+
+      for (const task of allBackendTasks) {
+        const sign = revalidationTaskToRouteSign(task);
+        staleMap.set(sign.id, sign);
+      }
+
+      for (const sign of boundsSigns) {
+        if (getFreshnessInfo(sign).isStale) {
+          staleMap.set(sign.id, sign);
+        }
+      }
+
+      const staleSigns = Array.from(staleMap.values()).sort(
+        (a, b) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0),
+      );
+
+      // Both backend revalidation tasks must be in the stale list even though neither is in boundsSigns
+      expect(staleSigns).toHaveLength(2);
+      expect(staleSigns.map((s) => s.signCode)).toEqual(
+        expect.arrayContaining(['P.102', 'P.124a']),
+      );
+      // Viewport active sign (95% fresh) should not be in the stale list
+      expect(staleSigns.find((s) => s.id === 'viewport-sign-1')).toBeUndefined();
+    });
+  });
 });

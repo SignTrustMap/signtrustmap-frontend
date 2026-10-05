@@ -2,6 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   fetchFirstRevalidationSign,
+  getAllRevalidationTasks,
   getRevalidationEvidenceQueue,
   getRevalidationTasksInBounds,
   getTaskEvidences,
@@ -23,6 +24,23 @@ export function isRealWorldTaskBounds(bounds: FindTasksInBoundsParams | undefine
     Number.isFinite(minLon) &&
     Number.isFinite(maxLon)
   );
+}
+
+export function useGetAllRevalidationTasks(
+  paramsOrEnabled?: { status?: string; priority?: string; pageSize?: number } | boolean,
+  enabledParam = true,
+) {
+  const params = typeof paramsOrEnabled === 'object' ? paramsOrEnabled : undefined;
+  const enabled = typeof paramsOrEnabled === 'boolean' ? paramsOrEnabled : enabledParam;
+
+  return useQuery({
+    queryKey: ['all-revalidation-tasks', params],
+    queryFn: enabled
+      ? ({ signal }) => getAllRevalidationTasks(params, signal)
+      : skipToken,
+    enabled,
+    staleTime: 60_000,
+  });
 }
 
 export function useGetRevalidationTasksInBounds(

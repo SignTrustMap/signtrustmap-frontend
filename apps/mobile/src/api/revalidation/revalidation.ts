@@ -116,6 +116,78 @@ export async function getRevalidationTasksInBounds(
 }
 
 /**
+ * Fetches all available revalidation tasks from the backend (independent of viewport).
+ * First attempts to query without bounding box, then falls back to nationwide bounds.
+ */
+export async function getAllRevalidationTasks(
+  params?: { status?: string; priority?: string; pageSize?: number },
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTaskItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const pageSize = String(params?.pageSize ?? 100);
+
+  // 1. Try querying /revalidation/tasks/map without bbox parameters
+  try {
+    const searchParams = new URLSearchParams({ pageSize });
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.priority) searchParams.append('priority', params.priority);
+
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      `${API_PATHS.REVALIDATION_TASKS_MAP}?${searchParams.toString()}`,
+      { signal },
+      token,
+    );
+    if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+      return res.items.map(toRevalidationTaskItem);
+    }
+  } catch {
+    // Continue to next fallback
+  }
+
+  // 2. Try querying /revalidation/tasks
+  try {
+    const searchParams = new URLSearchParams({ page: '1', pageSize });
+    if (params?.status) searchParams.append('status', params.status);
+
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      `${API_PATHS.REVALIDATION_TASKS}?${searchParams.toString()}`,
+      { signal },
+      token,
+    );
+    if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+      return res.items.map(toRevalidationTaskItem);
+    }
+  } catch {
+    // Continue to broad country bounds fallback
+  }
+
+  // 3. Fallback: query /revalidation/tasks/map with Vietnam-wide bounds
+  try {
+    const res = await getRevalidationTasksInBounds(
+      {
+        minLat: 8.0,
+        minLon: 102.0,
+        maxLat: 24.0,
+        maxLon: 110.0,
+        pageSize: params?.pageSize ?? 100,
+        status: params?.status,
+        priority: params?.priority,
+      },
+      signal,
+      token,
+    );
+    if (res && res.length > 0) {
+      return res;
+    }
+  } catch (err) {
+    console.warn('getAllRevalidationTasks fallback failed:', err);
+  }
+
+  return [];
+}
+
+/**
  * Transforms a RevalidationTaskItem into a standard RouteSign for rendering on map & details card.
  */
 export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSign {
@@ -141,7 +213,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     nameEn: task.name,
     signCode: code,
     freshnessScore: score,
-    status: score < 0.5 ? 'STALE' : score < 0.8 ? 'MODERATE' : 'ACTIVE',
+    status: 'STALE',
     roadName: task.roadName || 'Ho Chi Minh City, Vietnam',
     displayAddress: task.roadName || 'Ho Chi Minh City, Vietnam',
     lastVerifiedAt: task.lastVerifiedDate,

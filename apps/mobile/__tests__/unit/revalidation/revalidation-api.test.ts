@@ -2,6 +2,7 @@ import {
   toRevalidationTaskItem,
   revalidationTaskToRouteSign,
   getRevalidationTasksInBounds,
+  getAllRevalidationTasks,
   fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
@@ -271,6 +272,81 @@ describe('Revalidation API Module', () => {
       (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ items: [] });
 
       const tasks = await getRevalidationTasksInBounds(testBounds);
+      expect(Array.isArray(tasks)).toBe(true);
+      expect(tasks.length).toBe(0);
+    });
+  });
+
+  describe('getAllRevalidationTasks', () => {
+    it('fetches tasks without bounding box when endpoint supports it', async () => {
+      const mockRawResponse = {
+        items: [
+          {
+            id: 'task-all-1',
+            verified_sign_id: 'sign-all-1',
+            sign_code: 'P.124a',
+            name_vi: 'Cấm quay đầu xe',
+            latitude: 10.75,
+            longitude: 106.68,
+            created_at: new Date().toISOString(),
+            freshness_score: 0,
+            priority: 'HIGH',
+            status: 'OPEN',
+          },
+        ],
+        total: 1,
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRawResponse);
+
+      const tasks = await getAllRevalidationTasks();
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].id).toBe('task-all-1');
+      expect(tasks[0].code).toBe('P.124a');
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks/map?pageSize=100'),
+        expect.anything(),
+        'mock-stored-jwt-token',
+      );
+    });
+
+    it('falls back to broad nationwide bounds if unbounded query fails', async () => {
+      // First attempt fails (e.g. backend requires bbox)
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('bbox required'));
+      // Second attempt (/revalidation/tasks) also fails
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('not available'));
+      // Third attempt (broad bounds query) succeeds
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
+        items: [
+          {
+            id: 'task-fallback-1',
+            verified_sign_id: 'sign-fallback-1',
+            sign_code: 'P.131a',
+            name_vi: 'Cấm đỗ xe',
+            latitude: 10.77,
+            longitude: 106.69,
+            created_at: new Date().toISOString(),
+            freshness_score: 0,
+            priority: 'NORMAL',
+            status: 'OPEN',
+          },
+        ],
+        total: 1,
+      });
+
+      const tasks = await getAllRevalidationTasks();
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].id).toBe('task-fallback-1');
+      expect(tasks[0].code).toBe('P.131a');
+    });
+
+    it('returns empty array when all attempts fail', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('fail 1'));
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('fail 2'));
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('fail 3'));
+
+      const tasks = await getAllRevalidationTasks();
       expect(Array.isArray(tasks)).toBe(true);
       expect(tasks.length).toBe(0);
     });

@@ -266,7 +266,17 @@ export function RevalidationSignDetailsCard({
                 </Text>
                 <View
                   style={[
-                    { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: statusConfig.bg,
+                      borderColor: statusConfig.border,
+                    },
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -274,6 +284,9 @@ export function RevalidationSignDetailsCard({
                     name={statusConfig.icon}
                     size={11}
                   />
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: statusConfig.text }}>
+                    {statusConfig.label}
+                  </Text>
                 </View>
               </View>
 
