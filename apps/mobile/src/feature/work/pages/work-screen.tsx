@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { useGetReviewQueue } from '@/feature/review/hooks/use-review';
 import {
@@ -182,14 +182,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   variant="ghost"
                 >
                   <MaterialCommunityIcons
-                    color={isActive ? theme.primary : theme.grey}
+                    color={isActive ? "#fff" : theme.grey}
                     name={meta.icon}
                     size={20}
                   />
                   <Text
                     style={[
                       styles.roleTabText,
-                      { color: isActive ? theme.primary : theme.text },
+                      { color: isActive ? "#fff" : theme.text },
                     ]}
                   >
                     {meta.label}
@@ -210,7 +210,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                           { color: isActive ? theme.onPrimary : theme.text },
                         ]}
                       >
-                        {badgeCount}
+                        {badgeCount > 10 ? "10+" : badgeCount}
                       </Text>
                     </View>
                   ) : null}
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
   },
   roleSwitcher: {
     flexDirection: 'row',
-    borderRadius: Rounded.lg,
+    borderRadius: Rounded.round,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -490,9 +490,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
     borderBottomWidth: 3,
     borderBottomColor: 'transparent',
+    borderRadius: Rounded.round,
   },
   roleTabActive: {
-    backgroundColor: 'rgba(6, 113, 235, 0.05)',
+    backgroundColor: Colors.primary,
   },
   roleTabText: {
     fontFamily: Fonts.body,

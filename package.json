@@ -42,6 +42,18 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "testEnvironment": "<rootDir>/jest.environment.js",
+    "setupFiles": ["<rootDir>/jest.setup.js"],
+    "transform": {
+      "^.+\\.(js|jsx|ts|tsx|mjs)$": "babel-jest",
+      "^.+\\.(bmp|gif|jpg|jpeg|mp4|png|psd|svg|webp)$": "<rootDir>/node_modules/@react-native/jest-preset/jest/assetFileTransformer.js"
+    },
+
+    "transformIgnorePatterns": [
+      "node_modules[\\\\/](?!.*(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|msw|@msw|@mswjs|rettime|outvariant|until-async|@open-draft|is-node-process|cookie))",
+      "[\\\\/]node_modules[\\\\/]react-native-reanimated[\\\\/]plugin[\\\\/]",
+      "[\\\\/]node_modules[\\\\/]@react-native[\\\\/]babel-preset[\\\\/]"
+    ],
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/__mocks__/styleMock.js",
       "^@/(.*)$": "<rootDir>/apps/mobile/src/$1"

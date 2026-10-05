@@ -12,8 +12,8 @@ import {
 // ---------------------------------------------------------------------------
 // Helper: Pattern to match both absolute and relative backend URL paths
 // ---------------------------------------------------------------------------
-const LOGIN_PATH = '*/auth/login';
-const REGISTER_PATH = '*/auth/register';
+const LOGIN_PATH = '*/api/v1/auth/login';
+const REGISTER_PATH = '*/api/v1/auth/register';
 
 // ---------------------------------------------------------------------------
 // 1. Default Authentication Handlers (Standard Project API Behavior)
