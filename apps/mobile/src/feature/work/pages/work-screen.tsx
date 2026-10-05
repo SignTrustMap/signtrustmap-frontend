@@ -196,23 +196,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   </Text>
 
                   {badgeCount !== undefined && badgeCount > 0 ? (
-                    <View
+                    <Text
                       style={[
-                        styles.tabBadge,
-                        {
-                          backgroundColor: isActive ? theme.primary : `${theme.grey}25`,
-                        },
+                        styles.tabBadgeText,
+                        { color: isActive ? theme.onPrimary : theme.text },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.tabBadgeText,
-                          { color: isActive ? theme.onPrimary : theme.text },
-                        ]}
-                      >
-                        {badgeCount > 10 ? "10+" : badgeCount}
-                      </Text>
-                    </View>
+                      {badgeCount > 10 ? "10+" : badgeCount}
+                    </Text>
                   ) : null}
                 </AppButton>
               );
@@ -499,11 +490,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 14,
     fontWeight: '700',
-  },
-  tabBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
   },
   tabBadgeText: {
     fontFamily: Fonts.body,
