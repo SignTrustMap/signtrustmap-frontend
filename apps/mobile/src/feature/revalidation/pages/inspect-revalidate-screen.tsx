@@ -911,41 +911,6 @@ export function InspectRevalidateScreen() {
               ) : null}
             </View>
 
-            {/* =============================================================== */}
-            {/* 4. CONDITION & OBSERVATION NOTES (OTHER REQUIRED)               */}
-            {/* =============================================================== */}
-            <Text style={[styles.sectionHeading, { color: theme.text }]}>Physical Condition</Text>
-
-            <View style={styles.presetsWrap}>
-              {CONDITION_PRESETS.map((preset) => {
-                const isSelected = selectedCondition === preset.id;
-                return (
-                  <Pressable
-                    accessibilityLabel={preset.label}
-                    accessibilityRole="button"
-                    key={preset.id}
-                    onPress={() => setSelectedCondition(preset.id)}
-                    style={[
-                      styles.conditionChip,
-                      {
-                        backgroundColor: isSelected ? '#0671EB' : theme.backgroundElement,
-                        borderColor: isSelected ? '#0671EB' : theme.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.conditionChipText,
-                        { color: isSelected ? '#FFFFFF' : theme.text },
-                      ]}
-                    >
-                      {preset.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             {/* Labeled input for additional notes */}
             <View style={styles.inputLabelRow}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Additional Notes</Text>
