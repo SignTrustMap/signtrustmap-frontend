@@ -76,6 +76,33 @@ export default function ReviewerWorkspacePage() {
   const [stats, setStats] = useState<ReviewerMetrics>(defaultReviewerMetrics)
   const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>([])
 
+  const parseCandidateCoordinates = (item: any): { lat: number; lng: number } => {
+    if (typeof item.latitude === 'number' && typeof item.longitude === 'number') {
+      return { lat: item.latitude, lng: item.longitude }
+    }
+    if (item.locationContext?.coordinates?.latitude && item.locationContext?.coordinates?.longitude) {
+      return {
+        lat: Number(item.locationContext.coordinates.latitude),
+        lng: Number(item.locationContext.coordinates.longitude),
+      }
+    }
+    if (typeof item.submission?.latitude === 'number' && typeof item.submission?.longitude === 'number') {
+      return { lat: item.submission.latitude, lng: item.submission.longitude }
+    }
+    const noteStr = item.submission?.note || item.note
+    if (noteStr) {
+      const match = String(noteStr).match(/GPS:\s*([-\d.]+),\s*([-\d.]+)/i)
+      if (match) {
+        const parsedLat = parseFloat(match[1])
+        const parsedLng = parseFloat(match[2])
+        if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
+          return { lat: parsedLat, lng: parsedLng }
+        }
+      }
+    }
+    return { lat: 10.7769, lng: 106.7009 }
+  }
+
   // Load live queue and stats from API
   useEffect(() => {
     let active = true
@@ -90,6 +117,7 @@ export default function ReviewerWorkspacePage() {
             const type = item.predictedSignType
             const crop = resolveMediaUrl(item.signCropUrl)
             const frame = resolveMediaUrl(item.bestFrameUrl)
+            const coords = parseCandidateCoordinates(item)
             return {
               id: item.id,
               sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
@@ -98,8 +126,8 @@ export default function ReviewerWorkspacePage() {
               suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
               category: (type?.signCode?.charAt(0) || 'P') as any,
               confidence: 0.88,
-              lat: item.submission?.latitude ?? 10.7769,
-              lng: item.submission?.longitude ?? 106.7009,
+              lat: coords.lat,
+              lng: coords.lng,
               roadName: 'Đường khảo sát (Camera GPS)',
               directionHeading: 45,
               trafficFlowDirection: 'Northbound',

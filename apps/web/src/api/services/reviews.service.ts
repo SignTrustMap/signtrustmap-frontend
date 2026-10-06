@@ -3,10 +3,13 @@ import { API_ENDPOINTS } from '../endpoints'
 import type {
   ReviewCandidate,
   ReviewQueueResponse,
+  CandidateDetailResponse,
   VoteDto,
   ReportDto,
   ReviewerStatsResponse,
   MyReviewHistoryResponse,
+  TestReviewDto,
+  TestAssignDto,
 } from '@shared/types'
 
 /**
@@ -16,15 +19,51 @@ import type {
 export const reviewsService = {
   /**
    * Fetch a prioritized queue of candidate traffic signs awaiting community peer review.
+   * Supports `includeOwnSubmissions=true` for local development & self-review testing with 1 account.
    *
-   * @param params - Optional pagination query (page, pageSize).
+   * @param params - Optional pagination query (page, pageSize, includeOwnSubmissions).
    */
-  getReviewQueue: (params?: { page?: number; pageSize?: number }): Promise<ReviewQueueResponse> => {
+  getReviewQueue: (params?: {
+    page?: number
+    pageSize?: number
+    includeOwnSubmissions?: boolean
+  }): Promise<ReviewQueueResponse> => {
     const page = params?.page ?? 1
     const pageSize = params?.pageSize ?? 20
+    const allowSelf = params?.includeOwnSubmissions ?? true
+
+    const query = new URLSearchParams()
+    query.set('page', String(page))
+    query.set('pageSize', String(pageSize))
+    if (allowSelf) {
+      query.set('includeOwnSubmissions', 'true')
+    }
+
     return http.get<ReviewQueueResponse>(
-      `${API_ENDPOINTS.REVIEWS.QUEUE}?page=${page}&pageSize=${pageSize}`
+      `${API_ENDPOINTS.REVIEWS.QUEUE}?${query.toString()}`
     )
+  },
+
+  /**
+   * Direct Single-Reviewer Test Endpoint: POST /api/v1/reviews/test-review
+   * Submits a review for a specific reviewer and immediately evaluates single-vote consensus.
+   * Automatically provisions a reviewer profile if missing, deletes prior conflicts, and bypasses surveyor restrictions.
+   */
+  testReview: (
+    dto: TestReviewDto
+  ): Promise<{ success: boolean; vote?: number; message?: string; consensus?: any }> => {
+    return http.post(API_ENDPOINTS.REVIEWS.TEST_REVIEW, dto)
+  },
+
+  /**
+   * Direct Candidates to Specific Reviewer: POST /api/v1/reviews/test-assign
+   * Directs/resets candidate(s) specifically for a reviewer so they appear at the top of their queue
+   * (clears previous skips or votes by that reviewer).
+   */
+  testAssign: (
+    dto?: TestAssignDto
+  ): Promise<{ success: boolean; assignedCount?: number; candidateIds?: string[]; message?: string }> => {
+    return http.post(API_ENDPOINTS.REVIEWS.TEST_ASSIGN, dto ?? {})
   },
 
   /**
@@ -32,8 +71,8 @@ export const reviewsService = {
    *
    * @param candidateId - UUID of the candidate.
    */
-  getCandidateDetail: (candidateId: string): Promise<ReviewCandidate> => {
-    return http.get<ReviewCandidate>(API_ENDPOINTS.REVIEWS.CANDIDATE_DETAIL(candidateId))
+  getCandidateDetail: (candidateId: string): Promise<CandidateDetailResponse> => {
+    return http.get<CandidateDetailResponse>(API_ENDPOINTS.REVIEWS.CANDIDATE_DETAIL(candidateId))
   },
 
   /**

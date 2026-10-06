@@ -26,9 +26,10 @@ export const API_ENDPOINTS = {
     REPORT_ISSUE: (id: string) => `/api/v1/spatial/signs/${id}/report`,
   },
   CATALOG: {
-    BASE: '/api/v1/catalog',
-    DETAIL: (code: string) => `/api/v1/catalog/${code}`,
-    PROPOSE_NEW: '/api/v1/catalog/missing-reports',
+    CATEGORIES: '/api/v1/catalog/categories',
+    SIGN_TYPES: '/api/v1/catalog/sign-types',
+    SIGN_TYPE_DETAIL: (id: number | string) => `/api/v1/catalog/sign-types/${id}`,
+    PROPOSE_NEW: '/api/v1/reviews/missing-type',
   },
   SURVEY: {
     UPLOAD_VIDEO: '/api/v1/surveys/upload/video',
@@ -58,6 +59,8 @@ export const API_ENDPOINTS = {
     CANDIDATE_DETAIL: (candidateId: string) => `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}`,
     STATS: '/api/v1/reviews/me/stats',
     HISTORY: '/api/v1/reviews/me/history',
+    TEST_REVIEW: '/api/v1/reviews/test-review',
+    TEST_ASSIGN: '/api/v1/reviews/test-assign',
   },
   WALLET: {
     BALANCE: '/api/v1/economy/wallet/balance',

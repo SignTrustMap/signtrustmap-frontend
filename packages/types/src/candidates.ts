@@ -117,6 +117,20 @@ export interface ReportDto {
   reason: string
 }
 
+export interface TestReviewDto {
+  candidateId: string
+  reviewerId?: string
+  vote: 1 | -1
+  suggestedSignTypeId?: number
+  declineReason?: string
+  declineNote?: string
+}
+
+export interface TestAssignDto {
+  reviewerId?: string
+  candidateIds?: string[]
+}
+
 export interface ReviewCandidate {
   id: string
   submissionId: string
@@ -132,8 +146,19 @@ export interface ReviewCandidate {
   submission?: {
     surveyorId?: string
     createdAt?: string
+    submissionType?: string
     latitude?: number | null
     longitude?: number | null
+    note?: string | null
+  }
+  locationContext?: {
+    coordinates?: {
+      latitude: number
+      longitude: number
+    }
+    displayLocation?: string
+    nearbyRoad?: string | null
+    direction?: number | null
   }
 }
 
@@ -158,6 +183,21 @@ export interface MyReviewHistoryResponse {
   pageSize: number
   total: number
   totalPages: number
+}
+
+export interface CandidateDetailResponse {
+  candidate: ReviewCandidate
+  submission?: any
+  voteCount?: number
+  locationContext?: {
+    coordinates?: {
+      latitude: number
+      longitude: number
+    } | null
+    displayLocation?: string
+    nearbyRoad?: string | null
+    direction?: number | null
+  } | null
 }
 
 export interface ReviewerStatsResponse {

@@ -159,7 +159,10 @@ export function ReviewerMiniMap({
   useEffect(() => {
     if (!mapInstanceRef.current) return
 
-    mapInstanceRef.current.setView([lat, lng], 16, { animate: true })
+    mapInstanceRef.current.flyTo([lat, lng], 17, {
+      duration: 1.0,
+      easeLinearity: 0.25,
+    })
 
     if (pinMarkerRef.current) {
       pinMarkerRef.current.setLatLng([lat, lng])

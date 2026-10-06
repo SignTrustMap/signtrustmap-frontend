@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 export interface TrafficSignGraphicProps {
   sign: {
     code: string
@@ -5,15 +7,29 @@ export interface TrafficSignGraphicProps {
     color?: string
     nameVi?: string
     name?: string
+    imageUrl?: string
   }
   className?: string
   size?: number
 }
 
 export function TrafficSignGraphic({ sign, className = 'w-16 h-16', size }: TrafficSignGraphicProps) {
+  const [imgError, setImgError] = useState(false)
   const style = size ? { width: size, height: size } : undefined
   const code = (sign.code || '').toUpperCase().trim()
   const nameLabel = sign.nameVi || sign.name || sign.code
+
+  if (sign.imageUrl && !imgError) {
+    return (
+      <img
+        src={sign.imageUrl}
+        alt={nameLabel}
+        className={className}
+        style={{ ...style, objectFit: 'contain' }}
+        onError={() => setImgError(true)}
+      />
+    )
+  }
 
   // P.102: Cấm đi ngược chiều
   if (code === 'P.102') {
