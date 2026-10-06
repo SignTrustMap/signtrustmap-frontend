@@ -179,6 +179,7 @@ export function InspectRevalidateScreen() {
 
   // Observation state
   const [selectedCondition, setSelectedCondition] = useState<string>('INTACT');
+  const [suggestedSignTypeId, setSuggestedSignTypeId] = useState<string>('');
   const [customNote, setCustomNote] = useState('');
 
   // Submission state
@@ -485,6 +486,15 @@ export function InspectRevalidateScreen() {
       return;
     }
 
+    const evidenceType: 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' =
+      selectedCondition === 'REMOVED'
+        ? 'REMOVED'
+        : selectedCondition === 'REPLACED'
+          ? 'CHANGED'
+          : 'STILL_ACTIVE';
+
+    const parsedTypeId = suggestedSignTypeId.trim() ? parseInt(suggestedSignTypeId.trim(), 10) : undefined;
+
     try {
       await submitRevalidationEvidence(
         targetTaskId,
@@ -494,6 +504,8 @@ export function InspectRevalidateScreen() {
           capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
           note: `${selectedCondition}: ${customNote}`.trim(),
           condition: selectedCondition,
+          evidenceType,
+          suggestedSignTypeId: Number.isFinite(parsedTypeId) ? parsedTypeId : undefined,
         },
         selectedMedia
           ? {
@@ -1307,6 +1319,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     minHeight: 70,
     textAlignVertical: 'top',
+  },
+  suggestedTypeContainer: {
+    marginTop: Spacing.two,
+  },
+  singleLineInput: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
   },
   noteRequiredError: {
     color: '#DC2626',

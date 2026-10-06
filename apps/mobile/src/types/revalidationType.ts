@@ -2,7 +2,15 @@ import type { SignCategory } from '@/constants/sign-categories';
 
 export type TaskPriority = 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW';
 
-export type TaskStatus = 'OPEN' | 'EVALUATING' | 'CLOSED' | 'EXPIRED';
+export type TaskStatus =
+  | 'OPEN'
+  | 'EVALUATING'
+  | 'COMPLETED'
+  | 'CLOSED'
+  | 'EXPIRED'
+  | 'ESCALATED_MODERATION';
+
+export type RevalidationEvidenceType = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED';
 
 export interface RevalidationTaskItem {
   id: string;
@@ -35,6 +43,16 @@ export type FindTasksInBoundsParams = {
   pageSize?: number;
 };
 
+export type GetRevalidationTasksParams = {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  sort?: 'reward' | 'urgency' | 'distance' | string;
+  lat?: number;
+  lon?: number;
+  radiusMeters?: number;
+};
+
 export type RevalidationTasksInBoundsResponse = {
   items: Array<{
     id: string;
@@ -61,10 +79,48 @@ export type RevalidationTasksInBoundsResponse = {
     createdAt?: string;
   }>;
   total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  page?: number;
+  pageSize?: number;
+  totalPages?: number;
 };
+
+export interface RevalidationEvidenceDetailItem {
+  id: string;
+  taskId: string;
+  surveyorId?: string;
+  mediaUrl?: string;
+  evidenceType: RevalidationEvidenceType | string;
+  suggestedSignTypeId?: number | null;
+  submittedAt: string;
+  capturedAt?: string;
+  locationWkt?: string;
+  distanceMeters?: number;
+  status?: string;
+}
+
+export interface RevalidationTaskDetail {
+  id: string;
+  verifiedSignId: string;
+  freshnessRuleId?: number | null;
+  priority: TaskPriority | string;
+  status: TaskStatus | string;
+  rewardCredits: number;
+  bounty: number;
+  urgency: number;
+  expiredAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  location: { lat: number; lon: number } | null;
+  evidences: RevalidationEvidenceDetailItem[];
+  // UI helper fields
+  code?: string;
+  name?: string;
+  category?: SignCategory;
+  latitude?: number;
+  longitude?: number;
+  signCropUrl?: string;
+  historicalCropUrl?: string;
+}
 
 export type RevalidationFilterPriority = 'ALL' | TaskPriority;
 export type RevalidationFilterCategory = 'ALL' | SignCategory;
@@ -98,7 +154,7 @@ export interface RevalidationQueueEvidenceItem {
   };
   evidence: {
     mediaUrl?: string;
-    evidenceType: 'STILL_ACTIVE' | 'REMOVED' | string;
+    evidenceType: RevalidationEvidenceType | string;
     submittedAt: string;
     latitude: number;
     longitude: number;
@@ -115,6 +171,16 @@ export interface RevalidationEvidenceQueueResponse {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+export interface RevalidationDecisionItem {
+  id: string;
+  evidenceId: string;
+  reviewerId: string;
+  decision: RevalDecision | string;
+  suggestedSignTypeId: number | null;
+  note: string | null;
+  decidedAt: string;
 }
 
 export interface EvidenceVoteDto {
@@ -148,4 +214,31 @@ export interface EvidenceVoteResponse {
     taskId?: string;
   } | null;
 }
+
+export type SubmitRevalidationEvidenceDto = {
+  latitude: number;
+  longitude: number;
+  capturedAt?: string;
+  note?: string;
+  condition?: string;
+  mediaUrl?: string;
+  evidenceType?: RevalidationEvidenceType;
+  suggestedSignTypeId?: number;
+};
+
+export type SubmitRevalidationEvidenceResponse = {
+  id: string;
+  taskId?: string;
+  userId?: string;
+  verifiedSignId?: string;
+  mediaUrl?: string;
+  evidenceType?: RevalidationEvidenceType | string;
+  latitude: number;
+  longitude: number;
+  distanceMeters?: number;
+  maxProximityMeters?: number;
+  dailySubmissionLimit?: number;
+  remainingDailySubmissions?: number;
+  status?: string;
+};
 

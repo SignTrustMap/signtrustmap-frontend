@@ -172,12 +172,13 @@ function RevalidationReviewSkeleton() {
 type RevalidationBottomSheetProps = {
   type?: SheetType;
   onClose: () => void;
-  onConfirm: (note: string) => void;
+  onConfirm: (note: string, suggestedSignTypeId?: number) => void;
 };
 
 function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBottomSheetProps) {
   const theme = useTheme();
   const [note, setNote] = useState('');
+  const [suggestedTypeId, setSuggestedTypeId] = useState('');
 
   const title =
     type === 'changed'
@@ -196,16 +197,29 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
   const confirmColor =
     type === 'removed' ? Colors.danger : type === 'changed' ? '#D97706' : theme.primary;
 
+  const handleConfirm = () => {
+    const parsedId = suggestedTypeId.trim() ? parseInt(suggestedTypeId.trim(), 10) : undefined;
+    onConfirm(note, Number.isFinite(parsedId) ? parsedId : undefined);
+    setNote('');
+    setSuggestedTypeId('');
+  };
+
+  const handleClose = () => {
+    setNote('');
+    setSuggestedTypeId('');
+    onClose();
+  };
+
   return (
     <Modal
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent
       transparent
       visible={Boolean(type)}
     >
       <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel="Close review options" onPress={onClose} style={styles.backdrop} />
+        <Pressable accessibilityLabel="Close review options" onPress={handleClose} style={styles.backdrop} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           enabled={Platform.OS !== 'web'}
@@ -221,7 +235,7 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
               <Text style={[styles.sheetTitle, { color: theme.text }]}>{title}</Text>
               <AppButton
                 accessibilityLabel="Close"
-                onPress={onClose}
+                onPress={handleClose}
                 style={styles.sheetCloseButton}
                 variant="ghost"
               >
@@ -235,6 +249,29 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
               style={styles.sheetBodyScroll}
             >
               <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>{helperText}</Text>
+              {type === 'changed' ? (
+                <View style={styles.reasonInputGroup}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>
+                    Suggested Sign Type ID (optional)
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="Suggested sign type id"
+                    keyboardType="number-pad"
+                    onChangeText={setSuggestedTypeId}
+                    placeholder="e.g. 42"
+                    placeholderTextColor={theme.placeholder}
+                    style={[
+                      styles.singleLineInput,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                    ]}
+                    value={suggestedTypeId}
+                  />
+                </View>
+              ) : null}
               <View style={styles.reasonInputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
                   Reviewer Note {type === 'changed' ? <Text style={{ color: Colors.danger }}>*</Text> : '(optional)'}
@@ -262,13 +299,13 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
             <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>
               <AppButton
                 label="Cancel"
-                onPress={onClose}
+                onPress={handleClose}
                 style={[styles.sheetFooterButton, { borderColor: theme.border }]}
                 variant="surface"
               />
               <AppButton
                 label="Confirm Vote"
-                onPress={() => onConfirm(note)}
+                onPress={handleConfirm}
                 style={[
                   styles.sheetFooterButton,
                   { backgroundColor: confirmColor },
@@ -333,7 +370,7 @@ export function RevalidationReviewScreen() {
   // Action Handler: immediately calls vote API upon swipe or action confirmation
   // ---------------------------------------------------------------------------
   const handleVote = useCallback(
-    (action: RevalidationReviewAction, note?: string) => {
+    (action: RevalidationReviewAction, note?: string, suggestedSignTypeId?: number) => {
       if (!currentItem) return;
 
       const itemToVote = currentItem;
@@ -370,6 +407,7 @@ export function RevalidationReviewScreen() {
           dto: {
             decision: decisionMap[action],
             note: note || undefined,
+            suggestedSignTypeId: Number.isFinite(suggestedSignTypeId) ? suggestedSignTypeId : undefined,
           },
         },
         {
@@ -659,88 +697,190 @@ export function RevalidationReviewScreen() {
                 Click to enlarge if no signs are visible
               </Text>
             </View>
-            {/* Additional Information Box Displayed Below The Corresponding Images */}
+            {/* =============================================================== */}
+            {/* 2. COMPARISON SECTION: NEW EVIDENCE (LEFT) VS BASELINE (RIGHT)  */}
+            {/* =============================================================== */}
             <View
               style={[
-                styles.signInfoBox,
+                styles.comparisonBox,
                 {
                   backgroundColor: theme.backgroundElement,
                   borderColor: theme.border,
                 },
               ]}
             >
-              {/* Row 1: Sign Name with Surveyor Stated Status */}
-              <View style={styles.infoTopRow}>
-                <View style={styles.infoCodeContainer}>
-                  <Text numberOfLines={1} style={[styles.infoSignCode, { color: theme.text }]}>
-                    {currentItem.verifiedSign.nameVi || currentItem.verifiedSign.nameEn || currentItem.verifiedSign.signCode || 'Traffic Sign'}
-                  </Text>
-                </View>
+              <View style={styles.comparisonColumnsRow}>
+                {/* ----------------------------------------------------------- */}
+                {/* LEFT COLUMN: NEW EVIDENCE (ON-SITE SUBMISSION)               */}
+                {/* ----------------------------------------------------------- */}
+                <View style={styles.comparisonColumn}>
+                  <View style={styles.columnHeaderRow}>
+                    <MaterialCommunityIcons color={theme.primary} name="camera-marker" size={13} />
+                    <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
+                      NEW EVIDENCE
+                    </Text>
+                  </View>
 
-                {/* Surveyor Stated Evidence Type Badge */}
-                <View
-                  style={[
-                    styles.surveyorStatusBadge,
-                    currentItem.evidence.evidenceType === 'REMOVED'
-                      ? styles.surveyorStatusRemoved
-                      : styles.surveyorStatusActive,
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    color={currentItem.evidence.evidenceType === 'REMOVED' ? '#DC2626' : '#16A34A'}
-                    name={currentItem.evidence.evidenceType === 'REMOVED' ? 'alert-circle-outline' : 'check-circle-outline'}
-                    size={13}
-                  />
-                  <Text
+                  {/* Surveyor Stated Evidence Type Badge */}
+                  <View
                     style={[
-                      styles.surveyorStatusText,
-                      { color: currentItem.evidence.evidenceType === 'REMOVED' ? '#DC2626' : '#16A34A' },
+                      styles.evidenceStatusBadge,
+                      currentItem.evidence.evidenceType === 'REMOVED'
+                        ? styles.surveyorStatusRemoved
+                        : currentItem.evidence.evidenceType === 'CHANGED'
+                          ? styles.surveyorStatusChanged
+                          : styles.surveyorStatusActive,
                     ]}
                   >
-                    {currentItem.evidence.evidenceType === 'REMOVED' ? 'REPORTED REMOVED' : 'REPORTED ACTIVE'}
+                    <MaterialCommunityIcons
+                      color={
+                        currentItem.evidence.evidenceType === 'REMOVED'
+                          ? '#DC2626'
+                          : currentItem.evidence.evidenceType === 'CHANGED'
+                            ? '#D97706'
+                            : '#16A34A'
+                      }
+                      name={
+                        currentItem.evidence.evidenceType === 'REMOVED'
+                          ? 'alert-circle-outline'
+                          : currentItem.evidence.evidenceType === 'CHANGED'
+                            ? 'swap-horizontal'
+                            : 'check-circle-outline'
+                      }
+                      size={11}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.surveyorStatusText,
+                        {
+                          color:
+                            currentItem.evidence.evidenceType === 'REMOVED'
+                              ? '#DC2626'
+                              : currentItem.evidence.evidenceType === 'CHANGED'
+                                ? '#D97706'
+                                : '#16A34A',
+                        },
+                      ]}
+                    >
+                      {currentItem.evidence.evidenceType === 'REMOVED'
+                        ? 'REPORTED REMOVED'
+                        : currentItem.evidence.evidenceType === 'CHANGED'
+                          ? 'REPORTED CHANGED'
+                          : 'REPORTED ACTIVE'}
+                    </Text>
+                  </View>
+
+                  {/* Condition Title */}
+                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
+                    {currentItem.evidence.evidenceType === 'CHANGED'
+                      ? 'Observed: Replaced'
+                      : currentItem.evidence.evidenceType === 'REMOVED'
+                        ? 'Observed: Removed'
+                        : 'Observed: Still Active'}
                   </Text>
+
+                  {/* Distance & Timestamp Telemetry */}
+                  <View style={styles.columnTelemetryList}>
+                    <View style={styles.telemetryItem}>
+                      <MaterialCommunityIcons color={theme.placeholder} name="map-marker-distance" size={12} />
+                      <Text numberOfLines={1} style={[styles.telemetryText, { color: theme.placeholder }]}>
+                        {currentItem.evidence.distanceMeters != null
+                          ? `${currentItem.evidence.distanceMeters}m away`
+                          : 'Proximity verified'}
+                      </Text>
+                    </View>
+                    <View style={styles.telemetryItem}>
+                      <MaterialCommunityIcons color={theme.placeholder} name="clock-outline" size={12} />
+                      <Text numberOfLines={1} style={[styles.telemetryText, { color: theme.placeholder }]}>
+                        {formatDate(currentItem.evidence.submittedAt)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* ----------------------------------------------------------- */}
+                {/* CENTER DIVIDER WITH "VS" BADGE                              */}
+                {/* ----------------------------------------------------------- */}
+                <View style={styles.dividerWrapper}>
+                  <View style={[styles.verticalDividerLine, { backgroundColor: theme.border }]} />
+                  <View
+                    style={[
+                      styles.vsBadge,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.vsBadgeText, { color: theme.placeholder }]}>VS</Text>
+                  </View>
+                  <View style={[styles.verticalDividerLine, { backgroundColor: theme.border }]} />
+                </View>
+
+                {/* ----------------------------------------------------------- */}
+                {/* RIGHT COLUMN: BASELINE RECORD (HISTORICAL SIGN)             */}
+                {/* ----------------------------------------------------------- */}
+                <View style={styles.comparisonColumn}>
+                  <View style={styles.columnHeaderRow}>
+                    <MaterialCommunityIcons color={theme.placeholder} name="shield-check-outline" size={13} />
+                    <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
+                      BASELINE SIGN
+                    </Text>
+                  </View>
+
+                  {/* Baseline Sign Code Badge */}
+                  <View style={[styles.baselineCodeBadge, { backgroundColor: `${theme.primary}15`, borderColor: `${theme.primary}35` }]}>
+                    <Text numberOfLines={1} style={[styles.baselineCodeText, { color: theme.primary }]}>
+                      {currentItem.verifiedSign.signCode || 'Traffic Sign'}
+                    </Text>
+                  </View>
+
+                  {/* Baseline Sign Name */}
+                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
+                    {currentItem.verifiedSign.nameVi || currentItem.verifiedSign.nameEn || currentItem.verifiedSign.signCode || 'Traffic Sign'}
+                  </Text>
+
+                  {/* Thumbnail & Freshness Score Row */}
+                  <View style={styles.baselineMetaRow}>
+                    {currentItem.verifiedSign.signCropUrl ? (
+                      <Image
+                        accessibilityLabel={currentItem.verifiedSign.signCode}
+                        contentFit="cover"
+                        source={{ uri: resolveS3Url(currentItem.verifiedSign.signCropUrl) }}
+                        style={[styles.baselineMiniCrop, { borderColor: theme.border }]}
+                      />
+                    ) : (
+                      <View style={[styles.baselineMiniCropPlaceholder, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                        <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={14} />
+                      </View>
+                    )}
+                    <View style={styles.baselineScoreContainer}>
+                      <Text style={[styles.baselineScoreLabel, { color: scorePercent < 50 ? '#EA580C' : '#16A34A' }]}>
+                        Score: {scorePercent}%
+                      </Text>
+                      {currentItem.verifiedSign.lastVerifiedAt ? (
+                        <Text numberOfLines={1} style={[styles.baselineLastVerified, { color: theme.placeholder }]}>
+                          Verified {formatDate(currentItem.verifiedSign.lastVerifiedAt)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
                 </View>
               </View>
 
-              {/* Row 2: GPS Distance & Capture Time Telemetry */}
-              <View style={styles.telemetryRow}>
-                <View style={styles.telemetryItem}>
-                  <MaterialCommunityIcons color={theme.placeholder} name="map-marker-distance" size={15} />
-                  <Text style={[styles.telemetryText, { color: theme.placeholder }]}>
-                    {currentItem.evidence.distanceMeters != null
-                      ? `${currentItem.evidence.distanceMeters}m from original location`
-                      : 'Proximity verified'}
+              {/* Bottom Summary Bar */}
+              <View style={[styles.comparisonBottomBar, { borderTopColor: theme.border }]}>
+                <View style={styles.bottomBarItem}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="vote-outline" size={12} />
+                  <Text style={[styles.bottomBarText, { color: theme.placeholder }]}>
+                    {currentItem.currentVoteCount} votes recorded
                   </Text>
                 </View>
-
-                <View style={styles.telemetryItem}>
-                  <MaterialCommunityIcons color={theme.placeholder} name="clock-outline" size={14} />
-                  <Text style={[styles.telemetryText, { color: theme.placeholder }]}>
-                    {formatDate(currentItem.evidence.submittedAt)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Row 3: Consensus Progress, Reward Credits & Baseline Freshness */}
-              <View style={[styles.metricsDivider, { backgroundColor: theme.border }]} />
-              <View style={styles.metricsRow}>
-                {/* <View style={[styles.metricPill, { backgroundColor: `${theme.primary}12` }]}>
-                  <MaterialCommunityIcons color={theme.primary} name="vote-outline" size={14} />
-                  <Text style={[styles.metricPillText, { color: theme.primary }]}>
-                    {currentItem.currentVoteCount} / 3 votes
-                  </Text>
-                </View> */}
-
-                {/* <View style={[styles.metricPill, { backgroundColor: '#F0FDF4' }]}>
-                  <MaterialCommunityIcons color="#16A34A" name="gift-outline" size={14} />
-                  <Text style={[styles.metricPillText, { color: '#16A34A' }]}>
-                    +{currentItem.rewardCredits} credits
-                  </Text>
-                </View> */}
-
-                <View style={[styles.metricPill]}>
-                  <Text style={[styles.metricPillText, { color: '#C2410C' }]}>
-                    Sign Remaining Score: {scorePercent}%
+                <View style={styles.bottomBarItem}>
+                  <MaterialCommunityIcons color="#16A34A" name="gift-outline" size={12} />
+                  <Text style={[styles.bottomBarText, { color: '#16A34A' }]}>
+                    +{currentItem.rewardCredits} bounty credits
                   </Text>
                 </View>
               </View>
@@ -877,8 +1017,8 @@ export function RevalidationReviewScreen() {
       {/* Decision Note Bottom Sheet */}
       <RevalidationBottomSheet
         onClose={() => setActiveSheet(undefined)}
-        onConfirm={(note) => {
-          if (activeSheet === 'changed') handleVote('CHANGED', note);
+        onConfirm={(note, suggestedSignTypeId) => {
+          if (activeSheet === 'changed') handleVote('CHANGED', note, suggestedSignTypeId);
           else if (activeSheet === 'removed') handleVote('REMOVED', note);
           else if (activeSheet === 'unclear') handleVote('UNCLEAR', note);
           setActiveSheet(undefined);
@@ -1137,52 +1277,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  signInfoBox: {
-    width: '88%',
-    maxWidth: 324,
+  comparisonBox: {
+    width: '92%',
+    maxWidth: 348,
     alignSelf: 'center',
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginVertical: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginVertical: 4,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowRadius: 5,
     elevation: 2,
-    gap: 6,
   },
-  infoTopRow: {
+  comparisonColumnsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'space-between',
-    gap: Spacing.two,
-    width: '100%',
   },
-  infoCodeContainer: {
+  comparisonColumn: {
     flex: 1,
+    paddingHorizontal: 3,
+    justifyContent: 'flex-start',
   },
-  infoSignCode: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  infoSignName: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  surveyorStatusBadge: {
+  columnHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    marginBottom: 4,
+  },
+  columnLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  evidenceStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
     borderWidth: 1,
+    marginBottom: 4,
   },
   surveyorStatusActive: {
     backgroundColor: '#F0FDF4',
@@ -1192,48 +1332,119 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FCA5A5',
   },
+  surveyorStatusChanged: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
   surveyorStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  baselineCodeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  baselineCodeText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
-  telemetryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: Spacing.three,
-    width: '100%',
+  comparisonTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  columnTelemetryList: {
+    gap: 2,
   },
   telemetryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   telemetryText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
-  metricsDivider: {
-    height: 1,
-    width: '100%',
+  dividerWrapper: {
+    width: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginHorizontal: 2,
   },
-  metricsRow: {
+  verticalDividerLine: {
+    flex: 1,
+    width: 1,
+  },
+  vsBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 3,
+  },
+  vsBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  baselineMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  baselineMiniCrop: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  baselineMiniCropPlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  baselineScoreContainer: {
+    flex: 1,
+  },
+  baselineScoreLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  baselineLastVerified: {
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  comparisonBottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
+    borderTopWidth: 1,
+    paddingTop: 5,
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
-  metricPill: {
+  bottomBarItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    gap: 3,
   },
-  metricPillText: {
-    fontSize: 11,
-    fontWeight: '700',
+  bottomBarText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   actionsFooter: {
     alignItems: 'center',
@@ -1508,6 +1719,14 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     lineHeight: 18,
+  },
+  singleLineInput: {
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    fontFamily: Fonts.body,
+    fontSize: 13,
   },
   sheetFooter: {
     flexDirection: 'row',

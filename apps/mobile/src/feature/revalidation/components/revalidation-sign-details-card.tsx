@@ -52,6 +52,7 @@ export function RevalidationSignDetailsCard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const [copiedCoords, setCopiedCoords] = useState(false);
+  const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
 
   const lat = sign.coordinate?.[1] ?? (sign as any)?.latitude;
   const lng = sign.coordinate?.[0] ?? (sign as any)?.longitude;
@@ -65,6 +66,17 @@ export function RevalidationSignDetailsCard({
       }
     } catch (err) {
       console.warn('[RevalidationSignDetailsCard] Failed to copy coordinates:', err);
+    }
+  };
+
+  const handleCopyTaskId = async (taskId: string) => {
+    try {
+      console.log(taskId)
+      await Clipboard.setStringAsync(taskId);
+      setCopiedTaskId(taskId);
+      setTimeout(() => setCopiedTaskId(null), 2000);
+    } catch (err) {
+      console.warn('[RevalidationSignDetailsCard] Failed to copy Task ID:', err);
     }
   };
 
@@ -488,6 +500,25 @@ export function RevalidationSignDetailsCard({
               {copiedCoords
                 ? 'Copied to clipboard!'
                 : `Copy Lat/Lng (${lat !== undefined ? Number(lat).toFixed(4) : '?'}, ${lng !== undefined ? Number(lng).toFixed(4) : '?'})`}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Copy Task ID to clipboard"
+            hitSlop={4}
+            onPress={() => {
+              if (propTaskId) void handleCopyTaskId(propTaskId);
+            }}
+            style={styles.devCopyCoordsBtn}
+          >
+            <MaterialCommunityIcons
+              color={copiedTaskId ? '#16A34A' : '#64748B'}
+              name={copiedTaskId ? 'check-circle-outline' : 'content-copy'}
+              size={12}
+            />
+            <Text style={[styles.devCopyCoordsText, copiedTaskId && { color: '#16A34A' }]}>
+              {copiedTaskId
+                ? 'Copied to clipboard!'
+                : `Copy Task ID`}
             </Text>
           </Pressable>
 

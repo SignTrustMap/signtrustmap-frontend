@@ -6,6 +6,10 @@ import {
   fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
+  getRevalidationTasks,
+  getRevalidationTask,
+  finalizeRevalidationTask,
+  getEvidenceDecisions,
 } from '@/api/revalidation/revalidation';
 import type { RevalidationTaskItem } from '@/types/revalidationType';
 import * as apiClient from '@/api/api-client';
@@ -604,10 +608,241 @@ describe('Revalidation API Module', () => {
       expect(result.mediaUrl).toBe('https://s3.signmap.site/stm-sign-crops/revalidation/task-101/new-evidence.jpg');
     });
 
+    it('submits evidence with CHANGED type and suggestedSignTypeId via FileSystem.uploadAsync', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-1002',
+        taskId: 'task-101',
+        latitude: 10.7769,
+        longitude: 106.7009,
+        status: 'EVALUATING',
+        evidenceType: 'CHANGED',
+        suggestedSignTypeId: 42,
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/changed-sign.jpg',
+        fileName: 'changed-sign.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      const result = await submitRevalidationEvidence(
+        'task-101',
+        {
+          latitude: 10.7769,
+          longitude: 106.7009,
+          capturedAt: '2026-09-29T08:00:00Z',
+          evidenceType: 'CHANGED',
+          suggestedSignTypeId: 42,
+        },
+        mediaFile,
+      );
+
+      expect(result.id).toBe('evidence-1002');
+      expect(result.evidenceType).toBe('CHANGED');
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        'https://api.signmap.site/api/v1/revalidation/tasks/task-101/evidence',
+        'file:///data/changed-sign.jpg',
+        expect.objectContaining({
+          parameters: expect.objectContaining({
+            evidenceType: 'CHANGED',
+            suggestedSignTypeId: '42',
+            latitude: '10.7769',
+            longitude: '106.7009',
+          }),
+        }),
+      );
+    });
+
+    it('submits evidence with CHANGED type and suggestedSignTypeId without file', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-1003',
+        taskId: 'task-102',
+        evidenceType: 'CHANGED',
+        status: 'EVALUATING',
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockSuccessResponse);
+
+      const result = await submitRevalidationEvidence('task-102', {
+        latitude: 10.7769,
+        longitude: 106.7009,
+        evidenceType: 'CHANGED',
+        suggestedSignTypeId: 42,
+        mediaUrl: 'https://example.com/changed.jpg',
+      });
+
+      expect(result.id).toBe('evidence-1003');
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-102/evidence',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+        }),
+        'mock-stored-jwt-token',
+      );
+    });
+
     it('throws error when remote submit fails', async () => {
       (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Server 500 error'));
 
       await expect(submitRevalidationEvidence('task-offline', dto)).rejects.toThrow('Server 500 error');
     });
   });
+
+  describe('getRevalidationTasks', () => {
+    it('calls /revalidation/tasks with query params and normalizes returned items', async () => {
+      const mockResponse = {
+        items: [
+          {
+            id: 'task-list-1',
+            verified_sign_id: 'sign-list-1',
+            sign_code: 'P.102',
+            name_vi: 'Cấm đi ngược chiều',
+            latitude: 10.7769,
+            longitude: 106.7009,
+            status: 'OPEN',
+            priority: 'HIGH',
+            created_at: '2026-10-01T00:00:00Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const res = await getRevalidationTasks({
+        status: 'OPEN',
+        sort: 'STALE_DESC',
+        page: 1,
+        pageSize: 10,
+        lat: 10.7769,
+        lon: 106.7009,
+        radiusMeters: 5000,
+      });
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks?'),
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      const calledUrl = (apiClient.apiRequest as jest.Mock).mock.calls[0][0];
+      expect(calledUrl).toContain('status=OPEN');
+      expect(calledUrl).toContain('sort=STALE_DESC');
+      expect(calledUrl).toContain('lat=10.7769');
+      expect(calledUrl).toContain('lon=106.7009');
+      expect(calledUrl).toContain('radiusMeters=5000');
+      expect(res.items).toHaveLength(1);
+      expect(res.items[0].id).toBe('task-list-1');
+      expect(res.total).toBe(1);
+    });
+
+    it('returns empty list when api request fails', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      const res = await getRevalidationTasks({ page: 1 });
+      expect(res.items).toEqual([]);
+      expect(res.total).toBe(0);
+    });
+  });
+
+  describe('getRevalidationTask', () => {
+    it('fetches single task details and normalizes crop URLs', async () => {
+      const mockDetail = {
+        id: 'task-detail-1',
+        verified_sign_id: 'sign-v1',
+        sign_code: 'P.102',
+        name_vi: 'Cấm đi ngược chiều',
+        status: 'OPEN',
+        sign_crop_url: 'revalidation/task-1/crop.jpg',
+        evidences: [
+          {
+            id: 'ev-1',
+            media_url: 'revalidation/task-1/ev1.jpg',
+            evidence_type: 'CHANGED',
+            suggested_sign_type_id: 15,
+            submitted_at: '2026-10-01T00:00:00Z',
+          },
+        ],
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockDetail);
+
+      const task = await getRevalidationTask('task-detail-1');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-detail-1',
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      expect(task).not.toBeNull();
+      expect(task?.id).toBe('task-detail-1');
+      expect(task?.code).toBe('P.102');
+      expect(task?.signCropUrl).toBe('https://s3.signmap.site/stm-sign-crops/revalidation/task-1/crop.jpg');
+      expect(task?.evidences).toHaveLength(1);
+      expect(task?.evidences?.[0].evidenceType).toBe('CHANGED');
+      expect(task?.evidences?.[0].suggestedSignTypeId).toBe(15);
+      expect(task?.evidences?.[0].mediaUrl).toBe('https://s3.signmap.site/stm-sign-crops/revalidation/task-1/ev1.jpg');
+    });
+
+    it('returns null when task is not found or request errors', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('404 Not Found'));
+
+      const task = await getRevalidationTask('non-existent');
+      expect(task).toBeNull();
+    });
+  });
+
+  describe('finalizeRevalidationTask', () => {
+    it('posts to /revalidation/tasks/:taskId/finalize', async () => {
+      const mockRes = { taskId: 'task-fin-1', status: 'RESOLVED', reason: 'Consensus reached' };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRes);
+
+      const res = await finalizeRevalidationTask('task-fin-1');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-fin-1/finalize',
+        expect.objectContaining({ method: 'POST' }),
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockRes);
+    });
+  });
+
+  describe('getEvidenceDecisions', () => {
+    it('fetches decisions for an evidence item', async () => {
+      const mockDecisions = [
+        {
+          id: 'dec-1',
+          evidenceId: 'ev-100',
+          reviewerId: 'user-200',
+          decision: 'CHANGED',
+          suggestedSignTypeId: 42,
+          confidence: 0.9,
+          note: 'Sign was replaced with P.103',
+          createdAt: '2026-10-02T10:00:00Z',
+        },
+      ];
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockDecisions);
+
+      const res = await getEvidenceDecisions('ev-100');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/evidence/ev-100/decisions',
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockDecisions);
+    });
+
+    it('returns empty array when request fails', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      const res = await getEvidenceDecisions('ev-error');
+      expect(res).toEqual([]);
+    });
+  });
 });
+

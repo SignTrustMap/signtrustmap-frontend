@@ -13,5 +13,6 @@ export const API_PATHS = {
     REVALIDATION_TASKS: '/revalidation/tasks',
     REVALIDATION_TASKS_MAP: '/revalidation/tasks/map',
     REVALIDATION_EVIDENCE_QUEUE: '/revalidation/evidence/queue',
+    REVALIDATION_EVIDENCE: '/revalidation/evidence',
 } as const;
 

@@ -14,13 +14,30 @@ import type {
   EvidenceVoteDto,
   EvidenceVoteResponse,
   FindTasksInBoundsParams,
+  GetRevalidationTasksParams,
+  RevalidationDecisionItem,
+  RevalidationEvidenceDetailItem,
   RevalidationEvidenceQueueResponse,
+  RevalidationEvidenceType,
   RevalidationQueueEvidenceItem,
+  RevalidationTaskDetail,
   RevalidationTaskItem,
   RevalidationTasksInBoundsResponse,
+  SubmitRevalidationEvidenceDto,
+  SubmitRevalidationEvidenceResponse,
   TaskPriority,
   TaskStatus,
 } from '@/types/revalidationType';
+
+export type {
+  GetRevalidationTasksParams,
+  RevalidationDecisionItem,
+  RevalidationEvidenceDetailItem,
+  RevalidationEvidenceType,
+  RevalidationTaskDetail,
+  SubmitRevalidationEvidenceDto,
+  SubmitRevalidationEvidenceResponse,
+};
 
 /**
  * Reads the JWT access token that the SessionProvider stores under the
@@ -303,30 +320,6 @@ export async function fetchFirstRevalidationSign(
   return null;
 }
 
-export type SubmitRevalidationEvidenceDto = {
-  latitude: number;
-  longitude: number;
-  capturedAt?: string;
-  note?: string;
-  condition?: string;
-  mediaUrl?: string;
-  evidenceType?: 'STILL_ACTIVE' | 'REMOVED';
-};
-
-export type SubmitRevalidationEvidenceResponse = {
-  id: string;
-  taskId?: string;
-  verifiedSignId?: string;
-  mediaUrl?: string;
-  latitude: number;
-  longitude: number;
-  distanceMeters?: number;
-  maxProximityMeters?: number;
-  dailySubmissionLimit?: number;
-  remainingDailySubmissions?: number;
-  status?: string;
-};
-
 export type RevalidationEvidenceItem = {
   id: string;
   taskId?: string;
@@ -334,7 +327,7 @@ export type RevalidationEvidenceItem = {
   latitude?: number;
   longitude?: number;
   capturedAt?: string;
-  evidenceType?: 'STILL_ACTIVE' | 'REMOVED' | string;
+  evidenceType?: RevalidationEvidenceType | string;
   status?: string;
   createdAt?: string;
   distanceMeters?: number;
@@ -398,11 +391,14 @@ export async function submitRevalidationEvidence(
 ): Promise<SubmitRevalidationEvidenceResponse> {
   // Resolve token: caller may pass one in, otherwise read from storage
   const token = accessToken ?? (await getStoredAccessToken());
-  const evidenceType: 'STILL_ACTIVE' | 'REMOVED' = data.evidenceType ?? (
-    data.condition === 'REMOVED' || data.condition === 'MISSING'
-      ? 'REMOVED'
-      : 'STILL_ACTIVE'
-  );
+  let evidenceType: RevalidationEvidenceType = 'STILL_ACTIVE';
+  if (data.evidenceType) {
+    evidenceType = data.evidenceType;
+  } else if (data.condition === 'REMOVED' || data.condition === 'MISSING') {
+    evidenceType = 'REMOVED';
+  } else if (data.condition === 'CHANGED' || data.condition === 'REPLACED') {
+    evidenceType = 'CHANGED';
+  }
 
   try {
     const isLocalFile = Boolean(
@@ -427,6 +423,9 @@ export async function submitRevalidationEvidence(
         evidenceType,
       };
       if (data.capturedAt) parameters.capturedAt = data.capturedAt;
+      if (data.suggestedSignTypeId != null) {
+        parameters.suggestedSignTypeId = String(data.suggestedSignTypeId);
+      }
 
       let result = await FileSystem.uploadAsync(url, mediaFile.uri, {
         fieldName: 'file',
@@ -514,6 +513,9 @@ export async function submitRevalidationEvidence(
     formData.append('longitude', String(data.longitude));
     formData.append('evidenceType', evidenceType);
     if (data.capturedAt) formData.append('capturedAt', data.capturedAt);
+    if (data.suggestedSignTypeId != null) {
+      formData.append('suggestedSignTypeId', String(data.suggestedSignTypeId));
+    }
 
     if (mediaFile) {
       if (typeof File !== 'undefined' && (mediaFile as unknown) instanceof File) {
@@ -627,4 +629,146 @@ export async function voteOnRevalidationEvidence(
     token,
   );
 }
+
+/**
+ * Fetches revalidation tasks with optional spatial radius, sorting, and pagination.
+ * Supports /revalidation/tasks backend endpoint.
+ */
+export async function getRevalidationTasks(
+  params?: GetRevalidationTasksParams,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTasksInBoundsResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const searchParams = new URLSearchParams();
+  if (params?.page != null) searchParams.append('page', String(params.page));
+  if (params?.pageSize != null) searchParams.append('pageSize', String(params.pageSize));
+  if (params?.status) searchParams.append('status', params.status);
+  if (params?.sort) searchParams.append('sort', params.sort);
+  if (params?.lat != null) searchParams.append('lat', String(params.lat));
+  if (params?.lon != null) searchParams.append('lon', String(params.lon));
+  if (params?.radiusMeters != null) searchParams.append('radiusMeters', String(params.radiusMeters));
+
+  const qs = searchParams.toString();
+  const url = `${API_PATHS.REVALIDATION_TASKS}${qs ? `?${qs}` : ''}`;
+  try {
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      url,
+      { signal },
+      token,
+    );
+    const rawItems = Array.isArray(res?.items) ? res.items : [];
+    return {
+      items: rawItems,
+      total: res?.total ?? rawItems.length,
+      page: res?.page ?? params?.page ?? 1,
+      pageSize: res?.pageSize ?? params?.pageSize ?? rawItems.length,
+      totalPages: res?.totalPages ?? 1,
+    };
+  } catch (err) {
+    console.warn('[Revalidation] Failed to fetch revalidation tasks:', err);
+    return { items: [], total: 0, page: 1, pageSize: 0, totalPages: 0 };
+  }
+}
+
+/**
+ * Fetches full task details for a specific revalidation task including location and submitted evidences.
+ */
+export async function getRevalidationTask(
+  taskId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTaskDetail | null> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<any>(
+      `/revalidation/tasks/${encodeURIComponent(taskId)}`,
+      { signal },
+      token,
+    );
+    if (!res) return null;
+    const base = toRevalidationTaskItem(res as any);
+    return {
+      ...base,
+      ...res,
+      id: base.id,
+      code: base.code,
+      name: base.name,
+      category: base.category,
+      priority: base.priority,
+      status: base.status,
+      latitude: res.location?.lat != null ? Number(res.location.lat) : base.latitude,
+      longitude: res.location?.lon != null ? Number(res.location.lon) : base.longitude,
+      signCropUrl: resolveS3Url(res.sign_crop_url ?? res.signCropUrl),
+      historicalCropUrl: resolveS3Url(
+        res.historical_crop_url ?? res.historicalCropUrl ?? res.sign_crop_url ?? res.signCropUrl,
+      ),
+      evidences: Array.isArray(res.evidences)
+        ? res.evidences.map((e: any) => ({
+            id: e.id,
+            taskId: e.task_id ?? e.taskId,
+            surveyorId: e.user_id ?? e.userId,
+            mediaUrl: resolveS3Url(e.media_url ?? e.mediaUrl),
+            evidenceType: e.evidence_type ?? e.evidenceType ?? 'STILL_ACTIVE',
+            suggestedSignTypeId:
+              e.suggested_sign_type_id != null
+                ? Number(e.suggested_sign_type_id)
+                : e.suggestedSignTypeId != null
+                  ? Number(e.suggestedSignTypeId)
+                  : undefined,
+            submittedAt: e.submitted_at ?? e.submittedAt,
+            capturedAt: e.captured_at ?? e.capturedAt ?? e.submitted_at,
+            locationWkt: e.location_wkt ?? e.locationWkt,
+            distanceMeters: e.distance_meters != null ? Number(e.distance_meters) : e.distanceMeters,
+            status: e.status,
+          }))
+        : [],
+    };
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch task ${taskId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Staff / Admin finalization of a revalidation task.
+ */
+export async function finalizeRevalidationTask(
+  taskId: string,
+  accessToken?: string,
+  signal?: AbortSignal,
+): Promise<EvidenceVoteResponse['consensus']> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest<EvidenceVoteResponse['consensus']>(
+    `/revalidation/tasks/${encodeURIComponent(taskId)}/finalize`,
+    {
+      method: 'POST',
+      signal,
+    },
+    token,
+  );
+}
+
+/**
+ * Fetches historical consensus decisions for a specific evidence item.
+ */
+export async function getEvidenceDecisions(
+  evidenceId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationDecisionItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<RevalidationDecisionItem[]>(
+      `/revalidation/evidence/${encodeURIComponent(evidenceId)}/decisions`,
+      { signal },
+      token,
+    );
+    return Array.isArray(res) ? res : [];
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch decisions for evidence ${evidenceId}:`, err);
+    return [];
+  }
+}
+
 
