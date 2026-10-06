@@ -597,6 +597,7 @@ export function RevalidationReviewScreen() {
                 </View>
               ) : null}
 
+
               {/* Active Main Card with 4-Way Swipe */}
               <Animated.View
                 {...panResponder.panHandlers}
@@ -654,8 +655,10 @@ export function RevalidationReviewScreen() {
                   </View>
                 </Pressable>
               </Animated.View>
+              <Text style={{ marginTop: Spacing.two, color: theme.placeholder }}>
+                Click to enlarge if no signs are visible
+              </Text>
             </View>
-
             {/* Additional Information Box Displayed Below The Corresponding Images */}
             <View
               style={[

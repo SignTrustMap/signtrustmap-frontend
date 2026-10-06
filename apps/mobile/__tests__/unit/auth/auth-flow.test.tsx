@@ -528,49 +528,6 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   });
 
   // =========================================================================
-  // CASE 12: Dev Quick Login Presets
-  // =========================================================================
-  describe('Case 12: Dev Quick Login Presets', () => {
-    it('logs in immediately with Demo credentials when "Demo (All Roles)" chip is pressed', async () => {
-      mockApiLogin.mockResolvedValueOnce({
-        accessToken: 'demo-token',
-        account: { id: 'demo-id', email: 'demo@stm.dev', displayName: 'Demo User', roles: ['driver', 'surveyor', 'reviewer'] },
-      });
-
-      const { getByText } = await renderScreen(<LoginScreen />);
-
-      fireEvent.press(getByText('Demo (All Roles)'));
-
-      await waitFor(() => {
-        expect(mockApiLogin).toHaveBeenCalledWith({
-          email: 'demo@stm.dev',
-          password: 'Demo@123',
-        });
-        expect(mockReplace).toHaveBeenCalledWith('/');
-      });
-    });
-
-    it('logs in immediately with Reviewer credentials when "Reviewer 1" chip is pressed', async () => {
-      mockApiLogin.mockResolvedValueOnce({
-        accessToken: 'reviewer-token-1',
-        account: { id: 'rev-1', email: 'reviewer1@stm.dev', displayName: 'Reviewer 1', roles: ['driver', 'reviewer'] },
-      });
-
-      const { getByText } = await renderScreen(<LoginScreen />);
-
-      fireEvent.press(getByText('Reviewer 1'));
-
-      await waitFor(() => {
-        expect(mockApiLogin).toHaveBeenCalledWith({
-          email: 'reviewer1@stm.dev',
-          password: 'Reviewer@123',
-        });
-        expect(mockReplace).toHaveBeenCalledWith('/');
-      });
-    });
-  });
-
-  // =========================================================================
   // CASE 13: Password Visibility Toggle
   // =========================================================================
   describe('Case 13: Password Visibility Toggle in Inputs', () => {

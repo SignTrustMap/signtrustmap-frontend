@@ -223,4 +223,153 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       });
     });
   });
+
+  describe('Vehicle mode switching', () => {
+    const mockDrivingRoute = {
+      coordinates: [
+        [106.698, 10.7725],
+        [106.701, 10.772],
+        [106.704688, 10.771674],
+      ],
+      distance: 1200,
+      duration: 600,
+      steps: [],
+      geometry: [],
+    };
+
+    const mockBikeRoute = {
+      coordinates: [
+        [106.698, 10.7725],
+        [106.704688, 10.771674],
+      ],
+      distance: 1000,
+      duration: 300,
+      steps: [],
+      geometry: [],
+    };
+
+    it('switches vehicle mode when starting point and destination are selected without GPS: affects routing and estimated time', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        ...defaultDestinationParams,
+        startId: 'start-market',
+        startLat: '10.7725',
+        startLng: '106.6980',
+        startTitle: 'Ben Thanh Market',
+      });
+
+      (useGetNavigationRoute as jest.Mock).mockImplementation((origin, dest, mode) => {
+        if (!origin || !dest) {
+          return { data: undefined, isLoading: false, error: null };
+        }
+        return {
+          data: mode === 'BIKE' ? mockBikeRoute : mockDrivingRoute,
+          isLoading: false,
+          error: null,
+        };
+      });
+
+      const { getByLabelText, getAllByText, getByText } = await render(<NavigationMapScreen />);
+
+      // 1. Initial driving route is rendered
+      expect(useGetNavigationRoute).toHaveBeenCalledWith(
+        [106.698, 10.7725],
+        [106.704688, 10.771674],
+        'DRIVING',
+      );
+      expect(mockMapProps.routeStart).toEqual([106.698, 10.7725]);
+      expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
+
+      // Initial vehicle tab and header show driving info
+      expect(getByText('Car')).toBeTruthy();
+      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+      expect(getByText('(1.2 km)')).toBeTruthy();
+
+      // 2. Switch vehicle mode to Bike
+      const bikeTab = getByLabelText('Bike route');
+      fireEvent.press(bikeTab);
+
+      // 3. Route API called with BIKE mode, map coordinates and estimated time update
+      await waitFor(() => {
+        expect(useGetNavigationRoute).toHaveBeenCalledWith(
+          [106.698, 10.7725],
+          [106.704688, 10.771674],
+          'BIKE',
+        );
+      });
+
+      expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
+      expect(getByText('Bike')).toBeTruthy();
+      expect(getAllByText('5 min').length).toBeGreaterThan(0);
+      expect(getByText('(1.0 km)')).toBeTruthy();
+
+      // 4. Switch back to Car mode
+      const carTab = getByLabelText('Car route');
+      fireEvent.press(carTab);
+
+      await waitFor(() => {
+        expect(useGetNavigationRoute).toHaveBeenCalledWith(
+          [106.698, 10.7725],
+          [106.704688, 10.771674],
+          'DRIVING',
+        );
+      });
+
+      expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
+      expect(getByText('Car')).toBeTruthy();
+      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+    });
+
+    it('switches vehicle mode when starting point and destination are selected with GPS: affects routing and estimated time', async () => {
+      (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
+      (fetchFreshGpsPosition as jest.Mock).mockResolvedValue([106.695, 10.765]);
+
+      (useGetNavigationRoute as jest.Mock).mockImplementation((origin, dest, mode) => {
+        if (!origin || !dest) {
+          return { data: undefined, isLoading: false, error: null };
+        }
+        return {
+          data: mode === 'BIKE' ? mockBikeRoute : mockDrivingRoute,
+          isLoading: false,
+          error: null,
+        };
+      });
+
+      const { getByLabelText, getAllByText, getByText } = await render(<NavigationMapScreen />);
+
+      // Initially route is not calculated until user starts route with GPS
+      const startRouteButton = getByText('Start route');
+      fireEvent.press(startRouteButton);
+
+      await waitFor(() => {
+        expect(useGetNavigationRoute).toHaveBeenCalledWith(
+          [106.695, 10.765],
+          [106.704688, 10.771674],
+          'DRIVING',
+        );
+      });
+
+      expect(mockMapProps.routeStart).toEqual([106.695, 10.765]);
+      expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
+      expect(getByText('Car')).toBeTruthy();
+      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+      expect(getByText('(1.2 km)')).toBeTruthy();
+
+      // Switch vehicle mode to Bike
+      const bikeTab = getByLabelText('Bike route');
+      fireEvent.press(bikeTab);
+
+      await waitFor(() => {
+        expect(useGetNavigationRoute).toHaveBeenCalledWith(
+          [106.695, 10.765],
+          [106.704688, 10.771674],
+          'BIKE',
+        );
+      });
+
+      expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
+      expect(getByText('Bike')).toBeTruthy();
+      expect(getAllByText('5 min').length).toBeGreaterThan(0);
+      expect(getByText('(1.0 km)')).toBeTruthy();
+    });
+  });
 });

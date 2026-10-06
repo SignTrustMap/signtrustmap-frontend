@@ -53,7 +53,7 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     nameVi: nameVi || undefined,
     nameEn: nameEn || undefined,
     signCode: signCode,
-    freshnessScore: sign.freshnessScore,
+    freshnessScore: sign.freshnessScore ?? (sign as unknown as { freshness_score?: number }).freshness_score,
     status: sign.status,
     roadName: sign.roadName,
     displayAddress: sign.displayAddress,

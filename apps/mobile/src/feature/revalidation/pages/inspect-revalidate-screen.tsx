@@ -784,6 +784,7 @@ export function InspectRevalidateScreen() {
                 {
                   backgroundColor: theme.neutral,
                   borderColor: selectedMedia ? '#0671EB' : theme.border,
+                  padding: selectedMedia ? 0 : Spacing.four,
                 },
               ]}
             >
@@ -1153,7 +1154,7 @@ const styles = StyleSheet.create({
   uploadPlaceholder: {
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 160,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.one,
@@ -1178,20 +1179,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   selectedImage: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
     width: '100%',
     height: '100%',
+    borderRadius: Rounded.lg,
   },
   videoPreview: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',

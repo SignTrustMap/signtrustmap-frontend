@@ -380,10 +380,10 @@ export function RevalidationMapScreen() {
     const matchedTask = sign.taskId
       ? undefined
       : allRevalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id) ||
-        revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
+      revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
     const resolvedTaskId = sign.taskId || matchedTask?.id || '';
 
-    router.push({
+    router.replace({
       pathname: '/work/inspect-revalidate',
       params: {
         signId: sign.id,

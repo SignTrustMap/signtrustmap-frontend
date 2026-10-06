@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -50,6 +51,22 @@ export function RevalidationSignDetailsCard({
   const [cropError, setCropError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+  const [copiedCoords, setCopiedCoords] = useState(false);
+
+  const lat = sign.coordinate?.[1] ?? (sign as any)?.latitude;
+  const lng = sign.coordinate?.[0] ?? (sign as any)?.longitude;
+
+  const handleCopyCoordinates = async () => {
+    try {
+      if (lat !== undefined && lng !== undefined) {
+        await Clipboard.setStringAsync(`${lat}, ${lng}`);
+        setCopiedCoords(true);
+        setTimeout(() => setCopiedCoords(false), 2000);
+      }
+    } catch (err) {
+      console.warn('[RevalidationSignDetailsCard] Failed to copy coordinates:', err);
+    }
+  };
 
   const resolvedTaskId =
     propTaskId || sign.taskId || (sign.id.startsWith('reval-') ? sign.id : undefined);
@@ -454,6 +471,27 @@ export function RevalidationSignDetailsCard({
           </View>
 
           {/* =============================================================== */}
+          {/* DEV ONLY: COPY COORDINATES                                       */}
+          {/* =============================================================== */}
+          <Pressable
+            accessibilityLabel="Copy coordinates to clipboard"
+            hitSlop={4}
+            onPress={handleCopyCoordinates}
+            style={styles.devCopyCoordsBtn}
+          >
+            <MaterialCommunityIcons
+              color={copiedCoords ? '#16A34A' : '#64748B'}
+              name={copiedCoords ? 'check-circle-outline' : 'content-copy'}
+              size={12}
+            />
+            <Text style={[styles.devCopyCoordsText, copiedCoords && { color: '#16A34A' }]}>
+              {copiedCoords
+                ? 'Copied to clipboard!'
+                : `Copy Lat/Lng (${lat !== undefined ? Number(lat).toFixed(4) : '?'}, ${lng !== undefined ? Number(lng).toFixed(4) : '?'})`}
+            </Text>
+          </Pressable>
+
+          {/* =============================================================== */}
           {/* FRESHNESS INFORMATION & AUDIT DATE                              */}
           {/* =============================================================== */}
           <View style={styles.freshnessInfoRow}>
@@ -468,15 +506,18 @@ export function RevalidationSignDetailsCard({
               </View>
               {/* Progress Bar */}
               <View style={[styles.meterTrack, { backgroundColor: '#E2E8F0' }]}>
-                <View
-                  style={[
-                    styles.meterFill,
-                    {
-                      backgroundColor: freshnessColor,
-                      width: `${Math.min(100, Math.max(8, displayScore))}%`,
-                    },
-                  ]}
-                />
+                {displayScore > 0 ? (
+                  <View
+                    testID="freshness-meter-fill"
+                    style={[
+                      styles.meterFill,
+                      {
+                        backgroundColor: freshnessColor,
+                        width: `${Math.min(100, Math.max(0, displayScore))}%`,
+                      },
+                    ]}
+                  />
+                ) : null}
               </View>
             </View>
 
@@ -783,6 +824,24 @@ const styles = StyleSheet.create({
   noCropText: {
     fontSize: 9,
     fontWeight: '600',
+  },
+  devCopyCoordsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 6,
+  },
+  devCopyCoordsText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
   },
   // Freshness Row
   freshnessInfoRow: {

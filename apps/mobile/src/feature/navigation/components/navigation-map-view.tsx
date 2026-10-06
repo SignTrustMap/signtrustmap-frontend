@@ -64,10 +64,49 @@ const openStreetMapStyle: StyleSpecification = {
   ],
 };
 
-// ─── Sign callout tooltip ────────────────────────────────────────────────────
+// ─── Sign callout tooltip & freshness ────────────────────────────────────────
+
+export function getSignFreshness(freshnessScore?: number | string | null, status?: string) {
+  if (status?.toUpperCase() === 'RETIRED') {
+    return {
+      scorePercent: 0,
+      color: '#EF4444',
+      label: '0%',
+    };
+  }
+
+  const num =
+    freshnessScore !== undefined && freshnessScore !== null && freshnessScore !== ''
+      ? Number(freshnessScore)
+      : undefined;
+  const rawScore = num !== undefined && !Number.isNaN(num) ? num : undefined;
+  const scorePercent =
+    rawScore !== undefined
+      ? rawScore <= 1
+        ? Math.round(rawScore * 100)
+        : Math.round(rawScore)
+      : undefined;
+
+  const displayScore = scorePercent ?? 55;
+
+  let color = '#EF4444'; // Red (< 50%)
+  if (displayScore >= 80) {
+    color = '#10B981'; // Green (>= 80%)
+  } else if (displayScore >= 50) {
+    color = '#EAB308'; // Yellow (50% - 79%)
+  }
+
+  return {
+    scorePercent: displayScore,
+    isDefined: scorePercent !== undefined,
+    color,
+    label: `${displayScore}%`,
+  };
+}
 
 type SignCalloutProps = {
   sign: RouteSign;
+  freshness: ReturnType<typeof getSignFreshness>;
 };
 
 function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: string }) {
@@ -100,7 +139,7 @@ function SignMarkerIcon({ imageUrl, name, signCode }: { imageUrl?: string; name?
   );
 }
 
-function SignCallout({ sign }: SignCalloutProps) {
+function SignCallout({ sign, freshness }: SignCalloutProps) {
   const theme = useTheme();
   const signTitle = sign.name || sign.signCode || 'Traffic Sign';
 
@@ -110,16 +149,20 @@ function SignCallout({ sign }: SignCalloutProps) {
         backgroundColor: theme.backgroundElement,
         shadowColor: '#09233C',
       }]}>
-        <SignCalloutImage imageUrl={sign.imageUrl} title={signTitle} />
+        <View style={styles.calloutImageContainer}>
+          <SignCalloutImage imageUrl={sign.imageUrl} title={signTitle} />
+          <View style={[styles.calloutImageFreshnessDot, { backgroundColor: freshness.color }]} />
+        </View>
         <View style={styles.calloutText}>
           <Text numberOfLines={2} style={[styles.calloutTitle, { color: theme.text }]}>
             {signTitle}
           </Text>
-          {sign.signCode ? (
-            <Text numberOfLines={1} style={[styles.calloutCode, { color: theme.textSecondary }]}>
-              {sign.signCode}
+
+          <View style={styles.calloutFreshnessRow}>
+            <Text style={[styles.calloutFreshnessScore, { color: freshness.color }]}>
+              {freshness.scorePercent}% Freshness
             </Text>
-          ) : null}
+          </View>
         </View>
         {sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl ? (
           <Image
@@ -179,6 +222,38 @@ export function NavigationMapView({
   const handleSignPress = (sign: RouteSign) => {
     setSelectedSignId((prev) => (prev === sign.id ? null : sign.id));
   };
+
+  const sortedRouteSigns = useMemo(() => {
+    // 1. Deduplicate signs at identical coordinates with the same sign type/code,
+    // prioritizing the selected sign, then the one with the highest freshness score.
+    const dedup: Record<string, RouteSign> = {};
+    for (const sign of routeSigns) {
+      if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
+      const key = `${sign.coordinate[0].toFixed(5)},${sign.coordinate[1].toFixed(5)}_${sign.signCode || sign.name || ''}`;
+      const existing = dedup[key];
+      if (!existing) {
+        dedup[key] = sign;
+      } else {
+        if (sign.id === selectedSignId) {
+          dedup[key] = sign;
+        } else if (existing.id !== selectedSignId) {
+          const existingScore = existing.freshnessScore ?? 0;
+          const currentScore = sign.freshnessScore ?? 0;
+          if (currentScore > existingScore) {
+            dedup[key] = sign;
+          }
+        }
+      }
+    }
+
+    // 2. Sort so lower freshness signs are drawn first, higher freshness signs
+    // are drawn on top, and any currently selected sign is drawn last (topmost).
+    return Object.values(dedup).sort((a: RouteSign, b: RouteSign) => {
+      if (a.id === selectedSignId) return 1;
+      if (b.id === selectedSignId) return -1;
+      return (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0);
+    });
+  }, [routeSigns, selectedSignId]);
 
   const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
     onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
@@ -388,30 +463,39 @@ export function NavigationMapView({
         </GeoJSONSource>
       ) : null}
 
-      {routeSigns.map((sign) => (
-        <Marker
-          anchor="bottom"
-          id={`route-sign-${sign.id}`}
-          key={sign.id}
-          lngLat={sign.coordinate}
-          onPress={() => handleSignPress(sign)}
-        >
-          <View style={styles.signMarkerRoot}>
-            {selectedSignId === sign.id ? <SignCallout sign={sign} /> : null}
-            <View
-              accessibilityLabel={`View details for ${sign.name || sign.signCode || 'sign'}`}
-              accessibilityRole="button"
-              style={styles.stopSignMarker}
-            >
-              <SignMarkerIcon
-                imageUrl={sign.imageUrl}
-                name={sign.name}
-                signCode={sign.signCode}
-              />
+      {sortedRouteSigns.map((sign) => {
+        const freshness = getSignFreshness(sign.freshnessScore, sign.status);
+        const isSelected = selectedSignId === sign.id;
+        return (
+          <Marker
+            anchor="bottom"
+            id={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
+            key={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
+            lngLat={sign.coordinate}
+            onPress={() => handleSignPress(sign)}
+          >
+            <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
+              {isSelected ? <SignCallout freshness={freshness} sign={sign} /> : null}
+              <View
+                accessibilityLabel={`View details for ${sign.name || sign.signCode || 'sign'}`}
+                accessibilityRole="button"
+                style={styles.stopSignMarker}
+              >
+                <SignMarkerIcon
+                  imageUrl={sign.imageUrl}
+                  name={sign.name}
+                  signCode={sign.signCode}
+                />
+                {/* Small circle on the bottom right indicating its freshness */}
+                <View
+                  key={`dot-${freshness.color}`}
+                  style={[styles.markerFreshnessDot, { backgroundColor: freshness.color }]}
+                />
+              </View>
             </View>
-          </View>
-        </Marker>
-      ))}
+          </Marker>
+        );
+      })}
 
       {navigationActive ? (
         <>
@@ -503,6 +587,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
   },
+  markerFreshnessDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1.5,
+    elevation: 3,
+  },
   // ── Callout tooltip ──────────────────────────────────────────────────────────
   calloutWrapper: {
     alignItems: 'center',
@@ -514,17 +613,34 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderRadius: Rounded.md,
     paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    width: 230,
+    paddingVertical: Spacing.one + 2,
+    minWidth: 230,
+    maxWidth: 270,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 6,
   },
+  calloutImageContainer: {
+    position: 'relative',
+    width: 32,
+    height: 32,
+    flexShrink: 0,
+  },
   calloutImage: {
     width: 32,
     height: 32,
     flexShrink: 0,
+  },
+  calloutImageFreshnessDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   calloutText: {
     flex: 1,
@@ -541,7 +657,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 600,
     lineHeight: 14,
+    marginTop: 1,
+  },
+  calloutFreshnessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 2,
+  },
+  calloutFreshnessMiniDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  calloutFreshnessScore: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 700,
+    lineHeight: 14,
   },
   // Downward-pointing CSS triangle
   calloutArrow: {
