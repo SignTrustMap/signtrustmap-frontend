@@ -35,19 +35,19 @@ const roleMeta: Record<
   }
 > = {
   driver: {
-    description: 'Verify traffic signs and report road conditions along your assigned route.',
+    description: 'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
     icon: 'car-outline',
-    label: 'Driver',
+    label: 'Tài xế',
   },
   surveyor: {
-    description: 'Capture road sign condition and GPS telemetry data from the field.',
+    description: 'Thu thập tình trạng biển báo giao thông và dữ liệu đo đạc GPS thực địa.',
     icon: 'camera-outline',
-    label: 'Surveyor',
+    label: 'Khảo sát',
   },
   reviewer: {
-    description: 'Check submitted sign records and cast consensus votes before they enter the trusted map.',
+    description: 'Kiểm tra hồ sơ biển báo được gửi lên và bỏ phiếu đồng thuận trước khi đưa vào bản đồ tin cậy.',
     icon: 'shield-check-outline',
-    label: 'Reviewer',
+    label: 'Thẩm định',
   },
 };
 
@@ -146,15 +146,15 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
         >
           {/* Clean Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Work</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
             <Text style={[styles.subtitle, { color: theme.grey }]}>
-              Choose a role to view its assigned jobs and tasks.
+              Chọn vai trò để xem các công việc và nhiệm vụ được phân công.
             </Text>
           </View>
 
           {/* Role Switcher Tabs */}
           <View
-            accessibilityLabel="Work role"
+            accessibilityLabel="Vai trò công việc"
             accessibilityRole="tablist"
             style={[styles.roleSwitcher, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
           >
@@ -213,7 +213,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Role Summary */}
           <View style={styles.roleSummary}>
             <Text style={[styles.roleTitle, { color: theme.text }]}>
-              {roleMeta[selectedRole].label} Jobs
+              Nhiệm vụ {roleMeta[selectedRole].label}
             </Text>
             <Text style={[styles.roleDescription, { color: theme.grey }]}>
               {roleMeta[selectedRole].description}
@@ -228,12 +228,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#F59E0B"
                 count={draftCount}
                 icon="file-document-edit-outline"
-                label="Draft Submissions"
+                label="Bản nháp khảo sát"
                 onPress={() => router.push('/work/new-survey')}
                 subtitle={
                   draftCount > 0
-                    ? `${draftCount} recorded drafts on device ready to upload`
-                    : 'No pending local recordings'
+                    ? `${draftCount} bản ghi nháp trên thiết bị sẵn sàng tải lên`
+                    : 'Không có bản ghi nháp cục bộ'
                 }
                 urgent={draftCount > 0}
               />
@@ -243,7 +243,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#0671eb"
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
-                label="Pending Submissions"
+                label="Hồ sơ đang xử lý"
                 onPress={() => {
                   if (pendingSubmissionsList.length === 1) {
                     router.push({
@@ -259,8 +259,8 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 }}
                 subtitle={
                   pendingSurveyCount > 0
-                    ? `${pendingSurveyCount} ${pendingSurveyCount === 1 ? 'submission' : 'submissions'} awaiting AI processing and detection`
-                    : 'All submitted survey recordings processed'
+                    ? `${pendingSurveyCount} hồ sơ đang chờ AI xử lý và nhận diện`
+                    : 'Tất cả bản ghi khảo sát đã được xử lý'
                 }
               />
 
@@ -268,7 +268,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               {pendingSubmissionsList.length > 0 ? (
                 <View style={styles.pendingPreviewSection}>
                   <Text style={[styles.pendingPreviewTitle, { color: theme.textSecondary }]}>
-                    Active Processing ({pendingSubmissionsList.length})
+                    Đang xử lý ({pendingSubmissionsList.length})
                   </Text>
                   {pendingSubmissionsList.slice(0, 3).map((item) => {
                     const isVideo = item.submissionType === 'VIDEO_GPX';
@@ -306,7 +306,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                         <View style={styles.pendingPreviewText}>
                           <View style={styles.pendingPreviewTop}>
                             <Text numberOfLines={1} style={[styles.pendingPreviewName, { color: theme.text }]}>
-                              {isVideo ? 'Video survey' : 'Image survey'}
+                              {isVideo ? 'Khảo sát Video' : 'Khảo sát hình ảnh'}
                             </Text>
                             <View style={styles.pendingPreviewStatusBadge}>
                               <Text style={styles.pendingPreviewStatusText}>
@@ -315,7 +315,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                             </View>
                           </View>
                           <Text style={[styles.pendingPreviewSub, { color: theme.placeholder }]}>
-                            #{item.id.slice(0, 8)} · {item.totalCandidatesExtracted} signs detected
+                            #{item.id.slice(0, 8)} · Đã phát hiện {item.totalCandidatesExtracted} biển báo
                           </Text>
                         </View>
                         <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
@@ -330,16 +330,16 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#10B981"
                 count={revalidationTaskCount}
                 icon="map-search-outline"
-                label="Revalidation Map"
+                label="Bản đồ tái thẩm định"
                 onPress={handleOpenRevalidationMap}
-                subtitle="View the map to verify reported sign discrepancies"
+                subtitle="Xem bản đồ để kiểm tra các điểm sai lệch biển báo được báo cáo"
               />
             </View>
           ) : selectedRole === 'reviewer' ? (
             <View style={styles.actionList}>
               {/* Standout Hero Action for Reviewer: Pending Reviews */}
               <AppButton
-                accessibilityLabel="Review pending submissions"
+                accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
                 onPress={() => router.push('/work/submission-review')}
                 pressedOpacity={0.9}
                 style={styles.heroActionCard}
@@ -351,17 +351,17 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   </View>
                   <View style={styles.heroText}>
                     <View style={styles.heroTitleRow}>
-                      <Text style={styles.heroTitle}>Pending Reviews</Text>
+                      <Text style={styles.heroTitle}>Thẩm định chờ xử lý</Text>
                       {reviewQueueTotal > 0 ? (
                         <View style={styles.heroBadge}>
-                          <Text style={styles.heroBadgeText}>{reviewQueueTotal} NEW</Text>
+                          <Text style={styles.heroBadgeText}>{reviewQueueTotal} MỚI</Text>
                         </View>
                       ) : null}
                     </View>
                     <Text style={styles.heroSubtitle}>
                       {reviewQueueTotal > 0
-                        ? `${reviewQueueTotal} candidate signs waiting for your verification vote`
-                        : 'Review submitted sign records before they enter the trusted map'}
+                        ? `${reviewQueueTotal} biển báo ứng viên đang chờ phiếu xác minh của bạn`
+                        : 'Thẩm định hồ sơ biển báo trước khi đưa vào bản đồ tin cậy'}
                     </Text>
                   </View>
                 </View>
@@ -373,23 +373,23 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#0284C7"
                 count={revalEvidenceCount}
                 icon="clipboard-check-outline"
-                label="Pending Revalidation Evidence"
+                label="Minh chứng tái thẩm định chờ duyệt"
                 onPress={() => router.push('/work/revalidation-review')}
-                subtitle="Review on-site surveyor evidence submissions and cast consensus votes"
+                subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
               />
 
               {/* Secondary Standout Action: Sign Catalog */}
               <WorkActionCard
                 accentColor="#8B5CF6"
                 icon="database-search-outline"
-                label="Traffic Sign Catalog"
+                label="Tra cứu biển báo giao thông"
                 onPress={() => router.push('/work/sign-catalog')}
-                subtitle="Browse official Vietnamese standard sign codes and classifications"
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
               />
             </View>
           ) : (
             <AppButton
-              accessibilityLabel="View signs recorded during livestream"
+              accessibilityLabel="Xem biển báo đã ghi nhận khi phát trực tiếp"
               onPress={() => router.push('/work/recorded-signs')}
               pressedOpacity={0.88}
               style={[
@@ -404,10 +404,10 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 </View>
                 <View style={styles.recordedSignsCopy}>
                   <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
-                    Recorded Signs
+                    Biển báo đã ghi nhận
                   </Text>
                   <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
-                    Review signs captured from your livestream session
+                    Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn
                   </Text>
                 </View>
               </View>
@@ -420,7 +420,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
         {
           selectedRole === 'surveyor' ? (
             <AppButton
-              accessibilityLabel="Create new survey record"
+              accessibilityLabel="Tạo bản ghi khảo sát mới"
               onPress={() => router.push('/work/new-survey')}
               pressedOpacity={0.75}
               style={styles.floatingAction}

@@ -20,16 +20,16 @@ type AppTab = {
 };
 
 const tabs: AppTab[] = [
-  { fallbackLabel: 'H', label: 'Home', route: '/home', symbol: { android: 'home', web: 'home' } },
+  { fallbackLabel: 'C', label: 'Trang chủ', route: '/home', symbol: { android: 'home', web: 'home' } },
   {
-    fallbackLabel: 'T',
-    label: 'Work',
+    fallbackLabel: 'V',
+    label: 'Công việc',
     route: '/work',
     symbol: { android: 'task', web: 'task' },
   },
   {
-    fallbackLabel: 'P',
-    label: 'Profile',
+    fallbackLabel: 'N',
+    label: 'Cá nhân',
     route: '/profile',
     symbol: { android: 'person', web: 'person' },
   },

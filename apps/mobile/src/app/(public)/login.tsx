@@ -27,8 +27,8 @@ export default function LoginScreen() {
   const handleLogIn = async () => {
     if (isSubmitting) return;
     const nextErrors = {
-      email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Must be a valid email address.',
-      password: password.length > 1 ? undefined : 'Password must be greater than 1 character.',
+      email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Email không hợp lệ.',
+      password: password.length > 1 ? undefined : 'Mật khẩu phải có từ 2 ký tự trở lên.',
     };
 
     setErrors(nextErrors);
@@ -47,7 +47,7 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogIn = () => {
-    setLoginError('Google sign-in is not available in the mobile app yet.');
+    setLoginError('Đăng nhập Google hiện chưa khả dụng trên ứng dụng di động.');
   };
 
   const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
@@ -76,14 +76,14 @@ export default function LoginScreen() {
 
           <ThemedText style={styles.title}>SignTrustMap</ThemedText>
           <ThemedText type="small" style={styles.subtitle}>
-            Welcome back. Please enter your details.
+            Chào mừng trở lại. Vui lòng nhập thông tin đăng nhập.
           </ThemedText>
 
           <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
             <AppInput
               autoCorrect={false}
               error={errors.email}
-              label="Email Address"
+              label="Địa chỉ Email"
               onChangeText={(value) => {
                 setEmail(value);
                 if (!isSubmitting) loginMutation.reset();
@@ -96,25 +96,25 @@ export default function LoginScreen() {
             />
             <AppInput
               error={errors.password}
-              label="Password"
+              label="Mật khẩu"
               onChangeText={(value) => {
                 setPassword(value);
                 if (!isSubmitting) loginMutation.reset();
                 setLoginError(undefined);
                 setErrors((current) => ({ ...current, password: undefined }));
               }}
-              placeholder="Enter your password"
+              placeholder="Nhập mật khẩu của bạn"
               type="password"
               value={password}
             />
             <Pressable accessibilityRole="button" style={styles.forgotPassword}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>Forgot Password?</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}>Quên mật khẩu?</Text>
             </Pressable>
             {displayedLoginError ? <Text accessibilityRole="alert" style={styles.errorText}>{displayedLoginError}</Text> : null}
-            <AppButton disabled={isSubmitting} label={isSubmitting ? 'Logging in...' : 'Login'} onPress={handleLogIn} style={styles.loginButton} />
+            <AppButton disabled={isSubmitting} label={isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'} onPress={handleLogIn} style={styles.loginButton} />
             <View style={styles.dividerRow}>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>or</Text>
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>hoặc</Text>
               <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
             </View>
             <Pressable
@@ -130,11 +130,11 @@ export default function LoginScreen() {
                 source={require('../../../assets/brand/google-g.png')}
                 style={styles.googleIcon}
               />
-              <Text style={[styles.googleText, { color: theme.text }]}>Log in with google</Text>
+              <Text style={[styles.googleText, { color: theme.text }]}>Đăng nhập với Google</Text>
             </Pressable>
             {__DEV__ ? (
               <View style={[styles.devContainer, { borderColor: theme.border }]}>
-                <Text style={[styles.devHeader, { color: theme.textSecondary }]}>DEV QUICK LOGIN</Text>
+                <Text style={[styles.devHeader, { color: theme.textSecondary }]}>ĐĂNG NHẬP NHANH (DEV)</Text>
                 <View style={styles.devButtonsRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -145,10 +145,10 @@ export default function LoginScreen() {
                     ]}
                     onPress={() => handleQuickLogin('demo@stm.dev', 'Demo@123')}
                   >
-                    <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All Roles)</Text>
+                    <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All roles)</Text>
                   </Pressable>
                 </View>
-                <Text style={[styles.devSubheader, { color: theme.textSecondary }]}>REVIEWERS (CONSENSUS TESTING)</Text>
+                <Text style={[styles.devSubheader, { color: theme.textSecondary }]}>Reviewer (TEST ĐỒNG THUẬN)</Text>
                 <View style={styles.reviewerGrid}>
                   {[1, 2, 3, 4, 5].map((num) => (
                     <Pressable
@@ -170,9 +170,9 @@ export default function LoginScreen() {
           </ThemedView>
 
           <View style={styles.signupRow}>
-            <Text style={[styles.footerText, { color: theme.text }]}>Don&apos;t have an account?</Text>
+            <Text style={[styles.footerText, { color: theme.text }]}>Chưa có tài khoản?</Text>
             <Pressable accessibilityRole="button" onPress={() => router.push('/register')}>
-              <Text style={[styles.linkText, { color: theme.primary }]}> Sign Up</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}> Đăng ký</Text>
             </Pressable>
           </View>
         </ThemedView>

@@ -78,10 +78,10 @@ export function useSignProximityAlert({
         announcedSignIdsRef.current.add(sign.id);
 
         if (ttsEnabled) {
-          const signName = sign.name || sign.signCode || 'Traffic sign';
-          const spokenText = `${signName} ahead`;
+          const signName = sign.name || sign.signCode || 'Biển báo giao thông';
+          const spokenText = `Phía trước có ${signName}`;
           speechService.speak(spokenText, {
-            language: speechLanguage,
+            language: speechLanguage ?? 'vi-VN',
           });
         }
       }

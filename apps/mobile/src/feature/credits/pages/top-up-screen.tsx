@@ -54,24 +54,24 @@ export function TopUpScreen() {
       setConfirmSuccess(true);
       setTimeout(() => router.replace('/credits'), 1200);
     } catch (e) {
-      setConfirmError(e instanceof Error ? e.message : 'Payment failed. Please try again.');
+      setConfirmError(e instanceof Error ? e.message : 'Thanh toán thất bại. Vui lòng thử lại.');
     }
   };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <CreditScreenHeader onBack={() => router.back()} title="Top Up Credits" />
+      <CreditScreenHeader onBack={() => router.back()} title="Nạp Credits" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Current balance */}
         <View style={[styles.balancePanel, { backgroundColor: theme.backgroundSelected }]}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Current balance</Text>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số dư hiện tại</Text>
           <Text style={[styles.balanceValue, { color: theme.text }]}>
-            {balance} <Text style={styles.balanceUnit}>credits</Text>
+            {balance} <Text style={styles.balanceUnit}>Credits</Text>
           </Text>
         </View>
 
         {/* Package selection */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Select amount</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Chọn số lượng</Text>
         {loadingPackages ? (
           <ActivityIndicator color={theme.primary} />
         ) : (
@@ -107,27 +107,27 @@ export function TopUpScreen() {
         >
           <Text style={[styles.customAmountIcon, { color: theme.primary }]}>＋</Text>
           <Text style={[styles.customAmountText, { color: theme.text }]}>
-            {customCredit ? `Custom: ${customCredit} credits selected` : 'Enter custom amount'}
+            {customCredit ? `Tùy chọn: đã chọn ${customCredit} Credits` : 'Nhập số lượng tùy chỉnh'}
           </Text>
         </AppButton>
 
         {/* Payment methods */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Payment method</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Phương thức thanh toán</Text>
         <View style={[styles.paymentCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           {loadingMethods ? (
             <ActivityIndicator color={theme.primary} style={{ padding: Spacing.four }} />
           ) : paymentMethods.length === 0 ? (
             <Text style={[styles.emptyMethods, { color: theme.placeholder }]}>
-              No saved payment methods
+              Chưa có phương thức thanh toán đã lưu
             </Text>
           ) : (
             paymentMethods.map((method, index) => {
               const selected = method.id === effectiveMethodId;
               const label = `${method.cardBrand} ···· ${method.cardLast4}`;
-              const detail = `Expires ${method.expiryMonth}/${method.expiryYear}`;
+              const detail = `Hết hạn ${method.expiryMonth}/${method.expiryYear}`;
               return (
                 <AppButton
-                  accessibilityLabel={`Pay with ${label}`}
+                  accessibilityLabel={`Thanh toán bằng ${label}`}
                   key={method.id}
                   onPress={() => setPaymentMethodId(method.id)}
                   style={[
@@ -153,7 +153,7 @@ export function TopUpScreen() {
             })
           )}
           <AppButton
-            label="＋  Add new payment method"
+            label="＋  Thêm phương thức thanh toán mới"
             onPress={() => router.push('/credits/add-card')}
             style={styles.addMethodButton}
             textStyle={{ color: theme.primary }}
@@ -167,7 +167,7 @@ export function TopUpScreen() {
         ) : null}
         {confirmSuccess ? (
           <Text style={[styles.feedbackText, { color: '#087A3D' }]}>
-            ✓ Top-up order placed! Redirecting…
+            ✓ Đơn nạp Credits đã được tạo! Đang chuyển hướng…
           </Text>
         ) : null}
       </ScrollView>
@@ -177,12 +177,12 @@ export function TopUpScreen() {
         style={[styles.footer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
       >
         <AppButton
-          accessibilityLabel={`Pay ${displayAmount} credits with ${selectedMethod ? `${selectedMethod.cardBrand} ···· ${selectedMethod.cardLast4}` : 'selected payment method'}`}
+          accessibilityLabel={`Thanh toán ${displayAmount} Credits bằng ${selectedMethod ? `${selectedMethod.cardBrand} ···· ${selectedMethod.cardLast4}` : 'phương thức đã chọn'}`}
           disabled={displayAmount <= 0 || isConfirming || confirmSuccess}
           label={
             isConfirming
-              ? 'Processing…'
-              : `Confirm and pay  (${displayAmount} credits)`
+              ? 'Đang xử lý…'
+              : `Xác nhận và thanh toán  (${displayAmount} Credits)`
           }
           onPress={handleConfirm}
           style={styles.payButton}

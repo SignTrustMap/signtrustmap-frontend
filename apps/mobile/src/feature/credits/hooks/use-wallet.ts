@@ -71,7 +71,7 @@ export function useTopUp() {
   const queryClient = useQueryClient();
   return useMutation<TopUpOrderResponse, Error, { packageId: number }>({
     mutationFn: ({ packageId }) => {
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error('Chưa xác thực');
       return postTopUp(packageId, session.accessToken);
     },
     onSuccess: () => {
@@ -88,7 +88,7 @@ export function useTopUpCustom() {
   const queryClient = useQueryClient();
   return useMutation<TopUpOrderResponse, Error, { amount: number }>({
     mutationFn: ({ amount }) => {
-      if (!session) throw new Error('Not authenticated');
+      if (!session) throw new Error('Chưa xác thực');
       return postTopUpCustom(amount, session.accessToken);
     },
     onSuccess: () => {

@@ -51,7 +51,7 @@ export function NavigationStartScreen() {
         ] as MapCoordinate,
         id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
-        title: destinationTitle ?? "Destination",
+        title: destinationTitle ?? "Điểm đến",
       };
     }
     return undefined;
@@ -122,7 +122,7 @@ export function NavigationStartScreen() {
         ...destinationParams,
         startLat: String(coordinate[1]),
         startLng: String(coordinate[0]),
-        startTitle: "Current Location",
+        startTitle: "Vị trí hiện tại",
       },
     });
   };
@@ -174,7 +174,7 @@ export function NavigationStartScreen() {
     >
       <View style={styles.routeSelector}>
         <AppButton
-          accessibilityLabel="Go back"
+          accessibilityLabel="Quay lại"
           hitSlop={Spacing.one}
           onPress={handleBack}
           pressedOpacity={0.7}
@@ -189,13 +189,13 @@ export function NavigationStartScreen() {
           }]}>
             <AntDesign name="pushpin" size={17} color={theme.text} />
             <TextInput
-              accessibilityLabel="Search starting point"
+              accessibilityLabel="Tìm điểm xuất phát"
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
               clearButtonMode="while-editing"
               onChangeText={setQuery}
-              placeholder="Your starting point..."
+              placeholder="Chọn điểm xuất phát..."
               placeholderTextColor={theme.placeholder}
               returnKeyType="search"
               style={[styles.searchPrompt, { color: theme.text }]}
@@ -223,7 +223,7 @@ export function NavigationStartScreen() {
           ) : null}
         </View>
         <AppButton
-          accessibilityLabel="Swap starting point and destination"
+          accessibilityLabel="Đổi chiều điểm đi và đến"
           disabled={!destination}
           onPress={handleSwapRoutePoints}
           style={styles.backButton}
@@ -241,7 +241,7 @@ export function NavigationStartScreen() {
       >
         {!isSearching ? (
           <AppButton
-            accessibilityLabel="Use current location"
+            accessibilityLabel="Sử dụng vị trí hiện tại"
             onPress={handleSelectCurrentLocation}
             pressedOpacity={0.72}
             style={[styles.currentLocationRow, { borderColor: theme.border }]}
@@ -257,7 +257,7 @@ export function NavigationStartScreen() {
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>
-                Current Location
+                Vị trí hiện tại
               </Text>
               <Text
                 style={[
@@ -265,7 +265,7 @@ export function NavigationStartScreen() {
                   { color: theme.textSecondary },
                 ]}
               >
-                Using GPS accuracy
+                Sử dụng độ chính xác GPS
               </Text>
             </View>
             <AntDesign name="arrow-right" size={18} color={theme.primary} />
@@ -274,7 +274,7 @@ export function NavigationStartScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionLabel, { color: theme.primary }]}>
-            {isSearching ? "Search results" : "Recents"}
+            {isSearching ? "Kết quả tìm kiếm" : "Gần đây"}
           </Text>
         </View>
 
@@ -292,8 +292,8 @@ export function NavigationStartScreen() {
         {!isLoading && !error && startLocations.length === 0 ? (
           <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
             {isSearching
-              ? "No starting points found."
-              : "No saved or recent starting points."}
+              ? "Không tìm thấy điểm xuất phát phù hợp."
+              : "Chưa có điểm xuất phát đã lưu hoặc gần đây."}
           </Text>
         ) : null}
         {!isLoading &&

@@ -113,7 +113,7 @@ export function NavigationSignVerifyCard({
 
   if (!visible) return null;
 
-  const signTitle = sign?.name || sign?.signCode || 'Traffic Sign';
+  const signTitle = sign?.name || sign?.signCode || 'Biển báo giao thông';
 
   return (
     <Animated.View
@@ -134,7 +134,7 @@ export function NavigationSignVerifyCard({
       >
         {/* Dismiss × */}
         <Pressable
-          accessibilityLabel="Dismiss sign verification"
+          accessibilityLabel="Bỏ qua xác minh biển báo"
           accessibilityRole="button"
           hitSlop={12}
           onPress={() => hideCard(true)}
@@ -156,7 +156,7 @@ export function NavigationSignVerifyCard({
           </View>
           <View style={styles.signInfo}>
             <Text style={[styles.promptLabel, { color: theme.placeholder }]}>
-              SIGN AHEAD · {distanceMeters}M
+              BIỂN BÁO PHÍA TRƯỚC · {distanceMeters}M
             </Text>
             <Text numberOfLines={2} style={[styles.signName, { color: theme.text }]}>
               {signTitle}
@@ -166,13 +166,13 @@ export function NavigationSignVerifyCard({
 
         {/* Confirm question */}
         <Text style={[styles.question, { color: theme.textSecondary }]}>
-          Is this sign on the street?
+          Biển báo này có trên đường không?
         </Text>
 
         {/* Action buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            accessibilityLabel="Yes, the sign is on the street"
+            accessibilityLabel="Có, biển báo vẫn có trên đường"
             accessibilityRole="button"
             activeOpacity={0.78}
             disabled={responded}
@@ -184,11 +184,11 @@ export function NavigationSignVerifyCard({
             ]}
           >
             <Text style={styles.actionBtnIcon}>✅</Text>
-            <Text style={[styles.actionBtnLabel, styles.actionBtnLabelYes]}>Yes</Text>
+            <Text style={[styles.actionBtnLabel, styles.actionBtnLabelYes]}>Có</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            accessibilityLabel="No, the sign is not on the street"
+            accessibilityLabel="Không, không thấy biển báo"
             accessibilityRole="button"
             activeOpacity={0.78}
             disabled={responded}
@@ -200,7 +200,7 @@ export function NavigationSignVerifyCard({
             ]}
           >
             <Text style={styles.actionBtnIcon}>❌</Text>
-            <Text style={[styles.actionBtnLabel, { color: theme.danger }]}>No</Text>
+            <Text style={[styles.actionBtnLabel, { color: theme.danger }]}>Không</Text>
           </TouchableOpacity>
         </View>
       </View>

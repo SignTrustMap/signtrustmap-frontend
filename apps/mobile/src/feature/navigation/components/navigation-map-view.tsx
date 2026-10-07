@@ -160,7 +160,7 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
 
           <View style={styles.calloutFreshnessRow}>
             <Text style={[styles.calloutFreshnessScore, { color: freshness.color }]}>
-              {freshness.scorePercent}% Freshness
+              {freshness.scorePercent}% Độ tươi mới
             </Text>
           </View>
         </View>
@@ -477,7 +477,7 @@ export function NavigationMapView({
             <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
               {isSelected ? <SignCallout freshness={freshness} sign={sign} /> : null}
               <View
-                accessibilityLabel={`View details for ${sign.name || sign.signCode || 'sign'}`}
+                accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
                 accessibilityRole="button"
                 style={styles.stopSignMarker}
               >

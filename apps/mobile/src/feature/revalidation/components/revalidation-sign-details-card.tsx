@@ -154,7 +154,7 @@ export function RevalidationSignDetailsCard({
 
   if (isExplicitRetired) {
     statusConfig = {
-      label: 'Retired Sign',
+      label: 'Đã thu hồi',
       bg: '#F3F4F6',
       border: '#E5E7EB',
       text: '#4B5563',
@@ -162,7 +162,7 @@ export function RevalidationSignDetailsCard({
     };
   } else if (isFresh || displayScore >= 80) {
     statusConfig = {
-      label: 'Active & Verified',
+      label: 'Hoạt động & Đã xác minh',
       bg: '#ECFDF5',
       border: '#6EE7B7',
       text: '#047857',
@@ -170,7 +170,7 @@ export function RevalidationSignDetailsCard({
     };
   } else if (isModerate || displayScore >= 50) {
     statusConfig = {
-      label: 'Moderate Freshness',
+      label: 'Độ tươi mới trung bình',
       bg: '#FFF7ED',
       border: '#FDBA74',
       text: '#C2410C',
@@ -178,7 +178,7 @@ export function RevalidationSignDetailsCard({
     };
   } else {
     statusConfig = {
-      label: 'Needs Re-evaluation',
+      label: 'Cần tái thẩm định',
       bg: '#FFF1F2',
       border: '#FDA4AF',
       text: '#BE123C',
@@ -194,7 +194,7 @@ export function RevalidationSignDetailsCard({
         : '#B91C1C';
 
   // Clear Action CTA wording
-  const primaryCtaText = 'Inspect';
+  const primaryCtaText = 'Kiểm tra thực địa';
 
   const handleAction = () => {
     if (onRevalidate) {
@@ -228,7 +228,7 @@ export function RevalidationSignDetailsCard({
       {/* ================================================================= */}
       {!isExpanded ? (
         <Pressable
-          accessibilityLabel="Expand sign details"
+          accessibilityLabel="Mở rộng chi tiết biển báo"
           accessibilityRole="button"
           onPress={toggleExpanded}
           style={styles.collapsedRow}
@@ -250,25 +250,25 @@ export function RevalidationSignDetailsCard({
           <View style={styles.collapsedInfo}>
             <View style={styles.collapsedTitleRow}>
               <Text numberOfLines={1} style={[styles.compactSignName, { color: theme.text }]}>
-                {sign.name || sign.signCode || 'Traffic Sign'}
+                {sign.name || sign.signCode || 'Biển báo giao thông'}
               </Text>
             </View>
 
             <Text numberOfLines={1} style={[styles.compactLocation, { color: theme.grey }]}>
-              {sign.displayAddress || sign.roadName || 'No Location Available'}
+              {sign.displayAddress || sign.roadName || 'Không có thông tin vị trí'}
             </Text>
 
             <View style={styles.compactMetaRow}>
               <View style={[styles.freshnessMiniDot, { backgroundColor: freshnessColor }]} />
               <Text style={[styles.compactFreshnessText, { color: theme.grey }]}>
-                Freshness: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{displayScore}%</Text>
+                Độ tươi mới: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{displayScore}%</Text>
               </Text>
             </View>
           </View>
 
           {/* Quick CTA to Expand */}
           <View style={styles.inspectButton}>
-            <Text style={styles.inspectButtonText}>Inspect</Text>
+            <Text style={styles.inspectButtonText}>Kiểm tra</Text>
             <MaterialCommunityIcons color="#0671EB" name="chevron-right" size={16} />
           </View>
         </Pressable>
@@ -291,7 +291,7 @@ export function RevalidationSignDetailsCard({
             <View style={styles.expandedTitleCol}>
               <View style={styles.titleWithBadge}>
                 <Text numberOfLines={1} style={[styles.expandedTitleText, { color: theme.text }]}>
-                  {sign.name || sign.signCode || 'Traffic Sign'}
+                  {sign.name || sign.signCode || 'Biển báo giao thông'}
                 </Text>
                 <View
                   style={[
@@ -326,7 +326,7 @@ export function RevalidationSignDetailsCard({
                   size={12}
                 />
                 <Text numberOfLines={1} style={[styles.expandedLocationText, { color: theme.placeholder }]}>
-                  {sign.displayAddress || sign.roadName || 'No location data.'}
+                  {sign.displayAddress || sign.roadName || 'Không có dữ liệu vị trí.'}
                 </Text>
               </View>
             </View>
@@ -334,7 +334,7 @@ export function RevalidationSignDetailsCard({
             {/* Action Buttons: Collapse and Close */}
             <View style={styles.headerActionBtns}>
               <AppButton
-                accessibilityLabel="Collapse sign details"
+                accessibilityLabel="Thu gọn chi tiết"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={toggleExpanded}
@@ -347,7 +347,7 @@ export function RevalidationSignDetailsCard({
               </AppButton>
 
               <AppButton
-                accessibilityLabel="Close sign details"
+                accessibilityLabel="Đóng chi tiết"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={onClose}
@@ -366,7 +366,7 @@ export function RevalidationSignDetailsCard({
           {/* =============================================================== */}
 
           <Text style={[styles.evidenceSectionTitle, { color: theme.text }]}>
-            EVIDENCE COMPARISON
+            SO SÁNH BẰNG CHỨNG
           </Text>
           <View style={[styles.evidenceSection, { borderColor: "#666" }]}>
             {/* Compact Comparison Grid */}
@@ -374,7 +374,7 @@ export function RevalidationSignDetailsCard({
               {/* Box 1: Official Standard Sign */}
               <View style={[styles.evidenceBox, { borderColor: 'transparent' }]}>
                 <Text style={[styles.evidenceBoxLabel, { color: theme.text }]}>
-                  OFFICIAL SIGN
+                  BIỂN BÁO CHUẨN
                 </Text>
                 <View style={styles.evidenceImageFrame}>
                   {sign.imageUrl ? (
@@ -401,7 +401,7 @@ export function RevalidationSignDetailsCard({
               >
                 <View style={styles.submittedLabelRow}>
                   <Text style={[styles.evidenceBoxLabel, { color: '#0671EB' }]}>
-                    SIGN SUBMISSION
+                    ẢNH KHẢO SÁT GỬI LÊN
                   </Text>
                 </View>
                 <View style={styles.evidenceImageFrame}>
@@ -420,7 +420,7 @@ export function RevalidationSignDetailsCard({
                         size={18}
                       />
                       <Text style={[styles.noCropText, { color: theme.placeholder }]}>
-                        No surveyor photo
+                        Chưa có ảnh khảo sát
                       </Text>
                     </View>
                   )}
@@ -453,21 +453,21 @@ export function RevalidationSignDetailsCard({
                 <View style={styles.reviewsHeadlineRow}>
                   <Text style={[styles.reviewsHeadlineText, { color: theme.text }]}>
                     {isLoadingEvidences
-                      ? 'Checking reviews...'
+                      ? 'Đang kiểm tra đánh giá...'
                       : evidenceCount > 0
-                        ? `${evidenceCount} surveyor review${evidenceCount > 1 ? 's' : ''} have posted about this sign`
-                        : 'No surveyor reviews yet'}
+                        ? `${evidenceCount} lượt khảo sát đã ghi nhận về biển báo này`
+                        : 'Chưa có lượt khảo sát nào'}
                   </Text>
                 </View>
 
                 <Text numberOfLines={1} style={[styles.reviewsSubtext, { color: theme.placeholder }]}>
                   {isLoadingEvidences
-                    ? 'Loading community submissions...'
+                    ? 'Đang tải đóng góp từ cộng đồng...'
                     : evidenceCount > 0
                       ? latestEvidence?.capturedAt
-                        ? `Latest review submitted on ${formatDate(latestEvidence.capturedAt)}`
-                        : 'On-site evidence awaiting peer confirmation'
-                      : 'Be the first surveyor to inspect this location and earn bounty'}
+                        ? `Đánh giá gần nhất gửi ngày ${formatDate(latestEvidence.capturedAt)}`
+                        : 'Bằng chứng thực địa đang chờ đồng thuận'
+                      : 'Hãy là khảo sát viên đầu tiên kiểm tra vị trí này để nhận thưởng'}
                 </Text>
 
               </View>
@@ -477,7 +477,7 @@ export function RevalidationSignDetailsCard({
                 fontSize: 12,
                 color: theme.placeholder
               }}>
-                Note: You will not receive credits for signs that have already been reviewed correctly.
+                Lưu ý: Bạn sẽ không nhận được credits cho các biển báo đã được thẩm định chính xác trước đó.
               </Text>
             </View>
           </View>
@@ -486,7 +486,7 @@ export function RevalidationSignDetailsCard({
           {/* DEV ONLY: COPY COORDINATES                                       */}
           {/* =============================================================== */}
           <Pressable
-            accessibilityLabel="Copy coordinates to clipboard"
+            accessibilityLabel="Sao chép tọa độ vào bộ nhớ tạm"
             hitSlop={4}
             onPress={handleCopyCoordinates}
             style={styles.devCopyCoordsBtn}
@@ -498,12 +498,12 @@ export function RevalidationSignDetailsCard({
             />
             <Text style={[styles.devCopyCoordsText, copiedCoords && { color: '#16A34A' }]}>
               {copiedCoords
-                ? 'Copied to clipboard!'
-                : `Copy Lat/Lng (${lat !== undefined ? Number(lat).toFixed(4) : '?'}, ${lng !== undefined ? Number(lng).toFixed(4) : '?'})`}
+                ? 'Đã sao chép vào bộ nhớ tạm!'
+                : `Sao chép Vĩ độ/Kinh độ (${lat !== undefined ? Number(lat).toFixed(4) : '?'}, ${lng !== undefined ? Number(lng).toFixed(4) : '?'})`}
             </Text>
           </Pressable>
           <Pressable
-            accessibilityLabel="Copy Task ID to clipboard"
+            accessibilityLabel="Sao chép mã nhiệm vụ vào bộ nhớ tạm"
             hitSlop={4}
             onPress={() => {
               if (propTaskId) void handleCopyTaskId(propTaskId);
@@ -517,8 +517,8 @@ export function RevalidationSignDetailsCard({
             />
             <Text style={[styles.devCopyCoordsText, copiedTaskId && { color: '#16A34A' }]}>
               {copiedTaskId
-                ? 'Copied to clipboard!'
-                : `Copy Task ID`}
+                ? 'Đã sao chép vào bộ nhớ tạm!'
+                : `Sao chép Mã nhiệm vụ`}
             </Text>
           </Pressable>
 
@@ -529,7 +529,7 @@ export function RevalidationSignDetailsCard({
             <View style={styles.freshnessCol}>
               <View style={styles.freshnessMeterHeader}>
                 <Text style={[styles.freshnessLabel, { color: theme.text }]}>
-                  Freshness Quality
+                  Chỉ số độ tươi mới
                 </Text>
                 <Text style={[styles.freshnessScoreValue, { color: freshnessColor }]}>
                   {displayScore}%
@@ -554,7 +554,7 @@ export function RevalidationSignDetailsCard({
 
             {sign.lastVerifiedAt ? (
               <View style={styles.lastCheckedCol}>
-                <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>Last checked</Text>
+                <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>Kiểm tra lần cuối</Text>
                 <Text style={[styles.lastCheckedValue, { color: theme.text }]}>
                   {formatDate(sign.lastVerifiedAt)}
                 </Text>

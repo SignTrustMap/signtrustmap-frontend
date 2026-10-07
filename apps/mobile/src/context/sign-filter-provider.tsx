@@ -108,7 +108,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
 
   const createPreset = useCallback(
     async (name: string, categories: SignCategory[]) => {
-      const trimmedName = name.trim() || `List ${presets.length + 1}`;
+      const trimmedName = name.trim() || `Danh sách ${presets.length + 1}`;
       const newPreset: SignFilterPreset = {
         id: `preset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         name: trimmedName,

@@ -54,8 +54,8 @@ export function ErrorFallbackView({
   error,
   onRetry,
   onGoHome,
-  title = 'Something Went Wrong',
-  message = 'An unexpected error occurred in the application. You can try refreshing the screen or returning to the home page.',
+  title = 'Đã xảy ra sự cố',
+  message = 'Đã xảy ra lỗi không mong muốn trong ứng dụng. Bạn có thể thử tải lại màn hình hoặc quay về trang chủ.',
 }: ErrorFallbackViewProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -132,7 +132,7 @@ export function ErrorFallbackView({
           {/* Top Status Pill */}
           <View style={styles.statusPill}>
             <View style={styles.statusPillDot} />
-            <Text style={styles.statusPillText}>Application Error</Text>
+            <Text style={styles.statusPillText}>Lỗi ứng dụng</Text>
           </View>
 
           {/* Icon Bubble */}
@@ -151,7 +151,7 @@ export function ErrorFallbackView({
           <View style={styles.actionGroup}>
             {onRetry ? (
               <Pressable
-                accessibilityLabel="Try again"
+                accessibilityLabel="Thử lại"
                 accessibilityRole="button"
                 disabled={isRetrying}
                 onPress={handleRetry}
@@ -166,14 +166,14 @@ export function ErrorFallbackView({
                 ) : (
                   <>
                     <MaterialCommunityIcons color="#FFFFFF" name="refresh" size={18} />
-                    <Text style={styles.primaryButtonText}>Try Again</Text>
+                    <Text style={styles.primaryButtonText}>Thử lại</Text>
                   </>
                 )}
               </Pressable>
             ) : null}
 
             <Pressable
-              accessibilityLabel="Return to home screen"
+              accessibilityLabel="Quay về trang chủ"
               accessibilityRole="button"
               onPress={handleGoHome}
               style={({ pressed }) => [
@@ -183,21 +183,21 @@ export function ErrorFallbackView({
               ]}
             >
               <MaterialCommunityIcons color={theme.text} name="home-variant-outline" size={18} />
-              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Return to Home</Text>
+              <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Quay về trang chủ</Text>
             </Pressable>
           </View>
 
           {/* Technical Details Accordion */}
           <View style={[styles.detailsCard, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
             <Pressable
-              accessibilityLabel={showDetails ? 'Hide technical details' : 'Show technical details'}
+              accessibilityLabel={showDetails ? 'Ẩn chi tiết kỹ thuật' : 'Xem chi tiết kỹ thuật'}
               accessibilityRole="button"
               onPress={() => setShowDetails((prev) => !prev)}
               style={styles.detailsToggleRow}
             >
               <View style={styles.detailsToggleLeft}>
                 <MaterialCommunityIcons color={theme.placeholder} name="code-tags" size={18} />
-                <Text style={[styles.detailsToggleText, { color: theme.text }]}>Technical Details</Text>
+                <Text style={[styles.detailsToggleText, { color: theme.text }]}>Chi tiết kỹ thuật</Text>
                 <View style={styles.errorNameBadge}>
                   <Text numberOfLines={1} style={styles.errorNameBadgeText}>{errorName}</Text>
                 </View>
@@ -221,7 +221,7 @@ export function ErrorFallbackView({
                 </View>
 
                 <Pressable
-                  accessibilityLabel="Copy error details"
+                  accessibilityLabel="Sao chép chi tiết lỗi"
                   accessibilityRole="button"
                   onPress={handleCopyDetails}
                   style={styles.copyButton}
@@ -232,7 +232,7 @@ export function ErrorFallbackView({
                     size={15}
                   />
                   <Text style={[styles.copyButtonText, isCopied && { color: '#10B981' }]}>
-                    {isCopied ? 'Copied to clipboard' : 'Copy Details'}
+                    {isCopied ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép chi tiết'}
                   </Text>
                 </Pressable>
               </View>

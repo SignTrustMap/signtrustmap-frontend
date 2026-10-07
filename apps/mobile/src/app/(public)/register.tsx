@@ -39,10 +39,10 @@ export default function RegisterScreen() {
     if (isSubmitting) return;
 
     const nextErrors: FormErrors = {
-      email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Enter a valid email address.',
-      fullName: fullName.trim() ? undefined : 'Enter your full name.',
-      password: password.length >= 8 ? undefined : 'Use at least 8 characters.',
-      phone: phone.trim() ? undefined : 'Enter your phone number.',
+      email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Nhập địa chỉ email hợp lệ.',
+      fullName: fullName.trim() ? undefined : 'Nhập họ và tên của bạn.',
+      password: password.length >= 8 ? undefined : 'Mật khẩu tối thiểu 8 ký tự.',
+      phone: phone.trim() ? undefined : 'Nhập số điện thoại của bạn.',
     };
     setErrors(nextErrors);
 
@@ -65,56 +65,56 @@ export default function RegisterScreen() {
             <View style={[styles.logo, { backgroundColor: theme.primary }]}>
               <Text style={[styles.logoText, { color: theme.onPrimary }]}>STM</Text>
             </View>
-            <ThemedText style={styles.title}>Create your account</ThemedText>
+            <ThemedText style={styles.title}>Tạo tài khoản của bạn</ThemedText>
             <ThemedText type="small" style={styles.subtitle}>
-              Register to start using SignTrustMap.
+              Đăng ký để bắt đầu sử dụng SignTrustMap.
             </ThemedText>
 
             <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
               <AppInput
                 error={errors.fullName}
-                label="Full name"
+                label="Họ và tên"
                 onChangeText={(value) => { setFullName(value); clearFieldError('fullName'); }}
-                placeholder="Your full name"
+                placeholder="Họ và tên của bạn"
                 value={fullName}
               />
               <AppInput
                 autoCorrect={false}
                 error={errors.email}
-                label="Email address"
+                label="Địa chỉ Email"
                 onChangeText={(value) => { setEmail(value); clearFieldError('email'); }}
-                placeholder="you@example.com"
+                placeholder="email@example.com"
                 type="email"
                 value={email}
               />
               <AppInput
                 error={errors.phone}
-                label="Phone number"
+                label="Số điện thoại"
                 onChangeText={(value) => { setPhone(value); clearFieldError('phone'); }}
-                placeholder="Your phone number"
+                placeholder="Số điện thoại của bạn"
                 type="phone"
                 value={phone}
               />
               <AppInput
                 error={errors.password}
-                label="Password"
+                label="Mật khẩu"
                 onChangeText={(value) => { setPassword(value); clearFieldError('password'); }}
-                placeholder="At least 8 characters"
+                placeholder="Tối thiểu 8 ký tự"
                 type="password"
                 value={password}
               />
               {displayedError ? <Text accessibilityRole="alert" style={styles.errorText}>{displayedError}</Text> : null}
               <AppButton
                 disabled={isSubmitting}
-                label={isSubmitting ? 'Creating account...' : 'Create account'}
+                label={isSubmitting ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
                 onPress={handleRegister}
               />
             </ThemedView>
 
             <View style={styles.loginRow}>
-              <Text style={[styles.footerText, { color: theme.text }]}>Already have an account?</Text>
+              <Text style={[styles.footerText, { color: theme.text }]}>Đã có tài khoản?</Text>
               <Pressable accessibilityRole="button" onPress={() => router.replace('/login')}>
-                <Text style={[styles.linkText, { color: theme.primary }]}> Log in</Text>
+                <Text style={[styles.linkText, { color: theme.primary }]}> Đăng nhập</Text>
               </Pressable>
             </View>
           </ScrollView>

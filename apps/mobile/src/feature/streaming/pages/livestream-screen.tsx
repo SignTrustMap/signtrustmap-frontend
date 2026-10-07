@@ -111,7 +111,7 @@ export function LivestreamScreen() {
       ) : (
         <View style={styles.noPermissionContainer}>
           <MaterialCommunityIcons name="camera-off" size={56} color="#ffffff80" />
-          <Text style={styles.noPermissionText}>Camera permission required</Text>
+          <Text style={styles.noPermissionText}>Cần cấp quyền truy cập máy ảnh</Text>
         </View>
       )}
 

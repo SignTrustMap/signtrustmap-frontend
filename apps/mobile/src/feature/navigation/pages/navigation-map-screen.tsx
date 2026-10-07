@@ -83,7 +83,7 @@ export function NavigationMapScreen() {
         ] as MapCoordinate,
         id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
-        title: destinationTitle ?? "Destination",
+        title: destinationTitle ?? "Điểm đến",
       };
     }
     return undefined;
@@ -98,6 +98,7 @@ export function NavigationMapScreen() {
   const isCustomStart = Boolean(
     startLat &&
     startLng &&
+    startTitle !== "Vị trí hiện tại" &&
     startTitle !== "Current Location" &&
     startId &&
     startId !== "current-location"
@@ -149,8 +150,8 @@ export function NavigationMapScreen() {
   const routeStartTitle =
     startTitle ??
     (isCustomStart
-      ? "Starting point"
-      : (plannedRouteOrigin ? "Current Location" : undefined));
+      ? "Điểm xuất phát"
+      : (plannedRouteOrigin ? "Vị trí hiện tại" : undefined));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
@@ -379,10 +380,7 @@ export function NavigationMapScreen() {
   const routeDistance = routeResult?.distance;
   const routeDuration = routeResult?.duration;
   const routeSteps = routeResult?.steps;
-  const baseDuration = routeDuration ?? 0;
-  const carDuration = vehicleMode === "DRIVING" ? baseDuration : Math.round(baseDuration * 1.18);
-  const bikeDuration = vehicleMode === "BIKE" ? baseDuration : Math.max(60, Math.round(baseDuration * 0.85));
-  const activeDuration = vehicleMode === "DRIVING" ? carDuration : bikeDuration;
+  const activeDuration = routeDuration ?? 0;
 
   // Sync navigation state with tab bar visibility context
   useEffect(() => {
@@ -822,7 +820,7 @@ export function NavigationMapScreen() {
         message:
           error instanceof Error
             ? error.message
-            : "Unable to get your current location.",
+            : "Không thể lấy vị trí hiện tại của bạn.",
       }));
     } finally {
       setIsLocating(false);
@@ -838,7 +836,7 @@ export function NavigationMapScreen() {
         destinationId: startId ?? 'swapped-start',
         destinationLat: String(plannedRouteOrigin[1]),
         destinationLng: String(plannedRouteOrigin[0]),
-        destinationTitle: routeStartTitle ?? 'Starting point',
+        destinationTitle: routeStartTitle ?? 'Điểm xuất phát',
         destinationSubtitle: '',
         startId: selectedDestination.id,
         startLat: String(selectedDestination.coordinate[1]),
@@ -1023,12 +1021,12 @@ export function NavigationMapScreen() {
                 },
               ]}
             >
-              <Text style={[styles.upcomingSignsPanelLabel, { color: theme.grey }]}>Ahead</Text>
+              <Text style={[styles.upcomingSignsPanelLabel, { color: theme.grey }]}>Phía trước</Text>
               {upcomingSignsOnRoute.map((sign) => (
                 <View key={sign.id} style={styles.upcomingSignRow}>
                   {sign.imageUrl ? (
                     <Image
-                      accessibilityLabel={sign.name ?? 'Sign'}
+                      accessibilityLabel={sign.name ?? 'Biển báo'}
                       contentFit="contain"
                       source={{ uri: sign.imageUrl }}
                       style={styles.upcomingSignImage}
@@ -1036,7 +1034,7 @@ export function NavigationMapScreen() {
                   ) : null}
                   <View style={styles.upcomingSignInfo}>
                     <Text numberOfLines={1} style={[styles.upcomingSignName, { color: theme.text }]}>
-                      {sign.name ?? 'Sign'}
+                      {sign.name ?? 'Biển báo'}
                     </Text>
                     <Text style={[styles.upcomingSignDist, { color: theme.text, fontWeight: 700 }]}>
                       {sign.distanceMeters < 1000
@@ -1053,7 +1051,7 @@ export function NavigationMapScreen() {
         {/* Floating Re-center button during navigation */}
         {isNavigating ? (
           <Pressable
-            accessibilityLabel="Center"
+            accessibilityLabel="Căn giữa"
             accessibilityRole="button"
             onPress={() => {
               const coord = userCoordinate ?? plannedRouteOrigin;
@@ -1074,7 +1072,7 @@ export function NavigationMapScreen() {
             ]}
           >
             <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
-            <Text style={[styles.navRecenterText, { color: theme.primary }]}>Center</Text>
+            <Text style={[styles.navRecenterText, { color: theme.primary }]}>Căn giữa</Text>
           </Pressable>
         ) : null}
 
@@ -1092,7 +1090,7 @@ export function NavigationMapScreen() {
               showsHorizontalScrollIndicator={false}
             >
               <Pressable
-                accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'currently active' : 'tap to select'}`}
+                accessibilityLabel={`Tất cả biển báo, không lọc, ${activePresetId === null ? 'đang chọn' : 'nhấn để chọn'}`}
                 accessibilityRole="button"
                 onPress={() => void setActivePresetId(null)}
                 style={({ pressed }) => [
@@ -1116,7 +1114,7 @@ export function NavigationMapScreen() {
                     { color: activePresetId === null ? theme.onPrimary : theme.text },
                   ]}
                 >
-                  All signs
+                  Tất cả biển báo
                 </Text>
               </Pressable>
 
@@ -1124,7 +1122,7 @@ export function NavigationMapScreen() {
                 const isActive = activePresetId === preset.id;
                 return (
                   <Pressable
-                    accessibilityLabel={`${preset.name} filter, ${isActive ? 'currently active' : 'tap to select'}`}
+                    accessibilityLabel={`Bộ lọc ${preset.name}, ${isActive ? 'đang chọn' : 'nhấn để chọn'}`}
                     accessibilityRole="button"
                     key={preset.id}
                     onPress={() => void setActivePresetId(preset.id)}
@@ -1163,7 +1161,7 @@ export function NavigationMapScreen() {
                 <View style={[styles.selectedRouteRow, { backgroundColor: theme.backgroundElement }]}>
                   <View style={styles.selectedRouteFields}>
                     <AppButton
-                      accessibilityLabel="Change starting point"
+                      accessibilityLabel="Thay đổi điểm xuất phát"
                       onPress={() => router.push({
                         pathname: '/home/start',
                         params: {
@@ -1189,7 +1187,7 @@ export function NavigationMapScreen() {
                       ))}
                     </View>
                     <AppButton
-                      accessibilityLabel="Change destination"
+                      accessibilityLabel="Thay đổi điểm đến"
                       onPress={handleChangeDestination}
                       style={[styles.selectedRouteInput, styles.destinationWithSwap]}
                       variant="ghost"
@@ -1201,7 +1199,7 @@ export function NavigationMapScreen() {
                     </AppButton>
                   </View>
                   <AppButton
-                    accessibilityLabel="Swap starting point and destination"
+                    accessibilityLabel="Đổi chiều điểm đi và đến"
                     onPress={handleSwapSelectedRoute}
                     style={styles.routeSwapButton}
                     variant="ghost"
@@ -1218,7 +1216,7 @@ export function NavigationMapScreen() {
                   ]}
                 >
                   <AppButton
-                    accessibilityLabel="Change destination"
+                    accessibilityLabel="Thay đổi điểm đến"
                     onPress={handleChangeDestination}
                     style={[styles.selectedRouteInput, styles.selectedRouteFields, { borderRadius: Rounded.round }]}
                     variant="ghost"
@@ -1241,23 +1239,23 @@ export function NavigationMapScreen() {
                     style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                   >
                     <AppButton
-                      accessibilityLabel="Search destination"
+                      accessibilityLabel="Tìm kiếm điểm đến"
                       onPress={() => router.push('/home/search')}
                       style={styles.searchButton}
                       variant="ghost"
                     >
                       <Image
-                        accessibilityLabel="App logo"
+                        accessibilityLabel="Logo ứng dụng"
                         contentFit="cover"
                         source={require('@/assets/images/app-logo.svg')}
                         style={styles.appLogo}
                       />
                       <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                        Search here...
+                        Bắt đầu tìm kiếm...
                       </Text>
                     </AppButton>
                     <AppButton
-                      accessibilityLabel={`Add credits. Current balance: ${walletData?.wallet?.balance ?? 0}`}
+                      accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
                       onPress={() => router.push('/credits/top-up')}
                       pressedOpacity={0.68}
                       style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
@@ -1273,7 +1271,7 @@ export function NavigationMapScreen() {
                   </View>
                   <>
                     <AppButton
-                      accessibilityLabel="Live streaming"
+                      accessibilityLabel="Phát trực tiếp"
                       variant="ghost"
                       onPress={handleLivestreamPress}
                       style={[
@@ -1302,7 +1300,7 @@ export function NavigationMapScreen() {
             </View>
             {isHomeSignFilterOpen && !selectedDestination ? (
               <AppButton
-                accessibilityLabel="Close sign filter menu"
+                accessibilityLabel="Đóng menu lọc biển báo"
                 onPress={() => setIsHomeSignFilterOpen(false)}
                 style={styles.homeFilterBackdrop}
                 variant="ghost"
@@ -1322,21 +1320,21 @@ export function NavigationMapScreen() {
                 <View style={[styles.homeFilterHeader, { borderBottomColor: theme.border }]}>
                   <View style={styles.homeFilterTitleRow}>
                     <Text style={[styles.homeFilterTitle, { color: theme.text }]}>
-                      {filterViewMode === 'lists' ? 'Sign Filter' : 'Sign Categories'}
+                      {filterViewMode === 'lists' ? 'Bộ lọc biển báo' : 'Danh mục biển báo'}
                     </Text>
                   </View>
                   <AppButton
                     accessibilityLabel={
                       filterViewMode === 'lists'
-                        ? 'Switch to category filters'
-                        : 'Switch to filter lists'
+                        ? 'Chuyển sang lọc theo danh mục'
+                        : 'Chuyển sang danh sách lọc'
                     }
                     onPress={handleToggleFilterViewMode}
                     style={styles.homeFilterToggleAllButton}
                     variant="ghost"
                   >
                     <Text style={[styles.homeFilterToggleAllText, { color: theme.primary }]}>
-                      {filterViewMode === 'lists' ? 'Filter' : 'Lists'}
+                      {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
                     </Text>
                   </AppButton>
                 </View>
@@ -1346,7 +1344,7 @@ export function NavigationMapScreen() {
                     <ScrollView style={styles.homeFilterPresetsScroll} showsVerticalScrollIndicator={false}>
                       {/* Option 1: All Signs (No Filter) */}
                       <Pressable
-                        accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'selected' : 'not selected'}`}
+                        accessibilityLabel={`Tất cả biển báo, không lọc, ${activePresetId === null ? 'đã chọn' : 'chưa chọn'}`}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: activePresetId === null }}
                         onPress={() => handleSelectPreset(null)}
@@ -1363,7 +1361,7 @@ export function NavigationMapScreen() {
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
-                            All signs (No filter)
+                            Tất cả biển báo (Không lọc)
                           </Text>
                         </View>
                         <View
@@ -1384,7 +1382,7 @@ export function NavigationMapScreen() {
                         return (
                           <Pressable
                             key={preset.id}
-                            accessibilityLabel={`${preset.name}, ${isSelected ? 'selected' : 'not selected'}`}
+                            accessibilityLabel={`${preset.name}, ${isSelected ? 'đã chọn' : 'chưa chọn'}`}
                             accessibilityRole="radio"
                             accessibilityState={{ checked: isSelected }}
                             onPress={() => handleSelectPreset(preset.id)}
@@ -1404,8 +1402,7 @@ export function NavigationMapScreen() {
                                 {preset.name}
                               </Text>
                               <Text style={[styles.homeFilterRowSublabel, { color: theme.textSecondary }]}>
-                                {preset.categories.length}{' '}
-                                {preset.categories.length === 1 ? 'category.' : 'categories.'}
+                                {preset.categories.length} danh mục
                               </Text>
                             </View>
                             <View
@@ -1425,10 +1422,10 @@ export function NavigationMapScreen() {
                       {presets.length === 0 ? (
                         <View style={styles.homeFilterEmptyPrompt}>
                           <Text style={[styles.homeFilterEmptyText, { color: theme.placeholder }]}>
-                            No custom filter lists created yet.
+                            Chưa có danh sách bộ lọc tùy chỉnh nào.
                           </Text>
                           <AppButton
-                            accessibilityLabel="Create filter list in Profile"
+                            accessibilityLabel="Tạo danh sách lọc trong Cá nhân"
                             onPress={() => {
                               setIsHomeSignFilterOpen(false);
                               router.push({
@@ -1441,7 +1438,7 @@ export function NavigationMapScreen() {
                           >
                             <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
                             <Text style={[styles.homeFilterCreateBtnText, { color: theme.primary }]}>
-                              Create list in Profile
+                              Tạo danh sách trong Cá nhân
                             </Text>
                           </AppButton>
                         </View>
@@ -1450,7 +1447,7 @@ export function NavigationMapScreen() {
 
                     {/* Manage underline text under the list */}
                     <Pressable
-                      accessibilityLabel="Manage filter lists in Profile"
+                      accessibilityLabel="Quản lý danh sách lọc trong Cá nhân"
                       accessibilityRole="link"
                       onPress={() => {
                         setIsHomeSignFilterOpen(false);
@@ -1465,7 +1462,7 @@ export function NavigationMapScreen() {
                       ]}
                     >
                       <Text style={[styles.homeFilterManageText, { color: theme.primary }]}>
-                        Manage
+                        Quản lý
                       </Text>
                     </Pressable>
                   </>
@@ -1477,7 +1474,7 @@ export function NavigationMapScreen() {
                       return (
                         <Pressable
                           key={cat.id}
-                          accessibilityLabel={`${cat.label} signs, ${isSelected ? 'selected' : 'unselected'}`}
+                          accessibilityLabel={`Biển ${cat.label}, ${isSelected ? 'đã chọn' : 'chưa chọn'}`}
                           accessibilityRole="checkbox"
                           accessibilityState={{ checked: isSelected }}
                           onPress={() => handleToggleManualCategory(cat.id)}
@@ -1524,8 +1521,8 @@ export function NavigationMapScreen() {
                 <AppButton
                   accessibilityLabel={
                     isHomeSignFilterOpen
-                      ? "Close sign filter list"
-                      : "Open sign filter list"
+                      ? "Đóng danh sách lọc biển báo"
+                      : "Mở danh sách lọc biển báo"
                   }
                   onPress={() => setIsHomeSignFilterOpen((prev) => !prev)}
                   style={[
@@ -1561,8 +1558,8 @@ export function NavigationMapScreen() {
                 <AppButton
                   accessibilityLabel={
                     isLocating
-                      ? "Getting current location"
-                      : "Snap to current location"
+                      ? "Đang xác định vị trí"
+                      : "Về vị trí hiện tại"
                   }
                   disabled={isLocating}
                   onPress={handleCurrentLocation}
@@ -1593,7 +1590,7 @@ export function NavigationMapScreen() {
             contentContainerStyle={styles.navDrivingFilterScrollContent}
           >
             <Pressable
-              accessibilityLabel="Driver filter: All signs"
+              accessibilityLabel="Lọc khi lái xe: Tất cả biển báo"
               onPress={() => handleSelectPreset(null)}
               style={({ pressed }) => [
                 styles.navDrivingChip,
@@ -1615,7 +1612,7 @@ export function NavigationMapScreen() {
                   { color: activePresetId === null ? '#FFFFFF' : theme.text },
                 ]}
               >
-                All
+                Tất cả
               </Text>
             </Pressable>
             {presets.map((preset) => {
@@ -1623,7 +1620,7 @@ export function NavigationMapScreen() {
               return (
                 <Pressable
                   key={preset.id}
-                  accessibilityLabel={`Driver filter: ${preset.name}`}
+                  accessibilityLabel={`Lọc khi lái xe: ${preset.name}`}
                   onPress={() => handleSelectPreset(preset.id)}
                   style={({ pressed }) => [
                     styles.navDrivingChip,
@@ -1668,12 +1665,12 @@ export function NavigationMapScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               sheetSnapIndex === 0
-                ? 'Expand route preview'
+                ? 'Mở rộng xem lộ trình'
                 : sheetSnapIndex === 1
-                  ? 'Expand full sign filter list'
-                  : 'Collapse route details'
+                  ? 'Mở rộng danh sách bộ lọc biển báo'
+                  : 'Thu gọn chi tiết lộ trình'
             }
-            accessibilityHint="Drag up or down to adjust bottom sheet height. Tap to toggle."
+            accessibilityHint="Kéo lên hoặc xuống để thay đổi chiều cao. Chạm để chuyển đổi."
             accessibilityState={{ expanded: sheetSnapIndex > 0 }}
             accessibilityActions={[{ name: 'activate' }]}
             onAccessibilityAction={() => {
@@ -1757,8 +1754,8 @@ export function NavigationMapScreen() {
               ) : (
                 <View style={styles.routeHeaderRow}>
                   <Pressable
-                    accessibilityHint="Tap to change bottom sheet view"
-                    accessibilityLabel="Vehicle mode, duration and distance"
+                    accessibilityHint="Chạm để chuyển đổi chế độ xem dưới"
+                    accessibilityLabel="Phương tiện, thời gian và khoảng cách"
                     accessibilityRole="button"
                     onPress={() => {
                       const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
@@ -1767,7 +1764,7 @@ export function NavigationMapScreen() {
                     style={styles.routeHeaderInfo}
                   >
                     <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
-                      {vehicleMode === 'BIKE' ? 'Bike' : 'Car'}
+                      {vehicleMode === 'BIKE' ? 'Xe máy' : 'Ô tô'}
                     </Text>
                     {routeDuration !== undefined && routeDistance !== undefined ? (
                       <>
@@ -1785,7 +1782,7 @@ export function NavigationMapScreen() {
                     ) : null}
                   </Pressable>
                   <AppButton
-                    accessibilityLabel="Close route preview"
+                    accessibilityLabel="Đóng xem trước lộ trình"
                     onPress={handleCloseRoute}
                     style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
                     variant="ghost"
@@ -1799,7 +1796,7 @@ export function NavigationMapScreen() {
               {!isNavigating ? (
                 <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
                   <AppButton
-                    accessibilityLabel="Car route"
+                    accessibilityLabel="Lộ trình ô tô"
                     onPress={() => setVehicleMode('DRIVING')}
                     style={[
                       styles.vehicleTabButton,
@@ -1818,7 +1815,7 @@ export function NavigationMapScreen() {
                         { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
                       ]}
                     >
-                      {routeDuration !== undefined ? formatRouteDuration(carDuration) : '--'}
+                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
                     </Text>
                     {vehicleMode === 'DRIVING' ? (
                       <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
@@ -1826,7 +1823,7 @@ export function NavigationMapScreen() {
                   </AppButton>
 
                   <AppButton
-                    accessibilityLabel="Bike route"
+                    accessibilityLabel="Lộ trình xe máy"
                     onPress={() => setVehicleMode('BIKE')}
                     style={[
                       styles.vehicleTabButton,
@@ -1845,7 +1842,7 @@ export function NavigationMapScreen() {
                         { color: vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary },
                       ]}
                     >
-                      {routeDuration !== undefined ? formatRouteDuration(bikeDuration) : '--'}
+                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
                     </Text>
                     {vehicleMode === 'BIKE' ? (
                       <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
@@ -1874,7 +1871,7 @@ export function NavigationMapScreen() {
                 <View style={styles.signFilterHeader}>
                   <View style={styles.signFilterTitleGroup}>
                     <Text style={[styles.signFilterTitle, { color: theme.text }]}>
-                      {filterViewMode === 'lists' ? 'Sign Filter' : 'Sign Categories'}
+                      {filterViewMode === 'lists' ? 'Bộ lọc biển báo' : 'Danh mục biển báo'}
                     </Text>
                     <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
                       <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
@@ -1885,15 +1882,15 @@ export function NavigationMapScreen() {
                   <AppButton
                     accessibilityLabel={
                       filterViewMode === 'lists'
-                        ? 'Switch to category filters'
-                        : 'Switch to filter lists'
+                        ? 'Chuyển sang lọc theo danh mục'
+                        : 'Chuyển sang danh sách lọc'
                     }
                     onPress={handleToggleFilterViewMode}
                     style={styles.toggleAllButton}
                     variant="ghost"
                   >
                     <Text style={[styles.toggleAllText, { color: theme.primary }]}>
-                      {filterViewMode === 'lists' ? 'Filter' : 'Lists'}
+                      {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
                     </Text>
                   </AppButton>
                 </View>
@@ -1908,7 +1905,7 @@ export function NavigationMapScreen() {
                     <>
                       {/* Option 1: All signs (No filter) */}
                       <Pressable
-                        accessibilityLabel={`All signs, no filter applied, ${activePresetId === null ? 'selected' : 'not selected'}`}
+                        accessibilityLabel={`Tất cả biển báo, không lọc, ${activePresetId === null ? 'đã chọn' : 'chưa chọn'}`}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: activePresetId === null }}
                         onPress={() => handleSelectPreset(null)}
@@ -1928,7 +1925,7 @@ export function NavigationMapScreen() {
                         <View style={styles.signCatInfo}>
                           <View style={styles.signCatTitleRow}>
                             <Text style={[styles.signCatLabel, { color: theme.text }]}>
-                              All signs (No filter)
+                              Tất cả biển báo (Không lọc)
                             </Text>
                             <View style={[styles.signCountBadge, { backgroundColor: theme.primary }]}>
                               <Text style={[styles.signCountText, { color: '#FFFFFF' }]}>
@@ -1960,7 +1957,7 @@ export function NavigationMapScreen() {
                         return (
                           <Pressable
                             key={preset.id}
-                            accessibilityLabel={`${preset.name} filter list, ${isSelected ? 'selected' : 'not selected'}`}
+                            accessibilityLabel={`Danh sách ${preset.name}, ${isSelected ? 'đã chọn' : 'chưa chọn'}`}
                             accessibilityRole="radio"
                             accessibilityState={{ checked: isSelected }}
                             onPress={() => handleSelectPreset(preset.id)}
@@ -2000,8 +1997,7 @@ export function NavigationMapScreen() {
                                 </View>
                               </View>
                               <Text numberOfLines={1} style={[styles.signCatSublabel, { color: theme.textSecondary }]}>
-                                {preset.categories.length}{' '}
-                                {preset.categories.length === 1 ? 'category.' : 'categories.'}
+                                {preset.categories.length} danh mục
                               </Text>
                             </View>
                             <View
@@ -2023,10 +2019,10 @@ export function NavigationMapScreen() {
                       {presets.length === 0 ? (
                         <View style={styles.sheetFilterEmptyContainer}>
                           <Text style={[styles.sheetFilterEmptyText, { color: theme.placeholder }]}>
-                            No custom filter lists created yet.
+                            Chưa có danh sách bộ lọc tùy chỉnh nào.
                           </Text>
                           <AppButton
-                            accessibilityLabel="Create filter list in Profile"
+                            accessibilityLabel="Tạo danh sách lọc trong Cá nhân"
                             onPress={() =>
                               router.push({
                                 pathname: '/(authenticated)/(tabs)/profile',
@@ -2038,7 +2034,7 @@ export function NavigationMapScreen() {
                           >
                             <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
                             <Text style={[styles.sheetFilterCreateBtnText, { color: theme.primary }]}>
-                              Create list in Profile
+                              Tạo danh sách trong Cá nhân
                             </Text>
                           </AppButton>
                         </View>
@@ -2046,7 +2042,7 @@ export function NavigationMapScreen() {
 
                       {/* Manage underline text under the list */}
                       <Pressable
-                        accessibilityLabel="Manage filter lists in Profile"
+                        accessibilityLabel="Quản lý danh sách lọc trong Cá nhân"
                         accessibilityRole="link"
                         onPress={() =>
                           router.push({
@@ -2060,7 +2056,7 @@ export function NavigationMapScreen() {
                         ]}
                       >
                         <Text style={[styles.sheetFilterManageText, { color: theme.primary }]}>
-                          Manage
+                          Quản lý
                         </Text>
                       </Pressable>
                     </>
@@ -2075,7 +2071,7 @@ export function NavigationMapScreen() {
                         return (
                           <Pressable
                             key={cat.id}
-                            accessibilityLabel={`${cat.label} signs, ${isSelected ? 'selected' : 'unselected'}`}
+                            accessibilityLabel={`Biển ${cat.label}, ${isSelected ? 'đã chọn' : 'chưa chọn'}`}
                             accessibilityRole="checkbox"
                             accessibilityState={{ checked: isSelected }}
                             onPress={() => handleToggleManualCategory(cat.id)}
@@ -2144,15 +2140,15 @@ export function NavigationMapScreen() {
                   <AppButton
                     accessibilityLabel={
                       isStartingNavigation
-                        ? "Starting navigation"
-                        : "Begin navigation"
+                        ? "Đang bắt đầu điều hướng"
+                        : "Bắt đầu điều hướng"
                     }
                     disabled={isStartingNavigation}
                     onPress={handleBeginNavigation}
                     style={styles.bottomGoButton}
                   >
                     <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
-                      {isStartingNavigation ? "Starting..." : "Start"}
+                      {isStartingNavigation ? "Đang bắt đầu..." : "Bắt đầu"}
                     </Text>
                   </AppButton>
                 </View>
@@ -2181,15 +2177,15 @@ export function NavigationMapScreen() {
               </View>
               <View style={styles.destinationActions}>
                 <AppButton
-                  accessibilityLabel="Start route"
+                  accessibilityLabel="Bắt đầu lộ trình"
                   disabled={isStartingNavigation}
-                  label={isStartingNavigation ? "Starting..." : "Start route"}
+                  label={isStartingNavigation ? "Đang bắt đầu..." : "Bắt đầu lộ trình"}
                   onPress={handleGo}
                   style={[styles.goButton, styles.destinationActionButton]}
                 />
                 <AppButton
-                  accessibilityLabel={`Share ${selectedDestination.title}`}
-                  label="Share"
+                  accessibilityLabel={`Chia sẻ ${selectedDestination.title}`}
+                  label="Chia sẻ"
                   onPress={async () => {
                     try {
                       const [longitude, latitude] = selectedDestination.coordinate;
@@ -2200,7 +2196,7 @@ export function NavigationMapScreen() {
                     } catch {
                       setLocationToast((current) => ({
                         id: (current?.id ?? 0) + 1,
-                        message: 'Unable to share this destination right now.',
+                        message: 'Không thể chia sẻ điểm đến này lúc này.',
                       }));
                     }
                   }}
@@ -2244,7 +2240,7 @@ function getManeuverSymbol(step: NavigationStep) {
 }
 
 function formatManeuverDistance(distanceInMeters: number) {
-  if (distanceInMeters < 20) return "Now";
+  if (distanceInMeters < 20) return "Bây giờ";
   if (distanceInMeters < 1000)
     return `${Math.max(10, Math.round(distanceInMeters / 10) * 10)} m`;
 
@@ -2258,12 +2254,12 @@ function formatRouteDistanceInKilometers(distanceInMeters: number) {
 function formatRouteDuration(durationInSeconds: number) {
   const totalMinutes = Math.max(1, Math.round(durationInSeconds / 60));
 
-  if (totalMinutes < 60) return `${totalMinutes} min`;
+  if (totalMinutes < 60) return `${totalMinutes} phút`;
 
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
+  return minutes ? `${hours} giờ ${minutes} phút` : `${hours} giờ`;
 }
 
 function formatRouteEstimatedTime(durationInSeconds: number) {

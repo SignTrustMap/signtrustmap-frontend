@@ -15,11 +15,11 @@ export function CreditHistoryScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <CreditScreenHeader onBack={() => router.back()} title="Credit History" />
+      <CreditScreenHeader onBack={() => router.back()} title="Lịch sử Credits" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.dateFields}>
-          <DateField label="From date" value="01 Aug 2026" />
-          <DateField label="To date" value="17 Aug 2026" />
+          <DateField label="Từ ngày" value="01 Th08 2026" />
+          <DateField label="Đến ngày" value="17 Th08 2026" />
         </View>
         {creditHistoryGroups.map((group) => (
           <View key={group.label} style={styles.group}>

@@ -27,7 +27,7 @@ export function LivestreamBottomBanner() {
           style={styles.icon}
         />
         <Text style={styles.text}>
-          Livestream allows real time sign detection
+          Phát trực tiếp giúp nhận diện biển báo theo thời gian thực
         </Text>
       </View>
     </View>

@@ -86,7 +86,7 @@ export function UpdateModal({
             <View style={styles.checkingBox}>
               <ActivityIndicator color={theme.primary} size="large" />
               <Text style={[styles.checkingText, { color: theme.text }]}>
-                Checking for updates...
+                Đang kiểm tra bản cập nhật...
               </Text>
             </View>
           )}
@@ -98,13 +98,13 @@ export function UpdateModal({
                   <View style={styles.titleGroup}>
                     <Text style={[styles.title, { color: theme.text }]}>{displayTitle}</Text>
                     <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
-                      <Text style={[styles.newBadgeText, { color: theme.primary }]}>NEW</Text>
+                      <Text style={[styles.newBadgeText, { color: theme.primary }]}>MỚI</Text>
                     </View>
                   </View>
 
                   {releaseInfo.htmlUrl && (
                     <Pressable
-                      accessibilityLabel="View release on GitHub"
+                      accessibilityLabel="Xem bản phát hành trên GitHub"
                       accessibilityRole="button"
                       onPress={handleOpenGitHub}
                       style={({ pressed }) => [
@@ -115,26 +115,26 @@ export function UpdateModal({
                         },
                       ]}
                     >
-                      <Text style={[styles.githubText, { color: theme.text }]}>View</Text>
+                      <Text style={[styles.githubText, { color: theme.text }]}>Xem</Text>
                       <Octicons name="mark-github" size={13} color={theme.text} />
                     </Pressable>
                   )}
                 </View>
 
                 <Text style={[styles.metaText, { color: theme.placeholder }]}>
-                  Released {releaseInfo.publishedAt}
+                  Phát hành {releaseInfo.publishedAt}
                   {releaseInfo.apkAsset ? ` • ${releaseInfo.apkAsset.sizeFormatted}` : ''}
                 </Text>
               </View>
 
               <View style={styles.actions}>
                 <AppButton
-                  label="Update"
+                  label="Cập nhật ngay"
                   onPress={handleUpdate}
                   variant="primary"
                 />
                 <AppButton
-                  label="Later"
+                  label="Để sau"
                   onPress={onClose}
                   variant="ghost"
                 />
@@ -146,20 +146,20 @@ export function UpdateModal({
             <View style={styles.content}>
               <View style={styles.header}>
                 <View style={[styles.newBadge, { backgroundColor: theme.backgroundSelected }]}>
-                  <Text style={[styles.newBadgeText, { color: theme.primary }]}>UP TO DATE</Text>
+                  <Text style={[styles.newBadgeText, { color: theme.primary }]}>MỚI NHẤT</Text>
                 </View>
-                <Text style={[styles.title, { color: theme.text }]}>You&apos;re up to date!</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Ứng dụng đã là bản mới nhất!</Text>
                 <Text style={[styles.metaText, { color: theme.placeholder }]}>
-                  Current version: v{currentVersion}
+                  Phiên bản hiện tại: v{currentVersion}
                 </Text>
               </View>
 
               <Text style={[styles.description, { color: theme.textSecondary }]}>
-                You are currently running the latest version of SignTrustMap.
+                Bạn đang sử dụng phiên bản mới nhất của SignTrustMap.
               </Text>
 
               <View style={styles.actions}>
-                <AppButton label="Got it" onPress={onClose} variant="primary" />
+                <AppButton label="Đã hiểu" onPress={onClose} variant="primary" />
               </View>
             </View>
           )}
@@ -168,17 +168,17 @@ export function UpdateModal({
             <View style={styles.content}>
               <View style={styles.header}>
                 <View style={[styles.newBadge, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.newBadgeText, { color: '#DC2626' }]}>FAILED</Text>
+                  <Text style={[styles.newBadgeText, { color: '#DC2626' }]}>THẤT BẠI</Text>
                 </View>
-                <Text style={[styles.title, { color: theme.text }]}>Unable to check updates</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Không thể kiểm tra bản cập nhật</Text>
               </View>
 
               <View style={styles.errorContainer}>
-                <Text style={[styles.errorLabel, { color: theme.placeholder }]}>Error Details:</Text>
+                <Text style={[styles.errorLabel, { color: theme.placeholder }]}>Chi tiết lỗi:</Text>
                 <TextInput
                   editable={false}
                   multiline
-                  value={errorMessage ?? 'Unknown error occurred.'}
+                  value={errorMessage ?? 'Đã xảy ra lỗi không xác định.'}
                   style={[
                     styles.errorBox,
                     {
@@ -189,7 +189,7 @@ export function UpdateModal({
                   ]}
                 />
                 <AppButton
-                  label={copied ? '✓ Copied to clipboard!' : 'Copy Error'}
+                  label={copied ? '✓ Đã sao chép vào bộ nhớ tạm!' : 'Sao chép lỗi'}
                   onPress={handleCopyError}
                   variant="surface"
                   style={{ borderColor: theme.border, borderWidth: 1, marginTop: Spacing.two }}
@@ -197,8 +197,8 @@ export function UpdateModal({
               </View>
 
               <View style={styles.actions}>
-                <AppButton label="Retry" onPress={onRetry} variant="primary" />
-                <AppButton label="Close" onPress={onClose} variant="ghost" />
+                <AppButton label="Thử lại" onPress={onRetry} variant="primary" />
+                <AppButton label="Đóng" onPress={onClose} variant="ghost" />
               </View>
             </View>
           )}

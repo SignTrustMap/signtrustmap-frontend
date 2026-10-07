@@ -74,7 +74,7 @@ export function LivestreamRecordControl({
       pointerEvents="box-none"
     >
       <Pressable
-        accessibilityLabel={isRecording ? "Stop recording" : "Record button"}
+        accessibilityLabel={isRecording ? "Dừng ghi hình" : "Nút ghi hình"}
         accessibilityRole="button"
         onPress={isRecording ? onStopRecording : undefined}
         style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}

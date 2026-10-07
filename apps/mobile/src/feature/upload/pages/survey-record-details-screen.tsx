@@ -46,8 +46,8 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
           reject(
             new Error(
               error.code === error.PERMISSION_DENIED
-                ? 'Allow location access to use your current position.'
-                : 'Turn on location services and try again.',
+                ? 'Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn.'
+                : 'Bật dịch vụ định vị và thử lại.',
             ),
           );
         },
@@ -58,19 +58,19 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
 
   const mapLibre = getMapLibre();
   if (!mapLibre) {
-    throw new Error('Location lookup requires a native build.');
+    throw new Error('Tính năng tìm vị trí yêu cầu bản build native.');
   }
 
   const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
   if (!hasPermission) {
-    throw new Error('Allow location access to use your current position.');
+    throw new Error('Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn.');
   }
 
   const position = await mapLibre.LocationManager.getCurrentPosition();
 
   if (!position) {
-    throw new Error('Turn on location services and try again.');
+    throw new Error('Bật dịch vụ định vị và thử lại.');
   }
 
   return [position.coords.longitude, position.coords.latitude];
@@ -210,7 +210,7 @@ export function SurveyRecordDetailsScreen() {
         const file = result.assets[0];
         const name = file.name ?? '';
         if (!name.toLowerCase().endsWith('.gpx')) {
-          setSubmitError('Please select a valid GPX file (.gpx).');
+          setSubmitError('Vui lòng chọn một tệp GPX hợp lệ (.gpx).');
           return;
         }
         setSavedGpxUri(file.uri);
@@ -507,7 +507,7 @@ export function SurveyRecordDetailsScreen() {
     } catch (error) {
       console.error('[Surveyor] handleSubmit ERROR:', error);
       setSubmitError(
-        error instanceof Error ? error.message : 'The survey could not be submitted. Please retry.',
+        error instanceof Error ? error.message : 'Không thể gửi bản ghi khảo sát. Vui lòng thử lại.',
       );
       setIsModified(true);
     } finally {
@@ -527,7 +527,7 @@ export function SurveyRecordDetailsScreen() {
         >
           <View style={styles.header}>
             <AppButton
-              accessibilityLabel="Back to work"
+              accessibilityLabel="Quay lại"
               hitSlop={Spacing.one}
               onPress={() => router.replace({ pathname: '/work', params: { currentRole: 'surveyor' } })}
               pressedOpacity={0.7}
@@ -541,13 +541,13 @@ export function SurveyRecordDetailsScreen() {
                 tintColor={theme.text}
               />
             </AppButton>
-            <Text style={[styles.title, { color: theme.text }]}>New Survey Record</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Ghi nhận khảo sát mới</Text>
           </View>
 
-          {draftQuery.isPending ? <Text style={{ color: theme.text }}>Loading draft...</Text> : null}
-          {draftQuery.isError ? <AppButton label="Retry loading draft" onPress={() => { void draftQuery.refetch(); }} /> : null}
+          {draftQuery.isPending ? <Text style={{ color: theme.text }}>Đang tải bản nháp...</Text> : null}
+          {draftQuery.isError ? <AppButton label="Thử lại tải bản nháp" onPress={() => { void draftQuery.refetch(); }} /> : null}
           <View
-            accessibilityLabel={imageUri ? 'Selected survey media' : 'No survey media selected'}
+            accessibilityLabel={imageUri ? 'Phương tiện khảo sát đã chọn' : 'Chưa chọn phương tiện khảo sát'}
             style={[
               styles.imageFrame,
               {
@@ -558,7 +558,7 @@ export function SurveyRecordDetailsScreen() {
           >
             {imageUri && !imageMimeType?.startsWith('video/') && !/\.(mp4|mov|mkv)$/i.test(imageUri) ? (
               <Image
-                accessibilityLabel="Selected survey image"
+                accessibilityLabel="Ảnh khảo sát đã chọn"
                 contentFit="cover"
                 source={{ uri: imageUri }}
                 style={styles.image}
@@ -580,19 +580,19 @@ export function SurveyRecordDetailsScreen() {
                   tintColor={theme.primary}
                 />
                 <Text style={[styles.placeholderLabel, { color: theme.textSecondary }]}>
-                  {imageName ?? (imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'Video survey recording' : 'Media preview unavailable')}
+                  {imageName ?? (imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'Bản ghi khảo sát Video' : 'Không có bản xem trước')}
                 </Text>
               </>
             )}
           </View>
 
           {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO') && !imageUri ? (
-            <AppButton label="Choose draft media" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
+            <AppButton label="Chọn phương tiện bản nháp" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
           ) : null}
           <View style={styles.section}>
             <AppInput
-              label="Capture time"
-              accessibilityLabel="Media capture date and time with time zone"
+              label="Thời gian ghi nhận"
+              accessibilityLabel="Thời gian ghi nhận phương tiện kèm múi giờ"
               placeholder="YYYY-MM-DDTHH:mm:ss+07:00"
               value={capturedAt}
               onChangeText={(text) => {
@@ -612,10 +612,10 @@ export function SurveyRecordDetailsScreen() {
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
-                    Start Point (S)
+                    Điểm bắt đầu (S)
                   </Text>
                   <AppButton
-                    accessibilityLabel="Use current location for start point"
+                    accessibilityLabel="Sử dụng vị trí hiện tại cho điểm bắt đầu"
                     disabled={isLocating || isSubmitting}
                     onPress={handleUseCurrentLocation}
                     variant="ghost"
@@ -627,19 +627,19 @@ export function SurveyRecordDetailsScreen() {
                       tintColor={theme.primary}
                     />
                     <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
-                      {isLocating ? 'Locating...' : 'Get Location'}
+                      {isLocating ? 'Đang định vị...' : 'Lấy vị trí'}
                     </Text>
                   </AppButton>
                 </View>
                 <AppInput
-                  label="Start Location (latitude, longitude)"
-                  accessibilityLabel="Start Location latitude and longitude"
+                  label="Vị trí bắt đầu (vĩ độ, kinh độ)"
+                  accessibilityLabel="Vị trí bắt đầu vĩ độ và kinh độ"
                   editable={false}
                   showSoftInputOnFocus={false}
                   value={effectiveStartCoord
                     ? `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`
-                    : 'No start location available'}
-                  placeholder="No start location available"
+                    : 'Chưa có vị trí bắt đầu'}
+                  placeholder="Chưa có vị trí bắt đầu"
                   leadingIcon={<MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />}
                   containerStyle={styles.imageLocationInput}
                 />
@@ -648,14 +648,14 @@ export function SurveyRecordDetailsScreen() {
                     <View style={styles.addressResolvedHeader}>
                       <MaterialCommunityIcons name="map-marker-radius" size={16} color="#16A34A" />
                       <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                        {startLocationQuery.isLoading ? 'Resolving start location...' : 'Start Location Address'}
+                        {startLocationQuery.isLoading ? 'Đang tra cứu vị trí bắt đầu...' : 'Địa chỉ điểm bắt đầu'}
                       </Text>
                       {startLocationQuery.isLoading ? (
                         <ActivityIndicator size="small" color="#16A34A" style={{ marginLeft: 6 }} />
                       ) : null}
                     </View>
                     <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                      {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                      {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
                     </Text>
                     {startLocationQuery.data?.roadName ? (
                       <Text style={[styles.addressRoadText, { color: '#16A34A' }]}>
@@ -670,10 +670,10 @@ export function SurveyRecordDetailsScreen() {
               <View style={styles.section}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
-                    End Point (D)
+                    Điểm kết thúc (D)
                   </Text>
                   <AppButton
-                    accessibilityLabel="Use current location for end point"
+                    accessibilityLabel="Sử dụng vị trí hiện tại cho điểm kết thúc"
                     disabled={isLocatingEnd || isSubmitting}
                     onPress={handleUseCurrentLocationForEnd}
                     variant="ghost"
@@ -685,19 +685,19 @@ export function SurveyRecordDetailsScreen() {
                       tintColor={theme.primary}
                     />
                     <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
-                      {isLocatingEnd ? 'Locating...' : 'Get Location'}
+                      {isLocatingEnd ? 'Đang định vị...' : 'Lấy vị trí'}
                     </Text>
                   </AppButton>
                 </View>
                 <AppInput
-                  label="End Location (latitude, longitude)"
-                  accessibilityLabel="End Location latitude and longitude"
+                  label="Vị trí kết thúc (vĩ độ, kinh độ)"
+                  accessibilityLabel="Vị trí kết thúc vĩ độ và kinh độ"
                   editable={false}
                   showSoftInputOnFocus={false}
                   value={endCoordinate
                     ? `${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
-                    : 'Estimated from video duration...'}
-                  placeholder="Estimating end location..."
+                    : 'Ước tính từ thời lượng video...'}
+                  placeholder="Đang ước tính vị trí kết thúc..."
                   leadingIcon={<MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />}
                   containerStyle={styles.imageLocationInput}
                 />
@@ -706,14 +706,14 @@ export function SurveyRecordDetailsScreen() {
                     <View style={styles.addressResolvedHeader}>
                       <MaterialCommunityIcons name="flag-checkered" size={16} color="#DC2626" />
                       <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                        {endLocationQuery.isLoading ? 'Resolving end location...' : 'End Location Address'}
+                        {endLocationQuery.isLoading ? 'Đang tra cứu vị trí kết thúc...' : 'Địa chỉ điểm kết thúc'}
                       </Text>
                       {endLocationQuery.isLoading ? (
                         <ActivityIndicator size="small" color="#DC2626" style={{ marginLeft: 6 }} />
                       ) : null}
                     </View>
                     <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                      {endLocationQuery.data?.displayAddress || (endLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                      {endLocationQuery.data?.displayAddress || (endLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
                     </Text>
                     {endLocationQuery.data?.roadName ? (
                       <Text style={[styles.addressRoadText, { color: '#DC2626' }]}>
@@ -733,7 +733,7 @@ export function SurveyRecordDetailsScreen() {
                   <View style={styles.accordionHeaderLeft}>
                     <AntDesign name="file-text" size={18} color={theme.primary} />
                     <Text style={[styles.accordionTitle, { color: theme.text }]}>
-                      Advanced: Attach external GPX file
+                      Nâng cao: Đính kèm tệp GPX ngoài
                     </Text>
                   </View>
                   <MaterialCommunityIcons
@@ -746,29 +746,29 @@ export function SurveyRecordDetailsScreen() {
                 {isGpxAccordionOpen ? (
                   <View style={[styles.accordionBody, { borderColor: theme.border, backgroundColor: theme.neutral }]}>
                     <Text style={[styles.accordionDesc, { color: theme.textSecondary }]}>
-                      The system automatically extracts GPS and generates a companion GPX track. Only attach an external GPX file if you want to use a route from a dedicated GPS device.
+                      Hệ thống tự động trích xuất GPS và tạo lộ trình GPX tương ứng. Chỉ đính kèm tệp GPX ngoài nếu bạn muốn sử dụng lộ trình từ thiết bị GPS chuyên dụng.
                     </Text>
                     <AppInput
-                      label="GPX file"
-                      accessibilityLabel="Attached GPX track file"
+                      label="Tệp GPX"
+                      accessibilityLabel="Tệp lộ trình GPX đính kèm"
                       editable={false}
                       showSoftInputOnFocus={false}
-                      value={displayGpxName || 'Auto-extracted from video GPS'}
-                      placeholder="No GPX file attached"
+                      value={displayGpxName || 'Tự động trích xuất từ GPS video'}
+                      placeholder="Chưa đính kèm tệp GPX"
                       leadingIcon={<AntDesign name="file-text" size={18} color={theme.primary} />}
                       containerStyle={styles.imageLocationInput}
                     />
                     {!isSubmitting ? (
                       <View style={styles.gpxActionsRow}>
                         <AppButton
-                          label={displayGpxName ? 'Choose different GPX file' : 'Choose GPX file (.gpx)'}
+                          label={displayGpxName ? 'Chọn tệp GPX khác' : 'Chọn tệp GPX (.gpx)'}
                           variant="surface"
                           onPress={handlePickGpx}
                           style={styles.attachGpxButton}
                         />
                         {displayGpxName ? (
                           <AppButton
-                            label="Use auto GPS"
+                            label="Dùng GPS tự động"
                             variant="ghost"
                             onPress={() => {
                               setSavedGpxUri(undefined);
@@ -788,14 +788,14 @@ export function SurveyRecordDetailsScreen() {
             /* Single Image Location Input */
             <View style={styles.section}>
               <AppInput
-                label="Location (latitude, longitude)"
-                accessibilityLabel="Location latitude and longitude, read only"
+                label="Tọa độ (vĩ độ, kinh độ)"
+                accessibilityLabel="Vĩ độ và kinh độ vị trí"
                 editable={false}
                 showSoftInputOnFocus={false}
                 value={displayCoordinate
                   ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
                   : ''}
-                placeholder="No location available"
+                placeholder="Chưa có dữ liệu vị trí"
                 leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
                 containerStyle={styles.imageLocationInput}
               />
@@ -804,14 +804,14 @@ export function SurveyRecordDetailsScreen() {
                   <View style={styles.addressResolvedHeader}>
                     <MaterialCommunityIcons name="map-marker-radius" size={16} color={theme.primary} />
                     <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                      {startLocationQuery.isLoading ? 'Resolving actual location...' : 'Address'}
+                      {startLocationQuery.isLoading ? 'Đang tra cứu vị trí thực tế...' : 'Địa chỉ'}
                     </Text>
                     {startLocationQuery.isLoading ? (
                       <ActivityIndicator size="small" color={theme.primary} style={{ marginLeft: 6 }} />
                     ) : null}
                   </View>
                   <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                    {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Querying spatial service...' : 'Location address unavailable')}
+                    {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
                   </Text>
                   {startLocationQuery.data?.roadName ? (
                     <Text style={[styles.addressRoadText, { color: theme.primary }]}>
@@ -822,7 +822,7 @@ export function SurveyRecordDetailsScreen() {
               ) : null}
               <AppButton
                 accessibilityLabel={
-                  isLocating ? 'Getting current location' : 'Use current location for this survey'
+                  isLocating ? 'Đang lấy vị trí hiện tại' : 'Lấy vị trí hiện tại cho khảo sát này'
                 }
                 disabled={isLocating || isSubmitting}
                 onPress={handleUseCurrentLocation}
@@ -834,7 +834,7 @@ export function SurveyRecordDetailsScreen() {
                   tintColor={theme.onPrimary}
                 />
                 <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
-                  {isLocating ? 'Getting location...' : 'Use current location'}
+                  {isLocating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
                 </Text>
               </AppButton>
             </View>
@@ -842,12 +842,12 @@ export function SurveyRecordDetailsScreen() {
 
           {/* Map Preview */}
           <View style={styles.section}>
-            <Text style={[styles.label, { color: theme.text }]}>Map Preview</Text>
+            <Text style={[styles.label, { color: theme.text }]}>Bản đồ xem trước</Text>
             <View
               accessibilityLabel={
                 effectiveStartCoord
-                  ? `Selected survey location at ${effectiveStartCoord[1]}, ${effectiveStartCoord[0]}`
-                  : 'No survey location selected'
+                  ? `Vị trí khảo sát tại ${effectiveStartCoord[1]}, ${effectiveStartCoord[0]}`
+                  : 'Chưa chọn vị trí khảo sát'
               }
               style={[
                 styles.mapPlaceholder,
@@ -868,8 +868,8 @@ export function SurveyRecordDetailsScreen() {
                         ? {
                           coordinate: endCoordinate,
                           id: 'survey-end',
-                          title: 'End Point',
-                          subtitle: 'Survey Route',
+                          title: 'Điểm kết thúc',
+                          subtitle: 'Lộ trình khảo sát',
                           category: 'recent',
                         }
                         : undefined
@@ -894,12 +894,12 @@ export function SurveyRecordDetailsScreen() {
                     tintColor={theme.placeholder}
                   />
                   <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
-                    No GPS metadata found in this media
+                    Không tìm thấy tọa độ GPS trong tệp này
                   </Text>
                 </View>
               )}
               <AppButton
-                accessibilityLabel="Zoom map preview"
+                accessibilityLabel="Phóng to bản đồ xem trước"
                 style={[
                   styles.mapZoomButton,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -928,7 +928,7 @@ export function SurveyRecordDetailsScreen() {
 
           <View style={styles.section}>
             <AppInput
-              label={'Note'}
+              label={'Ghi chú'}
               value={note}
               onChangeText={(text) => {
                 setNote(text);
@@ -937,9 +937,9 @@ export function SurveyRecordDetailsScreen() {
               }}
               maxLength={2000}
               editable={!isSubmitting}
-              accessibilityLabel="Survey note"
+              accessibilityLabel="Ghi chú khảo sát"
               multiline
-              placeholder="Enter additional details..."
+              placeholder="Nhập thông tin chi tiết bổ sung..."
               placeholderTextColor={theme.placeholder}
               style={[
                 styles.noteInput,
@@ -955,7 +955,7 @@ export function SurveyRecordDetailsScreen() {
 
           <AppButton
             disabled={isSubmitting || isLocating || isLocatingEnd || !isDraftLoaded || !isEditable}
-            label={isSubmitting ? 'Submitting...' : 'Submit'}
+            label={isSubmitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
             onPress={handleSubmit}
             style={styles.submitButton}
           />
@@ -976,7 +976,7 @@ export function SurveyRecordDetailsScreen() {
         <View style={styles.progressModalOverlay}>
           <View style={[styles.progressModalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <ActivityIndicator color={theme.primary} size="large" />
-            <Text style={[styles.progressModalTitle, { color: theme.text }]}>Uploading Survey Video</Text>
+            <Text style={[styles.progressModalTitle, { color: theme.text }]}>Đang tải lên Video khảo sát</Text>
             <Text style={[styles.progressModalStatus, { color: theme.textSecondary }]}>
               {uploadProgress?.statusText}
             </Text>
@@ -990,7 +990,7 @@ export function SurveyRecordDetailsScreen() {
             </View>
             <View style={styles.progressMetaRow}>
               <Text style={[styles.progressMetaText, { color: theme.textSecondary }]}>
-                {uploadProgress?.currentChunk ? `Part ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Initializing'}
+                {uploadProgress?.currentChunk ? `Phần ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Đang khởi tạo'}
               </Text>
               <Text style={[styles.progressMetaText, { color: theme.primary, fontWeight: '700' }]}>
                 {`${uploadProgress?.percent ?? 0}%`}

@@ -50,19 +50,19 @@ export function SurveyorWorkPanel() {
     <View style={styles.panel}>
       <WorkActionCard
         count={pending?.pending}
-        label="Pending Submissions"
+        label="Hồ sơ đang xử lý"
         onPress={() => router.push('/work/survey-history')}
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
       />
       <WorkActionCard
         count={pending?.countsByStatus?.DRAFT}
-        label="Draft Submissions"
+        label="Bản nháp khảo sát"
         onPress={() => router.push('/work/new-survey')}
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
       />
       <WorkActionCard
         count={stats?.revalidationAvailable ?? 0}
-        label="Revalidation Map"
+        label="Bản đồ tái thẩm định"
         onPress={handleOpenRevalidationMap}
         symbol={{ android: 'explore', ios: 'location.north.circle', web: 'explore' }}
       />

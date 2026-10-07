@@ -40,25 +40,25 @@ import type {
 
 
 const submissionTypeLabels: Record<SubmissionType, string> = {
-  SINGLE_IMAGE: 'Single Image Survey',
-  VIDEO_GPX: 'Video & GPX Survey',
-  LIVE_TRIP: 'Live Trip Recording',
+  SINGLE_IMAGE: 'Khảo sát hình ảnh',
+  VIDEO_GPX: 'Khảo sát Video & GPX',
+  LIVE_TRIP: 'Ghi nhận chuyến đi trực tiếp',
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
-  DRAFT: 'Draft',
-  QUEUED: 'Queued for processing',
-  SYNCHRONIZING: 'Synchronizing video & GPX',
-  DETECTING: 'Detecting signs with AI',
-  TRACKING: 'Tracking signs along route',
-  ESTIMATING: 'Estimating GPS coordinates',
-  CLASSIFYING: 'Classifying sign types',
-  COMPLETED: 'Completed',
-  PARTIALLY_PROCESSED: 'Partially processed',
-  FAILED: 'Processing failed',
-  PENDING_CORRECTION: 'Needs correction',
-  NO_SIGN_DETECTED: 'No signs detected',
-  REJECTED: 'Rejected',
+  DRAFT: 'Bản nháp',
+  QUEUED: 'Đang chờ xử lý',
+  SYNCHRONIZING: 'Đang đồng bộ hóa video & GPX',
+  DETECTING: 'Đang nhận diện biển báo bằng AI',
+  TRACKING: 'Đang theo dõi biển báo trên tuyến',
+  ESTIMATING: 'Đang ước tính tọa độ GPS',
+  CLASSIFYING: 'Đang phân loại biển báo',
+  COMPLETED: 'Đã hoàn tất',
+  PARTIALLY_PROCESSED: 'Xử lý một phần',
+  FAILED: 'Xử lý thất bại',
+  PENDING_CORRECTION: 'Cần chỉnh sửa',
+  NO_SIGN_DETECTED: 'Không phát hiện biển báo',
+  REJECTED: 'Bị từ chối',
 };
 
 function getStatusColor(status: SubmissionStatus): { bg: string; text: string; border: string } {
@@ -86,10 +86,10 @@ function getStatusColor(status: SubmissionStatus): { bg: string; text: string; b
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return 'Not available';
+  if (!value) return 'Không có';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString('vi-VN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -240,7 +240,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
         {/* Top App Header */}
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Pressable
-            accessibilityLabel="Back"
+            accessibilityLabel="Quay lại"
             accessibilityRole="button"
             hitSlop={Spacing.one}
             onPress={() => router.back()}
@@ -251,7 +251,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
           <View style={styles.headerTextGroup}>
             <Text numberOfLines={1} style={[styles.headerTitle, { color: theme.text }]}>
-              Submission Details
+              Chi tiết hồ sơ khảo sát
             </Text>
             {submission ? (
               <Text numberOfLines={1} style={[styles.headerSubtitle, { color: theme.placeholder }]}>
@@ -263,7 +263,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
           <View style={styles.headerActions}>
             {canRetry ? (
               <Pressable
-                accessibilityLabel="Retry submission"
+                accessibilityLabel="Thử lại gửi hồ sơ"
                 accessibilityRole="button"
                 hitSlop={Spacing.one}
                 onPress={() => {
@@ -284,14 +284,14 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ) : (
                   <>
                     <MaterialCommunityIcons color="#EF4444" name="replay" size={16} />
-                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>Retry</Text>
+                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>Thử lại</Text>
                   </>
                 )}
               </Pressable>
             ) : null}
 
             <Pressable
-              accessibilityLabel="Refresh submission data"
+              accessibilityLabel="Làm mới dữ liệu hồ sơ"
               accessibilityRole="button"
               hitSlop={Spacing.one}
               onPress={() => { void refetch(); }}
@@ -310,18 +310,18 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
           <View style={styles.centerContainer}>
             <ActivityIndicator color={theme.primary} size="large" />
             <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-              Loading submission details…
+              Đang tải chi tiết hồ sơ…
             </Text>
           </View>
         ) : !submission ? (
           <View style={styles.centerContainer}>
             <MaterialCommunityIcons color={theme.placeholder} name="file-question-outline" size={48} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Submission Not Found</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Không tìm thấy hồ sơ</Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              The requested survey submission could not be located or has expired.
+              Không tìm thấy hồ sơ khảo sát yêu cầu hoặc đã hết hạn.
             </Text>
             <AppButton
-              label="Go to Survey History"
+              label="Đi tới Lịch sử khảo sát"
               onPress={() => router.replace('/work/survey-history')}
               style={styles.emptyAction}
               variant="primary"
@@ -375,15 +375,15 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View style={styles.failureAlertHeader}>
                     <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={20} />
                     <View style={styles.failureAlertTextWrap}>
-                      <Text style={styles.failureAlertTitle}>Submission Processing Failed</Text>
+                      <Text style={styles.failureAlertTitle}>Xử lý hồ sơ thất bại</Text>
                       <Text style={styles.failureText}>
-                        {submission.failureReason || 'An error occurred during AI processing. You can retry submitting this survey.'}
+                        {submission.failureReason || 'Đã xảy ra lỗi trong quá trình xử lý AI. Bạn có thể gửi lại khảo sát này.'}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.failureAlertActions}>
                     <Pressable
-                      accessibilityLabel="Resubmit survey"
+                      accessibilityLabel="Gửi lại khảo sát"
                       accessibilityRole="button"
                       onPress={() => {
                         setRetryError(undefined);
@@ -392,7 +392,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       style={[styles.failureActionRetryBtn, { backgroundColor: '#EF4444' }]}
                     >
                       <MaterialCommunityIcons color="#FFFFFF" name="replay" size={15} />
-                      <Text style={styles.failureActionRetryBtnText}>Resubmit Survey</Text>
+                      <Text style={styles.failureActionRetryBtnText}>Gửi lại khảo sát</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -404,7 +404,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View style={[styles.pipelineDot, styles.pipelineDotActive]}>
                     <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
                   </View>
-                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Uploaded</Text>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Đã tải lên</Text>
                 </View>
 
                 <View
@@ -433,7 +433,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       <View style={styles.pipelineDotInner} />
                     )}
                   </View>
-                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>AI Detection</Text>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>AI nhận diện</Text>
                 </View>
 
                 <View
@@ -458,16 +458,16 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
                     ) : null}
                   </View>
-                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Completed</Text>
+                  <Text style={[styles.pipelineLabel, { color: theme.text }]}>Hoàn tất</Text>
                 </View>
               </View>
             </View>
 
             {/* Media Section: Review the image or video again */}
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Survey Recording Media</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Phương tiện ghi nhận khảo sát</Text>
               <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {isVideoSubmission ? 'Video recording & telemetry data' : 'High-resolution survey photo'}
+                {isVideoSubmission ? 'Bản ghi video & dữ liệu đo đạc' : 'Ảnh khảo sát độ phân giải cao'}
               </Text>
             </View>
 
@@ -483,14 +483,14 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ]}
               >
                 <Pressable
-                  accessibilityLabel="Enlarge survey image"
+                  accessibilityLabel="Phóng to ảnh khảo sát"
                   accessibilityRole="button"
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.imagePressable}
                 >
                   {primaryImageUrl ? (
                     <Image
-                      accessibilityLabel="Survey photo submission"
+                      accessibilityLabel="Ảnh khảo sát gửi lên"
                       contentFit="cover"
                       source={{ uri: primaryImageUrl }}
                       style={styles.mediaImage}
@@ -499,7 +499,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   ) : null}
                   <View style={styles.zoomButton}>
                     <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
-                    <Text style={styles.zoomButtonText}>Tap to enlarge</Text>
+                    <Text style={styles.zoomButtonText}>Nhấn để phóng to</Text>
                   </View>
                 </Pressable>
               </View>
@@ -516,7 +516,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
               >
                 <View style={styles.videoThumbnailArea}>
                   <MaterialCommunityIcons color="#FFFFFF" name="video" size={48} />
-                  <Text style={styles.videoPromptText}>Survey Video Recording</Text>
+                  <Text style={styles.videoPromptText}>Bản ghi video khảo sát</Text>
                   {primaryVideo?.file_url ? (
                     <Text numberOfLines={1} style={styles.videoFilename}>
                       {primaryVideo.file_url.split('/').pop()}
@@ -524,13 +524,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   ) : null}
 
                   <Pressable
-                    accessibilityLabel="Play survey video"
+                    accessibilityLabel="Phát video khảo sát"
                     accessibilityRole="button"
                     onPress={() => handleOpenVideo(primaryVideoUrl)}
                     style={styles.playButton}
                   >
                     <MaterialCommunityIcons color="#FFFFFF" name="play" size={26} />
-                    <Text style={styles.playButtonText}>Play Video</Text>
+                    <Text style={styles.playButtonText}>Phát video</Text>
                   </Pressable>
                 </View>
 
@@ -538,7 +538,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View style={[styles.gpxRow, { borderTopColor: theme.border }]}>
                     <MaterialCommunityIcons color={theme.primary} name="crosshairs-gps" size={18} />
                     <Text style={[styles.gpxText, { color: theme.text }]}>
-                      Attached GPX Route Log: {gpxFiles[0].file_url.split('/').pop() || 'Track log'}
+                      Nhật ký lộ trình GPX: {gpxFiles[0].file_url.split('/').pop() || 'Nhật ký tuyến'}
                     </Text>
                   </View>
                 ) : null}
@@ -548,7 +548,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             {/* Extra Media Carousel Tabs if multiple files exist */}
             {mediaFiles.length > 1 ? (
               <View style={styles.mediaListGroup}>
-                <Text style={[styles.groupLabel, { color: theme.placeholder }]}>Attached Media Files</Text>
+                <Text style={[styles.groupLabel, { color: theme.placeholder }]}>Các tệp phương tiện đính kèm</Text>
                 {mediaFiles.map((file, idx) => {
                   const isVideo = file.media_type === 'VIDEO';
                   const isImage = file.media_type === 'IMAGE';
@@ -579,10 +579,10 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       />
                       <View style={styles.mediaFileText}>
                         <Text numberOfLines={1} style={[styles.mediaFileName, { color: theme.text }]}>
-                          {file.file_url.split('/').pop() || `${file.media_type} file`}
+                          {file.file_url.split('/').pop() || `Tệp ${file.media_type}`}
                         </Text>
                         <Text style={[styles.mediaFileType, { color: theme.placeholder }]}>
-                          {file.media_type} · Tap to {isVideo ? 'watch' : isImage ? 'preview' : 'view'}
+                          {file.media_type} · Nhấn để xem
                         </Text>
                       </View>
                       <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
@@ -604,7 +604,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             >
               <View style={styles.cardHeader}>
                 <MaterialCommunityIcons color={theme.primary} name="chart-box-outline" size={20} />
-                <Text style={[styles.cardTitle, { color: theme.text }]}>Detection Results</Text>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Kết quả nhận diện</Text>
               </View>
 
               <View style={styles.statsRow}>
@@ -613,7 +613,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     {submission.totalCandidatesExtracted}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                    Signs Extracted
+                    Biển báo trích xuất
                   </Text>
                 </View>
 
@@ -624,7 +624,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     {submission.coordinateSource || 'GPS'}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                    Telemetry Source
+                    Nguồn dữ liệu GPS
                   </Text>
                 </View>
               </View>
@@ -642,12 +642,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             >
               <View style={styles.cardHeader}>
                 <MaterialCommunityIcons color={theme.primary} name="information-outline" size={20} />
-                <Text style={[styles.cardTitle, { color: theme.text }]}>Submission Metadata</Text>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>Thông tin hồ sơ khảo sát</Text>
               </View>
 
               <View style={styles.metaList}>
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Submission ID</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Mã hồ sơ</Text>
                   <View style={styles.metaValueContainer}>
                     <Text
                       numberOfLines={1}
@@ -658,7 +658,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       {submission.id}
                     </Text>
                     <Pressable
-                      accessibilityLabel="Copy Submission ID"
+                      accessibilityLabel="Sao chép mã hồ sơ"
                       hitSlop={Spacing.half}
                       onPress={() => handleCopyText(submission.id, 'submission')}
                       style={styles.copyButton}
@@ -673,7 +673,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Type</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Loại</Text>
                   <View style={styles.metaValueContainer}>
                     <Text
                       numberOfLines={1}
@@ -686,7 +686,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Surveyor ID</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Mã khảo sát viên</Text>
                   <View style={styles.metaValueContainer}>
                     <Text
                       numberOfLines={1}
@@ -697,7 +697,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       {submission.surveyorId}
                     </Text>
                     <Pressable
-                      accessibilityLabel="Copy Surveyor ID"
+                      accessibilityLabel="Sao chép mã khảo sát viên"
                       hitSlop={Spacing.half}
                       onPress={() => handleCopyText(submission.surveyorId, 'surveyor')}
                       style={styles.copyButton}
@@ -712,7 +712,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Captured At</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Thời gian ghi nhận</Text>
                   <View style={styles.metaValueContainer}>
                     <Text
                       numberOfLines={1}
@@ -727,7 +727,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 {submission.latitude != null && submission.longitude != null ? (
                   <>
                     <View style={styles.metaRow}>
-                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Coordinates</Text>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Tọa độ</Text>
                       <View style={styles.metaValueContainer}>
                         <Text
                           numberOfLines={1}
@@ -740,7 +740,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     </View>
 
                     <View style={styles.metaRow}>
-                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Address / Location</Text>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Địa chỉ / Vị trí</Text>
                       <View style={styles.metaValueContainer}>
                         <Text
                           numberOfLines={2}
@@ -748,8 +748,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           style={[styles.metaValue, { color: theme.text }]}
                         >
                           {locationQuery.isLoading
-                            ? 'Resolving address…'
-                            : locationQuery.data?.displayAddress || 'Location address unavailable'}
+                            ? 'Đang tra cứu địa chỉ…'
+                            : locationQuery.data?.displayAddress || 'Không có địa chỉ'}
                         </Text>
                       </View>
                     </View>
@@ -758,7 +758,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 {submission.note ? (
                   <View style={styles.metaColumn}>
-                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Surveyor Note</Text>
+                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Ghi chú khảo sát viên</Text>
                     <Text style={[styles.noteText, { color: theme.text, backgroundColor: theme.background }]}>
                       {submission.note}
                     </Text>
@@ -781,7 +781,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <View style={styles.cardHeader}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={20} />
                   <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    {isVideoSubmission ? 'Survey Route Preview (S → D)' : 'Location Preview'}
+                    {isVideoSubmission ? 'Xem trước lộ trình khảo sát (S → D)' : 'Xem trước vị trí'}
                   </Text>
                 </View>
                 <View
@@ -802,8 +802,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           ? {
                             coordinate: endCoord,
                             id: 'survey-end',
-                            title: 'End Point',
-                            subtitle: 'Survey Route',
+                            title: 'Điểm kết thúc',
+                            subtitle: 'Lộ trình khảo sát',
                             category: 'recent',
                           }
                           : undefined
@@ -819,7 +819,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
                 <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
                   {isVideoSubmission && endCoord
-                    ? `Start (S): ${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)} → End (D): ${endCoord[1].toFixed(6)}, ${endCoord[0].toFixed(6)}`
+                    ? `Bắt đầu (S): ${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)} → Kết thúc (D): ${endCoord[1].toFixed(6)}, ${endCoord[0].toFixed(6)}`
                     : `${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)}`}
                 </Text>
               </View>
@@ -839,14 +839,14 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <View style={styles.cardHeader}>
                   <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={20} />
                   <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    Detected Traffic Signs ({statusData.candidates.length})
+                    Biển báo giao thông phát hiện ({statusData.candidates.length})
                   </Text>
                 </View>
 
                 <View style={styles.candidateList}>
                   {statusData.candidates.map((cand: any, idx: number) => {
                     const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
-                    const signLabel = cand.sign_type || cand.label || cand.type || `Sign #${idx + 1}`;
+                    const signLabel = cand.sign_type || cand.label || cand.type || `Biển #${idx + 1}`;
                     const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
                     const resolvedImg = candidateImg ? resolveS3Url(candidateImg) : undefined;
 
@@ -875,12 +875,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           {confidence != null ? (
                             <View style={styles.confidenceBadge}>
                               <MaterialCommunityIcons name="check-circle" size={12} color="#16A34A" />
-                              <Text style={styles.confidenceText}>Confidence: {confidence}%</Text>
+                              <Text style={styles.confidenceText}>Độ tin cậy: {confidence}%</Text>
                             </View>
                           ) : null}
                           {cand.timestamp_ms != null ? (
                             <Text style={[styles.candidateMeta, { color: theme.placeholder }]}>
-                              Video offset: {Math.round(cand.timestamp_ms / 1000)}s
+                              Thời điểm trong video: {Math.round(cand.timestamp_ms / 1000)}s
                             </Text>
                           ) : null}
                         </View>
@@ -903,7 +903,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
           <View style={styles.zoomBackdrop}>
             <SafeAreaView style={styles.zoomSafeArea}>
               <Pressable
-                accessibilityLabel="Close enlarged view"
+                accessibilityLabel="Đóng xem phóng to"
                 accessibilityRole="button"
                 onPress={() => setIsImageZoomed(false)}
                 style={styles.zoomCloseBtn}
@@ -968,7 +968,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <MaterialCommunityIcons color="#EF4444" name="replay" size={26} />
                 </View>
                 <View style={styles.retryModalHeaderText}>
-                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>Resubmit Survey</Text>
+                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>Gửi lại khảo sát</Text>
                   <Text style={[styles.retryModalSubtitle, { color: theme.placeholder }]}>
                     #{submission?.id.slice(0, 10)} · {submission ? submissionTypeLabels[submission.submissionType] : ''}
                   </Text>
@@ -977,12 +977,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
               {/* Modal Description */}
               <Text style={[styles.retryModalBodyText, { color: theme.textSecondary }]}>
-                Choose how you would like to resubmit this survey. You can send it directly to be reprocessed by the AI pipeline, or edit the metadata and GPS coordinates first.
+                Chọn phương thức bạn muốn gửi lại khảo sát này. Bạn có thể gửi trực tiếp để xử lý lại qua hệ thống AI, hoặc chỉnh sửa thông tin và tọa độ GPS trước.
               </Text>
 
               {submission?.failureReason ? (
                 <View style={[styles.retryModalFailureBox, { backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}>
-                  <Text style={styles.retryModalFailureLabel}>Failure Reason:</Text>
+                  <Text style={styles.retryModalFailureLabel}>Lý do thất bại:</Text>
                   <Text style={styles.retryModalFailureText}>{submission.failureReason}</Text>
                 </View>
               ) : null}
@@ -998,7 +998,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
               <View style={styles.retryModalActions}>
                 <AppButton
                   disabled={isSubmittingRetry}
-                  label={isSubmittingRetry ? 'Resubmitting…' : 'Resubmit Now'}
+                  label={isSubmittingRetry ? 'Đang gửi lại…' : 'Gửi lại ngay'}
                   onPress={handleDirectResubmit}
                   style={styles.retryModalActionBtn}
                   variant="primary"
@@ -1006,7 +1006,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 <AppButton
                   disabled={isSubmittingRetry}
-                  label="Edit Details & Resubmit"
+                  label="Chỉnh sửa chi tiết & Gửi lại"
                   onPress={handleEditAndResubmit}
                   style={styles.retryModalActionBtn}
                   variant="surface"
@@ -1014,7 +1014,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 <AppButton
                   disabled={isSubmittingRetry}
-                  label="Cancel"
+                  label="Hủy"
                   onPress={() => {
                     setIsRetryModalVisible(false);
                     setRetryError(undefined);
@@ -1029,7 +1029,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
         {copiedToast ? (
           <AppToast
             duration={1500}
-            message="Copied!"
+            message="Đã sao chép!"
             onDismiss={() => setCopiedToast(false)}
             placement="bottom"
             tone="success"

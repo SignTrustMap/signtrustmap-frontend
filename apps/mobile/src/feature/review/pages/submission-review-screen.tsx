@@ -35,18 +35,18 @@ type SubmissionReviewScreenProps = {
 type ReviewSheet = 'decline' | 'report';
 
 const declineReasons = [
-  'Incorrect Sign Type',
-  'Sign Not Found',
-  'Too Poor Image Quality',
-  'Duplicate Submission',
-  'Other',
+  { value: 'Incorrect Sign Type', label: 'Sai loại biển báo' },
+  { value: 'Sign Not Found', label: 'Không tìm thấy biển báo' },
+  { value: 'Too Poor Image Quality', label: 'Chất lượng ảnh quá kém' },
+  { value: 'Duplicate Submission', label: 'Dữ liệu bị trùng lặp' },
+  { value: 'Other', label: 'Lý do khác' },
 ] as const;
 
-type DeclineReason = (typeof declineReasons)[number];
+type DeclineReason = (typeof declineReasons)[number]['value'];
 
 function SubmissionReviewSkeleton() {
   return (
-    <View accessibilityLabel="Loading submissions" style={styles.skeletonContainer}>
+    <View accessibilityLabel="Đang tải danh sách thẩm định" style={styles.skeletonContainer}>
       <View style={[styles.skeletonBlock, { width: '100%', height: 4, marginVertical: 8 }]} />
       <View style={styles.skeletonCard} />
       <View style={styles.skeletonInfoBox} />
@@ -99,7 +99,7 @@ function ReviewBottomSheet({
       visible={Boolean(type)}
     >
       <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel="Close review options" onPress={onClose} style={styles.backdrop} />
+        <Pressable accessibilityLabel="Đóng tùy chọn thẩm định" onPress={onClose} style={styles.backdrop} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           enabled={Platform.OS !== 'web'}
@@ -113,10 +113,10 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Decline Reason' : 'Report Submission'}
+                {isDecline ? 'Lý do từ chối' : 'Báo cáo dữ liệu'}
               </Text>
               <AppButton
-                accessibilityLabel="Close"
+                accessibilityLabel="Đóng"
                 onPress={onClose}
                 style={styles.sheetCloseButton}
                 variant="ghost"
@@ -132,18 +132,18 @@ function ReviewBottomSheet({
                 style={styles.sheetBodyScroll}
               >
                 <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Please select a reason for declining this sign submission:
+                  Vui lòng chọn lý do từ chối biển báo này:
                 </Text>
                 <View style={styles.reasonList}>
-                  {declineReasons.map((reason) => {
-                    const selected = declineReason === reason;
+                  {declineReasons.map((reasonObj) => {
+                    const selected = declineReason === reasonObj.value;
 
                     return (
                       <Pressable
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
-                        key={reason}
-                        onPress={() => onChangeDeclineReason(reason)}
+                        key={reasonObj.value}
+                        onPress={() => onChangeDeclineReason(reasonObj.value)}
                         style={[
                           styles.reasonOption,
                           {
@@ -152,7 +152,7 @@ function ReviewBottomSheet({
                           },
                         ]}
                       >
-                        <Text style={[styles.reasonLabel, { color: theme.text }]}>{reason}</Text>
+                        <Text style={[styles.reasonLabel, { color: theme.text }]}>{reasonObj.label}</Text>
                         <View
                           style={[
                             styles.radio,
@@ -168,13 +168,13 @@ function ReviewBottomSheet({
                 {isOther ? (
                   <View style={styles.reasonInputGroup}>
                     <Text style={[styles.inputLabel, { color: theme.text }]}>
-                      Reason <Text style={{ color: Colors.danger }}>*</Text>
+                      Lý do chi tiết <Text style={{ color: Colors.danger }}>*</Text>
                     </Text>
                     <TextInput
-                      accessibilityLabel="Reason, required"
+                      accessibilityLabel="Lý do chi tiết, bắt buộc"
                       multiline
                       onChangeText={onChangeDeclineReasonDetail}
-                      placeholder="Please specify the reason"
+                      placeholder="Vui lòng nêu rõ lý do..."
                       placeholderTextColor={theme.placeholder}
                       style={[
                         styles.reasonInput,
@@ -194,13 +194,13 @@ function ReviewBottomSheet({
               >
                 <View style={styles.reasonInputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>
-                    Report Note <Text style={{ color: Colors.danger }}>*</Text>
+                    Ghi chú báo cáo <Text style={{ color: Colors.danger }}>*</Text>
                   </Text>
                   <TextInput
-                    accessibilityLabel="Report Note, required"
+                    accessibilityLabel="Ghi chú báo cáo, bắt buộc"
                     multiline
                     onChangeText={onChangeReportNote}
-                    placeholder="Describe the issue with this submission"
+                    placeholder="Mô tả sự cố hoặc sai lệch với dữ liệu này..."
                     placeholderTextColor={theme.placeholder}
                     style={[
                       styles.reasonInput,
@@ -211,21 +211,21 @@ function ReviewBottomSheet({
                   />
                 </View>
                 <Text style={[styles.reportHelper, { color: theme.placeholder }]}>
-                  Your report will be reviewed by the system administrators.
+                  Báo cáo của bạn sẽ được ban quản trị xem xét.
                 </Text>
               </ScrollView>
             )}
 
             <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>
               <AppButton
-                label="Cancel"
+                label="Hủy"
                 onPress={onClose}
                 style={[styles.sheetFooterButton, { borderColor: theme.border }]}
                 variant="surface"
               />
               <AppButton
                 disabled={!canConfirm}
-                label={isDecline ? 'Confirm Decline' : 'Submit Report'}
+                label={isDecline ? 'Xác nhận từ chối' : 'Gửi báo cáo'}
                 onPress={onConfirm}
                 style={[
                   styles.sheetFooterButton,
@@ -290,10 +290,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       completeCurrentReview(action, details);
 
       const toastMessages: Record<ReviewActionType, string> = {
-        approved: 'Sign approved',
-        declined: 'Sign declined',
-        reported: 'Sign reported',
-        skipped: 'Sign skipped (cannot identify)',
+        approved: 'Đã phê duyệt biển báo',
+        declined: 'Đã từ chối biển báo',
+        reported: 'Đã báo cáo biển báo',
+        skipped: 'Đã bỏ qua biển báo (không thể nhận diện)',
       };
 
       setToast((current) => ({
@@ -458,7 +458,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         <View style={styles.progressSection}>
           <View style={styles.progressTopRow}>
             <Pressable
-              accessibilityLabel="Go back"
+              accessibilityLabel="Quay lại"
               hitSlop={Spacing.one}
               onPress={() => router.back()}
               style={styles.backButton}
@@ -484,8 +484,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
           <View style={styles.progressCounterRow}>
             <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
-              {submission ? 'REVIEWING' : 'REVIEWED'}{' '}
-              {reviewPosition} OF {totalInQueue}
+              {submission ? 'ĐANG THẨM ĐỊNH' : 'ĐÃ THẨM ĐỊNH'}{' '}
+              {reviewPosition} / {totalInQueue}
             </Text>
           </View>
         </View>
@@ -537,7 +537,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 ]}
               >
                 <Pressable
-                  accessibilityLabel="Sign submission image. Tap to enlarge."
+                  accessibilityLabel="Ảnh biển báo. Chạm để phóng to."
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.cardInnerPressable}
                 >
@@ -557,7 +557,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: approveBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>APPROVE</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>PHÊ DUYỆT</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -567,7 +567,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: declineBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>DECLINE</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>TỪ CHỐI</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -577,7 +577,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: skipBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>SKIP</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BỎ QUA</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -587,7 +587,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: reportBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>REPORT</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BÁO CÁO</Text>
                   </Animated.View>
 
                   {displayedReviewAction ? (
@@ -607,7 +607,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       ]}
                     >
                       <Text style={styles.statusBadgeLabel}>
-                        {displayedReviewAction.toUpperCase()}
+                        {displayedReviewAction === 'approved'
+                          ? 'ĐÃ PHÊ DUYỆT'
+                          : displayedReviewAction === 'declined'
+                            ? 'ĐÃ TỪ CHỐI'
+                            : displayedReviewAction === 'reported'
+                              ? 'ĐÃ BÁO CÁO'
+                              : 'ĐÃ BỎ QUA'}
                       </Text>
                     </View>
                   ) : null}
@@ -637,7 +643,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {submission.captured}
                 {submission.location && submission.location !== 'Estimated GPS coordinates available'
                   ? ` • ${submission.location}`
-                  : ''}
+                  : submission.location === 'Estimated GPS coordinates available'
+                    ? ' • Tọa độ GPS ước tính'
+                    : ''}
               </Text>
             </View>
 
@@ -646,7 +654,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <View style={styles.diamondContainer}>
                 {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
                 <Pressable
-                  accessibilityLabel="Skip submission (cannot identify)"
+                  accessibilityLabel="Bỏ qua (không thể nhận diện)"
                   accessibilityRole="button"
                   onPress={() => completeReview('skipped')}
                   style={({ pressed }) => [
@@ -662,7 +670,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
                 {/* Left Button: Decline (X) */}
                 <Pressable
-                  accessibilityLabel="Decline submission"
+                  accessibilityLabel="Từ chối biển báo"
                   accessibilityRole="button"
                   onPress={() => setActiveSheet('decline')}
                   style={({ pressed }) => [
@@ -678,7 +686,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
                 {/* Right Button: Approve (Heart) */}
                 <Pressable
-                  accessibilityLabel="Approve submission"
+                  accessibilityLabel="Phê duyệt biển báo"
                   accessibilityRole="button"
                   onPress={() => completeReview('approved')}
                   style={({ pressed }) => [
@@ -693,7 +701,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
                 {/* Bottom Button: Report */}
                 <Pressable
-                  accessibilityLabel="Report submission"
+                  accessibilityLabel="Báo cáo biển báo"
                   accessibilityRole="button"
                   onPress={() => setActiveSheet('report')}
                   style={({ pressed }) => [
@@ -711,13 +719,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               {/* Undo Action (Subtle under the buttons) */}
               {reviewHistory.length > 0 && !recheckingSubmission ? (
                 <Pressable
-                  accessibilityLabel="Undo last review action"
+                  accessibilityLabel="Hoàn tác thao tác trước"
                   onPress={undoLastAction}
                   style={styles.undoRow}
                 >
                   <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
                   <Text style={[styles.undoText, { color: theme.placeholder }]}>
-                    Undo last action
+                    Hoàn tác thao tác trước
                   </Text>
                 </Pressable>
               ) : (
@@ -730,13 +738,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
-            <Text style={[styles.completeTitle, { color: theme.text }]}>All reviews completed</Text>
+            <Text style={[styles.completeTitle, { color: theme.text }]}>Đã hoàn thành tất cả thẩm định</Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
-              You have reviewed all available sign submissions.
+              Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.
             </Text>
             {reviewHistory.length > 0 ? (
               <AppButton
-                label="View Summary"
+                label="Xem tổng kết"
                 onPress={() => router.replace('/work/submission-summary')}
                 style={styles.completeSummaryButton}
               />
@@ -754,13 +762,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         visible={isImageZoomed}
       >
         <Pressable
-          accessibilityLabel="Close enlarged view"
+          accessibilityLabel="Đóng xem phóng to"
           onPress={() => setIsImageZoomed(false)}
           style={styles.zoomBackdrop}
         >
           <SafeAreaView edges={['top', 'bottom']} style={styles.zoomSafeArea}>
             <Pressable
-              accessibilityLabel="Close enlarged view"
+              accessibilityLabel="Đóng xem phóng to"
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={() => setIsImageZoomed(false)}
               style={[

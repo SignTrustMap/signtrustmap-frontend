@@ -34,10 +34,10 @@ import { RevalidationSignDetailsCard } from '../components/revalidation-sign-det
 type FreshnessFilter = 'ALL' | 'NEEDS_REVALIDATION' | 'MODERATE' | 'FRESH';
 
 const ZOOM_THRESHOLDS = [
-  { id: 'detail', label: '17.5x', name: 'Detail', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Poles & signs' },
-  { id: 'street', label: '16.5x', name: 'Street', zoom: 16.5, icon: 'road-variant', desc: 'Street level' },
-  { id: 'area', label: '14.5x', name: 'Area', zoom: 14.5, icon: 'home-city-outline', desc: 'Neighborhood' },
-  { id: 'city', label: '12.0x', name: 'City', zoom: 12.0, icon: 'city-variant-outline', desc: 'City overview' },
+  { id: 'detail', label: '17.5x', name: 'Chi tiết', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Cột & biển báo' },
+  { id: 'street', label: '16.5x', name: 'Đường phố', zoom: 16.5, icon: 'road-variant', desc: 'Cấp đường phố' },
+  { id: 'area', label: '14.5x', name: 'Khu vực', zoom: 14.5, icon: 'home-city-outline', desc: 'Khu dân cư' },
+  { id: 'city', label: '12.0x', name: 'Toàn cảnh', zoom: 12.0, icon: 'city-variant-outline', desc: 'Toàn thành phố' },
 ] as const;
 
 type ZoomThresholdId = (typeof ZOOM_THRESHOLDS)[number]['id'];
@@ -435,7 +435,7 @@ export function RevalidationMapScreen() {
           {/* Top Row: Back button + Title & Nearby Count */}
           <View style={styles.headerTopRow}>
             <Pressable
-              accessibilityLabel="Back to Work"
+              accessibilityLabel="Quay lại Công việc"
               accessibilityRole="button"
               hitSlop={8}
               onPress={() => router.back()}
@@ -445,9 +445,9 @@ export function RevalidationMapScreen() {
             </Pressable>
 
             <View style={styles.titleContainer}>
-              <Text style={[styles.headerTitle, { color: theme.text }]}>Revalidation</Text>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Tái thẩm định</Text>
               <Text style={[styles.headerSubtitle, { color: theme.grey }]}>
-                {rawSigns.length} signs nearby
+                {rawSigns.length} biển báo gần đây
               </Text>
             </View>
           </View>
@@ -455,7 +455,7 @@ export function RevalidationMapScreen() {
           {/* Compact Segmented Filter Pills */}
           <View style={styles.filterRow}>
             <Pressable
-              accessibilityLabel={`Show all ${rawSigns.length} signs`}
+              accessibilityLabel={`Hiển thị tất cả ${rawSigns.length} biển báo`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('ALL')}
               style={[
@@ -469,12 +469,12 @@ export function RevalidationMapScreen() {
                   { color: activeFilter === 'ALL' ? '#FFFFFF' : theme.text },
                 ]}
               >
-                All {rawSigns.length}
+                Tất cả {rawSigns.length}
               </Text>
             </Pressable>
 
             <Pressable
-              accessibilityLabel={`Show ${staleCount} signs needing review`}
+              accessibilityLabel={`Hiển thị ${staleCount} biển báo cần kiểm tra`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('NEEDS_REVALIDATION')}
               style={[
@@ -490,12 +490,12 @@ export function RevalidationMapScreen() {
                   },
                 ]}
               >
-                Needs review {staleCount}
+                Cần kiểm tra {staleCount}
               </Text>
             </Pressable>
 
             <Pressable
-              accessibilityLabel={`Show ${moderateCount} moderate signs`}
+              accessibilityLabel={`Hiển thị ${moderateCount} biển báo mức trung bình`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('MODERATE')}
               style={[
@@ -511,12 +511,12 @@ export function RevalidationMapScreen() {
                   },
                 ]}
               >
-                Moderate {moderateCount}
+                Trung bình {moderateCount}
               </Text>
             </Pressable>
 
             <Pressable
-              accessibilityLabel={`Show ${freshCount} fresh signs`}
+              accessibilityLabel={`Hiển thị ${freshCount} biển báo mới`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('FRESH')}
               style={[
@@ -532,7 +532,7 @@ export function RevalidationMapScreen() {
                   },
                 ]}
               >
-                Fresh {freshCount}
+                Tươi mới {freshCount}
               </Text>
             </Pressable>
           </View>
@@ -562,12 +562,12 @@ export function RevalidationMapScreen() {
               },
             ]}
           >
-            <Text style={[styles.zoomMenuTitle, { color: theme.grey }]}>MAP ZOOM LEVEL</Text>
+            <Text style={[styles.zoomMenuTitle, { color: theme.grey }]}>MỨC THU PHÓNG BẢN ĐỒ</Text>
             {ZOOM_THRESHOLDS.map((item) => {
               const isSelected = activeZoomId === item.id;
               return (
                 <Pressable
-                  accessibilityLabel={`Set zoom level to ${item.name} (${item.label})`}
+                  accessibilityLabel={`Đặt mức thu phóng thành ${item.name} (${item.label})`}
                   accessibilityRole="button"
                   key={item.id}
                   onPress={() => handleSelectZoomThreshold(item.id, item.zoom)}
@@ -612,7 +612,7 @@ export function RevalidationMapScreen() {
 
         {/* Button 0: Toggle Sign List Panel */}
         <Pressable
-          accessibilityLabel={`Show list of ${staleSigns.length} signs needing revalidation`}
+          accessibilityLabel={`Hiển thị danh sách ${staleSigns.length} biển báo cần tái thẩm định`}
           accessibilityRole="button"
           onPress={() => {
             setIsSignListOpen((prev) => !prev);
@@ -642,7 +642,7 @@ export function RevalidationMapScreen() {
 
         {/* Button 1: Modify Zoom Level by Selectable Threshold */}
         <Pressable
-          accessibilityLabel="Modify map zoom level by selectable threshold"
+          accessibilityLabel="Thay đổi mức thu phóng bản đồ"
           accessibilityRole="button"
           onPress={() => {
             setIsZoomMenuOpen((prev) => !prev);
@@ -672,7 +672,7 @@ export function RevalidationMapScreen() {
 
         {/* Button 2: Snap to Current Location if Available */}
         <Pressable
-          accessibilityLabel="Snap to current location"
+          accessibilityLabel="Đến vị trí hiện tại"
           accessibilityRole="button"
           onPress={handleSnapLocation}
           style={[
@@ -716,14 +716,14 @@ export function RevalidationMapScreen() {
                 <MaterialCommunityIcons color="#E11D48" name="alert-decagram-outline" size={18} />
               </View>
               <View>
-                <Text style={[styles.signListTitle, { color: theme.text }]}>Needs Revalidation</Text>
+                <Text style={[styles.signListTitle, { color: theme.text }]}>Cần tái thẩm định</Text>
                 <Text style={[styles.signListSubtitle, { color: theme.grey }]}>
-                  {staleSigns.length} {staleSigns.length === 1 ? 'sign' : 'signs'} require on-site verification
+                  {staleSigns.length} biển báo cần xác minh tại hiện trường
                 </Text>
               </View>
             </View>
             <Pressable
-              accessibilityLabel="Close sign list"
+              accessibilityLabel="Đóng danh sách biển báo"
               accessibilityRole="button"
               hitSlop={8}
               onPress={() => setIsSignListOpen(false)}
@@ -741,14 +741,14 @@ export function RevalidationMapScreen() {
             <View style={styles.signListEmpty}>
               <ActivityIndicator color={theme.primary} size="small" />
               <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
-                Loading revalidation signs...
+                Đang tải biển báo tái thẩm định...
               </Text>
             </View>
           ) : staleSigns.length === 0 ? (
             <View style={styles.signListEmpty}>
               <MaterialCommunityIcons color={theme.grey} name="check-circle-outline" size={32} />
               <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
-                No signs need revalidation
+                Không có biển báo cần tái thẩm định
               </Text>
             </View>
           ) : (
@@ -760,7 +760,7 @@ export function RevalidationMapScreen() {
                 const isActive = selectedSign?.id === item.id;
                 return (
                   <Pressable
-                    accessibilityLabel={`Go to sign ${item.signCode || item.name}`}
+                    accessibilityLabel={`Đến biển báo ${item.signCode || item.name}`}
                     accessibilityRole="button"
                     onPress={() => handleSignListItemPress(item)}
                     style={[
@@ -786,7 +786,7 @@ export function RevalidationMapScreen() {
                     <View style={styles.signListRowInfo}>
                       <View style={styles.signListRowTop}>
                         <Text numberOfLines={1} style={[styles.signListRowName, { color: theme.text }]}>
-                          {item.signCode || 'Sign'}
+                          {item.signCode || 'Biển báo'}
                         </Text>
                         {info.scorePercent !== undefined ? (
                           <View style={[styles.signListScoreBadge, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
@@ -795,7 +795,7 @@ export function RevalidationMapScreen() {
                         ) : null}
                       </View>
                       <Text numberOfLines={1} style={[styles.signListRowLabel, { color: theme.text }]}>
-                        {item.name || item.signCode || 'Unknown sign'}
+                        {item.name || item.signCode || 'Biển báo chưa xác định'}
                       </Text>
                       {item.roadName ? (
                         <Text numberOfLines={1} style={[styles.signListRowRoad, { color: theme.placeholder }]}>

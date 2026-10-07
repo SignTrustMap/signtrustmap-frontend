@@ -12,13 +12,13 @@ type ReviewTab = 'catalog' | 'review';
 const tabs = [
   {
     id: 'review',
-    label: 'Review',
+    label: 'Thẩm định',
     route: '/work/submission-review',
     symbol: { android: 'fact_check', ios: 'checkmark.rectangle.stack', web: 'fact_check' },
   },
   {
     id: 'catalog',
-    label: 'Catalog',
+    label: 'Tra cứu',
     route: '/work/sign-catalog',
     symbol: { android: 'menu_book', ios: 'books.vertical', web: 'menu_book' },
   },

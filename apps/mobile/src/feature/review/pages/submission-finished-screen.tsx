@@ -22,21 +22,20 @@ export function SubmissionFinishedScreen({ reviewedCount }: { reviewedCount: num
             <Text style={[styles.iconLabel, { color: theme.primary }]}>✓</Text>
           </View>
           <View style={styles.copy}>
-            <Text style={[styles.title, { color: theme.text }]}>Submission complete</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Hoàn tất thẩm định</Text>
             <Text style={[styles.description, { color: theme.textSecondary }]}>
-              {reviewedCount} {reviewedCount === 1 ? 'sign review has' : 'sign reviews have'} been
-              submitted successfully.
+              Đã gửi kết quả thẩm định cho {reviewedCount} biển báo thành công.
             </Text>
           </View>
           <View style={styles.actionFooter}>
             <AppButton
-              label="Return to home"
+              label="Quay lại trang chủ thẩm định"
               onPress={() => router.replace(reviewerWorkRoute)}
               style={styles.action}
               variant='surface'
             />
             <AppButton
-              label="Review more signs"
+              label="Thẩm định thêm biển báo"
               onPress={() => router.replace('/work/submission-review')}
               style={styles.action}
             />

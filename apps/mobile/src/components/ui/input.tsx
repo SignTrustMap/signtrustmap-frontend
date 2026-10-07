@@ -114,14 +114,14 @@ export function AppInput({
         />
         {isPassword ? (
           <Pressable
-            accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+            accessibilityLabel={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
             accessibilityRole="button"
             hitSlop={Spacing.one}
             onPress={() => setPasswordVisible((visible) => !visible)}
             style={styles.visibilityButton}
           >
             <Text style={[styles.visibilityText, { color: theme.textSecondary }]}>
-              {passwordVisible ? 'Hide' : 'Show'}
+              {passwordVisible ? 'Ẩn' : 'Hiện'}
             </Text>
           </Pressable>
         ) : null}

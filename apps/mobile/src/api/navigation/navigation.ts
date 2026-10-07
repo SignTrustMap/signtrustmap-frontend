@@ -85,6 +85,7 @@ export async function getNavigationRoute(
             maxAlternatives: 0,
             originLatitude: start[1],
             originLongitude: start[0],
+            _vehicleMode
         },
         undefined,
         signal,

@@ -53,7 +53,7 @@ export function SignFilterManager() {
   // Open editor for new preset
   const handleOpenCreate = () => {
     setEditingPreset(null);
-    setPresetNameInput(`List ${presets.length + 1}`);
+    setPresetNameInput(`Danh sách ${presets.length + 1}`);
     setSelectedCategories(new Set(['MANDATORY']));
     setEditorError('');
     setIsEditorModalOpen(true);
@@ -82,7 +82,7 @@ export function SignFilterManager() {
       const next = new Set(prev);
       if (next.has(cat)) {
         if (next.size === 1) {
-          setEditorError('A list must include at least one sign category.');
+          setEditorError('Danh sách phải bao gồm ít nhất một danh mục biển báo.');
           return prev;
         }
         next.delete(cat);
@@ -98,11 +98,11 @@ export function SignFilterManager() {
   const handleSaveEditor = async () => {
     const trimmed = presetNameInput.trim();
     if (!trimmed) {
-      setEditorError('Please provide a name for the list.');
+      setEditorError('Vui lòng nhập tên cho danh sách.');
       return;
     }
     if (selectedCategories.size === 0) {
-      setEditorError('Select at least one sign category.');
+      setEditorError('Chọn ít nhất một danh mục biển báo.');
       return;
     }
 
@@ -122,7 +122,7 @@ export function SignFilterManager() {
   const handleSaveRename = async () => {
     const trimmed = renameInput.trim();
     if (!trimmed) {
-      setRenameError('List name cannot be empty.');
+      setRenameError('Tên danh sách không được để trống.');
       return;
     }
     if (renamingPresetId) {
@@ -134,12 +134,12 @@ export function SignFilterManager() {
   // Confirm delete
   const handleDeletePress = (preset: SignFilterPreset) => {
     Alert.alert(
-      'Delete list',
-      `Are you sure you want to delete "${preset.name}"?`,
+      'Xóa danh sách',
+      `Bạn có chắc chắn muốn xóa "${preset.name}"?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Xóa',
           style: 'destructive',
           onPress: () => {
             void deletePreset(preset.id);
@@ -161,26 +161,26 @@ export function SignFilterManager() {
     <View style={styles.container}>
       <View style={styles.sectionHeadingRow}>
         <View style={styles.headingTitleRow}>
-          <Text style={[styles.subsectionTitle, { color: theme.text }]}>Sign filter lists</Text>
+          <Text style={[styles.subsectionTitle, { color: theme.text }]}>Danh sách lọc biển báo</Text>
           <AppButton
-            accessibilityLabel="Create new filter list"
+            accessibilityLabel="Tạo danh sách lọc mới"
             onPress={handleOpenCreate}
             style={styles.headerAddButton}
             variant="ghost"
           >
             <MaterialCommunityIcons color={theme.primary} name="plus" size={16} />
-            <Text style={[styles.headerAddText, { color: theme.primary }]}>New list</Text>
+            <Text style={[styles.headerAddText, { color: theme.primary }]}>Thêm mới</Text>
           </AppButton>
         </View>
         <Text style={[styles.subsectionDescription, { color: theme.textSecondary }]}>
-          Only signs from the selected list will appear on map and trigger audio alerts
+          Chỉ các biển báo trong danh sách đã chọn mới hiển thị trên bản đồ và phát cảnh báo âm thanh
         </Text>
       </View>
 
       <View style={styles.roleList}>
         {/* Option: Show all signs (No filter selected) */}
         <AppButton
-          accessibilityLabel={`All signs (No filter), ${activePresetId === null ? 'selected' : 'not selected'}`}
+          accessibilityLabel={`Tất cả biển báo (Không lọc), ${activePresetId === null ? 'đã chọn' : 'chưa chọn'}`}
           accessibilityRole="radio"
           accessibilityState={{ checked: activePresetId === null }}
           onPress={() => void setActivePresetId(null)}
@@ -191,9 +191,9 @@ export function SignFilterManager() {
             <MaterialCommunityIcons color={theme.primary} name="filter-outline" size={22} />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowTitle, { color: theme.text }]}>All signs (No filter)</Text>
+            <Text style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
             <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
-              Displays and alerts all 5 sign categories
+              Hiển thị và cảnh báo cho tất cả 5 danh mục biển báo
             </Text>
           </View>
           {activePresetId === null ? (
@@ -218,7 +218,7 @@ export function SignFilterManager() {
               ]}
             >
               <AppButton
-                accessibilityLabel={`${preset.name}, ${isActive ? 'selected' : 'not selected'}`}
+                accessibilityLabel={`${preset.name}, ${isActive ? 'đã chọn' : 'chưa chọn'}`}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: isActive }}
                 onPress={() => void setActivePresetId(preset.id)}
@@ -233,7 +233,7 @@ export function SignFilterManager() {
                     {preset.name}
                   </Text>
                   <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                    {categoryLabels || `${preset.categories.length} categories`}
+                    {categoryLabels || `${preset.categories.length} danh mục`}
                   </Text>
                 </View>
                 {isActive ? (
@@ -244,37 +244,37 @@ export function SignFilterManager() {
               {/* Action Buttons: Rename, Categories, Delete */}
               <View style={[styles.cardActionFooter, { borderTopColor: theme.border }]}>
                 <AppButton
-                  accessibilityLabel={`Rename ${preset.name}`}
+                  accessibilityLabel={`Đổi tên ${preset.name}`}
                   onPress={() => handleOpenRename(preset)}
                   style={styles.actionBtn}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={14} />
-                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Rename</Text>
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Đổi tên</Text>
                 </AppButton>
 
                 <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
 
                 <AppButton
-                  accessibilityLabel={`Edit categories for ${preset.name}`}
+                  accessibilityLabel={`Chỉnh sửa danh mục cho ${preset.name}`}
                   onPress={() => handleOpenEdit(preset)}
                   style={styles.actionBtn}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons color={theme.primary} name="tune-variant" size={14} />
-                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Categories</Text>
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Danh mục</Text>
                 </AppButton>
 
                 <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
 
                 <AppButton
-                  accessibilityLabel={`Delete ${preset.name}`}
+                  accessibilityLabel={`Xóa ${preset.name}`}
                   onPress={() => handleDeletePress(preset)}
                   style={styles.actionBtn}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons color={theme.danger} name="trash-can-outline" size={14} />
-                  <Text style={[styles.actionBtnText, { color: theme.danger }]}>Delete</Text>
+                  <Text style={[styles.actionBtnText, { color: theme.danger }]}>Xóa</Text>
                 </AppButton>
               </View>
             </View>
@@ -287,19 +287,19 @@ export function SignFilterManager() {
               <MaterialCommunityIcons color={theme.primary} name="playlist-plus" size={22} />
             </View>
             <View style={styles.rowCopy}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>No custom lists yet</Text>
+              <Text style={[styles.rowTitle, { color: theme.text }]}>Chưa có danh sách tùy chỉnh</Text>
               <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                Create custom lists to filter signs
+                Tạo danh sách tùy chỉnh để lọc biển báo
               </Text>
             </View>
             <AppButton
-              accessibilityLabel="Create first filter list"
+              accessibilityLabel="Tạo danh sách lọc đầu tiên"
               onPress={handleOpenCreate}
               style={[styles.emptyAddBtn, { backgroundColor: theme.backgroundSelected }]}
               variant="ghost"
             >
               <MaterialCommunityIcons color={theme.primary} name="plus" size={16} />
-              <Text style={[styles.emptyAddBtnText, { color: theme.primary }]}>Create</Text>
+              <Text style={[styles.emptyAddBtnText, { color: theme.primary }]}>Tạo mới</Text>
             </AppButton>
           </View>
         ) : null}
@@ -321,10 +321,10 @@ export function SignFilterManager() {
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {editingPreset ? 'Edit Filter List' : 'New Filter List'}
+                {editingPreset ? 'Chỉnh sửa danh sách lọc' : 'Danh sách lọc mới'}
               </Text>
               <Pressable
-                accessibilityLabel="Close editor"
+                accessibilityLabel="Đóng chỉnh sửa"
                 onPress={() => setIsEditorModalOpen(false)}
                 style={styles.modalCloseBtn}
               >
@@ -333,16 +333,16 @@ export function SignFilterManager() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScrollContent}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Tên danh sách</Text>
               <TextInput
-                accessibilityLabel="Filter list name"
+                accessibilityLabel="Tên danh sách lọc"
                 autoFocus
                 maxLength={40}
                 onChangeText={(t) => {
                   setPresetNameInput(t);
                   setEditorError('');
                 }}
-                placeholder="e.g. Mandatory Only, Highway Driving"
+                placeholder="VD: Chỉ biển hiệu lệnh, Lái xe cao tốc"
                 placeholderTextColor={theme.placeholder}
                 style={[
                   styles.textInput,
@@ -356,10 +356,10 @@ export function SignFilterManager() {
               />
 
               <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
-                Select Sign Categories to Include
+                Chọn danh mục biển báo cần bao gồm
               </Text>
               <Text style={[styles.inputHint, { color: theme.placeholder }]}>
-                Only signs matching checked categories will be displayed and announced.
+                Chỉ các biển báo thuộc danh mục được chọn mới được hiển thị và cảnh báo.
               </Text>
 
               <View style={styles.categoryPickerList}>
@@ -368,7 +368,7 @@ export function SignFilterManager() {
                   return (
                     <Pressable
                       key={cat.id}
-                      accessibilityLabel={`${cat.label} signs, ${isChecked ? 'included' : 'excluded'}`}
+                      accessibilityLabel={`Biển ${cat.label}, ${isChecked ? 'đã bao gồm' : 'chưa bao gồm'}`}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: isChecked }}
                       onPress={() => handleToggleCategory(cat.id)}
@@ -419,20 +419,20 @@ export function SignFilterManager() {
 
             <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
               <AppButton
-                accessibilityLabel="Cancel editing"
+                accessibilityLabel="Hủy chỉnh sửa"
                 onPress={() => setIsEditorModalOpen(false)}
                 style={styles.modalCancelBtn}
                 variant="ghost"
               >
-                <Text style={[styles.modalCancelText, { color: theme.placeholder }]}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: theme.placeholder }]}>Hủy</Text>
               </AppButton>
               <AppButton
-                accessibilityLabel="Save filter list"
+                accessibilityLabel="Lưu danh sách lọc"
                 onPress={handleSaveEditor}
                 style={styles.modalSaveBtn}
               >
                 <Text style={[styles.modalSaveText, { color: theme.onPrimary }]}>
-                  {editingPreset ? 'Update List' : 'Create List'}
+                  {editingPreset ? 'Cập nhật' : 'Tạo mới'}
                 </Text>
               </AppButton>
             </View>
@@ -454,20 +454,20 @@ export function SignFilterManager() {
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
             ]}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Rename Filter List</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Đổi tên danh sách lọc</Text>
             <Text style={[styles.inputHint, { color: theme.placeholder }]}>
-              Enter a new name for this list:
+              Nhập tên mới cho danh sách này:
             </Text>
 
             <TextInput
-              accessibilityLabel="New list name"
+              accessibilityLabel="Tên danh sách mới"
               autoFocus
               maxLength={40}
               onChangeText={(t) => {
                 setRenameInput(t);
                 setRenameError('');
               }}
-              placeholder="List name"
+              placeholder="Tên danh sách"
               placeholderTextColor={theme.placeholder}
               style={[
                 styles.textInput,
@@ -487,19 +487,19 @@ export function SignFilterManager() {
 
             <View style={[styles.modalFooter, { borderTopColor: theme.border, marginTop: Spacing.two }]}>
               <AppButton
-                accessibilityLabel="Cancel rename"
+                accessibilityLabel="Hủy đổi tên"
                 onPress={() => setIsRenameModalOpen(false)}
                 style={styles.modalCancelBtn}
                 variant="ghost"
               >
-                <Text style={[styles.modalCancelText, { color: theme.placeholder }]}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: theme.placeholder }]}>Hủy</Text>
               </AppButton>
               <AppButton
-                accessibilityLabel="Save new name"
+                accessibilityLabel="Lưu tên mới"
                 onPress={handleSaveRename}
                 style={styles.modalSaveBtn}
               >
-                <Text style={[styles.modalSaveText, { color: theme.onPrimary }]}>Save</Text>
+                <Text style={[styles.modalSaveText, { color: theme.onPrimary }]}>Lưu</Text>
               </AppButton>
             </View>
           </View>

@@ -73,10 +73,10 @@ export function RouteSearchScreen() {
       <View style={styles.header}>
         <View style={styles.searchInputWrapper}>
           <AppInput
-            accessibilityLabel="Search for your destination"
+            accessibilityLabel="Tìm kiếm điểm đến"
             autoFocus
             onChangeText={setQuery}
-            placeholder="Where to?"
+            placeholder="Bạn muốn đi đâu?"
             returnKeyType="search"
             style={[styles.searchPrompt, { color: theme.text }]}
             containerStyle={[
@@ -85,7 +85,7 @@ export function RouteSearchScreen() {
             ]}
             leadingIcon={
               <AppButton
-                accessibilityLabel="Go back"
+                accessibilityLabel="Quay lại"
                 hitSlop={Spacing.one}
                 onPress={() => router.back()}
                 pressedOpacity={0.7}
@@ -109,14 +109,14 @@ export function RouteSearchScreen() {
         style={styles.list}
       >
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {query.trim().length >= 2 ? 'SEARCH RESULTS' : 'SAVED & RECENT'}
+          {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'ĐÃ LƯU & GẦN ĐÂY'}
         </Text>
         {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
         {!isLoading && error ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}
         {!isLoading && !error && locations.length === 0 ? (
-          <Text style={[styles.error, { color: theme.textSecondary }]}>No destinations found.</Text>
+          <Text style={[styles.error, { color: theme.textSecondary }]}>Không tìm thấy điểm đến phù hợp.</Text>
         ) : null}
         {!isLoading && locations.map((location) => (
           <AppButton

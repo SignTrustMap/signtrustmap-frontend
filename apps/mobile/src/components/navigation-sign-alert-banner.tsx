@@ -17,7 +17,7 @@ export function NavigationSignAlertBanner({
   hasActiveManeuver = false,
 }: NavigationSignAlertBannerProps & { hasActiveManeuver?: boolean }) {
   const theme = useTheme();
-  const signTitle = sign.name || sign.signCode || 'Traffic Sign';
+  const signTitle = sign.name || sign.signCode || 'Biển báo giao thông';
 
   return (
     <SafeAreaView
@@ -51,7 +51,7 @@ export function NavigationSignAlertBanner({
         <View style={styles.copy}>
           <View style={styles.headerRow}>
             <Text style={[styles.tag, { color: theme.danger }]}>
-              SIGN AHEAD • {distanceMeters}M
+              BIỂN BÁO PHÍA TRƯỚC • {distanceMeters}M
             </Text>
           </View>
           <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>

@@ -503,7 +503,7 @@ export async function submitRevalidationEvidence(
       console.error(`[Revalidation] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
       const message = typeof body === 'object' && body && 'message' in body
         ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
-        : `Evidence upload failed with HTTP ${result.status}`;
+        : `Tải minh chứng lên thất bại với mã trạng thái ${result.status}`;
       throw new ApiError(message, result.status);
     }
 
