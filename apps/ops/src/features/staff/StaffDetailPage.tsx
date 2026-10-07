@@ -94,7 +94,7 @@ export default function StaffDetailPage() {
       </div>
 
       {/* Profile Details Container */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[16px] p-6 shadow-xs space-y-6">
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs sm:text-sm">
           <div>
             <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_email')}</span>
@@ -102,7 +102,7 @@ export default function StaffDetailPage() {
           </div>
           <div>
             <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_phone')}</span>
-            <p className="font-bold text-gray-900 dark:text-white mt-1">+84 (0) 912 345 678</p>
+            <p className="font-bold text-gray-900 dark:text-white mt-1">0912 345 678</p>
           </div>
           <div>
             <span className="text-gray-400 font-mono text-xs uppercase">{t('staff_detail.lbl_assigned_area')}</span>

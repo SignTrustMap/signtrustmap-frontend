@@ -1,55 +1,97 @@
-import { http, type ApiResponse } from '../client'
+import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import type {
+  AuthLoginPayload,
+  AuthRegisterPayload,
+  AuthSuccessResponse,
+  UserProfileResponse,
+  UpdateProfilePayload,
+} from '@shared/types'
 
-export interface LoginPayload {
-  email: string
-  password?: string
+export type {
+  AuthLoginPayload,
+  AuthRegisterPayload,
+  AuthSuccessResponse,
+  UserProfileResponse,
+  UpdateProfilePayload,
 }
 
-export interface RegisterPayload {
-  email: string
-  name: string
-  password?: string
-}
-
-export interface AuthResponse {
-  accessToken: string
-  refreshToken: string
-  user: {
-    id: string
-    name: string
-    email: string
-    role: string
-    avatar?: string
-  }
-}
-
+/**
+ * Functional service object managing authentication and user session calls.
+ * Adheres to RULE.md Section 6.5 (Functional Service Objects, Zero static class).
+ */
 export const authService = {
   /**
-   * Log in user
+   * Authenticate user with email and password
+   * @param payload Credentials
+   * @returns AuthSuccessResponse containing user and accessToken
    */
-  login: (payload: LoginPayload) => {
-    return http.post<ApiResponse<AuthResponse>>(API_ENDPOINTS.AUTH.LOGIN, payload)
+  login: (payload: AuthLoginPayload): Promise<AuthSuccessResponse> => {
+    return http.post<AuthSuccessResponse>(API_ENDPOINTS.AUTH.LOGIN, payload)
   },
 
   /**
-   * Register a new community account
+   * Register a new surveyor / driver account
+   * @param payload Registration details (fullName, email, password, optional phone)
+   * @returns AuthSuccessResponse containing user and accessToken
    */
-  register: (payload: RegisterPayload) => {
-    return http.post<ApiResponse<AuthResponse>>(API_ENDPOINTS.AUTH.REGISTER, payload)
+  register: (payload: AuthRegisterPayload): Promise<AuthSuccessResponse> => {
+    return http.post<AuthSuccessResponse>(API_ENDPOINTS.AUTH.REGISTER, payload)
   },
 
   /**
-   * Fetch current authenticated user profile
+   * Retrieve currently authenticated user profile with wallet balance and roles
+   * Requires Bearer token
    */
-  getMe: () => {
-    return http.get<ApiResponse<AuthResponse['user']>>(API_ENDPOINTS.AUTH.ME)
+  getMe: (): Promise<UserProfileResponse> => {
+    return http.get<UserProfileResponse>(API_ENDPOINTS.AUTH.ME)
   },
 
   /**
-   * Sign out and invalidate token
+   * Update profile information of the authenticated user
+   * Corresponds to PATCH /api/v1/auth/me
+   * @param payload Profile changes (fullName, phone, avatarUrl)
+   */
+  updateMe: (payload: UpdateProfilePayload): Promise<UserProfileResponse> => {
+    return http.patch<UserProfileResponse>(API_ENDPOINTS.AUTH.ME, payload)
+  },
+
+  /**
+   * Authenticate or auto-register using Google ID Token
+   * @param token Google ID Token (JWT)
+   */
+  googleTokenLogin: (token: string): Promise<AuthSuccessResponse> => {
+    return http.post<AuthSuccessResponse>(API_ENDPOINTS.AUTH.GOOGLE, { token })
+  },
+
+  /**
+   * Request password reset OTP code sent to registered email
+   */
+  forgotPassword: (email: string): Promise<{ message?: string }> => {
+    return http.post<{ message?: string }>(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email })
+  },
+
+  /**
+   * Validate OTP code
+   */
+  verifyOtp: (email: string, otp: string): Promise<{ message?: string }> => {
+    return http.post<{ message?: string }>(API_ENDPOINTS.AUTH.VERIFY_OTP, { email, otp })
+  },
+
+  /**
+   * Reset password with validated OTP code
+   */
+  resetPassword: (payload: { email: string; otp: string; newPassword: string }): Promise<{ message?: string }> => {
+    return http.post<{ message?: string }>(API_ENDPOINTS.AUTH.RESET_PASSWORD, payload)
+  },
+
+  /**
+   * Perform client-side logout and purge stored credentials
    */
   logout: () => {
-    return http.post<ApiResponse<{ message: string }>>(API_ENDPOINTS.AUTH.LOGOUT)
+    localStorage.removeItem('stm_access_token')
+    localStorage.removeItem('stm_web_user')
+    sessionStorage.removeItem('stm_access_token')
+    sessionStorage.removeItem('stm_web_user')
   },
 }

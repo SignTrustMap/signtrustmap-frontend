@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Coins,
   Key,
-  SignOut,
   CheckCircle,
   Sparkle,
   VideoCamera,
@@ -14,25 +13,38 @@ import {
   BookOpen,
   Eye,
   EyeSlash,
-  Calendar,
   Copy,
   Check,
   Lock,
+  CircleNotch,
+  WarningCircle,
 } from '@phosphor-icons/react'
+import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { opsPortalUrl } from '@/config/env'
+import { Avatar, AvatarImage, AvatarFallback, getInitials, PageHeader } from '@shared/ui'
 
+/**
+ * Dedicated Account Profile view for SignTrustMap Community Portal.
+ * Enables users to review contribution statistics, edit personal information
+ * (fullName, phone via PATCH /api/v1/auth/me), update security credentials,
+ * and view accessible workspace environments.
+ */
 export default function ProfilePage() {
-  const { user, updateProfile, logout } = useAuth()
+  const { user, updateProfile } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
 
   const [activeTab, setActiveTab] = useState<'info' | 'security' | 'workspaces'>('info')
   const [name, setName] = useState(user?.name || '')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -40,6 +52,20 @@ export default function ProfilePage() {
   const [showNewPw, setShowNewPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    if (phoneError) setPhoneError(null)
+  }
+
+  const handlePhoneBlur = () => {
+    const trimmed = phone.trim()
+    if (trimmed && !isValidVietnamPhone(trimmed)) {
+      setPhoneError(t('profile.phone_invalid'))
+    } else {
+      setPhoneError(null)
+    }
+  }
 
   if (!user) {
     return null
@@ -52,14 +78,41 @@ export default function ProfilePage() {
     setTimeout(() => setCopiedEmail(false), 2000)
   }
 
-  const handleUpdateName = (e: FormEvent) => {
+  const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) {
-      toast.error(t('profile.name_required'))
-      return
+    let hasError = false
+    const cleanName = name.trim()
+    if (!cleanName) {
+      setNameError(t('profile.name_required'))
+      hasError = true
+    } else {
+      setNameError(null)
     }
-    updateProfile({ name: name.trim() })
-    toast.success(t('profile.save_success'))
+
+    const trimmedPhone = phone.trim()
+    if (trimmedPhone && !isValidVietnamPhone(trimmedPhone)) {
+      setPhoneError(t('profile.phone_invalid'))
+      hasError = true
+    } else {
+      setPhoneError(null)
+    }
+
+    if (hasError) return
+
+    setIsSaving(true)
+    try {
+      const normalizedPhone = trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined
+      await updateProfile({
+        name: cleanName,
+        phone: normalizedPhone,
+      })
+      setPhoneError(null)
+      toast.success(t('profile.save_success'))
+    } catch (err: any) {
+      toast.error(err?.message || t('profile.save_error'))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -77,10 +130,6 @@ export default function ProfilePage() {
     setNewPw('')
     setConfirmPw('')
     toast.success(t('profile.pw_change_success'))
-  }
-
-  const handleLogout = () => {
-    logout('/')
   }
 
   const getRoleBadge = (role: string) => {
@@ -133,34 +182,13 @@ export default function ProfilePage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* ─── Page Header ────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('profile.modal_title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('profile.subtitle')}
-            </p>
-          </div>
+        <PageHeader
+          title={t('profile.modal_title')}
+          subtitle={t('profile.subtitle')}
+          bordered
+        />
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer self-start sm:self-auto ${
-              isDark
-                ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
-                : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
-            }`}
-          >
-            <SignOut size={16} weight="bold" />
-            <span>{t('profile.btn_logout')}</span>
-          </button>
-        </div>
-
-        {/* ─── Main 2-Column Grid ─────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: User Summary Card (4 cols) */}
           <div
             className={`lg:col-span-4 rounded-2xl border p-6 space-y-6 ${
               isDark
@@ -168,22 +196,11 @@ export default function ProfilePage() {
                 : 'bg-white border-[#E8E4E3] shadow-xs'
             }`}
           >
-            {/* Avatar & User Core */}
             <div className="flex flex-col items-center text-center space-y-3">
-              <div className="relative">
-                {user.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 border-[#00c4de] shadow-md"
-                  />
-                ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center font-extrabold text-3xl border-4 border-[#00c4de]">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#071317]" />
-              </div>
+              <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
+                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              </Avatar>
 
               <div className="space-y-1 w-full">
                 <h2 className="text-xl font-extrabold text-gray-900 dark:text-white break-words">
@@ -196,7 +213,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Email with copy button */}
               <button
                 type="button"
                 onClick={handleCopyEmail}
@@ -208,7 +224,7 @@ export default function ProfilePage() {
                 title={t('profile.copy_email')}
               >
                 <Envelope size={15} className="text-gray-500 dark:text-gray-400 shrink-0" />
-                <span className="truncate max-w-[200px]">{user.email}</span>
+                <span className="truncate max-w-52">{user.email}</span>
                 {copiedEmail ? (
                   <Check size={14} className="text-emerald-500 font-bold shrink-0" />
                 ) : (
@@ -217,55 +233,49 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Member Info & Stats */}
-            <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-3 text-sm">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                  <Calendar size={14} />
-                  <span>{t('profile.member_since')}</span>
-                </span>
-                <span className="font-bold text-gray-800 dark:text-gray-200">
-                  {user.joinDate || '15/05/2026'}
-                </span>
-              </div>
-
-              {/* Credits Row */}
-              {user.role !== 'staff' && user.role !== 'admin' && (
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100 dark:border-white/5">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                    <Coins size={14} className="text-amber-500" />
-                    <span>{t('profile.credits_balance')}</span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
-                      {user.credits || 0}
+            {((user.role !== 'staff' && user.role !== 'admin') || user.trustScore !== undefined) && (
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-3 text-sm">
+                {user.role !== 'staff' && user.role !== 'admin' && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
+                      <Coins size={14} className="text-amber-500" />
+                      <span>{t('profile.credits_balance')}</span>
                     </span>
-                    <Link
-                      to="/wallet"
-                      className="text-[11px] font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline"
-                    >
-                      {t('profile.link_wallet')}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400 text-sm">
+                        {user.credits || 0}
+                      </span>
+                      <Link
+                        to="/wallet"
+                        className="text-[11px] font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline"
+                      >
+                        {t('profile.link_wallet')}
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Trust Score Row */}
-              {user.trustScore !== undefined && (
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100 dark:border-white/5">
-                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
-                    <ShieldCheck size={14} className="text-emerald-500" />
-                    <span>{t('profile.trust_score')}</span>
-                  </span>
-                  <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                    {user.trustScore}%
-                  </span>
-                </div>
-              )}
-            </div>
+                {user.trustScore !== undefined && (
+                  <div
+                    className={`flex items-center justify-between text-xs ${
+                      user.role !== 'staff' && user.role !== 'admin'
+                        ? 'pt-2 border-t border-gray-100 dark:border-white/5'
+                        : ''
+                    }`}
+                  >
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1.5 font-medium">
+                      <ShieldCheck size={14} className="text-emerald-500" />
+                      <span>{t('profile.trust_score')}</span>
+                    </span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                      {user.trustScore}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Settings Panel with Tabs (8 cols) */}
           <div
             className={`lg:col-span-8 rounded-2xl border overflow-hidden ${
               isDark
@@ -273,7 +283,6 @@ export default function ProfilePage() {
                 : 'bg-white border-[#E8E4E3] shadow-xs'
             }`}
           >
-            {/* Tab Headers */}
             <div className="flex items-center border-b border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/20 px-4 pt-2 gap-2 overflow-x-auto">
               <button
                 type="button"
@@ -321,33 +330,83 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Tab 1: General Info */}
             {activeTab === 'info' && (
-              <form onSubmit={handleUpdateName} className="p-6 sm:p-8 space-y-6">
+              <form onSubmit={handleUpdateProfile} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-4">
-                  {/* Full Name */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
-                      {t('profile.label_fullname')} <span className="text-red-500">*</span>
+                      {t('profile.label_fullname')} <span className="text-rose-500 font-bold ml-0.5">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      maxLength={100}
+                      onChange={(e) => {
+                        setName(e.target.value)
+                        if (nameError) setNameError(null)
+                      }}
+                      onBlur={() => {
+                        if (!name.trim()) setNameError(t('profile.name_required'))
+                      }}
                       placeholder={t('profile.placeholder_fullname')}
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors outline-none ${
-                        isDark
-                          ? 'bg-black/30 border-white/15 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                          : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                      aria-invalid={!!nameError}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all outline-none ${
+                        nameError
+                          ? isDark
+                            ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                            : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                          : isDark
+                          ? 'bg-black/30 border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
                       }`}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {t('profile.fullname_helper')}
-                    </p>
+                    {nameError ? (
+                      <p className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150">
+                        <WarningCircle size={14} weight="fill" className="shrink-0" />
+                        <span>{nameError}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {t('profile.fullname_helper')}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Email (Read only) */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
+                      {t('profile.label_phone')}
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      maxLength={15}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      onBlur={handlePhoneBlur}
+                      placeholder={t('profile.placeholder_phone')}
+                      aria-invalid={!!phoneError}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all outline-none ${
+                        phoneError
+                          ? isDark
+                            ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                            : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                          : isDark
+                          ? 'bg-black/30 border-white/15 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                      }`}
+                    />
+                    {phoneError ? (
+                      <p className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150">
+                        <WarningCircle size={14} weight="fill" className="shrink-0" />
+                        <span>{phoneError}</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {t('profile.phone_helper')}
+                      </p>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_email')}
@@ -370,7 +429,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* System Role Info */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.badge_role')}
@@ -389,23 +447,29 @@ export default function ProfilePage() {
                 <div className="pt-4 border-t border-gray-200 dark:border-white/10 flex justify-end">
                   <button
                     type="submit"
-                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all cursor-pointer ${
+                    disabled={isSaving}
+                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                       isDark
                         ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/20'
                         : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
                     }`}
                   >
-                    {t('profile.btn_save')}
+                    {isSaving ? (
+                      <>
+                        <CircleNotch size={16} className="animate-spin" />
+                        <span>{t('profile.saving')}</span>
+                      </>
+                    ) : (
+                      <span>{t('profile.btn_save')}</span>
+                    )}
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Tab 2: Security & Password */}
             {activeTab === 'security' && (
               <form onSubmit={handleChangePassword} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-4">
-                  {/* Current Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_current_pw')} <span className="text-red-500">*</span>
@@ -433,7 +497,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* New Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_new_pw')} <span className="text-red-500">*</span>
@@ -461,7 +524,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Confirm New Password */}
                   <div>
                     <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                       {t('profile.label_confirm_pw')} <span className="text-red-500">*</span>
@@ -505,10 +567,8 @@ export default function ProfilePage() {
               </form>
             )}
 
-            {/* Tab 3: Workspaces & Quick Access */}
             {activeTab === 'workspaces' && (
               <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 1. Driver Workspace (Driver / Default) */}
                 {(!user.role || user.role === 'driver') && (
                   <Link
                     to="/product/map"
@@ -532,7 +592,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 2. Survey Studio (Surveyor Only) */}
                 {user.role === 'surveyor' && (
                   <Link
                     to="/survey"
@@ -556,7 +615,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 3. Reviewer Workspace (Reviewer Only) */}
                 {user.role === 'reviewer' && (
                   <Link
                     to="/review"
@@ -580,7 +638,6 @@ export default function ProfilePage() {
                   </Link>
                 )}
 
-                {/* 4. Ops Portal (Admin / Staff) */}
                 {(user.role === 'admin' || user.role === 'staff') && (
                   <a
                     href={`${opsPortalUrl}/overview`}
@@ -606,7 +663,6 @@ export default function ProfilePage() {
                   </a>
                 )}
 
-                {/* 5. Standard Catalog (All users) */}
                 <Link
                   to="/catalog"
                   className={`p-4 rounded-xl border transition-all flex items-start gap-3.5 group ${
@@ -628,7 +684,6 @@ export default function ProfilePage() {
                   </div>
                 </Link>
 
-                {/* 6. Wallet & Rewards (Non-staff) */}
                 {user.role !== 'admin' && user.role !== 'staff' && (
                   <Link
                     to="/wallet"

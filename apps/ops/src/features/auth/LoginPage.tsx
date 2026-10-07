@@ -15,8 +15,13 @@ import {
   Sun,
   Moon,
   Globe,
+  WarningCircle,
 } from '@phosphor-icons/react'
 
+/**
+ * Authentication and Login view for the Operations Command Center.
+ * Handles credential-based login for Staff and Admin roles with RBAC enforcement.
+ */
 export default function LoginPage() {
   const { login, isLoading } = useAuth()
   const { isDark, toggleTheme } = useTheme()
@@ -27,8 +32,9 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const ctrlPressTimesRef = useRef<number[]>([])
 
@@ -64,17 +70,33 @@ export default function LoginPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    if (!email.trim()) {
-      setError(t('login.email_required', { defaultValue: 'Vui lòng nhập email tài khoản' }))
-      return
+    let hasError = false
+    const cleanEmail = email.trim()
+
+    if (!cleanEmail) {
+      setEmailError(t('login.email_required'))
+      hasError = true
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        setEmailError(t('login.email_invalid'))
+        hasError = true
+      } else {
+        setEmailError(null)
+      }
     }
+
     if (!password) {
-      setError(t('login.password_required', { defaultValue: 'Vui lòng nhập mật khẩu' }))
-      return
+      setPasswordError(t('login.password_required'))
+      hasError = true
+    } else {
+      setPasswordError(null)
     }
+
+    if (hasError) return
+
     try {
-      await login(email, password)
+      await login(cleanEmail, password)
       const next = params.get('next') ?? null
       const isAdmin = email.toLowerCase().includes('admin')
       if (next) {
@@ -91,8 +113,9 @@ export default function LoginPage() {
         msg = t('login.forbidden_desc')
       } else if (err instanceof Error && err.message === 'INVALID_CREDENTIALS') {
         msg = t('login.err_invalid_credentials')
+      } else if (err instanceof Error && err.message) {
+        msg = err.message
       }
-      setError(msg)
       toast.error(msg)
     }
   }
@@ -103,7 +126,8 @@ export default function LoginPage() {
   function handleSecretFill(acc: DemoAccount) {
     setEmail(acc.email)
     setPassword(acc.password)
-    setError('')
+    setEmailError(null)
+    setPasswordError(null)
   }
 
   return (
@@ -111,9 +135,7 @@ export default function LoginPage() {
       className={`relative min-h-screen w-full flex flex-col justify-between font-sans transition-colors duration-300 ${isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
         }`}
     >
-      {/* 3D Wireframe & Dynamic Glow Spotlight Mesh Background */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        {/* Synchronized Terrain Mesh Wrapper (Ratio 1376:768 locked to bottom-center) */}
         <div
           className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none"
           style={{
@@ -132,7 +154,6 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Overhead teal/cyan spotlight beam */}
         <div
           className={`absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] blur-[140px] pointer-events-none ${isDark
               ? 'bg-gradient-to-b from-[#00c4de]/25 via-[#007b8b]/15 to-transparent'
@@ -140,13 +161,11 @@ export default function LoginPage() {
             }`}
         />
 
-        {/* Radial ambient glow behind main card */}
         <div
           className={`absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[550px] rounded-full blur-[130px] pointer-events-none ${isDark ? 'bg-[#007b8b]/12' : 'bg-white/80'
             }`}
         />
 
-        {/* Subtle coordinate dot-grid overlay */}
         <div
           className="absolute inset-0 opacity-[0.08]"
           style={{
@@ -157,8 +176,6 @@ export default function LoginPage() {
         />
       </div>
 
-      {/* ─── Secret Grid Edge Trigger Cells (Aligned with 48px CSS Grid) ─── */}
-      {/* Left Edge: Unauthorized Accounts (403 Test) */}
       <div
         className={`fixed left-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-r transition-all duration-300 ${isRevealed
             ? 'border-amber-500/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(245,158,11,0.25)]'
@@ -177,7 +194,6 @@ export default function LoginPage() {
               }`}
             aria-label={`${acc.label} (403 Test)`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -187,7 +203,6 @@ export default function LoginPage() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-amber-700 dark:text-amber-300 bg-white/95 dark:bg-[#1a0f02]/95 px-2.5 py-1 rounded-md shadow-lg border border-amber-500/30 dark:border-amber-400/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -198,7 +213,6 @@ export default function LoginPage() {
         ))}
       </div>
 
-      {/* Right Edge: Authorized Accounts (Staff & Admin) */}
       <div
         className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-l transition-all duration-300 ${isRevealed
             ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
@@ -217,7 +231,6 @@ export default function LoginPage() {
               }`}
             aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -227,7 +240,6 @@ export default function LoginPage() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -238,14 +250,12 @@ export default function LoginPage() {
         ))}
       </div>
 
-      {/* ─── Top Header with Logo & Controls (Fixed navigation) ─── */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 w-full px-6 sm:px-12 py-4 sm:py-5 flex items-center justify-between border-b backdrop-blur-xl transition-all shadow-sm ${isDark
             ? 'bg-[#030708]/90 border-white/10'
             : 'bg-white/90 border-[#E8E4E3]'
           }`}
       >
-        {/* Brand Logo */}
         <a
           href="/"
           className="flex items-center gap-3 font-sans font-bold text-xl group"
@@ -273,9 +283,7 @@ export default function LoginPage() {
           </div>
         </a>
 
-        {/* Right Header Action Items: Theme Toggle, Language Toggle, Web Portal Link */}
         <div className="flex items-center gap-3">
-          {/* Theme Switcher Button */}
           <button
             type="button"
             onClick={(e) => toggleTheme(e)}
@@ -293,7 +301,6 @@ export default function LoginPage() {
             )}
           </button>
 
-          {/* Language Switcher Pill */}
           <button
             type="button"
             onClick={toggleLang}
@@ -308,10 +315,8 @@ export default function LoginPage() {
             <span>{currentLang.toUpperCase()}</span>
           </button>
 
-          {/* Divider */}
           <div className="w-[1px] h-4 bg-gray-500/30 hidden sm:block" />
 
-          {/* Link to Community Portal */}
           <a
             href={communityPortalUrl}
             target="_blank"
@@ -327,22 +332,18 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Spacer so page content does not hide behind fixed header */}
-      <div className="h-16 sm:h-[72px] shrink-0 pointer-events-none" aria-hidden="true" />
+      <div className="h-16 sm:h-18 shrink-0 pointer-events-none" aria-hidden="true" />
 
-      {/* ─── Main Glassmorphism Login Card ───────── */}
       <main className="relative z-20 flex-1 flex items-center justify-center px-4 py-8 w-full">
-        <div className="relative w-full max-w-[1280px] flex flex-col items-center justify-center">
+        <div className="relative w-full max-w-7xl flex flex-col items-center justify-center">
 
-          {/* ─── Main Login Card ───────────────────────────────────────── */}
           <div
-            className={`w-full max-w-[460px] rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${
+            className={`w-full max-w-md rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${
               isDark
                 ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
                 : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
             }`}
           >
-            {/* Card Header */}
             <div className="flex flex-col items-center text-center mb-6">
               <a href="/" className="inline-block mb-3 hover:scale-105 transition-transform">
                 <img
@@ -363,16 +364,7 @@ export default function LoginPage() {
               </h1>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                  <span>⚠️</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Email field */}
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
                 <label
                   htmlFor="ops-email"
@@ -386,22 +378,35 @@ export default function LoginPage() {
                 <input
                   id="ops-email"
                   type="email"
-                  required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value)
-                    setError('')
+                    if (emailError) setEmailError(null)
                   }}
                   placeholder="staff@signtrustmap.site"
-                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${
-                    isDark
-                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                  aria-invalid={!!emailError}
+                  aria-describedby={emailError ? 'ops-email-error' : undefined}
+                  className={`w-full px-4 py-3 rounded-xl border text-sm transition-all outline-none ${
+                    emailError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                   }`}
                 />
+                {emailError && (
+                  <p
+                    id="ops-email-error"
+                    className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                  >
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{emailError}</span>
+                  </p>
+                )}
               </div>
 
-              {/* Password field */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label
@@ -425,17 +430,22 @@ export default function LoginPage() {
                   <input
                     id="ops-password"
                     type={showPw ? 'text' : 'password'}
-                    required
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value)
-                      setError('')
+                      if (passwordError) setPasswordError(null)
                     }}
                     placeholder="••••••••"
-                    className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${
-                      isDark
-                        ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                        : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                    aria-invalid={!!passwordError}
+                    aria-describedby={passwordError ? 'ops-password-error' : undefined}
+                    className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-all outline-none ${
+                      passwordError
+                        ? isDark
+                          ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                          : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                        : isDark
+                          ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
                     }`}
                   />
                   <button
@@ -449,9 +459,17 @@ export default function LoginPage() {
                     {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                {passwordError && (
+                  <p
+                    id="ops-password-error"
+                    className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                  >
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{passwordError}</span>
+                  </p>
+                )}
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -471,7 +489,6 @@ export default function LoginPage() {
                 )}
               </button>
 
-              {/* Divider */}
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
                   <div
@@ -493,13 +510,11 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Google Sign In button */}
               <button
                 type="button"
                 onClick={() => {
                   setEmail('staff@signtrustmap.com')
                   setPassword('password123')
-                  setError('')
                 }}
                 className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${
                   isDark
@@ -517,8 +532,7 @@ export default function LoginPage() {
             </form>
           </div>
 
-          {/* ─── Mobile/Tablet subtle bottom corners fallback ─── */}
-          <div className="md:hidden flex items-center justify-between w-full max-w-[460px] px-3 mt-3">
+          <div className="md:hidden flex items-center justify-between w-full max-w-md px-3 mt-3">
             <div className="flex gap-2">
               {unauthorizedAccounts.map((acc) => (
                 <button
@@ -556,7 +570,6 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer
         className={`relative z-10 w-full px-6 py-5 text-center text-xs transition-colors ${isDark ? 'text-gray-500 border-t border-white/5' : 'text-gray-500'
           }`}

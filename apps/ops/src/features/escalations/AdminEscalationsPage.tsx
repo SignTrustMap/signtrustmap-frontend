@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import { Pagination } from '@/components/common/Pagination'
@@ -6,14 +6,57 @@ import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
 import CustomSelect from '@/components/common/CustomSelect'
 import { ModalPortal } from '@/components/common/ModalPortal'
-import { X, CheckCircle, Prohibit, Scales } from '@phosphor-icons/react'
+import { X, CheckCircle, Prohibit, Scales, ArrowsClockwise, CircleNotch } from '@phosphor-icons/react'
 import { mockAdminEscalations, type AdminEscalationCase } from '@/data/adminGovernanceData'
+import { escalationService, type ModerationCaseItem } from '@/api/services/escalation.service'
+
+function mapBackendCaseToAdminEscalation(c: ModerationCaseItem): AdminEscalationCase {
+  let type: AdminEscalationCase['type'] = 'Privileged Moderation'
+  const cType = (c.case_type || c.caseType || '').toLowerCase()
+  if (cType.includes('spatial') || cType.includes('override') || cType.includes('sign')) {
+    type = 'Spatial Override'
+  } else if (cType.includes('catalog') || cType.includes('type')) {
+    type = 'Catalog Modification'
+  } else if (cType.includes('credit') || cType.includes('wallet') || cType.includes('reward')) {
+    type = 'Credit Discrepancy'
+  }
+
+  let priority: AdminEscalationCase['priority'] = 'Medium'
+  const sev = (c.severity || '').toUpperCase()
+  if (sev === 'CRITICAL' || sev === 'HIGH') priority = sev === 'CRITICAL' ? 'Critical' : 'High'
+
+  let status: AdminEscalationCase['status'] = 'Pending Admin Review'
+  const st = (c.status || '').toUpperCase()
+  if (st === 'RESOLVED') status = 'Resolved'
+  else if (st === 'DISMISSED' || st === 'REJECTED') status = 'Rejected'
+
+  const dateObj = new Date(c.created_at)
+  const escalatedAt = !isNaN(dateObj.getTime())
+    ? dateObj.toLocaleString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : c.created_at
+
+  return {
+    id: c.id,
+    type,
+    priority,
+    escalatedBy: 'Staff Moderator',
+    escalatedAt,
+    summary: c.notes || `Vụ việc kiểm duyệt tranh chấp: ${c.target_entity_type || 'Biển báo'} #${c.target_entity_id?.slice(0, 8) || 'N/A'}`,
+    reason: `Trường hợp xung đột kiểm duyệt mức độ ${priority}. Cần quản trị viên can thiệp xử lý.`,
+    affectedResource: `${c.target_entity_type || 'Resource'} #${c.target_entity_id || c.id.slice(0, 8)}`,
+    status,
+  }
+}
 
 export default function AdminEscalationsPage() {
   const { t } = useTranslation('ops')
   const toast = useToast()
 
   const [escalations, setEscalations] = useState<AdminEscalationCase[]>(mockAdminEscalations)
+  const [totalCount, setTotalCount] = useState<number>(mockAdminEscalations.length)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isResolving, setIsResolving] = useState<boolean>(false)
+
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -23,6 +66,34 @@ export default function AdminEscalationsPage() {
   const [decisionNotes, setDecisionNotes] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  const fetchCases = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await escalationService.getCases({
+        page: currentPage,
+        pageSize,
+      })
+      if (response && Array.isArray(response.items) && response.items.length > 0) {
+        const mapped = response.items.map(mapBackendCaseToAdminEscalation)
+        setEscalations(mapped)
+        setTotalCount(response.total ?? mapped.length)
+      } else {
+        setEscalations(mockAdminEscalations)
+        setTotalCount(mockAdminEscalations.length)
+      }
+    } catch (err) {
+      console.warn('Live moderation cases fetch failed, fallback to mock data:', err)
+      setEscalations(mockAdminEscalations)
+      setTotalCount(mockAdminEscalations.length)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize])
+
+  useEffect(() => {
+    fetchCases()
+  }, [fetchCases])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -60,7 +131,7 @@ export default function AdminEscalationsPage() {
     setDecisionNotes('')
   }
 
-  function handleResolve(actionType: 'Resolved' | 'Rejected') {
+  async function handleResolve(actionType: 'Resolved' | 'Rejected') {
     if (!selectedCase) return
 
     if (!decisionNotes.trim() && actionType === 'Rejected') {
@@ -68,22 +139,36 @@ export default function AdminEscalationsPage() {
       return
     }
 
-    setEscalations((prev) =>
-      prev.map((item) =>
-        item.id === selectedCase.id
-          ? { ...item, status: actionType }
-          : item
+    setIsResolving(true)
+    try {
+      const backendAction = actionType === 'Resolved' ? 'DISMISS' : 'BAN_USER'
+      await escalationService.resolveCase(selectedCase.id, {
+        resolutionNote: decisionNotes || (actionType === 'Resolved' ? 'Phán quyết giải quyết vụ việc bởi Admin' : 'Bác bỏ tranh chấp bởi Admin'),
+        actionType: backendAction,
+        actionNote: decisionNotes,
+      })
+
+      setEscalations((prev) =>
+        prev.map((item) =>
+          item.id === selectedCase.id
+            ? { ...item, status: actionType }
+            : item
+        )
       )
-    )
 
-    if (actionType === 'Resolved') {
-      toast.success(t('escalations.toast_resolved', { id: selectedCase.id }))
-    } else {
-      toast.warning(t('escalations.toast_rejected', { id: selectedCase.id }))
+      if (actionType === 'Resolved') {
+        toast.success(t('escalations.toast_resolved', { id: selectedCase.id }))
+      } else {
+        toast.warning(t('escalations.toast_rejected', { id: selectedCase.id }))
+      }
+      setSelectedCase(null)
+      setDecisionNotes('')
+    } catch (err: any) {
+      console.error('Failed to resolve escalation case:', err)
+      toast.error(err?.message || 'Không thể gửi phán quyết lên máy chủ')
+    } finally {
+      setIsResolving(false)
     }
-
-    setSelectedCase(null)
-    setDecisionNotes('')
   }
 
   const getTypeBadge = (type: AdminEscalationCase['type']) => {
@@ -167,7 +252,20 @@ export default function AdminEscalationsPage() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full animate-in fade-in duration-200">
       {/* Header - Clean, No subtitle or extra tag text as requested */}
-      <PageHeader title={t('escalations.title')} />
+      <PageHeader
+        title={t('escalations.title')}
+        actions={
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={fetchCases}
+            className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            title="Làm mới danh sách"
+          >
+            <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        }
+      />
 
       {/* Filter and Search Bar */}
       <DataFilterBar
@@ -229,7 +327,16 @@ export default function AdminEscalationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {paginatedEscalations.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-gray-400 font-medium">
+                    <div className="inline-flex items-center gap-2 text-neutral-500">
+                      <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>Đang tải danh sách tranh chấp & khiếu nại...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedEscalations.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-gray-500 dark:text-gray-400">
                     {t('escalations.empty_filter')}
@@ -317,7 +424,7 @@ export default function AdminEscalationsPage() {
         <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredEscalations.length}
+            totalItems={filteredEscalations.length === escalations.length ? totalCount : filteredEscalations.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
@@ -459,11 +566,16 @@ export default function AdminEscalationsPage() {
 
                       <button
                         type="button"
+                        disabled={isResolving}
                         onClick={() => handleResolve('Resolved')}
-                        className="px-5 py-2 bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        className="px-5 py-2 bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] disabled:opacity-50 text-white dark:text-black rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                       >
-                        <CheckCircle size={15} weight="bold" />
-                        <span>{t('escalations.btn_approve')}</span>
+                        {isResolving ? (
+                          <CircleNotch size={15} className="animate-spin" />
+                        ) : (
+                          <CheckCircle size={15} weight="bold" />
+                        )}
+                        <span>{isResolving ? 'Đang xử lý...' : t('escalations.btn_approve')}</span>
                       </button>
                     </div>
                   </>

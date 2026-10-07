@@ -1,18 +1,5 @@
-export interface SignItem {
-  id: string
-  code: string
-  name: string
-  category: 'P' | 'R' | 'W' | 'I' | 'S'
-  lat: number
-  lng: number
-  heading: number
-  trustScore: number
-  status: 'verified' | 'pending' | 'revalidating'
-  location: string
-  verifiedAt: string
-  imageUrl?: string
-  description?: string
-}
+import type { SignItem } from '@shared/types'
+export type { SignItem }
 
 export interface SignCategory {
   id: string

@@ -1,18 +1,19 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   User,
   Envelope,
   Key,
-  SignOut,
   Eye,
   EyeSlash,
-  Calendar,
   Copy,
   Check,
   Lock,
   X,
+  CircleNotch,
+  WarningCircle,
 } from '@phosphor-icons/react'
+import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
+import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
@@ -24,15 +25,23 @@ interface ProfileModalProps {
   onClose: () => void
 }
 
+/**
+ * Profile management modal dialog for the Operations Command Center.
+ * Allows authenticated operators to inspect system roles, update profile contacts
+ * (fullName, phone) via NestJS backend, and update security credentials.
+ */
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { user, updateProfile, logout } = useAuth()
+  const { user, updateProfile } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
-  const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
   const [name, setName] = useState(user?.name || '')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -41,14 +50,15 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
 
-  // Sync name when user state changes or modal opens
   useEffect(() => {
-    if (user?.name) {
-      setName(user.name)
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
     }
-  }, [user?.name, isOpen])
+    setNameError(null)
+    setPhoneError(null)
+  }, [user, isOpen])
 
-  // Close on Escape key
   useEffect(() => {
     if (!isOpen) return
 
@@ -73,14 +83,61 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setTimeout(() => setCopiedEmail(false), 2000)
   }
 
-  const handleUpdateName = (e: FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) {
-      toast.error(t('profile.name_required', { defaultValue: 'Họ tên không được để trống' }))
-      return
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    if (phoneError) setPhoneError(null)
+  }
+
+  const handlePhoneBlur = () => {
+    const trimmed = phone.trim()
+    if (trimmed && !isValidVietnamPhone(trimmed)) {
+      setPhoneError(
+        t('profile.phone_invalid', {
+          defaultValue: 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại gồm 10 chữ số (Ví dụ: 0912 345 678).',
+        })
+      )
     }
-    updateProfile({ name: name.trim() })
-    toast.success(t('profile.save_success', { defaultValue: 'Đã lưu thông tin tài khoản thành công!' }))
+  }
+
+  const handleUpdateProfile = async (e: FormEvent) => {
+    e.preventDefault()
+    let hasError = false
+
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setNameError(t('profile.name_required', { defaultValue: 'Họ tên không được để trống' }))
+      hasError = true
+    } else {
+      setNameError(null)
+    }
+
+    const trimmedPhone = phone.trim()
+    if (trimmedPhone && !isValidVietnamPhone(trimmedPhone)) {
+      setPhoneError(
+        t('profile.phone_invalid', {
+          defaultValue: 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại gồm 10 chữ số (Ví dụ: 0912 345 678).',
+        })
+      )
+      hasError = true
+    } else {
+      setPhoneError(null)
+    }
+
+    if (hasError) return
+
+    setIsSaving(true)
+    try {
+      await updateProfile({
+        fullName: trimmedName,
+        phone: trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined,
+      })
+      toast.success(t('profile.save_success', { defaultValue: 'Đã lưu thông tin tài khoản thành công!' }))
+    } catch (err) {
+      console.error('Failed to update ops profile:', err)
+      toast.error(t('profile.save_error', { defaultValue: 'Cập nhật thông tin thất bại. Vui lòng thử lại.' }))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -93,17 +150,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       toast.error(t('profile.pw_mismatch', { defaultValue: 'Mật khẩu xác nhận không khớp' }))
       return
     }
-    updateProfile({ password: newPw })
+    updateProfile({ password: newPw } as any)
     setCurrentPw('')
     setNewPw('')
     setConfirmPw('')
     toast.success(t('profile.pw_change_success', { defaultValue: 'Đã đổi mật khẩu thành công!' }))
-  }
-
-  const handleLogout = () => {
-    onClose()
-    logout()
-    navigate('/login', { replace: true })
   }
 
   const getRoleBadge = (role?: string) => {
@@ -143,30 +194,16 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ─── 1. Header: Profile Hero Summary ──────────────────── */}
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/70'}`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                {user.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-full object-cover border-2 border-[#00c4de] shadow-md"
-                  />
-                ) : (
-                  <div
-                    className={`w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center font-extrabold text-2xl border-2 border-[#00c4de] text-white shadow-md ${
-                      isAdmin ? 'bg-[#7c3aed]' : 'bg-[#007b8b]'
-                    }`}
-                  >
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+              <div className="shrink-0">
+                <Avatar size="xl" className="border-2 border-[#00c4de] shadow-md">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
               </div>
 
-              {/* Name, Role & Email */}
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h3 id="profile-modal-title" className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white truncate">
@@ -178,7 +215,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </div>
 
                 <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-300 flex-wrap">
-                  {/* Copyable Email Pill */}
                   <button
                     type="button"
                     onClick={handleCopyEmail}
@@ -197,18 +233,10 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                       <Copy size={13} className="text-gray-400 shrink-0" />
                     )}
                   </button>
-
-                  <span className="text-gray-300 dark:text-white/20">•</span>
-
-                  <span className="flex items-center gap-1 text-gray-600 dark:text-gray-300 font-medium">
-                    <Calendar size={13} className="shrink-0" />
-                    <span>{t('profile.member_since', { defaultValue: 'Gia nhập từ' })}: <strong className="text-gray-900 dark:text-gray-100 font-mono">{user.joinDate || '15/05/2026'}</strong></span>
-                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
@@ -223,7 +251,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </button>
           </div>
 
-          {/* ─── Tabs Bar ─────────────────────────────────────────── */}
           <div className="flex items-center gap-2 mt-5 border-b border-gray-200 dark:border-white/10 -mb-6 pb-0">
             <button
               type="button"
@@ -253,29 +280,81 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </div>
         </div>
 
-        {/* ─── 2. Tab Body ──────────────────────────────────────────── */}
         <div className="p-6 sm:p-7">
           {activeTab === 'info' && (
-            <form id="profile-form" onSubmit={handleUpdateName} className="space-y-4">
+            <form id="profile-form" onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                   {t('profile.label_fullname', { defaultValue: 'Họ và tên hiển thị' })} <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('profile.placeholder_fullname', { defaultValue: 'Nhập họ và tên của bạn' })}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors outline-none ${
-                    isDark
-                      ? 'bg-black/30 border-white/20 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
-                  }`}
-                />
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">
-                  {t('profile.fullname_helper', { defaultValue: 'Tên hiển thị công khai trên hệ thống và nhật ký kiểm toán.' })}
-                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (nameError) setNameError(null)
+                    }}
+                    onBlur={() => {
+                      if (!name.trim()) setNameError(t('profile.name_required', { defaultValue: 'Họ tên không được để trống' }))
+                    }}
+                    placeholder={t('profile.placeholder_fullname', { defaultValue: 'Nhập họ và tên của bạn' })}
+                    aria-invalid={!!nameError}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors outline-none ${
+                      nameError
+                        ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-500/10 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                        : isDark
+                        ? 'bg-black/30 border-white/20 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                    }`}
+                  />
+                </div>
+                {nameError ? (
+                  <p className="text-xs text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{nameError}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">
+                    {t('profile.fullname_helper', { defaultValue: 'Tên hiển thị công khai trên hệ thống và nhật ký kiểm toán.' })}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
+                  {t('profile.label_phone', { defaultValue: 'Số điện thoại' })}
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    maxLength={15}
+                    value={phone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    onBlur={handlePhoneBlur}
+                    placeholder={t('profile.placeholder_phone', { defaultValue: '0912 345 678' })}
+                    aria-invalid={!!phoneError}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors outline-none ${
+                      phoneError
+                        ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-500/10 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                        : isDark
+                        ? 'bg-black/30 border-white/20 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
+                    }`}
+                  />
+                </div>
+                {phoneError ? (
+                  <p className="text-xs text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <WarningCircle size={14} weight="fill" className="shrink-0" />
+                    <span>{phoneError}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 font-medium">
+                    {t('profile.phone_helper', { defaultValue: 'Số điện thoại gồm 10 chữ số (Ví dụ: 0912 345 678).' })}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
@@ -305,7 +384,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">
                     {t('profile.badge_role', { defaultValue: 'Vai trò hệ thống' })}
                   </label>
-                  <div className={`flex items-center gap-2.5 h-[42px] px-3.5 rounded-xl border ${
+                  <div className={`flex items-center gap-2.5 h-10 px-3.5 rounded-xl border ${
                     isDark
                       ? 'border-white/10 bg-white/5'
                       : 'border-gray-200 bg-gray-50'
@@ -416,27 +495,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           )}
         </div>
 
-        {/* ─── 3. Unified Modal Footer ─────────────────────────────── */}
-        <div className={`p-4 sm:p-5 border-t flex items-center justify-between gap-3 ${
+        <div className={`p-4 sm:p-5 border-t flex items-center justify-end gap-3 ${
           isDark
             ? 'border-white/10 bg-white/[0.02]'
             : 'border-gray-100 bg-gray-50/70'
         }`}>
-          {/* Left: Sign Out Button */}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer ${
-              isDark
-                ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-            }`}
-          >
-            <SignOut size={16} weight="bold" />
-            <span>{t('profile.btn_logout', { defaultValue: 'Đăng xuất tài khoản' })}</span>
-          </button>
-
-          {/* Right: Close & Submit Actions */}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
@@ -454,9 +517,15 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <button
                 type="submit"
                 form="profile-form"
-                className="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold text-white dark:text-black bg-[#007b8b] hover:bg-[#00606d] dark:bg-[#00c4de] dark:hover:bg-[#38dbf1] shadow-sm shadow-[#007b8b]/20 dark:shadow-[#00c4de]/20 transition-all cursor-pointer"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold text-white dark:text-black bg-[#007b8b] hover:bg-[#00606d] dark:bg-[#00c4de] dark:hover:bg-[#38dbf1] shadow-sm shadow-[#007b8b]/20 dark:shadow-[#00c4de]/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('profile.btn_save', { defaultValue: 'Lưu thay đổi' })}
+                {isSaving && <CircleNotch size={14} className="animate-spin" />}
+                <span>
+                  {isSaving
+                    ? t('profile.saving', { defaultValue: 'Đang lưu...' })
+                    : t('profile.btn_save', { defaultValue: 'Lưu thay đổi' })}
+                </span>
               </button>
             ) : (
               <button

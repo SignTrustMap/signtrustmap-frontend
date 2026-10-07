@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   CheckCircle,
@@ -13,17 +13,90 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockSurveySubmissions,
   type SurveySubmissionItem,
 } from '@/data'
+import { submissionsService } from '@/api/services/submissions.service'
 import { SurveyDetailModal } from './components'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { Pagination } from '@/components/common/Pagination'
+import { PageHeader } from '@/components/common/PageHeader'
 
 export default function SurveyHistoryPage() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
-  const [submissions] = useState<SurveySubmissionItem[]>(mockSurveySubmissions)
+  const [submissions, setSubmissions] = useState<SurveySubmissionItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setIsLoading(true)
+    submissionsService
+      .getMySubmissions({ page: 1, pageSize: 50 })
+      .then((res) => {
+        if (!active) return
+        if (res?.items && res.items.length > 0) {
+          const mapped: SurveySubmissionItem[] = res.items.map((sub) => {
+            const isVideo = sub.submissionType === 'VIDEO_GPX'
+            const statusMap: Record<string, any> = {
+              COMPLETED: 'Completed',
+              QUEUED: 'Processing',
+              SYNCHRONIZING: 'Processing',
+              DETECTING: 'Processing',
+              TRACKING: 'Processing',
+              ESTIMATING: 'Processing',
+              CLASSIFYING: 'Processing',
+              FAILED: 'Failed',
+              REJECTED: 'Failed',
+              PENDING_CORRECTION: 'PartiallyProcessed',
+              NO_SIGN_DETECTED: 'NoSignDetected',
+              DRAFT: 'Processing',
+            }
+
+            const stageMap: Record<string, SurveySubmissionItem['stage']> = {
+              SYNCHRONIZING: 'sync',
+              DETECTING: 'yolo_detect',
+              TRACKING: 'botsort_track',
+              ESTIMATING: 'geo_project',
+              CLASSIFYING: 'clip_classify',
+            }
+
+            return {
+              id: sub.id,
+              tripName: sub.note || (isVideo ? 'Khảo sát camera hành trình' : 'Khảo sát ảnh chụp đường bộ'),
+              route: sub.latitude && sub.longitude ? `${sub.latitude.toFixed(4)}, ${sub.longitude.toFixed(4)}` : 'Tọa độ khảo sát',
+              mediaType: isVideo ? 'video_gpx' : 'photo_gps',
+              videoFileName: isVideo ? 'dashcam_trip.mp4' : undefined,
+              photoFileName: !isVideo ? 'sign_photo.jpg' : undefined,
+              fileSizeMb: isVideo ? 245.5 : 3.8,
+              durationSec: isVideo ? 600 : undefined,
+              distanceKm: isVideo ? 5.2 : undefined,
+              uploadDate: new Date(sub.createdAt).toLocaleString('vi-VN'),
+              status: statusMap[sub.status] || 'Processing',
+              stage: stageMap[sub.status] || 'sync',
+              progressPercent: sub.status === 'COMPLETED' ? 100 : 50,
+              detectedSignsCount: sub.totalCandidatesExtracted || 0,
+              validatedSignsCount: sub.status === 'COMPLETED' ? sub.totalCandidatesExtracted : 0,
+              rewardCredits: (sub.totalCandidatesExtracted || 0) * 10,
+              candidates: [],
+            }
+          })
+          setSubmissions(mapped)
+        } else {
+          setSubmissions([])
+        }
+      })
+      .catch((err) => {
+        console.warn('[SurveyHistoryPage] Failed to fetch submissions:', err)
+        if (active) setSubmissions([])
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Selected submission to show in modal
   const [modalSubmission, setModalSubmission] = useState<SurveySubmissionItem | null>(null)
@@ -180,43 +253,39 @@ export default function SurveyHistoryPage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* ─── Page Header (Matching ProfilePage style) ────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('survey.history_title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('survey.history_subtitle')}
-            </p>
-          </div>
+        {/* ─── Page Header (Standardized via PageHeader) ───────────────────── */}
+        <PageHeader
+          title={t('survey.history_title')}
+          subtitle={t('survey.history_subtitle')}
+          bordered
+          actions={
+            <>
+              <Link
+                to="/survey/revalidation"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
+                  isDark
+                    ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
+                    : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
+                }`}
+              >
+                <ClockCounterClockwise size={16} weight="bold" />
+                <span>{t('survey.btn_revalidation')}</span>
+              </Link>
 
-          <div className="flex items-center gap-2.5 shrink-0">
-            <Link
-              to="/survey/revalidation"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors cursor-pointer shadow-xs ${
-                isDark
-                  ? 'bg-[#00c4de]/10 hover:bg-[#00c4de]/20 border-[#00c4de]/30 text-[#00c4de]'
-                  : 'bg-teal-50 hover:bg-teal-100 border-teal-200 text-[#007b8b]'
-              }`}
-            >
-              <ClockCounterClockwise size={16} weight="bold" />
-              <span>{t('survey.btn_revalidation')}</span>
-            </Link>
-
-            <Link
-              to="/survey"
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
-                isDark
-                  ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                  : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
-              }`}
-            >
-              <Plus size={16} weight="bold" />
-              <span>{t('survey.btn_new_survey')}</span>
-            </Link>
-          </div>
-        </div>
+              <Link
+                to="/survey"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer ${
+                  isDark
+                    ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
+                    : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                }`}
+              >
+                <Plus size={16} weight="bold" />
+                <span>{t('survey.btn_new_survey')}</span>
+              </Link>
+            </>
+          }
+        />
 
         {/* ─── 4 Clean, Unified KPI Summary Cards ──────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -349,7 +418,12 @@ export default function SurveyHistoryPage() {
 
           {/* List of Submissions */}
           <div className="divide-y divide-gray-200 dark:divide-white/10">
-            {paginatedSubmissions.length > 0 ? (
+            {isLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-4 border-[#00c4de] border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs text-gray-500 font-medium">Đang tải lịch sử khảo sát...</p>
+              </div>
+            ) : paginatedSubmissions.length > 0 ? (
               paginatedSubmissions.map((sub) => {
                 const badge = getStatusBadge(sub.status)
 
@@ -407,7 +481,7 @@ export default function SurveyHistoryPage() {
                         </div>
                       </div>
 
-                      <div className="text-right min-w-[70px]">
+                      <div className="text-right min-w-18">
                         <span className="text-[11px] uppercase font-bold tracking-wider text-gray-600 dark:text-gray-400 block">
                           Credits
                         </span>
@@ -436,6 +510,31 @@ export default function SurveyHistoryPage() {
                   </div>
                 )
               })
+            ) : submissions.length === 0 ? (
+              <div className="py-16 px-6 text-center space-y-4">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-[#007b8b]/10 dark:bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center">
+                  <VideoCamera size={30} weight="duotone" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                    Chưa có khảo sát nào
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Bạn chưa có bản ghi khảo sát nào được nộp. Hãy tải lên video hành trình hoặc ảnh chụp biển báo kèm GPS để bắt đầu đóng góp dữ liệu.
+                  </p>
+                </div>
+                <Link
+                  to="/survey"
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isDark
+                      ? 'bg-[#00c4de] text-black hover:bg-[#00c4de]/90 font-black'
+                      : 'bg-[#007b8b] text-white hover:bg-[#007b8b]/90 font-black'
+                  }`}
+                >
+                  <Plus size={16} weight="bold" />
+                  <span>Tạo khảo sát mới</span>
+                </Link>
+              </div>
             ) : (
               <div className="p-12 text-center text-gray-500 dark:text-gray-400 text-sm space-y-2">
                 <p>{t('survey.no_trips_found')}</p>

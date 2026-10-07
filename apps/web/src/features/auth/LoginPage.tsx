@@ -1,28 +1,36 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeSlash, CircleNotch } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CircleNotch, WarningCircle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
+import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
+import { env } from '@/config/env'
 import { mockDemoAccounts, type DemoUserAccount } from '@/data'
 
+/**
+ * Authentication and Login view for the Community Portal.
+ * Supports credential login, Google OAuth, and session persistence ("Remember Me").
+ */
 export default function Login() {
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const { login } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Sanitize redirect target: if coming from /login or /signup, always fallback to home '/'
   const rawFrom = (location.state as { from?: string })?.from || '/'
   const authPaths = ['/login', '/signup', '/register']
   const from = authPaths.includes(rawFrom) ? '/' : rawFrom
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [rememberMe, setRememberMe] = useState(true)
   const [showPw, setShowPw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
   const [isRevealed, setIsRevealed] = useState(false)
   const ctrlPressTimesRef = useRef<number[]>([])
 
@@ -48,35 +56,75 @@ export default function Login() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const leftAccounts = mockDemoAccounts.slice(0, 3) // Driver, Surveyor, Reviewer
-  const rightAccounts = mockDemoAccounts.slice(3) // Staff, Admin
+  const leftAccounts = mockDemoAccounts.slice(0, 3)
+  const rightAccounts = mockDemoAccounts.slice(3)
 
   function handleSecretFill(acc: DemoUserAccount) {
     setEmail(acc.email)
-    setPassword(acc.password)
-    setError('')
+    setPassword(acc.password || '')
+    setEmailError(null)
+    setPasswordError(null)
   }
 
   async function performLogin(targetEmail: string, targetPw: string) {
-    setError('')
     setIsLoading(true)
     try {
-      await login(targetEmail, targetPw)
+      await Promise.all([
+        login(targetEmail, targetPw, rememberMe),
+        new Promise((resolve) => setTimeout(resolve, 450)),
+      ])
       navigate(from, { replace: true })
-    } catch {
-      setError(t('auth.login.error_default'))
+    } catch (err: any) {
+      let msg = t('auth.login.error_default')
+      const rawMsg = err?.message || ''
+      if (
+        rawMsg.toLowerCase().includes('invalid credentials') ||
+        rawMsg.toLowerCase().includes('unauthorized') ||
+        rawMsg.toLowerCase().includes('không tìm thấy') ||
+        rawMsg.toLowerCase().includes('sai mật khẩu')
+      ) {
+        msg = t('auth.login.error_default')
+      } else if (rawMsg) {
+        msg = rawMsg
+      }
+      toast.error(msg)
     } finally {
       setIsLoading(false)
     }
   }
 
+  function handleGoogleLogin() {
+    window.location.href = `${env.apiBaseUrl}/api/v1/auth/google`
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!email.trim()) {
-      setError(t('auth.login.email_required'))
-      return
+    let hasError = false
+    const cleanEmail = email.trim()
+
+    if (!cleanEmail) {
+      setEmailError(t('auth.login.email_required'))
+      hasError = true
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        setEmailError(t('auth.login.email_invalid', { defaultValue: 'Địa chỉ email không đúng định dạng.' }))
+        hasError = true
+      } else {
+        setEmailError(null)
+      }
     }
-    await performLogin(email, password)
+
+    if (!password) {
+      setPasswordError(t('auth.login.password_required', { defaultValue: 'Vui lòng nhập mật khẩu.' }))
+      hasError = true
+    } else {
+      setPasswordError(null)
+    }
+
+    if (hasError) return
+
+    await performLogin(cleanEmail, password)
   }
 
   return (
@@ -84,7 +132,6 @@ export default function Login() {
       className={`w-full flex-1 flex flex-col items-center justify-center px-4 pt-6 sm:pt-8 pb-12 relative overflow-hidden transition-colors ${isDark ? 'bg-[#030708] text-white' : 'bg-[#F8F7F7] text-gray-900'
         }`}
     >
-      {/* Background Decorator */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <img
           src="/images/hero-wireframe.jpg"
@@ -106,7 +153,6 @@ export default function Login() {
               : 'from-[#F8F7F7]/90 via-[#F8F7F7]/60 to-[#F8F7F7]'
             }`}
         />
-        {/* Subtle coordinate dot-grid overlay (Aligned with 48px grid cells) */}
         <div
           className="absolute inset-0 opacity-[0.08]"
           style={{
@@ -117,8 +163,6 @@ export default function Login() {
         />
       </div>
 
-      {/* ─── Secret Grid Edge Trigger Cells (Aligned with 48px CSS Grid) ─── */}
-      {/* Left Edge: Community Accounts (Driver, Surveyor, Reviewer) */}
       <div
         className={`fixed left-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-r transition-all duration-300 ${isRevealed
             ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
@@ -137,7 +181,6 @@ export default function Login() {
               }`}
             aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -147,7 +190,6 @@ export default function Login() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute left-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -158,7 +200,6 @@ export default function Login() {
         ))}
       </div>
 
-      {/* Right Edge: Platform Accounts (Staff, Admin) */}
       <div
         className={`fixed right-0 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col border-y border-l transition-all duration-300 ${isRevealed
             ? 'border-[#00c4de]/50 bg-black/40 backdrop-blur-sm shadow-[0_0_20px_rgba(0,196,222,0.25)]'
@@ -177,7 +218,6 @@ export default function Login() {
               }`}
             aria-label={`${acc.label} (${acc.role.toUpperCase()})`}
           >
-            {/* Role icon revealed when isRevealed or on hover */}
             <span
               className={`text-xl select-none transition-all duration-200 pointer-events-none ${isRevealed
                   ? 'opacity-100 scale-100 group-hover:scale-110'
@@ -187,7 +227,6 @@ export default function Login() {
               {acc.icon}
             </span>
 
-            {/* Inward-pointing floating tooltip */}
             <div className="absolute right-14 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0 transition-all duration-150 pointer-events-none z-40 whitespace-nowrap">
               <span className="text-[11px] font-mono font-bold tracking-wide text-[#007b8b] dark:text-[#00c4de] bg-white/95 dark:bg-[#06161b]/95 px-2.5 py-1 rounded-md shadow-lg border border-[#007b8b]/30 dark:border-[#00c4de]/40 backdrop-blur-md flex items-center gap-1.5">
                 <span>{acc.icon}</span>
@@ -198,15 +237,13 @@ export default function Login() {
         ))}
       </div>
 
-      {/* Main Container */}
-      <div className="w-full max-w-[460px] relative z-10 mx-auto">
+      <div className="w-full max-w-md relative z-10 mx-auto">
         <div
-          className={`rounded-[24px] p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
+          className={`rounded-3xl p-6 sm:p-8 border shadow-2xl text-left transition-all ${isDark
               ? 'glass-panel border-white/15 bg-[#061417]/95 backdrop-blur-2xl'
               : 'bg-white border-[#E8E4E3] shadow-gray-200/80'
             }`}
         >
-          {/* Header */}
           <div className="flex flex-col items-center text-center mb-6">
             <Link to="/" className="inline-block mb-3 hover:scale-105 transition-transform">
               <img
@@ -226,45 +263,55 @@ export default function Login() {
             </h1>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Email Field */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <label
                 htmlFor="login-email"
-                className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${isDark ? 'text-gray-300' : 'text-gray-700'
-                  }`}
+                className={`text-xs font-bold uppercase tracking-wide font-mono mb-1.5 block ${
+                  isDark ? 'text-gray-300' : 'text-gray-700'
+                }`}
               >
                 {t('auth.login.email_label')}
               </label>
               <input
                 id="login-email"
                 type="email"
-                required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (emailError) setEmailError(null)
+                }}
                 placeholder="name@company.com"
-                className={`w-full px-4 py-3 rounded-xl border text-sm transition-colors outline-none ${isDark
-                    ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                    : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
-                  }`}
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'login-email-error' : undefined}
+                className={`w-full px-4 py-3 rounded-xl border text-sm transition-all outline-none ${
+                  emailError
+                    ? isDark
+                      ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                      : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                    : isDark
+                      ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
+                }`}
               />
+              {emailError && (
+                <p
+                  id="login-email-error"
+                  className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{emailError}</span>
+                </p>
+              )}
             </div>
 
-            {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
                   htmlFor="login-password"
-                  className={`text-xs font-bold uppercase tracking-wide font-mono ${isDark ? 'text-gray-300' : 'text-gray-700'
-                    }`}
+                  className={`text-xs font-bold uppercase tracking-wide font-mono ${
+                    isDark ? 'text-gray-300' : 'text-gray-700'
+                  }`}
                 >
                   {t('auth.login.password_label')}
                 </label>
@@ -281,14 +328,23 @@ export default function Login() {
                 <input
                   id="login-password"
                   type={showPw ? 'text' : 'password'}
-                  required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (passwordError) setPasswordError(null)
+                  }}
                   placeholder="••••••••"
-                  className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-colors outline-none ${isDark
-                      ? 'bg-white/5 border-white/10 text-white focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
-                      : 'bg-white border-gray-300 text-gray-900 focus:border-[#007b8b] focus:ring-1 focus:ring-[#007b8b]'
-                    }`}
+                  aria-invalid={!!passwordError}
+                  aria-describedby={passwordError ? 'login-password-error' : undefined}
+                  className={`w-full px-4 py-3 pr-12 rounded-xl border text-sm transition-all outline-none ${
+                    passwordError
+                      ? isDark
+                        ? 'bg-white/5 border-rose-500 text-white placeholder:text-gray-500 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20'
+                        : 'bg-white border-rose-500 text-gray-900 placeholder:text-gray-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 shadow-xs'
+                      : isDark
+                        ? 'bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-[#00c4de] focus:ring-1 focus:ring-[#00c4de]'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:border-[#007b8b] focus:ring-2 focus:ring-[#007b8b]/20 shadow-xs'
+                  }`}
                 />
                 <button
                   type="button"
@@ -299,9 +355,36 @@ export default function Login() {
                   {showPw ? <EyeSlash size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {passwordError && (
+                <p
+                  id="login-password-error"
+                  className="mt-1.5 text-[12px] text-rose-500 dark:text-rose-400 font-medium flex items-center gap-1.5 animate-in fade-in slide-in-from-top-0.5 duration-150"
+                >
+                  <WarningCircle size={14} weight="fill" className="shrink-0" />
+                  <span>{passwordError}</span>
+                </p>
+              )}
             </div>
 
-            {/* Submit Button */}
+            <div className="flex items-center justify-between text-xs py-0.5">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="login-remember-me"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className={`w-4 h-4 rounded transition-colors cursor-pointer ${
+                    isDark
+                      ? 'border-white/20 bg-white/5 accent-[#00c4de]'
+                      : 'border-gray-300 accent-[#007b8b]'
+                  }`}
+                />
+                <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>
+                  {t('auth.login.remember_me')}
+                </span>
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
@@ -320,7 +403,6 @@ export default function Login() {
               )}
             </button>
 
-            {/* Divider */}
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className={`w-full border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`} />
@@ -335,10 +417,9 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Google Sign In button */}
             <button
               type="button"
-              onClick={() => performLogin('driver@signtrustmap.com', 'password123')}
+              onClick={handleGoogleLogin}
               className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-full border text-sm font-semibold transition-all shadow-xs active:scale-[0.98] cursor-pointer ${isDark
                   ? 'border-white/15 bg-white/5 hover:bg-white/10 text-white'
                   : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-800 shadow-gray-200/50'
@@ -349,7 +430,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Footer switch link */}
           <div
             className={`text-center text-xs mt-6 pt-5 border-t ${isDark ? 'text-gray-400 border-white/10' : 'text-gray-600 border-gray-100'
               }`}
@@ -365,7 +445,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* ─── Mobile/Tablet subtle bottom corners fallback ─── */}
         <div className="md:hidden flex items-center justify-between w-full px-3 mt-3">
           <div className="flex gap-2">
             {leftAccounts.map((acc) => (

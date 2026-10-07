@@ -279,7 +279,7 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.35 + idx * 0.08, ease: [0.16, 1, 0.3, 1] }}
-              className={`rounded-[18px] p-7 text-left relative overflow-hidden group transition-all ${
+              className={`rounded-2xl p-7 text-left relative overflow-hidden group transition-all ${
                 isDark
                   ? 'glass-card'
                   : 'bg-white border border-[#E8E4E3] shadow-md hover:border-[#007b8b]/50 hover:shadow-xl'
@@ -364,7 +364,7 @@ function TopographicTransitionSection() {
           ].map((card) => (
             <div
               key={card.title}
-              className={`rounded-[18px] p-7 flex flex-col justify-between group transition-all text-left ${
+              className={`rounded-2xl p-7 flex flex-col justify-between group transition-all text-left ${
                 isDark
                   ? 'glass-panel hover:border-[#00c4de]/40'
                   : 'bg-[#F8F7F7] border border-[#E8E4E3] hover:border-[#007b8b]/50 shadow-sm hover:shadow-lg'
@@ -373,7 +373,7 @@ function TopographicTransitionSection() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div
-                    className={`w-12 h-12 rounded-[12px] flex items-center justify-center ${
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                       isDark ? 'bg-[#007b8b]/20' : 'bg-teal-100/60'
                     }`}
                   >
@@ -495,7 +495,7 @@ function MobileDownloadSection() {
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div
-          className={`rounded-[24px] p-8 sm:p-14 relative overflow-hidden border shadow-xl transition-all ${
+          className={`rounded-3xl p-8 sm:p-14 relative overflow-hidden border shadow-xl transition-all ${
             isDark
               ? 'glass-panel border-[#00c4de]/20 bg-gradient-to-br from-[#061519] to-[#030a0c]'
               : 'bg-gradient-to-br from-teal-50/80 via-[#F8F7F7] to-white border-[#007b8b]/25 shadow-gray-200/60'
@@ -553,7 +553,7 @@ function MobileDownloadSection() {
               ].map((b) => (
                 <div
                   key={b.title}
-                  className={`p-4 rounded-[14px] flex flex-col justify-center border transition-all ${
+                  className={`p-4 rounded-xl flex flex-col justify-center border transition-all ${
                     isDark
                       ? 'bg-white/[0.03] border-white/10'
                       : 'bg-white border-gray-200 shadow-sm'

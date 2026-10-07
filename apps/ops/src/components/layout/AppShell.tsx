@@ -35,7 +35,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* ─── Main Viewport with Full Height Support for Map & Pages ──── */}
         <main
           ref={mainRef}
-          className={`flex-1 flex flex-col min-h-0 overflow-auto relative transition-colors duration-300 ${
+          className={`flex-1 flex flex-col min-h-0 ${
+            pathname.startsWith('/map') ? 'overflow-hidden' : 'overflow-auto'
+          } relative transition-colors duration-300 ${
             isDark ? 'bg-[#030708]' : 'bg-[#F8F7F7]'
           }`}
         >

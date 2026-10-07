@@ -1,4 +1,7 @@
-// Central features index exporting all pages and screens
+/**
+ * Single entrypoint re-exporting all community pages and feature modules
+ * for the Community Portal per RULE.md Section 9.1.
+ */
 export { default as Home, default as HomePage } from './home/HomePage'
 export { default as ProductMap, default as ProductMapPage } from './product/ProductMapPage'
 export { default as ProductApp, default as ProductAppPage } from './product/ProductAppPage'
@@ -20,5 +23,6 @@ export { default as AboutPage } from './about/AboutPage'
 export { default as SurveyRevalidationPage } from './survey/SurveyRevalidationPage'
 export { default as Forbidden403Page } from './auth/Forbidden403Page'
 export { default as NotFound404Page } from './auth/NotFound404Page'
+export { default as UnexpectedError500Page } from './auth/UnexpectedError500Page'
 export { default as ForgotPasswordPage } from './auth/ForgotPasswordPage'
 export { default as ResetPasswordPage } from './auth/ResetPasswordPage'

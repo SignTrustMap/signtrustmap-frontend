@@ -1,14 +1,21 @@
 export interface TrafficCatalogSign {
+  id?: number | string
   code: string
   nameVi: string
   nameEn: string
-  category: 'prohibitory' | 'warning' | 'mandatory' | 'guide' | 'speed_limit' | 'additional'
-  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon'
-  color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White' | 'Black-White'
+  category: 'prohibitory' | 'warning' | 'mandatory' | 'guide' | 'speed_limit' | 'temporary' | 'information' | 'additional' | string
+  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | string
+  color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White' | 'Black-White' | string
   descriptionVi: string
   descriptionEn: string
   clipPrompt: string
   standardRef: string
+  imageUrl?: string
+  allowedVehicles?: string[]
+  labelingGuidelines?: string | null
+  categoryCode?: string
+  categoryNameVi?: string
+  categoryNameEn?: string
 }
 
 export const mockTrafficCatalog: TrafficCatalogSign[] = [

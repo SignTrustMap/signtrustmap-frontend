@@ -7,12 +7,12 @@ import { ArrowSquareOut, Stack } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { mockSigns } from '@/data'
 
-// Fix Leaflet default marker icons in bundler
+// Fix Leaflet default marker icons using localized assets (no external CDN dependency)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+  iconUrl: '/leaflet/marker-icon.png',
+  shadowUrl: '/leaflet/marker-shadow.png',
 })
 
 export function HomeMiniMap() {
@@ -138,7 +138,7 @@ export function HomeMiniMap() {
 
   return (
     <div
-      className={`rounded-[20px] overflow-hidden border shadow-2xl relative flex flex-col h-[420px] sm:h-[460px] transition-colors ${
+      className={`rounded-2xl overflow-hidden border shadow-2xl relative flex flex-col h-[420px] sm:h-[460px] transition-colors ${
         isDark
           ? 'glass-panel border-white/15 bg-[#08171b]'
           : 'bg-white border-[#E8E4E3] shadow-gray-200/80'

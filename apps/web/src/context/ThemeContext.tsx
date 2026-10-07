@@ -12,7 +12,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const THEME_STORAGE_KEY = 'signtrustmap_theme'
+const THEME_STORAGE_KEY = 'signtrustmap_theme_v2'
 
 function updateDOMTheme(theme: Theme) {
   if (typeof document === 'undefined') return
@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return savedTheme
       }
     }
-    return 'dark'
+    return 'light'
   })
 
   useEffect(() => {

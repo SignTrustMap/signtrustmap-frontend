@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import {
   BookOpen,
   VideoCamera,
-  Clock,
   ClockCounterClockwise,
   Coins,
   ShieldCheck,
@@ -16,6 +15,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { opsPortalUrl } from '@/config/env'
+import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 
 interface UserDropdownMenuProps {
   isOpen: boolean
@@ -87,11 +87,6 @@ export function UserDropdownMenu({ isOpen, onClose }: UserDropdownMenuProps) {
             label: t('nav.survey_revalidation'),
             href: '/survey/revalidation',
             icon: <ClockCounterClockwise size={18} weight="duotone" className="text-teal-600 dark:text-teal-400" />,
-          },
-          {
-            label: t('nav.survey_history'),
-            href: '/survey/history',
-            icon: <Clock size={18} weight="duotone" className="text-[#007b8b] dark:text-[#00c4de]" />,
           },
           {
             label: t('nav.catalog'),
@@ -176,17 +171,10 @@ export function UserDropdownMenu({ isOpen, onClose }: UserDropdownMenuProps) {
         <div className="flex items-center gap-3">
           {/* Avatar with Status Dot */}
           <div className="relative shrink-0">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="w-12 h-12 rounded-full object-cover border-2 border-[#00c4de] shadow-xs"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-[#007b8b]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center font-extrabold text-base border-2 border-[#00c4de]">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <Avatar size="lg" className="border-2 border-[#00c4de] shadow-xs">
+              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+            </Avatar>
           </div>
 
           {/* Name, Email & Role */}
