@@ -2,12 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   TrafficSignal,
   WarningCircle,
-  ArrowUpRight,
-  Gauge,
-  Compass,
-  TrafficCone,
   ArrowClockwise,
-  Tag,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
@@ -82,28 +77,6 @@ function getCategoryBadgeMeta(code?: string): CategoryMeta {
   }
 }
 
-/**
- * Returns matching Phosphor icon for a category code.
- */
-function getCategoryIcon(code?: string) {
-  const upper = (code || '').toUpperCase().trim()
-  switch (upper) {
-    case 'PROHIBITORY':
-      return WarningCircle
-    case 'WARNING':
-      return WarningCircle
-    case 'MANDATORY':
-      return ArrowUpRight
-    case 'SPEED_LIMIT':
-      return Gauge
-    case 'INFORMATION':
-      return Compass
-    case 'TEMPORARY':
-      return TrafficCone
-    default:
-      return Tag
-  }
-}
 
 /**
  * Public Traffic Sign Reference Catalog Page (Web Portal).
@@ -176,23 +149,20 @@ export default function CatalogPage() {
     [isEnglish]
   )
 
-  // Filter Bar Category tabs constructed directly from backend categories
+  // Filter Bar Category options constructed directly from backend categories
   const filterCategories = useMemo(() => {
     const list = [
       {
         id: 'all',
         label: t('catalog.categories.all'),
-        icon: TrafficSignal,
         count: signs.length,
       },
     ]
 
     for (const cat of categories) {
-      const Icon = getCategoryIcon(cat.code)
       list.push({
         id: String(cat.id),
         label: isEnglish ? cat.nameEn : cat.nameVi,
-        icon: Icon,
         count: signs.filter((s) => s.categoryId === cat.id).length,
       })
     }
@@ -279,43 +249,36 @@ export default function CatalogPage() {
           }
         />
 
-        {/* Real Dynamic Categories Filter Bar */}
-        <div
-          className={`rounded-2xl border p-4 sm:p-5 text-left transition-colors ${
-            isDark
-              ? 'bg-[#071317] border-white/10 shadow-lg shadow-black/40'
-              : 'bg-white border-[#E8E4E3] shadow-xs'
-          }`}
-        >
-          <DataFilterBar
-            searchQuery={searchQuery}
-            onSearchChange={(q) => {
-              setSearchQuery(q)
-              setCurrentPage(1)
-            }}
-            searchPlaceholder={t('catalog.search_placeholder')}
-            categories={filterCategories.map((c) => ({
-              id: c.id,
-              label: c.label,
-              icon: <c.icon size={14} weight="bold" />,
-              count: c.count,
-            }))}
-            selectedCategory={selectedCategory}
-            onSelectCategory={(catId) => {
-              setSelectedCategory(catId)
-              setCurrentPage(1)
-            }}
-            sortOptions={[
-              { id: 'code', label: t('catalog.sort_code') },
-              { id: 'name', label: t('catalog.sort_name') },
-            ]}
-            selectedSort={sortBy}
-            onSelectSort={(val) => {
-              setSortBy(val as 'code' | 'name')
-              setCurrentPage(1)
-            }}
-          />
-        </div>
+        {/* Real Dynamic Categories Filter Bar (Pro Single-Row Layout) */}
+        <DataFilterBar
+          searchQuery={searchQuery}
+          onSearchChange={(q) => {
+            setSearchQuery(q)
+            setCurrentPage(1)
+          }}
+          searchPlaceholder={t('catalog.search_placeholder')}
+          categoryFilterMode="select"
+          categorySelectLabel={t('catalog.filter_category_label', 'Phân loại')}
+          categories={filterCategories.map((c) => ({
+            id: c.id,
+            label: c.label,
+            count: c.count,
+          }))}
+          selectedCategory={selectedCategory}
+          onSelectCategory={(catId) => {
+            setSelectedCategory(catId)
+            setCurrentPage(1)
+          }}
+          sortOptions={[
+            { id: 'code', label: t('catalog.sort_code') },
+            { id: 'name', label: t('catalog.sort_name') },
+          ]}
+          selectedSort={sortBy}
+          onSelectSort={(val) => {
+            setSortBy(val as 'code' | 'name')
+            setCurrentPage(1)
+          }}
+        />
 
         {/* Loading State: Skeleton Cards Grid */}
         {isLoading ? (

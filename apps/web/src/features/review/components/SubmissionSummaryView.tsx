@@ -6,10 +6,9 @@ import {
   PencilSimpleLine,
   ArrowBendUpRight,
   ArrowCounterClockwise,
+  ArrowClockwise,
   House,
-  Sparkle,
   ArrowUUpLeft,
-  Coins,
 } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@shared/ui'
@@ -45,199 +44,178 @@ export function SubmissionSummaryView({
     { approved: 0, declined: 0, corrected: 0, reported: 0, skipped: 0 }
   )
 
-  // Estimated credits: Approved (+5), Corrected (+8), Rejected (+3), Flagged (+5)
-  const estimatedCredits =
-    counts.approved * 5 + counts.corrected * 8 + counts.declined * 3 + counts.reported * 5
-
   const getActionDetails = (action: string) => {
     switch (action) {
       case 'Approved':
         return {
           label: t('reviewer.action_approved', 'Đã duyệt'),
-          summary: t('reviewer.summary_approved_sub', 'Đạt chuẩn và sẵn sàng tích hợp bản đồ tin cậy.'),
           badgeCls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
         }
       case 'Corrected':
         return {
           label: t('reviewer.action_corrected', 'Đã sửa mã'),
-          summary: t('reviewer.summary_corrected_sub', 'Đã sửa lại mã hiệu đúng theo danh mục chuẩn QCVN 41.'),
           badgeCls: 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30',
         }
       case 'Rejected':
         return {
-          label: t('reviewer.action_declined', 'Đã từ chối'),
-          summary: t('reviewer.summary_declined_sub', 'Bị từ chối do không đạt quy chuẩn hoặc chất lượng ảnh.'),
+          label: t('reviewer.action_declined', 'Từ chối'),
           badgeCls: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
         }
       case 'Flagged':
         return {
-          label: t('reviewer.action_reported', 'Đã báo cờ'),
-          summary: t('reviewer.summary_reported_sub', 'Đã chuyển báo cáo bất thường lên ban quản trị.'),
+          label: t('reviewer.action_reported', 'Báo cờ'),
           badgeCls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
         }
       default:
         return {
-          label: t('reviewer.action_skipped', 'Đã bỏ qua'),
-          summary: t('reviewer.summary_skipped_sub', 'Tạm thời bỏ qua (chưa xác định được).'),
+          label: t('reviewer.action_skipped', 'Bỏ qua'),
           badgeCls: 'bg-gray-500/15 text-gray-600 dark:text-gray-400 border-gray-500/30',
         }
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/20 dark:border-[#00c4de]/30">
-          <Sparkle size={13} weight="fill" />
-          <span>{t('reviewer.summary_title', 'Tổng kết phiên thẩm định')}</span>
+    <div className="max-w-3xl mx-auto space-y-5">
+      {/* 1. Concise, Professional Header */}
+      <div className="text-center space-y-1.5">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center mb-1">
+          <Check size={24} weight="bold" />
         </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-          {t('reviewer.summary_subtitle', 'Hôm nay • {{count}} biển báo đã được xem xét', {
-            count: historyItems.length,
-          })}
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+          {t('reviewer.summary_complete_title', 'Hoàn tất phiên thẩm định')}
         </h2>
-        {estimatedCredits > 0 && (
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-3 py-1 rounded-xl border border-amber-500/20">
-            <Coins size={14} weight="bold" />
-            <span>{t('reviewer.summary_reward_est', 'Tích lũy phiên:')} +{estimatedCredits} Credits</span>
-          </div>
-        )}
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          {t(
+            'reviewer.summary_complete_desc',
+            'Đã xử lý xong {{count}} biển báo. Dữ liệu đã được đồng bộ vào hệ thống bản đồ.',
+            { count: historyItems.length }
+          )}
+        </p>
       </div>
 
-      {/* 5 Metric Badges */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {/* 2. Compact 5-Metric Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
         {/* Approved */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border text-center space-y-1 ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+          className={`p-3 rounded-xl border text-center transition-all ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200/80 shadow-2xs'
           }`}
         >
-          <div className="w-8 h-8 rounded-full border border-emerald-500 text-emerald-500 mx-auto flex items-center justify-center font-bold">
-            <Check size={16} weight="bold" />
+          <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400 mb-0.5">
+            <Check size={14} weight="bold" />
+            <span className="text-xl font-bold font-mono">{counts.approved}</span>
           </div>
-          <p className="text-2xl font-black text-gray-900 dark:text-white font-mono">
-            {counts.approved}
-          </p>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            {t('reviewer.summary_metric_approved', 'ĐÃ DUYỆT')}
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            {t('reviewer.action_approved', 'Đã duyệt')}
           </p>
         </div>
 
         {/* Corrected */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border text-center space-y-1 ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+          className={`p-3 rounded-xl border text-center transition-all ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200/80 shadow-2xs'
           }`}
         >
-          <div className="w-8 h-8 rounded-full border border-sky-500 text-sky-500 mx-auto flex items-center justify-center font-bold">
-            <PencilSimpleLine size={16} weight="bold" />
+          <div className="flex items-center justify-center gap-1.5 text-sky-600 dark:text-sky-400 mb-0.5">
+            <PencilSimpleLine size={14} weight="bold" />
+            <span className="text-xl font-bold font-mono">{counts.corrected}</span>
           </div>
-          <p className="text-2xl font-black text-gray-900 dark:text-white font-mono">
-            {counts.corrected}
-          </p>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
-            {t('reviewer.summary_metric_corrected', 'ĐÃ SỬA MÃ')}
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            {t('reviewer.action_corrected', 'Đã sửa mã')}
           </p>
         </div>
 
         {/* Declined */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border text-center space-y-1 ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+          className={`p-3 rounded-xl border text-center transition-all ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200/80 shadow-2xs'
           }`}
         >
-          <div className="w-8 h-8 rounded-full border border-rose-500 text-rose-500 mx-auto flex items-center justify-center font-bold">
-            <X size={16} weight="bold" />
+          <div className="flex items-center justify-center gap-1.5 text-rose-600 dark:text-rose-400 mb-0.5">
+            <X size={14} weight="bold" />
+            <span className="text-xl font-bold font-mono">{counts.declined}</span>
           </div>
-          <p className="text-2xl font-black text-gray-900 dark:text-white font-mono">
-            {counts.declined}
-          </p>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-            {t('reviewer.summary_metric_declined', 'TỪ CHỐI')}
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            {t('reviewer.action_declined', 'Từ chối')}
           </p>
         </div>
 
         {/* Reported */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border text-center space-y-1 ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+          className={`p-3 rounded-xl border text-center transition-all ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200/80 shadow-2xs'
           }`}
         >
-          <div className="w-8 h-8 rounded-full border border-amber-500 text-amber-500 mx-auto flex items-center justify-center font-bold">
-            <Warning size={16} weight="bold" />
+          <div className="flex items-center justify-center gap-1.5 text-amber-600 dark:text-amber-400 mb-0.5">
+            <Warning size={14} weight="bold" />
+            <span className="text-xl font-bold font-mono">{counts.reported}</span>
           </div>
-          <p className="text-2xl font-black text-gray-900 dark:text-white font-mono">
-            {counts.reported}
-          </p>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-            {t('reviewer.summary_metric_reported', 'BÁO CỜ')}
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            {t('reviewer.action_reported', 'Báo cờ')}
           </p>
         </div>
 
         {/* Skipped */}
         <div
-          className={`p-3.5 sm:p-4 rounded-2xl border text-center space-y-1 col-span-2 sm:col-span-1 ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
+          className={`p-3 rounded-xl border text-center transition-all col-span-2 sm:col-span-1 ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200/80 shadow-2xs'
           }`}
         >
-          <div className="w-8 h-8 rounded-full border border-gray-400 text-gray-400 mx-auto flex items-center justify-center font-bold">
-            <ArrowBendUpRight size={16} weight="bold" />
+          <div className="flex items-center justify-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+            <ArrowBendUpRight size={14} weight="bold" />
+            <span className="text-xl font-bold font-mono">{counts.skipped}</span>
           </div>
-          <p className="text-2xl font-black text-gray-900 dark:text-white font-mono">
-            {counts.skipped}
-          </p>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500">
-            {t('reviewer.summary_metric_skipped', 'BỎ QUA')}
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            {t('reviewer.action_skipped', 'Bỏ qua')}
           </p>
         </div>
       </div>
 
-      {/* Reviewed Signs List */}
+      {/* 3. Streamlined Review History List */}
       <div
         className={`rounded-2xl border overflow-hidden ${
           isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200 shadow-xs'
         }`}
       >
-        <div className="p-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
-          <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+        <div className="py-3 px-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
+          <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
             {t('reviewer.summary_list_title', 'Chi tiết đánh giá trong phiên')}
           </h4>
-          <span className="text-xs font-mono text-gray-500">
+          <span className="text-xs font-mono font-semibold text-gray-500">
             {historyItems.length} {t('reviewer.queue_progress_unit', 'biển báo')}
           </span>
         </div>
 
-        <div className="divide-y divide-gray-100 dark:divide-white/5 max-h-80 overflow-y-auto">
+        <div className="divide-y divide-gray-100 dark:divide-white/5 max-h-64 overflow-y-auto">
           {historyItems.length > 0 ? (
             historyItems.map((item) => {
               const details = getActionDetails(item.action)
               return (
-                <div key={item.id} className="p-3.5 sm:p-4 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-11 h-11 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center font-mono font-bold text-xs text-gray-900 dark:text-gray-100 shrink-0">
+                <div key={item.id} className="py-2.5 px-3 sm:px-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 border border-gray-200/80 dark:border-white/10 font-mono font-bold text-xs text-gray-800 dark:text-gray-200 shrink-0">
                       {item.signCode}
                     </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                          {item.signName}
-                        </p>
-                        {item.timestamp && (
-                          <span className="text-[11px] font-mono text-gray-400 hidden sm:inline">
-                            {item.timestamp}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 truncate mt-0.5">
-                        {item.details || details.summary}
+                    <div className="min-w-0 flex items-center gap-2 truncate">
+                      <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white truncate">
+                        {item.signName}
                       </p>
+                      {item.timestamp && (
+                        <span className="text-[11px] font-mono text-gray-400 shrink-0 hidden sm:inline">
+                          {item.timestamp}
+                        </span>
+                      )}
+                      {item.details && (
+                        <span className="text-[11px] text-gray-500 dark:text-gray-400 truncate shrink-0">
+                          ({item.details})
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold border ${details.badgeCls}`}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-bold border ${details.badgeCls}`}
                     >
                       {details.label}
                     </span>
@@ -245,12 +223,12 @@ export function SubmissionSummaryView({
                       <button
                         type="button"
                         onClick={() => onUndoItem(item.candidateId)}
-                        className={`p-1.5 rounded-lg border text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer ${
+                        className={`p-1 rounded-md border text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer ${
                           isDark ? 'border-white/10 hover:bg-white/10' : 'border-gray-200 hover:bg-gray-100'
                         }`}
                         title={t('reviewer.btn_undo_item', 'Hoàn tác mục này')}
                       >
-                        <ArrowUUpLeft size={14} weight="bold" />
+                        <ArrowUUpLeft size={13} weight="bold" />
                       </button>
                     )}
                   </div>
@@ -258,38 +236,38 @@ export function SubmissionSummaryView({
               )
             })
           ) : (
-            <div className="p-8 text-center text-xs text-gray-500">
+            <div className="p-6 text-center text-xs text-gray-500">
               {t('reviewer.summary_list_empty', 'Chưa có quyết định nào trong phiên này.')}
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer Actions - Responsive & Active */}
-      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+      {/* 4. Footer Actions - Harmonious & Balanced */}
+      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
         <Button
           variant="primary"
-          size="lg"
+          size="md"
           onClick={onNextBatch || onRecheckSubmission}
-          leftIcon={<Sparkle size={18} weight="bold" />}
+          leftIcon={<ArrowClockwise size={16} weight="bold" />}
         >
           {t('reviewer.btn_next_batch', 'Thẩm định đợt tiếp theo')}
         </Button>
         <Button
           variant="outline"
-          size="lg"
+          size="md"
           onClick={onRecheckSubmission}
-          leftIcon={<ArrowCounterClockwise size={18} weight="bold" />}
+          leftIcon={<ArrowCounterClockwise size={16} weight="bold" />}
         >
           {t('reviewer.btn_check_submission', 'Kiểm tra lại phiên')}
         </Button>
         <Button
           variant="ghost"
-          size="lg"
-          onClick={() => navigate('/')}
-          leftIcon={<House size={18} weight="bold" />}
+          size="md"
+          onClick={() => navigate('/review')}
+          leftIcon={<House size={16} weight="bold" />}
         >
-          {t('reviewer.btn_return_home', 'Về Trang chủ')}
+          {t('reviewer.btn_done_return_hub', 'Hoàn tất & Về Hub')}
         </Button>
       </div>
     </div>

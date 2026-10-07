@@ -137,6 +137,8 @@ export interface ReviewCandidate {
   signCropUrl?: string
   bestFrameUrl?: string
   createdAt: string
+  confidenceScore?: number
+  status?: string
   predictedSignType?: {
     id: number
     signCode: string

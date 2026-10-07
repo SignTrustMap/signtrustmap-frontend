@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@shared/ui'
 import { ClockCounterClockwise, Sparkle } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockTrafficCatalog,
   type CandidateToReview,
   type FlagReasonCode,
   type ReviewHistoryItem,
 } from '@/data'
 import { reviewsService } from '@/api/services/reviews.service'
+import type { BackendCatalogSignType } from '@/api/services/catalog.service'
 import { resolveMediaUrl } from './utils/resolveMediaUrl'
 import { useReviewHotkeys } from './hooks/useReviewHotkeys'
 import {
@@ -19,8 +19,9 @@ import {
   FlagCandidateModal,
   DeclineCandidateModal,
   SubmissionSummaryView,
-  type CatalogCategoryFilter,
+  ReviewGuideModal,
 } from './components'
+import { ProposeSignModal } from '@/features/catalog/components/ProposeSignModal'
 
 /**
  * CandidateReviewPage orchestrates the Community Peer Review workflow for unverified traffic signs.
@@ -38,43 +39,81 @@ export function CandidateReviewPage() {
   const [activeView, setActiveView] = useState<'crop' | 'context'>('crop')
   const [isLoading, setIsLoading] = useState(true)
   const [isAssigning, setIsAssigning] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submittingAction, setSubmittingAction] = useState<'approve' | 'reject' | 'skip' | 'flag' | null>(null)
 
   // Session History for Submission Summary
   const [sessionHistory, setSessionHistory] = useState<ReviewHistoryItem[]>([])
 
   // Modals
   const [showCatalogModal, setShowCatalogModal] = useState(false)
-  const [catalogSearch, setCatalogSearch] = useState('')
-  const [catalogCat, setCatalogCat] = useState<CatalogCategoryFilter>('all')
+  const [showProposeModal, setShowProposeModal] = useState(false)
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
+  const [showGuideModal, setShowGuideModal] = useState(false)
 
-  // Helper to extract GPS coordinates from direct fields or submission.note ("GPS: lat, lon")
-  const parseCandidateCoordinates = (item: any): { lat: number; lng: number } => {
-    if (typeof item.latitude === 'number' && typeof item.longitude === 'number') {
-      return { lat: item.latitude, lng: item.longitude }
-    }
-    if (item.locationContext?.coordinates?.latitude && item.locationContext?.coordinates?.longitude) {
-      return {
-        lat: Number(item.locationContext.coordinates.latitude),
-        lng: Number(item.locationContext.coordinates.longitude),
+  // Robust GPS coordinate extractor from any backend model schema or nested payload
+  const extractCandidateCoordinates = (item: any): { lat: number; lng: number } | null => {
+    if (!item) return null
+    const payload = item?.data || item?.candidate || item
+    const target = payload?.candidate || payload
+
+    // 1. Direct latitude/longitude or lat/lng on target or payload
+    const rawLat = target?.latitude ?? target?.lat ?? item?.latitude ?? item?.lat
+    const rawLng = target?.longitude ?? target?.lng ?? item?.longitude ?? item?.lng
+
+    if (rawLat !== undefined && rawLat !== null && rawLng !== undefined && rawLng !== null) {
+      const lat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat))
+      const lng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        return { lat, lng }
       }
     }
-    if (typeof item.submission?.latitude === 'number' && typeof item.submission?.longitude === 'number') {
-      return { lat: item.submission.latitude, lng: item.submission.longitude }
+
+    // 2. locationContext.coordinates
+    const loc = target?.locationContext || payload?.locationContext || item?.locationContext
+    if (loc?.coordinates) {
+      const c = loc.coordinates
+      const lat = typeof c.latitude === 'number' ? c.latitude : parseFloat(String(c.latitude ?? c.lat))
+      const lng = typeof c.longitude === 'number' ? c.longitude : parseFloat(String(c.longitude ?? c.lng))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
     }
-    const noteStr = item.submission?.note || item.note
-    if (noteStr) {
-      const match = String(noteStr).match(/GPS:\s*([-\d.]+),\s*([-\d.]+)/i)
+
+    // 3. locationContext direct latitude/longitude
+    if (loc?.latitude !== undefined && loc?.longitude !== undefined) {
+      const lat = parseFloat(String(loc.latitude))
+      const lng = parseFloat(String(loc.longitude))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
+    }
+
+    // 4. submission.latitude / submission.longitude
+    const sub = target?.submission || payload?.submission || item?.submission
+    if (sub?.latitude !== undefined && sub?.longitude !== undefined) {
+      const lat = parseFloat(String(sub.latitude))
+      const lng = parseFloat(String(sub.longitude))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
+    }
+
+    // 5. submission.note containing "GPS: lat, lon"
+    const noteStr = sub?.note || target?.note || payload?.note || item?.note
+    if (noteStr && typeof noteStr === 'string') {
+      const match = noteStr.match(/GPS:\s*([+-]?\d+(?:\.\d+)?),\s*([+-]?\d+(?:\.\d+)?)/i)
       if (match) {
-        const parsedLat = parseFloat(match[1])
-        const parsedLng = parseFloat(match[2])
-        if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
-          return { lat: parsedLat, lng: parsedLng }
+        const lat = parseFloat(match[1])
+        const lng = parseFloat(match[2])
+        if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+          return { lat, lng }
         }
       }
     }
-    return { lat: 10.7769, lng: 106.7009 }
+
+    return null
   }
 
   // 1. Fetch review queue from backend API directly (includes own submissions for testing)
@@ -86,11 +125,26 @@ export function CandidateReviewPage() {
       .then((res) => {
         if (!active) return
         if (res?.items && res.items.length > 0) {
+          // Identify survey baseline GPS from the first item with valid coordinates
+          let surveyBaseCoords: { lat: number; lng: number } = { lat: 10.7769, lng: 106.7009 }
+          for (const it of res.items) {
+            const found = extractCandidateCoordinates(it)
+            if (found) {
+              surveyBaseCoords = found
+              break
+            }
+          }
+
           const mapped: CandidateToReview[] = res.items.map((item, index) => {
             const type = item.predictedSignType
             const crop = resolveMediaUrl(item.signCropUrl)
             const frame = resolveMediaUrl(item.bestFrameUrl)
-            const coords = parseCandidateCoordinates(item)
+            const parsedCoords = extractCandidateCoordinates(item)
+            if (parsedCoords) {
+              surveyBaseCoords = parsedCoords
+            }
+            const coords = parsedCoords || surveyBaseCoords
+
             return {
               id: item.id,
               sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
@@ -98,7 +152,7 @@ export function CandidateReviewPage() {
               code: type?.signCode || 'P.102',
               suggestedName: type?.nameVi || type?.nameEn || 'Biển báo giao thông',
               category: (type?.signCode?.charAt(0) || 'P') as any,
-              confidence: (item as any).confidenceScore ?? (item as any).confidence ?? 0.88,
+              confidence: item.confidenceScore ?? 0.88,
               lat: coords.lat,
               lng: coords.lng,
               roadName: 'Đường khảo sát (Camera GPS)',
@@ -137,27 +191,26 @@ export function CandidateReviewPage() {
 
     reviewsService
       .getCandidateDetail(currentCandidate.id)
-      .then((detail) => {
+      .then((detail: any) => {
         if (!active || !detail) return
-        const coords = detail.locationContext?.coordinates
-        const road = detail.locationContext?.displayLocation || detail.locationContext?.nearbyRoad
-        const direction = detail.locationContext?.direction
+        const parsedCoords = extractCandidateCoordinates(detail)
+        const payload = detail?.data || detail?.candidate || detail
+        const loc = payload?.locationContext || detail?.locationContext
+        const road = loc?.displayLocation || loc?.nearbyRoad
+        const direction = loc?.direction
 
-        if (coords?.latitude && coords?.longitude) {
-          const newLat = Number(coords.latitude)
-          const newLng = Number(coords.longitude)
+        if (parsedCoords) {
           setCandidates((prev) =>
-            prev.map((c) =>
-              c.id === currentCandidate.id
-                ? {
-                    ...c,
-                    lat: newLat,
-                    lng: newLng,
-                    roadName: road || c.roadName,
-                    directionHeading: typeof direction === 'number' ? direction : c.directionHeading,
-                  }
-                : c
-            )
+            prev.map((c) => {
+              if (c.id !== currentCandidate.id) return c
+              return {
+                ...c,
+                lat: parsedCoords.lat,
+                lng: parsedCoords.lng,
+                roadName: road || c.roadName,
+                directionHeading: typeof direction === 'number' ? direction : c.directionHeading,
+              }
+            })
           )
         } else if (road) {
           setCandidates((prev) =>
@@ -180,11 +233,25 @@ export function CandidateReviewPage() {
       .getReviewQueue({ page: 1, pageSize: 50, includeOwnSubmissions: true })
       .then((res) => {
         if (res?.items && res.items.length > 0) {
+          let surveyBaseCoords: { lat: number; lng: number } = { lat: 10.7769, lng: 106.7009 }
+          for (const it of res.items) {
+            const found = extractCandidateCoordinates(it)
+            if (found) {
+              surveyBaseCoords = found
+              break
+            }
+          }
+
           const mapped: CandidateToReview[] = res.items.map((item, index) => {
             const type = item.predictedSignType
             const crop = resolveMediaUrl(item.signCropUrl)
             const frame = resolveMediaUrl(item.bestFrameUrl)
-            const coords = parseCandidateCoordinates(item)
+            const parsedCoords = extractCandidateCoordinates(item)
+            if (parsedCoords) {
+              surveyBaseCoords = parsedCoords
+            }
+            const coords = parsedCoords || surveyBaseCoords
+
             return {
               id: item.id,
               sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
@@ -234,24 +301,13 @@ export function CandidateReviewPage() {
     }
   }, [handleRefreshQueue, t, toast])
 
-  // Filter Catalog Modal Signs
-  const filteredCatalog = useMemo(() => {
-    return mockTrafficCatalog.filter((sign) => {
-      const matchSearch =
-        sign.code.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        sign.nameVi.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        sign.nameEn.toLowerCase().includes(catalogSearch.toLowerCase())
-
-      if (!matchSearch) return false
-      if (catalogCat === 'all') return true
-      return sign.category === catalogCat
-    })
-  }, [catalogCat, catalogSearch])
 
   // 1. Approve Handler (uses testReview with fallback to castVote)
   const handleApprove = useCallback(async () => {
-    if (!currentCandidate) return
+    if (!currentCandidate || isSubmitting) return
     const candidateId = currentCandidate.id
+    setIsSubmitting(true)
+    setSubmittingAction('approve')
 
     try {
       await reviewsService.testReview({
@@ -267,6 +323,9 @@ export function CandidateReviewPage() {
       } catch (err2) {
         console.warn('[CandidateReviewPage] API vote failed:', err2)
       }
+    } finally {
+      setIsSubmitting(false)
+      setSubmittingAction(null)
     }
 
     setSessionHistory((prev) => [
@@ -287,13 +346,15 @@ export function CandidateReviewPage() {
     )
 
     setCurrentIndex((i) => i + 1)
-  }, [currentCandidate, t, toast])
+  }, [currentCandidate, isSubmitting, t, toast])
 
   // 2. Decline Handler (uses testReview with fallback to castVote)
   const handleConfirmDecline = useCallback(
     async (reason: string, detail?: string) => {
-      if (!currentCandidate) return
+      if (!currentCandidate || isSubmitting) return
       const candidateId = currentCandidate.id
+      setIsSubmitting(true)
+      setSubmittingAction('reject')
 
       try {
         await reviewsService.testReview({
@@ -315,6 +376,10 @@ export function CandidateReviewPage() {
         } catch (err2) {
           console.warn('[CandidateReviewPage] API decline failed:', err2)
         }
+      } finally {
+        setIsSubmitting(false)
+        setSubmittingAction(null)
+        setShowDeclineModal(false)
       }
 
       setSessionHistory((prev) => [
@@ -337,19 +402,24 @@ export function CandidateReviewPage() {
 
       setCurrentIndex((i) => i + 1)
     },
-    [currentCandidate, t, toast]
+    [currentCandidate, isSubmitting, t, toast]
   )
 
   // 3. Skip Handler (Skip current sign)
   const handleSkip = useCallback(async () => {
-    if (!currentCandidate) return
+    if (!currentCandidate || isSubmitting) return
     const candidateId = currentCandidate.id
+    setIsSubmitting(true)
+    setSubmittingAction('skip')
 
     try {
       await reviewsService.skipCandidate(candidateId)
       toast.info(t('reviewer.toast_skipped', 'Đã bỏ qua biển báo'))
     } catch (err) {
       console.warn('[CandidateReviewPage] API skip failed:', err)
+    } finally {
+      setIsSubmitting(false)
+      setSubmittingAction(null)
     }
 
     setSessionHistory((prev) => [
@@ -366,24 +436,26 @@ export function CandidateReviewPage() {
     ])
 
     setCurrentIndex((i) => i + 1)
-  }, [currentCandidate, t, toast])
+  }, [currentCandidate, isSubmitting, t, toast])
 
   // 4. Suggest Corrected Sign from Catalog Picker or Quick Chips
   const handleSelectCorrectedSign = useCallback(
-    async (signCode: string) => {
-      if (!currentCandidate) return
+    async (signCode: string, signTypeId?: number, signObj?: BackendCatalogSignType) => {
+      if (!currentCandidate || isSubmitting) return
       setShowCatalogModal(false)
+      setIsSubmitting(true)
+      setSubmittingAction('approve')
 
-      const foundSign = mockTrafficCatalog.find((s) => s.code === signCode)
-      const signTypeId = foundSign ? Number(foundSign.code.replace(/\D/g, '')) || 102 : 102
+      const resolvedSignTypeId = signTypeId ?? (signObj?.id || 102)
+      const resolvedName = signObj?.nameVi || currentCandidate.suggestedName
 
       try {
         await reviewsService.testReview({
           candidateId: currentCandidate.id,
           vote: -1,
-          suggestedSignTypeId: signTypeId,
+          suggestedSignTypeId: resolvedSignTypeId,
           declineReason: 'Incorrect Sign Type',
-          declineNote: `Corrected to ${signCode}`,
+          declineNote: `Corrected to ${signCode} (${resolvedName})`,
         })
         toast.success(`${t('reviewer.toast_corrected', 'Đã sửa loại biển báo và duyệt')} ${signCode}`)
       } catch (err) {
@@ -391,14 +463,17 @@ export function CandidateReviewPage() {
         try {
           await reviewsService.castVote(currentCandidate.id, {
             vote: -1,
-            suggestedSignTypeId: signTypeId,
+            suggestedSignTypeId: resolvedSignTypeId,
             declineReason: 'Incorrect Sign Type',
-            declineNote: `Corrected to ${signCode}`,
+            declineNote: `Corrected to ${signCode} (${resolvedName})`,
           })
           toast.success(`${t('reviewer.toast_corrected', 'Đã sửa loại biển báo và duyệt')} ${signCode}`)
         } catch (err2) {
           console.warn('[CandidateReviewPage] API suggest vote failed:', err2)
         }
+      } finally {
+        setIsSubmitting(false)
+        setSubmittingAction(null)
       }
 
       setSessionHistory((prev) => [
@@ -406,7 +481,7 @@ export function CandidateReviewPage() {
           id: currentCandidate.id,
           candidateId: currentCandidate.id,
           signCode,
-          signName: foundSign?.nameVi || currentCandidate.suggestedName,
+          signName: resolvedName,
           action: 'Corrected',
           timestamp: new Date().toLocaleTimeString('vi-VN'),
           details: `Corrected to ${signCode}`,
@@ -418,35 +493,41 @@ export function CandidateReviewPage() {
       setCandidates((prev) =>
         prev.map((c) =>
           c.id === currentCandidate.id
-            ? { ...c, status: 'Approved', code: signCode, suggestedName: foundSign?.nameVi || c.suggestedName }
+            ? { ...c, status: 'Approved', code: signCode, suggestedName: resolvedName }
             : c
         )
       )
 
       setCurrentIndex((i) => i + 1)
     },
-    [currentCandidate, t, toast]
+    [currentCandidate, isSubmitting, t, toast]
   )
 
   // 5. Flag / Report Submission
   const handleConfirmFlag = useCallback(
     async (reason: FlagReasonCode, notes: string) => {
-      if (!currentCandidate) return
-      setShowFlagModal(false)
+      if (!currentCandidate || isSubmitting) return
+      const candidateId = currentCandidate.id
+      setIsSubmitting(true)
+      setSubmittingAction('flag')
 
       try {
-        await reviewsService.reportCandidate(currentCandidate.id, {
+        await reviewsService.reportCandidate(candidateId, {
           reason: `${reason}: ${notes || 'Flagged by reviewer'}`,
         })
         toast.warning(`${t('reviewer.toast_flagged', 'Đã gắn cờ báo lỗi biển báo')} ${currentCandidate.code}`)
       } catch (err) {
         console.warn('[CandidateReviewPage] API report failed:', err)
+      } finally {
+        setIsSubmitting(false)
+        setSubmittingAction(null)
+        setShowFlagModal(false)
       }
 
       setSessionHistory((prev) => [
         {
-          id: currentCandidate.id,
-          candidateId: currentCandidate.id,
+          id: candidateId,
+          candidateId,
           signCode: currentCandidate.code,
           signName: currentCandidate.suggestedName,
           action: 'Flagged',
@@ -458,12 +539,12 @@ export function CandidateReviewPage() {
       ])
 
       setCandidates((prev) =>
-        prev.map((c) => (c.id === currentCandidate.id ? { ...c, status: 'Flagged' } : c))
+        prev.map((c) => (c.id === candidateId ? { ...c, status: 'Flagged' } : c))
       )
 
       setCurrentIndex((i) => i + 1)
     },
-    [currentCandidate, t, toast]
+    [currentCandidate, isSubmitting, t, toast]
   )
 
   // 6. Undo Last Review (Workspace view)
@@ -522,18 +603,19 @@ export function CandidateReviewPage() {
   }, [handleRefreshQueue, t, toast])
 
   // Keyboard Hotkeys Engine
-  const isModalOpen = showCatalogModal || showFlagModal || showDeclineModal
+  const isModalOpen = showCatalogModal || showFlagModal || showDeclineModal || showGuideModal
   useReviewHotkeys(
     {
       onApprove: handleApprove,
-      onReject: () => setShowDeclineModal(true),
-      onSuggest: () => setShowCatalogModal(true),
+      onReject: () => !isSubmitting && setShowDeclineModal(true),
+      onSuggest: () => !isSubmitting && setShowCatalogModal(true),
       onSkip: handleSkip,
-      onFlag: () => setShowFlagModal(true),
+      onFlag: () => !isSubmitting && setShowFlagModal(true),
       onToggleView: () => setActiveView((v) => (v === 'crop' ? 'context' : 'crop')),
       onUndo: handleUndo,
+      onOpenGuide: () => setShowGuideModal(true),
     },
-    !isModalOpen && Boolean(currentCandidate)
+    !isModalOpen && Boolean(currentCandidate) && !isSubmitting
   )
 
   return (
@@ -592,7 +674,7 @@ export function CandidateReviewPage() {
             </div>
             <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-[#007b8b] to-[#00c4de] transition-all duration-300 rounded-full"
+                className="h-full bg-[#007b8b] dark:bg-[#00c4de] transition-all duration-300 rounded-full"
                 style={{ width: `${Math.round(((currentIndex + 1) / candidates.length) * 100)}%` }}
               />
             </div>
@@ -608,6 +690,7 @@ export function CandidateReviewPage() {
           </div>
         ) : currentCandidate ? (
           <CandidateWorkspaceCard
+            key={currentCandidate.id}
             candidate={currentCandidate}
             currentIndex={currentIndex}
             totalCandidates={candidates.length}
@@ -621,7 +704,10 @@ export function CandidateReviewPage() {
             onOpenCatalog={() => setShowCatalogModal(true)}
             onQuickCorrect={handleSelectCorrectedSign}
             onUndo={handleUndo}
-            canUndo={sessionHistory.length > 0}
+            canUndo={sessionHistory.length > 0 && !isSubmitting}
+            onOpenGuide={() => setShowGuideModal(true)}
+            isSubmitting={isSubmitting}
+            submittingAction={submittingAction}
           />
         ) : sessionHistory.length > 0 ? (
           <SubmissionSummaryView
@@ -679,39 +765,50 @@ export function CandidateReviewPage() {
         {currentCandidate && (
           <DeclineCandidateModal
             isOpen={showDeclineModal}
-            onClose={() => setShowDeclineModal(false)}
+            onClose={() => !isSubmitting && setShowDeclineModal(false)}
             candidateId={currentCandidate.id}
             signCode={currentCandidate.code}
             isDark={isDark}
             onConfirmDecline={handleConfirmDecline}
             onOpenCatalog={() => setShowCatalogModal(true)}
+            isSubmitting={isSubmitting && submittingAction === 'reject'}
           />
         )}
 
-        {/* Modal: QCVN 41 Catalog Picker */}
+        {/* Modal: QCVN 41 Catalog Picker (Live Backend API) */}
         <ReviewerCatalogModal
           isOpen={showCatalogModal}
-          catalogSearch={catalogSearch}
-          catalogCat={catalogCat}
-          filteredCatalog={filteredCatalog}
           isDark={isDark}
           onClose={() => setShowCatalogModal(false)}
-          onSearchChange={setCatalogSearch}
-          onCategoryChange={setCatalogCat}
           onSelectSign={handleSelectCorrectedSign}
-          onOpenNewSignModal={() => {}}
+          onOpenNewSignModal={() => setShowProposeModal(true)}
+        />
+
+        {/* Modal: Propose Missing Sign */}
+        <ProposeSignModal
+          isOpen={showProposeModal}
+          onClose={() => setShowProposeModal(false)}
+          isDark={isDark}
         />
 
         {/* Modal: Flag / Report */}
         {currentCandidate && (
           <FlagCandidateModal
             isOpen={showFlagModal}
-            onClose={() => setShowFlagModal(false)}
+            onClose={() => !isSubmitting && setShowFlagModal(false)}
             candidateId={currentCandidate.id}
             signCode={currentCandidate.code}
             onConfirmFlag={handleConfirmFlag}
+            isSubmitting={isSubmitting && submittingAction === 'flag'}
           />
         )}
+
+        {/* Modal: Review Guide & Hotkeys */}
+        <ReviewGuideModal
+          isOpen={showGuideModal}
+          onClose={() => setShowGuideModal(false)}
+          isDark={isDark}
+        />
       </div>
     </div>
   )

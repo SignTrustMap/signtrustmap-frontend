@@ -8,6 +8,7 @@ export interface ReviewHotkeysActions {
   onFlag?: () => void
   onToggleView?: () => void
   onUndo?: () => void
+  onOpenGuide?: () => void
 }
 
 /**
@@ -46,37 +47,33 @@ export function useReviewHotkeys(actions: ReviewHotkeysActions, enabled = true) 
       if (event.ctrlKey || event.metaKey || event.altKey) return
 
       switch (key) {
-        case '1':
-        case 'a':
+        case '4':
           event.preventDefault()
           actions.onApprove?.()
           break
 
-        case '2':
-        case 'r':
+        case '3':
           event.preventDefault()
           actions.onReject?.()
           break
 
-        case '3':
-        case 'c':
+        case '2':
           event.preventDefault()
           actions.onSuggest?.()
           break
 
-        case '4':
-        case 's':
+        case '1':
           event.preventDefault()
           actions.onSkip?.()
           break
 
-        case 'f':
+        case 'e':
           event.preventDefault()
           actions.onFlag?.()
           break
 
         case ' ':
-        case 'v':
+        case 'space':
           event.preventDefault()
           actions.onToggleView?.()
           break
@@ -84,6 +81,12 @@ export function useReviewHotkeys(actions: ReviewHotkeysActions, enabled = true) 
         case 'z':
           event.preventDefault()
           actions.onUndo?.()
+          break
+
+        case '?':
+        case 'h':
+          event.preventDefault()
+          actions.onOpenGuide?.()
           break
 
         default:

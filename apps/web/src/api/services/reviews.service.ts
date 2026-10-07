@@ -1,7 +1,6 @@
 import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
 import type {
-  ReviewCandidate,
   ReviewQueueResponse,
   CandidateDetailResponse,
   VoteDto,

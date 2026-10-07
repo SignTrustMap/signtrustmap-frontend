@@ -8,7 +8,6 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockTrafficCatalog,
   type CandidateToReview,
   type RevalidationCandidate,
   type ReviewHistoryItem,
@@ -31,7 +30,6 @@ import {
   DeclineCandidateModal,
   SubmissionSummaryView,
   type QueueFilterType,
-  type CatalogCategoryFilter,
 } from './components'
 
 const defaultReviewerMetrics: ReviewerMetrics = {
@@ -58,6 +56,8 @@ export default function ReviewerWorkspacePage() {
   const [activeView, setActiveView] = useState<'crop' | 'context'>('crop')
   const [filterMode, setFilterMode] = useState<QueueFilterType>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submittingAction, setSubmittingAction] = useState<'approve' | 'reject' | 'skip' | 'flag' | null>(null)
 
   // Revalidation Review State (Live API Queue)
   const [revalCandidates, setRevalCandidates] = useState<RevalidationCandidate[]>([])
@@ -65,8 +65,6 @@ export default function ReviewerWorkspacePage() {
 
   // Modals & Drawers
   const [showCatalogModal, setShowCatalogModal] = useState(false)
-  const [catalogSearch, setCatalogSearch] = useState('')
-  const [catalogCat, setCatalogCat] = useState<CatalogCategoryFilter>('all')
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [showDeclineModal, setShowDeclineModal] = useState(false)
   const [showNewSignModal, setShowNewSignModal] = useState(false)
@@ -76,31 +74,63 @@ export default function ReviewerWorkspacePage() {
   const [stats, setStats] = useState<ReviewerMetrics>(defaultReviewerMetrics)
   const [historyItems, setHistoryItems] = useState<ReviewHistoryItem[]>([])
 
-  const parseCandidateCoordinates = (item: any): { lat: number; lng: number } => {
-    if (typeof item.latitude === 'number' && typeof item.longitude === 'number') {
-      return { lat: item.latitude, lng: item.longitude }
-    }
-    if (item.locationContext?.coordinates?.latitude && item.locationContext?.coordinates?.longitude) {
-      return {
-        lat: Number(item.locationContext.coordinates.latitude),
-        lng: Number(item.locationContext.coordinates.longitude),
+  // Robust GPS coordinate extractor from any backend model schema or nested payload
+  const extractCandidateCoordinates = (item: any): { lat: number; lng: number } | null => {
+    if (!item) return null
+    const payload = item?.data || item?.candidate || item
+    const target = payload?.candidate || payload
+
+    const rawLat = target?.latitude ?? target?.lat ?? item?.latitude ?? item?.lat
+    const rawLng = target?.longitude ?? target?.lng ?? item?.longitude ?? item?.lng
+
+    if (rawLat !== undefined && rawLat !== null && rawLng !== undefined && rawLng !== null) {
+      const lat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat))
+      const lng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+        return { lat, lng }
       }
     }
-    if (typeof item.submission?.latitude === 'number' && typeof item.submission?.longitude === 'number') {
-      return { lat: item.submission.latitude, lng: item.submission.longitude }
+
+    const loc = target?.locationContext || payload?.locationContext || item?.locationContext
+    if (loc?.coordinates) {
+      const c = loc.coordinates
+      const lat = typeof c.latitude === 'number' ? c.latitude : parseFloat(String(c.latitude ?? c.lat))
+      const lng = typeof c.longitude === 'number' ? c.longitude : parseFloat(String(c.longitude ?? c.lng))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
     }
-    const noteStr = item.submission?.note || item.note
-    if (noteStr) {
-      const match = String(noteStr).match(/GPS:\s*([-\d.]+),\s*([-\d.]+)/i)
+
+    if (loc?.latitude !== undefined && loc?.longitude !== undefined) {
+      const lat = parseFloat(String(loc.latitude))
+      const lng = parseFloat(String(loc.longitude))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
+    }
+
+    const sub = target?.submission || payload?.submission || item?.submission
+    if (sub?.latitude !== undefined && sub?.longitude !== undefined) {
+      const lat = parseFloat(String(sub.latitude))
+      const lng = parseFloat(String(sub.longitude))
+      if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+        return { lat, lng }
+      }
+    }
+
+    const noteStr = sub?.note || target?.note || payload?.note || item?.note
+    if (noteStr && typeof noteStr === 'string') {
+      const match = noteStr.match(/GPS:\s*([+-]?\d+(?:\.\d+)?),\s*([+-]?\d+(?:\.\d+)?)/i)
       if (match) {
-        const parsedLat = parseFloat(match[1])
-        const parsedLng = parseFloat(match[2])
-        if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
-          return { lat: parsedLat, lng: parsedLng }
+        const lat = parseFloat(match[1])
+        const lng = parseFloat(match[2])
+        if (!Number.isNaN(lat) && !Number.isNaN(lng) && (lat !== 0 || lng !== 0)) {
+          return { lat, lng }
         }
       }
     }
-    return { lat: 10.7769, lng: 106.7009 }
+
+    return null
   }
 
   // Load live queue and stats from API
@@ -113,11 +143,25 @@ export default function ReviewerWorkspacePage() {
       .then((res) => {
         if (!active) return
         if (res?.items && res.items.length > 0) {
+          let surveyBaseCoords: { lat: number; lng: number } = { lat: 10.7769, lng: 106.7009 }
+          for (const it of res.items) {
+            const found = extractCandidateCoordinates(it)
+            if (found) {
+              surveyBaseCoords = found
+              break
+            }
+          }
+
           const mapped: CandidateToReview[] = res.items.map((item, idx) => {
             const type = item.predictedSignType
             const crop = resolveMediaUrl(item.signCropUrl)
             const frame = resolveMediaUrl(item.bestFrameUrl)
-            const coords = parseCandidateCoordinates(item)
+            const parsedCoords = extractCandidateCoordinates(item)
+            if (parsedCoords) {
+              surveyBaseCoords = parsedCoords
+            }
+            const coords = parsedCoords || surveyBaseCoords
+
             return {
               id: item.id,
               sourceTripId: item.submissionId ? `TRIP-${item.submissionId.slice(0, 8)}` : 'TRIP-SURVEY',
@@ -191,11 +235,46 @@ export default function ReviewerWorkspacePage() {
 
   // Candidate Decision Handler
   const handleCandidateDecision = useCallback(
-    (action: 'approve' | 'reject' | 'flag', correctedCode?: string, flagNotes?: string) => {
-      if (!currentCandidate) return
+    async (
+      action: 'approve' | 'reject' | 'flag',
+      correctedCode?: string,
+      flagNotes?: string,
+      suggestedSignTypeId?: number,
+      declineReason?: string,
+      declineNote?: string
+    ) => {
+      if (!currentCandidate || isSubmitting) return
 
       const candidateId = currentCandidate.id
       const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+      setIsSubmitting(true)
+      setSubmittingAction(action)
+
+      // Asynchronously record vote in backend API
+      try {
+        if (action === 'flag') {
+          await reviewsService.reportCandidate(candidateId, { reason: flagNotes || 'Flagged candidate' })
+        } else {
+          await reviewsService.castVote(candidateId, {
+            vote: action === 'approve' ? 1 : -1,
+            suggestedSignTypeId:
+              suggestedSignTypeId ??
+              (correctedCode ? Number(correctedCode) || undefined : undefined),
+            ...(action === 'reject'
+              ? {
+                  declineReason: declineReason || flagNotes,
+                  declineNote: declineNote,
+                }
+              : {}),
+          })
+        }
+      } catch (err) {
+        console.warn('[ReviewerWorkspacePage] API vote failed:', err)
+      } finally {
+        setIsSubmitting(false)
+        setSubmittingAction(null)
+      }
 
       let candidateStatus: 'Approved' | 'Rejected' | 'Flagged' = 'Flagged'
       if (action === 'approve') {
@@ -245,20 +324,6 @@ export default function ReviewerWorkspacePage() {
       }
       setHistoryItems((prev) => [historyEntry, ...prev])
 
-      // Asynchronously record vote in backend API
-      if (action === 'flag') {
-        reviewsService
-          .reportCandidate(candidateId, { reason: flagNotes || 'Flagged candidate' })
-          .catch(() => {})
-      } else {
-        reviewsService
-          .castVote(candidateId, {
-            vote: action === 'approve' ? 1 : -1,
-            suggestedSignTypeId: correctedCode ? Number(correctedCode) || undefined : undefined,
-          })
-          .catch(() => {})
-      }
-
       if (action === 'approve') {
         toast.success(
           correctedCode
@@ -291,7 +356,7 @@ export default function ReviewerWorkspacePage() {
         setCurrentIndex((i) => i + 1)
       }
     },
-    [currentCandidate, currentIndex, filteredCandidates.length, t, toast]
+    [currentCandidate, currentIndex, filteredCandidates.length, isSubmitting, t, toast]
   )
 
   // Revalidation Decision Handler
@@ -407,10 +472,21 @@ export default function ReviewerWorkspacePage() {
   }, [historyItems, handleUndo])
 
   // Skip Candidate (Mobile Parity: Skip current sign)
-  const handleSkip = useCallback(() => {
-    if (!currentCandidate) return
+  const handleSkip = useCallback(async () => {
+    if (!currentCandidate || isSubmitting) return
     const candidateId = currentCandidate.id
     const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+    setIsSubmitting(true)
+    setSubmittingAction('skip')
+    try {
+      await reviewsService.skipCandidate(candidateId)
+    } catch {
+      // ignore
+    } finally {
+      setIsSubmitting(false)
+      setSubmittingAction(null)
+    }
 
     const historyEntry: ReviewHistoryItem = {
       id: `HIST-${Date.now()}`,
@@ -422,7 +498,6 @@ export default function ReviewerWorkspacePage() {
       mode: 'candidate',
     }
     setHistoryItems((prev) => [historyEntry, ...prev])
-    reviewsService.skipCandidate(candidateId).catch(() => {})
     toast.info(t('reviewer.toast_skipped'))
 
     if (currentIndex < filteredCandidates.length - 1) {
@@ -430,13 +505,23 @@ export default function ReviewerWorkspacePage() {
     } else {
       setCurrentIndex(filteredCandidates.length)
     }
-  }, [currentCandidate, currentIndex, filteredCandidates.length, t, toast])
+  }, [currentCandidate, currentIndex, filteredCandidates.length, isSubmitting, t, toast])
 
   // Confirm Decline from DeclineCandidateModal
   const handleConfirmDecline = useCallback(
-    (reason: string, detail?: string) => {
-      setShowDeclineModal(false)
-      handleCandidateDecision('reject', undefined, detail ? `${reason}: ${detail}` : reason)
+    async (reason: string, detail?: string) => {
+      try {
+        await handleCandidateDecision(
+          'reject',
+          undefined,
+          detail ? `${reason}: ${detail}` : reason,
+          undefined,
+          reason,
+          detail
+        )
+      } finally {
+        setShowDeclineModal(false)
+      }
     },
     [handleCandidateDecision]
   )
@@ -461,24 +546,7 @@ export default function ReviewerWorkspacePage() {
       Boolean(currentCandidate)
   )
 
-  // Filter catalog by search query & category tab
-  const filteredCatalog = useMemo(() => {
-    return mockTrafficCatalog.filter((sign) => {
-      const matchesCategory =
-        catalogCat === 'all'
-          ? true
-          : catalogCat === 'prohibitory'
-          ? sign.category === 'prohibitory' || sign.category === 'speed_limit'
-          : sign.category === catalogCat
 
-      const matchesSearch =
-        sign.code.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        sign.nameVi.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-        sign.nameEn.toLowerCase().includes(catalogSearch.toLowerCase())
-
-      return matchesCategory && matchesSearch
-    })
-  }, [catalogSearch, catalogCat])
 
   return (
     <div
@@ -615,6 +683,7 @@ export default function ReviewerWorkspacePage() {
                   </div>
                 ) : currentCandidate ? (
                   <CandidateWorkspaceCard
+                    key={currentCandidate.id}
                     candidate={currentCandidate}
                     currentIndex={currentIndex}
                     totalCandidates={filteredCandidates.length}
@@ -629,13 +698,15 @@ export default function ReviewerWorkspacePage() {
                     onOpenCatalog={() => setShowCatalogModal(true)}
                     onOpenFlag={() => setShowFlagModal(true)}
                     onUndo={handleUndoLast}
-                    canUndo={historyItems.length > 0}
+                    canUndo={historyItems.length > 0 && !isSubmitting}
                     onPrev={() => setCurrentIndex((i) => Math.max(0, i - 1))}
                     onNext={() =>
                       setCurrentIndex((i) => Math.min(filteredCandidates.length - 1, i + 1))
                     }
                     canPrev={currentIndex > 0}
                     canNext={currentIndex < filteredCandidates.length - 1}
+                    isSubmitting={isSubmitting}
+                    submittingAction={submittingAction}
                   />
                 ) : historyItems.length > 0 ? (
                   <SubmissionSummaryView
@@ -741,17 +812,15 @@ export default function ReviewerWorkspacePage() {
           </div>
         </div>
 
-        {/* ─── 5. Visual Catalog Modal ───────────────────────────────── */}
+        {/* ─── 5. Visual Catalog Modal (Live Backend API) ─────────────── */}
         <ReviewerCatalogModal
           isOpen={showCatalogModal}
-          catalogSearch={catalogSearch}
-          catalogCat={catalogCat}
-          filteredCatalog={filteredCatalog}
           isDark={isDark}
           onClose={() => setShowCatalogModal(false)}
-          onSearchChange={setCatalogSearch}
-          onCategoryChange={setCatalogCat}
-          onSelectSign={(signCode) => handleCandidateDecision('approve', signCode)}
+          onSelectSign={(signCode, signTypeId) => {
+            setShowCatalogModal(false)
+            handleCandidateDecision('approve', signCode, undefined, signTypeId)
+          }}
           onOpenNewSignModal={() => setShowNewSignModal(true)}
         />
 
@@ -759,12 +828,13 @@ export default function ReviewerWorkspacePage() {
         {currentCandidate && (
           <DeclineCandidateModal
             isOpen={showDeclineModal}
-            onClose={() => setShowDeclineModal(false)}
+            onClose={() => !isSubmitting && setShowDeclineModal(false)}
             candidateId={currentCandidate.id}
             signCode={currentCandidate.code}
             isDark={isDark}
             onConfirmDecline={handleConfirmDecline}
             onOpenCatalog={() => setShowCatalogModal(true)}
+            isSubmitting={isSubmitting && submittingAction === 'reject'}
           />
         )}
 
@@ -772,12 +842,17 @@ export default function ReviewerWorkspacePage() {
         {currentCandidate && (
           <FlagCandidateModal
             isOpen={showFlagModal}
-            onClose={() => setShowFlagModal(false)}
+            onClose={() => !isSubmitting && setShowFlagModal(false)}
             candidateId={currentCandidate.id}
             signCode={currentCandidate.code}
-            onConfirmFlag={(reason: FlagReasonCode, notes: string) => {
-              handleCandidateDecision('flag', undefined, `${reason}: ${notes}`)
+            onConfirmFlag={async (reason: FlagReasonCode, notes: string) => {
+              try {
+                await handleCandidateDecision('flag', undefined, `${reason}: ${notes}`)
+              } finally {
+                setShowFlagModal(false)
+              }
             }}
+            isSubmitting={isSubmitting && submittingAction === 'flag'}
           />
         )}
 

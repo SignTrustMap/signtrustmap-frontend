@@ -24,6 +24,8 @@ export interface DataFilterBarProps {
   categories?: FilterCategoryItem[]
   selectedCategory?: string
   onSelectCategory?: (id: string) => void
+  categoryFilterMode?: 'pills' | 'select'
+  categorySelectLabel?: string
 
   sortOptions?: SortOptionItem[]
   selectedSort?: string
@@ -41,6 +43,8 @@ export function DataFilterBar({
   categories = [],
   selectedCategory,
   onSelectCategory,
+  categoryFilterMode = 'pills',
+  categorySelectLabel,
   sortOptions = [],
   selectedSort,
   onSelectSort,
@@ -55,9 +59,13 @@ export function DataFilterBar({
     if (onClearSearch) onClearSearch()
   }
 
+  const isSelectMode = categoryFilterMode === 'select'
+
   return (
     <div
-      className={`bg-white dark:bg-[#071317] border border-gray-200/80 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 ${className}`}
+      className={`bg-white dark:bg-[#071317] border border-gray-200/80 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-xs transition-colors ${
+        isSelectMode ? '' : 'space-y-3.5'
+      } ${className}`}
     >
       {/* Top row: Search input + Controls (Sort Dropdown, Custom Selects, View toggles via children) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -86,11 +94,30 @@ export function DataFilterBar({
           )}
         </div>
 
-        {/* Right controls: Sort Dropdown + Additional Controls (children) */}
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+        {/* Right controls: Category Dropdown (if select mode) + Sort Dropdown + Additional Controls (children) */}
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap sm:flex-nowrap shrink-0">
+          {isSelectMode && categories.length > 0 && onSelectCategory && selectedCategory && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 whitespace-nowrap">
+                {categorySelectLabel || t('filter.category', 'Phân loại')}:
+              </span>
+              <CustomSelect
+                size="sm"
+                value={selectedCategory}
+                onChange={onSelectCategory}
+                options={categories.map((cat) => ({
+                  value: cat.id,
+                  label: cat.label,
+                  count: cat.count,
+                }))}
+                className="w-48 sm:w-60 md:w-64 max-w-[280px] min-w-0"
+              />
+            </div>
+          )}
+
           {sortOptions.length > 0 && onSelectSort && selectedSort && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 whitespace-nowrap">
                 {t('filter.sort_by', 'Sắp xếp')}:
               </span>
               <CustomSelect
@@ -101,7 +128,7 @@ export function DataFilterBar({
                   value: opt.id,
                   label: opt.label,
                 }))}
-                className="w-36"
+                className="w-36 sm:w-40 min-w-0"
               />
             </div>
           )}
@@ -110,8 +137,8 @@ export function DataFilterBar({
         </div>
       </div>
 
-      {/* Bottom row: Category filter chips (Pills) */}
-      {categories.length > 0 && onSelectCategory && (
+      {/* Bottom row: Category filter chips (Pills) - Only rendered when NOT in select mode */}
+      {!isSelectMode && categories.length > 0 && onSelectCategory && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id

@@ -4,6 +4,7 @@ import { CaretDown, Check } from '@phosphor-icons/react'
 export interface OptionItem {
   value: string
   label: string
+  count?: number
   icon?: React.ReactNode
 }
 
@@ -88,16 +89,23 @@ export function CustomSelect({
 
   const isSmall = size === 'sm'
 
+  const fullDisplayTitle = selectedOption
+    ? typeof selectedOption.count === 'number'
+      ? `${selectedOption.label} (${selectedOption.count})`
+      : selectedOption.label
+    : placeholder
+
   return (
-    <div ref={containerRef} className={`relative inline-block text-left ${className}`}>
-      {/* Trigger Button */}
+    <div ref={containerRef} className={`relative inline-block text-left min-w-0 ${className}`}>
+      {/* Trigger Button: Strictly bounded, min-w-0, never overlaps sibling elements */}
       <button
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex items-center justify-between gap-2 rounded-xl transition-all duration-150 cursor-pointer select-none font-medium border ${
+        title={fullDisplayTitle}
+        className={`w-full min-w-0 flex items-center justify-between gap-2 rounded-xl transition-all duration-150 cursor-pointer select-none font-medium border ${
           disabled
             ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-400'
             : isOpen
@@ -105,20 +113,27 @@ export function CustomSelect({
             : 'bg-white dark:bg-[#071317] border-gray-200/80 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 shadow-2xs'
         } ${isSmall ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-xs sm:text-sm'} ${buttonClassName}`}
       >
-        <div className="flex items-center gap-1.5 truncate">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           {leftIcon && <span className="shrink-0 text-gray-400 dark:text-gray-500">{leftIcon}</span>}
           {prefixLabel && (
-            <span className="text-gray-400 dark:text-gray-500 font-normal shrink-0">
+            <span className="text-gray-400 dark:text-gray-500 font-normal shrink-0 whitespace-nowrap">
               {prefixLabel}:
             </span>
           )}
           {selectedOption ? (
-            <span className="truncate flex items-center gap-1.5 text-gray-900 dark:text-white font-medium">
+            <span className="min-w-0 flex-1 flex items-center gap-1.5 text-gray-900 dark:text-white font-medium overflow-hidden">
               {selectedOption.icon && <span className="shrink-0">{selectedOption.icon}</span>}
-              {selectedOption.label}
+              <span className="truncate block flex-1 text-left">
+                {selectedOption.label}
+              </span>
+              {typeof selectedOption.count === 'number' && (
+                <span className="shrink-0 text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 font-semibold">
+                  {selectedOption.count}
+                </span>
+              )}
             </span>
           ) : (
-            <span className="text-gray-400 dark:text-gray-500 truncate">{placeholder}</span>
+            <span className="text-gray-400 dark:text-gray-500 truncate block text-left flex-1">{placeholder}</span>
           )}
         </div>
 
@@ -131,11 +146,11 @@ export function CustomSelect({
         />
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu Popup */}
       {isOpen && (
         <div
           role="listbox"
-          className={`absolute z-50 min-w-full w-max max-w-xs rounded-xl bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden py-1 max-h-64 overflow-y-auto focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 ${
+          className={`absolute z-50 min-w-full w-max max-w-sm sm:max-w-md rounded-xl bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden py-1 max-h-72 overflow-y-auto focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 ${
             computedDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
           } ${align === 'right' ? 'right-0' : 'left-0'} ${dropdownClassName}`}
         >
@@ -148,7 +163,8 @@ export function CustomSelect({
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => handleSelect(opt.value)}
-                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors duration-150 select-none ${
+                title={opt.label}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left cursor-pointer transition-colors duration-150 select-none ${
                   isSmall ? 'text-xs' : 'text-xs sm:text-sm'
                 } ${
                   isSelected
@@ -156,17 +172,24 @@ export function CustomSelect({
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white font-normal'
                 }`}
               >
-                <div className="flex items-center gap-2 truncate">
+                <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                   {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                  <span className="truncate">{opt.label}</span>
+                  <span className="truncate flex-1">{opt.label}</span>
                 </div>
-                {isSelected && (
-                  <Check
-                    size={isSmall ? 12 : 14}
-                    weight="bold"
-                    className="shrink-0 text-[#007b8b] dark:text-[#00c4de]"
-                  />
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {typeof opt.count === 'number' && (
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 font-medium">
+                      {opt.count}
+                    </span>
+                  )}
+                  {isSelected && (
+                    <Check
+                      size={isSmall ? 12 : 14}
+                      weight="bold"
+                      className="shrink-0 text-[#007b8b] dark:text-[#00c4de]"
+                    />
+                  )}
+                </div>
               </button>
             )
           })}

@@ -79,8 +79,11 @@ export function ReviewerMiniMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return
 
+    const validLat = Number.isFinite(Number(lat)) && Math.abs(Number(lat)) <= 90 ? Number(lat) : 10.7769
+    const validLng = Number.isFinite(Number(lng)) && Math.abs(Number(lng)) <= 180 ? Number(lng) : 106.7009
+
     const map = L.map(mapContainerRef.current, {
-      center: [lat, lng],
+      center: [validLat, validLng],
       zoom: 16,
       zoomControl: false,
       attributionControl: false,
@@ -96,7 +99,7 @@ export function ReviewerMiniMap({
     tileLayerRef.current = initialTile
 
     // Add Map Pin
-    const marker = L.marker([lat, lng], { icon: createMapPinIcon() }).addTo(map)
+    const marker = L.marker([validLat, validLng], { icon: createMapPinIcon() }).addTo(map)
     const label = signName ? `${signCode} - ${signName}` : signCode
     if (label) {
       marker.bindTooltip(label, {
@@ -110,7 +113,7 @@ export function ReviewerMiniMap({
 
     const timer = setTimeout(() => {
       map.invalidateSize()
-    }, 200)
+    }, 100)
 
     return () => {
       clearTimeout(timer)
@@ -155,22 +158,78 @@ export function ReviewerMiniMap({
     }
   }, [isDark])
 
-  // Update map center and pin position when coordinates change
+  const isInitialMount = useRef(true)
+  const prevCoordsRef = useRef<{ lat: number; lng: number } | null>(null)
+
+  // Update map center and pin position smoothly when coordinates change (eliminates shaking/jitter)
   useEffect(() => {
     if (!mapInstanceRef.current) return
+    const map = mapInstanceRef.current
 
-    mapInstanceRef.current.flyTo([lat, lng], 17, {
-      duration: 1.0,
-      easeLinearity: 0.25,
-    })
+    const validLat = Number.isFinite(Number(lat)) && Math.abs(Number(lat)) <= 90 ? Number(lat) : 10.7769
+    const validLng = Number.isFinite(Number(lng)) && Math.abs(Number(lng)) <= 180 ? Number(lng) : 106.7009
 
+    // Skip on initial mount since map was already created at center [validLat, validLng]
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      prevCoordsRef.current = { lat: validLat, lng: validLng }
+      return
+    }
+
+    const prev = prevCoordsRef.current
+    const isVirtuallySame =
+      prev &&
+      Math.abs(prev.lat - validLat) < 0.000005 &&
+      Math.abs(prev.lng - validLng) < 0.000005
+
+    // Always update tooltip label if sign code/name changed
     if (pinMarkerRef.current) {
-      pinMarkerRef.current.setLatLng([lat, lng])
       const label = signName ? `${signCode} - ${signName}` : signCode
       if (label) {
         pinMarkerRef.current.setTooltipContent(label)
       }
     }
+
+    if (isVirtuallySame) {
+      return
+    }
+
+    prevCoordsRef.current = { lat: validLat, lng: validLng }
+
+    // Cancel any ongoing pan/zoom animations immediately to prevent frame collisions & shaking
+    map.stop()
+    map.invalidateSize()
+
+    const currentCenter = map.getCenter()
+    const distMeters = currentCenter.distanceTo([validLat, validLng])
+
+    if (distMeters < 0.5) {
+      // Same coordinate point, no camera movement needed
+      if (pinMarkerRef.current) {
+        pinMarkerRef.current.setLatLng([validLat, validLng])
+      }
+    } else if (distMeters < 3000) {
+      // Nearby point (< 3km): smooth pan at the existing zoom level (zero zoom pulsing or tile stretch)
+      map.panTo([validLat, validLng], {
+        animate: true,
+        duration: 0.35,
+        easeLinearity: 0.5,
+      })
+      if (pinMarkerRef.current) {
+        pinMarkerRef.current.setLatLng([validLat, validLng])
+      }
+    } else {
+      // Far point: instant clean setView without multi-zoom fly oscillation
+      map.setView([validLat, validLng], map.getZoom() || 16, { animate: false })
+      if (pinMarkerRef.current) {
+        pinMarkerRef.current.setLatLng([validLat, validLng])
+      }
+    }
+
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+    }, 60)
+    return () => clearTimeout(timer)
   }, [lat, lng, signCode, signName])
 
   const handleToggleTileMode = useCallback(() => {
@@ -187,7 +246,8 @@ export function ReviewerMiniMap({
 
   const handleRecenter = useCallback(() => {
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([lat, lng], 16, { animate: true })
+      mapInstanceRef.current.stop()
+      mapInstanceRef.current.panTo([lat, lng], { animate: true, duration: 0.35 })
     }
   }, [lat, lng])
 
