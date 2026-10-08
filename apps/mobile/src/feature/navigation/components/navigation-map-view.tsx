@@ -237,16 +237,18 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
     const list: { id: string; uri: string; label: string }[] = [];
     const seenUris = new Set<string>();
 
-    const actualCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : '';
-    if (actualCrop && !seenUris.has(actualCrop)) {
-      seenUris.add(actualCrop);
+    // 1. Whole frame image (dashcam / camera full view)
+    const wholeFrame = sign.frameUrl ? resolveImageUrl(sign.frameUrl) : '';
+    if (wholeFrame && !seenUris.has(wholeFrame)) {
+      seenUris.add(wholeFrame);
       list.push({
-        id: 'actual-crop',
-        uri: actualCrop,
-        label: 'Ảnh chụp thực địa',
+        id: 'whole-frame',
+        uri: wholeFrame,
+        label: 'Ảnh toàn cảnh thực địa',
       });
     }
 
+    // 2. Surveyor revalidation evidences (full camera photos)
     for (const ev of evidences) {
       if (ev.mediaUrl && !seenUris.has(ev.mediaUrl)) {
         seenUris.add(ev.mediaUrl);
@@ -263,7 +265,18 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
       }
     }
 
-    // Fallback to official sign image if no camera crops exist
+    // 3. Cropped sign image
+    const actualCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : '';
+    if (actualCrop && !seenUris.has(actualCrop)) {
+      seenUris.add(actualCrop);
+      list.push({
+        id: 'actual-crop',
+        uri: actualCrop,
+        label: 'Ảnh cắt cận cảnh',
+      });
+    }
+
+    // 4. Fallback to official sign image if no camera crops exist
     if (list.length === 0 && sign.imageUrl) {
       list.push({
         id: 'official-sign',
@@ -273,10 +286,12 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
     }
 
     return list;
-  }, [sign.actualCropUrl, sign.imageUrl, evidences]);
+  }, [sign.frameUrl, sign.actualCropUrl, sign.imageUrl, evidences]);
 
   return (
     <Animated.View
+      onStartShouldSetResponder={() => true}
+      onTouchEnd={(e) => e.stopPropagation()}
       style={[
         styles.bottomSheetContainer,
         {
@@ -618,6 +633,7 @@ export function NavigationMapView({
     <View style={styles.container}>
       <Map
         ref={mapRef}
+        onPress={() => setSelectedSignId(null)}
         onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
         onDidFinishLoadingMap={() => {
           void mapRef.current?.getBounds().then(reportBounds).catch(() => {

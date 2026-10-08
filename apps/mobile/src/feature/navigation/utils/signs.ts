@@ -49,6 +49,7 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     id: sign.id,
     imageUrl: resolveRepresentativeSignUrl(nameEn, signCode),
     actualCropUrl: resolveImageUrl(sign.signCropUrl),
+    frameUrl: resolveImageUrl(sign.frameUrl || sign.bestFrameUrl || ''),
     name: nameVi || nameEn || signCode || 'Traffic Sign',
     nameVi: nameVi || undefined,
     nameEn: nameEn || undefined,

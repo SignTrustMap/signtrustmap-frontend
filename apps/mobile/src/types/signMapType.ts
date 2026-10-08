@@ -60,6 +60,8 @@ export type VerifiedMapSign = {
     latitude: number;
     longitude: number;
     signCropUrl: string;
+    frameUrl?: string;
+    bestFrameUrl?: string;
     signType: { nameEn: string; signCode: string; nameVi?: string };
     freshnessScore?: number;
     status?: VerifiedSignStatus;
