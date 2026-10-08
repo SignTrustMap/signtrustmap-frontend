@@ -21,6 +21,8 @@ import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,6 +31,7 @@ import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
+import type { RevalidationEvidenceType } from '@/types/revalidationType';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -96,14 +99,37 @@ export function isValidGpsCoordinates(
   );
 }
 
-export const CONDITION_PRESETS = [
-  { id: 'INTACT', label: 'Tình trạng tốt' },
-  { id: 'OBSCURED', label: 'Bị cây / vật cản che khuất' },
-  { id: 'DAMAGED', label: 'Hư hỏng / Nghiêng đổ' },
-  { id: 'FADED', label: 'Mờ sơn / Bị lóa ban đêm' },
-  { id: 'REPLACED', label: 'Đã thay bằng biển báo mới' },
-  { id: 'OTHER', label: 'Khác' },
-] as const;
+export type RevalidationSignStatus = RevalidationEvidenceType;
+
+export const REVALIDATION_STATUS_OPTIONS: Array<{
+  id: RevalidationEvidenceType;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  activeColor: string;
+  description: string;
+}> = [
+  {
+    id: 'STILL_ACTIVE',
+    label: 'Vẫn hoạt động',
+    icon: 'check-circle-outline',
+    activeColor: '#16A34A',
+    description: 'Biển báo vẫn tồn tại và hoạt động bình thường trên thực địa.',
+  },
+  {
+    id: 'REMOVED',
+    label: 'Đã gỡ bỏ',
+    icon: 'close-circle-outline',
+    activeColor: '#DC2626',
+    description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn trên thực địa.',
+  },
+  {
+    id: 'CHANGED',
+    label: 'Đã thay đổi',
+    icon: 'swap-horizontal',
+    activeColor: '#D97706',
+    description: 'Biển báo đã được thay thế bằng một loại biển báo khác.',
+  },
+];
 
 /**
  * Resolves color styling and icon for freshness score:
@@ -149,6 +175,7 @@ export function InspectRevalidateScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<InspectRevalidateParams>();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -177,9 +204,8 @@ export function InspectRevalidateScreen() {
   const [isLocatingDevice, setIsLocatingDevice] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
 
-  // Observation state
-  const [selectedCondition, setSelectedCondition] = useState<string>('INTACT');
-  const [suggestedSignTypeId, setSuggestedSignTypeId] = useState<string>('');
+  // Revalidation state directly mapped to Backend evidence_type
+  const [evidenceType, setEvidenceType] = useState<RevalidationEvidenceType>('STILL_ACTIVE');
   const [customNote, setCustomNote] = useState('');
 
   // Submission state
@@ -211,9 +237,9 @@ export function InspectRevalidateScreen() {
   const isWithinProximity =
     distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
 
-  // Validation rules
+  // Validation rules: Note is required when sign is reported REMOVED
   const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
-  const isNoteValid = selectedCondition !== 'OTHER' || customNote.trim().length > 0;
+  const isNoteValid = evidenceType !== 'REMOVED' || customNote.trim().length > 0;
   const isSubmitDisabled =
     !selectedMedia ||
     !isLocationValid ||
@@ -232,7 +258,7 @@ export function InspectRevalidateScreen() {
   } else if (isWithinProximity === false) {
     submitButtonLabel = `Vị trí quá xa (${distanceFromTarget}m > 50m)`;
   } else if (!isNoteValid) {
-    submitButtonLabel = 'Cần nhập ghi chú khi chọn "Khác"';
+    submitButtonLabel = 'Cần nhập ghi chú khi chọn "Đã gỡ bỏ"';
   }
 
   /**
@@ -486,15 +512,6 @@ export function InspectRevalidateScreen() {
       return;
     }
 
-    const evidenceType: 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' =
-      selectedCondition === 'REMOVED'
-        ? 'REMOVED'
-        : selectedCondition === 'REPLACED'
-          ? 'CHANGED'
-          : 'STILL_ACTIVE';
-
-    const parsedTypeId = suggestedSignTypeId.trim() ? parseInt(suggestedSignTypeId.trim(), 10) : undefined;
-
     try {
       await submitRevalidationEvidence(
         targetTaskId,
@@ -502,10 +519,8 @@ export function InspectRevalidateScreen() {
           latitude: lat,
           longitude: lon,
           capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
-          note: `${selectedCondition}: ${customNote}`.trim(),
-          condition: selectedCondition,
+          note: customNote.trim() || undefined,
           evidenceType,
-          suggestedSignTypeId: Number.isFinite(parsedTypeId) ? parsedTypeId : undefined,
         },
         selectedMedia
           ? {
@@ -516,6 +531,11 @@ export function InspectRevalidateScreen() {
           : undefined,
         session?.accessToken,
       );
+
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
+      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
 
       setSubmitSuccess(true);
       setTimeout(() => {
@@ -925,44 +945,94 @@ export function InspectRevalidateScreen() {
             </View>
 
             {/* =============================================================== */}
-            {/* 4. CONDITION PRESET CHIPS & NOTES                               */}
+            {/* 4. REVALIDATION STATUS & NOTES                                  */}
             {/* =============================================================== */}
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Tình trạng biển báo</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Kết luận tái thẩm định thực địa</Text>
+              <Text style={styles.requiredTag}>* Bắt buộc</Text>
             </View>
-            <View style={styles.presetsWrap}>
-              {CONDITION_PRESETS.map((preset) => {
-                const isSelected = selectedCondition === preset.id;
+
+            <View style={styles.statusOptionsWrap}>
+              {REVALIDATION_STATUS_OPTIONS.map((opt) => {
+                const isSelected = evidenceType === opt.id;
                 return (
                   <Pressable
-                    key={preset.id}
-                    onPress={() => setSelectedCondition(preset.id)}
+                    accessibilityLabel={opt.label}
+                    accessibilityRole="button"
+                    key={opt.id}
+                    onPress={() => setEvidenceType(opt.id)}
                     style={[
-                      styles.conditionChip,
+                      styles.statusOptionCard,
                       {
-                        backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
-                        borderColor: isSelected ? theme.primary : theme.border,
+                        backgroundColor: isSelected
+                          ? `${opt.activeColor}12`
+                          : theme.backgroundElement,
+                        borderColor: isSelected ? opt.activeColor : theme.border,
                       },
                     ]}
                   >
+                    <View style={styles.statusOptionHeader}>
+                      <View
+                        style={[
+                          styles.statusOptionRadio,
+                          {
+                            borderColor: isSelected ? opt.activeColor : theme.placeholder,
+                          },
+                        ]}
+                      >
+                        {isSelected && (
+                          <View
+                            style={[
+                              styles.statusOptionRadioDot,
+                              { backgroundColor: opt.activeColor },
+                            ]}
+                          />
+                        )}
+                      </View>
+                      <MaterialCommunityIcons
+                        color={isSelected ? opt.activeColor : theme.placeholder}
+                        name={opt.icon}
+                        size={20}
+                      />
+                      <Text
+                        style={[
+                          styles.statusOptionLabel,
+                          {
+                            color: isSelected ? opt.activeColor : theme.text,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </View>
                     <Text
                       style={[
-                        styles.conditionChipText,
-                        { color: isSelected ? theme.onPrimary : theme.text },
+                        styles.statusOptionDesc,
+                        { color: theme.textSecondary },
                       ]}
                     >
-                      {preset.label}
+                      {opt.description}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
 
+            {evidenceType === 'CHANGED' ? (
+              <View style={[styles.aiNoticeCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                <MaterialCommunityIcons color="#D97706" name="robot-outline" size={18} />
+                <Text style={styles.aiNoticeText}>
+                  Hệ thống AI sẽ tự động phân tích ảnh thực địa bạn chụp để nhận diện loại biển báo mới.
+                </Text>
+              </View>
+            ) : null}
+
             {/* Labeled input for additional notes */}
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú bổ sung</Text>
-              {selectedCondition === 'OTHER' ? (
-                <Text style={styles.requiredTag}>* Bắt buộc khi chọn &quot;Khác&quot;</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú chi tiết</Text>
+              {evidenceType === 'REMOVED' ? (
+                <Text style={styles.requiredTag}>* Bắt buộc khi chọn &quot;Đã gỡ bỏ&quot;</Text>
               ) : (
                 <Text style={[styles.optionalTag, { color: theme.grey }]}>Không bắt buộc</Text>
               )}
@@ -979,9 +1049,11 @@ export function InspectRevalidateScreen() {
                 }, 250);
               }}
               placeholder={
-                selectedCondition === 'OTHER'
-                  ? 'Vui lòng mô tả tình trạng biển báo (bắt buộc)...'
-                  : 'Ghi chú bổ sung (ví dụ: cột hơi nghiêng, cây đã được tỉa)...'
+                evidenceType === 'REMOVED'
+                  ? 'Mô tả hiện trạng vị trí (ví dụ: cột đã bị tháo, công trình đang thi công gỡ bỏ)...'
+                  : evidenceType === 'CHANGED'
+                    ? 'Ghi chú thêm về biển báo mới (ví dụ: biển hạn chế tốc độ mới thay thế)...'
+                    : 'Ghi chú bổ sung (ví dụ: biển còn rõ ràng, quan sát tốt)...'
               }
               placeholderTextColor={theme.placeholder}
               style={[
@@ -989,7 +1061,7 @@ export function InspectRevalidateScreen() {
                 {
                   backgroundColor: theme.backgroundElement,
                   borderColor:
-                    selectedCondition === 'OTHER' && !customNote.trim()
+                    evidenceType === 'REMOVED' && !customNote.trim()
                       ? '#EF4444'
                       : theme.border,
                   color: theme.text,
@@ -998,9 +1070,9 @@ export function InspectRevalidateScreen() {
               value={customNote}
             />
 
-            {selectedCondition === 'OTHER' && !customNote.trim() ? (
+            {evidenceType === 'REMOVED' && !customNote.trim() ? (
               <Text style={styles.noteRequiredError}>
-                Vui lòng nhập giải thích trong phần ghi chú khi chọn &quot;Khác&quot;.
+                Vui lòng nhập giải thích lý do biển báo đã bị gỡ bỏ hoặc không còn.
               </Text>
             ) : null}
 
@@ -1307,22 +1379,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  // Condition Presets
-  presetsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  // Status Options Cards
+  statusOptionsWrap: {
+    gap: 10,
     marginBottom: Spacing.two,
   },
-  conditionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
+  statusOptionCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 4,
   },
-  conditionChipText: {
+  statusOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusOptionRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusOptionRadioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusOptionLabel: {
+    fontSize: 14,
+  },
+  statusOptionDesc: {
     fontSize: 12,
-    fontWeight: '600',
+    paddingLeft: 26,
+    lineHeight: 16,
+  },
+  aiNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: Spacing.two,
+  },
+  aiNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+    fontWeight: '500',
   },
   // Input Label Row & Notes
   inputLabelRow: {
@@ -1353,16 +1462,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     minHeight: 70,
     textAlignVertical: 'top',
-  },
-  suggestedTypeContainer: {
-    marginTop: Spacing.two,
-  },
-  singleLineInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
   },
   noteRequiredError: {
     color: '#DC2626',

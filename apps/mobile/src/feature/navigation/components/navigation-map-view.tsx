@@ -1,6 +1,18 @@
 import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -12,6 +24,8 @@ import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 import { getRouteForwardBearing } from '../utils/geo';
+import { useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
+import { resolveImageUrl } from '../utils/signs';
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -145,10 +159,15 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
 
   return (
     <View style={styles.calloutWrapper}>
-      <View style={[styles.calloutCard, {
-        backgroundColor: theme.backgroundElement,
-        shadowColor: '#09233C',
-      }]}>
+      <View
+        style={[
+          styles.calloutCard,
+          {
+            backgroundColor: theme.backgroundElement,
+            shadowColor: '#09233C',
+          },
+        ]}
+      >
         <View style={styles.calloutImageContainer}>
           <SignCalloutImage imageUrl={sign.imageUrl} title={signTitle} />
           <View style={[styles.calloutImageFreshnessDot, { backgroundColor: freshness.color }]} />
@@ -168,14 +187,229 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
           <Image
             accessibilityLabel="Ảnh thực địa camera"
             source={{ uri: sign.actualCropUrl }}
-            style={{ width: 32, height: 32, borderRadius: 4, borderWidth: 1, borderColor: '#CBD5E1' }}
+            style={styles.calloutActualCrop}
             resizeMode="cover"
           />
         ) : null}
       </View>
-      {/* Downward-pointing triangle arrow */}
       <View style={[styles.calloutArrow, { borderTopColor: theme.backgroundElement }]} />
     </View>
+  );
+}
+
+// ─── Non-modal Bottom Sheet (Browsing mode, no destination) ───────────────────
+
+type SignDetailsBottomSheetProps = {
+  sign: RouteSign;
+  onClose: () => void;
+};
+
+function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) {
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
+
+  const resolvedTaskId = sign.taskId || (sign.id.startsWith('reval-') ? sign.id : undefined);
+  const { data: evidences = [] } = useGetTaskEvidences(resolvedTaskId);
+
+  const slideAnim = useRef(new Animated.Value(180)).current;
+
+  useEffect(() => {
+    slideAnim.setValue(180);
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      damping: 24,
+      stiffness: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [sign.id, slideAnim]);
+
+  const freshness = getSignFreshness(sign.freshnessScore, sign.status);
+
+  const signCode = sign.signCode?.trim();
+  const signName = (sign.nameVi || sign.name || sign.nameEn || '').trim();
+  const signTitle =
+    signCode && signName && !signName.toLowerCase().includes(signCode.toLowerCase())
+      ? `${signName} - ${signCode}`
+      : (signName || signCode || 'Biển báo giao thông');
+
+  const verifiedImages = useMemo(() => {
+    const list: { id: string; uri: string; label: string }[] = [];
+    const seenUris = new Set<string>();
+
+    const actualCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : '';
+    if (actualCrop && !seenUris.has(actualCrop)) {
+      seenUris.add(actualCrop);
+      list.push({
+        id: 'actual-crop',
+        uri: actualCrop,
+        label: 'Ảnh chụp thực địa',
+      });
+    }
+
+    for (const ev of evidences) {
+      if (ev.mediaUrl && !seenUris.has(ev.mediaUrl)) {
+        seenUris.add(ev.mediaUrl);
+        list.push({
+          id: ev.id,
+          uri: ev.mediaUrl,
+          label:
+            ev.evidenceType === 'STILL_ACTIVE'
+              ? 'Xác thực còn hiệu lực'
+              : ev.evidenceType === 'REMOVED'
+                ? 'Bằng chứng đã thu hồi'
+                : 'Bằng chứng khảo sát',
+        });
+      }
+    }
+
+    // Fallback to official sign image if no camera crops exist
+    if (list.length === 0 && sign.imageUrl) {
+      list.push({
+        id: 'official-sign',
+        uri: sign.imageUrl,
+        label: 'Ảnh mẫu quy chuẩn',
+      });
+    }
+
+    return list;
+  }, [sign.actualCropUrl, sign.imageUrl, evidences]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.bottomSheetContainer,
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+          paddingBottom: Math.max(16, insets.bottom + 8),
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      {/* Drag Indicator Bar */}
+      <View style={styles.sheetHandleBar}>
+        <View style={[styles.sheetHandlePill, { backgroundColor: theme.border }]} />
+      </View>
+
+      {/* 1. Header row: sign image, sign name - sign code, x button in far right corner */}
+      <View style={styles.sheetHeaderRow}>
+        <View style={[styles.sheetSignIconContainer, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          {sign.imageUrl ? (
+            <ExpoImage
+              accessibilityLabel={signTitle}
+              contentFit="contain"
+              source={{ uri: sign.imageUrl }}
+              style={styles.sheetSignIcon}
+            />
+          ) : (
+            <MaterialCommunityIcons color={theme.primary} name="traffic-light" size={26} />
+          )}
+        </View>
+
+        <View style={styles.sheetHeaderInfo}>
+          <Text numberOfLines={2} style={[styles.sheetSignTitle, { color: theme.text }]}>
+            {signTitle}
+          </Text>
+          <View style={styles.sheetFreshnessRow}>
+            <View style={[styles.sheetFreshnessDot, { backgroundColor: freshness.color }]} />
+            <Text style={[styles.sheetFreshnessText, { color: freshness.color }]}>
+              {freshness.scorePercent}% Độ tươi mới
+            </Text>
+            {sign.roadName ? (
+              <>
+                <Text style={[styles.sheetDotSeparator, { color: theme.textSecondary }]}>•</Text>
+                <Text numberOfLines={1} style={[styles.sheetRoadName, { color: theme.textSecondary }]}>
+                  {sign.roadName}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+
+        <Pressable
+          accessibilityLabel="Đóng thông tin biển báo"
+          accessibilityRole="button"
+          hitSlop={12}
+          onPress={onClose}
+          style={[styles.sheetCloseBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+        >
+          <MaterialCommunityIcons color={theme.text} name="close" size={18} />
+        </Pressable>
+      </View>
+
+      {/* 2. Text(Verified sign images) */}
+      <View style={styles.sheetSectionHeader}>
+        <MaterialCommunityIcons color="#10B981" name="check-decagram" size={16} />
+        <Text style={[styles.sheetSectionTitle, { color: theme.text }]}>
+          Ảnh biển báo đã xác thực (Verified sign images)
+        </Text>
+      </View>
+
+      {/* 3. Carousel of verified images about that sign */}
+      {verifiedImages.length > 0 ? (
+        <ScrollView
+          contentContainerStyle={styles.carouselContainer}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
+          {verifiedImages.map((item, index) => (
+            <Pressable
+              accessibilityLabel={`Xem ảnh ${item.label}`}
+              accessibilityRole="button"
+              key={item.id || `${item.uri}-${index}`}
+              onPress={() => setSelectedPreviewImage(item.uri)}
+              style={[styles.carouselCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            >
+              <ExpoImage
+                contentFit="cover"
+                source={{ uri: item.uri }}
+                style={styles.carouselImage}
+                transition={200}
+              />
+              <View style={styles.carouselLabelBadge}>
+                <Text numberOfLines={1} style={styles.carouselLabelText}>
+                  {item.label}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : (
+        <View style={[styles.carouselEmptyBox, { borderColor: theme.border }]}>
+          <MaterialCommunityIcons color={theme.textSecondary} name="image-off-outline" size={24} />
+          <Text style={[styles.carouselEmptyText, { color: theme.textSecondary }]}>
+            Chưa có ảnh thực địa được xác thực
+          </Text>
+        </View>
+      )}
+
+      {/* Fullscreen Image Preview Modal */}
+      {selectedPreviewImage ? (
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setSelectedPreviewImage(null)}
+          transparent
+          visible={Boolean(selectedPreviewImage)}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable
+              accessibilityLabel="Đóng xem ảnh"
+              accessibilityRole="button"
+              onPress={() => setSelectedPreviewImage(null)}
+              style={styles.modalCloseBtn}
+            >
+              <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
+            </Pressable>
+            <ExpoImage
+              contentFit="contain"
+              source={{ uri: selectedPreviewImage }}
+              style={styles.modalImage}
+            />
+          </View>
+        </Modal>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -205,9 +439,9 @@ export function NavigationMapView({
   // setStop before the native view is attached causes the 'reactTag null' crash.
   const cameraReadyRef = useRef(false);
 
-  // Auto-dismiss the callout after 4 seconds
+  // Auto-dismiss the callout after 4 seconds ONLY when a destination is selected
   useEffect(() => {
-    if (!selectedSignId) return;
+    if (!selectedSignId || !destination) return;
 
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     dismissTimerRef.current = setTimeout(() => {
@@ -217,7 +451,7 @@ export function NavigationMapView({
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [selectedSignId]);
+  }, [selectedSignId, destination]);
 
   const handleSignPress = (sign: RouteSign) => {
     setSelectedSignId((prev) => (prev === sign.id ? null : sign.id));
@@ -254,6 +488,11 @@ export function NavigationMapView({
       return (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0);
     });
   }, [routeSigns, selectedSignId]);
+
+  const selectedSign = useMemo(
+    () => (selectedSignId ? sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null : null),
+    [sortedRouteSigns, selectedSignId],
+  );
 
   const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
     onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
@@ -376,173 +615,188 @@ export function NavigationMapView({
   const { Camera, GeoJSONSource, Layer, Map, Marker, UserLocation } = mapLibre;
 
   return (
-    <Map
-      ref={mapRef}
-      onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
-      onDidFinishLoadingMap={() => {
-        void mapRef.current?.getBounds().then(reportBounds).catch(() => {
-          // The next region change reports bounds if the map is not ready yet.
-        });
-      }}
-      attribution
-      attributionPosition={{ bottom: 8, right: 8 }}
-      compass
-      compassPosition={{ top: 112, right: 16 }}
-      logo={false}
-      mapStyle={openStreetMapStyle}
-      style={styles.map}
-      touchPitch={navigationActive}
-      touchRotate={navigationActive}
-    >
-      {navigationActive ? (
-        <Camera
-          ref={cameraRef}
-          initialViewState={
-            (userCoordinate ?? routeStart)
-              ? {
-                center: (userCoordinate ?? routeStart)!,
-                zoom: 18,
-                pitch: 55,
-                bearing: forwardBearing,
-                padding: {
-                  bottom: 220,
-                  left: 24,
-                  right: 24,
-                  top: 100,
-                },
-              }
-              : undefined
-          }
-          key="navigation-active-camera"
-          maxZoom={19}
-          minZoom={11}
-        />
-      ) : focusCoordinate ? (
-        <Camera
-          center={focusCoordinate}
-          duration={700}
-          easing="fly"
-          key={`focus-${focusRequestId}`}
-          maxZoom={19}
-          minZoom={11}
-          zoom={16}
-        />
-      ) : routeBounds ? (
-        <Camera
-          bounds={routeBounds}
-          duration={900}
-          easing="fly"
-          maxZoom={19}
-          minZoom={11}
-          padding={{ bottom: 160, left: 44, right: 44, top: 100 }}
-        />
-      ) : cameraCenter ? (
-        <Camera
-          center={cameraCenter}
-          duration={900}
-          easing="fly"
-          key={`destination-${destination?.id ?? 'center'}-${cameraCenter[0]}-${cameraCenter[1]}`}
-          maxZoom={19}
-          minZoom={11}
-          zoom={15}
-        />
-      ) : null}
-
-      {routeGeoJson ? (
-        <GeoJSONSource data={routeGeoJson} id="selected-route-source">
-          <Layer
-            id="selected-route-line"
-            type="line"
-            style={{
-              lineCap: 'round',
-              lineColor: theme.primary,
-              lineJoin: 'round',
-              lineWidth: 5,
-            }}
+    <View style={styles.container}>
+      <Map
+        ref={mapRef}
+        onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
+        onDidFinishLoadingMap={() => {
+          void mapRef.current?.getBounds().then(reportBounds).catch(() => {
+            // The next region change reports bounds if the map is not ready yet.
+          });
+        }}
+        attribution
+        attributionPosition={{ bottom: 8, right: 8 }}
+        compass
+        compassPosition={{ top: 112, right: 16 }}
+        logo={false}
+        mapStyle={openStreetMapStyle}
+        style={styles.map}
+        touchPitch={navigationActive}
+        touchRotate={navigationActive}
+      >
+        {navigationActive ? (
+          <Camera
+            ref={cameraRef}
+            initialViewState={
+              (userCoordinate ?? routeStart)
+                ? {
+                  center: (userCoordinate ?? routeStart)!,
+                  zoom: 18,
+                  pitch: 55,
+                  bearing: forwardBearing,
+                  padding: {
+                    bottom: 220,
+                    left: 24,
+                    right: 24,
+                    top: 100,
+                  },
+                }
+                : undefined
+            }
+            key="navigation-active-camera"
+            maxZoom={19}
+            minZoom={11}
           />
-        </GeoJSONSource>
-      ) : null}
+        ) : focusCoordinate ? (
+          <Camera
+            center={focusCoordinate}
+            duration={700}
+            easing="fly"
+            key={`focus-${focusRequestId}`}
+            maxZoom={19}
+            minZoom={11}
+            zoom={16}
+          />
+        ) : routeBounds ? (
+          <Camera
+            bounds={routeBounds}
+            duration={900}
+            easing="fly"
+            maxZoom={19}
+            minZoom={11}
+            padding={{ bottom: 160, left: 44, right: 44, top: 100 }}
+          />
+        ) : cameraCenter ? (
+          <Camera
+            center={cameraCenter}
+            duration={900}
+            easing="fly"
+            key={`destination-${destination?.id ?? 'center'}-${cameraCenter[0]}-${cameraCenter[1]}`}
+            maxZoom={19}
+            minZoom={11}
+            zoom={15}
+          />
+        ) : null}
 
-      {sortedRouteSigns.map((sign) => {
-        const freshness = getSignFreshness(sign.freshnessScore, sign.status);
-        const isSelected = selectedSignId === sign.id;
-        return (
-          <Marker
-            anchor="bottom"
-            id={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
-            key={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
-            lngLat={sign.coordinate}
-            onPress={() => handleSignPress(sign)}
-          >
-            <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
-              {isSelected ? <SignCallout freshness={freshness} sign={sign} /> : null}
-              <View
-                accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
-                accessibilityRole="button"
-                style={styles.stopSignMarker}
-              >
-                <SignMarkerIcon
-                  imageUrl={sign.imageUrl}
-                  name={sign.name}
-                  signCode={sign.signCode}
-                />
-                {/* Small circle on the bottom right indicating its freshness */}
+        {routeGeoJson ? (
+          <GeoJSONSource data={routeGeoJson} id="selected-route-source">
+            <Layer
+              id="selected-route-line"
+              type="line"
+              style={{
+                lineCap: 'round',
+                lineColor: theme.primary,
+                lineJoin: 'round',
+                lineWidth: 5,
+              }}
+            />
+          </GeoJSONSource>
+        ) : null}
+
+        {sortedRouteSigns.map((sign) => {
+          const freshness = getSignFreshness(sign.freshnessScore, sign.status);
+          const isSelected = selectedSignId === sign.id;
+          return (
+            <Marker
+              anchor="bottom"
+              id={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
+              key={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
+              lngLat={sign.coordinate}
+              onPress={() => handleSignPress(sign)}
+            >
+              <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
+                {isSelected && destination ? (
+                  <SignCallout freshness={freshness} sign={sign} />
+                ) : null}
                 <View
-                  key={`dot-${freshness.color}`}
-                  style={[styles.markerFreshnessDot, { backgroundColor: freshness.color }]}
-                />
+                  accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
+                  accessibilityRole="button"
+                  style={styles.stopSignMarker}
+                >
+                  <SignMarkerIcon
+                    imageUrl={sign.imageUrl}
+                    name={sign.name}
+                    signCode={sign.signCode}
+                  />
+                  {/* Small circle on the bottom right indicating its freshness */}
+                  <View
+                    key={`dot-${freshness.color}`}
+                    style={[styles.markerFreshnessDot, { backgroundColor: freshness.color }]}
+                  />
+                </View>
               </View>
+            </Marker>
+          );
+        })}
+
+        {navigationActive ? (
+          <>
+            {hasLiveLocation ? (
+              <UserLocation
+                accuracy
+                animated
+                heading
+                minDisplacement={0}
+              />
+            ) : null}
+          </>
+        ) : showCurrentLocation && userCoordinate ? (
+          <Marker
+            anchor="center"
+            id="current-location"
+            lngLat={userCoordinate}
+          >
+            <>
+              <View style={styles.currentLocationHalo}>
+                <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
+              </View>
+            </>
+          </Marker>
+        ) : null}
+
+        {/* Show the start marker only when the user explicitly selected a custom start point */}
+        {isCustomStart && routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
+          <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
+            <View style={styles.startMarker}>
+              <Text style={styles.startMarkerText}>S</Text>
             </View>
           </Marker>
-        );
-      })}
+        ) : null}
 
-      {navigationActive ? (
-        <>
-          {hasLiveLocation ? (
-            <UserLocation
-              accuracy
-              animated
-              heading
-              minDisplacement={0}
-            />
-          ) : null}
-        </>
-      ) : showCurrentLocation && userCoordinate ? (
-        <Marker
-          anchor="center"
-          id="current-location"
-          lngLat={userCoordinate}
-        >
-          <>
-            <View style={styles.currentLocationHalo}>
-              <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
+        {destination ? (
+          <Marker anchor="bottom" id="destination-location" lngLat={destination.coordinate}>
+            <View style={styles.destinationMarker}>
+              <Text style={styles.destinationMarkerText}>D</Text>
             </View>
-          </>
-        </Marker>
-      ) : null}
+          </Marker>
+        ) : null}
+      </Map>
 
-      {/* Show the start marker only when the user explicitly selected a custom start point */}
-      {isCustomStart && routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
-        <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
-          <View style={styles.startMarker}>
-            <Text style={styles.startMarkerText}>S</Text>
-          </View>
-        </Marker>
+      {!destination && selectedSign ? (
+        <SignDetailsBottomSheet
+          onClose={() => setSelectedSignId(null)}
+          sign={selectedSign}
+        />
       ) : null}
-
-      {destination ? (
-        <Marker anchor="bottom" id="destination-location" lngLat={destination.coordinate}>
-          <View style={styles.destinationMarker}>
-            <Text style={styles.destinationMarkerText}>D</Text>
-          </View>
-        </Marker>
-      ) : null}
-    </Map>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    position: 'relative',
+  },
   map: {
     flex: 1,
   },
@@ -755,5 +1009,191 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     fontWeight: 900,
+  },
+  calloutActualCrop: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  // ── Bottom Sheet (Browsing mode, no destination) ───────────────────────────
+  bottomSheetContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: Rounded.xlg,
+    borderTopRightRadius: Rounded.xlg,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 16,
+    zIndex: 1000,
+  },
+  sheetHandleBar: {
+    alignItems: 'center',
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  sheetHandlePill: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+  },
+  sheetHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  sheetSignIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+    flexShrink: 0,
+  },
+  sheetSignIcon: {
+    width: 40,
+    height: 40,
+  },
+  sheetHeaderInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sheetSignTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 700,
+    lineHeight: 18,
+  },
+  sheetFreshnessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
+  sheetFreshnessDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  sheetFreshnessText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 700,
+  },
+  sheetDotSeparator: {
+    fontSize: 11,
+  },
+  sheetRoadName: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 500,
+  },
+  sheetCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  sheetSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: Spacing.two,
+  },
+  sheetSectionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  carouselContainer: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.one,
+  },
+  carouselCard: {
+    width: 130,
+    height: 96,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  carouselImage: {
+    width: '100%',
+    height: '100%',
+  },
+  carouselLabelBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  carouselLabelText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 600,
+  },
+  carouselEmptyBox: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.three,
+    gap: Spacing.one,
+  },
+  carouselEmptyText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.three,
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalImage: {
+    width: '100%',
+    height: '75%',
   },
 });

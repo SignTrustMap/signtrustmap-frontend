@@ -55,12 +55,6 @@ export function SurveyorWorkPanel() {
         symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
       />
       <WorkActionCard
-        count={pending?.countsByStatus?.DRAFT}
-        label="Bản nháp khảo sát"
-        onPress={() => router.push('/work/new-survey')}
-        symbol={{ android: 'assignment_late', ios: 'clipboard', web: 'assignment_late' }}
-      />
-      <WorkActionCard
         count={stats?.revalidationAvailable ?? 0}
         label="Bản đồ tái thẩm định"
         onPress={handleOpenRevalidationMap}

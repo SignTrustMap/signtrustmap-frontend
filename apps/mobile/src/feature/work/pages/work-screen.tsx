@@ -224,26 +224,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {selectedRole === 'surveyor' ? (
             <View style={styles.actionList}>
 
-              <WorkActionCard
-                accentColor="#F59E0B"
-                count={draftCount}
-                icon="file-document-edit-outline"
-                label="Bản nháp khảo sát"
-                onPress={() => router.push('/work/new-survey')}
-                subtitle={
-                  draftCount > 0
-                    ? `${draftCount} bản ghi nháp trên thiết bị sẵn sàng tải lên`
-                    : 'Không có bản ghi nháp cục bộ'
-                }
-                urgent={draftCount > 0}
-              />
-
               {/* Standout Action: Pending Submissions */}
               <WorkActionCard
                 accentColor="#0671eb"
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
-                label="Hồ sơ đang xử lý"
+                label="Lịch sử khảo sát"
                 onPress={() => {
                   if (pendingSubmissionsList.length === 1) {
                     router.push({
@@ -257,82 +243,16 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     });
                   }
                 }}
-                subtitle={
-                  pendingSurveyCount > 0
-                    ? `${pendingSurveyCount} hồ sơ đang chờ AI xử lý và nhận diện`
-                    : 'Tất cả bản ghi khảo sát đã được xử lý'
-                }
+                subtitle={'Lịch sử ghi nhận biển báo đã nộp, duyệt, từ chối'}
               />
-
-              {/* Quick-Access to In-Flight Pending Submissions */}
-              {pendingSubmissionsList.length > 0 ? (
-                <View style={styles.pendingPreviewSection}>
-                  <Text style={[styles.pendingPreviewTitle, { color: theme.textSecondary }]}>
-                    Đang xử lý ({pendingSubmissionsList.length})
-                  </Text>
-                  {pendingSubmissionsList.slice(0, 3).map((item) => {
-                    const isVideo = item.submissionType === 'VIDEO_GPX';
-                    return (
-                      <Pressable
-                        accessibilityLabel={`View pending submission ${item.id}`}
-                        accessibilityRole="button"
-                        key={item.id}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/work/survey-submission-details',
-                            params: { id: item.id },
-                          })
-                        }
-                        style={[
-                          styles.pendingPreviewCard,
-                          {
-                            backgroundColor: theme.backgroundElement,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.pendingPreviewIconBox,
-                            { backgroundColor: isVideo ? 'rgba(239, 68, 68, 0.12)' : 'rgba(37, 99, 235, 0.12)' },
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            color={isVideo ? '#EF4444' : '#2563EB'}
-                            name={isVideo ? 'video-outline' : 'camera-outline'}
-                            size={20}
-                          />
-                        </View>
-                        <View style={styles.pendingPreviewText}>
-                          <View style={styles.pendingPreviewTop}>
-                            <Text numberOfLines={1} style={[styles.pendingPreviewName, { color: theme.text }]}>
-                              {isVideo ? 'Khảo sát Video' : 'Khảo sát hình ảnh'}
-                            </Text>
-                            <View style={styles.pendingPreviewStatusBadge}>
-                              <Text style={styles.pendingPreviewStatusText}>
-                                {item.status}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={[styles.pendingPreviewSub, { color: theme.placeholder }]}>
-                            #{item.id.slice(0, 8)} · Đã phát hiện {item.totalCandidatesExtracted} biển báo
-                          </Text>
-                        </View>
-                        <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-
               {/* Standout Action: Revalidation Map */}
               <WorkActionCard
                 accentColor="#10B981"
                 count={revalidationTaskCount}
                 icon="map-search-outline"
-                label="Bản đồ tái thẩm định"
+                label="Tái xác nhận biển báo"
                 onPress={handleOpenRevalidationMap}
-                subtitle="Xem bản đồ để kiểm tra các điểm sai lệch biển báo được báo cáo"
+                subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
               />
             </View>
           ) : selectedRole === 'reviewer' ? (
@@ -361,7 +281,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     <Text style={styles.heroSubtitle}>
                       {reviewQueueTotal > 0
                         ? `${reviewQueueTotal} biển báo ứng viên đang chờ phiếu xác minh của bạn`
-                        : 'Thẩm định hồ sơ biển báo trước khi đưa vào bản đồ tin cậy'}
+                        : 'Thẩm định hồ sơ biển báo trước khi đưa vào bản đồ'}
                     </Text>
                   </View>
                 </View>

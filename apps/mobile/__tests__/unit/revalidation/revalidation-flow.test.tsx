@@ -290,11 +290,11 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       // Check sign metadata
       expect(getAllByText('Cấm đi ngược chiều').length).toBeGreaterThan(0);
       expect(getAllByText('Đường Nguyễn Huệ, Quận 1').length).toBeGreaterThan(0);
-      expect(getByText('Moderate Freshness')).toBeTruthy();
+      expect(getByText(/Độ tươi mới trung bình|Moderate Freshness/)).toBeTruthy();
       expect(getByText('55%')).toBeTruthy();
 
       // Find and click Inspect button
-      const inspectButton = getByText('Inspect');
+      const inspectButton = getByText(/Kiểm tra thực địa|Inspect/);
       fireEvent.press(inspectButton);
 
       expect(onRevalidateMock).toHaveBeenCalledWith(mockSign);
@@ -311,7 +311,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
         />,
       );
 
-      const closeButton = getByLabelText('Close sign details');
+      const closeButton = getByLabelText(/Đóng chi tiết|Close sign details/);
       fireEvent.press(closeButton);
 
       expect(onCloseMock).toHaveBeenCalled();
