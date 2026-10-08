@@ -59,5 +59,6 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     roadName: sign.roadName,
     displayAddress: sign.displayAddress,
     lastVerifiedAt: sign.lastVerifiedAt,
+    createdAt: sign.createdAt ? String(sign.createdAt) : undefined,
   };
 }

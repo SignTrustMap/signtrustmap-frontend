@@ -28,6 +28,7 @@ export type RouteSign = {
     roadName?: string;
     displayAddress?: string;
     lastVerifiedAt?: string;
+    createdAt?: string;
     taskId?: string;
 };
 

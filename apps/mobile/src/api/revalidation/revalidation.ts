@@ -327,6 +327,7 @@ export type RevalidationEvidenceItem = {
   latitude?: number;
   longitude?: number;
   capturedAt?: string;
+  submittedAt?: string;
   evidenceType?: RevalidationEvidenceType | string;
   status?: string;
   createdAt?: string;
@@ -369,6 +370,42 @@ export async function getTaskEvidences(
     return [];
   }
 }
+
+/**
+ * Fetches all evidence submissions (reviews and photos) across all revalidations for a specific verified sign.
+ */
+export async function getSignEvidences(
+  signId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationEvidenceItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<RevalidationEvidenceItem[]>(
+      `/revalidation/signs/${encodeURIComponent(signId)}/evidences`,
+      { signal },
+      token,
+    );
+    if (!Array.isArray(res)) return [];
+    return res.map((row: any) => ({
+      id: row.id,
+      taskId: row.task_id ?? row.taskId,
+      surveyorId: row.user_id ?? row.userId ?? row.surveyorId,
+      mediaUrl: resolveS3Url(row.media_url ?? row.mediaUrl),
+      evidenceType: row.evidence_type ?? row.evidenceType ?? 'STILL_ACTIVE',
+      submittedAt: row.submitted_at ?? row.submittedAt,
+      capturedAt: row.captured_at ?? row.capturedAt ?? row.submitted_at ?? row.submittedAt,
+      locationWkt: row.location_wkt ?? row.locationWkt,
+      distanceMeters: row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
+      note: row.note,
+      status: row.status,
+    }));
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch evidences for sign ${signId}:`, err);
+    return [];
+  }
+}
+
 
 function normalizeEvidenceResponse(body: unknown): SubmitRevalidationEvidenceResponse {
   const res = body as SubmitRevalidationEvidenceResponse;

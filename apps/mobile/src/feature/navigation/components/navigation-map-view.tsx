@@ -24,8 +24,9 @@ import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 import { getRouteForwardBearing } from '../utils/geo';
-import { useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
+import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
+import { formatDate } from '@/utils/format-date';
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -210,7 +211,20 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
   const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
   const resolvedTaskId = sign.taskId || (sign.id.startsWith('reval-') ? sign.id : undefined);
-  const { data: evidences = [] } = useGetTaskEvidences(resolvedTaskId);
+  const { data: taskEvidences = [] } = useGetTaskEvidences(resolvedTaskId, Boolean(resolvedTaskId));
+  const { data: signEvidences = [] } = useGetSignEvidences(sign.id, Boolean(sign.id));
+
+  // Merge evidences from both sign and task, deduplicating by id or mediaUrl
+  const evidences = useMemo(() => {
+    const combined = [...signEvidences, ...taskEvidences];
+    const seen = new Set<string>();
+    return combined.filter((ev) => {
+      const key = ev.id || ev.mediaUrl;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [signEvidences, taskEvidences]);
 
   const slideAnim = useRef(new Animated.Value(180)).current;
 
@@ -234,33 +248,32 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
       : (signName || signCode || 'Biển báo giao thông');
 
   const verifiedImages = useMemo(() => {
-    const list: { id: string; uri: string; label: string }[] = [];
+    const list: { id: string; uri: string; label: string; date?: string }[] = [];
     const seenUris = new Set<string>();
 
     // 1. Whole frame image (dashcam / camera full view)
     const wholeFrame = sign.frameUrl ? resolveImageUrl(sign.frameUrl) : '';
     if (wholeFrame && !seenUris.has(wholeFrame)) {
       seenUris.add(wholeFrame);
+      const frameDate = formatDate(sign.createdAt || sign.lastVerifiedAt);
       list.push({
         id: 'whole-frame',
         uri: wholeFrame,
-        label: 'Ảnh toàn cảnh thực địa',
+        date: frameDate,
+        label: frameDate || 'Ảnh thực địa',
       });
     }
 
-    // 2. Surveyor revalidation evidences (full camera photos)
+    // 2. Surveyor revalidation evidences (full camera photos from revalidation)
     for (const ev of evidences) {
       if (ev.mediaUrl && !seenUris.has(ev.mediaUrl)) {
         seenUris.add(ev.mediaUrl);
+        const evDate = formatDate(ev.capturedAt || ev.submittedAt);
         list.push({
           id: ev.id,
           uri: ev.mediaUrl,
-          label:
-            ev.evidenceType === 'STILL_ACTIVE'
-              ? 'Xác thực còn hiệu lực'
-              : ev.evidenceType === 'REMOVED'
-                ? 'Bằng chứng đã thu hồi'
-                : 'Bằng chứng khảo sát',
+          date: evDate,
+          label: evDate || 'Ảnh tái thẩm định',
         });
       }
     }
@@ -269,10 +282,12 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
     const actualCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : '';
     if (actualCrop && !seenUris.has(actualCrop)) {
       seenUris.add(actualCrop);
+      const cropDate = formatDate(sign.createdAt || sign.lastVerifiedAt);
       list.push({
         id: 'actual-crop',
         uri: actualCrop,
-        label: 'Ảnh cắt cận cảnh',
+        date: cropDate,
+        label: cropDate || 'Ảnh thực địa',
       });
     }
 
@@ -281,12 +296,13 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
       list.push({
         id: 'official-sign',
         uri: sign.imageUrl,
-        label: 'Ảnh mẫu quy chuẩn',
+        date: '',
+        label: 'Biển báo chuẩn',
       });
     }
 
     return list;
-  }, [sign.frameUrl, sign.actualCropUrl, sign.imageUrl, evidences]);
+  }, [sign.frameUrl, sign.actualCropUrl, sign.imageUrl, sign.createdAt, sign.lastVerifiedAt, evidences]);
 
   return (
     <Animated.View
@@ -383,6 +399,14 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
                 transition={200}
               />
               <View style={styles.carouselLabelBadge}>
+                {item.date ? (
+                  <MaterialCommunityIcons
+                    color="#FFFFFF"
+                    name="calendar-clock-outline"
+                    size={11}
+                    style={{ marginRight: 3 }}
+                  />
+                ) : null}
                 <Text numberOfLines={1} style={styles.carouselLabelText}>
                   {item.label}
                 </Text>
@@ -421,6 +445,15 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
               source={{ uri: selectedPreviewImage }}
               style={styles.modalImage}
             />
+            {(() => {
+              const previewItem = verifiedImages.find((img) => img.uri === selectedPreviewImage);
+              return previewItem?.date ? (
+                <View style={styles.modalDateBadge}>
+                  <MaterialCommunityIcons color="#FFFFFF" name="calendar-clock-outline" size={14} style={{ marginRight: 6 }} />
+                  <Text style={styles.modalDateText}>Ngày ghi nhận: {previewItem.date}</Text>
+                </View>
+              ) : null;
+            })()}
           </View>
         </Modal>
       ) : null}
@@ -1168,6 +1201,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     paddingVertical: 3,
     paddingHorizontal: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   carouselLabelText: {
     color: '#FFFFFF',
@@ -1211,5 +1247,20 @@ const styles = StyleSheet.create({
   modalImage: {
     width: '100%',
     height: '75%',
+  },
+  modalDateBadge: {
+    marginTop: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    borderRadius: Rounded.md,
+  },
+  modalDateText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
   },
 });

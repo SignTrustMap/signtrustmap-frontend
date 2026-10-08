@@ -66,6 +66,7 @@ export type VerifiedMapSign = {
     freshnessScore?: number;
     status?: VerifiedSignStatus;
     lastVerifiedAt?: string;
+    createdAt?: string;
     roadName?: string;
     displayAddress?: string;
 };

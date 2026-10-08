@@ -9,6 +9,7 @@ import {
   getRevalidationTask,
   getRevalidationTasks,
   getRevalidationTasksInBounds,
+  getSignEvidences,
   getTaskEvidences,
   submitRevalidationEvidence,
   voteOnRevalidationEvidence,
@@ -112,6 +113,17 @@ export function useGetTaskEvidences(taskId?: string, enabled = true) {
       ? ({ signal }) => getTaskEvidences(taskId, signal)
       : skipToken,
     enabled: Boolean(enabled && taskId),
+    staleTime: 30_000,
+  });
+}
+
+export function useGetSignEvidences(signId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['sign-evidences', signId],
+    queryFn: enabled && signId
+      ? ({ signal }) => getSignEvidences(signId, signal)
+      : skipToken,
+    enabled: Boolean(enabled && signId),
     staleTime: 30_000,
   });
 }
