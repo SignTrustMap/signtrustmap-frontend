@@ -21,9 +21,9 @@ import {
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from "@/hooks/use-theme";
-import { SAME_LOCATION_MESSAGE } from "@/constants/message";
+import { GPS_UNAVAILABLE_MESSAGE, SAME_LOCATION_MESSAGE } from "@/constants/message";
 import { areSameLocation } from "../utils/location";
-import { fetchFreshGpsPosition, GPS_UNAVAILABLE_MESSAGE } from "../utils/gps";
+import { fetchFreshGpsPosition } from "../utils/gps";
 
 export function NavigationStartScreen() {
   const router = useRouter();

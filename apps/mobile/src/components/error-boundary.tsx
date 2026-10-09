@@ -15,6 +15,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  APPLICATION_ERROR_TITLE,
+  UNHANDLED_EXCEPTION_MESSAGE,
+} from '@/constants/message';
 
 // ============================================================================
 // Types
@@ -117,8 +121,8 @@ export function ErrorFallbackView({
     }
   };
 
-  const errorMessage = error?.message || 'An unhandled exception occurred.';
-  const errorName = error?.name || 'Application Error';
+  const errorMessage = error?.message || UNHANDLED_EXCEPTION_MESSAGE;
+  const errorName = error?.name || APPLICATION_ERROR_TITLE;
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safeArea, { backgroundColor: theme.background }]}>

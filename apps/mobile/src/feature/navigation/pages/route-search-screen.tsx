@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,6 +31,7 @@ export function RouteSearchScreen() {
     startTitle?: string;
   }>();
 
+  const inputRef = useRef<TextInput>(null);
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const [query, setQuery] = useState('');
   const { data: locations, isLoading, error } = usePlaceSuggestions(query);
@@ -73,11 +74,14 @@ export function RouteSearchScreen() {
       <View style={styles.header}>
         <View style={styles.searchInputWrapper}>
           <AppInput
+            ref={inputRef}
             accessibilityLabel="Tìm kiếm điểm đến"
+            autoCapitalize="none"
             autoFocus
             onChangeText={setQuery}
             placeholder="Bạn muốn đi đâu?"
             returnKeyType="search"
+            type="search"
             style={[styles.searchPrompt, { color: theme.text }]}
             containerStyle={[
               styles.searchInputContainer,
@@ -98,7 +102,27 @@ export function RouteSearchScreen() {
                 />
               </AppButton>
             }
-            value={query}
+            trailingIcon={
+              query.length > 0 ? (
+                <AppButton
+                  accessibilityLabel="Xóa nội dung tìm kiếm"
+                  hitSlop={Spacing.one}
+                  onPress={() => {
+                    inputRef.current?.clear();
+                    setQuery('');
+                  }}
+                  pressedOpacity={0.7}
+                  style={styles.clearButton}
+                  variant="ghost"
+                >
+                  <AntDesign
+                    color={theme.placeholder}
+                    name="close-circle"
+                    size={18}
+                  />
+                </AppButton>
+              ) : null
+            }
           />
         </View>
       </View>
@@ -184,8 +208,21 @@ const styles = StyleSheet.create({
   searchPrompt: {
     fontFamily: Fonts.body,
     fontSize: 18,
-    fontWeight: 600,
-    paddingHorizontal: Spacing.one
+    fontWeight: '600',
+    paddingHorizontal: Spacing.one,
+  },
+  clearButton: {
+    width: 32,
+    height: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginRight: Spacing.half,
+  },
+  clearIcon: {
+    fontSize: 16,
   },
   searchInputContainer: {
     borderRadius: Rounded.round,

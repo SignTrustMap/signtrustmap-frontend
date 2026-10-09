@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import { PAYMENT_FAILED_MESSAGE } from '@/constants/message';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -54,7 +55,7 @@ export function TopUpScreen() {
       setConfirmSuccess(true);
       setTimeout(() => router.replace('/credits'), 1200);
     } catch (e) {
-      setConfirmError(e instanceof Error ? e.message : 'Thanh toán thất bại. Vui lòng thử lại.');
+      setConfirmError(e instanceof Error ? e.message : PAYMENT_FAILED_MESSAGE);
     }
   };
 

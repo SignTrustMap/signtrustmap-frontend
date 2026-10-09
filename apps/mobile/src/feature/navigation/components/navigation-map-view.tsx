@@ -23,6 +23,10 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
+import {
+  MAP_BUILD_REQUIRED_DESCRIPTION,
+  MAP_BUILD_REQUIRED_TITLE,
+} from '@/constants/message';
 import { calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
 import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
@@ -726,10 +730,9 @@ export function NavigationMapView({
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
         <View style={[styles.fallbackPanel, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.fallbackTitle, { color: theme.text }]}>Map build required</Text>
+          <Text style={[styles.fallbackTitle, { color: theme.text }]}>{MAP_BUILD_REQUIRED_TITLE}</Text>
           <Text style={[styles.fallbackCopy, { color: theme.textSecondary }]}>
-            MapLibre is installed, but this app binary does not include its native module yet.
-            Rebuild the Expo development client to enable the interactive map.
+            {MAP_BUILD_REQUIRED_DESCRIPTION}
           </Text>
         </View>
       </View>

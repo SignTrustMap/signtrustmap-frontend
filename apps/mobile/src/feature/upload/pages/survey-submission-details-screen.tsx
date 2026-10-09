@@ -21,6 +21,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
+import {
+  SURVEY_RESUBMITTED_SUCCESS_MESSAGE,
+  UNABLE_TO_RESUBMIT_MESSAGE,
+} from '@/constants/message';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   useGetSurveySubmissionStatus,
@@ -182,12 +186,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
     try {
       await submitSubmission({ submissionId: submission.id });
       setIsRetryModalVisible(false);
-      setSuccessToast('Survey resubmitted successfully! It is now queued for processing.');
+      setSuccessToast(SURVEY_RESUBMITTED_SUCCESS_MESSAGE);
       setTimeout(() => setSuccessToast(undefined), 4000);
       void refetch();
     } catch (err) {
       console.warn('[Surveyor] Direct resubmit error:', err);
-      const msg = err instanceof Error ? err.message : 'Unable to resubmit. Please try editing details first.';
+      const msg = err instanceof Error ? err.message : UNABLE_TO_RESUBMIT_MESSAGE;
       setRetryError(msg);
     } finally {
       setIsSubmittingRetry(false);

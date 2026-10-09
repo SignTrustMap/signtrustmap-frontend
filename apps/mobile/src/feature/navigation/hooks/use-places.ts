@@ -3,6 +3,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 import { getUserPlaces, saveRecentPlace, searchPlaces, type ApiPlace } from '@/api/navigation/places';
 import { useSession } from '@/context/session-provider';
 import { useDebounce } from '@/hooks/use-debounce';
+import { SIGN_IN_TO_SAVE_PLACES_MESSAGE } from '@/constants/message';
 
 export function useGetUserPlaces(enabled = true) {
   const { session } = useSession();
@@ -49,7 +50,7 @@ export function useSaveRecentPlace() {
 
   return useMutation({
     mutationFn: (place: ApiPlace) => {
-      if (!session) throw new Error('Sign in to save recent places.');
+      if (!session) throw new Error(SIGN_IN_TO_SAVE_PLACES_MESSAGE);
       return saveRecentPlace(place, session.accessToken);
     },
     onSuccess: () => queryClient.invalidateQueries({

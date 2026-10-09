@@ -7,6 +7,10 @@ import type { MapCoordinate } from '@/types/navigationType';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
+import {
+  INTERACTIVE_MAP_CLIENT_TITLE,
+  MAPLIBRE_NOT_REGISTERED_MESSAGE,
+} from '@/constants/message';
 import { RevalidationSignMarker } from './revalidation-sign-marker';
 
 export type RevalidationMapViewProps = {
@@ -90,10 +94,9 @@ export function RevalidationMapView({
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
         <View style={[styles.fallbackPanel, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.fallbackTitle, { color: theme.text }]}>Interactive Map Client</Text>
+          <Text style={[styles.fallbackTitle, { color: theme.text }]}>{INTERACTIVE_MAP_CLIENT_TITLE}</Text>
           <Text style={[styles.fallbackCopy, { color: theme.textSecondary }]}>
-            MapLibre native module is not registered in this binary environment.
-            Please test on development client or web preview.
+            {MAPLIBRE_NOT_REGISTERED_MESSAGE}
           </Text>
         </View>
       </View>

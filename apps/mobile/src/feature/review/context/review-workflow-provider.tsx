@@ -13,6 +13,10 @@ import {
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
+import {
+  REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
+  UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
+} from '@/constants/message';
 
 export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped';
 
@@ -100,7 +104,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setPendingSubmissions(data.queue.submissions);
       setTotalSubmissions(data.queue.total);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+      setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +132,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+        if (active) setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -302,6 +306,6 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
 export function useReviewWorkflow() {
   const context = useContext(ReviewWorkflowContext);
-  if (!context) throw new Error('useReviewWorkflow must be used within ReviewWorkflowProvider');
+  if (!context) throw new Error(REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE);
   return context;
 }

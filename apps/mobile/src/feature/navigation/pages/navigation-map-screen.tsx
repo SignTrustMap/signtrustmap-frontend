@@ -36,9 +36,19 @@ import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
 import {
   ensureLocationPermission,
   fetchFreshGpsPosition,
-  GPS_UNAVAILABLE_MESSAGE,
   isValidGpsLocation,
 } from "../utils/gps";
+import {
+  ALLOW_LOCATION_ACCESS_MESSAGE,
+  CANNOT_SHARE_DESTINATION_MESSAGE,
+  GPS_NATIVE_BUILD_REQUIRED_MESSAGE,
+  GPS_UNAVAILABLE_MESSAGE,
+  LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE,
+  ROUTE_LOADING_MESSAGE,
+  UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
+  UNABLE_TO_LOAD_SIGNS_FOR_ROUTE_MESSAGE,
+  UNABLE_TO_LOAD_SIGNS_MESSAGE,
+} from "@/constants/message";
 import {
   SIGN_CATEGORIES,
   type SignCategory,
@@ -377,7 +387,7 @@ export function NavigationMapScreen() {
     routeResult?.geometry,
   );
   const navigationError = routeError?.message ?? navigationActionError
-    ?? (routeSignsError ? 'Unable to load traffic signs for this route.' : undefined);
+    ?? (routeSignsError ? UNABLE_TO_LOAD_SIGNS_FOR_ROUTE_MESSAGE : undefined);
   const routeCoordinates = routeResult?.coordinates;
   const routeDistance = routeResult?.distance;
   const routeDuration = routeResult?.duration;
@@ -743,7 +753,7 @@ export function NavigationMapScreen() {
       return;
 
     if (!routeCoordinates?.length) {
-      setNavigationError("The route is still loading. Try again in a moment.");
+      setNavigationError(ROUTE_LOADING_MESSAGE);
       return;
     }
 
@@ -754,7 +764,7 @@ export function NavigationMapScreen() {
       const hasPermission = await ensureLocationPermission();
 
       if (!hasPermission) {
-        setNavigationError("Location permission is required to start navigation.");
+        setNavigationError(LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE);
         return;
       }
 
@@ -798,12 +808,12 @@ export function NavigationMapScreen() {
     try {
       const mapLibre = getMapLibre();
       if (!mapLibre) {
-        throw new Error("Current GPS location requires a native build.");
+        throw new Error(GPS_NATIVE_BUILD_REQUIRED_MESSAGE);
       }
       const hasPermission = await ensureLocationPermission();
 
       if (!hasPermission) {
-        throw new Error("Allow location access to use your current position.");
+        throw new Error(ALLOW_LOCATION_ACCESS_MESSAGE);
       }
 
       await startGpsListening();
@@ -829,7 +839,7 @@ export function NavigationMapScreen() {
         message:
           error instanceof Error
             ? error.message
-            : "Không thể lấy vị trí hiện tại của bạn.",
+            : UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
       }));
     } finally {
       setIsLocating(false);
@@ -986,7 +996,7 @@ export function NavigationMapScreen() {
 
         {!hasSelectedRoute && boundsSignsError ? (
           <AppToast
-            message="Unable to load traffic signs."
+            message={UNABLE_TO_LOAD_SIGNS_MESSAGE}
           />
         ) : null}
 
@@ -2206,7 +2216,7 @@ export function NavigationMapScreen() {
                     } catch {
                       setLocationToast((current) => ({
                         id: (current?.id ?? 0) + 1,
-                        message: 'Không thể chia sẻ điểm đến này lúc này.',
+                        message: CANNOT_SHARE_DESTINATION_MESSAGE,
                       }));
                     }
                   }}

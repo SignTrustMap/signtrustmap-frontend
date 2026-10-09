@@ -23,6 +23,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import {
+  CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE,
+  CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
+  CANNOT_SAVE_DRAFT_MESSAGE,
+  GALLERY_DEV_BUILD_REQUIRED_MESSAGE,
+  MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE,
+  SELECT_VALID_GPX_FILE_MESSAGE,
+  UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE,
+  UNABLE_TO_READ_FILE_MESSAGE,
+} from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   extractImageGpsCoordinates,
@@ -301,7 +311,7 @@ export function NewSurveyRecordScreen() {
       setAndroidGalleryHasNextPage(page.hasNextPage);
     } catch (error) {
       console.warn('[Surveyor] Unable to load Android media library:', error);
-      setAndroidGalleryError('Unable to load your photo library. Please try again.');
+      setAndroidGalleryError(UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE);
     } finally {
       isLoadingAndroidGallery.current = false;
       setIsAndroidGalleryLoading(false);
@@ -317,7 +327,7 @@ export function NewSurveyRecordScreen() {
     });
 
     if (permission.status !== 'granted') {
-      setPickerError('Media library permission is required to select photos and videos.');
+      setPickerError(MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE);
       return;
     }
 
@@ -405,7 +415,7 @@ export function NewSurveyRecordScreen() {
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
-      setAndroidGalleryError('Unable to read that file. Please choose another one.');
+      setAndroidGalleryError(UNABLE_TO_READ_FILE_MESSAGE);
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
@@ -478,8 +488,8 @@ export function NewSurveyRecordScreen() {
     } catch (error) {
       setPickerError(
         error instanceof Error && error.message.includes('ExponentImagePicker')
-          ? 'Tính năng thư viện yêu cầu bản ứng dụng phát triển mới.'
-          : 'Không thể mở thư viện ảnh của bạn. Vui lòng thử lại.',
+          ? GALLERY_DEV_BUILD_REQUIRED_MESSAGE
+          : CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
       );
       console.log('[Surveyor] Unable to open image picker:', error);
     } finally {
@@ -500,7 +510,7 @@ export function NewSurveyRecordScreen() {
         const file = result.assets[0];
         const name = file.name ?? '';
         if (!name.toLowerCase().endsWith('.gpx')) {
-          setGpxPickerError('Vui lòng chọn tệp GPX hợp lệ (.gpx).');
+          setGpxPickerError(SELECT_VALID_GPX_FILE_MESSAGE);
           return;
         }
         setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
@@ -517,7 +527,7 @@ export function NewSurveyRecordScreen() {
         }
       }
     } catch (error) {
-      setGpxPickerError('Không thể mở trình chọn tệp. Vui lòng thử lại.');
+      setGpxPickerError(CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE);
       console.log('[Surveyor] Unable to open document picker:', error);
     }
   };
@@ -575,7 +585,7 @@ export function NewSurveyRecordScreen() {
       openSavedDraft();
     } catch (error) {
       console.warn('[Surveyor] Unable to save survey draft:', error);
-      setPickerError(error instanceof Error ? error.message : 'Không thể lưu bản nháp. Vui lòng thử lại.');
+      setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
       setIsScanning(false);
     } finally {
       setIsSaving(false);

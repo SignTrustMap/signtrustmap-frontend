@@ -9,6 +9,21 @@ import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import {
+  ALLOW_LOCATION_ACCESS_MESSAGE,
+  DRAFT_NO_UPLOADED_MEDIA_MESSAGE,
+  DRAFT_NO_VIDEO_MESSAGE,
+  ENABLE_LOCATION_SERVICE_MESSAGE,
+  ENTER_MEDIA_DATETIME_MESSAGE,
+  LIVE_GPS_UNAVAILABLE_MESSAGE,
+  LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE,
+  LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE,
+  LOCATION_NOT_AVAILABLE_IN_BROWSER_MESSAGE,
+  SESSION_EXPIRED_MESSAGE,
+  UNABLE_TO_GET_LOCATION_FOR_END_POINT_MESSAGE,
+  UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE,
+  USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE,
+} from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
@@ -36,7 +51,7 @@ import { getMapLibre } from '@/services/maplibre';
 async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
   if (Platform.OS === 'web') {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      throw new Error('Location is not available in this browser.');
+      throw new Error(LOCATION_NOT_AVAILABLE_IN_BROWSER_MESSAGE);
     }
 
     return new Promise((resolve, reject) => {
@@ -46,8 +61,8 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
           reject(
             new Error(
               error.code === error.PERMISSION_DENIED
-                ? 'Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn.'
-                : 'Bật dịch vụ định vị và thử lại.',
+                ? ALLOW_LOCATION_ACCESS_MESSAGE
+                : ENABLE_LOCATION_SERVICE_MESSAGE,
             ),
           );
         },
@@ -58,19 +73,19 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
 
   const mapLibre = getMapLibre();
   if (!mapLibre) {
-    throw new Error('Tính năng tìm vị trí yêu cầu bản build native.');
+    throw new Error(LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE);
   }
 
   const hasPermission = await mapLibre.LocationManager.requestPermissions();
 
   if (!hasPermission) {
-    throw new Error('Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn.');
+    throw new Error(ALLOW_LOCATION_ACCESS_MESSAGE);
   }
 
   const position = await mapLibre.LocationManager.getCurrentPosition();
 
   if (!position) {
-    throw new Error('Bật dịch vụ định vị và thử lại.');
+    throw new Error(ENABLE_LOCATION_SERVICE_MESSAGE);
   }
 
   return [position.coords.longitude, position.coords.latitude];
@@ -328,7 +343,7 @@ export function SurveyRecordDetailsScreen() {
     }).catch(() => {
       if (active) {
         setIsDraftLoaded(true);
-        setSubmitError('Unable to restore the draft media. Reopen this page to retry.');
+        setSubmitError(UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE);
       }
     });
     return () => { active = false; };
@@ -355,7 +370,7 @@ export function SurveyRecordDetailsScreen() {
       setLocationMessage(
         error instanceof Error
           ? error.message
-          : 'Live GPS is unavailable. Please try again.',
+          : LIVE_GPS_UNAVAILABLE_MESSAGE,
       );
     } finally {
       setIsLocating(false);
@@ -371,7 +386,7 @@ export function SurveyRecordDetailsScreen() {
       setIsModified(true);
       setSubmitError(undefined);
     } catch (err) {
-      setLocationMessage(err instanceof Error ? err.message : 'Unable to get location for end point.');
+      setLocationMessage(err instanceof Error ? err.message : UNABLE_TO_GET_LOCATION_FOR_END_POINT_MESSAGE);
     } finally {
       setIsLocatingEnd(false);
     }
@@ -380,22 +395,22 @@ export function SurveyRecordDetailsScreen() {
   const handleSubmit = async () => {
     if (submissionInProgress.current || isLocating || isLocatingEnd) return;
     if (!submissionId || !isDraftLoaded || !isEditable) {
-      setSubmitError('Load an editable draft before submitting.');
+      setSubmitError(LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE);
       return;
     }
     if (!session?.accessToken) {
-      setSubmitError('Your session has expired. Log in again and retry.');
+      setSubmitError(SESSION_EXPIRED_MESSAGE);
       return;
     }
     const captureTimestamp = Date.parse(capturedAt.trim());
     if (!Number.isFinite(captureTimestamp)) {
-      setSubmitError('Enter the date and time the media was recorded, including its time zone.');
+      setSubmitError(ENTER_MEDIA_DATETIME_MESSAGE);
       return;
     }
 
     const effectiveStart = startCoordinate ?? selectedCoordinate;
     if (!effectiveStart) {
-      setSubmitError('Use media with GPS metadata or select your current location.');
+      setSubmitError(USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE);
       return;
     }
 
@@ -420,7 +435,7 @@ export function SurveyRecordDetailsScreen() {
 
       if (isVideoDraft) {
         if (!imageUri) {
-          throw new Error('This draft has no video media available. Choose the file again.');
+          throw new Error(DRAFT_NO_VIDEO_MESSAGE);
         }
 
         const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
@@ -483,7 +498,7 @@ export function SurveyRecordDetailsScreen() {
           || sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
 
         if (!hasMainMedia) {
-          if (!imageUri) throw new Error('This draft has no uploaded media available. Choose the file again.');
+          if (!imageUri) throw new Error(DRAFT_NO_UPLOADED_MEDIA_MESSAGE);
           await saveDraft(
             { uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: 'image' },
             request,

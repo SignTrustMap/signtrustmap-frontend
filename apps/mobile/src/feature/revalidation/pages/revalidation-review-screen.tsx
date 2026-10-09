@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { AppButton } from '@/components/ui/button';
 import { AppToast } from '@/components/ui/toast';
+import { CANNOT_RECORD_VOTE_MESSAGE } from '@/constants/message';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/utils/format-date';
@@ -419,7 +420,7 @@ export function RevalidationReviewScreen() {
             console.error('[RevalidationReview] Vote API failed for evidence:', itemToVote.evidenceId, err);
             setToast({
               id: Date.now(),
-              message: err?.message || 'Không thể ghi nhận bình chọn. Vui lòng kiểm tra kết nối.',
+              message: err?.message || CANNOT_RECORD_VOTE_MESSAGE,
               tone: 'default',
             });
           },

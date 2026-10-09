@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { AppButton } from '@/components/ui/button';
+import { UNHANDLED_EXCEPTION_MESSAGE } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { UpdateStatus } from '@/hooks/use-app-update';
@@ -178,7 +179,7 @@ export function UpdateModal({
                 <TextInput
                   editable={false}
                   multiline
-                  value={errorMessage ?? 'Đã xảy ra lỗi không xác định.'}
+                  value={errorMessage ?? UNHANDLED_EXCEPTION_MESSAGE}
                   style={[
                     styles.errorBox,
                     {

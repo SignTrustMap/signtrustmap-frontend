@@ -1,5 +1,9 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import {
+  formatGithubApiErrorMessage,
+  UNABLE_TO_CONNECT_UPDATE_SERVER_MESSAGE,
+} from '@/constants/message';
 
 export interface ReleaseAsset {
   name: string;
@@ -80,7 +84,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
     });
 
     if (!fallbackResponse.ok) {
-      throw new Error(`GitHub API returned status ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
+      throw new Error(formatGithubApiErrorMessage(fallbackResponse.status, fallbackResponse.statusText));
     }
 
     const releases = await fallbackResponse.json();
@@ -91,7 +95,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   }
 
   if (!response.ok) {
-    throw new Error(`GitHub API returned status ${response.status}: ${response.statusText}`);
+    throw new Error(formatGithubApiErrorMessage(response.status, response.statusText));
   }
 
   const data = await response.json();
@@ -176,7 +180,7 @@ export async function checkAppUpdate(): Promise<UpdateCheckResult> {
       isUpdateAvailable: false,
       currentVersion,
       currentCommit,
-      error: error?.message || 'Không thể kết nối đến máy chủ cập nhật.',
+      error: error?.message || UNABLE_TO_CONNECT_UPDATE_SERVER_MESSAGE,
     };
   }
 }

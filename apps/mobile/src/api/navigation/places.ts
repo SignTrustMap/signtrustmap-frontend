@@ -1,4 +1,8 @@
 import { apiBaseUrl, apiRequest, jsonApiRequest } from '@/api/api-client';
+import {
+    formatNominatimHttpErrorMessage,
+    formatPhotonHttpErrorMessage,
+} from '@/constants/message';
 
 export type ApiPlace = {
     address: string | null;
@@ -67,7 +71,7 @@ export async function getUserPlaces(accessToken: string, signal?: AbortSignal): 
 async function searchPlacesViaPhoton(query: string, signal?: AbortSignal): Promise<ApiPlace[]> {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=8`;
     const response = await fetch(url, { signal });
-    if (!response.ok) throw new Error(`Photon returned HTTP ${response.status}`);
+    if (!response.ok) throw new Error(formatPhotonHttpErrorMessage(response.status));
     const data = await response.json();
     if (!Array.isArray(data?.features)) return [];
 
@@ -110,7 +114,7 @@ async function searchPlacesViaNominatim(query: string, signal?: AbortSignal): Pr
         headers: { 'User-Agent': 'SignTrustMap/0.1 (mobile)' },
         signal,
     });
-    if (!response.ok) throw new Error(`Nominatim returned HTTP ${response.status}`);
+    if (!response.ok) throw new Error(formatNominatimHttpErrorMessage(response.status));
     const data = await response.json();
     if (!Array.isArray(data)) return [];
 

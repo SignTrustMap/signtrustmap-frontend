@@ -6,6 +6,7 @@ import {
 } from '@/api/reviews/review';
 import { getCatalog } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
+import { SIGN_IN_TO_REVIEW_MESSAGE } from '@/constants/message';
 import { selectReviewHistory, selectReviewQueue } from '@/api/reviews/review-workflow';
 import type {
   CandidateReportParams, CandidateSignDetailsParams, CandidateVoteParams,
@@ -59,7 +60,7 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables: TVariables) => {
-      if (!session) throw new Error('Sign in to review submissions.');
+      if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
       return mutation(variables, session.accessToken);
     },
     onSuccess: () => {

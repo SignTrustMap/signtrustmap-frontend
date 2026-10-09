@@ -15,6 +15,12 @@ import {
   uploadSurveyChunk,
 } from '@/api/survey-submission/survey-submission';
 import { useSession } from '@/context/session-provider';
+import {
+  SIGN_IN_TO_CREATE_SURVEY_MESSAGE,
+  SIGN_IN_TO_SUBMIT_SURVEY_MESSAGE,
+  SIGN_IN_TO_UPDATE_SURVEY_MESSAGE,
+  SIGN_IN_TO_UPLOAD_SURVEY_MESSAGE,
+} from '@/constants/message';
 import type {
   InitializeUploadDto,
   CreateSubmissionDto,
@@ -77,7 +83,7 @@ export function useCreateSurveySubmission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ request, signal }: CreateSurveySubmissionVariables) => {
-      if (!session) throw new Error('Sign in to create a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_CREATE_SURVEY_MESSAGE);
       return createSurveySubmission(request, session.accessToken, signal);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: surveySubmissionKeys.all(session?.account.id) }),
@@ -89,7 +95,7 @@ export function useUpdateSurveySubmission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ submissionId, request, signal }: UpdateSurveySubmissionVariables) => {
-      if (!session) throw new Error('Sign in to update a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_UPDATE_SURVEY_MESSAGE);
       return updateSurveySubmission(submissionId, request, session.accessToken, signal);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: surveySubmissionKeys.all(session?.account.id) }),
@@ -101,7 +107,7 @@ export function useSubmitSurveySubmission() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ submissionId, signal }: SubmitSurveySubmissionVariables) => {
-      if (!session) throw new Error('Sign in to submit a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_SUBMIT_SURVEY_MESSAGE);
       return submitSurveySubmission(submissionId, session.accessToken, signal);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: surveySubmissionKeys.all(session?.account.id) }),
@@ -114,7 +120,7 @@ export function useInitializeSurveyUpload() {
 
   return useMutation({
     mutationFn: ({ submissionId, request, signal }: InitializeSurveyUploadVariables) => {
-      if (!session) throw new Error('Sign in to upload a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_UPLOAD_SURVEY_MESSAGE);
       return initializeSurveyUpload(submissionId, request, session.accessToken, signal);
     },
     onSuccess: (result) => queryClient.invalidateQueries({
@@ -129,7 +135,7 @@ export function useUploadSurveyChunk() {
 
   return useMutation({
     mutationFn: ({ sessionId, request, signal }: UploadSurveyChunkVariables) => {
-      if (!session) throw new Error('Sign in to upload a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_UPLOAD_SURVEY_MESSAGE);
       return uploadSurveyChunk(sessionId, request, session.accessToken, signal);
     },
     onSuccess: (result) => queryClient.invalidateQueries({
@@ -144,7 +150,7 @@ export function useCompleteSurveyUpload() {
 
   return useMutation({
     mutationFn: ({ sessionId, signal }: CompleteSurveyUploadVariables) => {
-      if (!session) throw new Error('Sign in to upload a survey.');
+      if (!session) throw new Error(SIGN_IN_TO_UPLOAD_SURVEY_MESSAGE);
       return completeSurveyUpload(sessionId, session.accessToken, signal);
     },
     // Completion attaches media to the draft; submitting it is a separate action.

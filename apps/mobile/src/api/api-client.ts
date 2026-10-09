@@ -1,5 +1,9 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import {
+    API_URL_NOT_CONFIGURED_MESSAGE,
+    formatServerConnectionErrorMessage,
+} from "@/constants/message";
 
 // ---------------------------------------------------------------------------
 // Auth-expiry emitter
@@ -69,7 +73,7 @@ export function apiBaseUrl() {
         return `http://${developmentHost}:3000/api/v1`;
     }
 
-    throw new Error("Chưa cấu hình EXPO_PUBLIC_API_URL.");
+    throw new Error(API_URL_NOT_CONFIGURED_MESSAGE);
 }
 
 function errorMessage(body: ApiErrorBody | undefined, status: number) {
@@ -105,7 +109,7 @@ export async function apiRequest<T>(
             cause,
             error,
         });
-        throw new Error(`Không thể kết nối đến máy chủ tại ${baseUrl}: ${cause}`);
+        throw new Error(formatServerConnectionErrorMessage(baseUrl, cause));
     }
 
     const text = await response.text();

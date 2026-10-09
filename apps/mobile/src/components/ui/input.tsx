@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { forwardRef, useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -8,31 +8,31 @@ import {
   type TextInputProps,
   View,
   StyleProp,
-  ViewStyle
+  ViewStyle,
 } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-type AppInputKind = 'email' | 'password' | 'phone' | 'text';
-
+type AppInputKind = 'email' | 'password' | 'phone' | 'search' | 'text';
 
 type AppInputProps =
-  Omit<TextInputProps, 'keyboardType' | 'secureTextEntry' | 'textContentType'> & {
+  Omit<TextInputProps, 'secureTextEntry'> & {
     containerStyle?: StyleProp<ViewStyle>;
     error?: string;
     label?: string;
     type?: AppInputKind;
     leadingIcon?: React.ReactNode;
+    trailingIcon?: React.ReactNode;
     callback?: (text: string) => void;
   };
 
 function getInputConfig(type: AppInputKind): {
   autoCapitalize: TextInputProps['autoCapitalize'];
-  autoComplete: TextInputProps['autoComplete'];
+  autoComplete?: TextInputProps['autoComplete'];
   icon?: string;
   keyboardType: KeyboardTypeOptions;
-  textContentType: TextInputProps['textContentType'];
+  textContentType?: TextInputProps['textContentType'];
 } {
   switch (type) {
     case 'email':
@@ -56,31 +56,48 @@ function getInputConfig(type: AppInputKind): {
         keyboardType: 'phone-pad',
         textContentType: 'telephoneNumber',
       };
+    case 'search':
+      return {
+        autoCapitalize: 'none',
+        keyboardType: 'default',
+      };
     case 'text':
     default:
       return {
         autoCapitalize: 'sentences',
-        autoComplete: 'off',
         keyboardType: 'default',
-        textContentType: 'none',
       };
   }
 }
 
-export function AppInput({
-  error,
-  label,
-  containerStyle,
-  style,
-  leadingIcon,
-  type = 'text',
-  callback,
-  ...inputProps
-}: AppInputProps) {
+export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
+  {
+    error,
+    label,
+    containerStyle,
+    style,
+    leadingIcon,
+    trailingIcon,
+    type = 'text',
+    callback,
+    autoCapitalize,
+    autoComplete,
+    keyboardType,
+    textContentType,
+    onChangeText,
+    ...inputProps
+  }: AppInputProps,
+  ref,
+) {
   const theme = useTheme();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const config = useMemo(() => getInputConfig(type), [type]);
   const isPassword = type === 'password';
+
+  const handleChangeText = (text: string) => {
+    callback?.(text);
+    onChangeText?.(text);
+  };
 
   return (
     <View style={styles.field}>
@@ -92,26 +109,26 @@ export function AppInput({
             backgroundColor: theme.background,
             borderColor: error ? styles.errorText.color : theme.border,
           },
-          containerStyle
+          containerStyle,
         ]}
       >
         {config.icon ? (
           <Text style={[styles.leadingIcon, { color: theme.textSecondary }]}>{config.icon}</Text>
         ) : null}
-        {leadingIcon ? (
-          <>{leadingIcon}</>
-        ) : null}
+        {leadingIcon ? <>{leadingIcon}</> : null}
         <TextInput
-          autoCapitalize={config.autoCapitalize}
-          autoComplete={config.autoComplete}
-          keyboardType={config.keyboardType}
+          ref={ref}
+          autoCapitalize={autoCapitalize ?? config.autoCapitalize}
+          autoComplete={autoComplete ?? config.autoComplete}
+          keyboardType={keyboardType ?? config.keyboardType}
           placeholderTextColor={theme.placeholder}
           secureTextEntry={isPassword && !passwordVisible}
           style={[styles.input, { color: theme.text }, style]}
-          textContentType={config.textContentType}
-          onChangeText={(e) => callback?.(e)}
+          textContentType={textContentType ?? config.textContentType}
+          onChangeText={handleChangeText}
           {...inputProps}
         />
+        {trailingIcon ? <>{trailingIcon}</> : null}
         {isPassword ? (
           <Pressable
             accessibilityLabel={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
@@ -129,7 +146,7 @@ export function AppInput({
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   field: {

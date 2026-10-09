@@ -22,6 +22,18 @@ import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  CAMERA_PERMISSION_REQUIRED_MESSAGE,
+  CANNOT_OPEN_CAMERA_MESSAGE,
+  CANNOT_OPEN_MEDIA_LIBRARY_MESSAGE,
+  CANNOT_READ_SELECTED_FILE_MESSAGE,
+  COORDINATES_REQUIRED_EVIDENCE_MESSAGE,
+  COULD_NOT_ACQUIRE_GPS_MESSAGE,
+  MEDIA_LIBRARY_PERMISSION_REQUIRED_PHOTOS_MESSAGE,
+  SUBMIT_EVIDENCE_FAILED_MESSAGE,
+  UNABLE_TO_GET_GPS_LOCATION_MESSAGE,
+  UNABLE_TO_LOAD_PHOTO_LIBRARY_SIMPLE_MESSAGE,
+} from '@/constants/message';
 
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -293,10 +305,10 @@ export function InspectRevalidateScreen() {
           longitude: pos[0],
         });
       } else {
-        setPickerError('Could not acquire current GPS location. Please check location permissions.');
+        setPickerError(COULD_NOT_ACQUIRE_GPS_MESSAGE);
       }
     } catch {
-      setPickerError('Unable to get current GPS location.');
+      setPickerError(UNABLE_TO_GET_GPS_LOCATION_MESSAGE);
     } finally {
       setIsLocatingDevice(false);
     }
@@ -324,7 +336,7 @@ export function InspectRevalidateScreen() {
       setAndroidGalleryHasNextPage(page.hasNextPage);
     } catch (error) {
       console.warn('[InspectRevalidate] Unable to load Android gallery:', error);
-      setAndroidGalleryError('Unable to load photo library. Please try again.');
+      setAndroidGalleryError(UNABLE_TO_LOAD_PHOTO_LIBRARY_SIMPLE_MESSAGE);
     } finally {
       isLoadingAndroidGallery.current = false;
       setIsAndroidGalleryLoading(false);
@@ -334,7 +346,7 @@ export function InspectRevalidateScreen() {
   const openAndroidGallery = async () => {
     const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
     if (permission.status !== 'granted') {
-      setPickerError('Media library permission is required to choose photos.');
+      setPickerError(MEDIA_LIBRARY_PERMISSION_REQUIRED_PHOTOS_MESSAGE);
       return;
     }
     setAndroidGalleryAssets([]);
@@ -407,7 +419,7 @@ export function InspectRevalidateScreen() {
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[InspectRevalidate] Unable to process selected asset:', error);
-      setAndroidGalleryError('Không thể đọc tệp đã chọn. Vui lòng chọn tệp khác.');
+      setAndroidGalleryError(CANNOT_READ_SELECTED_FILE_MESSAGE);
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
@@ -420,7 +432,7 @@ export function InspectRevalidateScreen() {
       const ImagePicker = await import('expo-image-picker');
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        setPickerError('Cần cấp quyền máy ảnh để chụp ảnh kiểm tra.');
+        setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
         return;
       }
 
@@ -450,7 +462,7 @@ export function InspectRevalidateScreen() {
       }
     } catch (err) {
       console.warn('[InspectRevalidate] Camera error:', err);
-      setPickerError('Không thể mở máy ảnh.');
+      setPickerError(CANNOT_OPEN_CAMERA_MESSAGE);
     }
   };
 
@@ -491,7 +503,7 @@ export function InspectRevalidateScreen() {
       }
     } catch (err) {
       console.warn('[InspectRevalidate] Gallery error:', err);
-      setPickerError('Không thể mở thư viện phương tiện.');
+      setPickerError(CANNOT_OPEN_MEDIA_LIBRARY_MESSAGE);
     } finally {
       setIsOpeningGallery(false);
     }
@@ -508,7 +520,7 @@ export function InspectRevalidateScreen() {
     const targetTaskId = taskId || signId;
 
     if (!lat || !lon) {
-      setSubmitError('Cần có vị trí tọa độ để gửi bằng chứng.');
+      setSubmitError(COORDINATES_REQUIRED_EVIDENCE_MESSAGE);
       return;
     }
 
@@ -543,7 +555,7 @@ export function InspectRevalidateScreen() {
       }, 1400);
     } catch (err) {
       console.error('[InspectRevalidate] Submission failed:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Gửi bằng chứng thất bại. Vui lòng thử lại.');
+      setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }

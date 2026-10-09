@@ -1,5 +1,6 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/context/session-provider';
+import { UNAUTHENTICATED_MESSAGE } from '@/constants/message';
 import {
   getWallet,
   getTopUpPackages,
@@ -71,7 +72,7 @@ export function useTopUp() {
   const queryClient = useQueryClient();
   return useMutation<TopUpOrderResponse, Error, { packageId: number }>({
     mutationFn: ({ packageId }) => {
-      if (!session) throw new Error('Chưa xác thực');
+      if (!session) throw new Error(UNAUTHENTICATED_MESSAGE);
       return postTopUp(packageId, session.accessToken);
     },
     onSuccess: () => {
@@ -88,7 +89,7 @@ export function useTopUpCustom() {
   const queryClient = useQueryClient();
   return useMutation<TopUpOrderResponse, Error, { amount: number }>({
     mutationFn: ({ amount }) => {
-      if (!session) throw new Error('Chưa xác thực');
+      if (!session) throw new Error(UNAUTHENTICATED_MESSAGE);
       return postTopUpCustom(amount, session.accessToken);
     },
     onSuccess: () => {

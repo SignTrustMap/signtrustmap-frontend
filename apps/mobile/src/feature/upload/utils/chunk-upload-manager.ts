@@ -12,6 +12,7 @@ import {
 } from './video-processor';
 import { prepareSurveyGpx } from './survey-image';
 import { createCompanionGpxDescriptor } from './video-gps';
+import { UPLOAD_ABORTED_BY_USER_MESSAGE } from '@/constants/message';
 
 export type UploadProgressInfo = {
   currentChunk: number;
@@ -154,7 +155,7 @@ export async function executeChunkedVideoUpload(
   let completedCount = totalChunks - missingIndices.length;
 
   for (const chunkIndex of missingIndices) {
-    if (signal?.aborted) throw new Error('Upload aborted by user.');
+    if (signal?.aborted) throw new Error(UPLOAD_ABORTED_BY_USER_MESSAGE);
 
     const percent = Math.round((completedCount / totalChunks) * 85); // Video is 85% of total progress
     onProgress?.({
