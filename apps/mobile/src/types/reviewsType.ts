@@ -14,6 +14,15 @@ export type VoteDto = {
     declineNote?: string;
 }
 
+export type CreateMissingTypeReportDto = {
+    candidateId?: string;
+    proposedCategoryId?: number;
+    proposedName: string;
+    description?: string;
+    suggestedShape?: string;
+    suggestedColorScheme?: string;
+}
+
 export type SignCategoryDto = {
     id: string;
     code: string;

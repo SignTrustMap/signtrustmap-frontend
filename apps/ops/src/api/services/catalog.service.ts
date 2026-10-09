@@ -76,20 +76,41 @@ export interface CreateSignCategoryInput {
 
 export interface UpdateSignCategoryInput extends Partial<CreateSignCategoryInput> {}
 
+export interface CandidateEnriched {
+  id: string
+  predictedSignTypeId?: number
+  confidenceScore?: number
+  bestFrameUrl?: string
+  signCropUrl?: string
+  status?: string
+  latitude?: number
+  longitude?: number
+}
+
 export interface MissingTypeReportItem {
   id: string
-  submittedBy: string
+  reporterId?: string
+  submittedBy?: string
+  candidateId?: string | null
   originalCandidateId?: string | null
-  suggestedCode?: string | null
+  proposedCategoryId?: number | null
+  proposedName: string
   suggestedNameVi?: string | null
   suggestedNameEn?: string | null
+  suggestedCode?: string | null
+  description?: string | null
+  suggestedShape?: string | null
+  suggestedColorScheme?: string | null
   cropImageUrl?: string | null
-  status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'MERGED' | 'ESCALATED_ADMIN' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE' | 'IN_REVIEW'
+  mergedIntoSignTypeId?: number | null
+  reviewedBy?: string | null
   staffNotes?: string | null
   resolvedBy?: string | null
   resolvedAt?: string | null
   createdAt: string
   updatedAt: string
+  candidate?: CandidateEnriched | null
 }
 
 export interface PaginatedMissingReportsResponse {
@@ -101,13 +122,18 @@ export interface PaginatedMissingReportsResponse {
 }
 
 export interface ApproveAndCreateSignTypeInput {
-  categoryId: number
-  signCode: string
-  nameVi: string
-  nameEn: string
+  proposedCategoryId?: number
+  categoryId?: number
+  signCode?: string
+  nameVi?: string
+  nameEn?: string
   description?: string
+  suggestedShape?: string
   shape?: string
+  suggestedColorScheme?: string
   colorScheme?: string
+  aiLabelPrompt?: string
+  staffNotes?: string
 }
 
 export const catalogService = {
@@ -169,14 +195,38 @@ export const catalogService = {
     return http.get<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id))
   },
 
-  updateMissingReport: async (id: string, data: { status?: string; staffNotes?: string }): Promise<MissingTypeReportItem> => {
+  updateMissingReport: async (
+    id: string,
+    data: {
+      status?: string
+      staffNotes?: string
+      actionNote?: string
+      mergedSignTypeId?: number
+      mergedIntoSignTypeId?: number
+      suggestedShape?: string
+      suggestedColorScheme?: string
+    }
+  ): Promise<MissingTypeReportItem> => {
     return http.patch<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id), data)
   },
 
-  approveAndCreateType: async (id: string, data: ApproveAndCreateSignTypeInput): Promise<{ message: string; signType: CatalogSignTypeItem }> => {
-    return http.post<{ message: string; signType: CatalogSignTypeItem }>(
+  approveAndCreateType: async (
+    id: string,
+    data: ApproveAndCreateSignTypeInput
+  ): Promise<{ message?: string; report?: MissingTypeReportItem; createdSignType?: CatalogSignTypeItem; signType?: CatalogSignTypeItem }> => {
+    return http.post(
       API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
       data
+    )
+  },
+
+  reprocessCandidates: async (
+    signTypeId: number,
+    similarityThreshold = 0.70
+  ): Promise<{ message: string; reprocessedCount: number }> => {
+    return http.post<{ message: string; reprocessedCount: number }>(
+      API_ENDPOINTS.CATALOG.REPROCESS(signTypeId),
+      { similarityThreshold }
     )
   },
 

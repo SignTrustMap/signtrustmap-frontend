@@ -84,7 +84,7 @@ export function Pagination({
             <span className="text-gray-400 dark:text-gray-500">{t('pagination.per_page', 'Số dòng/trang')}:</span>
             <CustomSelect
               size="sm"
-              direction="auto"
+              direction="up"
               value={String(pageSize)}
               onChange={(val) => onPageSizeChange(Number(val))}
               options={pageSizeOptions.map((size) => ({

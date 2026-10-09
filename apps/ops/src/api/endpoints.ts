@@ -67,6 +67,7 @@ export const API_ENDPOINTS = {
     REBUILD_PROTOTYPES: '/api/v1/catalog/rebuild-prototypes',
     PUBLISH_VERSION: '/api/v1/catalog/publish-version',
     SYNC_EMBEDDINGS: '/api/v1/catalog/sync-embeddings',
+    REPROCESS: (id: number | string) => `/api/v1/catalog/sign-types/${id}/reprocess-candidates`,
     MISSING_REPORTS: {
       BASE: '/api/v1/moderation/missing-type-reports',
       DETAIL: (id: string) => `/api/v1/moderation/missing-type-reports/${id}`,

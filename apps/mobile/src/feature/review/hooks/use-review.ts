@@ -2,7 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
-  reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats
+  reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats, reportMissingType
 } from '@/api/reviews/review';
 import { getCatalog } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
@@ -10,7 +10,7 @@ import { selectReviewHistory, selectReviewQueue } from '@/api/reviews/review-wor
 import type {
   CandidateReportParams, CandidateSignDetailsParams, CandidateVoteParams,
   CannotIdentifySignReportParams, MyReviewHistoryParams, ReportDto, ReviewQueueParams, VoteDto,
-  ReviewerStatsResponse,
+  ReviewerStatsResponse, CreateMissingTypeReportDto,
 } from '@/types/reviewsType';
 
 export const reviewKeys = {
@@ -79,6 +79,21 @@ export function useCastVoteOnSignCandidate() {
 export function useReportSignCandidate() {
   return useReviewMutation(({ params, request, signal }: { params: CandidateReportParams; request: ReportDto; signal?: AbortSignal }, token) =>
     reportSignCandidate(params, request, token, signal));
+}
+
+export function useReportMissingType() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: CreateMissingTypeReportDto) => {
+      if (!session) throw new Error('Sign in to report missing sign type.');
+      return reportMissingType(request, session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
+    },
+  });
 }
 
 export function useSkipSign() {

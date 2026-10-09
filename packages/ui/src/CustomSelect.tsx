@@ -64,7 +64,7 @@ export function CustomSelect({
     }
   }, [isOpen])
 
-  // Auto calculate direction (up or down) based on viewport
+  // Auto calculate direction (up or down) based on viewport and overflow parent
   useEffect(() => {
     if (isOpen && direction === 'auto' && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
@@ -72,7 +72,24 @@ export function CustomSelect({
       const spaceAbove = rect.top
       const estimatedDropdownHeight = Math.min(options.length * 36 + 16, 260)
 
-      if (spaceBelow < estimatedDropdownHeight && spaceAbove > spaceBelow) {
+      // Also detect if any scrollable or clipping ancestor constrains space below
+      let overflowParentBelow = spaceBelow
+      let parent = containerRef.current.parentElement
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent)
+        const overflow = style.overflow + style.overflowY
+        if (overflow.includes('hidden') || overflow.includes('auto') || overflow.includes('scroll')) {
+          const parentRect = parent.getBoundingClientRect()
+          overflowParentBelow = Math.min(overflowParentBelow, parentRect.bottom - rect.bottom)
+          break
+        }
+        parent = parent.parentElement
+      }
+
+      if (
+        (overflowParentBelow < estimatedDropdownHeight || spaceBelow < estimatedDropdownHeight) &&
+        spaceAbove > 80
+      ) {
         setComputedDirection('up')
       } else {
         setComputedDirection('down')

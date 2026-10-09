@@ -10,6 +10,7 @@ import {
     ReviewQueueResponse,
     MyReviewHistoryResponse,
     ReviewerStatsResponse,
+    CreateMissingTypeReportDto,
 } from '@/types/reviewsType';
 
 import { API_PATHS } from '@/api/api';
@@ -149,3 +150,17 @@ export function getMyReviewerStats(
         accessToken,
     );
 }
+
+export function reportMissingType(
+    request: CreateMissingTypeReportDto,
+    accessToken: string,
+    signal?: AbortSignal,
+) {
+    return jsonApiRequest(
+        `${API_PATHS.REVIEWS}/missing-type`,
+        request,
+        accessToken,
+        signal,
+    );
+}
+

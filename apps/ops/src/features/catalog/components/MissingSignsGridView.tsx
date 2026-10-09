@@ -45,17 +45,19 @@ export function MissingSignsGridView({
               <img
                 src={report.sampleImageUrl}
                 alt={report.tempLabel}
+                onError={(e) => {
+                  e.currentTarget.onerror = null
+                  e.currentTarget.src =
+                    'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?w=500&auto=format&fit=crop&q=80'
+                }}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-black/75 text-white backdrop-blur-xs">
-                  {report.id}
-                </span>
                 <StatusBadge status={report.status} />
               </div>
-              {report.aiConfidence && (
+              {report.aiConfidence !== undefined && (
                 <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-black/75 text-[#00c4de] backdrop-blur-xs">
-                  AI: {report.aiConfidence}%
+                  AI: {(report.aiConfidence * 100).toFixed(0)}%
                 </div>
               )}
             </div>
@@ -67,7 +69,7 @@ export function MissingSignsGridView({
                   <h3 className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm line-clamp-2 leading-snug">
                     {report.tempLabel}
                   </h3>
-                  <CategoryBadge category={report.category} />
+                  <CategoryBadge category={report.category} categoryId={report.proposedCategoryId} />
                 </div>
 
                 <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed bg-gray-50 dark:bg-white/5 p-2.5 rounded-xl border border-gray-100 dark:border-white/5 italic">

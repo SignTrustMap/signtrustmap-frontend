@@ -24,6 +24,8 @@ import {
   type ReviewActionType,
   useReviewWorkflow,
 } from '@/feature/review/context/review-workflow-provider';
+import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal';
+import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -43,6 +45,41 @@ const declineReasons = [
 ] as const;
 
 type DeclineReason = (typeof declineReasons)[number];
+
+export type ReportIssueType =
+  | 'missing_type'
+  | 'inappropriate'
+  | 'poor_quality'
+  | 'fraud'
+  | 'other';
+
+export const REPORT_ISSUE_OPTIONS: Array<{
+  id: ReportIssueType;
+  label: string;
+  badge?: string;
+}> = [
+  {
+    id: 'missing_type',
+    label: 'Sign not in catalog',
+    badge: 'Flow 4',
+  },
+  {
+    id: 'inappropriate',
+    label: 'Inappropriate content',
+  },
+  {
+    id: 'poor_quality',
+    label: 'Poor image quality',
+  },
+  {
+    id: 'fraud',
+    label: 'Suspected fraud / fake sign',
+  },
+  {
+    id: 'other',
+    label: 'Other issue',
+  },
+];
 
 function SubmissionReviewSkeleton() {
   return (
@@ -65,9 +102,11 @@ type ReviewBottomSheetProps = {
   declineReasonDetail: string;
   onChangeDeclineReason: (reason: DeclineReason) => void;
   onChangeDeclineReasonDetail: (value: string) => void;
+  onChangeReportIssueType: (issue: ReportIssueType) => void;
   onChangeReportNote: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  reportIssueType: ReportIssueType;
   reportNote: string;
   type?: ReviewSheet;
 };
@@ -77,18 +116,33 @@ function ReviewBottomSheet({
   declineReasonDetail,
   onChangeDeclineReason,
   onChangeDeclineReasonDetail,
+  onChangeReportIssueType,
   onChangeReportNote,
   onClose,
   onConfirm,
+  reportIssueType,
   reportNote,
   type,
 }: ReviewBottomSheetProps) {
   const theme = useTheme();
   const isDecline = type === 'decline';
   const isOther = declineReason === 'Other';
+  const isMissingType = reportIssueType === 'missing_type';
+  const isReportOther = reportIssueType === 'other';
+
   const canConfirm = isDecline
     ? Boolean(declineReason && (!isOther || declineReasonDetail.trim()))
-    : Boolean(reportNote.trim());
+    : (isMissingType || !isReportOther || Boolean(reportNote.trim()));
+
+  const confirmButtonLabel = isDecline
+    ? 'Confirm Decline'
+    : isMissingType
+      ? 'Continue'
+      : 'Submit Report';
+
+  const confirmButtonColor = isDecline
+    ? Colors.danger
+    : theme.primary;
 
   return (
     <Modal
@@ -113,7 +167,7 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Decline Reason' : 'Report Submission'}
+                {isDecline ? 'Decline Reason' : 'Report Issue'}
               </Text>
               <AppButton
                 accessibilityLabel="Close"
@@ -192,27 +246,67 @@ function ReviewBottomSheet({
                 keyboardShouldPersistTaps="handled"
                 style={styles.sheetBodyScroll}
               >
-                <View style={styles.reasonInputGroup}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>
-                    Report Note <Text style={{ color: Colors.danger }}>*</Text>
-                  </Text>
-                  <TextInput
-                    accessibilityLabel="Report Note, required"
-                    multiline
-                    onChangeText={onChangeReportNote}
-                    placeholder="Describe the issue with this submission"
-                    placeholderTextColor={theme.placeholder}
-                    style={[
-                      styles.reasonInput,
-                      { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
-                    ]}
-                    textAlignVertical="top"
-                    value={reportNote}
-                  />
-                </View>
-                <Text style={[styles.reportHelper, { color: theme.placeholder }]}>
-                  Your report will be reviewed by the system administrators.
+                <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
+                  Please select the issue with this sign submission:
                 </Text>
+
+                <View style={styles.reasonList}>
+                  {REPORT_ISSUE_OPTIONS.map((option) => {
+                    const selected = reportIssueType === option.id;
+
+                    return (
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        key={option.id}
+                        onPress={() => onChangeReportIssueType(option.id)}
+                        style={[
+                          styles.reasonOption,
+                          {
+                            backgroundColor: selected ? theme.backgroundSelected : theme.surface,
+                            borderColor: selected ? theme.primary : theme.border,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.reasonLabel, { color: theme.text }]}>{option.label}</Text>
+                        {option.badge ? (
+                          <View style={[styles.inlineBadge, { backgroundColor: `${theme.primary}18` }]}>
+                            <Text style={[styles.inlineBadgeText, { color: theme.primary }]}>{option.badge}</Text>
+                          </View>
+                        ) : null}
+                        <View
+                          style={[
+                            styles.radio,
+                            { borderColor: selected ? theme.primary : theme.placeholder },
+                          ]}
+                        >
+                          {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {isReportOther ? (
+                  <View style={styles.reasonInputGroup}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>
+                      Details <Text style={{ color: Colors.danger }}>*</Text>
+                    </Text>
+                    <TextInput
+                      accessibilityLabel="Report details, required"
+                      multiline
+                      onChangeText={onChangeReportNote}
+                      placeholder="Please specify the issue"
+                      placeholderTextColor={theme.placeholder}
+                      style={[
+                        styles.reasonInput,
+                        { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                      ]}
+                      textAlignVertical="top"
+                      value={reportNote}
+                    />
+                  </View>
+                ) : null}
               </ScrollView>
             )}
 
@@ -225,11 +319,11 @@ function ReviewBottomSheet({
               />
               <AppButton
                 disabled={!canConfirm}
-                label={isDecline ? 'Confirm Decline' : 'Submit Report'}
+                label={confirmButtonLabel}
                 onPress={onConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: isDecline ? Colors.danger : theme.primary },
+                  { backgroundColor: canConfirm ? confirmButtonColor : theme.placeholder },
                 ]}
               />
             </View>
@@ -258,7 +352,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
+  const [reportIssueType, setReportIssueType] = useState<ReportIssueType>('missing_type');
   const [reportNote, setReportNote] = useState('');
+  const [isNewSignTypeModalOpen, setIsNewSignTypeModalOpen] = useState(false);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [toast, setToast] = useState<{
     id: number;
@@ -283,7 +379,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const completeReview = useCallback(
     (
       action: ReviewActionType,
-      details?: { declineReason?: string; declineNote?: string },
+      details?: {
+        declineReason?: string;
+        declineNote?: string;
+        newSignReport?: CreateMissingTypeReportDto;
+      },
     ) => {
       if (!submission) return;
       const completesReviewQueue = pendingSubmissions.length === 1;
@@ -293,14 +393,15 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       const toastMessages: Record<ReviewActionType, string> = {
         approved: 'Sign approved',
         declined: 'Sign declined',
-        reported: 'Sign reported',
+        reported: 'Submission reported for moderation',
         skipped: 'Sign skipped (cannot identify)',
+        reported_new_sign: 'New sign type reported for catalog appraisal',
       };
 
       setToast((current) => ({
         id: (current?.id ?? 0) + 1,
         message: toastMessages[action],
-        tone: action === 'approved' ? 'success' : 'default',
+        tone: action === 'approved' || action === 'reported_new_sign' ? 'success' : 'default',
       }));
 
       if (completesReviewQueue) {
@@ -309,6 +410,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     },
     [completeCurrentReview, pendingSubmissions.length, router, submission],
   );
+
+  const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
+    completeReview('reported_new_sign', { newSignReport: reportDto });
+  };
 
   const closeSheet = () => setActiveSheet(undefined);
 
@@ -323,9 +428,17 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   };
 
   const confirmReport = () => {
-    if (!reportNote.trim()) return;
+    if (reportIssueType === 'missing_type') {
+      closeSheet();
+      setIsNewSignTypeModalOpen(true);
+      return;
+    }
 
-    completeReview('reported', { declineNote: reportNote });
+    const selectedOption = REPORT_ISSUE_OPTIONS.find((opt) => opt.id === reportIssueType);
+    const reasonTitle = selectedOption?.label || 'Reported Issue';
+    const fullReason = reportNote.trim() ? `${reasonTitle}: ${reportNote.trim()}` : reasonTitle;
+
+    completeReview('reported', { declineReason: reasonTitle, declineNote: fullReason });
     setReportNote('');
     closeSheet();
   };
@@ -417,7 +530,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               return;
             }
           } else {
-            // Vertical swipe: Up -> Skip, Down -> Report
+            // Vertical swipe: Up -> Skip, Down -> Report Issue
             if (dy < -SWIPE_THRESHOLD || (dy < -35 && vy < -0.4)) {
               Animated.timing(pan, {
                 toValue: { x: dx, y: -500 },
@@ -692,9 +805,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
                 </Pressable>
 
-                {/* Bottom Button: Report */}
+                {/* Bottom Button: Report Issue */}
                 <Pressable
-                  accessibilityLabel="Report submission"
+                  accessibilityLabel="Report issue"
                   accessibilityRole="button"
                   onPress={() => setActiveSheet('report')}
                   style={({ pressed }) => [
@@ -705,7 +818,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                     pressed && styles.circleButtonPressed,
                   ]}
                 >
-                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={24} />
                 </Pressable>
               </View>
 
@@ -803,12 +916,24 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           if (reason !== 'Other') setDeclineReasonDetail('');
         }}
         onChangeDeclineReasonDetail={setDeclineReasonDetail}
+        onChangeReportIssueType={setReportIssueType}
         onChangeReportNote={setReportNote}
         onClose={closeSheet}
         onConfirm={activeSheet === 'decline' ? confirmDecline : confirmReport}
+        reportIssueType={reportIssueType}
         reportNote={reportNote}
         type={activeSheet}
       />
+
+      {/* Report New Sign Type Modal */}
+      {submission ? (
+        <ReportNewSignTypeModal
+          candidateId={submission.id}
+          isOpen={isNewSignTypeModalOpen}
+          onClose={() => setIsNewSignTypeModalOpen(false)}
+          onSubmit={handleConfirmNewSignType}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1370,5 +1495,16 @@ const styles = StyleSheet.create({
   zoomedImage: {
     width: '100%',
     height: '85%',
+  },
+  inlineBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  inlineBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '800',
   },
 });
