@@ -260,6 +260,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
   const [reportNote, setReportNote] = useState('');
   const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [isSignFocused, setIsSignFocused] = useState(true);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -544,11 +545,35 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 >
                   <Image
                     accessibilityLabel={submission.title}
-                    contentFit="cover"
+                    contentFit={isSignFocused ? "contain" : "cover"}
                     source={submission.image}
-                    style={styles.cardImage}
+                    style={[
+                      styles.cardImage,
+                      isSignFocused && { transform: [{ scale: 1.15 }] },
+                    ]}
                     transition={180}
                   />
+
+                  {/* Focus Toggle Pill */}
+                  <Pressable
+                    accessibilityLabel="Toggle sign focus"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setIsSignFocused((prev) => !prev);
+                    }}
+                    style={styles.focusToggleBadge}
+                  >
+                    <MaterialCommunityIcons
+                      color="#FFFFFF"
+                      name={isSignFocused ? "target" : "image-filter-center-focus"}
+                      size={13}
+                    />
+                    <Text style={styles.focusToggleText}>
+                      {isSignFocused ? "Focus Biển báo" : "Toàn cảnh"}
+                    </Text>
+                  </Pressable>
 
                   {/* Directional Swipe Badges */}
                   <Animated.View
@@ -773,11 +798,33 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             </Pressable>
             {submission ? (
               <Image
-                contentFit="contain"
+                contentFit={isSignFocused ? "contain" : "cover"}
                 source={submission.image}
-                style={styles.zoomedImage}
+                style={[
+                  styles.zoomedImage,
+                  isSignFocused && { transform: [{ scale: 1.25 }] },
+                ]}
               />
             ) : null}
+            <Pressable
+              accessibilityLabel="Toggle sign focus in fullscreen"
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={(e) => {
+                e.stopPropagation();
+                setIsSignFocused((prev) => !prev);
+              }}
+              style={styles.zoomFocusToggle}
+            >
+              <MaterialCommunityIcons
+                color="#FFFFFF"
+                name={isSignFocused ? "target" : "image-filter-center-focus"}
+                size={16}
+              />
+              <Text style={styles.zoomFocusToggleText}>
+                {isSignFocused ? "Chế độ: Focus Biển báo" : "Chế độ: Toàn cảnh"}
+              </Text>
+            </Pressable>
           </SafeAreaView>
         </Pressable>
       </Modal>
@@ -926,6 +973,47 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
+  },
+  focusToggleBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    zIndex: 12,
+  },
+  focusToggleText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: Fonts.body,
+  },
+  zoomFocusToggle: {
+    position: 'absolute',
+    bottom: 34,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 20,
+  },
+  zoomFocusToggleText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   swipeBadge: {
     position: 'absolute',

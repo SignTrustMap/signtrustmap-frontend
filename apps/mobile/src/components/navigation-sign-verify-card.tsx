@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
+import { ImageInspectionModal } from './image-inspection-modal';
 
 export type SignVerifyResult = 'present' | 'absent';
 
@@ -43,6 +44,7 @@ export function NavigationSignVerifyCard({
   const [lastSignId, setLastSignId] = useState(sign?.id);
   const [visible, setVisible] = useState(Boolean(sign));
   const [responded, setResponded] = useState(false);
+  const [inspectPhoto, setInspectPhoto] = useState<string | null>(null);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (sign?.id !== lastSignId) {
@@ -145,19 +147,36 @@ export function NavigationSignVerifyCard({
 
         {/* Sign image + info */}
         <View style={styles.signRow}>
-          <View style={[styles.signImageWrap, { backgroundColor: theme.backgroundSelected }]}>
-            {sign?.imageUrl ? (
+          <Pressable
+            accessibilityLabel="Tap to view full verification photo"
+            onPress={() => setInspectPhoto(sign?.actualCropUrl || sign?.imageUrl || null)}
+            style={[styles.signImageWrap, { backgroundColor: theme.backgroundSelected }]}
+          >
+            {sign?.actualCropUrl ? (
+              <Image
+                contentFit="cover"
+                source={{ uri: sign.actualCropUrl }}
+                style={styles.signImage}
+              />
+            ) : sign?.imageUrl ? (
               <Image
                 contentFit="contain"
                 source={{ uri: sign.imageUrl }}
                 style={styles.signImage}
               />
             ) : null}
-          </View>
+          </Pressable>
           <View style={styles.signInfo}>
-            <Text style={[styles.promptLabel, { color: theme.placeholder }]}>
-              SIGN AHEAD · {distanceMeters}M
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={[styles.promptLabel, { color: theme.placeholder }]}>
+                SIGN AHEAD · {distanceMeters}M
+              </Text>
+            </View>
+            {sign?.actualCropUrl ? (
+              <Text style={{ fontSize: 9, color: '#0671EB', fontWeight: '700', marginBottom: 2 }}>
+                ẢNH XÁC THỰC
+              </Text>
+            ) : null}
             <Text numberOfLines={2} style={[styles.signName, { color: theme.text }]}>
               {signTitle}
             </Text>
@@ -204,6 +223,13 @@ export function NavigationSignVerifyCard({
           </TouchableOpacity>
         </View>
       </View>
+      <ImageInspectionModal
+        visible={Boolean(inspectPhoto)}
+        onClose={() => setInspectPhoto(null)}
+        imageUrl={inspectPhoto}
+        title={signTitle}
+        subtitle={sign?.roadName || sign?.displayAddress || undefined}
+      />
     </Animated.View>
   );
 }
