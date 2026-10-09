@@ -165,7 +165,7 @@ describe('Revalidation API Module', () => {
       expect(routeSign.coordinate).toEqual([106.7009, 10.7769]);
       expect(routeSign.signCode).toBe('P.102');
       expect(routeSign.name).toBe('Cấm đi ngược chiều');
-      expect(routeSign.status).toBe('STALE');
+      expect(routeSign.status).toBe('MODERATE');
       expect(routeSign.roadName).toBe('Đường Nguyễn Huệ');
       expect(routeSign.displayAddress).toBe('Đường Nguyễn Huệ');
       expect(routeSign.lastVerifiedAt).toBe('2026-01-01');

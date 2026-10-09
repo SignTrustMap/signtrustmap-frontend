@@ -22,6 +22,7 @@ import {
 import { mockOpsSigns, type OpsSignItem } from '@/data'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
+import { env } from '@/config/env'
 
 // Fix Leaflet default icon paths in bundlers
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
@@ -98,7 +99,8 @@ export default function MapPage() {
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-    const osmTile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const defaultTileUrl = env.mapTileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    const osmTile = L.tileLayer(defaultTileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map)

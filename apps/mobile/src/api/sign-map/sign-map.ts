@@ -73,4 +73,35 @@ export function updateVerifiedSign(
     );
 }
 
+export interface ConfirmSignDto {
+    isPresent: boolean;
+    latitude?: number;
+    longitude?: number;
+    note?: string;
+}
+
+export interface ConfirmSignResponse {
+    signId: string;
+    isPresent: boolean;
+    creditsAwarded: number;
+    cooldownActive: boolean;
+    message: string;
+    revalidationTaskId?: string;
+}
+
+export function confirmVerifiedSign(
+    id: string,
+    data: ConfirmSignDto,
+    accessToken?: string,
+    signal?: AbortSignal,
+): Promise<ConfirmSignResponse> {
+    return jsonApiRequest<ConfirmSignResponse>(
+        `${API_PATHS.SIGNS}/${encodeURIComponent(id)}/confirm`,
+        data,
+        accessToken,
+        signal,
+        'POST',
+    );
+}
+
 

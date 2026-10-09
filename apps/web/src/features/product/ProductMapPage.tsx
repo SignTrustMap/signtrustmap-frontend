@@ -20,15 +20,18 @@ import {
   FileArrowUp,
   TrafficSignal,
   ChatText,
+  Eye,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { Modal } from '@/components/common/Modal'
 import { CustomSelect } from '@/components/common/CustomSelect'
+import { ImageInspectionModal } from '@/components/common/ImageInspectionModal'
 import { mockSigns, signCategories, type SignItem } from '@/data'
 
 import { signsService } from '@/api/services/signs.service'
+import { env } from '@/config/env'
 
 // Fix Leaflet default marker icons in bundler
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
@@ -51,6 +54,7 @@ export default function ProductMap() {
   const [issueDesc, setIssueDesc] = useState('')
   const [issuePhotoPreview, setIssuePhotoPreview] = useState<string | null>(null)
   const [isReporting, setIsReporting] = useState(false)
+  const [isImageInspectionOpen, setIsImageInspectionOpen] = useState(false)
 
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -138,7 +142,8 @@ export default function ProductMap() {
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
 
-    const osmTile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const defaultTileUrl = env.mapTileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    const osmTile = L.tileLayer(defaultTileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(map)
@@ -789,6 +794,41 @@ export default function ProductMap() {
                   </div>
                 )}
 
+                {/* Field Verification Photo Evidence */}
+                {(selectedSign.actualCropUrl || selectedSign.imageUrl) && (
+                  <div className="mt-3 p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <Camera size={13} className="text-[#007b8b] dark:text-[#00c4de]" />
+                        Ảnh kiểm định thực tế
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsImageInspectionOpen(true)}
+                        className="text-[10px] font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye size={12} weight="bold" />
+                        Phóng to
+                      </button>
+                    </div>
+                    <div
+                      onClick={() => setIsImageInspectionOpen(true)}
+                      className="relative h-28 rounded-lg overflow-hidden bg-black/40 border border-gray-200 dark:border-white/10 cursor-pointer group"
+                    >
+                      <img
+                        src={selectedSign.actualCropUrl || selectedSign.imageUrl}
+                        alt={selectedSign.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="px-2.5 py-1 rounded-md bg-black/75 backdrop-blur-sm text-white font-bold text-xs flex items-center gap-1.5 shadow-lg">
+                          <Eye size={13} weight="bold" /> Xem ảnh gốc
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Telemetry Details Grid */}
                 <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-white/10 text-xs">
                   <div
@@ -1215,6 +1255,23 @@ export default function ProductMap() {
             </form>
           </div>
         </Modal>
+      )}
+
+
+      {/* ─── Image Inspection Lightbox Modal ─────────────────────────────── */}
+      {selectedSign && (
+        <ImageInspectionModal
+          isOpen={isImageInspectionOpen}
+          onClose={() => setIsImageInspectionOpen(false)}
+          signName={selectedSign.name}
+          signCode={selectedSign.code}
+          actualCropUrl={selectedSign.actualCropUrl}
+          scenePhotoUrl={selectedSign.scenePhotoUrl}
+          lat={selectedSign.lat}
+          lng={selectedSign.lng}
+          heading={selectedSign.heading}
+          verifiedAt={selectedSign.verifiedAt}
+        />
       )}
     </div>
   )

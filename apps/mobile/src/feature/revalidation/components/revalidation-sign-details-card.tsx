@@ -23,6 +23,7 @@ import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { ImageInspectionModal } from '@/components/image-inspection-modal';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -50,6 +51,7 @@ export function RevalidationSignDetailsCard({
   const [cropError, setCropError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+  const [inspectPhotoUrl, setInspectPhotoUrl] = useState<string | null>(null);
 
   const resolvedTaskId =
     propTaskId || sign.taskId || (sign.id.startsWith('reval-') ? sign.id : undefined);
@@ -266,6 +268,7 @@ export function RevalidationSignDetailsCard({
                 </Text>
                 <View
                   style={[
+                    styles.statusBadge,
                     { backgroundColor: statusConfig.bg, borderColor: statusConfig.border },
                   ]}
                 >
@@ -274,6 +277,9 @@ export function RevalidationSignDetailsCard({
                     name={statusConfig.icon}
                     size={11}
                   />
+                  <Text style={{ color: statusConfig.text, fontSize: 10, fontWeight: '700' }}>
+                    {statusConfig.label}
+                  </Text>
                 </View>
               </View>
 
@@ -364,12 +370,18 @@ export function RevalidationSignDetailsCard({
                 </View>
                 <View style={styles.evidenceImageFrame}>
                   {hasSubmittedCrop ? (
-                    <Image
-                      contentFit="cover"
-                      onError={() => setCropError(true)}
-                      source={{ uri: displaySubmittedCrop }}
-                      style={styles.cropImg}
-                    />
+                    <Pressable
+                      accessibilityLabel="Inspect submitted sign photo"
+                      accessibilityRole="button"
+                      onPress={() => setInspectPhotoUrl(displaySubmittedCrop)}
+                    >
+                      <Image
+                        contentFit="cover"
+                        onError={() => setCropError(true)}
+                        source={{ uri: displaySubmittedCrop }}
+                        style={styles.cropImg}
+                      />
+                    </Pressable>
                   ) : (
                     <View style={styles.noCropBox}>
                       <MaterialCommunityIcons
@@ -509,6 +521,13 @@ export function RevalidationSignDetailsCard({
           </View>
         </ScrollView>
       ) : null}
+      <ImageInspectionModal
+        imageUrl={inspectPhotoUrl}
+        onClose={() => setInspectPhotoUrl(null)}
+        subtitle={sign.displayAddress || sign.roadName || undefined}
+        title={sign.name || sign.signCode}
+        visible={Boolean(inspectPhotoUrl)}
+      />
     </Animated.View>
   );
 }

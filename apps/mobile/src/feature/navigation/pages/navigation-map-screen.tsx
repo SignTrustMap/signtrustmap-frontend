@@ -18,6 +18,7 @@ import {
   type VehicleMode,
 } from "@/types/navigationType";
 import { useTheme } from "@/hooks/use-theme";
+import { useOptionalSession } from "@/context/session-provider";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 import { useSignFilter } from "@/context/sign-filter-provider";
 
@@ -25,6 +26,8 @@ import { NavigationMapView } from "../components/navigation-map-view";
 import type { NavigationStep } from '@/api/navigation/navigation';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import { useSavedRoutes } from '../hooks/use-saved-routes';
+import { confirmVerifiedSign } from '@/api/sign-map/sign-map';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
@@ -152,6 +155,8 @@ export function NavigationMapScreen() {
       ? "Starting point"
       : (plannedRouteOrigin ? "Current Location" : undefined));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
+  const session = useOptionalSession()?.session;
+  const { savedRoutes, saveRoute, isSaving: isSavingRoute } = useSavedRoutes();
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     destinationId: string;
@@ -726,6 +731,78 @@ export function NavigationMapScreen() {
     };
   }, [handleLocationUpdate, startGpsListening]);
 
+  const isRouteSaved = useMemo(() => {
+    if (!plannedRouteOrigin || !selectedDestination || !savedRoutes.length) return false;
+    return savedRoutes.some((r) =>
+      Math.abs(r.originLatitude - plannedRouteOrigin[1]) < 0.001 &&
+      Math.abs(r.originLongitude - plannedRouteOrigin[0]) < 0.001 &&
+      Math.abs(r.destinationLatitude - selectedDestination.coordinate[1]) < 0.001 &&
+      Math.abs(r.destinationLongitude - selectedDestination.coordinate[0]) < 0.001 &&
+      r.vehicleMode === vehicleMode
+    );
+  }, [plannedRouteOrigin, selectedDestination, savedRoutes, vehicleMode]);
+
+  const handleSaveRoute = useCallback(async () => {
+    if (!plannedRouteOrigin || !selectedDestination) return;
+    if (!session?.accessToken) {
+      setLocationToast({
+        id: Date.now(),
+        message: 'Vui lòng đăng nhập để lưu tuyến đường yêu thích',
+      });
+      return;
+    }
+    if (isRouteSaved) {
+      setLocationToast({
+        id: Date.now(),
+        message: 'Tuyến đường này đã có trong danh sách yêu thích',
+      });
+      return;
+    }
+    try {
+      const originLat = plannedRouteOrigin[1];
+      const originLng = plannedRouteOrigin[0];
+      const destLat = selectedDestination.coordinate[1];
+      const destLng = selectedDestination.coordinate[0];
+      const routeName = `${routeStartTitle || 'Điểm xuất phát'} ➔ ${selectedDestination.title || 'Điểm đến'}`;
+      const filterFixed = !manualCategories.has('TEMPORARY');
+
+      await saveRoute({
+        name: routeName,
+        originName: routeStartTitle || 'Điểm xuất phát',
+        originLatitude: originLat,
+        originLongitude: originLng,
+        destinationName: selectedDestination.title || 'Điểm đến',
+        destinationLatitude: destLat,
+        destinationLongitude: destLng,
+        vehicleMode: vehicleMode as any,
+        filterFixedSignsOnly: filterFixed,
+        encodedPolyline: routeResult?.geometry,
+        distanceMeters: routeResult?.distance,
+        durationSeconds: routeResult?.duration,
+      });
+
+      setLocationToast({
+        id: Date.now(),
+        message: 'Đã lưu tuyến đường vào danh sách yêu thích!',
+      });
+    } catch (err: any) {
+      setLocationToast({
+        id: Date.now(),
+        message: err?.message || 'Không thể lưu tuyến đường',
+      });
+    }
+  }, [
+    plannedRouteOrigin,
+    selectedDestination,
+    session?.accessToken,
+    isRouteSaved,
+    routeStartTitle,
+    manualCategories,
+    saveRoute,
+    vehicleMode,
+    routeResult,
+  ]);
+
   const handleBeginNavigation = async () => {
     if (
       Platform.OS === "web" ||
@@ -998,8 +1075,33 @@ export function NavigationMapScreen() {
           <NavigationSignVerifyCard
             distanceMeters={activeSignAlert.distanceMeters}
             sign={activeSignAlert.sign}
-            onVerify={(sign, _result: SignVerifyResult) => {
+            onVerify={async (sign, result: SignVerifyResult) => {
               verifiedSignIdsRef.current.add(sign.id);
+              try {
+                const isPresent = result === 'present';
+                const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
+                const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
+                const res = await confirmVerifiedSign(
+                  sign.id,
+                  {
+                    isPresent,
+                    latitude: lat,
+                    longitude: lon,
+                    note: isPresent
+                      ? 'Tài xế xác nhận biển báo còn tồn tại'
+                      : 'Tài xế báo cáo biển báo không còn tại hiện trường',
+                  },
+                  session?.accessToken,
+                );
+                if (res?.message) {
+                  setToast({
+                    id: Date.now(),
+                    message: res.message,
+                  });
+                }
+              } catch (e: any) {
+                console.warn('[Navigation] Confirm sign error:', e?.message);
+              }
             }}
             onDismiss={() => {
               setDismissedVerifySignId(activeSignAlert.sign.id);
@@ -2138,23 +2240,52 @@ export function NavigationMapScreen() {
                 </ScrollView>
               </Animated.View>
 
-              {/* Start button — hidden during active navigation */}
+              {/* Start button and Save route button — hidden during active navigation */}
               {!isNavigating ? (
                 <View style={styles.sheetBottomButtonRow}>
-                  <AppButton
-                    accessibilityLabel={
-                      isStartingNavigation
-                        ? "Starting navigation"
-                        : "Begin navigation"
-                    }
-                    disabled={isStartingNavigation}
-                    onPress={handleBeginNavigation}
-                    style={styles.bottomGoButton}
-                  >
-                    <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
-                      {isStartingNavigation ? "Starting..." : "Start"}
-                    </Text>
-                  </AppButton>
+                  <View style={styles.sheetBottomButtonsContainer}>
+                    <Pressable
+                      accessibilityLabel="Save route to wishlist"
+                      accessibilityRole="button"
+                      disabled={isSavingRoute}
+                      onPress={handleSaveRoute}
+                      style={[
+                        styles.saveRouteButton,
+                        {
+                          borderColor: isRouteSaved ? "#F59E0B" : theme.border,
+                          backgroundColor: isRouteSaved ? "rgba(245, 158, 11, 0.12)" : theme.surface,
+                        },
+                      ]}
+                    >
+                      <AntDesign
+                        name={isRouteSaved ? "star" : "staro"}
+                        size={18}
+                        color={isRouteSaved ? "#F59E0B" : theme.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.saveRouteButtonLabel,
+                          { color: isRouteSaved ? "#D97706" : theme.text },
+                        ]}
+                      >
+                        {isSavingRoute ? "Đang lưu..." : isRouteSaved ? "Đã lưu" : "Lưu tuyến"}
+                      </Text>
+                    </Pressable>
+                    <AppButton
+                      accessibilityLabel={
+                        isStartingNavigation
+                          ? "Starting navigation"
+                          : "Begin navigation"
+                      }
+                      disabled={isStartingNavigation}
+                      onPress={handleBeginNavigation}
+                      style={[styles.bottomGoButton, { flex: 1 }]}
+                    >
+                      <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
+                        {isStartingNavigation ? "Starting..." : "Start"}
+                      </Text>
+                    </AppButton>
+                  </View>
                 </View>
               ) : null}
             </View>
@@ -3157,6 +3288,27 @@ const styles = StyleSheet.create({
   sheetBottomButtonRow: {
     paddingTop: Spacing.two,
     marginTop: 'auto',
+  },
+  sheetBottomButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    width: '100%',
+  },
+  saveRouteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    minHeight: 52,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  saveRouteButtonLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '700',
   },
   bottomGoButton: {
     alignSelf: 'stretch',
