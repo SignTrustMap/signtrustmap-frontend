@@ -68,7 +68,7 @@ export async function getVehicleModes(signal?: AbortSignal): Promise<VehicleMode
         }
         return [
             { id: "DRIVING", label: "Car" },
-            { id: "BIKE", label: "Bike" },
+            { id: "MOTORCYCLE", label: "Motorcycle" },
         ];
     }
 }
@@ -76,9 +76,10 @@ export async function getVehicleModes(signal?: AbortSignal): Promise<VehicleMode
 export async function getNavigationRoute(
     start: MapCoordinate,
     destination: MapCoordinate,
-    _vehicleMode: VehicleMode["id"] = "DRIVING",
+    vehicleMode: VehicleMode["id"] = "DRIVING",
     signal?: AbortSignal,
 ) {
+    const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
     const directions = await jsonApiRequest<DirectionsResponse>(
         API_PATHS.NAVIGATION_ROUTING,
         {
@@ -87,6 +88,8 @@ export async function getNavigationRoute(
             maxAlternatives: 0,
             originLatitude: start[1],
             originLongitude: start[0],
+            vehicleMode: isMotorcycle ? 'DRIVING' : (vehicleMode as 'DRIVING'),
+            vehicleType: isMotorcycle ? 'MOTORCYCLE' : 'CAR',
         },
         undefined,
         signal,

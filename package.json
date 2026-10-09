@@ -60,6 +60,7 @@
     ],
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/__mocks__/styleMock.js",
+      "^@/assets/(.*)$": "<rootDir>/apps/mobile/assets/$1",
       "^@/(.*)$": "<rootDir>/apps/mobile/src/$1"
     }
   },

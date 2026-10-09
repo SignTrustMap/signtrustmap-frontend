@@ -29,7 +29,7 @@ export const navigationHandlers = [
   http.post(NAVIGATION_ROUTING_PATH, async ({ request }) => {
     const body = (await request.json().catch(() => ({}))) as any;
     // Inspect origin or parameters
-    if (body.vehicleMode === 'BIKE') {
+    if (body.vehicleMode === 'BIKE' || body.vehicleType === 'MOTORCYCLE' || body.vehicleMode === 'MOTORCYCLE') {
       return HttpResponse.json(mockDirectionsBike, { status: 200 });
     }
     return HttpResponse.json(mockDirectionsDriving, { status: 200 });

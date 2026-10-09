@@ -7,7 +7,35 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
 import { TransactionList } from '../components/transaction-list';
-import { creditHistoryGroups } from '../data/mock-credit-data';
+
+const creditHistoryGroups = [
+  {
+    label: 'Tháng 8 năm 2026',
+    transactions: [
+      {
+        id: '1',
+        type: 'transaction',
+        name: 'Gia hạn gói Pro',
+        amount: -129000,
+        timestamp: '01 Th08 2026, 10:30',
+      },
+      {
+        id: '2',
+        type: 'transaction',
+        name: 'Nâng cấp lên gói Pro',
+        amount: -129000,
+        timestamp: '15 Th07 2026, 14:20',
+      },
+      {
+        id: '3',
+        type: 'transaction',
+        name: 'Nạp tiền lần 1',
+        amount: -100000,
+        timestamp: '01 Th07 2026, 09:00',
+      },
+    ],
+  },
+];
 
 export function CreditHistoryScreen() {
   const router = useRouter();

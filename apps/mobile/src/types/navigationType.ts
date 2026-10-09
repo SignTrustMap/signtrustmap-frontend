@@ -1,4 +1,4 @@
-export type VehicleModeId = "DRIVING" | "BIKE";
+export type VehicleModeId = "DRIVING" | "MOTORCYCLE" | "BIKE";
 
 export type VehicleMode = { id: VehicleModeId; label: string };
 

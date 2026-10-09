@@ -116,7 +116,7 @@ export function RouteSearchScreen() {
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}
         {!isLoading && !error && locations.length === 0 ? (
-          <Text style={[styles.error, { color: theme.textSecondary }]}>Không tìm thấy điểm đến phù hợp.</Text>
+          <Text style={[styles.error, { color: theme.textSecondary }]}>Không có điểm đến.</Text>
         ) : null}
         {!isLoading && locations.map((location) => (
           <AppButton

@@ -23,7 +23,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
-import { getRouteForwardBearing } from '../utils/geo';
+import { calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
 import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
 import { formatDate } from '@/utils/format-date';
@@ -42,6 +42,7 @@ type NavigationMapViewProps = {
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
   isCustomStart?: boolean;
+  onSignSelect?: (sign: RouteSign | null) => void;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -477,10 +478,12 @@ export function NavigationMapView({
   userCoordinate,
   hasLiveLocation = false,
   isCustomStart = false,
+  onSignSelect,
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSignPressTimeRef = useRef<number>(0);
   const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
   // Tracks whether the navigation Camera's native view is ready to receive setStop commands.
   // When navigationActive flips on the Camera key changes, causing a remount — calling
@@ -494,15 +497,21 @@ export function NavigationMapView({
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     dismissTimerRef.current = setTimeout(() => {
       setSelectedSignId(null);
+      onSignSelect?.(null);
     }, 4000);
 
     return () => {
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     };
-  }, [selectedSignId, destination]);
+  }, [selectedSignId, destination, onSignSelect]);
 
   const handleSignPress = (sign: RouteSign) => {
-    setSelectedSignId((prev) => (prev === sign.id ? null : sign.id));
+    lastSignPressTimeRef.current = Date.now();
+    setSelectedSignId((prev) => {
+      const next = prev === sign.id ? null : sign.id;
+      onSignSelect?.(next ? sign : null);
+      return next;
+    });
   };
 
   const sortedRouteSigns = useMemo(() => {
@@ -544,6 +553,73 @@ export function NavigationMapView({
 
   const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
     onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
+  };
+
+  const handleMapPress = async (event: any) => {
+    // If a sign marker was tapped within the last 450ms, ignore map background tap
+    if (Date.now() - lastSignPressTimeRef.current < 450) {
+      return;
+    }
+
+    const clickLngLat: [number, number] | undefined =
+      event?.nativeEvent?.lngLat ?? event?.lngLat;
+    const clickPoint: [number, number] | undefined =
+      event?.nativeEvent?.point ?? event?.point;
+
+    if (sortedRouteSigns.length > 0) {
+      // 1. Screen-pixel distance hit test (most accurate for touch interaction)
+      if (clickPoint && Array.isArray(clickPoint) && clickPoint.length >= 2 && mapRef.current?.project) {
+        try {
+          let bestSign: RouteSign | null = null;
+          let bestDist = Number.POSITIVE_INFINITY;
+
+          for (const sign of sortedRouteSigns) {
+            if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
+            const projected = await mapRef.current.project(sign.coordinate);
+            if (projected && Array.isArray(projected) && projected.length >= 2) {
+              const dx = projected[0] - clickPoint[0];
+              // Marker anchor is 'bottom', height is 36dp. Icon center is ~18dp above coordinate.
+              const dy = (projected[1] - 18) - clickPoint[1];
+              const dist = Math.hypot(dx, dy);
+              if (dist < bestDist && dist <= 38) {
+                bestDist = dist;
+                bestSign = sign;
+              }
+            }
+          }
+
+          if (bestSign) {
+            handleSignPress(bestSign);
+            return;
+          }
+        } catch {
+          // If project fails, fall through to geo distance
+        }
+      }
+
+      // 2. Geographic distance fallback (within ~35 meters)
+      if (clickLngLat && Array.isArray(clickLngLat) && clickLngLat.length >= 2) {
+        let closestSign: RouteSign | null = null;
+        let minDistance = Number.POSITIVE_INFINITY;
+
+        for (const sign of sortedRouteSigns) {
+          if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
+          const d = calculateDistanceMeters(clickLngLat, sign.coordinate);
+          if (d < minDistance) {
+            minDistance = d;
+            closestSign = sign;
+          }
+        }
+
+        if (closestSign && minDistance <= 35) {
+          handleSignPress(closestSign);
+          return;
+        }
+      }
+    }
+
+    setSelectedSignId(null);
+    onSignSelect?.(null);
   };
   const mapLibre = loadMapLibre();
   // The camera only targets destination when available; if neither destination
@@ -666,7 +742,7 @@ export function NavigationMapView({
     <View style={styles.container}>
       <Map
         ref={mapRef}
-        onPress={() => setSelectedSignId(null)}
+        onPress={handleMapPress}
         onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
         onDidFinishLoadingMap={() => {
           void mapRef.current?.getBounds().then(reportBounds).catch(() => {
@@ -758,8 +834,8 @@ export function NavigationMapView({
           return (
             <Marker
               anchor="bottom"
-              id={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
-              key={`route-sign-${sign.id}-${freshness.color}-${isSelected ? 'sel' : 'unsel'}`}
+              id={`route-sign-${sign.id}`}
+              key={`route-sign-${sign.id}`}
               lngLat={sign.coordinate}
               onPress={() => handleSignPress(sign)}
             >
@@ -767,9 +843,11 @@ export function NavigationMapView({
                 {isSelected && destination ? (
                   <SignCallout freshness={freshness} sign={sign} />
                 ) : null}
-                <View
+                <Pressable
                   accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
                   accessibilityRole="button"
+                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                  onPress={() => handleSignPress(sign)}
                   style={styles.stopSignMarker}
                 >
                   <SignMarkerIcon
@@ -782,7 +860,7 @@ export function NavigationMapView({
                     key={`dot-${freshness.color}`}
                     style={[styles.markerFreshnessDot, { backgroundColor: freshness.color }]}
                   />
-                </View>
+                </Pressable>
               </View>
             </Marker>
           );
@@ -833,7 +911,10 @@ export function NavigationMapView({
 
       {!destination && selectedSign ? (
         <SignDetailsBottomSheet
-          onClose={() => setSelectedSignId(null)}
+          onClose={() => {
+            setSelectedSignId(null);
+            onSignSelect?.(null);
+          }}
           sign={selectedSign}
         />
       ) : null}
@@ -873,7 +954,10 @@ const styles = StyleSheet.create({
   },
   // ── Sign marker ─────────────────────────────────────────────────────────────
   signMarkerRoot: {
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   stopSignMarker: {
     width: 36,

@@ -6,7 +6,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Camera } from "expo-camera";
-import { Image } from "expo-image";
+import { Image as ExpoImage } from "expo-image";
+import { Image } from "react-native";
 import { AppButton } from "@/components/ui/button";
 import { AppToast } from "@/components/ui/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
@@ -20,9 +21,9 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 import { useSignFilter } from "@/context/sign-filter-provider";
-
+const AppLogo = require('@/assets/images/app-logo.png') as number;
 import { NavigationMapView } from "../components/navigation-map-view";
-import type { NavigationStep } from '@/api/navigation/navigation';
+import type { NavigationStep, RouteSign } from '@/api/navigation/navigation';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
@@ -354,6 +355,7 @@ export function NavigationMapScreen() {
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
+  const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
   // Use rerouteOrigin when available (off-route rerouting), otherwise the
   // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
   // triggers an automatic re-fetch for the new path.
@@ -394,6 +396,13 @@ export function NavigationMapScreen() {
       snapTo(0);
     }
   }, [isNavigating, snapTo]);
+
+  // Clear selected map sign when destination changes or route is started
+  useEffect(() => {
+    if (selectedDestination) {
+      setSelectedMapSign(null);
+    }
+  }, [selectedDestination]);
 
   const hasLiveLocation = Boolean(
     isNavigating && navigationSession?.hasLiveLocation,
@@ -972,6 +981,7 @@ export function NavigationMapScreen() {
           routeStart={plannedRouteOrigin}
           routeSigns={filteredSigns}
           showCurrentLocation={!isNavigating}
+          onSignSelect={setSelectedMapSign}
         />
 
         {!hasSelectedRoute && boundsSignsError ? (
@@ -1025,7 +1035,7 @@ export function NavigationMapScreen() {
               {upcomingSignsOnRoute.map((sign) => (
                 <View key={sign.id} style={styles.upcomingSignRow}>
                   {sign.imageUrl ? (
-                    <Image
+                    <ExpoImage
                       accessibilityLabel={sign.name ?? 'Biển báo'}
                       contentFit="contain"
                       source={{ uri: sign.imageUrl }}
@@ -1246,8 +1256,8 @@ export function NavigationMapScreen() {
                     >
                       <Image
                         accessibilityLabel="Logo ứng dụng"
-                        contentFit="cover"
-                        source={require('@/assets/images/app-logo.svg')}
+                        resizeMode="contain"
+                        source={AppLogo}
                         style={styles.appLogo}
                       />
                       <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
@@ -1515,7 +1525,7 @@ export function NavigationMapScreen() {
               </View>
             ) : null}
 
-            {!selectedDestination ? (
+            {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
                 {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
@@ -1764,7 +1774,7 @@ export function NavigationMapScreen() {
                     style={styles.routeHeaderInfo}
                   >
                     <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
-                      {vehicleMode === 'BIKE' ? 'Xe máy' : 'Ô tô'}
+                      {vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
                     </Text>
                     {routeDuration !== undefined && routeDistance !== undefined ? (
                       <>
@@ -1824,27 +1834,27 @@ export function NavigationMapScreen() {
 
                   <AppButton
                     accessibilityLabel="Lộ trình xe máy"
-                    onPress={() => setVehicleMode('BIKE')}
+                    onPress={() => setVehicleMode('MOTORCYCLE')}
                     style={[
                       styles.vehicleTabButton,
-                      vehicleMode === 'BIKE' && styles.vehicleTabButtonActive,
+                      vehicleMode === 'MOTORCYCLE' && styles.vehicleTabButtonActive,
                     ]}
                     variant="ghost"
                   >
                     <MaterialCommunityIcons
                       name="motorbike"
                       size={24}
-                      color={vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary}
+                      color={vehicleMode === 'MOTORCYCLE' ? theme.primary : theme.textSecondary}
                     />
                     <Text
                       style={[
                         styles.vehicleTabDurationText,
-                        { color: vehicleMode === 'BIKE' ? theme.primary : theme.textSecondary },
+                        { color: vehicleMode === 'MOTORCYCLE' ? theme.primary : theme.textSecondary },
                       ]}
                     >
                       {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
                     </Text>
-                    {vehicleMode === 'BIKE' ? (
+                    {vehicleMode === 'MOTORCYCLE' ? (
                       <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
                     ) : null}
                   </AppButton>
