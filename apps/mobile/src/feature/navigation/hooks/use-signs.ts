@@ -35,15 +35,19 @@ export function useGetSignsInBounds(
   });
 }
 
+import type { VehicleMode } from '@/types/navigationType';
+
 export function useGetSignsAlongRoute(
   start: MapCoordinate | undefined,
   destination: MapCoordinate | undefined,
   geometry: RoutePointDto[] | undefined,
+  vehicleMode: VehicleMode["id"] = "DRIVING",
 ) {
+  const vehicleType = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE' ? 'MOTORCYCLE' : 'CAR';
   return useQuery({
-    queryKey: ['signs-along-route', start, destination, geometry],
+    queryKey: ['signs-along-route', start, destination, geometry, vehicleType],
     queryFn: start && destination && geometry && geometry.length >= 2
-      ? ({ signal }) => getSignsAlongRoute({ geometry }, signal)
+      ? ({ signal }) => getSignsAlongRoute({ geometry, vehicleType }, signal)
       : skipToken,
     select: (response) => response.signs.map(({ sign }) => toRouteSign(sign)),
     staleTime: 30_000,

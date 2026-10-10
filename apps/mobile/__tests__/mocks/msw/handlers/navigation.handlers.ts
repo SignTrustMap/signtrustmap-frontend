@@ -125,4 +125,134 @@ export const navigationHandlers = [
       { status: 200 },
     );
   }),
+
+  // 11. Saved Routes: GET /saved-routes/:id/signs
+  http.get('*/api/v1/saved-routes/:id/signs', ({ params }) => {
+    return HttpResponse.json(
+      {
+        routeId: params.id,
+        routeTitle: 'Lộ trình mẫu',
+        vehicleMode: 'MOTORCYCLE',
+        distanceMeters: 5200,
+        signCount: mockSignsAlongRouteResponse.signs?.length ?? 0,
+        signs: mockSignsAlongRouteResponse.signs ?? [],
+      },
+      { status: 200 }
+    );
+  }),
+
+  // 12. Saved Routes: GET /saved-routes/:id
+  http.get('*/api/v1/saved-routes/:id', ({ params }) => {
+    return HttpResponse.json(
+      {
+        id: params.id || 'mock-saved-route-1',
+        userId: 'user-123',
+        title: 'Đi làm hàng ngày',
+        vehicleMode: 'MOTORCYCLE',
+        originName: 'Nhà riêng',
+        originLatitude: 10.7769,
+        originLongitude: 106.7009,
+        destinationName: 'Công ty',
+        destinationLatitude: 10.85,
+        destinationLongitude: 106.772,
+        distanceMeters: 5200,
+        durationSeconds: 900,
+        encodedPolyline: '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+        filterRules: {
+          onlyFixedSigns: true,
+          categories: ['P', 'W', 'R'],
+        },
+        createdAt: '2026-03-01T08:00:00Z',
+        updatedAt: '2026-03-01T08:00:00Z',
+      },
+      { status: 200 }
+    );
+  }),
+
+  // 13. Saved Routes: GET /saved-routes
+  http.get('*/api/v1/saved-routes', () => {
+    return HttpResponse.json(
+      [
+        {
+          id: 'mock-saved-route-1',
+          userId: 'user-123',
+          title: 'Đi làm hàng ngày',
+          vehicleMode: 'MOTORCYCLE',
+          originName: 'Nhà riêng',
+          originLatitude: 10.7769,
+          originLongitude: 106.7009,
+          destinationName: 'Công ty',
+          destinationLatitude: 10.85,
+          destinationLongitude: 106.772,
+          distanceMeters: 5200,
+          durationSeconds: 900,
+          encodedPolyline: '_p~iF~ps|U_ulLnnqC_mqNvxq`@',
+          filterRules: {
+            onlyFixedSigns: true,
+            categories: ['P', 'W', 'R'],
+          },
+          createdAt: '2026-03-01T08:00:00Z',
+          updatedAt: '2026-03-01T08:00:00Z',
+        },
+      ],
+      { status: 200 }
+    );
+  }),
+
+  // 14. Saved Routes: POST /saved-routes
+  http.post('*/api/v1/saved-routes', async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as any;
+    return HttpResponse.json(
+      {
+        id: `mock-saved-route-${Date.now()}`,
+        userId: 'user-123',
+        title: body.title || 'Lộ trình mới',
+        vehicleMode: body.vehicleMode || 'MOTORCYCLE',
+        originName: body.originName || 'Điểm xuất phát',
+        originLatitude: body.originLatitude || 10.7769,
+        originLongitude: body.originLongitude || 106.7009,
+        destinationName: body.destinationName || 'Điểm đến',
+        destinationLatitude: body.destinationLatitude || 10.85,
+        destinationLongitude: body.destinationLongitude || 106.772,
+        distanceMeters: body.distanceMeters || 5000,
+        durationSeconds: body.durationSeconds || 850,
+        encodedPolyline: body.encodedPolyline || '',
+        filterRules: body.filterRules || { onlyFixedSigns: true, categories: ['P', 'W', 'R'] },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      { status: 201 }
+    );
+  }),
+
+  // 15. Saved Routes: PATCH /saved-routes/:id
+  http.patch('*/api/v1/saved-routes/:id', async ({ request, params }) => {
+    const body = (await request.json().catch(() => ({}))) as any;
+    return HttpResponse.json(
+      {
+        id: params.id || 'mock-saved-route-1',
+        userId: 'user-123',
+        title: body.title || 'Lộ trình cập nhật',
+        vehicleMode: body.vehicleMode || 'MOTORCYCLE',
+        originName: 'Nhà riêng',
+        originLatitude: 10.7769,
+        originLongitude: 106.7009,
+        destinationName: 'Công ty',
+        destinationLatitude: 10.85,
+        destinationLongitude: 106.772,
+        distanceMeters: 5200,
+        durationSeconds: 900,
+        encodedPolyline: '',
+        filterRules: body.filterRules || { onlyFixedSigns: true, categories: ['P', 'W', 'R'] },
+        createdAt: '2026-03-01T08:00:00Z',
+        updatedAt: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
+  }),
+
+  // 16. Saved Routes: DELETE /saved-routes/:id
+  http.delete('*/api/v1/saved-routes/:id', ({ params }) => {
+    return HttpResponse.json({ success: true, id: params.id || 'mock-saved-route-1' }, { status: 200 });
+  }),
 ];

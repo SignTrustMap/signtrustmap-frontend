@@ -72,6 +72,14 @@ jest.mock('@/feature/navigation/hooks/use-places', () => ({
   usePlaceSuggestions: jest.fn(() => ({ data: [] })),
 }));
 
+jest.mock('@/feature/saved-routes/hooks/use-saved-routes', () => ({
+  useGetSavedRoute: jest.fn(() => ({ data: undefined })),
+  useGetSavedRouteSigns: jest.fn(() => ({ data: undefined })),
+  useCreateSavedRoute: jest.fn(() => ({ mutateAsync: jest.fn() })),
+  useUpdateSavedRoute: jest.fn(() => ({ mutateAsync: jest.fn() })),
+  useDeleteSavedRoute: jest.fn(() => ({ mutateAsync: jest.fn() })),
+}));
+
 // 5. Mock GPS utilities
 jest.mock('@/feature/navigation/utils/gps', () => ({
   ensureLocationPermission: jest.fn(),
@@ -119,16 +127,16 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
     (fetchFreshGpsPosition as jest.Mock).mockResolvedValue([106.69, 10.76]);
 
-    const { getAllByText, getByText, queryByText } = await render(<NavigationMapScreen />);
+    const { getAllByText, getByText, queryByText, getByLabelText } = await render(<NavigationMapScreen />);
 
     // 1. Destination card is shown
     expect(getAllByText('Bitexco Financial Tower').length).toBeGreaterThan(0);
     expect(getByText('2 Hai Trieu, Ben Nghe, District 1')).toBeTruthy();
-    expect(getByText('Start route')).toBeTruthy();
+    expect(getByLabelText('Start route')).toBeTruthy();
 
     // 2. Route planning tabs are NOT shown yet
-    expect(queryByText('Bike')).toBeNull();
-    expect(queryByText('Car')).toBeNull();
+    expect(queryByText(/Bike|Xe máy/i)).toBeNull();
+    expect(queryByText(/Car|Ô tô/i)).toBeNull();
 
     // 3. Map received destination coordinate, but routeStart is undefined
     expect(mockMapProps.destination).toEqual({
@@ -152,9 +160,9 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
     (fetchFreshGpsPosition as jest.Mock).mockResolvedValue([106.695, 10.765]);
 
-    const { getByText } = await render(<NavigationMapScreen />);
+    const { getByLabelText } = await render(<NavigationMapScreen />);
 
-    const startRouteButton = getByText('Start route');
+    const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
 
     await waitFor(() => {
@@ -175,9 +183,9 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
   it('user clicks "Start route" when GPS permission is denied: redirects to starting point selection screen', async () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(false);
 
-    const { getByText } = await render(<NavigationMapScreen />);
+    const { getByLabelText } = await render(<NavigationMapScreen />);
 
-    const startRouteButton = getByText('Start route');
+    const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
 
     await waitFor(() => {
@@ -205,9 +213,9 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
     (fetchFreshGpsPosition as jest.Mock).mockResolvedValue(null);
 
-    const { getByText } = await render(<NavigationMapScreen />);
+    const { getByLabelText } = await render(<NavigationMapScreen />);
 
-    const startRouteButton = getByText('Start route');
+    const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
 
     await waitFor(() => {
@@ -280,8 +288,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
 
       // Initial vehicle tab and header show driving info
-      expect(getByText('Car')).toBeTruthy();
-      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+      expect(getByText(/Car|Ô tô/i)).toBeTruthy();
+      expect(getAllByText(/10 min|10 phút/i).length).toBeGreaterThan(0);
       expect(getByText('(1.2 km)')).toBeTruthy();
 
       // 2. Switch vehicle mode to Bike
@@ -298,8 +306,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       });
 
       expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
-      expect(getByText('Bike')).toBeTruthy();
-      expect(getAllByText('5 min').length).toBeGreaterThan(0);
+      expect(getByText(/Bike|Xe máy/i)).toBeTruthy();
+      expect(getAllByText(/5 min|5 phút/i).length).toBeGreaterThan(0);
       expect(getByText('(1.0 km)')).toBeTruthy();
 
       // 4. Switch back to Car mode
@@ -315,8 +323,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       });
 
       expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
-      expect(getByText('Car')).toBeTruthy();
-      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+      expect(getByText(/Car|Ô tô/i)).toBeTruthy();
+      expect(getAllByText(/10 min|10 phút/i).length).toBeGreaterThan(0);
     });
 
     it('switches vehicle mode when starting point and destination are selected with GPS: affects routing and estimated time', async () => {
@@ -337,7 +345,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       const { getByLabelText, getAllByText, getByText } = await render(<NavigationMapScreen />);
 
       // Initially route is not calculated until user starts route with GPS
-      const startRouteButton = getByText('Start route');
+      const startRouteButton = getByLabelText('Start route');
       fireEvent.press(startRouteButton);
 
       await waitFor(() => {
@@ -350,8 +358,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
 
       expect(mockMapProps.routeStart).toEqual([106.695, 10.765]);
       expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
-      expect(getByText('Car')).toBeTruthy();
-      expect(getAllByText('10 min').length).toBeGreaterThan(0);
+      expect(getByText(/Car|Ô tô/i)).toBeTruthy();
+      expect(getAllByText(/10 min|10 phút/i).length).toBeGreaterThan(0);
       expect(getByText('(1.2 km)')).toBeTruthy();
 
       // Switch vehicle mode to Bike
@@ -367,8 +375,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       });
 
       expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
-      expect(getByText('Bike')).toBeTruthy();
-      expect(getAllByText('5 min').length).toBeGreaterThan(0);
+      expect(getByText(/Bike|Xe máy/i)).toBeTruthy();
+      expect(getAllByText(/5 min|5 phút/i).length).toBeGreaterThan(0);
       expect(getByText('(1.0 km)')).toBeTruthy();
     });
   });

@@ -390,11 +390,11 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
   });
 
   // =========================================================================
-  // CASE 4: Decline Review Action with Decline Reason Modal
+  // CASE 4: Decline Review Action with Sign Remedies Grid Bottom Sheet
   // =========================================================================
-  describe('Case 4: Decline Review Action with Decline Reason Modal', () => {
-    it('opens decline modal, selects reason, confirms decline, and dispatches vote with decline details', async () => {
-      const { getByLabelText, getByText } = await render(
+  describe('Case 4: Decline Review Action with Sign Remedies Grid Bottom Sheet', () => {
+    it('displays Sign detected label, opens remedies grid, selects top sign, and confirms vote with suggestedSignTypeId', async () => {
+      const { getByLabelText, getByText, getByTestId } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
         </ReviewWorkflowProvider>
@@ -404,35 +404,41 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
       });
 
-      await fireEvent.press(getByLabelText('Decline submission'));
+      // Verify "Sign detected" label is displayed
+      expect(getByText('Sign detected')).toBeTruthy();
+
+      await fireEvent.press(getByLabelText(/Decline submission/i));
 
       await waitFor(() => {
-        expect(getByText('Decline Reason')).toBeTruthy();
-        expect(getByText('Sign Not Found')).toBeTruthy();
+        expect(getByText('Gợi ý biển báo')).toBeTruthy();
+        expect(getByTestId('remedies-grid')).toBeTruthy();
+        expect(getByText('W.201a')).toBeTruthy();
+        expect(getByText('no correct option?')).toBeTruthy();
+        expect(getByLabelText('Báo cáo')).toBeTruthy();
       });
 
-      // Select standard reason
-      await fireEvent.press(getByText('Sign Not Found'));
+      // Select top remedy sign W.201a
+      await fireEvent.press(getByText('W.201a'));
 
-      // Confirm decline
-      await fireEvent.press(getByText('Confirm Decline'));
+      // Confirm decline with remedy
+      await fireEvent.press(getByText('Xác nhận chọn'));
 
       await waitFor(() => {
         expect(mockCastVote).toHaveBeenCalledWith(
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
-            request: {
+            request: expect.objectContaining({
               vote: -1,
-              declineReason: 'Sign Not Found',
-            },
+              suggestedSignTypeId: 102,
+            }),
           })
         );
-        expect(getByText('Sign declined')).toBeTruthy();
+        expect(getByText('Đã từ chối biển báo')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });
 
-    it('requires text input when "Other" decline reason is chosen before allowing confirmation', async () => {
+    it('navigates to report note sheet when report button below "no correct option?" is clicked', async () => {
       const { getByLabelText, getByText, getByPlaceholderText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
@@ -443,29 +449,32 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
       });
 
-      await fireEvent.press(getByLabelText('Decline submission'));
+      await fireEvent.press(getByLabelText(/Decline submission/i));
 
       await waitFor(() => {
-        expect(getByText('Other')).toBeTruthy();
+        expect(getByText('no correct option?')).toBeTruthy();
       });
 
-      await fireEvent.press(getByText('Other'));
-
-      const input = getByPlaceholderText('Please specify the reason');
-      expect(input).toBeTruthy();
-
-      // Type detail reason
-      await fireEvent.changeText(input, 'Sign is obscured by tree branches');
-      await fireEvent.press(getByText('Confirm Decline'));
+      // Click report button below "no correct option?"
+      await fireEvent.press(getByLabelText('Báo cáo'));
 
       await waitFor(() => {
-        expect(mockCastVote).toHaveBeenCalledWith(
+        expect(getByText('Báo cáo dữ liệu')).toBeTruthy();
+      });
+
+      const input = getByPlaceholderText('Mô tả sự cố hoặc sai lệch với dữ liệu này...');
+      expect(input).toBeTruthy();
+
+      // Enter report reason and submit
+      await fireEvent.changeText(input, 'Sign is completely obscured and unidentifiable');
+      await fireEvent.press(getByText('Gửi báo cáo'));
+
+      await waitFor(() => {
+        expect(mockReportCandidate).toHaveBeenCalledWith(
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
             request: {
-              vote: -1,
-              declineReason: 'Other',
-              declineNote: 'Sign is obscured by tree branches',
+              reason: 'Sign is completely obscured and unidentifiable',
             },
           })
         );
@@ -883,27 +892,27 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('filters sign cards in real-time by search query across name and code', async () => {
       const { getByPlaceholderText, getByText, queryByText } = await render(<SignCatalogScreen />);
 
-      const searchInput = getByPlaceholderText('Search signs...');
+      const searchInput = getByPlaceholderText('Tìm kiếm biển báo...');
 
       // Search by partial English name
       await fireEvent.changeText(searchInput, 'Curve');
       await waitFor(() => {
-        expect(getByText('Dangerous Curve Ahead')).toBeTruthy();
-        expect(queryByText('No Left Turn')).toBeNull();
+        expect(getByText('Chỗ ngoặt nguy hiểm')).toBeTruthy();
+        expect(queryByText('Cấm rẽ trái')).toBeNull();
       });
 
       // Search by sign code
       await fireEvent.changeText(searchInput, 'P.123');
       await waitFor(() => {
-        expect(queryByText('Dangerous Curve Ahead')).toBeNull();
-        expect(getByText('No Left Turn')).toBeTruthy();
+        expect(queryByText('Chỗ ngoặt nguy hiểm')).toBeNull();
+        expect(getByText('Cấm rẽ trái')).toBeTruthy();
       });
 
       // Search with non-matching query -> Empty state
       await fireEvent.changeText(searchInput, 'xyz123random');
       await waitFor(() => {
-        expect(getByText('No signs found')).toBeTruthy();
-        expect(getByText('Try another English name, description, or category.')).toBeTruthy();
+        expect(getByText('Không tìm thấy biển báo')).toBeTruthy();
+        expect(getByText('Thử tìm theo tên, mô tả hoặc danh mục khác.')).toBeTruthy();
       });
     });
   });
@@ -915,17 +924,17 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders Review and Catalog tabs and handles route transitions', async () => {
       const { getByText } = await render(<ReviewBottomTabs activeTab="review" />);
 
-      expect(getByText('Review')).toBeTruthy();
-      expect(getByText('Catalog')).toBeTruthy();
+      expect(getByText('Thẩm định')).toBeTruthy();
+      expect(getByText('Tra cứu')).toBeTruthy();
 
-      await fireEvent.press(getByText('Catalog'));
+      await fireEvent.press(getByText('Tra cứu'));
       expect(mockReplace).toHaveBeenCalledWith('/work/sign-catalog');
     });
 
     it('navigates to /work/submission-review when Review tab is clicked from catalog', async () => {
       const { getByText } = await render(<ReviewBottomTabs activeTab="catalog" />);
 
-      await fireEvent.press(getByText('Review'));
+      await fireEvent.press(getByText('Thẩm định'));
       expect(mockReplace).toHaveBeenCalledWith('/work/submission-review');
     });
   });

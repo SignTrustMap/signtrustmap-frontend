@@ -30,7 +30,10 @@ export type ReviewWorkflowContextValue = {
   checkedReviewIndex: number;
   checkingSubmission: boolean;
   isCheckingSubmission: boolean;
-  completeCurrentReview: (actionOrDecision: ReviewActionType | ReviewDecision, details?: { declineReason?: string; declineNote?: string }) => Promise<boolean>;
+  completeCurrentReview: (
+    actionOrDecision: ReviewActionType | ReviewDecision,
+    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
+  ) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
   goToNextCheckedReview: () => void;
@@ -182,7 +185,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const completeCurrentReview = async (
     actionOrDecision: ReviewActionType | ReviewDecision,
-    details?: { declineReason?: string; declineNote?: string }
+    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
@@ -191,6 +194,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const action: ReviewActionType = typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
     const reason = details?.declineReason || (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
     const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
+    const suggestedSignTypeId = (details as any)?.suggestedSignTypeId ?? (typeof actionOrDecision === 'object' ? (actionOrDecision as any).suggestedSignTypeId : undefined);
 
     // 1. Immediately update UI state optimistically so review cards advance with zero lag
     setReviewHistory((history) => {
@@ -232,6 +236,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           params,
           request: {
             vote: action === 'approved' ? 1 : -1,
+            ...(suggestedSignTypeId != null ? { suggestedSignTypeId: Number(suggestedSignTypeId) } : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
           },

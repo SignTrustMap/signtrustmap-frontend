@@ -259,10 +259,10 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
   });
 
   // =========================================================================
-  // 4. Review Decisions: Decline (-1) with Reason Selection
+  // 4. Review Decisions: Decline (-1) with Sign Remedies Selection
   // =========================================================================
-  describe('FIT-REV-05: Decline with Bottom Sheet Reason', () => {
-    it('opens decline bottom sheet, selects reason, and submits vote: -1 payload', async () => {
+  describe('FIT-REV-05: Decline with Sign Remedies Bottom Sheet', () => {
+    it('displays Sign detected label, opens remedies grid, selects top sign, and submits vote: -1 payload', async () => {
       let capturedDeclinePayload: any = null;
 
       server.use(
@@ -275,23 +275,29 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
       const { findByText, getByLabelText, getByText } = await renderReviewFlow();
       await findByText(/Tốc độ tối đa 50 km\/h/i);
 
+      // Verify "Sign detected" label is present
+      expect(getByText('Sign detected')).toBeTruthy();
+
       // 1. Press Decline button
       const declineButton = getByLabelText('Decline submission');
       await fireEvent.press(declineButton);
 
-      // 2. Decline Sheet appears -> Select "Too Poor Image Quality"
-      const reasonOption = await findByText(/Too Poor Image Quality/i);
-      await fireEvent.press(reasonOption);
+      // 2. Decline Sheet appears with Sign Remedies grid and "no correct option?"
+      const remedyOption = await findByText('W.201a');
+      expect(remedyOption).toBeTruthy();
+      expect(getByText('no correct option?')).toBeTruthy();
+      expect(getByLabelText('Báo cáo')).toBeTruthy();
 
-      // 3. Confirm Decline
-      const confirmButton = getByText('Confirm Decline');
+      // 3. Select remedy sign and confirm
+      await fireEvent.press(remedyOption);
+      const confirmButton = getByText('Xác nhận chọn');
       await fireEvent.press(confirmButton);
 
       // 4. Verify MSW payload
       await waitFor(() => {
         expect(capturedDeclinePayload).toMatchObject({
           vote: -1,
-          declineReason: 'Too Poor Image Quality',
+          suggestedSignTypeId: 102,
         });
       });
 

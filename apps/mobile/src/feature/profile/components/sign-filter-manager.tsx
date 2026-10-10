@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -25,6 +26,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 export function SignFilterManager() {
   const theme = useTheme();
+  const router = useRouter();
   const {
     activePresetId,
     createPreset,
@@ -39,8 +41,9 @@ export function SignFilterManager() {
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<SignFilterPreset | null>(null);
   const [presetNameInput, setPresetNameInput] = useState('');
+  const [onlyFixedSignsInput, setOnlyFixedSignsInput] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<Set<SignCategory>>(
-    new Set(['MANDATORY'])
+    new Set(['MANDATORY', 'WARNING', 'PROHIBITORY'])
   );
   const [editorError, setEditorError] = useState('');
 
@@ -53,8 +56,9 @@ export function SignFilterManager() {
   // Open editor for new preset
   const handleOpenCreate = () => {
     setEditingPreset(null);
-    setPresetNameInput(`Danh sách ${presets.length + 1}`);
-    setSelectedCategories(new Set(['MANDATORY']));
+    setPresetNameInput(`Lộ trình ${presets.length + 1}`);
+    setSelectedCategories(new Set(['MANDATORY', 'WARNING', 'PROHIBITORY']));
+    setOnlyFixedSignsInput(true);
     setEditorError('');
     setIsEditorModalOpen(true);
   };
@@ -64,6 +68,7 @@ export function SignFilterManager() {
     setEditingPreset(preset);
     setPresetNameInput(preset.name);
     setSelectedCategories(new Set(preset.categories));
+    setOnlyFixedSignsInput(preset.onlyFixedSigns !== false);
     setEditorError('');
     setIsEditorModalOpen(true);
   };
@@ -74,6 +79,15 @@ export function SignFilterManager() {
     setRenameInput(preset.name);
     setRenameError('');
     setIsRenameModalOpen(true);
+  };
+
+  // Navigate to map to view corridor and signs
+  const handleViewOnMap = (preset: SignFilterPreset) => {
+    void setActivePresetId(preset.id);
+    router.push({
+      pathname: '/(authenticated)/(tabs)/home',
+      params: { savedRouteId: preset.id },
+    });
   };
 
   // Toggle category checkbox in editor
@@ -98,7 +112,7 @@ export function SignFilterManager() {
   const handleSaveEditor = async () => {
     const trimmed = presetNameInput.trim();
     if (!trimmed) {
-      setEditorError('Vui lòng nhập tên cho danh sách.');
+      setEditorError('Vui lòng nhập tên cho lộ trình/danh sách.');
       return;
     }
     if (selectedCategories.size === 0) {
@@ -111,9 +125,12 @@ export function SignFilterManager() {
       await updatePreset(editingPreset.id, {
         name: trimmed,
         categories: categoriesArray,
+        onlyFixedSigns: onlyFixedSignsInput,
       });
     } else {
-      await createPreset(trimmed, categoriesArray);
+      await createPreset(trimmed, categoriesArray, {
+        onlyFixedSigns: onlyFixedSignsInput,
+      });
     }
     setIsEditorModalOpen(false);
   };
@@ -134,7 +151,7 @@ export function SignFilterManager() {
   // Confirm delete
   const handleDeletePress = (preset: SignFilterPreset) => {
     Alert.alert(
-      'Xóa danh sách',
+      'Xóa lộ trình đã lưu',
       `Bạn có chắc chắn muốn xóa "${preset.name}"?`,
       [
         { text: 'Hủy', style: 'cancel' },
@@ -161,7 +178,7 @@ export function SignFilterManager() {
     <View style={styles.container}>
       <View style={styles.sectionHeadingRow}>
         <View style={styles.headingTitleRow}>
-          <Text style={[styles.subsectionTitle, { color: theme.text }]}>Danh sách lọc biển báo</Text>
+          <Text style={[styles.subsectionTitle, { color: theme.text }]}>Lộ trình đã lưu & Bộ lọc</Text>
           <AppButton
             accessibilityLabel="Tạo danh sách lọc mới"
             onPress={handleOpenCreate}
@@ -173,7 +190,7 @@ export function SignFilterManager() {
           </AppButton>
         </View>
         <Text style={[styles.subsectionDescription, { color: theme.textSecondary }]}>
-          Chỉ các biển báo trong danh sách đã chọn mới hiển thị trên bản đồ và phát cảnh báo âm thanh
+          Lộ trình đã lưu và quy tắc lọc biển báo (biển cố định, danh mục) khi dẫn đường
         </Text>
       </View>
 
@@ -193,7 +210,7 @@ export function SignFilterManager() {
           <View style={styles.rowCopy}>
             <Text style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
             <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
-              Hiển thị và cảnh báo cho tất cả 5 danh mục biển báo
+              Hiển thị và cảnh báo cho tất cả danh mục biển báo
             </Text>
           </View>
           {activePresetId === null ? (
@@ -201,13 +218,20 @@ export function SignFilterManager() {
           ) : null}
         </AppButton>
 
-        {/* User-created Presets */}
+        {/* User-created Presets / Bookmarked Routes */}
         {presets.map((preset) => {
           const isActive = activePresetId === preset.id;
           const categoryLabels = preset.categories
             .map((catId) => categoryMap.get(catId)?.label)
             .filter(Boolean)
             .join(', ');
+
+          const vehicleMode = preset.savedRoute?.vehicleMode?.toUpperCase();
+          const isBike = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+          const vehicleIcon = isBike ? 'motorbike' : 'car';
+          const hasRouteDetails = Boolean(
+            preset.savedRoute?.originName && preset.savedRoute?.destinationName
+          );
 
           return (
             <View
@@ -226,23 +250,64 @@ export function SignFilterManager() {
                 variant="ghost"
               >
                 <View style={styles.iconTile}>
-                  <MaterialCommunityIcons color={theme.primary} name="playlist-check" size={22} />
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name={hasRouteDetails ? vehicleIcon : 'playlist-check'}
+                    size={22}
+                  />
                 </View>
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>
                     {preset.name}
                   </Text>
-                  <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                    {categoryLabels || `${preset.categories.length} danh mục`}
-                  </Text>
+                  {hasRouteDetails ? (
+                    <Text numberOfLines={1} style={[styles.routePathText, { color: theme.textSecondary }]}>
+                      {`${preset.savedRoute!.originName} → ${preset.savedRoute!.destinationName}`}
+                    </Text>
+                  ) : null}
+                  <View style={styles.badgeRow}>
+                    {preset.onlyFixedSigns ? (
+                      <View style={[styles.ruleBadge, { backgroundColor: '#10B9811A', borderColor: '#10B981' }]}>
+                        <MaterialCommunityIcons color="#10B981" name="shield-check" size={11} />
+                        <Text style={[styles.ruleBadgeText, { color: '#10B981' }]}>Chỉ biển cố định</Text>
+                      </View>
+                    ) : null}
+                    <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary, flex: 1 }]}>
+                      {categoryLabels || `${preset.categories.length} danh mục`}
+                    </Text>
+                  </View>
                 </View>
                 {isActive ? (
                   <MaterialCommunityIcons color={theme.primary} name="check" size={22} />
                 ) : null}
               </AppButton>
 
-              {/* Action Buttons: Rename, Categories, Delete */}
+              {/* Action Buttons: View Map, Rename, Categories, Delete */}
               <View style={[styles.cardActionFooter, { borderTopColor: theme.border }]}>
+                <AppButton
+                  accessibilityLabel={`Xem trên bản đồ: ${preset.name}`}
+                  onPress={() => handleViewOnMap(preset)}
+                  style={styles.actionBtn}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons color={theme.primary} name="map-outline" size={14} />
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Bản đồ</Text>
+                </AppButton>
+
+                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+
+                <AppButton
+                  accessibilityLabel={`Chỉnh sửa bộ lọc cho ${preset.name}`}
+                  onPress={() => handleOpenEdit(preset)}
+                  style={styles.actionBtn}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons color={theme.primary} name="tune-variant" size={14} />
+                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Bộ lọc</Text>
+                </AppButton>
+
+                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
+
                 <AppButton
                   accessibilityLabel={`Đổi tên ${preset.name}`}
                   onPress={() => handleOpenRename(preset)}
@@ -251,18 +316,6 @@ export function SignFilterManager() {
                 >
                   <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={14} />
                   <Text style={[styles.actionBtnText, { color: theme.primary }]}>Đổi tên</Text>
-                </AppButton>
-
-                <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
-
-                <AppButton
-                  accessibilityLabel={`Chỉnh sửa danh mục cho ${preset.name}`}
-                  onPress={() => handleOpenEdit(preset)}
-                  style={styles.actionBtn}
-                  variant="ghost"
-                >
-                  <MaterialCommunityIcons color={theme.primary} name="tune-variant" size={14} />
-                  <Text style={[styles.actionBtnText, { color: theme.primary }]}>Danh mục</Text>
                 </AppButton>
 
                 <View style={[styles.actionDivider, { backgroundColor: theme.border }]} />
@@ -284,12 +337,12 @@ export function SignFilterManager() {
         {presets.length === 0 ? (
           <View style={[styles.overviewRow, styles.shadowRow]}>
             <View style={styles.iconTile}>
-              <MaterialCommunityIcons color={theme.primary} name="playlist-plus" size={22} />
+              <MaterialCommunityIcons color={theme.primary} name="bookmark-outline" size={22} />
             </View>
             <View style={styles.rowCopy}>
-              <Text style={[styles.rowTitle, { color: theme.text }]}>Chưa có danh sách tùy chỉnh</Text>
+              <Text style={[styles.rowTitle, { color: theme.text }]}>Chưa có lộ trình lưu nào</Text>
               <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                Tạo danh sách tùy chỉnh để lọc biển báo
+                Tạo lộ trình hoặc lưu từ bản đồ để tùy chỉnh bộ lọc biển báo
               </Text>
             </View>
             <AppButton
@@ -321,7 +374,7 @@ export function SignFilterManager() {
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {editingPreset ? 'Chỉnh sửa danh sách lọc' : 'Danh sách lọc mới'}
+                {editingPreset ? 'Chỉnh sửa lộ trình & bộ lọc' : 'Lộ trình & bộ lọc mới'}
               </Text>
               <Pressable
                 accessibilityLabel="Đóng chỉnh sửa"
@@ -333,7 +386,7 @@ export function SignFilterManager() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalScrollContent}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Tên danh sách</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Tên lộ trình / danh sách</Text>
               <TextInput
                 accessibilityLabel="Tên danh sách lọc"
                 autoFocus
@@ -342,7 +395,7 @@ export function SignFilterManager() {
                   setPresetNameInput(t);
                   setEditorError('');
                 }}
-                placeholder="VD: Chỉ biển hiệu lệnh, Lái xe cao tốc"
+                placeholder="VD: Đi làm hàng ngày, Lộ trình Q1 đến Q7"
                 placeholderTextColor={theme.placeholder}
                 style={[
                   styles.textInput,
@@ -354,6 +407,51 @@ export function SignFilterManager() {
                 ]}
                 value={presetNameInput}
               />
+
+              {/* Only Fixed Signs option */}
+              <Pressable
+                accessibilityLabel={`Chỉ hiển thị biển báo cố định, ${onlyFixedSignsInput ? 'bật' : 'tắt'}`}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: onlyFixedSignsInput }}
+                onPress={() => setOnlyFixedSignsInput((prev) => !prev)}
+                style={({ pressed }) => [
+                  styles.catOptionRow,
+                  {
+                    backgroundColor: onlyFixedSignsInput ? theme.backgroundSelected : theme.background,
+                    borderColor: onlyFixedSignsInput ? theme.primary : theme.border,
+                    opacity: pressed ? 0.75 : 1,
+                    marginTop: Spacing.two,
+                    marginBottom: Spacing.one,
+                  },
+                ]}
+              >
+                <View style={[styles.catIconShell, { backgroundColor: '#10B9811A' }]}>
+                  <MaterialCommunityIcons color="#10B981" name="shield-check" size={18} />
+                </View>
+
+                <View style={styles.catOptionCopy}>
+                  <Text style={[styles.catOptionTitle, { color: theme.text }]}>
+                    Chỉ hiển thị biển cố định
+                  </Text>
+                  <Text style={[styles.catOptionSublabel, { color: theme.placeholder }]}>
+                    Bỏ qua biển báo tạm thời, công trường, phân luồng sửa chữa
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.catCheckbox,
+                    {
+                      backgroundColor: onlyFixedSignsInput ? theme.primary : 'transparent',
+                      borderColor: onlyFixedSignsInput ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  {onlyFixedSignsInput ? (
+                    <MaterialCommunityIcons color="#FFFFFF" name="check" size={13} />
+                  ) : null}
+                </View>
+              </Pressable>
 
               <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
                 Chọn danh mục biển báo cần bao gồm
@@ -454,9 +552,9 @@ export function SignFilterManager() {
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
             ]}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Đổi tên danh sách lọc</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Đổi tên lộ trình</Text>
             <Text style={[styles.inputHint, { color: theme.placeholder }]}>
-              Nhập tên mới cho danh sách này:
+              Nhập tên mới cho lộ trình này:
             </Text>
 
             <TextInput
@@ -467,7 +565,7 @@ export function SignFilterManager() {
                 setRenameInput(t);
                 setRenameError('');
               }}
-              placeholder="Tên danh sách"
+              placeholder="Tên lộ trình"
               placeholderTextColor={theme.placeholder}
               style={[
                 styles.textInput,
@@ -582,6 +680,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 500,
     lineHeight: 21,
+  },
+  routePathText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 1,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  ruleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: Rounded.sm,
+    borderWidth: 0.5,
+  },
+  ruleBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: 600,
   },
   rowDescription: {
     fontFamily: Fonts.body,

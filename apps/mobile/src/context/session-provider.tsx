@@ -41,6 +41,10 @@ export const useSession = () => {
   return value;
 };
 
+export const useOptionalSession = (): SessionContextValue | null => {
+  return use(AuthContext);
+};
+
 function normalizeRoles(roles: unknown): AccountRole[] {
   const requestedRoles = Array.isArray(roles)
     ? roles.filter((role): role is AccountRole => ACCOUNT_ROLES.includes(role as AccountRole))

@@ -41,6 +41,7 @@ type NavigationMapViewProps = {
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeSigns?: RouteSign[];
+  signs?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
@@ -477,6 +478,7 @@ export function NavigationMapView({
   routeCoordinates,
   routeStart,
   routeSigns = [],
+  signs,
   showCurrentLocation = true,
   isNavigatingFeature = false,
   userCoordinate,
@@ -519,10 +521,11 @@ export function NavigationMapView({
   };
 
   const sortedRouteSigns = useMemo(() => {
+    const effectiveRouteSigns = routeSigns.length > 0 ? routeSigns : (signs ?? []);
     // 1. Deduplicate signs at identical coordinates with the same sign type/code,
     // prioritizing the selected sign, then the one with the highest freshness score.
     const dedup: Record<string, RouteSign> = {};
-    for (const sign of routeSigns) {
+    for (const sign of effectiveRouteSigns) {
       if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
       const key = `${sign.coordinate[0].toFixed(5)},${sign.coordinate[1].toFixed(5)}_${sign.signCode || sign.name || ''}`;
       const existing = dedup[key];
@@ -548,7 +551,7 @@ export function NavigationMapView({
       if (b.id === selectedSignId) return -1;
       return (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0);
     });
-  }, [routeSigns, selectedSignId]);
+  }, [routeSigns, signs, selectedSignId]);
 
   const selectedSign = useMemo(
     () => (selectedSignId ? sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null : null),

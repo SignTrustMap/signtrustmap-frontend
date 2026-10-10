@@ -85,10 +85,10 @@ export async function getNavigationRoute(
         {
             destinationLatitude: destination[1],
             destinationLongitude: destination[0],
-            maxAlternatives: 0,
+            maxAlternatives: 2,
             originLatitude: start[1],
             originLongitude: start[0],
-            vehicleMode: isMotorcycle ? 'DRIVING' : (vehicleMode as 'DRIVING'),
+            vehicleMode: isMotorcycle ? 'BIKE' : 'DRIVING',
             vehicleType: isMotorcycle ? 'MOTORCYCLE' : 'CAR',
         },
         undefined,
