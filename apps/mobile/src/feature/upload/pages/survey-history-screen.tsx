@@ -12,25 +12,25 @@ import { useTheme } from '@/hooks/use-theme';
 import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types/surveySubmissionType';
 
 const submissionLabels: Record<SubmissionType, string> = {
-  SINGLE_IMAGE: 'Image survey',
-  VIDEO_GPX: 'Video survey',
-  LIVE_TRIP: 'Live trip',
+  SINGLE_IMAGE: 'Khảo sát hình ảnh',
+  VIDEO_GPX: 'Khảo sát Video',
+  LIVE_TRIP: 'Chuyến đi trực tiếp',
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
-  DRAFT: 'Draft',
-  QUEUED: 'Queued',
-  SYNCHRONIZING: 'Synchronizing',
-  DETECTING: 'Detecting signs',
-  TRACKING: 'Tracking signs',
-  ESTIMATING: 'Estimating location',
-  CLASSIFYING: 'Classifying signs',
-  COMPLETED: 'Completed',
-  PARTIALLY_PROCESSED: 'Partially processed',
-  FAILED: 'Failed',
-  PENDING_CORRECTION: 'Needs correction',
-  NO_SIGN_DETECTED: 'No signs detected',
-  REJECTED: 'Rejected',
+  DRAFT: 'Bản nháp',
+  QUEUED: 'Đang chờ xử lý',
+  SYNCHRONIZING: 'Đang đồng bộ hóa',
+  DETECTING: 'Đang nhận diện biển báo',
+  TRACKING: 'Đang theo dõi biển báo',
+  ESTIMATING: 'Đang ước tính tọa độ',
+  CLASSIFYING: 'Đang phân loại biển báo',
+  COMPLETED: 'Đã hoàn tất',
+  PARTIALLY_PROCESSED: 'Xử lý một phần',
+  FAILED: 'Thất bại',
+  PENDING_CORRECTION: 'Cần chỉnh sửa',
+  NO_SIGN_DETECTED: 'Không phát hiện biển báo',
+  REJECTED: 'Bị từ chối',
 };
 
 const pendingStatuses: SubmissionStatus[] = [
@@ -46,8 +46,8 @@ const pendingStatuses: SubmissionStatus[] = [
 function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? 'Date unavailable'
-    : date.toLocaleString(undefined, {
+    ? 'Không có ngày'
+    : date.toLocaleString('vi-VN', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -138,7 +138,7 @@ function SubmissionRow({
               #{submission.id.slice(0, 8)}
             </Text>
             <Text style={[styles.detail, { color: theme.text }]}>
-              {submission.totalCandidatesExtracted} sign candidates
+              {submission.totalCandidatesExtracted} biển báo ứng viên
             </Text>
           </View>
 
@@ -207,7 +207,7 @@ export function SurveyHistoryScreen() {
         {/* Header */}
         <View style={styles.header}>
           <AppButton
-            accessibilityLabel="Back to surveyor work"
+            accessibilityLabel="Quay lại công việc khảo sát"
             onPress={() => router.replace({ pathname: '/work', params: { currentRole: 'surveyor' } })}
             style={styles.iconButton}
             variant="ghost"
@@ -216,13 +216,13 @@ export function SurveyHistoryScreen() {
           </AppButton>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
             {activeTab === 'pending'
-              ? 'Pending Submissions'
+              ? 'Hồ sơ đang xử lý'
               : activeTab === 'completed'
-                ? 'Survey History'
-                : 'Survey Submissions'}
+                ? 'Lịch sử khảo sát'
+                : 'Hồ sơ khảo sát'}
           </Text>
           <AppButton
-            accessibilityLabel="Refresh survey history"
+            accessibilityLabel="Làm mới lịch sử khảo sát"
             disabled={isFetching}
             onPress={() => {
               void refetch();
@@ -236,7 +236,7 @@ export function SurveyHistoryScreen() {
 
         {/* Filter Tabs */}
         <View
-          accessibilityLabel="Submission filter"
+          accessibilityLabel="Bộ lọc hồ sơ"
           accessibilityRole="tablist"
           style={[styles.filterBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
         >
@@ -257,7 +257,7 @@ export function SurveyHistoryScreen() {
                     { color: isActive ? '#FFFFFF' : theme.textSecondary },
                   ]}
                 >
-                  {tab === 'all' ? 'All' : tab === 'pending' ? 'Pending' : 'Completed'}
+                  {tab === 'all' ? 'Tất cả' : tab === 'pending' ? 'Đang xử lý' : 'Đã hoàn tất'}
                 </Text>
               </Pressable>
             );
@@ -265,12 +265,12 @@ export function SurveyHistoryScreen() {
         </View>
 
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {filteredItems.length} {activeTab} submissions · Tap any record to view details & media
+          {filteredItems.length} hồ sơ {activeTab === 'pending' ? 'đang xử lý' : activeTab === 'completed' ? 'đã hoàn tất' : ''} · Nhấn vào bản ghi để xem chi tiết
         </Text>
 
         {error && data ? (
           <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
-            Could not refresh your history. Showing previously loaded records.
+            Không thể làm mới lịch sử. Đang hiển thị bản ghi đã tải trước đó.
           </Text>
         ) : null}
 
@@ -292,14 +292,14 @@ export function SurveyHistoryScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               {isLoading ? (
-                <ActivityIndicator accessibilityLabel="Loading survey history" color={theme.primary} size="large" />
+                <ActivityIndicator accessibilityLabel="Đang tải lịch sử khảo sát" color={theme.primary} size="large" />
               ) : error ? (
                 <>
                   <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
-                    Unable to load your survey history.
+                    Không thể tải lịch sử khảo sát của bạn.
                   </Text>
                   <AppButton
-                    label="Try again"
+                    label="Thử lại"
                     onPress={() => {
                       void refetch();
                     }}
@@ -310,15 +310,15 @@ export function SurveyHistoryScreen() {
                   <AntDesign color={theme.primary} name="file-text" size={36} />
                   <Text style={[styles.emptyTitle, { color: theme.text }]}>
                     {activeTab === 'pending'
-                      ? 'No pending submissions'
+                      ? 'Không có hồ sơ đang xử lý'
                       : activeTab === 'completed'
-                        ? 'No completed submissions yet'
-                        : 'No submissions found'}
+                        ? 'Chưa có hồ sơ đã hoàn tất'
+                        : 'Không tìm thấy hồ sơ nào'}
                   </Text>
                   <Text style={[styles.message, { color: theme.textSecondary }]}>
                     {activeTab === 'pending'
-                      ? 'All submitted survey recordings have finished AI processing.'
-                      : 'Your recorded surveys and detection results will appear here.'}
+                      ? 'Tất cả bản ghi khảo sát gửi lên đã hoàn tất xử lý AI.'
+                      : 'Các khảo sát đã ghi và kết quả nhận diện của bạn sẽ xuất hiện tại đây.'}
                   </Text>
                 </>
               )}
@@ -330,16 +330,16 @@ export function SurveyHistoryScreen() {
           <View style={styles.pagination}>
             <AppButton
               disabled={page <= 1 || isFetching}
-              label="Previous"
+              label="Trước"
               onPress={() => changePage(page - 1)}
               variant="surface"
             />
             <Text style={[styles.detail, { color: theme.text }]}>
-              {data ? `${page} / ${Math.max(page, data.totalPages)}` : `Page ${page}`}
+              {data ? `${page} / ${Math.max(page, data.totalPages)}` : `Trang ${page}`}
             </Text>
             <AppButton
               disabled={isFetching || !data || page >= data.totalPages}
-              label="Next"
+              label="Sau"
               onPress={() => changePage(page + 1)}
               variant="surface"
               style={(isFetching || !data || page >= data.totalPages) && {

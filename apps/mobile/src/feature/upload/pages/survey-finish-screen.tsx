@@ -26,7 +26,7 @@ export function SurveyFinishScreen() {
             <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
                 <View style={styles.content}>
                     <View
-                        accessibilityLabel="Survey submitted successfully"
+                        accessibilityLabel="Gửi khảo sát thành công"
                         accessibilityRole="image"
                         style={[styles.icon, { backgroundColor: theme.backgroundSelected }]}
                     >
@@ -38,25 +38,25 @@ export function SurveyFinishScreen() {
                     </View>
 
                     <View style={styles.copy}>
-                        <Text style={[styles.title, { color: theme.text }]}>Sign submitted</Text>
+                        <Text style={[styles.title, { color: theme.text }]}>Đã gửi hồ sơ khảo sát</Text>
                         <Text style={[styles.description, { color: theme.textSecondary }]}>
-                            Your image was uploaded successfully and is queued for processing.
+                            Hình ảnh của bạn đã được tải lên thành công và đang được đưa vào hàng đợi xử lý.
                         </Text>
                         {submissionId ? (
                             <Text style={[styles.reference, { color: theme.placeholder }]}>
-                                Reference {submissionId.slice(0, 8)} - {submissionStatus ?? 'QUEUED'}
+                                Mã tham chiếu {submissionId.slice(0, 8)} - {submissionStatus ?? 'ĐANG CHỜ'}
                             </Text>
                         ) : null}
                     </View>
 
                     <View style={styles.actionFooter}>
                         <AppButton
-                            label="Submit another survey"
+                            label="Gửi khảo sát khác"
                             onPress={() => router.replace('/work/new-survey')}
                             style={styles.action}
                         />
                         <AppButton
-                            label="Return to surveyor's home"
+                            label="Quay lại trang khảo sát"
                             onPress={() => router.replace(surveyorWorkRoute)}
                             style={styles.action}
                             variant="surface"

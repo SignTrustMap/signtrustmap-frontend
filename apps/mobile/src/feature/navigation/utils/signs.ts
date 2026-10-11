@@ -49,14 +49,16 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     id: sign.id,
     imageUrl: resolveRepresentativeSignUrl(nameEn, signCode),
     actualCropUrl: resolveImageUrl(sign.signCropUrl),
+    frameUrl: resolveImageUrl(sign.frameUrl || sign.bestFrameUrl || ''),
     name: nameVi || nameEn || signCode || 'Traffic Sign',
     nameVi: nameVi || undefined,
     nameEn: nameEn || undefined,
     signCode: signCode,
-    freshnessScore: sign.freshnessScore,
+    freshnessScore: sign.freshnessScore ?? (sign as unknown as { freshness_score?: number }).freshness_score,
     status: sign.status,
     roadName: sign.roadName,
     displayAddress: sign.displayAddress,
     lastVerifiedAt: sign.lastVerifiedAt,
+    createdAt: sign.createdAt ? String(sign.createdAt) : undefined,
   };
 }

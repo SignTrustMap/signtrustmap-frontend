@@ -1,5 +1,9 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import {
+  formatGithubApiErrorMessage,
+  UNABLE_TO_CONNECT_UPDATE_SERVER_MESSAGE,
+} from '@/constants/message';
 
 export interface ReleaseAsset {
   name: string;
@@ -33,30 +37,30 @@ function formatBytes(bytes: number): string {
 }
 
 function formatRelativeDate(dateStr?: string): string {
-  if (!dateStr) return 'Recently';
+  if (!dateStr) return 'Gần đây';
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
 
-  if (isNaN(diffMs)) return 'Recently';
+  if (isNaN(diffMs)) return 'Gần đây';
 
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffHours < 1) {
     const diffMins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
-    return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    return `${diffMins} phút trước`;
   }
 
   if (diffHours < 24) {
-    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    return `${diffHours} giờ trước`;
   }
 
   if (diffDays < 7) {
-    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return `${diffDays} ngày trước`;
   }
 
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('vi-VN', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -80,7 +84,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
     });
 
     if (!fallbackResponse.ok) {
-      throw new Error(`GitHub API returned status ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
+      throw new Error(formatGithubApiErrorMessage(fallbackResponse.status, fallbackResponse.statusText));
     }
 
     const releases = await fallbackResponse.json();
@@ -91,7 +95,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   }
 
   if (!response.ok) {
-    throw new Error(`GitHub API returned status ${response.status}: ${response.statusText}`);
+    throw new Error(formatGithubApiErrorMessage(response.status, response.statusText));
   }
 
   const data = await response.json();
@@ -132,7 +136,7 @@ function parseReleaseData(data: any): ReleaseInfo {
 
   return {
     tagName: data.tag_name ?? '',
-    name: data.name || data.tag_name || 'Latest Release',
+    name: data.name || data.tag_name || 'Bản phát hành mới nhất',
     publishedAt: formatRelativeDate(data.published_at),
     htmlUrl: data.html_url,
     apkAsset,
@@ -176,7 +180,7 @@ export async function checkAppUpdate(): Promise<UpdateCheckResult> {
       isUpdateAvailable: false,
       currentVersion,
       currentCommit,
-      error: error?.message || 'Failed to connect to update server.',
+      error: error?.message || UNABLE_TO_CONNECT_UPDATE_SERVER_MESSAGE,
     };
   }
 }

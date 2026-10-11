@@ -2,15 +2,24 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   fetchFirstRevalidationSign,
+  finalizeRevalidationTask,
+  getAllRevalidationTasks,
+  getEvidenceDecisions,
   getRevalidationEvidenceQueue,
+  getRevalidationTask,
+  getRevalidationTasks,
   getRevalidationTasksInBounds,
+  getSignEvidences,
   getTaskEvidences,
+  submitRevalidationEvidence,
   voteOnRevalidationEvidence,
 } from '@/api/revalidation/revalidation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type {
   EvidenceVoteDto,
   FindTasksInBoundsParams,
+  GetRevalidationTasksParams,
+  SubmitRevalidationEvidenceDto,
 } from '@/types/revalidationType';
 
 export function isRealWorldTaskBounds(bounds: FindTasksInBoundsParams | undefined): boolean {
@@ -23,6 +32,48 @@ export function isRealWorldTaskBounds(bounds: FindTasksInBoundsParams | undefine
     Number.isFinite(minLon) &&
     Number.isFinite(maxLon)
   );
+}
+
+export function useGetAllRevalidationTasks(
+  paramsOrEnabled?: { status?: string; priority?: string; pageSize?: number } | boolean,
+  enabledParam = true,
+) {
+  const params = typeof paramsOrEnabled === 'object' ? paramsOrEnabled : undefined;
+  const enabled = typeof paramsOrEnabled === 'boolean' ? paramsOrEnabled : enabledParam;
+
+  return useQuery({
+    queryKey: ['all-revalidation-tasks', params],
+    queryFn: enabled
+      ? ({ signal }) => getAllRevalidationTasks(params, signal)
+      : skipToken,
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useGetRevalidationTasks(
+  params?: GetRevalidationTasksParams,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['revalidation-tasks', params],
+    queryFn: enabled
+      ? ({ signal }) => getRevalidationTasks(params, signal)
+      : skipToken,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useGetRevalidationTask(taskId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['revalidation-task-detail', taskId],
+    queryFn: enabled && taskId
+      ? ({ signal }) => getRevalidationTask(taskId, signal)
+      : skipToken,
+    enabled: Boolean(enabled && taskId),
+    staleTime: 30_000,
+  });
 }
 
 export function useGetRevalidationTasksInBounds(
@@ -66,6 +117,17 @@ export function useGetTaskEvidences(taskId?: string, enabled = true) {
   });
 }
 
+export function useGetSignEvidences(signId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['sign-evidences', signId],
+    queryFn: enabled && signId
+      ? ({ signal }) => getSignEvidences(signId, signal)
+      : skipToken,
+    enabled: Boolean(enabled && signId),
+    staleTime: 30_000,
+  });
+}
+
 export function useGetRevalidationEvidenceQueue(
   params?: { page?: number; pageSize?: number },
   enabled = true,
@@ -77,6 +139,41 @@ export function useGetRevalidationEvidenceQueue(
       : skipToken,
     enabled,
     staleTime: 30_000,
+  });
+}
+
+export function useGetEvidenceDecisions(evidenceId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['evidence-decisions', evidenceId],
+    queryFn: enabled && evidenceId
+      ? ({ signal }) => getEvidenceDecisions(evidenceId, signal)
+      : skipToken,
+    enabled: Boolean(enabled && evidenceId),
+    staleTime: 30_000,
+  });
+}
+
+export function useSubmitRevalidationEvidence() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      taskIdOrSignId,
+      data,
+      mediaFile,
+    }: {
+      taskIdOrSignId: string;
+      data: SubmitRevalidationEvidenceDto;
+      mediaFile?: { uri: string; fileName?: string; mimeType?: string };
+    }) => submitRevalidationEvidence(taskIdOrSignId, data, mediaFile),
+    onSuccess: (_, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['task-evidences', variables.taskIdOrSignId] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
+      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+    },
   });
 }
 
@@ -93,3 +190,18 @@ export function useVoteOnRevalidationEvidence() {
     },
   });
 }
+
+export function useFinalizeRevalidationTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: string) => finalizeRevalidationTask(taskId),
+    onSuccess: (_, taskId) => {
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-task-detail', taskId] });
+      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
+    },
+  });
+}
+

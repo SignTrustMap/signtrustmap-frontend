@@ -1,6 +1,11 @@
 import { useRef } from 'react';
 
 import { useSession } from '@/context/session-provider';
+import {
+  GPX_UPLOAD_SESSION_UNAVAILABLE_MESSAGE,
+  SIGN_IN_TO_SAVE_DRAFT_MESSAGE,
+  UPLOAD_SESSION_UNAVAILABLE_MESSAGE,
+} from '@/constants/message';
 import { useCompleteSurveyUpload, useCreateSurveySubmission, useInitializeSurveyUpload, useUploadSurveyChunk } from './use-survey-submission';
 import { prepareSurveyGpx, prepareSurveyImage, type SurveyImage } from '../utils/survey-image';
 import { readSubmissionId } from '../utils/submission-response';
@@ -44,7 +49,7 @@ export function useSaveSurveyDraft() {
     submissionId?: string,
     gpx?: { name?: string; uri: string },
   ) => {
-    if (!session) throw new Error('Sign in to save a draft.');
+    if (!session) throw new Error(SIGN_IN_TO_SAVE_DRAFT_MESSAGE);
     if (submissionId && attempt.current?.submissionId !== submissionId) {
       attempt.current = await readDraftImage(session.account.id, submissionId) ?? {
         ...image,
@@ -90,7 +95,7 @@ export function useSaveSurveyDraft() {
         draft.chunkUploaded = true;
         await persist();
       }
-      if (!draft.sessionId) throw new Error('Upload session is unavailable. Please retry.');
+      if (!draft.sessionId) throw new Error(UPLOAD_SESSION_UNAVAILABLE_MESSAGE);
       await complete.mutateAsync({ sessionId: draft.sessionId });
       draft.uploadCompleted = true;
       await persist();
@@ -113,7 +118,7 @@ export function useSaveSurveyDraft() {
         draft.gpxChunkUploaded = true;
         await persist();
       }
-      if (!draft.gpxSessionId) throw new Error('GPX upload session is unavailable. Please retry.');
+      if (!draft.gpxSessionId) throw new Error(GPX_UPLOAD_SESSION_UNAVAILABLE_MESSAGE);
       await complete.mutateAsync({ sessionId: draft.gpxSessionId });
       draft.gpxUploadCompleted = true;
       await persist();

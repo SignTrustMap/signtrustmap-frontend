@@ -16,6 +16,8 @@ import { queryClient } from '@/api/query-client';
 import { authExpiredEmitter } from '@/api/api-client';
 import { reconcilePendingCrops } from '@/feature/upload/utils/crop-sync-manager';
 
+import { ErrorBoundary, RouteErrorBoundary } from '@/components/error-boundary';
+
 LogBox.ignoreLogs([
   // Known Expo Router 57 / React 19 Fabric dev-only warning triggered when resolving initial deep link in useLinking
   "Can't perform a React state update on a component that hasn't mounted yet",
@@ -25,15 +27,20 @@ SplashScreen.preventAutoHideAsync();
 
 export default function TabLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={DefaultTheme}>
-        <SessionProvider>
-          <RootNavigation />
-        </SessionProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={DefaultTheme}>
+          <SessionProvider>
+            <RootNavigation />
+          </SessionProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
+
+// Export route error boundary for Expo Router screen-level errors
+export { RouteErrorBoundary as ErrorBoundary };
 
 function RootNavigation() {
   const { isInitializing, logOut, session } = useSession();

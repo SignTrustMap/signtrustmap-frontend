@@ -13,6 +13,10 @@ import {
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
+import {
+  REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
+  UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
+} from '@/constants/message';
 
 export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped';
 
@@ -21,12 +25,15 @@ export type CompletedReview = {
   submission: ReviewSubmission;
 };
 
-type ReviewWorkflowContextValue = {
+export type ReviewWorkflowContextValue = {
   beginSubmissionCheck: () => void;
   checkedReviewIndex: number;
   checkingSubmission: boolean;
   isCheckingSubmission: boolean;
-  completeCurrentReview: (actionOrDecision: ReviewActionType | ReviewDecision, details?: { declineReason?: string; declineNote?: string }) => Promise<boolean>;
+  completeCurrentReview: (
+    actionOrDecision: ReviewActionType | ReviewDecision,
+    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
+  ) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
   goToNextCheckedReview: () => void;
@@ -47,7 +54,7 @@ type ReviewWorkflowContextValue = {
   undoLastReview: () => Promise<boolean>;
 };
 
-const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
+export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
 
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -100,7 +107,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setPendingSubmissions(data.queue.submissions);
       setTotalSubmissions(data.queue.total);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+      setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +135,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+        if (active) setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -178,7 +185,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const completeCurrentReview = async (
     actionOrDecision: ReviewActionType | ReviewDecision,
-    details?: { declineReason?: string; declineNote?: string }
+    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
@@ -187,6 +194,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const action: ReviewActionType = typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
     const reason = details?.declineReason || (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
     const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
+    const suggestedSignTypeId = (details as any)?.suggestedSignTypeId ?? (typeof actionOrDecision === 'object' ? (actionOrDecision as any).suggestedSignTypeId : undefined);
 
     // 1. Immediately update UI state optimistically so review cards advance with zero lag
     setReviewHistory((history) => {
@@ -228,6 +236,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           params,
           request: {
             vote: action === 'approved' ? 1 : -1,
+            ...(suggestedSignTypeId != null ? { suggestedSignTypeId: Number(suggestedSignTypeId) } : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
           },
@@ -302,6 +311,6 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
 export function useReviewWorkflow() {
   const context = useContext(ReviewWorkflowContext);
-  if (!context) throw new Error('useReviewWorkflow must be used within ReviewWorkflowProvider');
+  if (!context) throw new Error(REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE);
   return context;
 }

@@ -19,26 +19,26 @@ const actionDetails: Record<
 > = {
   approved: {
     color: Colors.primary,
-    label: 'Approved',
-    summary: 'Ready for the trusted sign map.',
+    label: 'Phê duyệt',
+    summary: 'Sẵn sàng đưa vào bản đồ biển báo tin cậy.',
     symbol: '✓',
   },
   declined: {
     color: Colors.danger,
-    label: 'Declined',
-    summary: 'Declined during quality review.',
+    label: 'Từ chối',
+    summary: 'Từ chối trong quá trình kiểm tra chất lượng.',
     symbol: '×',
   },
   reported: {
     color: Colors.placeholder,
-    label: 'Reported',
-    summary: 'Reported to system staff.',
+    label: 'Báo cáo',
+    summary: 'Đã báo cáo cho ban quản trị hệ thống.',
     symbol: '!',
   },
   skipped: {
     color: Colors.grey,
-    label: 'Skipped',
-    summary: 'Cannot identify sign.',
+    label: 'Bỏ qua',
+    summary: 'Không thể nhận diện biển báo.',
     symbol: '↷',
   },
 };
@@ -115,9 +115,9 @@ export function SubmissionSummaryScreen() {
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <View style={styles.content}>
           <View style={styles.heading}>
-            <Text style={[styles.title, { color: theme.text }]}>Submission Summary</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Tổng kết thẩm định</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Today • {reviewHistory.length} signs reviewed
+              Hôm nay • Đã thẩm định {reviewHistory.length} biển báo
             </Text>
           </View>
 
@@ -140,7 +140,7 @@ export function SubmissionSummaryScreen() {
 
           <View style={styles.footerActions}>
             <AppButton
-              label="Check submission"
+              label="Kiểm tra lại hồ sơ"
               onPress={() => {
                 beginSubmissionCheck();
                 router.replace('/work/submission-review');
@@ -150,7 +150,7 @@ export function SubmissionSummaryScreen() {
               variant="surface"
             />
             <AppButton
-              label="Submit"
+              label="Hoàn tất"
               onPress={() => {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();

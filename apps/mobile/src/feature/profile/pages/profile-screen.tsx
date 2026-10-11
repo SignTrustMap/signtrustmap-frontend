@@ -20,9 +20,9 @@ import { useTheme } from '@/hooks/use-theme';
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 const roleLabels: Record<AccountRole, string> = {
-  driver: 'Driver',
-  reviewer: 'Reviewer',
-  surveyor: 'Surveyor',
+  driver: 'Tài xế',
+  reviewer: 'Thẩm định viên',
+  surveyor: 'Khảo sát viên',
 };
 
 const roleIcons: Record<AccountRole, MaterialIconName> = {
@@ -100,7 +100,7 @@ export function ProfileScreen() {
     releaseInfo,
     status,
   } = useAppUpdate();
-  const displayName = session?.account.displayName ?? 'SignTrustMap user';
+  const displayName = session?.account.displayName ?? 'Người dùng SignTrustMap';
   const email = session?.account.email ?? '';
 
   return (
@@ -121,11 +121,11 @@ export function ProfileScreen() {
           />
 
           <SafeAreaView edges={['top']} style={styles.heroSafeArea}>
-            <Text style={[styles.title, { color: theme.onPrimary }]}>Profile</Text>
+            <Text style={[styles.title, { color: theme.onPrimary }]}>Cá nhân</Text>
 
             <View style={styles.identity}>
               <View
-                accessibilityLabel={`${displayName} profile picture`}
+                accessibilityLabel={`Ảnh đại diện của ${displayName}`}
                 style={[
                   styles.avatar,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.onPrimary },
@@ -165,7 +165,7 @@ export function ProfileScreen() {
           style={[styles.overviewPanel, { backgroundColor: theme.backgroundElement }]}
         >
           <View style={styles.panelContent}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Account overview</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Tổng quan tài khoản</Text>
 
             <View style={styles.profileSummaryRow}>
               <View style={styles.iconTile}>
@@ -173,13 +173,13 @@ export function ProfileScreen() {
               </View>
               <View style={styles.rowCopy}>
                 <AppButton
-                  accessibilityLabel="Log out"
+                  accessibilityLabel="Xem thông tin tài khoản"
                   onPress={logOut}
                   style={styles.overviewRow}
                   variant="ghost"
                 >
                   <View style={styles.rowCopy}>
-                    <Text style={[styles.rowTitle, { color: theme.text }]}>View profile</Text>
+                    <Text style={[styles.rowTitle, { color: theme.text }]}>Xem hồ sơ</Text>
                   </View>
                   <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
                 </AppButton>
@@ -189,9 +189,9 @@ export function ProfileScreen() {
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
             <View style={styles.sectionHeadingRow}>
-              <Text style={[styles.subsectionTitle, { color: theme.text }]}>Account roles</Text>
+              <Text style={[styles.subsectionTitle, { color: theme.text }]}>Vai trò tài khoản</Text>
               <Text style={[styles.subsectionDescription, { color: theme.textSecondary }]}>
-                Driver access is always included
+                Quyền Tài xế luôn được kích hoạt
               </Text>
             </View>
 
@@ -210,7 +210,7 @@ export function ProfileScreen() {
                     <View style={styles.rowCopy}>
                       <Text style={[styles.rowTitle, { color: theme.text }]}>{roleLabels[role]}</Text>
                       <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
-                        {role === 'driver' ? 'Navigation access' : `${roleLabels[role]} tools`}
+                        {role === 'driver' ? 'Quyền điều hướng' : `Công cụ ${roleLabels[role]}`}
                       </Text>
                     </View>
                     <View
@@ -228,7 +228,7 @@ export function ProfileScreen() {
                           { color: isEnabled ? theme.primary : theme.placeholder },
                         ]}
                       >
-                        {isEnabled ? 'On' : 'Off'}
+                        {isEnabled ? 'Bật' : 'Tắt'}
                       </Text>
                     </View>
                   </>
@@ -244,7 +244,7 @@ export function ProfileScreen() {
 
                 return (
                   <AppButton
-                    accessibilityLabel={`${isEnabled ? 'Disable' : 'Enable'} ${roleLabels[role]} role`}
+                    accessibilityLabel={`${isEnabled ? 'Tắt' : 'Bật'} vai trò ${roleLabels[role]}`}
                     accessibilityRole="switch"
                     accessibilityState={{ checked: isEnabled }}
                     key={role}
@@ -273,9 +273,9 @@ export function ProfileScreen() {
 
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            <Text style={[styles.subsectionTitle, { color: theme.text }]}>Application</Text>
+            <Text style={[styles.subsectionTitle, { color: theme.text }]}>Ứng dụng</Text>
             <AppButton
-              accessibilityLabel="Check for application updates"
+              accessibilityLabel="Kiểm tra bản cập nhật ứng dụng"
               disabled={status === 'checking'}
               onPress={checkForUpdates}
               style={styles.overviewRow}
@@ -285,18 +285,18 @@ export function ProfileScreen() {
                 <MaterialCommunityIcons color={theme.primary} name="cellphone-arrow-down" size={22} />
               </View>
               <View style={styles.rowCopy}>
-                <Text style={[styles.rowTitle, { color: theme.text }]}>App updates</Text>
+                <Text style={[styles.rowTitle, { color: theme.text }]}>Cập nhật ứng dụng</Text>
                 <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
                   {status === 'checking'
-                    ? 'Checking for updates…'
-                    : `Version ${currentVersion}${currentCommit ? ` · ${currentCommit.slice(0, 7)}` : ''}`}
+                    ? 'Đang kiểm tra bản cập nhật…'
+                    : `Phiên bản ${currentVersion}${currentCommit ? ` · ${currentCommit.slice(0, 7)}` : ''}`}
                 </Text>
               </View>
               <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
             </AppButton>
 
             <AppButton
-              accessibilityLabel="Log out"
+              accessibilityLabel="Đăng xuất"
               onPress={logOut}
               style={styles.overviewRow}
               variant="ghost"
@@ -305,8 +305,8 @@ export function ProfileScreen() {
                 <MaterialCommunityIcons color={theme.danger} name="logout" size={22} />
               </View>
               <View style={styles.rowCopy}>
-                <Text style={[styles.rowTitle, { color: theme.danger }]}>Log out</Text>
-                <Text style={[styles.rowDescription, { color: theme.placeholder }]}>Sign out of this device</Text>
+                <Text style={[styles.rowTitle, { color: theme.danger }]}>Đăng xuất</Text>
+                <Text style={[styles.rowDescription, { color: theme.placeholder }]}>Đăng xuất khỏi thiết bị này</Text>
               </View>
               <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={24} />
             </AppButton>

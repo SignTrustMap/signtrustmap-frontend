@@ -1,10 +1,14 @@
-import type { MyReviewHistoryResponse, ReviewCandidate, ReviewQueueResponse } from '@/types/reviewsType';
+import type { MyReviewHistoryResponse, RemedySignDto, ReviewCandidate, ReviewQueueResponse } from '@/types/reviewsType';
+
+export type RemedySign = RemedySignDto;
 
 export type ReviewSubmission = {
   captured: string;
   id: string;
   image: any;
   location: string;
+  predictedSignTypeId?: number;
+  remedySigns?: RemedySign[];
   surveyorId: string;
   title: string;
 };
@@ -13,6 +17,7 @@ export type ReviewDecision = {
   action: 'approved' | 'declined' | 'reported';
   declineNote?: string;
   declineReason?: string;
+  suggestedSignTypeId?: number | string;
 };
 
 export type ReviewHistoryItem = {
@@ -59,6 +64,8 @@ function toSubmission(candidate: ReviewCandidate): ReviewSubmission {
     id: candidate.id,
     image: imageSource,
     location: 'Estimated GPS coordinates available',
+    predictedSignTypeId: type?.id,
+    remedySigns: candidate.remedySigns,
     surveyorId: candidate.submission?.surveyorId ?? candidate.submissionId,
     title: type?.nameVi ? `${type.nameVi} (${type.signCode})` : (type?.nameEn || type?.signCode || 'Unidentified sign'),
   };

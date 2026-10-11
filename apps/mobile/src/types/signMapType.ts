@@ -52,6 +52,8 @@ export type RoutePointDto = {
 
 export type RouteSignsRequestDto = {
     geometry: RoutePointDto[];
+    vehicleType?: 'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN';
+    enabledCategoryCodes?: string[];
 };
 
 // Read response shapes used by the existing navigation API integration.
@@ -60,10 +62,13 @@ export type VerifiedMapSign = {
     latitude: number;
     longitude: number;
     signCropUrl: string;
+    frameUrl?: string;
+    bestFrameUrl?: string;
     signType: { nameEn: string; signCode: string; nameVi?: string };
     freshnessScore?: number;
     status?: VerifiedSignStatus;
     lastVerifiedAt?: string;
+    createdAt?: string;
     roadName?: string;
     displayAddress?: string;
 };

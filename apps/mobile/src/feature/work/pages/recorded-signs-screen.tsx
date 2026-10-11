@@ -16,19 +16,20 @@ type RecordedSign = {
 
 const RECORDED_SIGNS: RecordedSign[] = [
   {
+
     id: '1',
-    name: 'Stop Sign',
-    timestamp: '09:14 AM',
+    name: 'Biển Dừng lại (P.122)',
+    timestamp: '09:14',
   },
   {
     id: '2',
-    name: 'No Entry Sign',
-    timestamp: '09:21 AM',
+    name: 'Biển Cấm đi ngược chiều (P.102)',
+    timestamp: '09:21',
   },
   {
     id: '3',
-    name: 'Speed Limit 40',
-    timestamp: '09:35 AM',
+    name: 'Biển Tốc độ tối đa 40 km/h (P.127)',
+    timestamp: '09:35',
   },
 ];
 
@@ -47,7 +48,7 @@ export function RecordedSignsScreen() {
         {/* Header */}
         <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
           <AppButton
-            accessibilityLabel="Go back"
+            accessibilityLabel="Quay lại"
             onPress={() => router.back()}
             pressedOpacity={0.6}
             style={styles.backButton}
@@ -56,9 +57,9 @@ export function RecordedSignsScreen() {
             <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
           </AppButton>
           <View style={styles.topBarTitle}>
-            <Text style={[styles.screenTitle, { color: theme.text }]}>Recorded Signs</Text>
+            <Text style={[styles.screenTitle, { color: theme.text }]}>Biển báo đã ghi nhận</Text>
             <Text style={[styles.screenSubtitle, { color: theme.grey }]}>
-              {RECORDED_SIGNS.length} signs captured this session
+              {RECORDED_SIGNS.length} biển báo ghi nhận trong phiên này
             </Text>
           </View>
         </View>
@@ -87,12 +88,12 @@ export function RecordedSignsScreen() {
                 <View style={styles.signMeta}>
                   <MaterialCommunityIcons color={theme.grey} name="clock-outline" size={14} />
                   <Text style={[styles.signTimestamp, { color: theme.grey }]}>
-                    Captured at {sign.timestamp}
+                    Ghi nhận lúc {sign.timestamp}
                   </Text>
                 </View>
                 <View style={[styles.signBadge, { backgroundColor: '#10B98118' }]}>
                   <MaterialCommunityIcons color="#10B981" name="check-circle-outline" size={13} />
-                  <Text style={[styles.signBadgeText, { color: '#10B981' }]}>Livestream capture</Text>
+                  <Text style={[styles.signBadgeText, { color: '#10B981' }]}>Ghi nhận phát trực tiếp</Text>
                 </View>
               </View>
             </View>
@@ -110,11 +111,11 @@ export function RecordedSignsScreen() {
           ]}
         >
           <Text style={[styles.noticeText, { color: '#EF4444' }]}>
-            ⚠ The recorded signs will be submitted every 1 hour or you can submit it now
+            ⚠ Các biển báo đã ghi nhận sẽ được gửi tự động mỗi 1 giờ hoặc bạn có thể gửi ngay
           </Text>
           <AppButton
-            accessibilityLabel="Submit recorded signs"
-            label="Submit Now"
+            accessibilityLabel="Gửi các biển báo đã ghi nhận"
+            label="Gửi ngay"
             onPress={handleSubmit}
             style={styles.submitButton}
             variant="primary"

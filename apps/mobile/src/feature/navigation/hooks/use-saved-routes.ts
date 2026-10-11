@@ -59,7 +59,7 @@ export function useSavedRoutes() {
 }
 
 export function useSavedRouteSigns(routeId?: string) {
-  const { session } = useSession();
+  const session = useOptionalSession()?.session;
   const token = session?.accessToken;
 
   return useQuery({

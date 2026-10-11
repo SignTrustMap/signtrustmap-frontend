@@ -47,13 +47,13 @@ export function AddCardScreen() {
   if (status === 'success') {
     return (
       <View style={[styles.screen, { backgroundColor: theme.background }]}>
-        <CreditScreenHeader onBack={() => router.replace('/credits/top-up')} title="Payment Methods" />
+        <CreditScreenHeader onBack={() => router.replace('/credits/top-up')} title="Phương thức thanh toán" />
         <CreditFlowState
-          actionLabel="Continue to top up"
+          actionLabel="Tiếp tục nạp Credits"
           detail={<SavedCardPreview isDefault={isDefault} />}
-          message="Your Visa ending in 4242 is ready for top-ups and payments."
+          message="Thẻ Visa đuôi 4242 của bạn đã sẵn sàng để nạp tiền và thanh toán."
           onAction={() => router.replace('/credits/top-up')}
-          title="Card added successfully"
+          title="Thêm thẻ thành công"
           variant="success"
         />
       </View>
@@ -65,7 +65,7 @@ export function AddCardScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: theme.background }]}
     >
-      <CreditScreenHeader onBack={() => router.back()} title="Add New Card" />
+      <CreditScreenHeader onBack={() => router.back()} title="Thêm thẻ mới" />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -79,20 +79,20 @@ export function AddCardScreen() {
           <Text style={styles.maskedNumber}>••••  ••••  ••••  {cardNumber.slice(-4) || '4242'}</Text>
           <View style={styles.previewBottomRow}>
             <View>
-              <Text style={styles.previewLabel}>CARDHOLDER</Text>
-              <Text style={styles.previewValue}>{cardholderName.toUpperCase() || 'CARDHOLDER NAME'}</Text>
+              <Text style={styles.previewLabel}>CHỦ THẺ</Text>
+              <Text style={styles.previewValue}>{cardholderName.toUpperCase() || 'TÊN CHỦ THẺ'}</Text>
             </View>
             <View style={styles.previewExpiry}>
-              <Text style={styles.previewLabel}>EXPIRES</Text>
+              <Text style={styles.previewLabel}>HẾT HẠN</Text>
               <Text style={styles.previewValue}>{expiry || 'MM/YY'}</Text>
             </View>
           </View>
         </View>
 
-        <CardField label="Cardholder name" onChangeText={setCardholderName} value={cardholderName} />
+        <CardField label="Tên chủ thẻ" onChangeText={setCardholderName} value={cardholderName} />
         <CardField
           keyboardType="number-pad"
-          label="Card number"
+          label="Số thẻ"
           maxLength={19}
           onChangeText={(value) => setCardNumber(formatCardNumber(value))}
           value={cardNumber}
@@ -101,7 +101,7 @@ export function AddCardScreen() {
           <CardField
             containerStyle={styles.halfField}
             keyboardType="number-pad"
-            label="Expiry date"
+            label="Ngày hết hạn"
             maxLength={5}
             onChangeText={setExpiry}
             placeholder="MM/YY"
@@ -119,15 +119,15 @@ export function AddCardScreen() {
         </View>
         <CardField
           keyboardType="number-pad"
-          label="Billing ZIP code"
+          label="Mã bưu chính (ZIP)"
           onChangeText={setBillingZip}
           value={billingZip}
         />
 
         <View style={styles.defaultRow}>
           <View style={styles.defaultCopy}>
-            <Text style={[styles.defaultTitle, { color: theme.text }]}>Set as default payment method</Text>
-            <Text style={[styles.defaultDetail, { color: theme.placeholder }]}>Use this card for future top-ups</Text>
+            <Text style={[styles.defaultTitle, { color: theme.text }]}>Đặt làm phương thức thanh toán mặc định</Text>
+            <Text style={[styles.defaultDetail, { color: theme.placeholder }]}>Sử dụng thẻ này cho các lần nạp tiền tiếp theo</Text>
           </View>
           <Switch
             onValueChange={setIsDefault}
@@ -136,13 +136,13 @@ export function AddCardScreen() {
             value={isDefault}
           />
         </View>
-        <AppButton label="＋  Add Card" onPress={handleAddCard} style={styles.addCardButton} />
+        <AppButton label="＋  Thêm thẻ" onPress={handleAddCard} style={styles.addCardButton} />
       </ScrollView>
       {status === 'loading' ? (
         <CreditFlowState
-          message="This only takes a moment."
+          message="Chỉ mất một chút thời gian."
           presentation="overlay"
-          title="Verifying your card…"
+          title="Đang xác minh thẻ…"
           variant="loading"
         />
       ) : null}
@@ -183,11 +183,11 @@ function SavedCardPreview({ isDefault }: { isDefault: boolean }) {
       <View style={styles.savedCardTopRow}>
         <Text style={[styles.savedCardIcon, { color: theme.primary }]}>▰</Text>
         {isDefault ? (
-          <Text style={[styles.defaultBadge, { color: theme.textSecondary, borderColor: theme.border }]}>DEFAULT</Text>
+          <Text style={[styles.defaultBadge, { color: theme.textSecondary, borderColor: theme.border }]}>MẶC ĐỊNH</Text>
         ) : null}
       </View>
       <Text style={[styles.savedCardNumber, { color: theme.text }]}>••••  ••••  ••••  4242</Text>
-      <Text style={[styles.savedCardExpiry, { color: theme.placeholder }]}>EXPIRES 12/28</Text>
+      <Text style={[styles.savedCardExpiry, { color: theme.placeholder }]}>HẾT HẠN 12/28</Text>
     </View>
   );
 }

@@ -117,7 +117,7 @@ export async function uploadSurveyChunk(
     console.error(`[SurveyUpload] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
     const message = typeof body === 'object' && body && 'message' in body
       ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
-      : `Chunk upload failed with HTTP ${result.status}`;
+      : `Tải phân đoạn lên thất bại với mã trạng thái ${result.status}`;
     throw new ApiError(message, result.status);
   }
 
