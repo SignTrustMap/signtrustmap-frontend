@@ -60,6 +60,21 @@ jest.mock('@/feature/navigation/hooks/use-sign-proximity-alert', () => ({
   useSignProximityAlert: jest.fn(() => ({ activeAlert: undefined })),
 }));
 
+jest.mock('@/feature/navigation/hooks/use-saved-routes', () => ({
+  useSavedRoutes: jest.fn(() => ({
+    savedRoutes: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+    saveRoute: jest.fn(),
+    isSaving: false,
+    updateRoute: jest.fn(),
+    isUpdating: false,
+    deleteRoute: jest.fn(),
+    isDeleting: false,
+  })),
+}));
+
 jest.mock('@/context/navigation-active-provider', () => ({
   useNavigationActive: jest.fn(() => ({ setNavigationActive: jest.fn() })),
 }));

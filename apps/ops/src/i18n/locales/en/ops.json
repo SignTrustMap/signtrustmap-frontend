@@ -24,7 +24,7 @@
     "empty_filter": "No user accounts match the selected filters.",
     "modal_title": "Account Information",
     "lbl_name": "Full Name",
-    "lbl_email": "Email Address",
+    "lbl_email": "Email",
     "lbl_phone": "Phone Number",
     "lbl_location": "Location / Region",
     "lbl_role": "Role",
@@ -342,7 +342,18 @@
     "lbl_pkg_name": "Package Name",
     "ph_pkg_name": "Enter package name (e.g. Standard Pack)...",
     "btn_confirm": "Confirm",
-    "btn_cancel": "Cancel"
+    "btn_cancel": "Cancel",
+    "sec_dynamic_rules": "Dynamic Reward Rules Engine",
+    "lbl_activity_type": "Contribution Activity",
+    "lbl_base_amount": "Base Reward",
+    "lbl_daily_limit": "Daily Cap",
+    "lbl_rule_status": "Status",
+    "btn_add_rule": "Add Reward Rule",
+    "modal_add_rule_title": "Add Dynamic Reward Rule",
+    "modal_edit_rule_title": "Edit Reward Rule",
+    "toast_rule_updated": "Reward rule updated successfully!",
+    "toast_rule_toggled": "Reward rule status toggled successfully!",
+    "toast_rule_created": "New reward rule created successfully!"
   },
   "mlops": {
     "title": "AI Retraining & Pipeline",
@@ -1036,7 +1047,14 @@
     "card_empty_title": "No traffic signs found",
     "card_empty_desc": "Try adjusting your search query or sign category filters.",
     "showing_signs_count": "Showing {{count}} signs",
-    "quick_filter_status": "Filter status:"
+    "quick_filter_status": "Filter status:",
+    "thinning_active": "Collision Thinning",
+    "thinning_all": "Show 100% Signs",
+    "btn_thinning_on": "Smart collision thinning is active",
+    "btn_thinning_off": "Showing 100% signs without thinning",
+    "signs_unit": "signs",
+    "hud_live": "GIS LIVE",
+    "hud_standard": "WGS 84 • QCVN 41:2019"
   },
   "staff": {
     "title": "User & Staff Management",
@@ -1132,5 +1150,12 @@
     "desc": "The page you are looking for does not exist or has been moved.",
     "btn_home": "Back to Dashboard",
     "btn_back": "Go Back"
+  },
+  "unexpected_error_500": {
+    "title": "Unexpected Error Occurred...",
+    "desc": "The system encountered an unexpected issue and protected your session. Please try reloading or return to dashboard.",
+    "btn_retry": "Reload Page",
+    "btn_home": "Back to Dashboard"
   }
 }
+

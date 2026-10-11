@@ -1,20 +1,5 @@
-export interface OpsSignItem {
-  id: string
-  code: string
-  name: string
-  category: 'P' | 'R' | 'W' | 'I' | 'S'
-  lat: number
-  lng: number
-  heading: number
-  trustScore: number
-  status: 'verified' | 'pending' | 'flagged' | 'revalidating'
-  location: string
-  reviewerVotes: { approve: number; reject: number; modify: number }
-  aiConfidence: number
-  verifiedAt: string
-  imageUrl: string
-  detectedBy: string
-}
+import type { OpsSignItem } from '@shared/types'
+export type { OpsSignItem }
 
 export interface SignGroupFilterItem {
   id: string

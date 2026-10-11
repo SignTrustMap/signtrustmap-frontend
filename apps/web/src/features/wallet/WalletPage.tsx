@@ -20,6 +20,7 @@ import {
 } from '@/data'
 import { Modal } from '@/components/common/Modal'
 import { Pagination } from '@/components/common/Pagination'
+import { PageHeader } from '@/components/common/PageHeader'
 
 export default function WalletPage() {
   const { user, claimDailyBonus } = useAuth()
@@ -148,17 +149,12 @@ export default function WalletPage() {
       }`}
     >
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* ─── Page Header ────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-white/10">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('wallet.title')}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('wallet.subtitle')}
-            </p>
-          </div>
-        </div>
+        {/* ─── Page Header (Standardized via PageHeader) ─────────────── */}
+        <PageHeader
+          title={t('wallet.title')}
+          subtitle={t('wallet.subtitle')}
+          bordered
+        />
 
         {/* ─── Balance & Earn Overview (2 Columns) ────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">

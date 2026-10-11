@@ -21,7 +21,7 @@ export interface ApiResponse<T = any> {
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: env.apiBaseUrl,
-  timeout: 20000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -35,12 +35,19 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // When sending FormData, delete Content-Type to let browser / Axios
+    // automatically generate the multipart/form-data boundary parameter
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type']
+    }
+
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// Response Interceptor: Handle global HTTP errors & automatic token refresh
+// Response Interceptor: Handle global HTTP errors & 401 unauthorized
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response.data
@@ -48,41 +55,51 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    // 401 Unauthorized handling
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-      try {
-        const refreshToken = localStorage.getItem('stm_refresh_token')
-        if (refreshToken) {
-          const res = await axios.post(`${apiClient.defaults.baseURL}/api/v1/auth/refresh-token`, {
-            refreshToken,
-          })
-          const newAccessToken = res.data?.data?.accessToken
-          if (newAccessToken) {
-            localStorage.setItem('stm_access_token', newAccessToken)
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-            return apiClient(originalRequest)
-          }
-        }
-      } catch (refreshErr) {
-        localStorage.removeItem('stm_access_token')
-        localStorage.removeItem('stm_refresh_token')
+    // 401 Unauthorized handling (token expired or revoked)
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      if (originalRequest) {
+        originalRequest._retry = true
+      }
 
-        // Soft event-driven unauthorized dispatch (prevents hard full-page reload)
-        // Only trigger redirect when the request was authenticated (protected route)
-        const wasProtectedRequest = !!originalRequest?.headers?.Authorization
-        if (wasProtectedRequest && typeof window !== 'undefined') {
+      // Check whether this request was an authenticated protected route
+      const wasProtectedRequest = !!originalRequest?.headers?.Authorization
+
+      if (wasProtectedRequest) {
+        // Clear all token and session traces from both storages
+        localStorage.removeItem('stm_access_token')
+        localStorage.removeItem('stm_web_user')
+        sessionStorage.removeItem('stm_access_token')
+        sessionStorage.removeItem('stm_web_user')
+
+        // Soft event-driven unauthorized dispatch (prevents hard full-page reload - RULE 6.4)
+        if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('auth:unauthorized', {
-              detail: { reason: 'token_expired', path: window.location.pathname },
+              detail: { reason: 'session_expired', path: window.location.pathname },
             })
           )
         }
-        return Promise.reject(refreshErr)
       }
     }
 
-    return Promise.reject(error.response?.data || error)
+    // Extract readable error message from NestJS (handles string or ValidationPipe array)
+    const errData = error.response?.data
+    let readableMessage = error.message || 'Lỗi kết nối máy chủ'
+
+    if (error.code === 'ECONNABORTED' || (error.message && error.message.toLowerCase().includes('timeout'))) {
+      readableMessage = 'Quá thời gian chờ phản hồi từ máy chủ (Request Timeout). Vui lòng thử lại.'
+    } else if (errData?.message) {
+      readableMessage = Array.isArray(errData.message)
+        ? errData.message.join('. ')
+        : String(errData.message)
+    }
+
+    const enhancedError = new Error(readableMessage)
+    ;(enhancedError as any).response = error.response
+    ;(enhancedError as any).status = error.response?.status
+    ;(enhancedError as any).data = errData
+
+    return Promise.reject(enhancedError)
   }
 )
 

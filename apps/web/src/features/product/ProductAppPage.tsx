@@ -183,13 +183,13 @@ export default function ProductApp() {
 
             {/* Right Column: High-Fidelity Phone Screen Mockup (5 cols) */}
             <div className="lg:col-span-5 flex justify-center">
-              <div className="w-72 sm:w-80 h-[520px] rounded-[38px] border-4 border-gray-800 dark:border-gray-700 bg-black p-3 shadow-2xl relative flex flex-col justify-between overflow-hidden">
+              <div className="w-72 sm:w-80 h-[520px] rounded-3xl border-4 border-gray-800 dark:border-gray-700 bg-black p-3 shadow-2xl relative flex flex-col justify-between overflow-hidden">
                 {/* Dynamic island notch */}
                 <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-4 bg-black rounded-full z-20" />
 
                 {/* Phone Screen Internal Container */}
                 <div
-                  className={`w-full h-full rounded-[28px] p-4 flex flex-col justify-between text-left relative transition-colors ${
+                  className={`w-full h-full rounded-2xl p-4 flex flex-col justify-between text-left relative transition-colors ${
                     isDark
                       ? 'bg-[#08171b] border border-white/10 text-white'
                       : 'bg-white border border-gray-200 text-gray-900'

@@ -97,7 +97,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
       </div>
 
       <div
-        className={`backdrop-blur-2xl border rounded-[16px] shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors ${
+        className={`backdrop-blur-2xl border rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row transition-colors ${
           isDark
             ? 'bg-[#081215]/95 border-white/10 text-gray-200'
             : 'bg-white/95 border-[#E8E4E3] text-gray-800'
@@ -119,7 +119,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedCat(cat.id)}
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-[10px] text-sm font-medium text-left transition-all cursor-pointer ${
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-medium text-left transition-all cursor-pointer ${
                   active
                     ? isDark
                       ? 'bg-[#007b8b]/25 text-[#00c4de] border border-[#00c4de]/35 shadow-sm'
@@ -159,7 +159,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
                 key={item.title}
                 to={item.href}
                 onClick={onClose}
-                className={`group flex flex-col justify-between p-4 rounded-[12px] border transition-all ${
+                className={`group flex flex-col justify-between p-4 rounded-xl border transition-all ${
                   isDark
                     ? 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 hover:border-[#00c4de]/40'
                     : 'bg-white hover:bg-gray-50 border-gray-200 hover:border-[#007b8b]/40 shadow-sm'
@@ -167,7 +167,7 @@ export function MegaDropdown({ onClose }: MegaDropdownProps) {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2.5">
-                    <div className={`w-9 h-9 rounded-[8px] flex items-center justify-center ${
+                    <div className={`w-9 h-9 rounded-md flex items-center justify-center ${
                       isDark ? 'bg-[#007b8b]/20' : 'bg-teal-50'
                     }`}>
                       {item.icon}

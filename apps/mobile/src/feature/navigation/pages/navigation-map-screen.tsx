@@ -19,6 +19,7 @@ import {
   type VehicleMode,
 } from "@/types/navigationType";
 import { useTheme } from "@/hooks/use-theme";
+import { useOptionalSession } from "@/context/session-provider";
 import { useNavigationActive } from "@/context/navigation-active-provider";
 import { useSignFilter } from "@/context/sign-filter-provider";
 import {
@@ -34,6 +35,7 @@ import { NavigationMapView } from "../components/navigation-map-view";
 import { getNavigationRoute, type NavigationStep, type RouteSign } from '@/api/navigation/navigation';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import { confirmSignPresence } from '@/api/sign-map/sign-map';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
@@ -205,6 +207,7 @@ export function NavigationMapScreen() {
         : (plannedRouteOrigin ? "Vị trí hiện tại" : undefined)));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const isMotorcycleMode = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+  const session = useOptionalSession()?.session;
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     destinationId: string;
@@ -1283,8 +1286,33 @@ export function NavigationMapScreen() {
           <NavigationSignVerifyCard
             distanceMeters={activeSignAlert.distanceMeters}
             sign={activeSignAlert.sign}
-            onVerify={(sign, _result: SignVerifyResult) => {
+            onVerify={async (sign, result: SignVerifyResult) => {
               verifiedSignIdsRef.current.add(sign.id);
+              try {
+                const isPresent = result === 'present';
+                const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
+                const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
+                const res = await confirmSignPresence(
+                  sign.id,
+                  {
+                    isPresent,
+                    latitude: lat,
+                    longitude: lon,
+                    note: isPresent
+                      ? 'Tài xế xác nhận biển báo còn tồn tại'
+                      : 'Tài xế báo cáo biển báo không còn tại hiện trường',
+                  },
+                  session?.accessToken || '',
+                );
+                if (res?.message) {
+                  setLocationToast({
+                    id: Date.now(),
+                    message: res.message,
+                  });
+                }
+              } catch (e: any) {
+                console.warn('[Navigation] Confirm sign error:', e?.message);
+              }
             }}
             onDismiss={() => {
               setDismissedVerifySignId(activeSignAlert.sign.id);
@@ -2443,7 +2471,7 @@ export function NavigationMapScreen() {
                 </ScrollView>
               </Animated.View>
 
-              {/* Start button — hidden during active navigation */}
+              {/* Start button and Save route button — hidden during active navigation */}
               {!isNavigating ? (
                 <View style={styles.sheetBottomButtonRow}>
                   <AppButton
@@ -3699,6 +3727,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  sheetBottomButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    width: '100%',
+  },
+  saveRouteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    minHeight: 52,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  saveRouteButtonLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    fontWeight: '700',
   },
   bottomGoButton: {
     flex: 1,

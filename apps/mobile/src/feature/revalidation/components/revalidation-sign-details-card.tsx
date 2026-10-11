@@ -24,6 +24,7 @@ import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { ImageInspectionModal } from '@/components/image-inspection-modal';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -53,6 +54,7 @@ export function RevalidationSignDetailsCard({
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const [copiedCoords, setCopiedCoords] = useState(false);
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
+  const [inspectPhotoUrl, setInspectPhotoUrl] = useState<string | null>(null);
 
   const lat = sign.coordinate?.[1] ?? (sign as any)?.latitude;
   const lng = sign.coordinate?.[0] ?? (sign as any)?.longitude;
@@ -406,12 +408,18 @@ export function RevalidationSignDetailsCard({
                 </View>
                 <View style={styles.evidenceImageFrame}>
                   {hasSubmittedCrop ? (
-                    <Image
-                      contentFit="cover"
-                      onError={() => setCropError(true)}
-                      source={{ uri: displaySubmittedCrop }}
-                      style={styles.cropImg}
-                    />
+                    <Pressable
+                      accessibilityLabel="Inspect submitted sign photo"
+                      accessibilityRole="button"
+                      onPress={() => setInspectPhotoUrl(displaySubmittedCrop || null)}
+                    >
+                      <Image
+                        contentFit="cover"
+                        onError={() => setCropError(true)}
+                        source={{ uri: displaySubmittedCrop }}
+                        style={styles.cropImg}
+                      />
+                    </Pressable>
                   ) : (
                     <View style={styles.noCropBox}>
                       <MaterialCommunityIcons
@@ -594,6 +602,13 @@ export function RevalidationSignDetailsCard({
           </View>
         </ScrollView>
       ) : null}
+      <ImageInspectionModal
+        imageUrl={inspectPhotoUrl}
+        onClose={() => setInspectPhotoUrl(null)}
+        subtitle={sign.displayAddress || sign.roadName || undefined}
+        title={sign.name || sign.signCode}
+        visible={Boolean(inspectPhotoUrl)}
+      />
     </Animated.View>
   );
 }

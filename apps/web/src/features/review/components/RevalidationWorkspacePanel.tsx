@@ -114,7 +114,7 @@ export function RevalidationWorkspacePanel({
 
   return (
     <div
-      className={`rounded-[28px] border shadow-2xl overflow-hidden transition-colors ${
+      className={`rounded-3xl border shadow-2xl overflow-hidden transition-colors ${
         isDark ? 'bg-[#061417]/95 border-white/10' : 'bg-white border-gray-200'
       }`}
     >
@@ -134,7 +134,7 @@ export function RevalidationWorkspacePanel({
           <span className="text-sm font-extrabold text-gray-900 dark:text-white">{candidate.name}</span>
           <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1 font-medium">
             <MapPin size={14} className="text-red-500" weight="fill" />
-            <span className="truncate max-w-[240px] text-gray-800 dark:text-gray-200">{candidate.roadName}</span>
+            <span className="truncate max-w-60 text-gray-800 dark:text-gray-200">{candidate.roadName}</span>
           </span>
         </div>
 

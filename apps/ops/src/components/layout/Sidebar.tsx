@@ -338,7 +338,7 @@ export function Sidebar() {
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge ? (
                     <span
-                      className={`shrink-0 min-w-[20px] h-[20px] flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${
+                      className={`shrink-0 min-w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${
                         active
                           ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-[#061115]'
                           : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'

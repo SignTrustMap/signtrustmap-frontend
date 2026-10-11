@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useSidebar } from '@/context/SidebarContext'
 import { SearchBar } from '@/components/common/SearchBar'
 import { ModalPortal } from '@/components/common/ModalPortal'
+import PageHeader from '@/components/common/PageHeader'
 import {
   CaretRight,
   WarningOctagon,
@@ -160,21 +161,17 @@ export default function CandidateDetailPage() {
         <span className="text-gray-900 dark:text-white font-bold font-mono">{reportId}</span>
       </nav>
 
-      {/* Page Title & Status (Action buttons moved exclusively to Sticky Bottom Bar) */}
-      <div className="border-b border-[#E8E4E3] dark:border-white/10 pb-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                {t('candidate_detail.title')}
-              </h1>
-              <span className="font-mono text-xs px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-bold border border-gray-200/80 dark:border-white/15 shadow-2xs">
-                {reportId}
-              </span>
-            </div>
+      {/* Page Title & Status (Standardized via PageHeader) */}
+      <PageHeader
+        title={
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{t('candidate_detail.title')}</span>
+            <span className="font-mono text-xs px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-bold border border-gray-200/80 dark:border-white/15 shadow-2xs">
+              {reportId}
+            </span>
           </div>
-
-          {/* Status Badges Group */}
+        }
+        actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30 uppercase tracking-wider shadow-2xs">
               <WarningOctagon size={15} weight="fill" /> {t('candidate_detail.priority_high')}
@@ -184,8 +181,9 @@ export default function CandidateDetailPage() {
               <span>{t(`candidate_detail.status_${currentStatusKey}`)}</span>
             </span>
           </div>
-        </div>
-      </div>
+        }
+        bordered
+      />
 
       {actionNotice && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center justify-between gap-2 shadow-xs animate-in fade-in">

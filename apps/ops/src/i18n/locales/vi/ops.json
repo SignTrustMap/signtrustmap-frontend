@@ -24,7 +24,7 @@
     "empty_filter": "Không tìm thấy tài khoản người dùng nào khớp với bộ lọc.",
     "modal_title": "Thông tin tài khoản",
     "lbl_name": "Họ và tên",
-    "lbl_email": "Địa chỉ Email",
+    "lbl_email": "Email",
     "lbl_phone": "Số điện thoại",
     "lbl_location": "Khu vực / Địa bàn",
     "lbl_role": "Vai trò",
@@ -342,7 +342,18 @@
     "lbl_pkg_name": "Tên gói nạp",
     "ph_pkg_name": "Nhập tên gói nạp (VD: Gói Tiêu chuẩn)...",
     "btn_confirm": "Xác nhận",
-    "btn_cancel": "Hủy"
+    "btn_cancel": "Hủy",
+    "sec_dynamic_rules": "Cơ chế Thưởng Động (Dynamic Reward Rules Engine)",
+    "lbl_activity_type": "Hoạt động đóng góp",
+    "lbl_base_amount": "Thưởng cơ bản",
+    "lbl_daily_limit": "Hạn mức/ngày",
+    "lbl_rule_status": "Trạng thái",
+    "btn_add_rule": "Thêm luật thưởng",
+    "modal_add_rule_title": "Thêm Luật Thưởng Hoạt Động",
+    "modal_edit_rule_title": "Chỉnh Sửa Luật Thưởng",
+    "toast_rule_updated": "Đã cập nhật luật thưởng thành công!",
+    "toast_rule_toggled": "Đã đổi trạng thái luật thưởng thành công!",
+    "toast_rule_created": "Đã thêm luật thưởng mới thành công!"
   },
   "mlops": {
     "title": "Mô hình AI & Huấn luyện",
@@ -1036,7 +1047,14 @@
     "card_empty_title": "Không tìm thấy biển báo",
     "card_empty_desc": "Thử đổi từ khóa tìm kiếm hoặc chọn nhóm biển báo khác.",
     "showing_signs_count": "Hiển thị {{count}} biển báo",
-    "quick_filter_status": "Lọc trạng thái:"
+    "quick_filter_status": "Lọc trạng thái:",
+    "thinning_active": "Lọc thưa chống lag",
+    "thinning_all": "Hiện 100% biển",
+    "btn_thinning_on": "Chế độ lọc thưa thông minh đang bật",
+    "btn_thinning_off": "Đang hiển thị toàn bộ 100% biển báo",
+    "signs_unit": "biển",
+    "hud_live": "GIS LIVE",
+    "hud_standard": "WGS 84 • QCVN 41:2019"
   },
   "staff": {
     "title": "Quản lý nhân sự & Người dùng",
@@ -1132,5 +1150,12 @@
     "desc": "Đường dẫn bạn đang tìm kiếm không tồn tại hoặc đã bị thay đổi toạ độ.",
     "btn_home": "Về Bảng Điều Khiển",
     "btn_back": "Quay Lại"
+  },
+  "unexpected_error_500": {
+    "title": "Đã Xảy Ra Lỗi Không Mong Muốn...",
+    "desc": "Hệ thống đã ghi nhận sự cố và bảo vệ phiên làm việc của bạn. Vui lòng thử tải lại hoặc quay về bảng điều khiển.",
+    "btn_retry": "Tải Lại Trang",
+    "btn_home": "Về Bảng Điều Khiển"
   }
 }
+

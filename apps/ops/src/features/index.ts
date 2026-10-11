@@ -1,5 +1,7 @@
-// apps/ops/src/features/index.ts
-// Single entrypoint re-exporting all operational pages & feature modules
+/**
+ * Single entrypoint re-exporting all operational pages and feature modules
+ * for the Operations Command Center per RULE.md Section 9.1.
+ */
 
 // Overview
 export { default as DashboardPage } from './dashboard/DashboardPage'
@@ -43,5 +45,6 @@ export { default as ForgotPasswordPage } from './auth/ForgotPasswordPage'
 export { default as ResetPasswordPage } from './auth/ResetPasswordPage'
 export { default as NotAllowedPage } from './auth/NotAllowedPage'
 export { default as NotFound404Page } from './auth/NotFound404Page'
+export { default as UnexpectedError500Page } from './auth/UnexpectedError500Page'
 export * from './auth/Guards'
 export * from './auth/AuthContext'

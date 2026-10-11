@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { I18nProvider } from '@/context/I18nContext'
@@ -11,30 +11,49 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { ScrollToTop } from '@/components/common/ScrollToTop'
 import { opsPortalUrl } from '@/config/env'
-import {
-  Home,
-  ProductMap,
-  ProductApp,
-  Login,
-  Signup,
-  Docs,
-  AboutPage,
-  SurveyStudioPage,
-  SurveyHistoryPage,
-  SurveyRevalidationPage,
-  ReviewerHubPage,
-  CandidateReviewPage,
-  RevalidationReviewPage,
-  WalletPage,
-  CatalogPage,
-  TermsPage,
-  PrivacyPage,
-  ProfilePage,
-  Forbidden403Page,
-  NotFound404Page,
-  ForgotPasswordPage,
-  ResetPasswordPage,
-} from '@/features'
+import { ErrorBoundary } from '@shared/ui'
+
+// Lazy-loaded pages for bundle splitting
+const Home = lazy(() => import('@/features/home/HomePage'))
+const ProductMap = lazy(() => import('@/features/product/ProductMapPage'))
+const ProductApp = lazy(() => import('@/features/product/ProductAppPage'))
+const Login = lazy(() => import('@/features/auth/LoginPage'))
+const Signup = lazy(() => import('@/features/auth/SignupPage'))
+const Docs = lazy(() => import('@/features/docs/DocsPage'))
+const AboutPage = lazy(() => import('@/features/about/AboutPage'))
+const SurveyStudioPage = lazy(() => import('@/features/survey/SurveyStudioPage'))
+const SurveyHistoryPage = lazy(() => import('@/features/survey/SurveyHistoryPage'))
+const SurveyRevalidationPage = lazy(() => import('@/features/survey/SurveyRevalidationPage'))
+const CandidateReviewPage = lazy(() =>
+  import('@/features/review/CandidateReviewPage').then((m) => ({ default: m.CandidateReviewPage }))
+)
+const RevalidationReviewPage = lazy(() =>
+  import('@/features/review/RevalidationReviewPage').then((m) => ({ default: m.RevalidationReviewPage }))
+)
+const WalletPage = lazy(() => import('@/features/wallet/WalletPage'))
+const CatalogPage = lazy(() => import('@/features/catalog/CatalogPage'))
+const TermsPage = lazy(() => import('@/features/legal/TermsPage'))
+const PrivacyPage = lazy(() => import('@/features/legal/PrivacyPage'))
+const ProfilePage = lazy(() => import('@/features/profile/ProfilePage'))
+const Forbidden403Page = lazy(() => import('@/features/auth/Forbidden403Page'))
+const NotFound404Page = lazy(() => import('@/features/auth/NotFound404Page'))
+const UnexpectedError500Page = lazy(() => import('@/features/auth/UnexpectedError500Page'))
+const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
+
+function PageLoadingFallback() {
+  const { t } = useTranslation()
+  return (
+    <div className="flex items-center justify-center min-h-[50vh] w-full">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[#00c4de]/20 border-t-[#00c4de] animate-spin" />
+        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">
+          {t('common.loading_page', 'Đang tải trang...')}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 type CommunityRole = 'driver' | 'surveyor' | 'reviewer'
 type AppRole = CommunityRole | 'staff' | 'admin'
@@ -142,140 +161,145 @@ function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
       {!isBarePage && (
-        <div className="sticky top-0 z-40 w-full">
+        <div className="sticky top-0 z-[1100] w-full">
           <AnnouncementBar />
           <Navbar />
         </div>
       )}
       <main className="flex-1 w-full flex flex-col">
-        <Routes>
-          {/* Public & Information Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/product/map" element={<ProductMap />} />
-          <Route path="/product/app" element={<ProductApp />} />
-          <Route path="/docs" element={<Docs />} />
-          <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          {/* Error Routes */}
-          <Route path="/403" element={<Forbidden403Page />} />
-          <Route path="/404" element={<NotFound404Page />} />
+        <ErrorBoundary variant="full-page">
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Routes>
+            {/* Public & Information Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/product/map" element={<ProductMap />} />
+            <Route path="/product/app" element={<ProductApp />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="/catalog" element={<CatalogPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            {/* Error Routes */}
+            <Route path="/403" element={<Forbidden403Page />} />
+            <Route path="/404" element={<NotFound404Page />} />
+            <Route path="/500" element={<UnexpectedError500Page />} />
 
-          {/* Guest-only routes: Logged in users are automatically redirected to '/' */}
-          <Route
-            path="/login"
-            element={
-              <GuestOnlyRoute>
-                <Login />
-              </GuestOnlyRoute>
-            }
-          />
-          <Route
-            path="/signup"
-            element={
-              <GuestOnlyRoute>
-                <Signup />
-              </GuestOnlyRoute>
-            }
-          />
-          <Route
-            path="/forgot-password"
-            element={
-              <GuestOnlyRoute>
-                <ForgotPasswordPage />
-              </GuestOnlyRoute>
-            }
-          />
-          <Route
-            path="/reset-password"
-            element={<ResetPasswordPage />}
-          />
+            {/* Guest-only routes: Logged in users are automatically redirected to '/' */}
+            <Route
+              path="/login"
+              element={
+                <GuestOnlyRoute>
+                  <Login />
+                </GuestOnlyRoute>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <GuestOnlyRoute>
+                  <Signup />
+                </GuestOnlyRoute>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <GuestOnlyRoute>
+                  <ForgotPasswordPage />
+                </GuestOnlyRoute>
+              }
+            />
+            <Route
+              path="/reset-password"
+              element={<ResetPasswordPage />}
+            />
 
-          {/* Surveyor Workspace Routes */}
-          <Route
-            path="/survey"
-            element={
-              <RoleRoute allow={['surveyor']}>
-                <SurveyStudioPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/survey/history"
-            element={
-              <RoleRoute allow={['surveyor']}>
-                <SurveyHistoryPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/survey/revalidation"
-            element={
-              <RoleRoute allow={['surveyor']}>
-                <SurveyRevalidationPage />
-              </RoleRoute>
-            }
-          />
+            {/* Surveyor Workspace Routes */}
+            <Route
+              path="/survey"
+              element={
+                <RoleRoute allow={['surveyor']}>
+                  <SurveyStudioPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/survey/history"
+              element={
+                <RoleRoute allow={['surveyor']}>
+                  <SurveyHistoryPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/survey/revalidation"
+              element={
+                <RoleRoute allow={['surveyor']}>
+                  <SurveyRevalidationPage />
+                </RoleRoute>
+              }
+            />
 
-          {/* Reviewer Workspace Routes */}
-          <Route
-            path="/review"
-            element={
-              <RoleRoute allow={['reviewer']}>
-                <ReviewerHubPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/review/candidate"
-            element={
-              <RoleRoute allow={['reviewer']}>
-                <CandidateReviewPage />
-              </RoleRoute>
-            }
-          />
-          <Route
-            path="/review/revalidate"
-            element={
-              <RoleRoute allow={['reviewer']}>
-                <RevalidationReviewPage />
-              </RoleRoute>
-            }
-          />
+            {/* Reviewer Workspace Routes - Direct Focus Mode */}
+            <Route
+              path="/review"
+              element={
+                <RoleRoute allow={['reviewer']}>
+                  <CandidateReviewPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/review/candidate"
+              element={
+                <RoleRoute allow={['reviewer']}>
+                  <CandidateReviewPage />
+                </RoleRoute>
+              }
+            />
+            <Route
+              path="/review/revalidate"
+              element={
+                <RoleRoute allow={['reviewer']}>
+                  <RevalidationReviewPage />
+                </RoleRoute>
+              }
+            />
 
-          {/* Community Wallet (Driver, Surveyor, Reviewer) */}
-          <Route
-            path="/wallet"
-            element={
-              <RoleRoute allow={['driver', 'surveyor', 'reviewer']}>
-                <WalletPage />
-              </RoleRoute>
-            }
-          />
+            {/* Community Wallet (Driver, Surveyor, Reviewer) */}
+            <Route
+              path="/wallet"
+              element={
+                <RoleRoute allow={['driver', 'surveyor', 'reviewer']}>
+                  <WalletPage />
+                </RoleRoute>
+              }
+            />
 
-          {/* Authenticated Common Profile */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/account"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Authenticated Common Profile */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Fallback Catch-all: Unmatched routes display dedicated 404 page */}
-          <Route path="*" element={<NotFound404Page />} />
-        </Routes>
-      </main>
+            {/* Fallback Catch-all: Unmatched routes display dedicated 404 page */}
+            <Route path="*" element={<NotFound404Page />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
+    </main>
       {!isBarePage && <Footer />}
       {!isBarePage && <ScrollToTop />}
     </div>

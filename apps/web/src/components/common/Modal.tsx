@@ -41,7 +41,7 @@ export function Modal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-[9999] overflow-y-auto bg-black/75 backdrop-blur-md animate-fadeIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose()
@@ -49,7 +49,7 @@ export function Modal({
       }}
     >
       <div
-        className={`min-h-full flex items-start justify-center p-4 sm:p-6 ${topSpacing}`}
+        className={`min-h-full flex items-center justify-center p-4 sm:p-6 ${topSpacing}`}
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose()

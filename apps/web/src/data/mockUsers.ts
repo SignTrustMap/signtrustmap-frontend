@@ -20,7 +20,8 @@ export interface DemoUserAccount {
   label: string
   icon: string
   email: string
-  password: string
+  phone?: string
+  password?: string
   name: string
   avatar?: string
   credits?: number

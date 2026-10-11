@@ -142,7 +142,7 @@ export default function DashboardPage() {
         {currentKpis.map((kpi, idx) => (
           <div
             key={kpi.label}
-            className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-5 shadow-sm flex flex-col justify-between hover:border-[#00c4de]/50 hover:shadow-md transition-all group"
+            className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:border-[#00c4de]/50 hover:shadow-md transition-all group"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
       {/* Charts 2-Column Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Growth / Workflow Pipeline Area Chart (8 cols) */}
-        <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
@@ -329,7 +329,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right: Category Donut Chart (4 cols) */}
-        <div className="lg:col-span-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
@@ -421,7 +421,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom: Recent Activity Feed */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-[18px] p-6 shadow-xs">
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs">
         <div className="flex items-center justify-between border-b border-[#E8E4E3] dark:border-white/10 pb-4 mb-4">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-gray-900 dark:text-white">

@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
-import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut } from '@phosphor-icons/react'
+import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut, Phone, CircleNotch, WarningCircle } from '@phosphor-icons/react'
+import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
+import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
 
 interface UserProfileModalProps {
   isOpen: boolean
@@ -17,21 +19,66 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
   const toast = useToast()
 
   const [name, setName] = useState(user?.name || '')
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [phone, setPhone] = useState(user?.phone || '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
 
+  const handlePhoneChange = (val: string) => {
+    setPhone(val)
+    if (phoneError) setPhoneError(null)
+  }
+
+  const handlePhoneBlur = () => {
+    const trimmed = phone.trim()
+    if (trimmed && !isValidVietnamPhone(trimmed)) {
+      setPhoneError(t('profile.phone_invalid'))
+    } else {
+      setPhoneError(null)
+    }
+  }
+
   if (!isOpen || !user) return null
 
-  const handleUpdateName = (e: FormEvent) => {
+  const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) {
-      toast.error(t('profile.name_required'))
-      return
+    let hasError = false
+    const cleanName = name.trim()
+    if (!cleanName) {
+      setNameError(t('profile.name_required'))
+      hasError = true
+    } else {
+      setNameError(null)
     }
-    updateProfile({ name: name.trim() })
-    toast.success(t('profile.save_success'))
+
+    const trimmedPhone = phone.trim()
+    if (trimmedPhone && !isValidVietnamPhone(trimmedPhone)) {
+      setPhoneError(t('profile.phone_invalid'))
+      hasError = true
+    } else {
+      setPhoneError(null)
+    }
+
+    if (hasError) return
+
+    setIsSaving(true)
+    try {
+      const normalizedPhone = trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined
+      await updateProfile({
+        name: cleanName,
+        phone: normalizedPhone,
+      })
+      setPhoneError(null)
+      toast.success(t('profile.save_success'))
+    } catch (err: any) {
+      toast.error(err?.message || t('profile.save_error'))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -102,13 +149,10 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/50'}`}>
           <div className="flex items-center gap-4">
             <div className="relative">
-              {user.avatar ? (
-                <img src={user.avatar} alt={user.name} className="w-14 h-14 rounded-full object-cover border-2 border-[#00c4de]" />
-              ) : (
-                <div className="w-14 h-14 rounded-full bg-[#00c4de]/20 flex items-center justify-center text-xl font-bold text-[#00c4de]">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <Avatar size="lg" className="border-2 border-[#00c4de]">
+                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+              </Avatar>
               <span className="absolute -bottom-1 -right-1 text-sm">{user.icon}</span>
             </div>
 
@@ -183,24 +227,76 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
         {/* Tab Contents */}
         <div className="p-6">
           {activeTab === 'info' ? (
-            <form onSubmit={handleUpdateName} className="space-y-4">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">
-                  {t('profile.label_fullname')}
+                  {t('profile.label_fullname')} <span className="text-rose-500 font-bold ml-0.5">*</span>
                 </label>
                 <div className="relative">
-                  <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <User size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${nameError ? 'text-rose-500' : 'text-gray-400'}`} />
                   <input
                     type="text"
+                    required
+                    maxLength={100}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (nameError) setNameError(null)
+                    }}
+                    onBlur={() => {
+                      if (!name.trim()) setNameError(t('profile.name_required'))
+                    }}
+                    aria-invalid={!!nameError}
                     className={`w-full pl-10 pr-3.5 py-2.5 text-xs rounded-xl border outline-none transition-colors ${
-                      isDark
+                      nameError
+                        ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-500/10 focus:border-rose-500'
+                        : isDark
                         ? 'bg-white/5 border-white/10 focus:border-[#00c4de] text-white'
                         : 'bg-white border-gray-300 focus:border-[#007b8b] text-gray-900'
                     }`}
                   />
                 </div>
+                {nameError && (
+                  <p className="text-[11px] text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <WarningCircle size={12} weight="fill" className="shrink-0" />
+                    <span>{nameError}</span>
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  {t('profile.label_phone')}
+                </label>
+                <div className="relative">
+                  <Phone size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${phoneError ? 'text-rose-500' : 'text-gray-400'}`} />
+                  <input
+                    type="tel"
+                    maxLength={15}
+                    value={phone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    onBlur={handlePhoneBlur}
+                    placeholder={t('profile.placeholder_phone')}
+                    aria-invalid={!!phoneError}
+                    className={`w-full pl-10 pr-3.5 py-2.5 text-xs rounded-xl border outline-none transition-colors ${
+                      phoneError
+                        ? 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-500/10 focus:border-rose-500'
+                        : isDark
+                        ? 'bg-white/5 border-white/10 focus:border-[#00c4de] text-white'
+                        : 'bg-white border-gray-300 focus:border-[#007b8b] text-gray-900'
+                    }`}
+                  />
+                </div>
+                {phoneError ? (
+                  <p className="text-[11px] text-rose-500 dark:text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <WarningCircle size={12} weight="fill" className="shrink-0" />
+                    <span>{phoneError}</span>
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                    {t('profile.phone_helper')}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -223,13 +319,21 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="submit"
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer ${
+                  disabled={isSaving}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                     isDark
                       ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
                       : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
                   }`}
                 >
-                  {t('profile.btn_save')}
+                  {isSaving ? (
+                    <>
+                      <CircleNotch size={14} className="animate-spin" />
+                      <span>{t('profile.saving')}</span>
+                    </>
+                  ) : (
+                    <span>{t('profile.btn_save')}</span>
+                  )}
                 </button>
               </div>
             </form>
