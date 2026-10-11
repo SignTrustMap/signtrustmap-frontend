@@ -169,7 +169,9 @@ export function NavigationMapScreen() {
   const [initialGpsOrigin, setInitialGpsOrigin] = useState<MapCoordinate | undefined>(fallbackCurrentLocation);
 
   useEffect(() => {
-    setInitialGpsOrigin(fallbackCurrentLocation);
+    if (fallbackCurrentLocation) {
+      setInitialGpsOrigin(fallbackCurrentLocation);
+    }
     if (selectedDestination) {
       setMapFocus(undefined);
     }
@@ -217,6 +219,12 @@ export function NavigationMapScreen() {
     selectedDestination &&
     navigationSession.destinationId === selectedDestination.id,
   );
+
+  useEffect(() => {
+    if (initialGpsOrigin && !isNavigating && !isCustomStart && !fallbackCurrentLocation && userCoordinate) {
+      setInitialGpsOrigin(userCoordinate);
+    }
+  }, [initialGpsOrigin, isNavigating, isCustomStart, fallbackCurrentLocation, userCoordinate]);
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(Spacing.two, insets.bottom - Spacing.two);
   const [sheetSnapIndex, setSheetSnapIndex] = useState<0 | 1 | 2>(1);
@@ -409,11 +417,39 @@ export function NavigationMapScreen() {
   // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
   // triggers an automatic re-fetch for the new path.
   const activeRouteOrigin = rerouteOrigin ?? plannedRouteOrigin;
-  const { data: routeResult, error: routeError } = useGetNavigationRoute(
+
+  // Dual query: Fetch both Car and Motorcycle directions simultaneously
+  const {
+    data: carRouteResult,
+    isLoading: isCarRouteLoading,
+    error: carRouteError,
+  } = useGetNavigationRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
-    vehicleMode,
+    'DRIVING',
   );
+
+  const {
+    data: motorcycleRouteResult,
+    isLoading: isMotorcycleRouteLoading,
+    error: motorcycleRouteError,
+  } = useGetNavigationRoute(
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    'BIKE',
+  );
+
+  // Store durations and distances in corresponding variables
+  const carDuration = carRouteResult?.duration;
+  const motorcycleDuration = motorcycleRouteResult?.duration;
+  const carDistance = carRouteResult?.distance;
+  const motorcycleDistance = motorcycleRouteResult?.distance;
+
+  // Active route depends on selected vehicle mode tab
+  const activeRouteResult = isMotorcycleMode ? motorcycleRouteResult : carRouteResult;
+  const activeRouteError = isMotorcycleMode ? motorcycleRouteError : carRouteError;
+  const isRouteLoading = isMotorcycleMode ? isMotorcycleRouteLoading : isCarRouteLoading;
+
   const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
   const hasSelectedRoute = Boolean(plannedRouteOrigin && selectedDestination);
   const { data: mapSigns = [], error: boundsSignsError } = useGetSignsInBounds(
@@ -423,16 +459,23 @@ export function NavigationMapScreen() {
   const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
-    routeResult?.geometry,
+    activeRouteResult?.geometry,
     vehicleMode,
   );
-  const navigationError = routeError?.message ?? navigationActionError
+  const navigationError = activeRouteError?.message ?? navigationActionError
     ?? (routeSignsError ? UNABLE_TO_LOAD_SIGNS_FOR_ROUTE_MESSAGE : undefined);
-  const routeCoordinates = routeResult?.coordinates;
-  const routeDistance = routeResult?.distance;
-  const routeDuration = routeResult?.duration;
-  const routeSteps = routeResult?.steps;
+  const routeCoordinates = activeRouteResult?.coordinates;
+  const routeDistance = activeRouteResult?.distance;
+  const routeDuration = activeRouteResult?.duration;
+  const routeSteps = activeRouteResult?.steps;
   const activeDuration = routeDuration ?? 0;
+
+  // Clear any persistent navigation action errors once active route coordinates are available
+  useEffect(() => {
+    if (activeRouteResult?.coordinates?.length) {
+      setNavigationError(undefined);
+    }
+  }, [activeRouteResult?.coordinates]);
 
   // Sync navigation state with tab bar visibility context
   useEffect(() => {
@@ -819,7 +862,7 @@ export function NavigationMapScreen() {
   const consecutiveOffRouteCountRef = useRef(0);
 
   useEffect(() => {
-    if (!isNavigating || !hasLiveLocation || !userCoordinate || !routeCoordinates?.length) {
+    if (!isNavigating || isCustomStart || !hasLiveLocation || !userCoordinate || !routeCoordinates?.length) {
       consecutiveOffRouteCountRef.current = 0;
       return;
     }
@@ -845,7 +888,7 @@ export function NavigationMapScreen() {
     isReroutingRef.current = true;
     console.log('[GPS] Triggering auto-reroute from current GPS position:', userCoordinate);
     setRerouteOrigin([...userCoordinate]);
-  }, [isNavigating, hasLiveLocation, userCoordinate, routeCoordinates]);
+  }, [isNavigating, isCustomStart, hasLiveLocation, userCoordinate, routeCoordinates]);
 
   // Reset reroute lock and clear rerouteOrigin whenever new route coordinates arrive
   useEffect(() => {
@@ -948,14 +991,8 @@ export function NavigationMapScreen() {
       setNavigationSession((prev) =>
         prev ? { ...prev, vehicleMode: newMode } : undefined,
       );
-      if (navigationSession) {
-        const currentCoord = userCoordinate ?? plannedRouteOrigin;
-        if (currentCoord) {
-          setRerouteOrigin(currentCoord);
-        }
-      }
     },
-    [navigationSession, userCoordinate, plannedRouteOrigin],
+    [],
   );
 
   const handleBeginNavigation = async () => {
@@ -1001,19 +1038,16 @@ export function NavigationMapScreen() {
       await startGpsListening();
 
       // If navigating from Current Location, ensure fresh GPS position
-      let currentCoord: MapCoordinate | null | undefined = userCoordinate;
       if (!isCustomStart) {
+        let currentCoord: MapCoordinate | null | undefined = userCoordinate;
         if (!currentCoord) {
           currentCoord = await fetchFreshGpsPosition(3500);
         }
 
-        if (!currentCoord) {
-          setNavigationError(GPS_UNAVAILABLE_MESSAGE);
-          return;
+        if (currentCoord) {
+          setUserCoordinate(currentCoord);
+          setInitialGpsOrigin(currentCoord);
         }
-
-        setUserCoordinate(currentCoord);
-        setInitialGpsOrigin(currentCoord);
       }
 
       setNavigationSession({
@@ -1224,6 +1258,7 @@ export function NavigationMapScreen() {
           signs={filteredSigns}
           showCurrentLocation={!isNavigating}
           onSignSelect={setSelectedMapSign}
+          vehicleMode={vehicleMode}
         />
 
         {!hasSelectedRoute && boundsSignsError ? (
@@ -2085,7 +2120,9 @@ export function NavigationMapScreen() {
                         { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
                       ]}
                     >
-                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
+                      {carDuration !== undefined
+                        ? formatRouteDuration(carDuration)
+                        : (isCarRouteLoading ? '...' : '--')}
                     </Text>
                     {vehicleMode === 'DRIVING' ? (
                       <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
@@ -2112,7 +2149,9 @@ export function NavigationMapScreen() {
                         { color: isMotorcycleMode ? theme.primary : theme.textSecondary },
                       ]}
                     >
-                      {routeDuration !== undefined ? formatRouteDuration(activeDuration) : '--'}
+                      {motorcycleDuration !== undefined
+                        ? formatRouteDuration(motorcycleDuration)
+                        : (isMotorcycleRouteLoading ? '...' : '--')}
                     </Text>
                     {isMotorcycleMode ? (
                       <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />

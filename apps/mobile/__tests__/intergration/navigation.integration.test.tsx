@@ -237,7 +237,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       );
 
       // Verify section header
-      expect(await findByText('SAVED & RECENT')).toBeTruthy();
+      expect(await findByText(/SAVED & RECENT|ĐÃ LƯU & GẦN ĐÂY/i)).toBeTruthy();
 
       // Verify items from MSW /places/saved and /places/recent-searches
       expect(await findByText('Home')).toBeTruthy();
@@ -254,13 +254,13 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         </Wrapper>,
       );
 
-      const searchInput = getByPlaceholderText('Where to?');
+      const searchInput = getByPlaceholderText(/Where to\?|Bạn muốn đi đâu\?/i);
       await act(async () => {
         await fireEvent.changeText(searchInput, 'Nguyen Hue');
       });
 
       // Verify search results section appears
-      expect(await findByText('SEARCH RESULTS')).toBeTruthy();
+      expect(await findByText(/SEARCH RESULTS|KẾT QUẢ TÌM KIẾM/i)).toBeTruthy();
       // Verify spatial address match from MSW /addresses/search
       expect(await findByText('Nguyen Hue Walking Street')).toBeTruthy();
       expect(await findByText(/Ben Nghe, District 1/i)).toBeTruthy();
@@ -283,7 +283,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         </Wrapper>,
       );
 
-      const searchInput = getByPlaceholderText('Where to?');
+      const searchInput = getByPlaceholderText(/Where to\?|Bạn muốn đi đâu\?/i);
       await act(async () => {
         await fireEvent.changeText(searchInput, 'Nguyen Hue');
       });
@@ -330,7 +330,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         </Wrapper>,
       );
 
-      const searchInput = getByPlaceholderText('Where to?');
+      const searchInput = getByPlaceholderText(/Where to\?|Bạn muốn đi đâu\?/i);
       await act(async () => {
         await fireEvent.changeText(searchInput, 'Nguyen Hue');
       });

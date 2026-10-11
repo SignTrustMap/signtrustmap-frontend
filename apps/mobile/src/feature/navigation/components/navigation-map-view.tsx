@@ -18,6 +18,7 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type MapCoordinate,
   type PreviousLocation,
+  type VehicleMode,
 } from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
@@ -48,6 +49,7 @@ type NavigationMapViewProps = {
   hasLiveLocation?: boolean;
   isCustomStart?: boolean;
   onSignSelect?: (sign: RouteSign | null) => void;
+  vehicleMode?: VehicleMode["id"] | string;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -485,8 +487,12 @@ export function NavigationMapView({
   hasLiveLocation = false,
   isCustomStart = false,
   onSignSelect,
+  vehicleMode = 'DRIVING',
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+  const routeLineColor = isMotorcycle ? '#0D9488' : theme.primary;
+  const routeCasingColor = isMotorcycle ? '#042F2E' : '#1E3A8A';
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignPressTimeRef = useRef<number>(0);
@@ -822,11 +828,23 @@ export function NavigationMapView({
         {routeGeoJson ? (
           <GeoJSONSource data={routeGeoJson} id="selected-route-source">
             <Layer
-              id="selected-route-line"
+              id={`selected-route-casing-${isMotorcycle ? 'bike' : 'car'}`}
+              key={`selected-route-casing-${isMotorcycle ? 'bike' : 'car'}`}
               type="line"
               style={{
                 lineCap: 'round',
-                lineColor: theme.primary,
+                lineColor: routeCasingColor,
+                lineJoin: 'round',
+                lineWidth: 7,
+              }}
+            />
+            <Layer
+              id={`selected-route-line-${isMotorcycle ? 'bike' : 'car'}`}
+              key={`selected-route-line-${isMotorcycle ? 'bike' : 'car'}`}
+              type="line"
+              style={{
+                lineCap: 'round',
+                lineColor: routeLineColor,
                 lineJoin: 'round',
                 lineWidth: 5,
               }}

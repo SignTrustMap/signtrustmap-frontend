@@ -1,7 +1,10 @@
 import { skipToken, useQuery } from '@tanstack/react-query';
-
-import { getSignsAlongRoute, getSignsInBounds } from '@/api/sign-map/sign-map';
-import type { MapCoordinate } from '@/types/navigationType';
+import {
+  getNearbySignCandidates,
+  getSignsAlongRoute,
+  getSignsInBounds,
+} from '@/api/sign-map/sign-map';
+import type { MapCoordinate, NearbySignsQuery, VehicleMode } from '@/types/navigationType';
 import type { FindSignsInBoundsParams, RoutePointDto } from '@/types/signMapType';
 import { toRouteSign } from '../utils/signs';
 
@@ -35,23 +38,37 @@ export function useGetSignsInBounds(
   });
 }
 
-import type { VehicleMode } from '@/types/navigationType';
-
 export function useGetSignsAlongRoute(
   start: MapCoordinate | undefined,
   destination: MapCoordinate | undefined,
   geometry: RoutePointDto[] | undefined,
   vehicleMode: VehicleMode["id"] = "DRIVING",
+  enabledCategoryCodes?: string[],
 ) {
   const vehicleType = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE' ? 'MOTORCYCLE' : 'CAR';
   return useQuery({
-    queryKey: ['signs-along-route', start, destination, geometry, vehicleType],
+    queryKey: ['signs-along-route', start, destination, geometry, vehicleType, enabledCategoryCodes],
     queryFn: start && destination && geometry && geometry.length >= 2
-      ? ({ signal }) => getSignsAlongRoute({ geometry, vehicleType }, signal)
+      ? ({ signal }) => getSignsAlongRoute({ geometry, vehicleType, enabledCategoryCodes }, signal)
       : skipToken,
     select: (response) => response.signs.map(({ sign }) => toRouteSign(sign)),
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+  });
+}
+
+export function useGetNearbySigns(
+  params: NearbySignsQuery | undefined,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['nearby-signs', params],
+    queryFn: enabled && params && Number.isFinite(params.latitude) && Number.isFinite(params.longitude)
+      ? ({ signal }) => getNearbySignCandidates(params, signal)
+      : skipToken,
+    select: (response) => response.signs.map(toRouteSign),
+    enabled: Boolean(enabled && params && Number.isFinite(params.latitude) && Number.isFinite(params.longitude)),
+    staleTime: 10_000,
   });
 }

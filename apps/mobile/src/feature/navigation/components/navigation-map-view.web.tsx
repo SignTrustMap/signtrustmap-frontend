@@ -21,10 +21,14 @@ type NavigationMapViewProps = {
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeSigns?: RouteSign[];
+  signs?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
+  isCustomStart?: boolean;
+  onSignSelect?: (sign: RouteSign | null) => void;
+  vehicleMode?: string;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -168,6 +172,7 @@ export function NavigationMapView({
   routeCoordinates,
   routeStart,
   routeSigns = [],
+  vehicleMode = 'DRIVING',
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const destinationMarkerRef = useRef<Marker | null>(null);
@@ -326,6 +331,8 @@ export function NavigationMapView({
         },
         type: 'geojson',
       });
+      const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+      const routeLineColor = isMotorcycle ? '#0D9488' : theme.primary;
       map.addLayer({
         id: 'selected-route-line',
         source: 'selected-route-source',
@@ -335,7 +342,7 @@ export function NavigationMapView({
           'line-join': 'round',
         },
         paint: {
-          'line-color': theme.primary,
+          'line-color': routeLineColor,
           'line-width': 5,
         },
       });
@@ -366,7 +373,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary]);
+  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary, vehicleMode]);
 
   return (
     <View style={styles.container}>

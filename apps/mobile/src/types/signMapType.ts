@@ -53,6 +53,7 @@ export type RoutePointDto = {
 export type RouteSignsRequestDto = {
     geometry: RoutePointDto[];
     vehicleType?: 'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN';
+    enabledCategoryCodes?: string[];
 };
 
 // Read response shapes used by the existing navigation API integration.
