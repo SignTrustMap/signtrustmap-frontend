@@ -491,8 +491,10 @@ export function NavigationMapView({
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
-  const routeLineColor = isMotorcycle ? '#0D9488' : theme.primary;
-  const routeCasingColor = isMotorcycle ? '#042F2E' : '#1E3A8A';
+  const isBicycle = vehicleMode === 'CYCLING';
+  const isWalking = vehicleMode === 'WALKING';
+  const routeLineColor = isWalking ? '#10B981' : isBicycle ? '#F59E0B' : isMotorcycle ? '#0D9488' : theme.primary;
+  const routeCasingColor = isWalking ? '#064E3B' : isBicycle ? '#78350F' : isMotorcycle ? '#042F2E' : '#1E3A8A';
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignPressTimeRef = useRef<number>(0);

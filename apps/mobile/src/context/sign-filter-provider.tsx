@@ -155,7 +155,11 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
       categories: SignCategory[],
       options?: CreatePresetOptions
     ) => {
-      const trimmedName = name.trim() || `Lộ trình ${presets.length + 1}`;
+      const defaultRouteName =
+        options?.originName && options?.destinationName
+          ? `${options.originName} ➔ ${options.destinationName}`
+          : `Lộ trình ${presets.length + 1}`;
+      const trimmedName = name.trim() || defaultRouteName;
       const onlyFixed = options?.onlyFixedSigns !== false;
       const cats: SignCategory[] = categories.length > 0 ? categories : ['MANDATORY'];
 
@@ -200,6 +204,27 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         categories: cats,
         onlyFixedSigns: onlyFixed,
         createdAt: Date.now(),
+        ...(options?.originName && options?.destinationName
+          ? {
+              savedRoute: {
+                id: `route_${Date.now()}`,
+                userId: 'local',
+                title: trimmedName,
+                vehicleMode: options.vehicleMode || 'MOTORCYCLE',
+                originName: options.originName,
+                originLatitude: options.originLatitude ?? 10.7769,
+                originLongitude: options.originLongitude ?? 106.7009,
+                destinationName: options.destinationName,
+                destinationLatitude: options.destinationLatitude ?? 10.85,
+                destinationLongitude: options.destinationLongitude ?? 106.772,
+                distanceMeters: options.distanceMeters ?? 0,
+                durationSeconds: options.durationSeconds ?? 0,
+                encodedPolyline: options.encodedPolyline ?? '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
       };
 
       setPresets((prev) => [...prev, newPreset]);
@@ -301,10 +326,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
     return new Set(activePreset.categories);
   }, [activePreset]);
 
-  const activeOnlyFixedSigns = useMemo(() => {
-    if (!activePreset) return false;
-    return activePreset.onlyFixedSigns !== false;
-  }, [activePreset]);
+  const activeOnlyFixedSigns = false;
 
   return (
     <SignFilterContext.Provider

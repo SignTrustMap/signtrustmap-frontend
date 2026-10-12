@@ -332,7 +332,9 @@ export function NavigationMapView({
         type: 'geojson',
       });
       const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
-      const routeLineColor = isMotorcycle ? '#0D9488' : theme.primary;
+      const isBicycle = vehicleMode === 'CYCLING';
+      const isWalking = vehicleMode === 'WALKING';
+      const routeLineColor = isWalking ? '#10B981' : isBicycle ? '#F59E0B' : isMotorcycle ? '#0D9488' : theme.primary;
       map.addLayer({
         id: 'selected-route-line',
         source: 'selected-route-source',

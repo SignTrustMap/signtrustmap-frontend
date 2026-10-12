@@ -26,6 +26,7 @@ import {
 } from '@/feature/review/context/review-workflow-provider';
 import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { resolveS3Url, type RemedySign } from '@/api/reviews/review-workflow';
+import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -240,7 +241,7 @@ function ReviewBottomSheet({
                 {/* Below the grid: small text label "no correct option?", a report button appears below */}
                 <View style={styles.noOptionContainer}>
                   <Text style={[styles.noOptionLabel, { color: theme.placeholder }]}>
-                    no correct option?
+                    Không có biển báo đúng?
                   </Text>
                   <AppButton
                     accessibilityLabel="Báo cáo"
@@ -328,6 +329,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [reportNote, setReportNote] = useState('');
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isSignFocused, setIsSignFocused] = useState(true);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -769,10 +771,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 },
               ]}
             >
-              <View style={styles.detectedBadgeRow}>
-                <MaterialCommunityIcons color={Colors.primary} name="shield-check-outline" size={13} style={{ marginRight: 4 }} />
-                <Text style={styles.detectedBadgeText}>Sign detected</Text>
-              </View>
               <Text numberOfLines={2} style={[styles.infoBoxTitle, { color: theme.text }]}>
                 {submission.title}
               </Text>
@@ -790,67 +788,83 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <View style={styles.actionsFooter}>
               <View style={styles.diamondContainer}>
                 {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                <Pressable
-                  accessibilityLabel="Skip submission (cannot identify)"
-                  accessibilityRole="button"
-                  onPress={() => completeReview('skipped')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondTop,
-                    styles.neutralDiamondButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondTop]}>
+                  <Pressable
+                    accessibilityLabel="Skip submission (cannot identify)"
+                    accessibilityRole="button"
+                    onPress={() => completeReview('skipped')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.neutralDiamondButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Bỏ qua
+                  </Text>
+                </View>
 
                 {/* Left Button: Decline (X) */}
-                <Pressable
-                  accessibilityLabel="Decline submission"
-                  accessibilityRole="button"
-                  onPress={() => setActiveSheet('decline')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondLeft,
-                    styles.declineButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondLeft]}>
+                  <Pressable
+                    accessibilityLabel="Decline submission"
+                    accessibilityRole="button"
+                    onPress={() => setActiveSheet('decline')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.declineButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Từ chối
+                  </Text>
+                </View>
 
                 {/* Right Button: Approve (Heart) */}
-                <Pressable
-                  accessibilityLabel="Approve submission"
-                  accessibilityRole="button"
-                  onPress={() => completeReview('approved')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondRight,
-                    styles.approveButton,
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondRight]}>
+                  <Pressable
+                    accessibilityLabel="Approve submission"
+                    accessibilityRole="button"
+                    onPress={() => completeReview('approved')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.approveButton,
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Đồng ý
+                  </Text>
+                </View>
 
                 {/* Bottom Button: Report */}
-                <Pressable
-                  accessibilityLabel="Report submission"
-                  accessibilityRole="button"
-                  onPress={() => setActiveSheet('report')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondBottom,
-                    styles.neutralDiamondButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondBottom]}>
+                  <Pressable
+                    accessibilityLabel="Report submission"
+                    accessibilityRole="button"
+                    onPress={() => setActiveSheet('report')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.neutralDiamondButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Báo cáo
+                  </Text>
+                </View>
               </View>
 
               {/* Undo Action (Subtle under the buttons) */}
@@ -868,6 +882,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               ) : (
                 <View style={styles.undoSpacer} />
               )}
+
+              {/* Floating Action Button: Question Mark Help Guide */}
+              <Pressable
+                accessibilityLabel="Hướng dẫn thao tác thẩm định"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setIsHelpModalVisible(true)}
+                style={({ pressed }) => [
+                  styles.helpFab,
+                  { backgroundColor: theme.primary },
+                  pressed && styles.helpFabPressed,
+                ]}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="help" size={24} />
+              </Pressable>
             </View>
           </View>
         ) : (
@@ -980,6 +1009,12 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         reportNote={reportNote}
         selectedRemedySign={selectedRemedySign}
         type={activeSheet}
+      />
+
+      {/* Review Instruction Modal */}
+      <ReviewInstructionModal
+        isHelpModalVisible={isHelpModalVisible}
+        setIsHelpModalVisible={setIsHelpModalVisible}
       />
     </View>
   );
@@ -1247,17 +1282,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
+    position: 'relative',
+    width: '100%',
+  },
+  helpFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 20,
+  },
+  helpFabPressed: {
+    transform: [{ scale: 0.92 }],
+    opacity: 0.88,
   },
   diamondContainer: {
     width: 168,
-    height: 168,
+    height: 196,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 2,
   },
-  diamondButton: {
+  diamondItem: {
     position: 'absolute',
+    width: 54,
+    alignItems: 'center',
+  },
+  diamondButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
@@ -1269,7 +1330,7 @@ const styles = StyleSheet.create({
     left: 57,
   },
   diamondBottom: {
-    bottom: 0,
+    top: 114,
     left: 57,
   },
   diamondLeft: {
@@ -1279,6 +1340,15 @@ const styles = StyleSheet.create({
   diamondRight: {
     right: 0,
     top: 57,
+  },
+  diamondLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 4,
+    width: 76,
+    letterSpacing: 0.2,
   },
   circleButtonPressed: {
     transform: [{ scale: 0.92 }],
@@ -1546,7 +1616,7 @@ const styles = StyleSheet.create({
   },
   skeletonDiamond: {
     width: 168,
-    height: 168,
+    height: 196,
     position: 'relative',
     alignSelf: 'center',
     marginVertical: Spacing.two,

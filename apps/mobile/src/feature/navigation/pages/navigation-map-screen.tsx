@@ -421,7 +421,7 @@ export function NavigationMapScreen() {
   // triggers an automatic re-fetch for the new path.
   const activeRouteOrigin = rerouteOrigin ?? plannedRouteOrigin;
 
-  // Dual query: Fetch both Car and Motorcycle directions simultaneously
+  // Quad query: Fetch Car, Motorcycle, Bicycle, and Walking directions simultaneously
   const {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
@@ -442,16 +442,61 @@ export function NavigationMapScreen() {
     'BIKE',
   );
 
+  const {
+    data: cyclingRouteResult,
+    isLoading: isCyclingRouteLoading,
+    error: cyclingRouteError,
+  } = useGetNavigationRoute(
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    'CYCLING',
+  );
+
+  const {
+    data: walkingRouteResult,
+    isLoading: isWalkingRouteLoading,
+    error: walkingRouteError,
+  } = useGetNavigationRoute(
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    'WALKING',
+  );
+
   // Store durations and distances in corresponding variables
   const carDuration = carRouteResult?.duration;
   const motorcycleDuration = motorcycleRouteResult?.duration;
+  const cyclingDuration = cyclingRouteResult?.duration;
+  const walkingDuration = walkingRouteResult?.duration;
   const carDistance = carRouteResult?.distance;
   const motorcycleDistance = motorcycleRouteResult?.distance;
+  const cyclingDistance = cyclingRouteResult?.distance;
+  const walkingDistance = walkingRouteResult?.distance;
 
   // Active route depends on selected vehicle mode tab
-  const activeRouteResult = isMotorcycleMode ? motorcycleRouteResult : carRouteResult;
-  const activeRouteError = isMotorcycleMode ? motorcycleRouteError : carRouteError;
-  const isRouteLoading = isMotorcycleMode ? isMotorcycleRouteLoading : isCarRouteLoading;
+  const activeRouteResult =
+    vehicleMode === 'CYCLING'
+      ? cyclingRouteResult
+      : vehicleMode === 'WALKING'
+        ? walkingRouteResult
+        : isMotorcycleMode
+          ? motorcycleRouteResult
+          : carRouteResult;
+  const activeRouteError =
+    vehicleMode === 'CYCLING'
+      ? cyclingRouteError
+      : vehicleMode === 'WALKING'
+        ? walkingRouteError
+        : isMotorcycleMode
+          ? motorcycleRouteError
+          : carRouteError;
+  const isRouteLoading =
+    vehicleMode === 'CYCLING'
+      ? isCyclingRouteLoading
+      : vehicleMode === 'WALKING'
+        ? isWalkingRouteLoading
+        : isMotorcycleMode
+          ? isMotorcycleRouteLoading
+          : isCarRouteLoading;
 
   const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
   const hasSelectedRoute = Boolean(plannedRouteOrigin && selectedDestination);
@@ -530,10 +575,16 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (savedRouteData && !isNavigating) {
-      const isBike =
-        savedRouteData.vehicleMode?.toUpperCase() === 'MOTORCYCLE' ||
-        savedRouteData.vehicleMode?.toUpperCase() === 'BIKE';
-      setVehicleMode(isBike ? 'BIKE' : 'DRIVING');
+      const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
+      if (modeUpper === 'CYCLING' || modeUpper === 'BICYCLE') {
+        setVehicleMode('CYCLING');
+      } else if (modeUpper === 'WALKING' || modeUpper === 'PEDESTRIAN') {
+        setVehicleMode('WALKING');
+      } else if (modeUpper === 'MOTORCYCLE' || modeUpper === 'BIKE') {
+        setVehicleMode('BIKE');
+      } else {
+        setVehicleMode('DRIVING');
+      }
       void setActivePresetId(savedRouteData.id);
       snapTo(1);
     }
@@ -611,18 +662,14 @@ export function NavigationMapScreen() {
     }
     return visibleSigns.filter((sign) => {
       const cat = getSignCategory(sign);
-      if (activeOnlyFixedSigns && (cat === 'TEMPORARY' || (sign as any).isTemporary)) {
-        return false;
-      }
       return activeCategories.has(cat);
     });
-  }, [filterViewMode, manualCategories, visibleSigns, activeCategories, activePresetId, activeOnlyFixedSigns]);
+  }, [filterViewMode, manualCategories, visibleSigns, activeCategories, activePresetId]);
 
   const createSavedRouteMutation = useCreateSavedRoute();
   const updateSavedRouteMutation = useUpdateSavedRoute();
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
   const [bookmarkTitleInput, setBookmarkTitleInput] = useState('');
-  const [bookmarkOnlyFixedSigns, setBookmarkOnlyFixedSigns] = useState(true);
   const [bookmarkCategories, setBookmarkCategories] = useState<Set<SignCategory>>(
     new Set(['MANDATORY', 'WARNING', 'PROHIBITORY'])
   );
@@ -641,11 +688,8 @@ export function NavigationMapScreen() {
     if (!selectedDestination || !plannedRouteOrigin) return;
     const currentName =
       savedRouteData?.title ||
-      `${selectedDestination.title} (${isMotorcycleMode ? 'Xe máy' : 'Ô tô'})`;
+      `${routeStartTitle || 'Điểm xuất phát'} ➔ ${selectedDestination.title}`;
     setBookmarkTitleInput(currentName);
-    setBookmarkOnlyFixedSigns(
-      savedRouteData?.filterRules?.onlyFixedSigns ?? activeOnlyFixedSigns ?? true
-    );
     if (savedRouteData?.filterRules?.categories && savedRouteData.filterRules.categories.length > 0) {
       setBookmarkCategories(new Set(savedRouteData.filterRules.categories.map(codeToCategory)));
     } else if (activeCategories && activeCategories.size > 0) {
@@ -658,9 +702,8 @@ export function NavigationMapScreen() {
   }, [
     selectedDestination,
     plannedRouteOrigin,
+    routeStartTitle,
     savedRouteData,
-    isMotorcycleMode,
-    activeOnlyFixedSigns,
     activeCategories,
   ]);
 
@@ -681,15 +724,23 @@ export function NavigationMapScreen() {
     try {
       const categoriesArray = Array.from(bookmarkCategories).map(categoryToCode);
       const polylineStr = routeCoordinates?.length ? encodePolyline(routeCoordinates) : undefined;
+      const targetVehicleMode =
+        vehicleMode === 'CYCLING'
+          ? 'CYCLING'
+          : vehicleMode === 'WALKING'
+            ? 'WALKING'
+            : isMotorcycleMode
+              ? 'MOTORCYCLE'
+              : 'CAR';
 
       if (activeSavedRouteId && savedRouteData) {
         await updateSavedRouteMutation.mutateAsync({
           id: activeSavedRouteId,
           dto: {
             title: trimmed,
-            vehicleMode: isMotorcycleMode ? 'MOTORCYCLE' : 'CAR',
+            vehicleMode: targetVehicleMode,
             filterRules: {
-              onlyFixedSigns: bookmarkOnlyFixedSigns,
+              onlyFixedSigns: true,
               categories: categoriesArray,
             },
           },
@@ -701,7 +752,7 @@ export function NavigationMapScreen() {
       } else {
         const created = await createSavedRouteMutation.mutateAsync({
           title: trimmed,
-          vehicleMode: isMotorcycleMode ? 'MOTORCYCLE' : 'CAR',
+          vehicleMode: targetVehicleMode,
           originName: routeStartTitle || 'Điểm xuất phát',
           originLatitude: plannedRouteOrigin![1],
           originLongitude: plannedRouteOrigin![0],
@@ -712,7 +763,7 @@ export function NavigationMapScreen() {
           distanceMeters: routeDistance,
           durationSeconds: routeDuration,
           filterRules: {
-            onlyFixedSigns: bookmarkOnlyFixedSigns,
+            onlyFixedSigns: true,
             categories: categoriesArray,
           },
         });
@@ -736,8 +787,8 @@ export function NavigationMapScreen() {
     activeSavedRouteId,
     savedRouteData,
     updateSavedRouteMutation,
+    vehicleMode,
     isMotorcycleMode,
-    bookmarkOnlyFixedSigns,
     createSavedRouteMutation,
     routeStartTitle,
     plannedRouteOrigin,
@@ -1714,7 +1765,9 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
-                                {preset.name}
+                                {preset.savedRoute?.originName && preset.savedRoute?.destinationName
+                                  ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
+                                  : preset.name}
                               </Text>
                               <Text style={[styles.homeFilterRowSublabel, { color: theme.textSecondary }]}>
                                 {preset.categories.length} danh mục
@@ -2023,7 +2076,15 @@ export function NavigationMapScreen() {
                     {/* Dòng trên: Vehicle icon + Estimated time + leaf icon */}
                     <View style={styles.navEstimatedTimeRow}>
                       <MaterialCommunityIcons
-                        name={isMotorcycleMode ? 'motorbike' : 'car'}
+                        name={
+                          vehicleMode === 'CYCLING'
+                            ? 'bicycle'
+                            : vehicleMode === 'WALKING'
+                              ? 'walk'
+                              : isMotorcycleMode
+                                ? 'motorbike'
+                                : 'car'
+                        }
                         size={18}
                         color={theme.primary}
                         style={{ marginRight: 6 }}
@@ -2085,7 +2146,13 @@ export function NavigationMapScreen() {
                     style={styles.routeHeaderInfo}
                   >
                     <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
-                      {isMotorcycleMode ? 'Xe máy' : 'Ô tô'}
+                      {vehicleMode === 'CYCLING'
+                        ? 'Xe đạp'
+                        : vehicleMode === 'WALKING'
+                          ? 'Đi bộ'
+                          : isMotorcycleMode
+                            ? 'Xe máy'
+                            : 'Ô tô'}
                     </Text>
                     {routeDuration !== undefined && routeDistance !== undefined ? (
                       <>
@@ -2127,64 +2194,135 @@ export function NavigationMapScreen() {
 
               {/* Vehicle picker: visible in preview, and in navigation mode when expanded (snap index > 0) */}
               {!isNavigating || sheetSnapIndex > 0 ? (
-                <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
-                  <AppButton
-                    accessibilityLabel="Car route"
-                    onPress={() => handleSwitchVehicleMode('DRIVING')}
-                    style={[
-                      styles.vehicleTabButton,
-                      vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
-                    ]}
-                    variant="ghost"
+                <View style={[styles.vehicleTabsContainer, { borderBottomColor: theme.border }]}>
+                  <ScrollView
+                    contentContainerStyle={styles.vehicleTabsScroll}
+                    horizontal
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.vehicleTabsScrollView}
                   >
-                    <MaterialCommunityIcons
-                      name="car"
-                      size={24}
-                      color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
-                    />
-                    <Text
+                    {/* Car */}
+                    <AppButton
+                      accessibilityLabel="Car route"
+                      onPress={() => handleSwitchVehicleMode('DRIVING')}
                       style={[
-                        styles.vehicleTabDurationText,
-                        { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                        styles.vehicleTabButton,
+                        vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
                       ]}
+                      variant="ghost"
                     >
-                      {carDuration !== undefined
-                        ? formatRouteDuration(carDuration)
-                        : (isCarRouteLoading ? '...' : '--')}
-                    </Text>
-                    {vehicleMode === 'DRIVING' ? (
-                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                    ) : null}
-                  </AppButton>
+                      <MaterialCommunityIcons
+                        name="car"
+                        size={22}
+                        color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {carDuration !== undefined
+                          ? formatRouteDuration(carDuration)
+                          : (isCarRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'DRIVING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
 
-                  <AppButton
-                    accessibilityLabel="Bike route"
-                    onPress={() => handleSwitchVehicleMode('BIKE')}
-                    style={[
-                      styles.vehicleTabButton,
-                      isMotorcycleMode && styles.vehicleTabButtonActive,
-                    ]}
-                    variant="ghost"
-                  >
-                    <MaterialCommunityIcons
-                      name="motorbike"
-                      size={24}
-                      color={isMotorcycleMode ? theme.primary : theme.textSecondary}
-                    />
-                    <Text
+                    {/* Motorcycle */}
+                    <AppButton
+                      accessibilityLabel="Motorcycle route"
+                      onPress={() => handleSwitchVehicleMode('BIKE')}
                       style={[
-                        styles.vehicleTabDurationText,
-                        { color: isMotorcycleMode ? theme.primary : theme.textSecondary },
+                        styles.vehicleTabButton,
+                        isMotorcycleMode && styles.vehicleTabButtonActive,
                       ]}
+                      variant="ghost"
                     >
-                      {motorcycleDuration !== undefined
-                        ? formatRouteDuration(motorcycleDuration)
-                        : (isMotorcycleRouteLoading ? '...' : '--')}
-                    </Text>
-                    {isMotorcycleMode ? (
-                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                    ) : null}
-                  </AppButton>
+                      <MaterialCommunityIcons
+                        name="motorbike"
+                        size={22}
+                        color={isMotorcycleMode ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: isMotorcycleMode ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {motorcycleDuration !== undefined
+                          ? formatRouteDuration(motorcycleDuration)
+                          : (isMotorcycleRouteLoading ? '...' : '--')}
+                      </Text>
+                      {isMotorcycleMode ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+
+                    {/* Bicycle */}
+                    <AppButton
+                      accessibilityLabel="Bicycle route"
+                      onPress={() => handleSwitchVehicleMode('CYCLING')}
+                      style={[
+                        styles.vehicleTabButton,
+                        vehicleMode === 'CYCLING' && styles.vehicleTabButtonActive,
+                      ]}
+                      variant="ghost"
+                    >
+                      <MaterialCommunityIcons
+                        name="bicycle"
+                        size={22}
+                        color={vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {cyclingDuration !== undefined
+                          ? formatRouteDuration(cyclingDuration)
+                          : (isCyclingRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'CYCLING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+
+                    {/* Walking */}
+                    <AppButton
+                      accessibilityLabel="Walking route"
+                      onPress={() => handleSwitchVehicleMode('WALKING')}
+                      style={[
+                        styles.vehicleTabButton,
+                        vehicleMode === 'WALKING' && styles.vehicleTabButtonActive,
+                      ]}
+                      variant="ghost"
+                    >
+                      <MaterialCommunityIcons
+                        name="walk"
+                        size={22}
+                        color={vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {walkingDuration !== undefined
+                          ? formatRouteDuration(walkingDuration)
+                          : (isWalkingRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'WALKING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+                  </ScrollView>
                 </View>
               ) : null}
 
@@ -2202,17 +2340,13 @@ export function NavigationMapScreen() {
                   { opacity: expandableContentOpacity },
                 ]}
               >
-                {/* Divider between vehicle tabs and sign filter */}
-                <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
                 {/* Sign filter section: filter by WARNING, MANDATORY, PROHIBITORY, INFORMATION, TEMPORARY */}
                 <View style={styles.signFilterHeader}>
                   <View style={styles.signFilterTitleGroup}>
-                    <Text style={[styles.signFilterTitle, { color: theme.text }]}>
-                      {filterViewMode === 'lists' ? 'Bộ lọc biển báo' : 'Danh mục biển báo'}
-                    </Text>
-                    <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
-                      <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
-                        {filteredSigns.length}/{visibleSigns.length}
+                    <View style={[styles.signFilterTotalBadge]}>
+                      <Text style={[styles.signFilterTotalText, { color: theme.text }]}>
+                        {/* {filteredSigns.length}/{visibleSigns.length} biển báo đang hiển thị */}
+                        {filteredSigns.length === 0 && visibleSigns.length === 0 ? 'Không có biển báo thỏa điều kiện' : `${filteredSigns.length}/${visibleSigns.length} biển báo đang hiển thị`}
                       </Text>
                     </View>
                   </View>
@@ -2315,7 +2449,9 @@ export function NavigationMapScreen() {
                             <View style={styles.signCatInfo}>
                               <View style={styles.signCatTitleRow}>
                                 <Text style={[styles.signCatLabel, { color: theme.text }]}>
-                                  {preset.name}
+                                  {preset.savedRoute?.originName && preset.savedRoute?.destinationName
+                                    ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
+                                    : preset.name}
                                 </Text>
                                 <View
                                   style={[
@@ -2500,7 +2636,7 @@ export function NavigationMapScreen() {
                   >
                     <MaterialCommunityIcons
                       name={isRouteBookmarked ? "bookmark" : "bookmark-outline"}
-                      size={22}
+                      size={24}
                       color={isRouteBookmarked ? theme.primary : theme.text}
                     />
                   </AppButton>
@@ -2630,12 +2766,27 @@ export function NavigationMapScreen() {
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={isMotorcycleMode ? 'motorbike' : 'car'}
+                  name={
+                    vehicleMode === 'CYCLING'
+                      ? 'bicycle'
+                      : vehicleMode === 'WALKING'
+                        ? 'walk'
+                        : isMotorcycleMode
+                          ? 'motorbike'
+                          : 'car'
+                  }
                   size={20}
                   color={theme.primary}
                 />
                 <Text style={[styles.bookmarkVehicleText, { color: theme.text }]}>
-                  {`Phương tiện: ${isMotorcycleMode ? 'Xe máy' : 'Ô tô'}`}
+                  {`Phương tiện: ${vehicleMode === 'CYCLING'
+                    ? 'Xe đạp'
+                    : vehicleMode === 'WALKING'
+                      ? 'Đi bộ'
+                      : isMotorcycleMode
+                        ? 'Xe máy'
+                        : 'Ô tô'
+                    }`}
                 </Text>
                 {routeDistance !== undefined ? (
                   <Text style={[styles.bookmarkVehicleSub, { color: theme.textSecondary }]}>
@@ -2643,51 +2794,6 @@ export function NavigationMapScreen() {
                   </Text>
                 ) : null}
               </View>
-
-              {/* Only Fixed Signs option */}
-              <Pressable
-                accessibilityLabel={`Chỉ hiển thị biển báo cố định, ${bookmarkOnlyFixedSigns ? 'bật' : 'tắt'}`}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: bookmarkOnlyFixedSigns }}
-                onPress={() => setBookmarkOnlyFixedSigns((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.catOptionRow,
-                  {
-                    backgroundColor: bookmarkOnlyFixedSigns ? theme.backgroundSelected : theme.background,
-                    borderColor: bookmarkOnlyFixedSigns ? theme.primary : theme.border,
-                    opacity: pressed ? 0.75 : 1,
-                    marginTop: Spacing.two,
-                    marginBottom: Spacing.one,
-                  },
-                ]}
-              >
-                <View style={[styles.catIconShell, { backgroundColor: '#10B9811A' }]}>
-                  <MaterialCommunityIcons color="#10B981" name="shield-check" size={18} />
-                </View>
-
-                <View style={styles.catOptionCopy}>
-                  <Text style={[styles.catOptionTitle, { color: theme.text }]}>
-                    Chỉ hiển thị biển cố định
-                  </Text>
-                  <Text style={[styles.catOptionSublabel, { color: theme.placeholder }]}>
-                    Bỏ qua các biển báo tạm thời, công trường, phân luồng sửa chữa
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.catCheckbox,
-                    {
-                      backgroundColor: bookmarkOnlyFixedSigns ? theme.primary : 'transparent',
-                      borderColor: bookmarkOnlyFixedSigns ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  {bookmarkOnlyFixedSigns ? (
-                    <MaterialCommunityIcons color="#FFFFFF" name="check" size={13} />
-                  ) : null}
-                </View>
-              </Pressable>
 
               <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
                 Quy tắc lọc danh mục biển báo
@@ -3580,20 +3686,25 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     marginLeft: Spacing.two,
   },
-  vehicleTabsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  vehicleTabsContainer: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.two,
   },
+  vehicleTabsScrollView: {
+    flexGrow: 0,
+  },
+  vehicleTabsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   vehicleTabButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.two,
+    gap: 8,
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.one,
+    paddingHorizontal: Spacing.two,
     minHeight: 46,
     position: 'relative',
     borderRadius: 0,
@@ -3601,7 +3712,7 @@ const styles = StyleSheet.create({
   vehicleTabButtonActive: {},
   vehicleTabDurationText: {
     fontFamily: Fonts.body,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
   },
   vehicleTabActiveLine: {
@@ -3634,10 +3745,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   signFilterTotalBadge: {
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
-    marginLeft: Spacing.half,
+    // paddingHorizontal: Spacing.one,
+    // paddingVertical: 2,
+    // borderRadius: Rounded.round,
+    // marginLeft: Spacing.half,
   },
   signFilterTotalText: {
     fontFamily: Fonts.body,
@@ -3757,7 +3868,10 @@ const styles = StyleSheet.create({
   bottomBookmarkButton: {
     width: 52,
     height: 52,
-    borderRadius: Rounded.round,
+    minHeight: 52,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
