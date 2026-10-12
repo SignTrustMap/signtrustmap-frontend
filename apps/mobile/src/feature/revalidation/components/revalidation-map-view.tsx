@@ -7,6 +7,10 @@ import type { MapCoordinate } from '@/types/navigationType';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
+import {
+  INTERACTIVE_MAP_CLIENT_TITLE,
+  MAPLIBRE_NOT_REGISTERED_MESSAGE,
+} from '@/constants/message';
 import { RevalidationSignMarker } from './revalidation-sign-marker';
 
 export type RevalidationMapViewProps = {
@@ -49,6 +53,21 @@ function loadMapLibre(): MapLibreModule | null {
   return getMapLibre();
 }
 
+function isValidCoordinate(coord?: MapCoordinate): coord is [number, number] {
+  return (
+    Array.isArray(coord) &&
+    coord.length === 2 &&
+    typeof coord[0] === 'number' &&
+    typeof coord[1] === 'number' &&
+    Number.isFinite(coord[0]) &&
+    Number.isFinite(coord[1]) &&
+    coord[0] >= -180 &&
+    coord[0] <= 180 &&
+    coord[1] >= -90 &&
+    coord[1] <= 90
+  );
+}
+
 export function RevalidationMapView({
   signs = [],
   selectedSignId,
@@ -75,10 +94,9 @@ export function RevalidationMapView({
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
         <View style={[styles.fallbackPanel, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.fallbackTitle, { color: theme.text }]}>Interactive Map Client</Text>
+          <Text style={[styles.fallbackTitle, { color: theme.text }]}>{INTERACTIVE_MAP_CLIENT_TITLE}</Text>
           <Text style={[styles.fallbackCopy, { color: theme.textSecondary }]}>
-            MapLibre native module is not registered in this binary environment.
-            Please test on development client or web preview.
+            {MAPLIBRE_NOT_REGISTERED_MESSAGE}
           </Text>
         </View>
       </View>
@@ -116,7 +134,7 @@ export function RevalidationMapView({
       touchPitch={false}
       touchRotate
     >
-      {focusCoordinate ? (
+      {isValidCoordinate(focusCoordinate) ? (
         <Camera
           center={focusCoordinate}
           duration={700}
@@ -127,7 +145,7 @@ export function RevalidationMapView({
           ref={cameraRef}
           zoom={zoomLevel ?? 16.5}
         />
-      ) : userCoordinate ? (
+      ) : isValidCoordinate(userCoordinate) ? (
         <Camera
           center={userCoordinate}
           duration={800}
@@ -151,21 +169,23 @@ export function RevalidationMapView({
       )}
 
       {/* Render Verified Signs with Freshness Indicators */}
-      {signs.map((sign) => {
-        const isSelected = selectedSignId === sign.id;
-        const isDimmed = Boolean(selectedSignId && !isSelected);
-        return (
-          <Marker
-            anchor="center"
-            id={`reval-sign-${sign.id}`}
-            key={sign.id}
-            lngLat={sign.coordinate}
-            onPress={() => onSignPress?.(sign)}
-          >
-            <RevalidationSignMarker isDimmed={isDimmed} isSelected={isSelected} sign={sign} />
-          </Marker>
-        );
-      })}
+      {signs
+        .filter((sign) => isValidCoordinate(sign.coordinate))
+        .map((sign) => {
+          const isSelected = selectedSignId === sign.id;
+          const isDimmed = Boolean(selectedSignId && !isSelected);
+          return (
+            <Marker
+              anchor="center"
+              id={`reval-sign-${sign.id}`}
+              key={sign.id}
+              lngLat={sign.coordinate}
+              onPress={() => onSignPress?.(sign)}
+            >
+              <RevalidationSignMarker isDimmed={isDimmed} isSelected={isSelected} sign={sign} />
+            </Marker>
+          );
+        })}
 
     </Map>
   );

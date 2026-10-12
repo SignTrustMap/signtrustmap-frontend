@@ -21,10 +21,14 @@ type NavigationMapViewProps = {
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeSigns?: RouteSign[];
+  signs?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
+  isCustomStart?: boolean;
+  onSignSelect?: (sign: RouteSign | null) => void;
+  vehicleMode?: string;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -50,6 +54,14 @@ const openStreetMapStyle: StyleSpecification = {
 };
 
 function createSignMarkerElement(sign: RouteSign) {
+  const container = document.createElement('div');
+  container.style.position = 'relative';
+  container.style.width = '36px';
+  container.style.height = '36px';
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+  container.style.justifyContent = 'center';
+
   const marker = document.createElement('img');
   marker.src = sign.imageUrl || '';
   marker.alt = sign.name || sign.signCode;
@@ -60,8 +72,38 @@ function createSignMarkerElement(sign: RouteSign) {
   marker.onerror = () => {
     marker.style.display = 'none';
   };
+  container.appendChild(marker);
 
-  return marker;
+  const rawScore =
+    typeof sign.freshnessScore === 'number' && !Number.isNaN(sign.freshnessScore)
+      ? sign.freshnessScore
+      : undefined;
+  const scorePercent =
+    rawScore !== undefined
+      ? rawScore <= 1
+        ? Math.round(rawScore * 100)
+        : Math.round(rawScore)
+      : 55;
+  const color =
+    sign.status?.toUpperCase() === 'RETIRED' || scorePercent < 50
+      ? '#EF4444'
+      : scorePercent >= 80
+        ? '#10B981'
+        : '#EAB308';
+
+  const dot = document.createElement('div');
+  dot.style.position = 'absolute';
+  dot.style.bottom = '-1px';
+  dot.style.right = '-1px';
+  dot.style.width = '10px';
+  dot.style.height = '10px';
+  dot.style.borderRadius = '5px';
+  dot.style.border = '1.5px solid #FFFFFF';
+  dot.style.background = color;
+  dot.style.boxShadow = '0 1px 2px rgba(0,0,0,0.3)';
+  container.appendChild(dot);
+
+  return container;
 }
 
 function createDriverMarkerElement(color: string) {
@@ -130,6 +172,7 @@ export function NavigationMapView({
   routeCoordinates,
   routeStart,
   routeSigns = [],
+  vehicleMode = 'DRIVING',
 }: NavigationMapViewProps) {
   const theme = useTheme();
   const destinationMarkerRef = useRef<Marker | null>(null);
@@ -201,7 +244,20 @@ export function NavigationMapView({
     const map = mapRef.current;
     if (!map) return;
 
-    const markers = routeSigns.map((sign) => (
+    const dedup: Record<string, RouteSign> = {};
+    for (const sign of routeSigns) {
+      if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
+      const key = `${sign.coordinate[0].toFixed(5)},${sign.coordinate[1].toFixed(5)}_${sign.signCode || sign.name || ''}`;
+      const existing = dedup[key];
+      if (!existing || (sign.freshnessScore ?? 0) > (existing.freshnessScore ?? 0)) {
+        dedup[key] = sign;
+      }
+    }
+    const sorted = Object.values(dedup).sort(
+      (a: RouteSign, b: RouteSign) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0),
+    );
+
+    const markers = sorted.map((sign) => (
       new Marker({ element: createSignMarkerElement(sign) })
         .setLngLat(sign.coordinate)
         .addTo(map)
@@ -275,6 +331,8 @@ export function NavigationMapView({
         },
         type: 'geojson',
       });
+      const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+      const routeLineColor = isMotorcycle ? '#0D9488' : theme.primary;
       map.addLayer({
         id: 'selected-route-line',
         source: 'selected-route-source',
@@ -284,7 +342,7 @@ export function NavigationMapView({
           'line-join': 'round',
         },
         paint: {
-          'line-color': theme.primary,
+          'line-color': routeLineColor,
           'line-width': 5,
         },
       });
@@ -315,7 +373,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary]);
+  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary, vehicleMode]);
 
   return (
     <View style={styles.container}>

@@ -1,6 +1,7 @@
 import { getStorageItemAsync, removeStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import { SESSION_PROVIDER_REQUIRED_MESSAGE } from '@/constants/message';
 
 export const ACCOUNT_ROLES = ['driver', 'surveyor', 'reviewer'] as const;
 
@@ -34,10 +35,14 @@ export const useSession = () => {
   const value = use(AuthContext);
 
   if (!value) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error(SESSION_PROVIDER_REQUIRED_MESSAGE);
   }
 
   return value;
+};
+
+export const useOptionalSession = (): SessionContextValue | null => {
+  return use(AuthContext);
 };
 
 function normalizeRoles(roles: unknown): AccountRole[] {

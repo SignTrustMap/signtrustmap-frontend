@@ -9,7 +9,7 @@ export type ReportDto = {
 
 export type VoteDto = {
     vote: Vote;
-    suggestedSignTypeId?: string;
+    suggestedSignTypeId?: string | number;
     declineReason?: string;
     declineNote?: string;
 }
@@ -22,6 +22,15 @@ export type CreateMissingTypeReportDto = {
     suggestedShape?: string;
     suggestedColorScheme?: string;
 }
+
+export type RemedySignDto = {
+    id: number;
+    signCode: string;
+    nameVi: string;
+    nameEn: string;
+    imageUrl?: string | null;
+    description?: string | null;
+};
 
 export type SignCategoryDto = {
     id: string;
@@ -72,6 +81,7 @@ export type ReviewCandidate = {
         nameVi: string;
         signCode: string;
     };
+    remedySigns?: RemedySignDto[];
     signCropUrl?: string;
     submission?: {
         createdAt?: string;

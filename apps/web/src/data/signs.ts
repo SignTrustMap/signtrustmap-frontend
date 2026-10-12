@@ -30,6 +30,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Đường Nguyễn Huệ, Quận 1, TP.HCM',
     verifiedAt: '12/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1572736209353-29a3a1f807df?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1200&auto=format&fit=crop&q=80',
     description: 'Biển báo đặt tại đầu tuyến đường, áp dụng cho tất cả các loại phương tiện cơ giới và thô sơ.',
   },
   {
@@ -44,6 +46,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Đường Lê Lợi, Quận 1, TP.HCM',
     verifiedAt: '15/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=1200&auto=format&fit=crop&q=80',
     description: 'Giới hạn tốc độ tối đa 50 km/h trong khu vực đông dân cư theo quy chuẩn QCVN 41:2019.',
   },
   {
@@ -58,6 +62,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Giao lộ Đồng Khởi - Lê Thánh Tôn, Quận 1, TP.HCM',
     verifiedAt: '18/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
     description: 'Bắt buộc các phương tiện chỉ được phép đi thẳng, không được rẽ trái hay rẽ phải.',
   },
   {
@@ -72,6 +78,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Đường Tôn Đức Thắng, Quận 1, TP.HCM',
     verifiedAt: '20/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1514924013411-cbf25faa35bb?w=1200&auto=format&fit=crop&q=80',
     description: 'Báo trước sắp đến một chỗ ngoặt nguy hiểm có bán kính cong nhỏ sang phía bên trái.',
   },
   {
@@ -86,6 +94,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Đường Hàm Nghi, Quận 1, TP.HCM',
     verifiedAt: '22/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200&auto=format&fit=crop&q=80',
     description: 'Chỉ dẫn những đoạn đường chỉ cho phép phương tiện lưu thông theo một chiều nhất định.',
   },
   {
@@ -100,6 +110,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Đường Pasteur, Quận 1, TP.HCM',
     verifiedAt: '24/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1572736209353-29a3a1f807df?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=1200&auto=format&fit=crop&q=80',
     description: 'Cấm các loại xe cơ giới dừng và đỗ ở đoạn đường có đặt biển báo.',
   },
   {
@@ -114,6 +126,8 @@ export const mockSigns: SignItem[] = [
     status: 'verified',
     location: 'Vòng xoay Ngã Sáu Phù Đổng, Quận 1, TP.HCM',
     verifiedAt: '25/08/2026',
+    actualCropUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    scenePhotoUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
     description: 'Báo cho các loại xe phải đi vòng qua chướng ngại vật theo hướng mũi tên chỉ sang phải.',
   },
 ]

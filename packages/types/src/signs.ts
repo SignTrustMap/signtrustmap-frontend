@@ -14,6 +14,8 @@ export interface SignItem {
   location?: string
   verifiedAt?: string
   imageUrl?: string
+  actualCropUrl?: string
+  scenePhotoUrl?: string
   description?: string
   detectedBy?: string
   aiConfidence?: number

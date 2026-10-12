@@ -3,6 +3,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { Blob } from 'expo-blob';
 
 import type { UploadChunkRequest } from '@/types/surveySubmissionType';
+import {
+  GPX_EMPTY_MESSAGE,
+  GPX_READ_FAILED_MESSAGE,
+  MEDIA_EMPTY_MESSAGE,
+  MEDIA_READ_FAILED_MESSAGE,
+  MEDIA_READ_FAILED_OR_EMPTY_MESSAGE,
+} from '@/constants/message';
 
 export type SurveyImage = {
   fileName?: string;
@@ -45,7 +52,7 @@ export async function prepareSurveyImage(image: SurveyImage) {
   if (Platform.OS !== 'web' && (image.uri.startsWith('file://') || image.uri.startsWith('/'))) {
     const info = await FileSystem.getInfoAsync(image.uri);
     if (!info.exists || !info.size) {
-      throw new Error('The selected media could not be read or is empty.');
+      throw new Error(MEDIA_READ_FAILED_OR_EMPTY_MESSAGE);
     }
     const chunk: UploadChunkRequest = {
       chunkIndex: 0,
@@ -61,12 +68,12 @@ export async function prepareSurveyImage(image: SurveyImage) {
 
   const response = await fetch(image.uri);
   if (/^https?:/i.test(image.uri) && !response.ok) {
-    throw new Error('The selected media could not be read.');
+    throw new Error(MEDIA_READ_FAILED_MESSAGE);
   }
   const blob = new Blob([await response.arrayBuffer()], {
     type: response.headers.get('content-type') ?? mimeType,
   });
-  if (blob.size < 1) throw new Error('The selected media is empty.');
+  if (blob.size < 1) throw new Error(MEDIA_EMPTY_MESSAGE);
 
   const chunk: UploadChunkRequest = {
     chunkIndex: 0,
@@ -96,13 +103,13 @@ export async function prepareSurveyGpx(gpx: SurveyGpx) {
   } else {
     const response = await fetch(gpx.uri);
     if (/^https?:/i.test(gpx.uri) && !response.ok) {
-      throw new Error('The selected GPX file could not be read.');
+      throw new Error(GPX_READ_FAILED_MESSAGE);
     }
     xmlContent = await response.text();
   }
 
   if (!xmlContent || xmlContent.trim().length === 0) {
-    throw new Error('The selected GPX file is empty.');
+    throw new Error(GPX_EMPTY_MESSAGE);
   }
 
   const encodedBytes = new TextEncoder().encode(xmlContent);

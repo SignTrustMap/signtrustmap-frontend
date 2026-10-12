@@ -1,5 +1,8 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as MediaLibrary from 'expo-media-library';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,6 +23,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
+import {
+  CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE,
+  CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
+  CANNOT_SAVE_DRAFT_MESSAGE,
+  GALLERY_DEV_BUILD_REQUIRED_MESSAGE,
+  MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE,
+  SELECT_VALID_GPX_FILE_MESSAGE,
+  UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE,
+  UNABLE_TO_READ_FILE_MESSAGE,
+} from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   extractImageGpsCoordinates,
@@ -123,7 +136,6 @@ async function extractSelectedAssetGps(asset: ImagePickerAsset) {
   }
 
   try {
-    const MediaLibrary = await import('expo-media-library');
     const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
 
     console.log('[Surveyor] Media location permission:', {
@@ -299,7 +311,7 @@ export function NewSurveyRecordScreen() {
       setAndroidGalleryHasNextPage(page.hasNextPage);
     } catch (error) {
       console.warn('[Surveyor] Unable to load Android media library:', error);
-      setAndroidGalleryError('Unable to load your photo library. Please try again.');
+      setAndroidGalleryError(UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE);
     } finally {
       isLoadingAndroidGallery.current = false;
       setIsAndroidGalleryLoading(false);
@@ -315,7 +327,7 @@ export function NewSurveyRecordScreen() {
     });
 
     if (permission.status !== 'granted') {
-      setPickerError('Media library permission is required to select photos and videos.');
+      setPickerError(MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE);
       return;
     }
 
@@ -403,7 +415,7 @@ export function NewSurveyRecordScreen() {
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
-      setAndroidGalleryError('Unable to read that file. Please choose another one.');
+      setAndroidGalleryError(UNABLE_TO_READ_FILE_MESSAGE);
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
@@ -420,8 +432,6 @@ export function NewSurveyRecordScreen() {
         await openAndroidMediaLibrary();
         return;
       }
-
-      const ImagePicker = await import('expo-image-picker');
 
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
@@ -478,8 +488,8 @@ export function NewSurveyRecordScreen() {
     } catch (error) {
       setPickerError(
         error instanceof Error && error.message.includes('ExponentImagePicker')
-          ? 'Gallery support requires a rebuilt development app.'
-          : 'Unable to open your photo library. Please try again.',
+          ? GALLERY_DEV_BUILD_REQUIRED_MESSAGE
+          : CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
       );
       console.log('[Surveyor] Unable to open image picker:', error);
     } finally {
@@ -490,7 +500,6 @@ export function NewSurveyRecordScreen() {
   const handlePickGpx = async () => {
     setGpxPickerError(undefined);
     try {
-      const DocumentPicker = await import('expo-document-picker');
       const result = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
         multiple: false,
@@ -501,7 +510,7 @@ export function NewSurveyRecordScreen() {
         const file = result.assets[0];
         const name = file.name ?? '';
         if (!name.toLowerCase().endsWith('.gpx')) {
-          setGpxPickerError('Please select a valid GPX file (.gpx).');
+          setGpxPickerError(SELECT_VALID_GPX_FILE_MESSAGE);
           return;
         }
         setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
@@ -518,7 +527,7 @@ export function NewSurveyRecordScreen() {
         }
       }
     } catch (error) {
-      setGpxPickerError('Unable to open file picker. Please try again.');
+      setGpxPickerError(CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE);
       console.log('[Surveyor] Unable to open document picker:', error);
     }
   };
@@ -576,7 +585,7 @@ export function NewSurveyRecordScreen() {
       openSavedDraft();
     } catch (error) {
       console.warn('[Surveyor] Unable to save survey draft:', error);
-      setPickerError(error instanceof Error ? error.message : 'Unable to save the draft. Please retry.');
+      setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
       setIsScanning(false);
     } finally {
       setIsSaving(false);
@@ -611,7 +620,7 @@ export function NewSurveyRecordScreen() {
       >
         <View style={styles.galleryModalRoot}>
           <Pressable
-            accessibilityLabel="Close media library"
+            accessibilityLabel="Đóng thư viện ảnh"
             accessibilityRole="button"
             onPress={() => setIsAndroidGalleryVisible(false)}
             style={styles.galleryBackdrop}
@@ -625,14 +634,14 @@ export function NewSurveyRecordScreen() {
             </View>
             <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
               <View style={styles.galleryHeading}>
-                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose a photo or video</Text>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>Chọn ảnh hoặc video</Text>
                 <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
-                  Original location metadata will be preserved
+                  Dữ liệu vị trí gốc sẽ được giữ nguyên
                 </Text>
               </View>
               <AppButton
-                accessibilityLabel="Close media library"
-                label="Close"
+                accessibilityLabel="Đóng thư viện ảnh"
+                label="Đóng"
                 onPress={() => setIsAndroidGalleryVisible(false)}
                 style={styles.galleryCloseButton}
                 variant="ghost"
@@ -657,7 +666,7 @@ export function NewSurveyRecordScreen() {
                     <ActivityIndicator color={theme.primary} size="large" />
                   ) : null}
                   <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
-                    {isAndroidGalleryLoading ? 'Loading your media…' : 'No photos or videos found'}
+                    {isAndroidGalleryLoading ? 'Đang tải tệp phương tiện…' : 'Không tìm thấy ảnh hoặc video nào'}
                   </Text>
                 </View>
               }
@@ -716,7 +725,7 @@ export function NewSurveyRecordScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <AppButton
-              accessibilityLabel="Back to surveyor work"
+              accessibilityLabel="Quay lại công việc khảo sát"
               hitSlop={Spacing.one}
               onPress={() => router.back()}
               pressedOpacity={0.7}
@@ -730,12 +739,12 @@ export function NewSurveyRecordScreen() {
                 tintColor={theme.text}
               />
             </AppButton>
-            <Text style={[styles.title, { color: theme.text }]}>New Survey Record</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Ghi nhận khảo sát mới</Text>
           </View>
 
           <AppButton
             accessibilityLabel={
-              selectedAsset ? 'Change selected photo' : 'Choose a photo from gallery'
+              selectedAsset ? 'Đổi ảnh đã chọn' : 'Chọn ảnh từ thư viện'
             }
             disabled={isOpeningGallery || isScanning}
             onPress={handleOpenGallery}
@@ -745,6 +754,7 @@ export function NewSurveyRecordScreen() {
               {
                 backgroundColor: theme.neutral,
                 borderColor: theme.border,
+                padding: selectedAsset ? 0 : Spacing.four,
               },
             ]}
             variant="surface"
@@ -759,12 +769,12 @@ export function NewSurveyRecordScreen() {
                     tintColor={theme.onPrimary}
                   />
                   <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
-                    {selectedAsset.fileName ?? 'Video selected'}
+                    {selectedAsset.fileName ?? 'Đã chọn video'}
                   </Text>
                 </View>
               ) : (
                 <Image
-                  accessibilityLabel="Selected survey media"
+                  accessibilityLabel="Tệp khảo sát đã chọn"
                   contentFit="cover"
                   source={{ uri: selectedAsset.uri }}
                   style={styles.selectedImage}
@@ -786,15 +796,15 @@ export function NewSurveyRecordScreen() {
                 />
                 <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
                   {isOpeningGallery
-                    ? 'Opening gallery...'
-                    : 'Upload photo or video'}
+                    ? 'Đang mở thư viện...'
+                    : 'Tải lên ảnh hoặc video'}
                 </Text>
               </>
             )}
           </AppButton>
 
           <Text style={[styles.helperText, { color: theme.placeholder }]}>
-            {selectedAsset ? 'Tap the preview to choose a different file' : 'Upload your sign image or video here'}
+            {selectedAsset ? 'Nhấn vào bản xem trước để chọn tệp khác' : 'Tải lên hình ảnh hoặc video biển báo tại đây'}
           </Text>
 
           {pickerError ? (
@@ -823,32 +833,32 @@ export function NewSurveyRecordScreen() {
                 <View style={styles.videoGpsText}>
                   <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
                     {selectedGps
-                      ? `GPS detected: ${selectedGps.latitude.toFixed(5)}, ${selectedGps.longitude.toFixed(5)}`
-                      : 'No GPS metadata found in video'}
+                      ? `Đã phát hiện GPS: ${selectedGps.latitude.toFixed(5)}, ${selectedGps.longitude.toFixed(5)}`
+                      : 'Không tìm thấy tọa độ GPS trong video'}
                   </Text>
                   <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
                     {selectedGps
-                      ? 'Route start and end points will be mapped on the next screen'
-                      : 'You can select or confirm your location on the map in the next step'}
+                      ? 'Điểm bắt đầu và kết thúc lộ trình sẽ được thể hiện trên bản đồ ở bước tiếp theo'
+                      : 'Bạn có thể chọn hoặc xác nhận vị trí trên bản đồ ở bước tiếp theo'}
                   </Text>
                 </View>
               </View>
 
               <Pressable
-                accessibilityLabel="Toggle advanced GPX file picker"
+                accessibilityLabel="Chuyển đổi tùy chọn tệp GPX ngoài"
                 accessibilityRole="button"
                 onPress={() => setShowAdvancedGpx((prev) => !prev)}
                 style={styles.advancedGpxToggle}
               >
                 <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
-                  {showAdvancedGpx ? 'Hide external GPX option' : 'Advanced option: Attach external GPX file (optional)'}
+                  {showAdvancedGpx ? 'Ẩn tùy chọn tệp GPX ngoài' : 'Tùy chọn nâng cao: Đính kèm tệp GPX ngoài (tùy chọn)'}
                 </Text>
               </Pressable>
 
               {showAdvancedGpx ? (
                 <>
                   <AppButton
-                    accessibilityLabel={selectedGpxFile ? 'Change GPX file' : 'Upload GPX file'}
+                    accessibilityLabel={selectedGpxFile ? 'Đổi tệp GPX' : 'Tải lên tệp GPX'}
                     disabled={isScanning || isSaving}
                     onPress={handlePickGpx}
                     pressedOpacity={0.78}
@@ -869,7 +879,7 @@ export function NewSurveyRecordScreen() {
                       tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
                     />
                     <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
-                      {selectedGpxFile ? selectedGpxFile.name : 'Choose external .gpx file'}
+                      {selectedGpxFile ? selectedGpxFile.name : 'Chọn tệp .gpx từ thiết bị'}
                     </Text>
                   </AppButton>
 
@@ -885,7 +895,7 @@ export function NewSurveyRecordScreen() {
 
           <AppButton
             disabled={!selectedAsset || isOpeningGallery || isScanning || isSaving}
-            label={isSaving ? "Saving draft..." : "Submit Record"}
+            label={isSaving ? "Đang lưu bản nháp..." : "Tiếp tục ghi nhận"}
             onPress={handleSubmitRecord}
             style={styles.submitButton}
           />
@@ -1073,7 +1083,7 @@ const styles = StyleSheet.create({
   uploadPlaceholder: {
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 176,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.one,
@@ -1083,13 +1093,9 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   selectedImage: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
     width: '100%',
     height: '100%',
+    borderRadius: Rounded.lg,
   },
   imageFallback: {
     fontFamily: Fonts.body,

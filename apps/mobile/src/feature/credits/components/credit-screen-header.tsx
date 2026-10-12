@@ -24,7 +24,7 @@ export function CreditScreenHeader({ onBack, rightContent, title }: CreditScreen
         <View style={styles.side}>
           {onBack ? (
             <AppButton
-              accessibilityLabel="Go back"
+              accessibilityLabel="Quay lại"
               onPress={onBack}
               style={styles.backButton}
               variant="ghost"

@@ -58,13 +58,13 @@ export function AppSplashScreen() {
             style={styles.splashOverlay}
         >
             <Image
-                accessibilityLabel="SignTrustMap logo"
+                accessibilityLabel="Logo SignTrustMap"
                 source={require('../../../../assets/images/app-logo.png')}
                 style={styles.logo}
             />
             <Text style={styles.title}>SignTrustMap</Text>
             <View
-                accessibilityLabel="Loading SignTrustMap"
+                accessibilityLabel="Đang tải SignTrustMap"
                 accessibilityRole="progressbar"
                 style={styles.progressTrack}
             >

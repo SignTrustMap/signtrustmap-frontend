@@ -98,7 +98,7 @@ export function WorkActionCard({
             },
           ]}
         >
-          <Text style={[styles.topRightBadgeText, { color: theme.onPrimary }]}>{count}</Text>
+          <Text style={[styles.topRightBadgeText, { color: theme.onPrimary }]}>{count > 100 ? '99+' : count}</Text>
         </View>
       ) : null}
     </View>

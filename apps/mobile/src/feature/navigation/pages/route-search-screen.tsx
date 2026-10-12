@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,6 +15,8 @@ import {
 } from '@/types/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
+import { useSavedRoutes } from '../hooks/use-saved-routes';
+import type { SavedRouteItem } from '@/api/navigation/saved-routes';
 import { useTheme } from '@/hooks/use-theme';
 
 import { areSameLocation } from '../utils/location';
@@ -31,6 +33,7 @@ export function RouteSearchScreen() {
     startTitle?: string;
   }>();
 
+  const inputRef = useRef<TextInput>(null);
   const [toast, setToast] = useState<{ id: number; message: string }>();
   const [query, setQuery] = useState('');
   const { data: locations, isLoading, error } = usePlaceSuggestions(query);
@@ -40,6 +43,23 @@ export function RouteSearchScreen() {
     [startLat, startLng],
   );
   const routeStart = coordinateStart;
+  const { savedRoutes } = useSavedRoutes();
+
+  const handleSelectSavedRoute = (saved: SavedRouteItem) => {
+    router.replace({
+      pathname: '/home',
+      params: {
+        destinationLat: String(saved.destinationLatitude),
+        destinationLng: String(saved.destinationLongitude),
+        destinationSubtitle: saved.destinationName,
+        destinationTitle: saved.destinationName,
+        startLat: String(saved.originLatitude),
+        startLng: String(saved.originLongitude),
+        startTitle: saved.originName,
+        vehicleMode: saved.vehicleMode === 'MOTORCYCLE' ? 'BIKE' : 'DRIVING',
+      },
+    });
+  };
 
   const handleSelectLocation = (destination: ApiPlace) => {
     if (destination.latitude == null || destination.longitude == null) return;
@@ -73,11 +93,14 @@ export function RouteSearchScreen() {
       <View style={styles.header}>
         <View style={styles.searchInputWrapper}>
           <AppInput
-            accessibilityLabel="Search for your destination"
+            ref={inputRef}
+            accessibilityLabel="Tìm kiếm điểm đến"
+            autoCapitalize="none"
             autoFocus
             onChangeText={setQuery}
-            placeholder="Where to?"
+            placeholder="Bạn muốn đi đâu?"
             returnKeyType="search"
+            type="search"
             style={[styles.searchPrompt, { color: theme.text }]}
             containerStyle={[
               styles.searchInputContainer,
@@ -85,7 +108,7 @@ export function RouteSearchScreen() {
             ]}
             leadingIcon={
               <AppButton
-                accessibilityLabel="Go back"
+                accessibilityLabel="Quay lại"
                 hitSlop={Spacing.one}
                 onPress={() => router.back()}
                 pressedOpacity={0.7}
@@ -98,7 +121,27 @@ export function RouteSearchScreen() {
                 />
               </AppButton>
             }
-            value={query}
+            trailingIcon={
+              query.length > 0 ? (
+                <AppButton
+                  accessibilityLabel="Xóa nội dung tìm kiếm"
+                  hitSlop={Spacing.one}
+                  onPress={() => {
+                    inputRef.current?.clear();
+                    setQuery('');
+                  }}
+                  pressedOpacity={0.7}
+                  style={styles.clearButton}
+                  variant="ghost"
+                >
+                  <AntDesign
+                    color={theme.placeholder}
+                    name="close-circle"
+                    size={18}
+                  />
+                </AppButton>
+              ) : null
+            }
           />
         </View>
       </View>
@@ -108,15 +151,50 @@ export function RouteSearchScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.list}
       >
+        {query.trim().length < 2 && savedRoutes && savedRoutes.length > 0 ? (
+          <>
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+              TUYẾN ĐƯỜNG YÊU THÍCH (WISHLIST)
+            </Text>
+            {savedRoutes.map((saved) => (
+              <AppButton
+                accessibilityLabel={saved.name}
+                key={saved.id}
+                onPress={() => handleSelectSavedRoute(saved)}
+                pressedOpacity={0.72}
+                style={[styles.locationRow, { borderColor: theme.border }]}
+                variant="ghost"
+              >
+                <View style={[styles.recentIconCircle, { backgroundColor: '#0671EB15' }]}>
+                  <AntDesign color="#F59E0B" name="star" size={17} />
+                </View>
+                <View style={styles.locationCopy}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.locationTitle, { color: theme.text }]}>{saved.name}</Text>
+                    <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
+                        {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+                    {saved.originName} ➔ {saved.destinationName}
+                  </Text>
+                </View>
+              </AppButton>
+            ))}
+          </>
+        ) : null}
+
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {query.trim().length >= 2 ? 'SEARCH RESULTS' : 'SAVED & RECENT'}
+          {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'ĐÃ LƯU & GẦN ĐÂY'}
         </Text>
         {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
         {!isLoading && error ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}
         {!isLoading && !error && locations.length === 0 ? (
-          <Text style={[styles.error, { color: theme.textSecondary }]}>No destinations found.</Text>
+          <Text style={[styles.error, { color: theme.textSecondary }]}>Không có điểm đến.</Text>
         ) : null}
         {!isLoading && locations.map((location) => (
           <AppButton
@@ -184,8 +262,21 @@ const styles = StyleSheet.create({
   searchPrompt: {
     fontFamily: Fonts.body,
     fontSize: 18,
-    fontWeight: 600,
-    paddingHorizontal: Spacing.one
+    fontWeight: '600',
+    paddingHorizontal: Spacing.one,
+  },
+  clearButton: {
+    width: 32,
+    height: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginRight: Spacing.half,
+  },
+  clearIcon: {
+    fontSize: 16,
   },
   searchInputContainer: {
     borderRadius: Rounded.round,

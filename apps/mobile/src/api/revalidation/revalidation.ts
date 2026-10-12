@@ -14,13 +14,30 @@ import type {
   EvidenceVoteDto,
   EvidenceVoteResponse,
   FindTasksInBoundsParams,
+  GetRevalidationTasksParams,
+  RevalidationDecisionItem,
+  RevalidationEvidenceDetailItem,
   RevalidationEvidenceQueueResponse,
+  RevalidationEvidenceType,
   RevalidationQueueEvidenceItem,
+  RevalidationTaskDetail,
   RevalidationTaskItem,
   RevalidationTasksInBoundsResponse,
+  SubmitRevalidationEvidenceDto,
+  SubmitRevalidationEvidenceResponse,
   TaskPriority,
   TaskStatus,
 } from '@/types/revalidationType';
+
+export type {
+  GetRevalidationTasksParams,
+  RevalidationDecisionItem,
+  RevalidationEvidenceDetailItem,
+  RevalidationEvidenceType,
+  RevalidationTaskDetail,
+  SubmitRevalidationEvidenceDto,
+  SubmitRevalidationEvidenceResponse,
+};
 
 /**
  * Reads the JWT access token that the SessionProvider stores under the
@@ -61,6 +78,29 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
   const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
   const repUrl = resolveRepresentativeSignUrl(raw.name_en || raw.nameEn, code);
 
+  const rawAny = raw as any;
+  const rawLat =
+    raw.latitude ??
+    rawAny.lat ??
+    rawAny.location?.lat ??
+    rawAny.location?.latitude ??
+    rawAny.y;
+  const rawLon =
+    raw.longitude ??
+    rawAny.lon ??
+    rawAny.lng ??
+    rawAny.location?.lon ??
+    rawAny.location?.lng ??
+    rawAny.location?.longitude ??
+    rawAny.x;
+
+  const parsedLat = Number(rawLat);
+  const parsedLon = Number(rawLon);
+  const latitude =
+    Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : 10.7769;
+  const longitude =
+    Number.isFinite(parsedLon) && parsedLon >= -180 && parsedLon <= 180 ? parsedLon : 106.6955;
+
   return {
     id: raw.id,
     verifiedSignId: raw.verified_sign_id || raw.verifiedSignId || raw.id,
@@ -70,8 +110,8 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
     priority: normalizePriority(raw.priority),
     status: normalizeStatus(raw.status),
     staleDays: raw.created_at ? Math.max(1, Math.round((Date.now() - new Date(raw.created_at).getTime()) / (1000 * 3600 * 24))) : 60,
-    latitude: Number(raw.latitude),
-    longitude: Number(raw.longitude),
+    latitude,
+    longitude,
     historicalCropUrl: resolvedCrop,
     representativeUrl: repUrl,
     lastVerifiedDate: raw.created_at || raw.createdAt,
@@ -116,6 +156,78 @@ export async function getRevalidationTasksInBounds(
 }
 
 /**
+ * Fetches all available revalidation tasks from the backend (independent of viewport).
+ * First attempts to query without bounding box, then falls back to nationwide bounds.
+ */
+export async function getAllRevalidationTasks(
+  params?: { status?: string; priority?: string; pageSize?: number },
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTaskItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const pageSize = String(params?.pageSize ?? 100);
+
+  // 1. Try querying /revalidation/tasks/map without bbox parameters
+  try {
+    const searchParams = new URLSearchParams({ pageSize });
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.priority) searchParams.append('priority', params.priority);
+
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      `${API_PATHS.REVALIDATION_TASKS_MAP}?${searchParams.toString()}`,
+      { signal },
+      token,
+    );
+    if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+      return res.items.map(toRevalidationTaskItem);
+    }
+  } catch {
+    // Continue to next fallback
+  }
+
+  // 2. Try querying /revalidation/tasks
+  try {
+    const searchParams = new URLSearchParams({ page: '1', pageSize });
+    if (params?.status) searchParams.append('status', params.status);
+
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      `${API_PATHS.REVALIDATION_TASKS}?${searchParams.toString()}`,
+      { signal },
+      token,
+    );
+    if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
+      return res.items.map(toRevalidationTaskItem);
+    }
+  } catch {
+    // Continue to broad country bounds fallback
+  }
+
+  // 3. Fallback: query /revalidation/tasks/map with Vietnam-wide bounds
+  try {
+    const res = await getRevalidationTasksInBounds(
+      {
+        minLat: 8.0,
+        minLon: 102.0,
+        maxLat: 24.0,
+        maxLon: 110.0,
+        pageSize: params?.pageSize ?? 100,
+        status: params?.status,
+        priority: params?.priority,
+      },
+      signal,
+      token,
+    );
+    if (res && res.length > 0) {
+      return res;
+    }
+  } catch (err) {
+    console.warn('getAllRevalidationTasks fallback failed:', err);
+  }
+
+  return [];
+}
+
+/**
  * Transforms a RevalidationTaskItem into a standard RouteSign for rendering on map & details card.
  */
 export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSign {
@@ -130,8 +242,13 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     score = task.currentTrustScore > 1 ? task.currentTrustScore / 100 : task.currentTrustScore;
   }
 
+  const rawLat = Number(task.latitude);
+  const rawLon = Number(task.longitude);
+  const validLat = Number.isFinite(rawLat) && rawLat >= -90 && rawLat <= 90 ? rawLat : 10.7769;
+  const validLon = Number.isFinite(rawLon) && rawLon >= -180 && rawLon <= 180 ? rawLon : 106.6955;
+
   return {
-    coordinate: [task.longitude, task.latitude],
+    coordinate: [validLon, validLat],
     id: task.verifiedSignId || task.id,
     taskId: task.id,
     imageUrl: repUrl,
@@ -141,7 +258,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     nameEn: task.name,
     signCode: code,
     freshnessScore: score,
-    status: score < 0.5 ? 'STALE' : score < 0.8 ? 'MODERATE' : 'ACTIVE',
+    status: 'STALE',
     roadName: task.roadName || 'Ho Chi Minh City, Vietnam',
     displayAddress: task.roadName || 'Ho Chi Minh City, Vietnam',
     lastVerifiedAt: task.lastVerifiedDate,
@@ -203,30 +320,6 @@ export async function fetchFirstRevalidationSign(
   return null;
 }
 
-export type SubmitRevalidationEvidenceDto = {
-  latitude: number;
-  longitude: number;
-  capturedAt?: string;
-  note?: string;
-  condition?: string;
-  mediaUrl?: string;
-  evidenceType?: 'STILL_ACTIVE' | 'REMOVED';
-};
-
-export type SubmitRevalidationEvidenceResponse = {
-  id: string;
-  taskId?: string;
-  verifiedSignId?: string;
-  mediaUrl?: string;
-  latitude: number;
-  longitude: number;
-  distanceMeters?: number;
-  maxProximityMeters?: number;
-  dailySubmissionLimit?: number;
-  remainingDailySubmissions?: number;
-  status?: string;
-};
-
 export type RevalidationEvidenceItem = {
   id: string;
   taskId?: string;
@@ -234,7 +327,8 @@ export type RevalidationEvidenceItem = {
   latitude?: number;
   longitude?: number;
   capturedAt?: string;
-  evidenceType?: 'STILL_ACTIVE' | 'REMOVED' | string;
+  submittedAt?: string;
+  evidenceType?: RevalidationEvidenceType | string;
   status?: string;
   createdAt?: string;
   distanceMeters?: number;
@@ -277,6 +371,42 @@ export async function getTaskEvidences(
   }
 }
 
+/**
+ * Fetches all evidence submissions (reviews and photos) across all revalidations for a specific verified sign.
+ */
+export async function getSignEvidences(
+  signId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationEvidenceItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<RevalidationEvidenceItem[]>(
+      `/revalidation/signs/${encodeURIComponent(signId)}/evidences`,
+      { signal },
+      token,
+    );
+    if (!Array.isArray(res)) return [];
+    return res.map((row: any) => ({
+      id: row.id,
+      taskId: row.task_id ?? row.taskId,
+      surveyorId: row.user_id ?? row.userId ?? row.surveyorId,
+      mediaUrl: resolveS3Url(row.media_url ?? row.mediaUrl),
+      evidenceType: row.evidence_type ?? row.evidenceType ?? 'STILL_ACTIVE',
+      submittedAt: row.submitted_at ?? row.submittedAt,
+      capturedAt: row.captured_at ?? row.capturedAt ?? row.submitted_at ?? row.submittedAt,
+      locationWkt: row.location_wkt ?? row.locationWkt,
+      distanceMeters: row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
+      note: row.note,
+      status: row.status,
+    }));
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch evidences for sign ${signId}:`, err);
+    return [];
+  }
+}
+
+
 function normalizeEvidenceResponse(body: unknown): SubmitRevalidationEvidenceResponse {
   const res = body as SubmitRevalidationEvidenceResponse;
   if (res && typeof res === 'object') {
@@ -298,11 +428,14 @@ export async function submitRevalidationEvidence(
 ): Promise<SubmitRevalidationEvidenceResponse> {
   // Resolve token: caller may pass one in, otherwise read from storage
   const token = accessToken ?? (await getStoredAccessToken());
-  const evidenceType: 'STILL_ACTIVE' | 'REMOVED' = data.evidenceType ?? (
-    data.condition === 'REMOVED' || data.condition === 'MISSING'
-      ? 'REMOVED'
-      : 'STILL_ACTIVE'
-  );
+  let evidenceType: RevalidationEvidenceType = 'STILL_ACTIVE';
+  if (data.evidenceType) {
+    evidenceType = data.evidenceType;
+  } else if (data.condition === 'REMOVED' || data.condition === 'MISSING') {
+    evidenceType = 'REMOVED';
+  } else if (data.condition === 'CHANGED' || data.condition === 'REPLACED') {
+    evidenceType = 'CHANGED';
+  }
 
   try {
     const isLocalFile = Boolean(
@@ -327,6 +460,9 @@ export async function submitRevalidationEvidence(
         evidenceType,
       };
       if (data.capturedAt) parameters.capturedAt = data.capturedAt;
+      if (data.suggestedSignTypeId != null) {
+        parameters.suggestedSignTypeId = String(data.suggestedSignTypeId);
+      }
 
       let result = await FileSystem.uploadAsync(url, mediaFile.uri, {
         fieldName: 'file',
@@ -404,7 +540,7 @@ export async function submitRevalidationEvidence(
       console.error(`[Revalidation] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
       const message = typeof body === 'object' && body && 'message' in body
         ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
-        : `Evidence upload failed with HTTP ${result.status}`;
+        : `Tải minh chứng lên thất bại với mã trạng thái ${result.status}`;
       throw new ApiError(message, result.status);
     }
 
@@ -414,6 +550,9 @@ export async function submitRevalidationEvidence(
     formData.append('longitude', String(data.longitude));
     formData.append('evidenceType', evidenceType);
     if (data.capturedAt) formData.append('capturedAt', data.capturedAt);
+    if (data.suggestedSignTypeId != null) {
+      formData.append('suggestedSignTypeId', String(data.suggestedSignTypeId));
+    }
 
     if (mediaFile) {
       if (typeof File !== 'undefined' && (mediaFile as unknown) instanceof File) {
@@ -527,4 +666,146 @@ export async function voteOnRevalidationEvidence(
     token,
   );
 }
+
+/**
+ * Fetches revalidation tasks with optional spatial radius, sorting, and pagination.
+ * Supports /revalidation/tasks backend endpoint.
+ */
+export async function getRevalidationTasks(
+  params?: GetRevalidationTasksParams,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTasksInBoundsResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const searchParams = new URLSearchParams();
+  if (params?.page != null) searchParams.append('page', String(params.page));
+  if (params?.pageSize != null) searchParams.append('pageSize', String(params.pageSize));
+  if (params?.status) searchParams.append('status', params.status);
+  if (params?.sort) searchParams.append('sort', params.sort);
+  if (params?.lat != null) searchParams.append('lat', String(params.lat));
+  if (params?.lon != null) searchParams.append('lon', String(params.lon));
+  if (params?.radiusMeters != null) searchParams.append('radiusMeters', String(params.radiusMeters));
+
+  const qs = searchParams.toString();
+  const url = `${API_PATHS.REVALIDATION_TASKS}${qs ? `?${qs}` : ''}`;
+  try {
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
+      url,
+      { signal },
+      token,
+    );
+    const rawItems = Array.isArray(res?.items) ? res.items : [];
+    return {
+      items: rawItems,
+      total: res?.total ?? rawItems.length,
+      page: res?.page ?? params?.page ?? 1,
+      pageSize: res?.pageSize ?? params?.pageSize ?? rawItems.length,
+      totalPages: res?.totalPages ?? 1,
+    };
+  } catch (err) {
+    console.warn('[Revalidation] Failed to fetch revalidation tasks:', err);
+    return { items: [], total: 0, page: 1, pageSize: 0, totalPages: 0 };
+  }
+}
+
+/**
+ * Fetches full task details for a specific revalidation task including location and submitted evidences.
+ */
+export async function getRevalidationTask(
+  taskId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationTaskDetail | null> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<any>(
+      `/revalidation/tasks/${encodeURIComponent(taskId)}`,
+      { signal },
+      token,
+    );
+    if (!res) return null;
+    const base = toRevalidationTaskItem(res as any);
+    return {
+      ...base,
+      ...res,
+      id: base.id,
+      code: base.code,
+      name: base.name,
+      category: base.category,
+      priority: base.priority,
+      status: base.status,
+      latitude: res.location?.lat != null ? Number(res.location.lat) : base.latitude,
+      longitude: res.location?.lon != null ? Number(res.location.lon) : base.longitude,
+      signCropUrl: resolveS3Url(res.sign_crop_url ?? res.signCropUrl),
+      historicalCropUrl: resolveS3Url(
+        res.historical_crop_url ?? res.historicalCropUrl ?? res.sign_crop_url ?? res.signCropUrl,
+      ),
+      evidences: Array.isArray(res.evidences)
+        ? res.evidences.map((e: any) => ({
+            id: e.id,
+            taskId: e.task_id ?? e.taskId,
+            surveyorId: e.user_id ?? e.userId,
+            mediaUrl: resolveS3Url(e.media_url ?? e.mediaUrl),
+            evidenceType: e.evidence_type ?? e.evidenceType ?? 'STILL_ACTIVE',
+            suggestedSignTypeId:
+              e.suggested_sign_type_id != null
+                ? Number(e.suggested_sign_type_id)
+                : e.suggestedSignTypeId != null
+                  ? Number(e.suggestedSignTypeId)
+                  : undefined,
+            submittedAt: e.submitted_at ?? e.submittedAt,
+            capturedAt: e.captured_at ?? e.capturedAt ?? e.submitted_at,
+            locationWkt: e.location_wkt ?? e.locationWkt,
+            distanceMeters: e.distance_meters != null ? Number(e.distance_meters) : e.distanceMeters,
+            status: e.status,
+          }))
+        : [],
+    };
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch task ${taskId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Staff / Admin finalization of a revalidation task.
+ */
+export async function finalizeRevalidationTask(
+  taskId: string,
+  accessToken?: string,
+  signal?: AbortSignal,
+): Promise<EvidenceVoteResponse['consensus']> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest<EvidenceVoteResponse['consensus']>(
+    `/revalidation/tasks/${encodeURIComponent(taskId)}/finalize`,
+    {
+      method: 'POST',
+      signal,
+    },
+    token,
+  );
+}
+
+/**
+ * Fetches historical consensus decisions for a specific evidence item.
+ */
+export async function getEvidenceDecisions(
+  evidenceId: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationDecisionItem[]> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  try {
+    const res = await apiRequest<RevalidationDecisionItem[]>(
+      `/revalidation/evidence/${encodeURIComponent(evidenceId)}/decisions`,
+      { signal },
+      token,
+    );
+    return Array.isArray(res) ? res : [];
+  } catch (err) {
+    console.warn(`[Revalidation] Failed to fetch decisions for evidence ${evidenceId}:`, err);
+    return [];
+  }
+}
+
 

@@ -21,6 +21,20 @@ import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  CAMERA_PERMISSION_REQUIRED_MESSAGE,
+  CANNOT_OPEN_CAMERA_MESSAGE,
+  CANNOT_OPEN_MEDIA_LIBRARY_MESSAGE,
+  CANNOT_READ_SELECTED_FILE_MESSAGE,
+  COORDINATES_REQUIRED_EVIDENCE_MESSAGE,
+  COULD_NOT_ACQUIRE_GPS_MESSAGE,
+  MEDIA_LIBRARY_PERMISSION_REQUIRED_PHOTOS_MESSAGE,
+  SUBMIT_EVIDENCE_FAILED_MESSAGE,
+  UNABLE_TO_GET_GPS_LOCATION_MESSAGE,
+  UNABLE_TO_LOAD_PHOTO_LIBRARY_SIMPLE_MESSAGE,
+} from '@/constants/message';
+
 import { AppButton } from '@/components/ui/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,6 +43,7 @@ import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
+import type { RevalidationEvidenceType } from '@/types/revalidationType';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -96,14 +111,37 @@ export function isValidGpsCoordinates(
   );
 }
 
-export const CONDITION_PRESETS = [
-  { id: 'INTACT', label: 'Good condition' },
-  { id: 'OBSCURED', label: 'Obscured by trees' },
-  { id: 'DAMAGED', label: 'Damaged / Tilted' },
-  { id: 'FADED', label: 'Faded paint / Night glare' },
-  { id: 'REPLACED', label: 'Replaced with new sign' },
-  { id: 'OTHER', label: 'Other' },
-] as const;
+export type RevalidationSignStatus = RevalidationEvidenceType;
+
+export const REVALIDATION_STATUS_OPTIONS: Array<{
+  id: RevalidationEvidenceType;
+  label: string;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  activeColor: string;
+  description: string;
+}> = [
+  {
+    id: 'STILL_ACTIVE',
+    label: 'Vẫn hoạt động',
+    icon: 'check-circle-outline',
+    activeColor: '#16A34A',
+    description: 'Biển báo vẫn tồn tại và hoạt động bình thường trên thực địa.',
+  },
+  {
+    id: 'REMOVED',
+    label: 'Đã gỡ bỏ',
+    icon: 'close-circle-outline',
+    activeColor: '#DC2626',
+    description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn trên thực địa.',
+  },
+  {
+    id: 'CHANGED',
+    label: 'Đã thay đổi',
+    icon: 'swap-horizontal',
+    activeColor: '#D97706',
+    description: 'Biển báo đã được thay thế bằng một loại biển báo khác.',
+  },
+];
 
 /**
  * Resolves color styling and icon for freshness score:
@@ -149,14 +187,15 @@ export function InspectRevalidateScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<InspectRevalidateParams>();
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Carried target sign metadata
   const signId = params.signId || 'sign-target';
   const taskId = params.taskId;
-  const signCode = params.signCode || 'Traffic Sign';
-  const signName = params.name || params.nameVi || params.nameEn || 'Sign Inspection';
+  const signCode = params.signCode || 'Biển báo giao thông';
+  const signName = params.name || params.nameVi || params.nameEn || 'Kiểm tra biển báo';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
   const targetLon = params.longitude ? parseFloat(params.longitude) : undefined;
   const targetImageUrl = params.imageUrl ? resolveS3Url(params.imageUrl) : undefined;
@@ -168,7 +207,7 @@ export function InspectRevalidateScreen() {
       : Math.round(rawScore)
     : 65;
   const freshnessStyle = getFreshnessStyle(freshnessScore);
-  const roadName = params.roadName || params.displayAddress || 'Current Street';
+  const roadName = params.roadName || params.displayAddress || 'Tuyến đường hiện tại';
 
   // Media selection & GPS state
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia>();
@@ -177,8 +216,8 @@ export function InspectRevalidateScreen() {
   const [isLocatingDevice, setIsLocatingDevice] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
 
-  // Observation state
-  const [selectedCondition, setSelectedCondition] = useState<string>('INTACT');
+  // Revalidation state directly mapped to Backend evidence_type
+  const [evidenceType, setEvidenceType] = useState<RevalidationEvidenceType>('STILL_ACTIVE');
   const [customNote, setCustomNote] = useState('');
 
   // Submission state
@@ -210,9 +249,9 @@ export function InspectRevalidateScreen() {
   const isWithinProximity =
     distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
 
-  // Validation rules
+  // Validation rules: Note is required when sign is reported REMOVED
   const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
-  const isNoteValid = selectedCondition !== 'OTHER' || customNote.trim().length > 0;
+  const isNoteValid = evidenceType !== 'REMOVED' || customNote.trim().length > 0;
   const isSubmitDisabled =
     !selectedMedia ||
     !isLocationValid ||
@@ -221,17 +260,17 @@ export function InspectRevalidateScreen() {
     isOpeningGallery;
 
   // Dynamic submit button label based on current validation state
-  let submitButtonLabel = 'Submit Revalidation Evidence';
+  let submitButtonLabel = 'Gửi bằng chứng tái thẩm định';
   if (isSubmitting) {
-    submitButtonLabel = 'Submitting Evidence…';
+    submitButtonLabel = 'Đang gửi bằng chứng…';
   } else if (!selectedMedia) {
-    submitButtonLabel = 'Upload Evidence Photo';
+    submitButtonLabel = 'Tải lên ảnh hoặc video bằng chứng';
   } else if (!detectedGps) {
-    submitButtonLabel = 'Location Required (Stamp Device GPS)';
+    submitButtonLabel = 'Cần vị trí (Đóng dấu GPS thiết bị)';
   } else if (isWithinProximity === false) {
-    submitButtonLabel = `Location Too Far (${distanceFromTarget}m > 50m)`;
+    submitButtonLabel = `Vị trí quá xa (${distanceFromTarget}m > 50m)`;
   } else if (!isNoteValid) {
-    submitButtonLabel = 'Note Required for "Other" Condition';
+    submitButtonLabel = 'Cần nhập ghi chú khi chọn "Đã gỡ bỏ"';
   }
 
   /**
@@ -266,10 +305,10 @@ export function InspectRevalidateScreen() {
           longitude: pos[0],
         });
       } else {
-        setPickerError('Could not acquire current GPS location. Please check location permissions.');
+        setPickerError(COULD_NOT_ACQUIRE_GPS_MESSAGE);
       }
     } catch {
-      setPickerError('Unable to get current GPS location.');
+      setPickerError(UNABLE_TO_GET_GPS_LOCATION_MESSAGE);
     } finally {
       setIsLocatingDevice(false);
     }
@@ -297,7 +336,7 @@ export function InspectRevalidateScreen() {
       setAndroidGalleryHasNextPage(page.hasNextPage);
     } catch (error) {
       console.warn('[InspectRevalidate] Unable to load Android gallery:', error);
-      setAndroidGalleryError('Unable to load photo library. Please try again.');
+      setAndroidGalleryError(UNABLE_TO_LOAD_PHOTO_LIBRARY_SIMPLE_MESSAGE);
     } finally {
       isLoadingAndroidGallery.current = false;
       setIsAndroidGalleryLoading(false);
@@ -307,7 +346,7 @@ export function InspectRevalidateScreen() {
   const openAndroidGallery = async () => {
     const permission = await LegacyMediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
     if (permission.status !== 'granted') {
-      setPickerError('Media library permission is required to choose photos.');
+      setPickerError(MEDIA_LIBRARY_PERMISSION_REQUIRED_PHOTOS_MESSAGE);
       return;
     }
     setAndroidGalleryAssets([]);
@@ -380,7 +419,7 @@ export function InspectRevalidateScreen() {
       setIsAndroidGalleryVisible(false);
     } catch (error) {
       console.warn('[InspectRevalidate] Unable to process selected asset:', error);
-      setAndroidGalleryError('Unable to read selected asset. Please choose another.');
+      setAndroidGalleryError(CANNOT_READ_SELECTED_FILE_MESSAGE);
     } finally {
       setSelectingAndroidAssetId(undefined);
     }
@@ -393,7 +432,7 @@ export function InspectRevalidateScreen() {
       const ImagePicker = await import('expo-image-picker');
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
-        setPickerError('Camera permission is required to capture inspection photos.');
+        setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
         return;
       }
 
@@ -410,7 +449,7 @@ export function InspectRevalidateScreen() {
         setSelectedMedia({
           uri: asset.uri,
           type: 'image',
-          fileName: asset.fileName || 'camera-inspection.jpg',
+          fileName: asset.fileName || 'anh-kiem-tra.jpg',
           mimeType: asset.mimeType,
           capturedAt: new Date().toISOString(),
         });
@@ -423,7 +462,7 @@ export function InspectRevalidateScreen() {
       }
     } catch (err) {
       console.warn('[InspectRevalidate] Camera error:', err);
-      setPickerError('Could not open camera.');
+      setPickerError(CANNOT_OPEN_CAMERA_MESSAGE);
     }
   };
 
@@ -464,7 +503,7 @@ export function InspectRevalidateScreen() {
       }
     } catch (err) {
       console.warn('[InspectRevalidate] Gallery error:', err);
-      setPickerError('Could not open media library.');
+      setPickerError(CANNOT_OPEN_MEDIA_LIBRARY_MESSAGE);
     } finally {
       setIsOpeningGallery(false);
     }
@@ -481,7 +520,7 @@ export function InspectRevalidateScreen() {
     const targetTaskId = taskId || signId;
 
     if (!lat || !lon) {
-      setSubmitError('Location is required to submit evidence.');
+      setSubmitError(COORDINATES_REQUIRED_EVIDENCE_MESSAGE);
       return;
     }
 
@@ -492,8 +531,8 @@ export function InspectRevalidateScreen() {
           latitude: lat,
           longitude: lon,
           capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
-          note: `${selectedCondition}: ${customNote}`.trim(),
-          condition: selectedCondition,
+          note: customNote.trim() || undefined,
+          evidenceType,
         },
         selectedMedia
           ? {
@@ -505,13 +544,18 @@ export function InspectRevalidateScreen() {
         session?.accessToken,
       );
 
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
+      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+
       setSubmitSuccess(true);
       setTimeout(() => {
         handleNavigateBack();
       }, 1400);
     } catch (err) {
       console.error('[InspectRevalidate] Submission failed:', err);
-      setSubmitError(err instanceof Error ? err.message : 'Evidence submission failed. Please try again.');
+      setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
     } finally {
       setIsSubmitting(false);
     }
@@ -531,7 +575,7 @@ export function InspectRevalidateScreen() {
       >
         <View style={styles.galleryModalRoot}>
           <Pressable
-            accessibilityLabel="Close media library"
+            accessibilityLabel="Đóng thư viện ảnh"
             accessibilityRole="button"
             onPress={() => setIsAndroidGalleryVisible(false)}
             style={styles.galleryBackdrop}
@@ -545,14 +589,14 @@ export function InspectRevalidateScreen() {
             </View>
             <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
               <View style={styles.galleryHeading}>
-                <Text style={[styles.galleryTitle, { color: theme.text }]}>Choose evidence media</Text>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>Chọn hình ảnh / video bằng chứng</Text>
                 <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
-                  Original GPS location metadata will be checked
+                  Dữ liệu tọa độ GPS gốc sẽ được kiểm tra đối chiếu
                 </Text>
               </View>
               <AppButton
-                accessibilityLabel="Close"
-                label="Close"
+                accessibilityLabel="Đóng"
+                label="Đóng"
                 onPress={() => setIsAndroidGalleryVisible(false)}
                 style={styles.galleryCloseButton}
                 variant="ghost"
@@ -588,7 +632,7 @@ export function InspectRevalidateScreen() {
                 if ('isCameraTile' in item && item.isCameraTile) {
                   return (
                     <Pressable
-                      accessibilityLabel="Open camera"
+                      accessibilityLabel="Mở máy ảnh"
                       accessibilityRole="button"
                       onPress={() => {
                         setIsAndroidGalleryVisible(false);
@@ -611,7 +655,7 @@ export function InspectRevalidateScreen() {
                         <View style={styles.cameraTileIconBox}>
                           <MaterialCommunityIcons color="#FFFFFF" name="camera" size={22} />
                         </View>
-                        <Text style={[styles.cameraTileText, { color: theme.text }]}>Camera</Text>
+                        <Text style={[styles.cameraTileText, { color: theme.text }]}>Máy ảnh</Text>
                       </View>
                     </Pressable>
                   );
@@ -671,7 +715,7 @@ export function InspectRevalidateScreen() {
             {/* Top Header Row */}
             <View style={styles.header}>
               <Pressable
-                accessibilityLabel="Back to revalidation map"
+                accessibilityLabel="Quay lại bản đồ tái thẩm định"
                 accessibilityRole="button"
                 hitSlop={10}
                 onPress={handleNavigateBack}
@@ -681,7 +725,7 @@ export function InspectRevalidateScreen() {
               </Pressable>
               <View style={styles.headerTitleCol}>
                 <View style={styles.headerBadgeRow}>
-                  <Text style={[styles.title, { color: theme.text }]}>Inspect & Revalidate</Text>
+                  <Text style={[styles.title, { color: theme.text }]}>Kiểm tra & Tái thẩm định</Text>
                   <View style={styles.signCodePill}>
                     <Text style={styles.signCodePillText}>{signCode}</Text>
                   </View>
@@ -712,7 +756,7 @@ export function InspectRevalidateScreen() {
                   <Text style={[styles.targetSignMeta, { color: theme.grey }]}>
                     {targetLat && targetLon
                       ? `GPS: ${targetLat.toFixed(5)}, ${targetLon.toFixed(5)}`
-                      : 'Target location loaded'}
+                      : 'Đã tải vị trí mục tiêu'}
                   </Text>
                 </View>
                 <View
@@ -735,12 +779,12 @@ export function InspectRevalidateScreen() {
                       { color: freshnessStyle.text },
                     ]}
                   >
-                    {freshnessScore}% Freshness
+                    {freshnessScore}% Độ tươi mới
                   </Text>
                 </View>
               </View>
 
-              {/* Visual Evidence Reference Comparison (CATALOG SPEC label removed as requested) */}
+              {/* Visual Evidence Reference Comparison */}
               <View style={styles.evidenceComparisonRow}>
                 <View style={[styles.miniEvidenceBox, { borderColor: theme.border }]}>
                   <View style={styles.miniImgFrame}>
@@ -761,7 +805,7 @@ export function InspectRevalidateScreen() {
                     ) : (
                       <View style={styles.noCropMini}>
                         <MaterialCommunityIcons color={theme.placeholder} name="camera-outline" size={18} />
-                        <Text style={[styles.noCropMiniText, { color: theme.placeholder }]}>No crop</Text>
+                        <Text style={[styles.noCropMiniText, { color: theme.placeholder }]}>Không có ảnh crop</Text>
                       </View>
                     )}
                   </View>
@@ -770,11 +814,11 @@ export function InspectRevalidateScreen() {
             </View>
 
             {/* =============================================================== */}
-            {/* 2. MEDIA EVIDENCE UPLOADER & PREVIEW (MATCHING DESIGN)          */}
+            {/* 2. MEDIA EVIDENCE UPLOADER & PREVIEW                             */}
             {/* =============================================================== */}
             <Pressable
               accessibilityLabel={
-                selectedMedia ? 'Change selected media' : 'Upload photo or video'
+                selectedMedia ? 'Đổi tệp đã chọn' : 'Tải lên ảnh hoặc video'
               }
               accessibilityRole="button"
               disabled={isOpeningGallery || isSubmitting}
@@ -784,6 +828,7 @@ export function InspectRevalidateScreen() {
                 {
                   backgroundColor: theme.neutral,
                   borderColor: selectedMedia ? '#0671EB' : theme.border,
+                  padding: selectedMedia ? 0 : Spacing.four,
                 },
               ]}
             >
@@ -792,12 +837,12 @@ export function InspectRevalidateScreen() {
                   <View style={styles.videoPreview}>
                     <MaterialCommunityIcons color="#FFFFFF" name="video" size={36} />
                     <Text numberOfLines={2} style={styles.videoFileName}>
-                      {selectedMedia.fileName ?? 'Evidence Video Selected'}
+                      {selectedMedia.fileName ?? 'Đã chọn video bằng chứng'}
                     </Text>
                   </View>
                 ) : (
                   <Image
-                    accessibilityLabel="Selected evidence"
+                    accessibilityLabel="Bằng chứng đã chọn"
                     contentFit="cover"
                     source={{ uri: selectedMedia.uri }}
                     style={styles.selectedImage}
@@ -818,7 +863,7 @@ export function InspectRevalidateScreen() {
                     tintColor={theme.placeholder}
                   />
                   <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
-                    {isOpeningGallery ? 'Opening gallery...' : 'Upload photo or video'}
+                    {isOpeningGallery ? 'Đang mở thư viện...' : 'Tải lên ảnh hoặc video'}
                   </Text>
                 </>
               )}
@@ -827,8 +872,8 @@ export function InspectRevalidateScreen() {
             {/* Helper text matching new survey screen */}
             <Text style={[styles.helperText, { color: theme.placeholder }]}>
               {selectedMedia
-                ? 'Tap the preview to choose a different file'
-                : 'Upload your sign image or video here'}
+                ? 'Nhấn vào ảnh để chọn tệp khác'
+                : 'Tải ảnh hoặc video biển báo của bạn tại đây'}
             </Text>
 
             {pickerError ? (
@@ -875,17 +920,17 @@ export function InspectRevalidateScreen() {
                 <View style={styles.gpsCardTitleCol}>
                   <Text style={[styles.gpsCardTitle, { color: theme.text }]}>
                     {distanceFromTarget !== null
-                      ? `${distanceFromTarget}m from target sign`
+                      ? `Cách biển báo mục tiêu ${distanceFromTarget}m`
                       : detectedGps
                         ? `GPS: ${detectedGps.latitude.toFixed(5)}, ${detectedGps.longitude.toFixed(5)}`
-                        : 'No GPS detected yet'}
+                        : 'Chưa phát hiện tọa độ GPS'}
                   </Text>
                   <Text style={[styles.gpsCardSubtitle, { color: theme.textSecondary }]}>
                     {isWithinProximity === true
-                      ? 'Within valid inspection radius (< 50m). PostGIS check will pass.'
+                      ? 'Nằm trong bán kính hợp lệ (< 50m). Đạt chuẩn PostGIS.'
                       : isWithinProximity === false
-                        ? `Evidence is ${distanceFromTarget}m away. Maximum allowed is 50m.`
-                        : 'Take photo on-site or tap below to stamp device location.'}
+                        ? `Bằng chứng cách xa ${distanceFromTarget}m. Tối đa cho phép 50m.`
+                        : 'Chụp ảnh tại hiện trường hoặc nhấn bên dưới để đóng dấu GPS thiết bị.'}
                   </Text>
                 </View>
               </View>
@@ -893,7 +938,7 @@ export function InspectRevalidateScreen() {
               {/* Stamp Live GPS Fallback Button */}
               {!detectedGps || isWithinProximity === false ? (
                 <AppButton
-                  accessibilityLabel="Use current device GPS"
+                  accessibilityLabel="Sử dụng GPS thiết bị hiện tại"
                   disabled={isLocatingDevice || isSubmitting}
                   onPress={handleUseCurrentLocation}
                   style={styles.stampGpsBtn}
@@ -905,59 +950,108 @@ export function InspectRevalidateScreen() {
                     <MaterialCommunityIcons color={theme.primary} name="crosshairs-gps" size={16} />
                   )}
                   <Text style={[styles.stampGpsBtnText, { color: theme.primary }]}>
-                    {isLocatingDevice ? 'Acquiring GPS…' : 'Stamp Current Device GPS'}
+                    {isLocatingDevice ? 'Đang lấy tín hiệu GPS…' : 'Đóng dấu GPS thiết bị hiện tại'}
                   </Text>
                 </AppButton>
               ) : null}
             </View>
 
             {/* =============================================================== */}
-            {/* 4. CONDITION & OBSERVATION NOTES (OTHER REQUIRED)               */}
+            {/* 4. REVALIDATION STATUS & NOTES                                  */}
             {/* =============================================================== */}
-            <Text style={[styles.sectionHeading, { color: theme.text }]}>Physical Condition</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Kết luận tái thẩm định thực địa</Text>
+              <Text style={styles.requiredTag}>* Bắt buộc</Text>
+            </View>
 
-            <View style={styles.presetsWrap}>
-              {CONDITION_PRESETS.map((preset) => {
-                const isSelected = selectedCondition === preset.id;
+            <View style={styles.statusOptionsWrap}>
+              {REVALIDATION_STATUS_OPTIONS.map((opt) => {
+                const isSelected = evidenceType === opt.id;
                 return (
                   <Pressable
-                    accessibilityLabel={preset.label}
+                    accessibilityLabel={opt.label}
                     accessibilityRole="button"
-                    key={preset.id}
-                    onPress={() => setSelectedCondition(preset.id)}
+                    key={opt.id}
+                    onPress={() => setEvidenceType(opt.id)}
                     style={[
-                      styles.conditionChip,
+                      styles.statusOptionCard,
                       {
-                        backgroundColor: isSelected ? '#0671EB' : theme.backgroundElement,
-                        borderColor: isSelected ? '#0671EB' : theme.border,
+                        backgroundColor: isSelected
+                          ? `${opt.activeColor}12`
+                          : theme.backgroundElement,
+                        borderColor: isSelected ? opt.activeColor : theme.border,
                       },
                     ]}
                   >
+                    <View style={styles.statusOptionHeader}>
+                      <View
+                        style={[
+                          styles.statusOptionRadio,
+                          {
+                            borderColor: isSelected ? opt.activeColor : theme.placeholder,
+                          },
+                        ]}
+                      >
+                        {isSelected && (
+                          <View
+                            style={[
+                              styles.statusOptionRadioDot,
+                              { backgroundColor: opt.activeColor },
+                            ]}
+                          />
+                        )}
+                      </View>
+                      <MaterialCommunityIcons
+                        color={isSelected ? opt.activeColor : theme.placeholder}
+                        name={opt.icon}
+                        size={20}
+                      />
+                      <Text
+                        style={[
+                          styles.statusOptionLabel,
+                          {
+                            color: isSelected ? opt.activeColor : theme.text,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </View>
                     <Text
                       style={[
-                        styles.conditionChipText,
-                        { color: isSelected ? '#FFFFFF' : theme.text },
+                        styles.statusOptionDesc,
+                        { color: theme.textSecondary },
                       ]}
                     >
-                      {preset.label}
+                      {opt.description}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
 
+            {evidenceType === 'CHANGED' ? (
+              <View style={[styles.aiNoticeCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
+                <MaterialCommunityIcons color="#D97706" name="robot-outline" size={18} />
+                <Text style={styles.aiNoticeText}>
+                  Hệ thống AI sẽ tự động phân tích ảnh thực địa bạn chụp để nhận diện loại biển báo mới.
+                </Text>
+              </View>
+            ) : null}
+
             {/* Labeled input for additional notes */}
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Additional Notes</Text>
-              {selectedCondition === 'OTHER' ? (
-                <Text style={styles.requiredTag}>* Required for &quot;Other&quot;</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú chi tiết</Text>
+              {evidenceType === 'REMOVED' ? (
+                <Text style={styles.requiredTag}>* Bắt buộc khi chọn &quot;Đã gỡ bỏ&quot;</Text>
               ) : (
-                <Text style={[styles.optionalTag, { color: theme.grey }]}>Optional</Text>
+                <Text style={[styles.optionalTag, { color: theme.grey }]}>Không bắt buộc</Text>
               )}
             </View>
 
             <TextInput
-              accessibilityLabel="Surveyor inspection remarks"
+              accessibilityLabel="Ghi chú của người kiểm tra"
               multiline
               numberOfLines={3}
               onChangeText={setCustomNote}
@@ -967,9 +1061,11 @@ export function InspectRevalidateScreen() {
                 }, 250);
               }}
               placeholder={
-                selectedCondition === 'OTHER'
-                  ? 'Please describe the sign condition (required)...'
-                  : 'Additional remarks (e.g. pole slightly bent, tree trimmed)...'
+                evidenceType === 'REMOVED'
+                  ? 'Mô tả hiện trạng vị trí (ví dụ: cột đã bị tháo, công trình đang thi công gỡ bỏ)...'
+                  : evidenceType === 'CHANGED'
+                    ? 'Ghi chú thêm về biển báo mới (ví dụ: biển hạn chế tốc độ mới thay thế)...'
+                    : 'Ghi chú bổ sung (ví dụ: biển còn rõ ràng, quan sát tốt)...'
               }
               placeholderTextColor={theme.placeholder}
               style={[
@@ -977,7 +1073,7 @@ export function InspectRevalidateScreen() {
                 {
                   backgroundColor: theme.backgroundElement,
                   borderColor:
-                    selectedCondition === 'OTHER' && !customNote.trim()
+                    evidenceType === 'REMOVED' && !customNote.trim()
                       ? '#EF4444'
                       : theme.border,
                   color: theme.text,
@@ -986,9 +1082,9 @@ export function InspectRevalidateScreen() {
               value={customNote}
             />
 
-            {selectedCondition === 'OTHER' && !customNote.trim() ? (
+            {evidenceType === 'REMOVED' && !customNote.trim() ? (
               <Text style={styles.noteRequiredError}>
-                Please provide an explanation in the notes when selecting &quot;Other&quot;.
+                Vui lòng nhập giải thích lý do biển báo đã bị gỡ bỏ hoặc không còn.
               </Text>
             ) : null}
 
@@ -1003,7 +1099,7 @@ export function InspectRevalidateScreen() {
               <View style={styles.successBanner}>
                 <MaterialCommunityIcons color="#059669" name="check-circle" size={20} />
                 <Text style={styles.successBannerText}>
-                  Evidence submitted! Snapping back to revalidation map…
+                  Đã gửi bằng chứng! Đang quay lại bản đồ tái thẩm định…
                 </Text>
               </View>
             ) : null}
@@ -1188,7 +1284,7 @@ const styles = StyleSheet.create({
   uploadPlaceholder: {
     position: 'relative',
     overflow: 'hidden',
-    minHeight: 160,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.one,
@@ -1213,20 +1309,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   selectedImage: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
     width: '100%',
     height: '100%',
+    borderRadius: Rounded.lg,
   },
   videoPreview: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+    width: '100%',
+    height: '100%',
     backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1302,22 +1391,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  // Condition Presets
-  presetsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  // Status Options Cards
+  statusOptionsWrap: {
+    gap: 10,
     marginBottom: Spacing.two,
   },
-  conditionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
+  statusOptionCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 4,
   },
-  conditionChipText: {
+  statusOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusOptionRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusOptionRadioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusOptionLabel: {
+    fontSize: 14,
+  },
+  statusOptionDesc: {
     fontSize: 12,
-    fontWeight: '600',
+    paddingLeft: 26,
+    lineHeight: 16,
+  },
+  aiNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: Spacing.two,
+  },
+  aiNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+    fontWeight: '500',
   },
   // Input Label Row & Notes
   inputLabelRow: {

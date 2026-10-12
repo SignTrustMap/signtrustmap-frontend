@@ -26,6 +26,8 @@ import {
 } from '@/feature/review/context/review-workflow-provider';
 import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal';
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
+import { useGetCatalog } from '@/feature/review/hooks/use-review';
+import { resolveS3Url, type RemedySign } from '@/api/reviews/review-workflow';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -36,15 +38,53 @@ type SubmissionReviewScreenProps = {
 
 type ReviewSheet = 'decline' | 'report';
 
+export const DEFAULT_REMEDY_SIGNS: RemedySign[] = [
+  {
+    id: 102,
+    signCode: 'W.201a',
+    nameVi: 'Chỗ ngoặt nguy hiểm bên trái',
+    nameEn: 'Dangerous Curve Left',
+    imageUrl: 'https://s3.signmap.site/stm-sign-crops/w201a.png',
+  },
+  {
+    id: 103,
+    signCode: 'P.102',
+    nameVi: 'Cấm đi ngược chiều',
+    nameEn: 'No Entry',
+    imageUrl: 'https://s3.signmap.site/stm-sign-crops/p102.png',
+  },
+  {
+    id: 104,
+    signCode: 'P.123a',
+    nameVi: 'Cấm rẽ trái',
+    nameEn: 'No Left Turn',
+    imageUrl: 'https://s3.signmap.site/stm-sign-crops/p123a.png',
+  },
+  {
+    id: 105,
+    signCode: 'I.408',
+    nameVi: 'Nơi đỗ xe',
+    nameEn: 'Parking Space',
+    imageUrl: 'https://s3.signmap.site/stm-sign-crops/i408.png',
+  },
+  {
+    id: 106,
+    signCode: 'P.130',
+    nameVi: 'Cấm dừng xe và đỗ xe',
+    nameEn: 'No Stopping and Parking',
+    imageUrl: 'https://s3.signmap.site/stm-sign-crops/p130.png',
+  },
+];
+
 const declineReasons = [
-  'Incorrect Sign Type',
-  'Sign Not Found',
-  'Too Poor Image Quality',
-  'Duplicate Submission',
-  'Other',
+  { value: 'Incorrect Sign Type', label: 'Sai loại biển báo' },
+  { value: 'Sign Not Found', label: 'Không tìm thấy biển báo' },
+  { value: 'Too Poor Image Quality', label: 'Chất lượng ảnh quá kém' },
+  { value: 'Duplicate Submission', label: 'Dữ liệu bị trùng lặp' },
+  { value: 'Other', label: 'Lý do khác' },
 ] as const;
 
-type DeclineReason = (typeof declineReasons)[number];
+type DeclineReason = (typeof declineReasons)[number]['value'];
 
 export type ReportIssueType =
   | 'missing_type'
@@ -83,7 +123,7 @@ export const REPORT_ISSUE_OPTIONS: Array<{
 
 function SubmissionReviewSkeleton() {
   return (
-    <View accessibilityLabel="Loading submissions" style={styles.skeletonContainer}>
+    <View accessibilityLabel="Đang tải danh sách thẩm định" style={styles.skeletonContainer}>
       <View style={[styles.skeletonBlock, { width: '100%', height: 4, marginVertical: 8 }]} />
       <View style={styles.skeletonCard} />
       <View style={styles.skeletonInfoBox} />
@@ -99,15 +139,19 @@ function SubmissionReviewSkeleton() {
 
 type ReviewBottomSheetProps = {
   declineReason?: DeclineReason;
-  declineReasonDetail: string;
-  onChangeDeclineReason: (reason: DeclineReason) => void;
-  onChangeDeclineReasonDetail: (value: string) => void;
-  onChangeReportIssueType: (issue: ReportIssueType) => void;
+  declineReasonDetail?: string;
+  onChangeDeclineReason?: (reason: DeclineReason) => void;
+  onChangeDeclineReasonDetail?: (value: string) => void;
+  onChangeReportIssueType?: (issue: ReportIssueType) => void;
   onChangeReportNote: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
-  reportIssueType: ReportIssueType;
+  onOpenReport?: () => void;
+  onSelectRemedySign?: (sign: RemedySign) => void;
+  remedySigns?: RemedySign[];
+  reportIssueType?: ReportIssueType;
   reportNote: string;
+  selectedRemedySign?: RemedySign;
   type?: ReviewSheet;
 };
 
@@ -120,29 +164,28 @@ function ReviewBottomSheet({
   onChangeReportNote,
   onClose,
   onConfirm,
-  reportIssueType,
+  onOpenReport,
+  onSelectRemedySign,
+  remedySigns = [],
+  reportIssueType = 'missing_type',
   reportNote,
+  selectedRemedySign,
   type,
 }: ReviewBottomSheetProps) {
   const theme = useTheme();
   const isDecline = type === 'decline';
-  const isOther = declineReason === 'Other';
   const isMissingType = reportIssueType === 'missing_type';
   const isReportOther = reportIssueType === 'other';
 
   const canConfirm = isDecline
-    ? Boolean(declineReason && (!isOther || declineReasonDetail.trim()))
+    ? Boolean(selectedRemedySign || declineReason)
     : (isMissingType || !isReportOther || Boolean(reportNote.trim()));
 
   const confirmButtonLabel = isDecline
-    ? 'Confirm Decline'
+    ? 'Xác nhận chọn'
     : isMissingType
       ? 'Continue'
       : 'Submit Report';
-
-  const confirmButtonColor = isDecline
-    ? Colors.danger
-    : theme.primary;
 
   return (
     <Modal
@@ -153,7 +196,7 @@ function ReviewBottomSheet({
       visible={Boolean(type)}
     >
       <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel="Close review options" onPress={onClose} style={styles.backdrop} />
+        <Pressable accessibilityLabel="Đóng tùy chọn thẩm định" onPress={onClose} style={styles.backdrop} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
           enabled={Platform.OS !== 'web'}
@@ -167,10 +210,10 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Decline Reason' : 'Report Issue'}
+                {isDecline ? 'Gợi ý biển báo' : 'Report Issue'}
               </Text>
               <AppButton
-                accessibilityLabel="Close"
+                accessibilityLabel="Đóng"
                 onPress={onClose}
                 style={styles.sheetCloseButton}
                 variant="ghost"
@@ -186,59 +229,78 @@ function ReviewBottomSheet({
                 style={styles.sheetBodyScroll}
               >
                 <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Please select a reason for declining this sign submission:
+                  Chọn biển báo đúng từ các gợi ý phát hiện của AI:
                 </Text>
-                <View style={styles.reasonList}>
-                  {declineReasons.map((reason) => {
-                    const selected = declineReason === reason;
+
+                {/* 2x2 grid: top 4 signs */}
+                <View style={styles.remediesGrid} testID="remedies-grid">
+                  {remedySigns.slice(0, 4).map((sign) => {
+                    const selected = selectedRemedySign?.id === sign.id;
 
                     return (
                       <Pressable
-                        accessibilityRole="radio"
+                        accessibilityLabel={`Chọn biển báo ${sign.signCode} - ${sign.nameVi || sign.nameEn}`}
+                        accessibilityRole="button"
                         accessibilityState={{ selected }}
-                        key={reason}
-                        onPress={() => onChangeDeclineReason(reason)}
+                        key={sign.id}
+                        onPress={() => {
+                          onSelectRemedySign?.(sign);
+                          onChangeDeclineReason?.(sign.signCode as any);
+                        }}
                         style={[
-                          styles.reasonOption,
+                          styles.remedyCard,
                           {
                             backgroundColor: selected ? theme.backgroundSelected : theme.surface,
                             borderColor: selected ? theme.primary : theme.border,
                           },
                         ]}
                       >
-                        <Text style={[styles.reasonLabel, { color: theme.text }]}>{reason}</Text>
-                        <View
-                          style={[
-                            styles.radio,
-                            { borderColor: selected ? theme.primary : theme.placeholder },
-                          ]}
-                        >
-                          {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
+                        <View style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}>
+                          {sign.imageUrl ? (
+                            <Image
+                              accessibilityLabel={sign.signCode}
+                              contentFit="contain"
+                              source={{ uri: resolveS3Url(sign.imageUrl) }}
+                              style={styles.remedyImage}
+                            />
+                          ) : (
+                            <MaterialCommunityIcons
+                              color={theme.placeholder}
+                              name="traffic-light"
+                              size={32}
+                            />
+                          )}
+                          {selected ? (
+                            <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
+                              <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                            </View>
+                          ) : null}
                         </View>
+                        <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
+                          {sign.signCode}
+                        </Text>
+                        <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
+                          {sign.nameVi || sign.nameEn}
+                        </Text>
                       </Pressable>
                     );
                   })}
                 </View>
-                {isOther ? (
-                  <View style={styles.reasonInputGroup}>
-                    <Text style={[styles.inputLabel, { color: theme.text }]}>
-                      Reason <Text style={{ color: Colors.danger }}>*</Text>
-                    </Text>
-                    <TextInput
-                      accessibilityLabel="Reason, required"
-                      multiline
-                      onChangeText={onChangeDeclineReasonDetail}
-                      placeholder="Please specify the reason"
-                      placeholderTextColor={theme.placeholder}
-                      style={[
-                        styles.reasonInput,
-                        { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
-                      ]}
-                      textAlignVertical="top"
-                      value={declineReasonDetail}
-                    />
-                  </View>
-                ) : null}
+
+                {/* Below the grid: small text label "no correct option?", a report button appears below */}
+                <View style={styles.noOptionContainer}>
+                  <Text style={[styles.noOptionLabel, { color: theme.placeholder }]}>
+                    no correct option?
+                  </Text>
+                  <AppButton
+                    accessibilityLabel="Báo cáo"
+                    label="Báo cáo"
+                    onPress={onOpenReport}
+                    style={[styles.remedyReportButton, { borderColor: theme.border }]}
+                    textStyle={{ color: theme.text }}
+                    variant="surface"
+                  />
+                </View>
               </ScrollView>
             ) : (
               <ScrollView
@@ -259,7 +321,7 @@ function ReviewBottomSheet({
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
                         key={option.id}
-                        onPress={() => onChangeReportIssueType(option.id)}
+                        onPress={() => onChangeReportIssueType?.(option.id)}
                         style={[
                           styles.reasonOption,
                           {
@@ -312,7 +374,7 @@ function ReviewBottomSheet({
 
             <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>
               <AppButton
-                label="Cancel"
+                label="Hủy"
                 onPress={onClose}
                 style={[styles.sheetFooterButton, { borderColor: theme.border }]}
                 variant="surface"
@@ -323,7 +385,7 @@ function ReviewBottomSheet({
                 onPress={onConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: canConfirm ? confirmButtonColor : theme.placeholder },
+                  { backgroundColor: canConfirm ? theme.primary : theme.placeholder },
                 ]}
               />
             </View>
@@ -350,17 +412,22 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   } = useReviewWorkflow();
 
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
+  const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
   const [reportIssueType, setReportIssueType] = useState<ReportIssueType>('missing_type');
   const [reportNote, setReportNote] = useState('');
   const [isNewSignTypeModalOpen, setIsNewSignTypeModalOpen] = useState(false);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [isSignFocused, setIsSignFocused] = useState(true);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
     tone: 'default' | 'success';
   }>();
+
+  const { data: catalog } = useGetCatalog();
+  const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
 
   const displayedReviewAction = recheckingPreviousAction;
   const submission = pendingSubmissions[0];
@@ -370,11 +437,40 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
-  console.log(nextSubmission)
   const reviewPosition = Math.min(
     reviewHistory.length + (submission ? 1 : 0),
     totalInQueue,
   );
+
+  const activeRemedySigns: RemedySign[] = useMemo(() => {
+    if (submission?.remedySigns && submission.remedySigns.length >= 4) {
+      return submission.remedySigns.slice(0, 4);
+    }
+    const candidateSignId = (submission as any)?.predictedSignTypeId;
+    const candidateTitle = submission?.title?.toLowerCase() || '';
+
+    const fromCatalog = catalogSigns.filter((s) => {
+      if (candidateSignId && s.id === candidateSignId) return false;
+      if (candidateTitle.includes(s.signCode.toLowerCase())) return false;
+      return true;
+    });
+
+    if (fromCatalog.length >= 4) {
+      return fromCatalog.slice(0, 4).map((s) => ({
+        id: s.id,
+        signCode: s.signCode,
+        nameVi: s.nameVi,
+        nameEn: s.nameEn,
+        imageUrl: s.representativeImageKey,
+      }));
+    }
+
+    return DEFAULT_REMEDY_SIGNS.filter((s) => {
+      if (candidateSignId && s.id === candidateSignId) return false;
+      if (candidateTitle.includes(s.signCode.toLowerCase())) return false;
+      return true;
+    }).slice(0, 4);
+  }, [catalogSigns, submission]);
 
   const completeReview = useCallback(
     (
@@ -382,6 +478,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       details?: {
         declineReason?: string;
         declineNote?: string;
+        suggestedSignTypeId?: number;
         newSignReport?: CreateMissingTypeReportDto;
       },
     ) => {
@@ -391,11 +488,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       completeCurrentReview(action, details);
 
       const toastMessages: Record<ReviewActionType, string> = {
-        approved: 'Sign approved',
-        declined: 'Sign declined',
-        reported: 'Submission reported for moderation',
-        skipped: 'Sign skipped (cannot identify)',
-        reported_new_sign: 'New sign type reported for catalog appraisal',
+        approved: 'Đã phê duyệt biển báo',
+        declined: 'Đã từ chối biển báo',
+        reported: 'Đã báo cáo biển báo',
+        skipped: 'Đã bỏ qua biển báo (không thể nhận diện)',
+        reported_new_sign: 'Đã báo cáo loại biển mới chờ thẩm định catalog',
       };
 
       setToast((current) => ({
@@ -415,13 +512,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     completeReview('reported_new_sign', { newSignReport: reportDto });
   };
 
-  const closeSheet = () => setActiveSheet(undefined);
+  const closeSheet = () => {
+    setActiveSheet(undefined);
+    setSelectedRemedySign(undefined);
+  };
 
   const confirmDecline = () => {
-    const canDecline = declineReason && (declineReason !== 'Other' || declineReasonDetail.trim());
-    if (!canDecline) return;
+    const chosenSign = selectedRemedySign || activeRemedySigns[0];
+    if (!chosenSign && !declineReason) return;
 
-    completeReview('declined', { declineReason, declineNote: declineReasonDetail });
+    completeReview('declined', {
+      suggestedSignTypeId: chosenSign?.id,
+      declineReason: chosenSign ? `Corrected to ${chosenSign.signCode}` : declineReason,
+      declineNote: chosenSign ? (chosenSign.nameVi || chosenSign.nameEn) : declineReasonDetail,
+    });
+    setSelectedRemedySign(undefined);
     setDeclineReason(undefined);
     setDeclineReasonDetail('');
     closeSheet();
@@ -651,17 +756,41 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 ]}
               >
                 <Pressable
-                  accessibilityLabel="Sign submission image. Tap to enlarge."
+                  accessibilityLabel="Ảnh biển báo. Chạm để phóng to."
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.cardInnerPressable}
                 >
                   <Image
                     accessibilityLabel={submission.title}
-                    contentFit="cover"
+                    contentFit={isSignFocused ? "contain" : "cover"}
                     source={submission.image}
-                    style={styles.cardImage}
+                    style={[
+                      styles.cardImage,
+                      isSignFocused && { transform: [{ scale: 1.15 }] },
+                    ]}
                     transition={180}
                   />
+
+                  {/* Focus Toggle Pill */}
+                  <Pressable
+                    accessibilityLabel="Toggle sign focus"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setIsSignFocused((prev) => !prev);
+                    }}
+                    style={styles.focusToggleBadge}
+                  >
+                    <MaterialCommunityIcons
+                      color="#FFFFFF"
+                      name={isSignFocused ? "target" : "image-filter-center-focus"}
+                      size={13}
+                    />
+                    <Text style={styles.focusToggleText}>
+                      {isSignFocused ? "Focus Biển báo" : "Toàn cảnh"}
+                    </Text>
+                  </Pressable>
 
                   {/* Directional Swipe Badges */}
                   <Animated.View
@@ -671,7 +800,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: approveBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>APPROVE</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>PHÊ DUYỆT</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -681,7 +810,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: declineBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>DECLINE</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>TỪ CHỐI</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -691,7 +820,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: skipBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>SKIP</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BỎ QUA</Text>
                   </Animated.View>
 
                   <Animated.View
@@ -701,7 +830,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       { opacity: reportBadgeOpacity },
                     ]}
                   >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>REPORT</Text>
+                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BÁO CÁO</Text>
                   </Animated.View>
 
                   {displayedReviewAction ? (
@@ -721,7 +850,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       ]}
                     >
                       <Text style={styles.statusBadgeLabel}>
-                        {displayedReviewAction.toUpperCase()}
+                        {displayedReviewAction === 'approved'
+                          ? 'ĐÃ PHÊ DUYỆT'
+                          : displayedReviewAction === 'declined'
+                            ? 'ĐÃ TỪ CHỐI'
+                            : displayedReviewAction === 'reported'
+                              ? 'ĐÃ BÁO CÁO'
+                              : 'ĐÃ BỎ QUA'}
                       </Text>
                     </View>
                   ) : null}
@@ -744,6 +879,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 },
               ]}
             >
+              <View style={styles.detectedBadgeRow}>
+                <MaterialCommunityIcons color={Colors.primary} name="shield-check-outline" size={13} style={{ marginRight: 4 }} />
+                <Text style={styles.detectedBadgeText}>Sign detected</Text>
+              </View>
               <Text numberOfLines={2} style={[styles.infoBoxTitle, { color: theme.text }]}>
                 {submission.title}
               </Text>
@@ -751,7 +890,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {submission.captured}
                 {submission.location && submission.location !== 'Estimated GPS coordinates available'
                   ? ` • ${submission.location}`
-                  : ''}
+                  : submission.location === 'Estimated GPS coordinates available'
+                    ? ' • Tọa độ GPS ước tính'
+                    : ''}
               </Text>
             </View>
 
@@ -844,13 +985,15 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
-            <Text style={[styles.completeTitle, { color: theme.text }]}>All reviews completed</Text>
+            <Text accessibilityLabel="All reviews completed" style={[styles.completeTitle, { color: theme.text }]}>
+              All reviews completed
+            </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
-              You have reviewed all available sign submissions.
+              Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.
             </Text>
             {reviewHistory.length > 0 ? (
               <AppButton
-                label="View Summary"
+                label="Xem tổng kết"
                 onPress={() => router.replace('/work/submission-summary')}
                 style={styles.completeSummaryButton}
               />
@@ -868,13 +1011,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         visible={isImageZoomed}
       >
         <Pressable
-          accessibilityLabel="Close enlarged view"
+          accessibilityLabel="Đóng xem phóng to"
           onPress={() => setIsImageZoomed(false)}
           style={styles.zoomBackdrop}
         >
           <SafeAreaView edges={['top', 'bottom']} style={styles.zoomSafeArea}>
             <Pressable
-              accessibilityLabel="Close enlarged view"
+              accessibilityLabel="Đóng xem phóng to"
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={() => setIsImageZoomed(false)}
               style={[
@@ -886,11 +1029,33 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             </Pressable>
             {submission ? (
               <Image
-                contentFit="contain"
+                contentFit={isSignFocused ? "contain" : "cover"}
                 source={submission.image}
-                style={styles.zoomedImage}
+                style={[
+                  styles.zoomedImage,
+                  isSignFocused && { transform: [{ scale: 1.25 }] },
+                ]}
               />
             ) : null}
+            <Pressable
+              accessibilityLabel="Toggle sign focus in fullscreen"
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={(e) => {
+                e.stopPropagation();
+                setIsSignFocused((prev) => !prev);
+              }}
+              style={styles.zoomFocusToggle}
+            >
+              <MaterialCommunityIcons
+                color="#FFFFFF"
+                name={isSignFocused ? "target" : "image-filter-center-focus"}
+                size={16}
+              />
+              <Text style={styles.zoomFocusToggleText}>
+                {isSignFocused ? "Chế độ: Focus Biển báo" : "Chế độ: Toàn cảnh"}
+              </Text>
+            </Pressable>
           </SafeAreaView>
         </Pressable>
       </Modal>
@@ -911,17 +1076,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       <ReviewBottomSheet
         declineReason={declineReason}
         declineReasonDetail={declineReasonDetail}
-        onChangeDeclineReason={(reason) => {
-          setDeclineReason(reason);
-          if (reason !== 'Other') setDeclineReasonDetail('');
-        }}
+        onChangeDeclineReason={setDeclineReason}
         onChangeDeclineReasonDetail={setDeclineReasonDetail}
         onChangeReportIssueType={setReportIssueType}
         onChangeReportNote={setReportNote}
         onClose={closeSheet}
         onConfirm={activeSheet === 'decline' ? confirmDecline : confirmReport}
+        onOpenReport={() => {
+          setSelectedRemedySign(undefined);
+          setActiveSheet('report');
+        }}
+        onSelectRemedySign={setSelectedRemedySign}
+        remedySigns={activeRemedySigns}
         reportIssueType={reportIssueType}
         reportNote={reportNote}
+        selectedRemedySign={selectedRemedySign}
         type={activeSheet}
       />
 
@@ -1051,6 +1220,47 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
+  },
+  focusToggleBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    zIndex: 12,
+  },
+  focusToggleText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: Fonts.body,
+  },
+  zoomFocusToggle: {
+    position: 'absolute',
+    bottom: 34,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    zIndex: 20,
+  },
+  zoomFocusToggleText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   swipeBadge: {
     position: 'absolute',
@@ -1506,5 +1716,99 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     fontWeight: '800',
+  },
+  detectedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 71, 103, 0.08)',
+  },
+  detectedBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+    letterSpacing: 0.3,
+  },
+  remediesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+    columnGap: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  remedyCard: {
+    width: '48%',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  remedyImageWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  remedyImage: {
+    width: 54,
+    height: 54,
+  },
+  remedyCheckBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  remedyCode: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  remedyName: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  noOptionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+    gap: 8,
+  },
+  noOptionLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  remedyReportButton: {
+    minWidth: 140,
+    minHeight: 40,
+    borderWidth: 1,
   },
 });

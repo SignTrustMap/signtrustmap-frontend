@@ -1,0 +1,358 @@
+import { useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { AppButton } from '@/components/ui/button';
+import { AppInput } from '@/components/ui/input';
+import { useLogin } from '@/feature/auth/hooks/use-login';
+import { useTheme } from '@/hooks/use-theme';
+
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export default function LoginScreen() {
+    const loginMutation = useLogin();
+    const router = useRouter();
+    const theme = useTheme();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+    const isSubmitting = loginMutation.isPending;
+    const [loginError, setLoginError] = useState<string>();
+    const displayedLoginError = loginError ?? loginMutation.error?.message;
+
+    const handleLogIn = async () => {
+        if (isSubmitting) return;
+        const nextErrors = {
+            email: EMAIL_PATTERN.test(email.trim()) ? undefined : 'Email không hợp lệ.',
+            password: password.length > 1 ? undefined : 'Mật khẩu phải có từ 2 ký tự trở lên.',
+        };
+
+        setErrors(nextErrors);
+
+        if (nextErrors.email || nextErrors.password) {
+            return;
+        }
+
+        setLoginError(undefined);
+        try {
+            await loginMutation.mutateAsync({ email: email.trim(), password });
+            router.replace('/');
+        } catch {
+            // The mutation exposes request and session-storage errors to the form.
+        }
+    };
+
+    const handleGoogleLogIn = () => {
+        setLoginError('Đăng nhập Google hiện chưa khả dụng trên ứng dụng di động.');
+    };
+
+    const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
+        if (isSubmitting) return;
+        setEmail(quickEmail);
+        setPassword(quickPass);
+        setErrors({});
+        setLoginError(undefined);
+        loginMutation.reset();
+        try {
+            await loginMutation.mutateAsync({ email: quickEmail, password: quickPass });
+            router.replace('/');
+        } catch {
+        }
+    };
+
+    return (
+        <ThemedView style={styles.container}>
+            <SafeAreaView style={styles.safeArea}>
+                <ThemedView style={styles.content}>
+                    <View style={[styles.imagePlaceholder, { backgroundColor: theme.primary }]}>
+                        <View style={[styles.imageGlyph, { borderColor: theme.onPrimary }]}>
+                            <View style={[styles.imageMountain, { borderColor: theme.onPrimary }]} />
+                        </View>
+                    </View>
+
+                    <ThemedText style={styles.title}>SignTrustMap</ThemedText>
+                    <ThemedText type="small" style={styles.subtitle}>
+                        Chào mừng trở lại. Vui lòng nhập thông tin đăng nhập.
+                    </ThemedText>
+
+                    <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.border }]}>
+                        <AppInput
+                            autoCorrect={false}
+                            error={errors.email}
+                            label="Địa chỉ Email"
+                            onChangeText={(value) => {
+                                setEmail(value);
+                                if (!isSubmitting) loginMutation.reset();
+                                setLoginError(undefined);
+                                setErrors((current) => ({ ...current, email: undefined }));
+                            }}
+                            placeholder="demo@stm.dev"
+                            type="email"
+                            value={email}
+                        />
+                        <AppInput
+                            error={errors.password}
+                            label="Mật khẩu"
+                            onChangeText={(value) => {
+                                setPassword(value);
+                                if (!isSubmitting) loginMutation.reset();
+                                setLoginError(undefined);
+                                setErrors((current) => ({ ...current, password: undefined }));
+                            }}
+                            placeholder="Nhập mật khẩu của bạn"
+                            type="password"
+                            value={password}
+                        />
+                        <Pressable accessibilityRole="button" style={styles.forgotPassword}>
+                            <Text style={[styles.linkText, { color: theme.primary }]}>Quên mật khẩu?</Text>
+                        </Pressable>
+                        {displayedLoginError ? <Text accessibilityRole="alert" style={styles.errorText}>{displayedLoginError}</Text> : null}
+                        <AppButton disabled={isSubmitting} label={isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'} onPress={handleLogIn} style={styles.loginButton} />
+                        <View style={styles.dividerRow}>
+                            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                            <Text style={[styles.dividerText, { color: theme.textSecondary }]}>hoặc</Text>
+                            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+                        </View>
+                        <Pressable
+                            accessibilityRole="button"
+                            style={({ pressed }) => [
+                                styles.googleButton,
+                                { borderColor: theme.border, opacity: pressed ? 0.75 : 1 },
+                            ]}
+                            onPress={handleGoogleLogIn}
+                        >
+                            <Image
+                                accessibilityIgnoresInvertColors
+                                source={require('../../../../assets/brand/google-g.png')}
+                                style={styles.googleIcon}
+                            />
+                            <Text style={[styles.googleText, { color: theme.text }]}>Đăng nhập với Google</Text>
+                        </Pressable>
+                        {__DEV__ ? (
+                            <View style={[styles.devContainer, { borderColor: theme.border }]}>
+                                <Text style={[styles.devHeader, { color: theme.textSecondary }]}>ĐĂNG NHẬP NHANH (DEV)</Text>
+                                <View style={styles.devButtonsRow}>
+                                    <Pressable
+                                        accessibilityRole="button"
+                                        disabled={isSubmitting}
+                                        style={({ pressed }) => [
+                                            styles.devChip,
+                                            { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                                        ]}
+                                        onPress={() => handleQuickLogin('demo@stm.dev', 'Demo@123')}
+                                    >
+                                        <Text style={[styles.devChipText, { color: theme.text }]}>Demo (All roles)</Text>
+                                    </Pressable>
+                                </View>
+                                <Text style={[styles.devSubheader, { color: theme.textSecondary }]}>Reviewer (TEST ĐỒNG THUẬN)</Text>
+                                <View style={styles.reviewerGrid}>
+                                    {[1, 2, 3, 4, 5].map((num) => (
+                                        <Pressable
+                                            key={num}
+                                            accessibilityRole="button"
+                                            disabled={isSubmitting}
+                                            style={({ pressed }) => [
+                                                styles.reviewerChip,
+                                                { borderColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                                            ]}
+                                            onPress={() => handleQuickLogin(`reviewer${num}@stm.dev`, 'Reviewer@123')}
+                                        >
+                                            <Text style={[styles.devChipText, { color: theme.text }]}>Reviewer {num}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : null}
+                    </ThemedView>
+
+                    <View style={styles.signupRow}>
+                        <Text style={[styles.footerText, { color: theme.text }]}>Chưa có tài khoản?</Text>
+                        <Pressable accessibilityRole="button" onPress={() => router.push('/register')}>
+                            <Text style={[styles.linkText, { color: theme.primary }]}> Đăng ký</Text>
+                        </Pressable>
+                    </View>
+                </ThemedView>
+            </SafeAreaView>
+        </ThemedView>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    safeArea: {
+        flex: 1,
+        maxWidth: MaxContentWidth,
+        paddingHorizontal: Spacing.four,
+    },
+    content: {
+        flex: 1,
+        alignItems: 'center',
+        gap: Spacing.three,
+        justifyContent: 'center',
+    },
+    imagePlaceholder: {
+        width: 64,
+        height: 64,
+        borderRadius: Rounded.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: Spacing.one,
+    },
+    imageGlyph: {
+        width: 28,
+        height: 24,
+        borderWidth: 2,
+        borderRadius: Rounded.sm,
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+    },
+    imageMountain: {
+        width: 18,
+        height: 18,
+        borderLeftWidth: 2,
+        borderTopWidth: 2,
+        transform: [{ rotate: '45deg' }, { translateX: 5 }, { translateY: 5 }],
+    },
+    title: {
+        textAlign: 'center',
+        fontFamily: Fonts.title,
+        fontSize: 30,
+        fontWeight: 700,
+        lineHeight: 38,
+    },
+    subtitle: {
+        textAlign: 'center',
+        marginBottom: Spacing.four,
+    },
+    card: {
+        alignSelf: 'stretch',
+        borderWidth: 1,
+        borderRadius: Rounded.lg,
+        gap: Spacing.three,
+        padding: Spacing.four,
+    },
+    forgotPassword: {
+        alignSelf: 'flex-end',
+    },
+    linkText: {
+        fontFamily: Fonts.body,
+        fontSize: 13,
+        fontWeight: 700,
+    },
+    errorText: {
+        color: '#C62828',
+        fontFamily: Fonts.body,
+        fontSize: 13,
+        fontWeight: 600,
+        lineHeight: 18,
+    },
+    loginButton: {
+        alignSelf: 'stretch',
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.three,
+        marginVertical: Spacing.one,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+    },
+    dividerText: {
+        fontFamily: Fonts.body,
+        fontSize: 13,
+    },
+    googleButton: {
+        minHeight: 48,
+        borderWidth: 1,
+        borderRadius: Rounded.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.one,
+    },
+    googleIcon: {
+        width: 18,
+        height: 18,
+    },
+    googleText: {
+        fontFamily: Fonts.body,
+        fontSize: 14,
+        fontWeight: 700,
+    },
+    signupRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: Spacing.four,
+    },
+    footerText: {
+        fontFamily: Fonts.body,
+        fontSize: 13,
+    },
+    devContainer: {
+        marginTop: Spacing.one,
+        paddingTop: Spacing.three,
+        borderTopWidth: 1,
+        gap: Spacing.two,
+    },
+    devHeader: {
+        fontFamily: Fonts.body,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    devButtonsRow: {
+        flexDirection: 'row',
+        gap: Spacing.two,
+    },
+    devChip: {
+        flex: 1,
+        minHeight: 40,
+        paddingVertical: Spacing.one,
+        paddingHorizontal: Spacing.two,
+        borderWidth: 1,
+        borderRadius: Rounded.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    devChipText: {
+        fontFamily: Fonts.body,
+        fontSize: 12,
+        fontWeight: 600,
+    },
+    devSubheader: {
+        fontFamily: Fonts.body,
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: 0.5,
+        marginTop: Spacing.one,
+        textTransform: 'uppercase',
+    },
+    reviewerGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Spacing.two,
+    },
+    reviewerChip: {
+        minWidth: '28%',
+        flexGrow: 1,
+        minHeight: 38,
+        paddingVertical: Spacing.one,
+        paddingHorizontal: Spacing.two,
+        borderWidth: 1,
+        borderRadius: Rounded.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+});
