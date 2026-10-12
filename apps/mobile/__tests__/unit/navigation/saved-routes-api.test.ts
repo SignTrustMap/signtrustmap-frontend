@@ -73,6 +73,36 @@ describe('Saved Routes API Module', () => {
     expect(result.filterFixedSignsOnly).toBe(true);
   });
 
+  it('rounds float distanceMeters and durationSeconds to integer upon create', async () => {
+    const floatDto = {
+      name: 'Float Route',
+      originName: 'HCMC',
+      originLatitude: 10.76,
+      originLongitude: 106.66,
+      destinationName: 'Vung Tau',
+      destinationLatitude: 10.34,
+      destinationLongitude: 107.08,
+      distanceMeters: 7548.8,
+      durationSeconds: 585.4,
+    };
+
+    (apiClient.jsonApiRequest as jest.Mock).mockResolvedValueOnce({ id: 'route-float' });
+
+    await createSavedRoute(floatDto, 'token-123');
+
+    expect(apiClient.jsonApiRequest).toHaveBeenCalledWith(
+      '/saved-routes',
+      {
+        ...floatDto,
+        distanceMeters: 7549,
+        durationSeconds: 585,
+      },
+      'token-123',
+      undefined,
+      'POST',
+    );
+  });
+
   it('updates an existing saved route', async () => {
     const patchDto = {
       name: 'Updated Route Name',

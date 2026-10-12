@@ -26,6 +26,8 @@ import {
 } from '@/feature/review/context/review-workflow-provider';
 import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { resolveS3Url, type RemedySign } from '@/api/reviews/review-workflow';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -342,6 +344,57 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const displayedReviewAction = recheckingPreviousAction;
   const submission = pendingSubmissions[0];
   const nextSubmission = pendingSubmissions[1];
+  const session = typeof useOptionalSession === 'function' ? useOptionalSession()?.session : undefined;
+  const [resolvedAddress, setResolvedAddress] = useState<string>();
+
+  useEffect(() => {
+    if (!submission) {
+      setResolvedAddress(undefined);
+      return;
+    }
+
+    if (submission.location && submission.location !== 'Estimated GPS coordinates available') {
+      setResolvedAddress(submission.location.replace(/^[•\s,.-]+/, '').trim());
+      return;
+    }
+
+    const lat = submission.latitude;
+    const lon = submission.longitude;
+    if (lat == null || lon == null) {
+      setResolvedAddress(undefined);
+      return;
+    }
+
+    let isMounted = true;
+    void (async () => {
+      try {
+        const resolved = await resolveLocation(lat, lon, session?.accessToken);
+        if (isMounted && resolved) {
+          const formatted = (resolved.displayAddress || formatResolvedLocationTitle(resolved) || '')
+            .replace(/^[•\s,.-]+/, '')
+            .trim();
+          if (formatted) {
+            setResolvedAddress(formatted);
+          }
+        }
+      } catch {
+        // keep undefined
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [submission?.id, submission?.location, submission?.latitude, submission?.longitude, session?.accessToken]);
+
+  const displayLocation = useMemo(() => {
+    if (resolvedAddress) return resolvedAddress;
+    if (submission?.location && submission.location !== 'Estimated GPS coordinates available') {
+      return submission.location;
+    }
+    return '';
+  }, [resolvedAddress, submission?.location]);
+
   const totalInQueue = Math.max(
     totalSubmissions,
     reviewHistory.length + pendingSubmissions.length,
@@ -775,12 +828,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {submission.title}
               </Text>
               <Text numberOfLines={1} style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}>
-                {submission.captured}
-                {submission.location && submission.location !== 'Estimated GPS coordinates available'
-                  ? ` • ${submission.location}`
-                  : submission.location === 'Estimated GPS coordinates available'
-                    ? ' • Tọa độ GPS ước tính'
-                    : ''}
+                {[submission.captured, displayLocation].filter(Boolean).join(', ')}
               </Text>
             </View>
 

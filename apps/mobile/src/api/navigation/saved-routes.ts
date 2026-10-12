@@ -47,6 +47,17 @@ export async function getSavedRoutes(
   );
 }
 
+function sanitizeSavedRouteDto<T extends Partial<CreateSavedRouteDto>>(dto: T): T {
+  const sanitized = { ...dto };
+  if (sanitized.distanceMeters != null && !Number.isNaN(sanitized.distanceMeters)) {
+    sanitized.distanceMeters = Math.round(sanitized.distanceMeters);
+  }
+  if (sanitized.durationSeconds != null && !Number.isNaN(sanitized.durationSeconds)) {
+    sanitized.durationSeconds = Math.round(sanitized.durationSeconds);
+  }
+  return sanitized;
+}
+
 export async function createSavedRoute(
   dto: CreateSavedRouteDto,
   accessToken?: string,
@@ -54,7 +65,7 @@ export async function createSavedRoute(
 ): Promise<SavedRouteItem> {
   return jsonApiRequest<SavedRouteItem>(
     API_PATHS.SAVED_ROUTES,
-    dto,
+    sanitizeSavedRouteDto(dto),
     accessToken,
     signal,
     'POST',
@@ -69,7 +80,7 @@ export async function updateSavedRoute(
 ): Promise<SavedRouteItem> {
   return jsonApiRequest<SavedRouteItem>(
     `${API_PATHS.SAVED_ROUTES}/${id}`,
-    dto,
+    sanitizeSavedRouteDto(dto),
     accessToken,
     signal,
     'PATCH',

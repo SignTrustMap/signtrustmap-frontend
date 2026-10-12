@@ -33,6 +33,7 @@ import { categoryToCode, codeToCategory } from "@/types/savedRouteType";
 const AppLogo = require('@/assets/images/app-logo.png') as number;
 import { NavigationMapView } from "../components/navigation-map-view";
 import { getNavigationRoute, type NavigationStep, type RouteSign } from '@/api/navigation/navigation';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { confirmSignPresence } from '@/api/sign-map/sign-map';
@@ -193,6 +194,8 @@ export function NavigationMapScreen() {
     }
   }, [selectedDestination, userCoordinate]);
 
+  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
+
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
     : (savedRouteData && !fallbackCurrentLocation
@@ -204,10 +207,35 @@ export function NavigationMapScreen() {
       ? "Điểm xuất phát"
       : (savedRouteData
         ? savedRouteData.originName
-        : (plannedRouteOrigin ? "Vị trí hiện tại" : undefined)));
+        : (resolvedOriginTitle ?? (plannedRouteOrigin ? "Vị trí hiện tại" : undefined))));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const isMotorcycleMode = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
   const session = useOptionalSession()?.session;
+
+  useEffect(() => {
+    if (isCustomStart || startTitle || savedRouteData || !plannedRouteOrigin) {
+      return;
+    }
+
+    let isMounted = true;
+    const [lon, lat] = plannedRouteOrigin;
+
+    void (async () => {
+      try {
+        const resolved = await resolveLocation(lat, lon, session?.accessToken);
+        const title = formatResolvedLocationTitle(resolved);
+        if (isMounted && title) {
+          setResolvedOriginTitle(title);
+        }
+      } catch {
+        // keep fallback
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isCustomStart, startTitle, savedRouteData, plannedRouteOrigin, session?.accessToken]);
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     destinationId: string;
@@ -733,11 +761,34 @@ export function NavigationMapScreen() {
               ? 'MOTORCYCLE'
               : 'CAR';
 
+      // Resolve real origin name if it is currently "Vị trí hiện tại"
+      let effectiveOrigin = routeStartTitle || 'Điểm xuất phát';
+      if (effectiveOrigin === 'Vị trí hiện tại' && plannedRouteOrigin) {
+        try {
+          const resolved = await resolveLocation(
+            plannedRouteOrigin[1],
+            plannedRouteOrigin[0],
+            session?.accessToken,
+          );
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            effectiveOrigin = formatted;
+            setResolvedOriginTitle(formatted);
+          }
+        } catch {
+          // keep fallback
+        }
+      }
+
+      const finalTitle = trimmed.startsWith('Vị trí hiện tại ➔') && effectiveOrigin !== 'Vị trí hiện tại'
+        ? trimmed.replace('Vị trí hiện tại ➔', `${effectiveOrigin} ➔`)
+        : trimmed;
+
       if (activeSavedRouteId && savedRouteData) {
         await updateSavedRouteMutation.mutateAsync({
           id: activeSavedRouteId,
           dto: {
-            title: trimmed,
+            title: finalTitle,
             vehicleMode: targetVehicleMode,
             filterRules: {
               onlyFixedSigns: true,
@@ -751,17 +802,17 @@ export function NavigationMapScreen() {
         });
       } else {
         const created = await createSavedRouteMutation.mutateAsync({
-          title: trimmed,
+          title: finalTitle,
           vehicleMode: targetVehicleMode,
-          originName: routeStartTitle || 'Điểm xuất phát',
+          originName: effectiveOrigin,
           originLatitude: plannedRouteOrigin![1],
           originLongitude: plannedRouteOrigin![0],
           destinationName: selectedDestination!.title,
           destinationLatitude: selectedDestination!.coordinate[1],
           destinationLongitude: selectedDestination!.coordinate[0],
           encodedPolyline: polylineStr,
-          distanceMeters: routeDistance,
-          durationSeconds: routeDuration,
+          distanceMeters: routeDistance != null ? Math.round(routeDistance) : undefined,
+          durationSeconds: routeDuration != null ? Math.round(routeDuration) : undefined,
           filterRules: {
             onlyFixedSigns: true,
             categories: categoriesArray,
@@ -2671,29 +2722,6 @@ export function NavigationMapScreen() {
                   label={isStartingNavigation ? "Đang bắt đầu..." : "Bắt đầu lộ trình"}
                   onPress={handleGo}
                   style={[styles.goButton, styles.destinationActionButton]}
-                />
-                <AppButton
-                  accessibilityLabel={`Chia sẻ ${selectedDestination.title}`}
-                  label="Chia sẻ"
-                  onPress={async () => {
-                    try {
-                      const [longitude, latitude] = selectedDestination.coordinate;
-                      await Share.share({
-                        title: selectedDestination.title,
-                        message: `${selectedDestination.title}\nhttps://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
-                      });
-                    } catch {
-                      setLocationToast((current) => ({
-                        id: (current?.id ?? 0) + 1,
-                        message: CANNOT_SHARE_DESTINATION_MESSAGE,
-                      }));
-                    }
-                  }}
-                  style={[styles.destinationActionButton, {
-                    backgroundColor: theme.backgroundSelected, borderColor: 'transparent',
-                  }]}
-                  textStyle={{ color: theme.textSecondary }}
-                  variant="surface"
                 />
               </View>
             </>

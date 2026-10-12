@@ -26,6 +26,8 @@ import {
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions } from '@/feature/navigation/hooks/use-places';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { useOptionalSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 
 type SelectedPlace = {
@@ -38,6 +40,7 @@ type SelectedPlace = {
 export function SignFilterManager() {
   const theme = useTheme();
   const router = useRouter();
+  const session = useOptionalSession()?.session;
   const {
     activePresetId,
     createPreset,
@@ -139,13 +142,25 @@ export function SignFilterManager() {
     try {
       const pos = await fetchFreshGpsPosition(3500);
       if (pos) {
+        let resolvedTitle = 'Vị trí hiện tại';
+        let resolvedAddress = 'Tọa độ GPS thiết bị';
+        try {
+          const resolved = await resolveLocation(pos[1], pos[0], session?.accessToken);
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            resolvedTitle = formatted;
+            resolvedAddress = resolved?.displayAddress || resolvedAddress;
+          }
+        } catch {
+          // keep fallback
+        }
         setStartPoint({
-          title: 'Vị trí hiện tại',
-          address: 'Tọa độ GPS thiết bị',
+          title: resolvedTitle,
+          address: resolvedAddress,
           latitude: pos[1],
           longitude: pos[0],
         });
-        setStartQuery('Vị trí hiện tại');
+        setStartQuery(resolvedTitle);
         setIsStartFocused(false);
         setEditorError('');
       } else {
@@ -164,13 +179,25 @@ export function SignFilterManager() {
     try {
       const pos = await fetchFreshGpsPosition(3500);
       if (pos) {
+        let resolvedTitle = 'Vị trí hiện tại';
+        let resolvedAddress = 'Tọa độ GPS thiết bị';
+        try {
+          const resolved = await resolveLocation(pos[1], pos[0], session?.accessToken);
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            resolvedTitle = formatted;
+            resolvedAddress = resolved?.displayAddress || resolvedAddress;
+          }
+        } catch {
+          // keep fallback
+        }
         setDestPoint({
-          title: 'Vị trí hiện tại',
-          address: 'Tọa độ GPS thiết bị',
+          title: resolvedTitle,
+          address: resolvedAddress,
           latitude: pos[1],
           longitude: pos[0],
         });
-        setDestQuery('Vị trí hiện tại');
+        setDestQuery(resolvedTitle);
         setIsDestFocused(false);
         setEditorError('');
       } else {

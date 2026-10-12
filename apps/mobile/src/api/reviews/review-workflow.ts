@@ -11,6 +11,8 @@ export type ReviewSubmission = {
   remedySigns?: RemedySign[];
   surveyorId: string;
   title: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type ReviewDecision = {
@@ -59,15 +61,21 @@ function toSubmission(candidate: ReviewCandidate): ReviewSubmission {
   const cropUrl = resolveS3Url(candidate.signCropUrl);
   const frameUrl = resolveS3Url(candidate.bestFrameUrl);
   const imageSource = cropUrl ? { uri: cropUrl } : (frameUrl ? { uri: frameUrl } : undefined);
+  const lat = candidate.locationContext?.coordinates?.latitude ?? candidate.latitude ?? candidate.submission?.latitude ?? null;
+  const lon = candidate.locationContext?.coordinates?.longitude ?? candidate.longitude ?? candidate.submission?.longitude ?? null;
+  const locationText = candidate.locationContext?.displayLocation || candidate.locationContext?.nearbyRoad || '';
+
   return {
     captured: formatCaptured(candidate.submission?.createdAt ?? candidate.createdAt),
     id: candidate.id,
     image: imageSource,
-    location: 'Estimated GPS coordinates available',
+    location: locationText,
     predictedSignTypeId: type?.id,
     remedySigns: candidate.remedySigns,
     surveyorId: candidate.submission?.surveyorId ?? candidate.submissionId,
     title: type?.nameVi ? `${type.nameVi} (${type.signCode})` : (type?.nameEn || type?.signCode || 'Unidentified sign'),
+    latitude: lat,
+    longitude: lon,
   };
 }
 

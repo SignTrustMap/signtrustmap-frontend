@@ -109,3 +109,39 @@ export async function resolveLocation(
     return reverseGeocodeViaNominatim(latitude, longitude, signal);
   }
 }
+
+/**
+ * Formats a human-readable, concise title from a ResolvedLocation.
+ * Prioritizes roadName, then the most specific leading part of displayAddress,
+ * then commune + province.
+ */
+export function formatResolvedLocationTitle(
+  resolved: ResolvedLocation | null | undefined,
+): string | null {
+  if (!resolved) return null;
+  if (resolved.roadName && resolved.roadName.trim()) {
+    return resolved.roadName.trim();
+  }
+  if (resolved.displayAddress && resolved.displayAddress.trim()) {
+    const raw = resolved.displayAddress.trim();
+    const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+    const candidate = parts[0];
+    if (
+      candidate &&
+      candidate !== 'Không xác định' &&
+      candidate !== 'Việt Nam' &&
+      !/^\d+(\.\d+)?$/.test(candidate)
+    ) {
+      return candidate;
+    }
+    if (raw !== 'Không xác định, Việt Nam' && raw !== 'Việt Nam') {
+      return raw;
+    }
+  }
+  if (resolved.communeName && resolved.communeName.trim()) {
+    return resolved.provinceName && resolved.provinceName.trim()
+      ? `${resolved.communeName.trim()}, ${resolved.provinceName.trim()}`
+      : resolved.communeName.trim();
+  }
+  return null;
+}

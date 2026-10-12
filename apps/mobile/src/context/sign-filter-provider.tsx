@@ -24,6 +24,7 @@ import {
   type SavedRoute,
   type UpdateSavedRouteDto,
 } from '@/types/savedRouteType';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 
 export const SIGN_FILTER_STORAGE_KEY = 'stm_sign_filter_presets_v1';
 
@@ -155,11 +156,37 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
       categories: SignCategory[],
       options?: CreatePresetOptions
     ) => {
+      let effectiveOriginName = options?.originName || 'Điểm xuất phát';
+      if (
+        effectiveOriginName === 'Vị trí hiện tại' &&
+        options?.originLatitude != null &&
+        options?.originLongitude != null
+      ) {
+        try {
+          const resolved = await resolveLocation(
+            options.originLatitude,
+            options.originLongitude,
+            accessToken,
+          );
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            effectiveOriginName = formatted;
+          }
+        } catch {
+          // keep fallback
+        }
+      }
+
       const defaultRouteName =
-        options?.originName && options?.destinationName
-          ? `${options.originName} ➔ ${options.destinationName}`
+        effectiveOriginName && options?.destinationName
+          ? `${effectiveOriginName} ➔ ${options.destinationName}`
           : `Lộ trình ${presets.length + 1}`;
-      const trimmedName = name.trim() || defaultRouteName;
+      const rawTrimmed = name.trim();
+      const trimmedName = rawTrimmed
+        ? (rawTrimmed.startsWith('Vị trí hiện tại ➔') && effectiveOriginName !== 'Vị trí hiện tại'
+            ? rawTrimmed.replace('Vị trí hiện tại ➔', `${effectiveOriginName} ➔`)
+            : rawTrimmed)
+        : defaultRouteName;
       const onlyFixed = options?.onlyFixedSigns !== false;
       const cats: SignCategory[] = categories.length > 0 ? categories : ['MANDATORY'];
 
@@ -167,15 +194,15 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         const createDto: CreateSavedRouteDto = {
           title: trimmedName,
           vehicleMode: options?.vehicleMode || 'MOTORCYCLE',
-          originName: options?.originName || 'Điểm xuất phát',
+          originName: effectiveOriginName,
           originLatitude: options?.originLatitude ?? 10.7769,
           originLongitude: options?.originLongitude ?? 106.7009,
           destinationName: options?.destinationName || trimmedName,
           destinationLatitude: options?.destinationLatitude ?? 10.85,
           destinationLongitude: options?.destinationLongitude ?? 106.772,
           encodedPolyline: options?.encodedPolyline,
-          distanceMeters: options?.distanceMeters,
-          durationSeconds: options?.durationSeconds,
+          distanceMeters: options?.distanceMeters != null ? Math.round(options.distanceMeters) : undefined,
+          durationSeconds: options?.durationSeconds != null ? Math.round(options.durationSeconds) : undefined,
           filterRules: {
             onlyFixedSigns: onlyFixed,
             categories: cats.map(categoryToCode),
@@ -211,14 +238,14 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
                 userId: 'local',
                 title: trimmedName,
                 vehicleMode: options.vehicleMode || 'MOTORCYCLE',
-                originName: options.originName,
+                originName: effectiveOriginName,
                 originLatitude: options.originLatitude ?? 10.7769,
                 originLongitude: options.originLongitude ?? 106.7009,
                 destinationName: options.destinationName,
                 destinationLatitude: options.destinationLatitude ?? 10.85,
                 destinationLongitude: options.destinationLongitude ?? 106.772,
-                distanceMeters: options.distanceMeters ?? 0,
-                durationSeconds: options.durationSeconds ?? 0,
+                distanceMeters: options.distanceMeters != null ? Math.round(options.distanceMeters) : 0,
+                durationSeconds: options.durationSeconds != null ? Math.round(options.durationSeconds) : 0,
                 encodedPolyline: options.encodedPolyline ?? '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
