@@ -32,6 +32,7 @@ import { calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
 import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
 import { formatDate } from '@/utils/format-date';
+import { formatFreshnessScore } from '@/utils/freshness';
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -90,41 +91,7 @@ const openStreetMapStyle: StyleSpecification = {
 // ─── Sign callout tooltip & freshness ────────────────────────────────────────
 
 export function getSignFreshness(freshnessScore?: number | string | null, status?: string) {
-  if (status?.toUpperCase() === 'RETIRED') {
-    return {
-      scorePercent: 0,
-      color: '#EF4444',
-      label: '0%',
-    };
-  }
-
-  const num =
-    freshnessScore !== undefined && freshnessScore !== null && freshnessScore !== ''
-      ? Number(freshnessScore)
-      : undefined;
-  const rawScore = num !== undefined && !Number.isNaN(num) ? num : undefined;
-  const scorePercent =
-    rawScore !== undefined
-      ? rawScore <= 1
-        ? Math.round(rawScore * 100)
-        : Math.round(rawScore)
-      : undefined;
-
-  const displayScore = scorePercent ?? 55;
-
-  let color = '#EF4444'; // Red (< 50%)
-  if (displayScore >= 80) {
-    color = '#10B981'; // Green (>= 80%)
-  } else if (displayScore >= 50) {
-    color = '#EAB308'; // Yellow (50% - 79%)
-  }
-
-  return {
-    scorePercent: displayScore,
-    isDefined: scorePercent !== undefined,
-    color,
-    label: `${displayScore}%`,
-  };
+  return formatFreshnessScore(freshnessScore, status);
 }
 
 type SignCalloutProps = {
@@ -187,8 +154,9 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
           </Text>
 
           <View style={styles.calloutFreshnessRow}>
+            <View style={[styles.calloutFreshnessMiniDot, { backgroundColor: freshness.color }]} />
             <Text style={[styles.calloutFreshnessScore, { color: freshness.color }]}>
-              {freshness.scorePercent}% Độ tươi mới
+              {freshness.label}
             </Text>
           </View>
         </View>
@@ -353,7 +321,7 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
           <View style={styles.sheetFreshnessRow}>
             <View style={[styles.sheetFreshnessDot, { backgroundColor: freshness.color }]} />
             <Text style={[styles.sheetFreshnessText, { color: freshness.color }]}>
-              {freshness.scorePercent}% Độ tươi mới
+              {freshness.label}
             </Text>
             {sign.roadName ? (
               <>
