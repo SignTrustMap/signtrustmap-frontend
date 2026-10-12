@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -46,10 +46,17 @@ export function SignFilterManager() {
     createPreset,
     deletePreset,
     presets,
+    refetchPresets,
     renamePreset,
     setActivePresetId,
     updatePreset,
   } = useSignFilter();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchPresets();
+    }, [refetchPresets])
+  );
 
   // Create / Edit modal state
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
@@ -386,7 +393,7 @@ export function SignFilterManager() {
             <MaterialCommunityIcons color={theme.primary} name="filter-outline" size={22} />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
+            <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
             <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
               Hiển thị và cảnh báo cho tất cả danh mục biển báo
             </Text>

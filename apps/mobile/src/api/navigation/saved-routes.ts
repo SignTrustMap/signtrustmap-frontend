@@ -6,6 +6,7 @@ export interface SavedRouteItem {
   id: string;
   userId: string;
   name: string;
+  title?: string;
   originName: string;
   originLatitude: number;
   originLongitude: number;
@@ -40,11 +41,15 @@ export async function getSavedRoutes(
   accessToken?: string,
   signal?: AbortSignal,
 ): Promise<SavedRouteItem[]> {
-  return apiRequest<SavedRouteItem[]>(
+  const routes = await apiRequest<any[]>(
     API_PATHS.SAVED_ROUTES,
     { signal },
     accessToken,
   );
+  return (routes || []).map((r) => ({
+    ...r,
+    name: r.name || r.title || `${r.originName || 'Xuất phát'} ➔ ${r.destinationName || 'Điểm đến'}`,
+  }));
 }
 
 function sanitizeSavedRouteDto<T extends Partial<CreateSavedRouteDto>>(dto: T): T {

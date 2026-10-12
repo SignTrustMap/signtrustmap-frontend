@@ -25,6 +25,7 @@ import {
   type UpdateSavedRouteDto,
 } from '@/types/savedRouteType';
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { queryClient } from '@/api/query-client';
 
 export const SIGN_FILTER_STORAGE_KEY = 'stm_sign_filter_presets_v1';
 
@@ -221,6 +222,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
 
         setPresets((prev) => [newPreset, ...prev.filter((p) => p.id !== newPreset.id)]);
         setActivePresetIdState(newPreset.id);
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
         return newPreset;
       }
 
@@ -295,6 +297,9 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
               : p
           )
         );
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route', id] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route-signs', id] });
         return;
       }
 
@@ -331,6 +336,9 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.error('Failed to delete saved route from backend:', err);
         }
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route', id] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route-signs', id] });
       }
 
       setPresets((prev) => prev.filter((p) => p.id !== id));
@@ -340,6 +348,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
   );
 
   const refetchPresets = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
     await loadSavedRoutesFromBackend();
   }, [loadSavedRoutesFromBackend]);
 
@@ -353,7 +362,10 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
     return new Set(activePreset.categories);
   }, [activePreset]);
 
-  const activeOnlyFixedSigns = false;
+  const activeOnlyFixedSigns = useMemo(() => {
+    if (!activePreset) return false;
+    return activePreset.onlyFixedSigns !== false;
+  }, [activePreset]);
 
   return (
     <SignFilterContext.Provider

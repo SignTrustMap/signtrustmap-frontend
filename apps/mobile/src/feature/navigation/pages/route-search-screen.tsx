@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,12 +43,19 @@ export function RouteSearchScreen() {
     [startLat, startLng],
   );
   const routeStart = coordinateStart;
-  const { savedRoutes } = useSavedRoutes();
+  const { savedRoutes, refetch: refetchSavedRoutes } = useSavedRoutes();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchSavedRoutes();
+    }, [refetchSavedRoutes])
+  );
 
   const handleSelectSavedRoute = (saved: SavedRouteItem) => {
     router.replace({
       pathname: '/home',
       params: {
+        savedRouteId: saved.id,
         destinationLat: String(saved.destinationLatitude),
         destinationLng: String(saved.destinationLongitude),
         destinationSubtitle: saved.destinationName,
@@ -156,33 +163,36 @@ export function RouteSearchScreen() {
             <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
               TUYẾN ĐƯỜNG YÊU THÍCH (WISHLIST)
             </Text>
-            {savedRoutes.map((saved) => (
-              <AppButton
-                accessibilityLabel={saved.name}
-                key={saved.id}
-                onPress={() => handleSelectSavedRoute(saved)}
-                pressedOpacity={0.72}
-                style={[styles.locationRow, { borderColor: theme.border }]}
-                variant="ghost"
-              >
-                <View style={[styles.recentIconCircle, { backgroundColor: '#0671EB15' }]}>
-                  <AntDesign color="#F59E0B" name="star" size={17} />
-                </View>
-                <View style={styles.locationCopy}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.locationTitle, { color: theme.text }]}>{saved.name}</Text>
-                    <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
-                        {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
-                      </Text>
-                    </View>
+            {savedRoutes.map((saved) => {
+              const displayName = saved.name || (saved as any).title || `${saved.originName} ➔ ${saved.destinationName}`;
+              return (
+                <AppButton
+                  accessibilityLabel={displayName}
+                  key={saved.id}
+                  onPress={() => handleSelectSavedRoute(saved)}
+                  pressedOpacity={0.72}
+                  style={[styles.locationRow, { borderColor: theme.border }]}
+                  variant="ghost"
+                >
+                  <View style={[styles.recentIconCircle, { backgroundColor: '#0671EB15' }]}>
+                    <AntDesign color="#F59E0B" name="star" size={17} />
                   </View>
-                  <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
-                    {saved.originName} ➔ {saved.destinationName}
-                  </Text>
-                </View>
-              </AppButton>
-            ))}
+                  <View style={styles.locationCopy}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.locationTitle, { color: theme.text }]}>{displayName}</Text>
+                      <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
+                          {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+                      {saved.originName} ➔ {saved.destinationName}
+                    </Text>
+                  </View>
+                </AppButton>
+              );
+            })}
           </>
         ) : null}
 

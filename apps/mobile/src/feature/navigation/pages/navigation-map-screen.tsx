@@ -598,6 +598,7 @@ export function NavigationMapScreen() {
     activePreset,
     activePresetId,
     presets,
+    refetchPresets,
     setActivePresetId,
   } = useSignFilter();
 
@@ -796,6 +797,7 @@ export function NavigationMapScreen() {
             },
           },
         });
+        await refetchPresets();
         setLocationToast({
           id: Date.now(),
           message: 'Đã cập nhật lộ trình đã lưu!',
@@ -818,6 +820,7 @@ export function NavigationMapScreen() {
             categories: categoriesArray,
           },
         });
+        await refetchPresets();
         setActiveSavedRouteId(created.id);
         void setActivePresetId(created.id);
         setLocationToast({
@@ -847,6 +850,7 @@ export function NavigationMapScreen() {
     routeDistance,
     routeDuration,
     setActivePresetId,
+    refetchPresets,
   ]);
   const maneuverProgresses = useMemo(
     () =>
@@ -2446,7 +2450,7 @@ export function NavigationMapScreen() {
                         </View>
                         <View style={styles.signCatInfo}>
                           <View style={styles.signCatTitleRow}>
-                            <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
                               Tất cả biển báo (Không lọc)
                             </Text>
                             <View style={[styles.signCountBadge, { backgroundColor: theme.primary }]}>
@@ -2499,7 +2503,7 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={styles.signCatInfo}>
                               <View style={styles.signCatTitleRow}>
-                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
                                   {preset.savedRoute?.originName && preset.savedRoute?.destinationName
                                     ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
                                     : preset.name}
@@ -2615,7 +2619,7 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={styles.signCatInfo}>
                               <View style={styles.signCatTitleRow}>
-                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
                                   {cat.label}
                                 </Text>
                                 <View
@@ -2660,7 +2664,12 @@ export function NavigationMapScreen() {
 
               {/* Start button and Save route button — hidden during active navigation */}
               {!isNavigating ? (
-                <View style={styles.sheetBottomButtonRow}>
+                <View
+                  style={[
+                    styles.sheetBottomButtonRow,
+                    { borderTopColor: theme.border },
+                  ]}
+                >
                   <AppButton
                     accessibilityLabel={
                       isStartingNavigation
@@ -3686,6 +3695,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: Spacing.one,
     flexWrap: 'wrap',
+    paddingLeft: Spacing.two,
   },
   headerTimeDistanceGroup: {
     flexDirection: 'row',
@@ -3818,21 +3828,31 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   signCatInfo: {
     flex: 1,
     minWidth: 0,
+    overflow: 'hidden',
   },
   signCatTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    gap: Spacing.one,
     marginBottom: 2,
   },
   signCatLabel: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: Fonts.body,
     fontSize: 15,
     fontWeight: '800',
+    paddingRight: Spacing.half,
   },
   signCatSublabel: {
     fontFamily: Fonts.body,
@@ -3840,6 +3860,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   signCountBadge: {
+    flexShrink: 0,
     paddingHorizontal: Spacing.one,
     paddingVertical: 1,
     borderRadius: Rounded.round,
@@ -3859,8 +3880,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   sheetBottomButtonRow: {
+    borderTopWidth: 1,
     paddingTop: Spacing.two,
     marginTop: 'auto',
     flexDirection: 'row',
