@@ -21,7 +21,7 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { useOptionalSession } from "@/context/session-provider";
 import { useNavigationActive } from "@/context/navigation-active-provider";
-import { useSignFilter } from "@/context/sign-filter-provider";
+import { useSignFilter, type SignFilterPreset } from "@/context/sign-filter-provider";
 import {
   useCreateSavedRoute,
   useGetSavedRoute,
@@ -559,9 +559,10 @@ export function NavigationMapScreen() {
     return () => setNavigationActive(false);
   }, [isNavigating, setNavigationActive]);
 
-  // Automatically reduce the bottom sheet to peek range (vehicle mode, ETA & distance) when navigating
+  // Automatically reduce the bottom sheet to peek range and switch to manual categories when navigating
   useEffect(() => {
     if (isNavigating) {
+      setFilterViewMode('categories');
       snapTo(0);
     }
   }, [isNavigating, snapTo]);
@@ -663,6 +664,86 @@ export function NavigationMapScreen() {
     }
   }, [presets, setActivePresetId]);
 
+  const isPresetMatchingCurrentRoute = useCallback(
+    (preset: SignFilterPreset): boolean => {
+      if (!plannedRouteOrigin || !selectedDestination) return false;
+
+      // 1. Direct ID match if loaded from saved route or just created
+      if (
+        activeSavedRouteId &&
+        (preset.id === activeSavedRouteId || preset.savedRoute?.id === activeSavedRouteId)
+      ) {
+        return true;
+      }
+      if (
+        savedRouteData?.id &&
+        (preset.id === savedRouteData.id || preset.savedRoute?.id === savedRouteData.id)
+      ) {
+        return true;
+      }
+
+      const sr = preset.savedRoute;
+      if (!sr) return false;
+
+      // 2. Coordinate proximity check (within ~300 meters, ~0.003 deg)
+      const [currOriginLng, currOriginLat] = plannedRouteOrigin;
+      const [currDestLng, currDestLat] = selectedDestination.coordinate;
+
+      const originDiff =
+        Math.abs(sr.originLatitude - currOriginLat) +
+        Math.abs(sr.originLongitude - currOriginLng);
+      const destDiff =
+        Math.abs(sr.destinationLatitude - currDestLat) +
+        Math.abs(sr.destinationLongitude - currDestLng);
+
+      if (originDiff < 0.003 && destDiff < 0.003) {
+        return true;
+      }
+
+      // 3. Name matching fallback
+      const norm = (s?: string) =>
+        (s || '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[,\-–—.]/g, ' ')
+          .replace(/\s+/g, ' ');
+
+      const srOrigin = norm(sr.originName);
+      const srDest = norm(sr.destinationName);
+      const currOrigin = norm(routeStartTitle);
+      const currDest = norm(selectedDestination.title);
+
+      if (
+        srOrigin.length > 2 &&
+        srDest.length > 2 &&
+        currOrigin.length > 2 &&
+        currDest.length > 2 &&
+        (srOrigin === currOrigin || currOrigin.includes(srOrigin) || srOrigin.includes(currOrigin)) &&
+        (srDest === currDest || currDest.includes(srDest) || srDest.includes(currDest))
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [plannedRouteOrigin, selectedDestination, activeSavedRouteId, savedRouteData, routeStartTitle]
+  );
+
+  const routeMatchingPresets = useMemo(() => {
+    return presets.filter(isPresetMatchingCurrentRoute);
+  }, [presets, isPresetMatchingCurrentRoute]);
+
+  useEffect(() => {
+    if (activePresetId && plannedRouteOrigin && selectedDestination) {
+      const isMatching = routeMatchingPresets.some((p) => p.id === activePresetId);
+      if (!isMatching) {
+        void setActivePresetId(null);
+      }
+    }
+  }, [activePresetId, plannedRouteOrigin, selectedDestination, routeMatchingPresets, setActivePresetId]);
+
   const handleLivestreamPress = useCallback(async () => {
     // Request camera permission
     const cameraResult = await Camera.requestCameraPermissionsAsync();
@@ -675,7 +756,12 @@ export function NavigationMapScreen() {
   }, [router]);
 
   const filteredSigns = useMemo(() => {
-    if (filterViewMode === 'categories') {
+    const isCategoriesActive =
+      isNavigating ||
+      filterViewMode === 'categories' ||
+      routeMatchingPresets.length === 0;
+
+    if (isCategoriesActive) {
       if (manualCategories.size === SIGN_CATEGORIES.length) {
         return visibleSigns;
       }
@@ -693,7 +779,15 @@ export function NavigationMapScreen() {
       const cat = getSignCategory(sign);
       return activeCategories.has(cat);
     });
-  }, [filterViewMode, manualCategories, visibleSigns, activeCategories, activePresetId]);
+  }, [
+    isNavigating,
+    filterViewMode,
+    routeMatchingPresets.length,
+    manualCategories,
+    visibleSigns,
+    activeCategories,
+    activePresetId,
+  ]);
 
   const createSavedRouteMutation = useCreateSavedRoute();
   const updateSavedRouteMutation = useUpdateSavedRoute();
@@ -1164,6 +1258,10 @@ export function NavigationMapScreen() {
         destinationId: selectedDestination.id,
         vehicleMode,
       });
+      setFilterViewMode('categories');
+      if (activeCategories && activeCategories.size > 0 && activePresetId !== null) {
+        setManualCategories(new Set(activeCategories));
+      }
     } catch (error) {
       console.error("[GPS] Failed to begin navigation:", error);
       setNavigationError(GPS_UNAVAILABLE_MESSAGE);
@@ -1497,82 +1595,68 @@ export function NavigationMapScreen() {
           </Pressable>
         ) : null}
 
-        {/* Floating Quick-Preset Bar during active navigation (Driver-friendly UX) */}
-        {isNavigating && presets.length > 0 ? (
-          <View
-            style={[
-              styles.navDrivingFilterContainer,
-              { bottom: 158 + bottomInset },
+        {/* Floating Sign Filter button during navigation */}
+        {isNavigating ? (
+          <Pressable
+            accessibilityLabel="Bộ lọc biển báo"
+            accessibilityRole="button"
+            onPress={() => {
+              setFilterViewMode('categories');
+              const nextSnap = snapIndexRef.current === 0 ? 1 : 0;
+              snapTo(nextSnap);
+            }}
+            style={({ pressed }) => [
+              styles.navFilterButton,
+              {
+                backgroundColor:
+                  manualCategories.size < SIGN_CATEGORIES.length
+                    ? theme.backgroundSelected
+                    : theme.backgroundElement,
+                borderColor:
+                  manualCategories.size < SIGN_CATEGORIES.length
+                    ? theme.primary
+                    : theme.border,
+                bottom: 108 + bottomInset,
+                opacity: pressed ? 0.75 : 1,
+              },
             ]}
           >
-            <ScrollView
-              contentContainerStyle={styles.navDrivingFilterScrollContent}
-              horizontal
-              showsHorizontalScrollIndicator={false}
+            <MaterialCommunityIcons
+              name="filter-variant"
+              size={16}
+              color={
+                manualCategories.size < SIGN_CATEGORIES.length
+                  ? theme.primary
+                  : theme.text
+              }
+            />
+            <Text
+              style={[
+                styles.navRecenterText,
+                {
+                  color:
+                    manualCategories.size < SIGN_CATEGORIES.length
+                      ? theme.primary
+                      : theme.text,
+                },
+              ]}
             >
-              <Pressable
-                accessibilityLabel={`Tất cả biển báo, không lọc, ${activePresetId === null ? 'đang chọn' : 'nhấn để chọn'}`}
-                accessibilityRole="button"
-                onPress={() => void setActivePresetId(null)}
-                style={({ pressed }) => [
-                  styles.navDrivingChip,
+              Bộ lọc
+            </Text>
+            {manualCategories.size < SIGN_CATEGORIES.length ? (
+              <View
+                style={[
+                  styles.filterActiveBadge,
                   {
-                    backgroundColor:
-                      activePresetId === null ? theme.primary : theme.backgroundElement,
-                    borderColor: activePresetId === null ? theme.primary : theme.border,
-                    opacity: pressed ? 0.75 : 1,
+                    backgroundColor: theme.primary,
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
                   },
                 ]}
-              >
-                <MaterialCommunityIcons
-                  color={activePresetId === null ? theme.onPrimary : theme.text}
-                  name={activePresetId === null ? 'check' : 'filter-variant'}
-                  size={16}
-                />
-                <Text
-                  style={[
-                    styles.navDrivingChipText,
-                    { color: activePresetId === null ? theme.onPrimary : theme.text },
-                  ]}
-                >
-                  Tất cả biển báo
-                </Text>
-              </Pressable>
-
-              {presets.map((preset) => {
-                const isActive = activePresetId === preset.id;
-                return (
-                  <Pressable
-                    accessibilityLabel={`Bộ lọc ${preset.name}, ${isActive ? 'đang chọn' : 'nhấn để chọn'}`}
-                    accessibilityRole="button"
-                    key={preset.id}
-                    onPress={() => void setActivePresetId(preset.id)}
-                    style={({ pressed }) => [
-                      styles.navDrivingChip,
-                      {
-                        backgroundColor: isActive ? theme.primary : theme.backgroundElement,
-                        borderColor: isActive ? theme.primary : theme.border,
-                        opacity: pressed ? 0.75 : 1,
-                      },
-                    ]}
-                  >
-                    {isActive ? (
-                      <MaterialCommunityIcons color={theme.onPrimary} name="check" size={16} />
-                    ) : null}
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.navDrivingChipText,
-                        { color: isActive ? theme.onPrimary : theme.text },
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
+              />
+            ) : null}
+          </Pressable>
         ) : null}
 
         {!isNavigating ? (
@@ -2004,75 +2088,7 @@ export function NavigationMapScreen() {
         ) : null}
       </View>
 
-      {/* Quick Filter Chip Bar for Drivers while Navigating */}
-      {isNavigating && presets.length > 0 ? (
-        <View style={[styles.navDrivingFilterContainer, { bottom: insets.bottom + 90 }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.navDrivingFilterScrollContent}
-          >
-            <Pressable
-              accessibilityLabel="Lọc khi lái xe: Tất cả biển báo"
-              onPress={() => handleSelectPreset(null)}
-              style={({ pressed }) => [
-                styles.navDrivingChip,
-                {
-                  backgroundColor: activePresetId === null ? theme.primary : theme.backgroundElement,
-                  borderColor: activePresetId === null ? theme.primary : theme.border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="filter-outline"
-                size={16}
-                color={activePresetId === null ? '#FFFFFF' : theme.primary}
-              />
-              <Text
-                style={[
-                  styles.navDrivingChipText,
-                  { color: activePresetId === null ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                Tất cả
-              </Text>
-            </Pressable>
-            {presets.map((preset) => {
-              const isSelected = activePresetId === preset.id;
-              return (
-                <Pressable
-                  key={preset.id}
-                  accessibilityLabel={`Lọc khi lái xe: ${preset.name}`}
-                  onPress={() => handleSelectPreset(preset.id)}
-                  style={({ pressed }) => [
-                    styles.navDrivingChip,
-                    {
-                      backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
-                      borderColor: isSelected ? theme.primary : theme.border,
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="playlist-check"
-                    size={16}
-                    color={isSelected ? '#FFFFFF' : theme.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.navDrivingChipText,
-                      { color: isSelected ? '#FFFFFF' : theme.text },
-                    ]}
-                  >
-                    {preset.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
+
 
       {selectedDestination ? (
         <Animated.View
@@ -2173,6 +2189,7 @@ export function NavigationMapScreen() {
                     accessibilityLabel="Tùy chọn lộ trình"
                     accessibilityRole="button"
                     onPress={() => {
+                      setFilterViewMode('categories');
                       const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
                       snapTo(nextIndex);
                     }}
@@ -2247,8 +2264,8 @@ export function NavigationMapScreen() {
                 </View>
               )}
 
-              {/* Vehicle picker: visible in preview, and in navigation mode when expanded (snap index > 0) */}
-              {!isNavigating || sheetSnapIndex > 0 ? (
+              {/* Vehicle picker: visible in preview, hidden during active navigation */}
+              {!isNavigating ? (
                 <View style={[styles.vehicleTabsContainer, { borderBottomColor: theme.border }]}>
                   <ScrollView
                     contentContainerStyle={styles.vehicleTabsScroll}
@@ -2400,25 +2417,49 @@ export function NavigationMapScreen() {
                   <View style={styles.signFilterTitleGroup}>
                     <View style={[styles.signFilterTotalBadge]}>
                       <Text style={[styles.signFilterTotalText, { color: theme.text }]}>
-                        {/* {filteredSigns.length}/{visibleSigns.length} biển báo đang hiển thị */}
-                        {filteredSigns.length === 0 && visibleSigns.length === 0 ? 'Không có biển báo thỏa điều kiện' : `${filteredSigns.length}/${visibleSigns.length} biển báo đang hiển thị`}
+                        {filteredSigns.length === 0 && visibleSigns.length === 0
+                          ? 'Không có biển báo thỏa điều kiện'
+                          : `${filteredSigns.length}/${visibleSigns.length} biển báo đang hiển thị`}
                       </Text>
                     </View>
                   </View>
-                  <AppButton
-                    accessibilityLabel={
-                      filterViewMode === 'lists'
-                        ? 'Chuyển sang lọc theo danh mục'
-                        : 'Chuyển sang danh sách lọc'
-                    }
-                    onPress={handleToggleFilterViewMode}
-                    style={styles.toggleAllButton}
-                    variant="ghost"
-                  >
-                    <Text style={[styles.toggleAllText, { color: theme.primary }]}>
-                      {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
-                    </Text>
-                  </AppButton>
+                  {!isNavigating && routeMatchingPresets.length > 0 ? (
+                    <AppButton
+                      accessibilityLabel={
+                        filterViewMode === 'lists'
+                          ? 'Chuyển sang lọc theo danh mục'
+                          : 'Chuyển sang danh sách lọc'
+                      }
+                      onPress={handleToggleFilterViewMode}
+                      style={styles.toggleAllButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                        {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
+                      </Text>
+                    </AppButton>
+                  ) : (
+                    <AppButton
+                      accessibilityLabel={
+                        manualCategories.size === SIGN_CATEGORIES.length
+                          ? 'Bỏ chọn tất cả danh mục'
+                          : 'Chọn tất cả danh mục'
+                      }
+                      onPress={() => {
+                        if (manualCategories.size === SIGN_CATEGORIES.length) {
+                          setManualCategories(new Set());
+                        } else {
+                          setManualCategories(new Set(SIGN_CATEGORIES.map((c) => c.id)));
+                        }
+                      }}
+                      style={styles.toggleAllButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                        {manualCategories.size === SIGN_CATEGORIES.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                      </Text>
+                    </AppButton>
+                  )}
                 </View>
 
                 <ScrollView
@@ -2427,7 +2468,7 @@ export function NavigationMapScreen() {
                   showsVerticalScrollIndicator
                   style={styles.signFilterScrollView}
                 >
-                  {filterViewMode === 'lists' ? (
+                  {!isNavigating && filterViewMode === 'lists' && routeMatchingPresets.length > 0 ? (
                     <>
                       {/* Option 1: All signs (No filter) */}
                       <Pressable
@@ -2474,8 +2515,8 @@ export function NavigationMapScreen() {
                         </View>
                       </Pressable>
 
-                      {/* User presets */}
-                      {presets.map((preset) => {
+                      {/* User presets matching current route */}
+                      {routeMatchingPresets.map((preset) => {
                         const isSelected = activePresetId === preset.id;
                         const matchingCount = visibleSigns.filter((s) =>
                           preset.categories.includes(getSignCategory(s))
@@ -2543,50 +2584,6 @@ export function NavigationMapScreen() {
                           </Pressable>
                         );
                       })}
-
-                      {presets.length === 0 ? (
-                        <View style={styles.sheetFilterEmptyContainer}>
-                          <Text style={[styles.sheetFilterEmptyText, { color: theme.placeholder }]}>
-                            Chưa có danh sách bộ lọc tùy chỉnh nào.
-                          </Text>
-                          <AppButton
-                            accessibilityLabel="Tạo danh sách lọc trong Cá nhân"
-                            onPress={() =>
-                              router.push({
-                                pathname: '/(authenticated)/(tabs)/profile',
-                                params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                              })
-                            }
-                            style={styles.sheetFilterCreateBtn}
-                            variant="surface"
-                          >
-                            <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
-                            <Text style={[styles.sheetFilterCreateBtnText, { color: theme.primary }]}>
-                              Tạo danh sách trong Cá nhân
-                            </Text>
-                          </AppButton>
-                        </View>
-                      ) : null}
-
-                      {/* Manage underline text under the list */}
-                      <Pressable
-                        accessibilityLabel="Quản lý danh sách lọc trong Cá nhân"
-                        accessibilityRole="link"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/(authenticated)/(tabs)/profile',
-                            params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.sheetFilterManageRow,
-                          { opacity: pressed ? 0.6 : 1 },
-                        ]}
-                      >
-                        <Text style={[styles.sheetFilterManageText, { color: theme.primary }]}>
-                          Quản lý
-                        </Text>
-                      </Pressable>
                     </>
                   ) : (
                     /* Categories view: directly filter sign categories without creating a list */
@@ -3958,6 +3955,23 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 900,
+  },
+  navFilterButton: {
+    position: 'absolute',
+    right: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
   },
   navDrivingFilterContainer: {
     position: 'absolute',
