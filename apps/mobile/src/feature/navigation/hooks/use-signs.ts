@@ -6,6 +6,7 @@ import {
 } from '@/api/sign-map/sign-map';
 import type { MapCoordinate, NearbySignsQuery, VehicleMode } from '@/types/navigationType';
 import type { FindSignsInBoundsParams, RoutePointDto } from '@/types/signMapType';
+import { resolveRoutingModeAndType } from '@/api/navigation/navigation';
 import { toRouteSign } from '../utils/signs';
 
 export function isRealWorldBounds(bounds: FindSignsInBoundsParams | undefined): boolean {
@@ -45,7 +46,7 @@ export function useGetSignsAlongRoute(
   vehicleMode: VehicleMode["id"] = "DRIVING",
   enabledCategoryCodes?: string[],
 ) {
-  const vehicleType = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE' ? 'MOTORCYCLE' : 'CAR';
+  const { vehicleType } = resolveRoutingModeAndType(vehicleMode);
   return useQuery({
     queryKey: ['signs-along-route', start, destination, geometry, vehicleType, enabledCategoryCodes],
     queryFn: start && destination && geometry && geometry.length >= 2

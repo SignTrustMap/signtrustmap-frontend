@@ -99,6 +99,11 @@ jest.mock('@/context/session-provider', () => ({
     currentRole: 'reviewer',
     switchRole: jest.fn(),
   }),
+  useOptionalSession: () => ({
+    session: mockSession,
+    currentRole: 'reviewer',
+    switchRole: jest.fn(),
+  }),
 }));
 
 const mockInvalidateWalletAndStats = jest.fn();

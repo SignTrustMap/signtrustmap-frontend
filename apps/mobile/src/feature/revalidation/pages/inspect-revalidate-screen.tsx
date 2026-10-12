@@ -44,6 +44,7 @@ import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
+import { formatFreshnessScore } from '@/utils/freshness';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -206,7 +207,7 @@ export function InspectRevalidateScreen() {
       ? Math.round(rawScore * 100)
       : Math.round(rawScore)
     : 65;
-  const freshnessStyle = getFreshnessStyle(freshnessScore);
+  const freshnessInfo = formatFreshnessScore(freshnessScore);
   const roadName = params.roadName || params.displayAddress || 'Tuyến đường hiện tại';
 
   // Media selection & GPS state
@@ -763,23 +764,23 @@ export function InspectRevalidateScreen() {
                   style={[
                     styles.freshnessBadge,
                     {
-                      backgroundColor: freshnessStyle.bg,
-                      borderColor: freshnessStyle.border,
+                      backgroundColor: freshnessInfo.badgeBg,
+                      borderColor: freshnessInfo.badgeBorder,
                     },
                   ]}
                 >
                   <MaterialCommunityIcons
-                    color={freshnessStyle.text}
-                    name={freshnessStyle.icon}
+                    color={freshnessInfo.color}
+                    name={freshnessInfo.icon as any}
                     size={12}
                   />
                   <Text
                     style={[
                       styles.freshnessBadgeText,
-                      { color: freshnessStyle.text },
+                      { color: freshnessInfo.color },
                     ]}
                   >
-                    {freshnessScore}% Độ tươi mới
+                    {freshnessInfo.label}
                   </Text>
                 </View>
               </View>

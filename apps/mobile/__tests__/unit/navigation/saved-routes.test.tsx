@@ -125,6 +125,35 @@ describe('Saved Routes API & Utilities', () => {
       expect(res.id).toBe('created-id');
     });
 
+    it('rounds float distanceMeters and durationSeconds in createSavedRoute', async () => {
+      const dto = {
+        title: 'Float Route',
+        originName: 'A',
+        originLatitude: 10,
+        originLongitude: 106,
+        destinationName: 'B',
+        destinationLatitude: 11,
+        destinationLongitude: 107,
+        distanceMeters: 7548.8,
+        durationSeconds: 585.6,
+      };
+      (apiClient.jsonApiRequest as jest.Mock).mockResolvedValueOnce({ id: 'created-float' });
+
+      await createSavedRoute(dto, 'token-abc');
+
+      expect(apiClient.jsonApiRequest).toHaveBeenCalledWith(
+        '/saved-routes',
+        {
+          ...dto,
+          distanceMeters: 7549,
+          durationSeconds: 586,
+        },
+        'token-abc',
+        undefined,
+        'POST'
+      );
+    });
+
     it('calls updateSavedRoute with payload and route ID', async () => {
       const updateDto = {
         title: 'Updated Title',
