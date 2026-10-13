@@ -20,13 +20,25 @@ import { useSubmitRecaptureMutation } from '@/feature/review/hooks/use-recapture
 import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
+import type { RecaptureReason } from '@/types/reviewsType';
 
 interface SelectedPhoto {
   uri: string;
   fileName?: string;
   mimeType?: string;
   gps?: { latitude: number; longitude: number };
+  source: 'camera' | 'library';
+  hasExifGps: boolean;
 }
+
+const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  BLURRY: { label: 'Ảnh mờ / rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
+  POOR_LIGHTING: { label: 'Thiếu sáng / ngược sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  WRONG_ANGLE: { label: 'Góc chụp nghiêng / lệch', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
+  MISSING_CONTEXT: { label: 'Thiếu góc toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
+  OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
+};
 
 export function RecaptureCameraScreen() {
   const router = useRouter();
@@ -50,13 +62,7 @@ export function RecaptureCameraScreen() {
   const oldSignCropUrl = resolveS3Url(params.oldSignCropUrl);
 
   const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
-  const [isGpsLoading, setIsGpsLoading] = useState(true);
-
-  // Ảnh chính (Ảnh thực địa / Best Frame)
-  const [mainPhoto, setMainPhoto] = useState<SelectedPhoto | null>(null);
-  // Ảnh cận cảnh riêng biệt (Tùy chọn, nếu không chụp riêng thì hệ thống dùng mainPhoto)
-  const [customCropPhoto, setCustomCropPhoto] = useState<SelectedPhoto | null>(null);
-  const [isCustomCropVisible, setIsCustomCropVisible] = useState(false);
+  const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
 
   const submitMutation = useSubmitRecaptureMutation();
 
@@ -65,9 +71,8 @@ export function RecaptureCameraScreen() {
     let isMounted = true;
     async function updateGps() {
       const pos = await fetchFreshGpsPosition(4000);
-      if (isMounted) {
-        setIsGpsLoading(false);
-        if (pos) setCurrentPosition(pos);
+      if (isMounted && pos) {
+        setCurrentPosition(pos);
       }
     }
     void updateGps();
@@ -78,18 +83,18 @@ export function RecaptureCameraScreen() {
     };
   }, []);
 
-  // Toạ độ hiệu lực: Ưu tiên GPS từ metadata của ảnh; nếu ảnh không có metadata GPS thì dùng GPS thiết bị
+  // Toạ độ hiệu lực: Ưu tiên GPS từ metadata EXIF của ảnh; nếu ảnh không có metadata GPS thì dùng GPS thiết bị
   const effectiveCoords: { latitude: number; longitude: number } | null = useMemo(() => {
-    if (mainPhoto?.gps) {
-      return mainPhoto.gps;
+    if (photo?.gps) {
+      return photo.gps;
     }
     if (currentPosition) {
       return { latitude: currentPosition[1], longitude: currentPosition[0] };
     }
     return null;
-  }, [mainPhoto?.gps, currentPosition]);
+  }, [photo?.gps, currentPosition]);
 
-  // Khoảng cách tới biển báo
+  // Khoảng cách tới vị trí biển báo gốc
   const distanceMeters = useMemo(() => {
     if (!effectiveCoords || Number.isNaN(targetLat) || Number.isNaN(targetLon)) {
       return null;
@@ -102,81 +107,88 @@ export function RecaptureCameraScreen() {
 
   const isWithinGeofence = distanceMeters != null && distanceMeters <= 100;
 
-  // Xử lý chọn ảnh (Camera hoặc Thư viện)
-  const handlePickPhoto = async (target: 'main' | 'crop', source: 'camera' | 'library') => {
+  // 1. Chụp ảnh trực tiếp tại hiện trường (tự động gắn GPS thiết bị)
+  const handleLaunchCamera = async () => {
     try {
       const ImagePicker = await import('expo-image-picker');
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Cần quyền máy ảnh', 'Vui lòng cấp quyền truy cập máy ảnh để chụp lại biển báo.');
+        return;
+      }
 
-      if (source === 'camera') {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) {
-          Alert.alert('Cần quyền máy ảnh', 'Vui lòng cấp quyền truy cập máy ảnh để chụp lại biển báo.');
-          return;
-        }
-        const result = await ImagePicker.launchCameraAsync({
-          quality: 0.9,
-          allowsEditing: false,
-          exif: true,
-        });
-        if (!result.canceled && result.assets[0]) {
-          const a = result.assets[0];
-          // Trích xuất GPS từ EXIF hoặc fallback dùng GPS máy
-          const photoGps =
-            extractImageGpsCoordinates(a.exif) ||
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.9,
+        allowsEditing: false,
+        exif: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const a = result.assets[0];
+        // Lấy GPS tươi từ thiết bị tại thời điểm chụp
+        const freshGps = await fetchFreshGpsPosition(3000);
+        const photoGps = freshGps
+          ? { latitude: freshGps[1], longitude: freshGps[0] }
+          : extractImageGpsCoordinates(a.exif) ||
             (currentPosition ? { latitude: currentPosition[1], longitude: currentPosition[0] } : undefined);
 
-          const photo: SelectedPhoto = {
-            uri: a.uri,
-            fileName: a.fileName || `${target}-${Date.now()}.jpg`,
-            mimeType: a.mimeType || 'image/jpeg',
-            gps: photoGps,
-          };
-          if (target === 'main') {
-            setMainPhoto(photo);
-          } else {
-            setCustomCropPhoto(photo);
-          }
-        }
-      } else {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          quality: 0.9,
-          allowsEditing: false,
-          mediaTypes: ['images'],
-          exif: true,
+        setPhoto({
+          uri: a.uri,
+          fileName: a.fileName || `recapture-camera-${Date.now()}.jpg`,
+          mimeType: a.mimeType || 'image/jpeg',
+          gps: photoGps,
+          source: 'camera',
+          hasExifGps: Boolean(extractImageGpsCoordinates(a.exif)),
         });
-        if (!result.canceled && result.assets[0]) {
-          const a = result.assets[0];
-          // Ưu tiên trích xuất metadata GPS từ ảnh thư viện
-          const photoGps =
-            extractImageGpsCoordinates(a.exif) ||
-            (currentPosition ? { latitude: currentPosition[1], longitude: currentPosition[0] } : undefined);
-
-          const photo: SelectedPhoto = {
-            uri: a.uri,
-            fileName: a.fileName || `${target}-${Date.now()}.jpg`,
-            mimeType: a.mimeType || 'image/jpeg',
-            gps: photoGps,
-          };
-          if (target === 'main') {
-            setMainPhoto(photo);
-          } else {
-            setCustomCropPhoto(photo);
-          }
-        }
       }
     } catch (err) {
-      console.error('[Recapture] Photo pick error:', err);
-      Alert.alert('Lỗi', 'Không thể mở máy ảnh hoặc thư viện ảnh.');
+      console.error('[Recapture] Camera launch error:', err);
+      Alert.alert('Lỗi', 'Không thể mở máy ảnh trên thiết bị.');
     }
   };
 
+  // 2. Chọn ảnh từ thư viện (Ưu tiên trích xuất metadata GPS từ EXIF)
+  const handlePickLibrary = async () => {
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.9,
+        allowsEditing: false,
+        mediaTypes: ['images'],
+        exif: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const a = result.assets[0];
+        // Trích xuất metadata GPS từ ảnh
+        const exifGps = extractImageGpsCoordinates(a.exif);
+        const photoGps =
+          exifGps ||
+          (currentPosition ? { latitude: currentPosition[1], longitude: currentPosition[0] } : undefined);
+
+        setPhoto({
+          uri: a.uri,
+          fileName: a.fileName || `recapture-lib-${Date.now()}.jpg`,
+          mimeType: a.mimeType || 'image/jpeg',
+          gps: photoGps,
+          source: 'library',
+          hasExifGps: Boolean(exifGps),
+        });
+      }
+    } catch (err) {
+      console.error('[Recapture] Library pick error:', err);
+      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh.');
+    }
+  };
+
+  // 3. Nộp ảnh chụp lại
   const handleSubmit = async () => {
     if (!candidateId) {
       Alert.alert('Lỗi', 'Không tìm thấy mã hồ sơ biển báo.');
       return;
     }
-    if (!mainPhoto) {
-      Alert.alert('Chưa có ảnh', 'Vui lòng chụp hoặc tải lên ảnh chụp thực địa của biển báo.');
+    if (!photo) {
+      Alert.alert('Chưa có ảnh', 'Vui lòng chụp hoặc chọn ảnh thực địa của biển báo.');
       return;
     }
     if (!effectiveCoords) {
@@ -196,20 +208,16 @@ export function RecaptureCameraScreen() {
       formData.append('latitude', String(effectiveCoords.latitude));
       formData.append('longitude', String(effectiveCoords.longitude));
 
-      // bestFrame: Ảnh toàn cảnh thực địa chính
-      formData.append('bestFrame', {
-        uri: mainPhoto.uri,
-        name: mainPhoto.fileName || 'best-frame.jpg',
-        type: mainPhoto.mimeType || 'image/jpeg',
-      } as any);
+      const filePayload = {
+        uri: photo.uri,
+        name: photo.fileName || 'recapture-evidence.jpg',
+        type: photo.mimeType || 'image/jpeg',
+      } as any;
 
-      // signCrop: Dùng ảnh cận cảnh riêng nếu có, nếu không thì dùng chính mainPhoto
-      const cropPhoto = customCropPhoto || mainPhoto;
-      formData.append('signCrop', {
-        uri: cropPhoto.uri,
-        name: cropPhoto.fileName || 'sign-crop.jpg',
-        type: cropPhoto.mimeType || 'image/jpeg',
-      } as any);
+      // Gửi đồng thời image, bestFrame, signCrop để tương thích 100% với cả backend cũ lẫn mới:
+      formData.append('image', filePayload);
+      formData.append('bestFrame', filePayload);
+      formData.append('signCrop', filePayload);
 
       await submitMutation.mutateAsync({
         candidateId,
@@ -232,6 +240,12 @@ export function RecaptureCameraScreen() {
     }
   };
 
+  const reasonMeta = REASON_LABELS[reason] || {
+    label: reason,
+    color: '#DC2626',
+    bg: 'rgba(220, 38, 38, 0.1)',
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -246,13 +260,13 @@ export function RecaptureCameraScreen() {
           ]}
         >
           <AppButton
-            accessibilityLabel="Quay lại"
+            accessibilityLabel="Quay lại danh sách chụp lại"
             onPress={() => router.back()}
             pressedOpacity={0.6}
             style={styles.backButton}
             variant="ghost"
           >
-            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
           </AppButton>
 
           <View style={styles.topBarTitle}>
@@ -264,7 +278,7 @@ export function RecaptureCameraScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Card 1: Target Sign Context */}
+          {/* Card 1: Thông tin biển báo cần chụp lại */}
           <View
             style={[
               styles.infoCard,
@@ -284,63 +298,27 @@ export function RecaptureCameraScreen() {
                 <Text numberOfLines={1} style={[styles.targetTitle, { color: theme.text }]}>
                   {signTitle}
                 </Text>
-                <View style={[styles.reasonBadge, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
-                  <MaterialCommunityIcons color="#DC2626" name="alert-circle-outline" size={13} />
-                  <Text style={styles.reasonBadgeText}>Yêu cầu: {reason}</Text>
+                <View style={[styles.reasonBadge, { backgroundColor: reasonMeta.bg }]}>
+                  <MaterialCommunityIcons color={reasonMeta.color} name="alert-circle-outline" size={13} />
+                  <Text style={[styles.reasonBadgeText, { color: reasonMeta.color }]}>
+                    Yêu cầu: {reasonMeta.label}
+                  </Text>
                 </View>
                 {note ? (
                   <Text numberOfLines={2} style={[styles.noteText, { color: theme.textSecondary }]}>
                     {`Hướng dẫn: "${note}"`}
                   </Text>
                 ) : null}
+                {!Number.isNaN(targetLat) && !Number.isNaN(targetLon) ? (
+                  <Text style={[styles.targetCoordText, { color: theme.grey }]}>
+                    📍 Vị trí gốc: {targetLat.toFixed(5)}°, {targetLon.toFixed(5)}°
+                  </Text>
+                ) : null}
               </View>
             </View>
           </View>
 
-          {/* Card 2: GPS & Geofence Status */}
-          <View
-            style={[
-              styles.geofenceCard,
-              {
-                backgroundColor: isWithinGeofence
-                  ? 'rgba(22, 163, 74, 0.08)'
-                  : theme.backgroundSelected,
-                borderColor: isWithinGeofence ? '#86EFAC' : `${theme.primary}30`,
-              },
-            ]}
-          >
-            <View style={styles.geofenceHeader}>
-              <MaterialCommunityIcons
-                color={isWithinGeofence ? '#16A34A' : theme.primary}
-                name={isWithinGeofence ? 'check-circle' : 'crosshairs-gps'}
-                size={20}
-              />
-              <Text
-                style={[
-                  styles.geofenceTitle,
-                  { color: isWithinGeofence ? '#16A34A' : theme.text },
-                ]}
-              >
-                {isWithinGeofence
-                  ? `Vị trí hợp lệ (Cách ${Math.round(distanceMeters ?? 0)}m ≤ 100m)`
-                  : distanceMeters != null
-                    ? `Cách biển báo: ${Math.round(distanceMeters)}m (Quy định: ≤ 100m)`
-                    : 'Đang xác định toạ độ...'}
-              </Text>
-            </View>
-
-            <View style={styles.geofenceMetaRow}>
-              <Text style={[styles.gpsSubtext, { color: theme.grey }]}>
-                {mainPhoto?.gps
-                  ? `📍 Toạ độ từ metadata ảnh: ${mainPhoto.gps.latitude.toFixed(5)}°, ${mainPhoto.gps.longitude.toFixed(5)}°`
-                  : currentPosition
-                    ? `📍 Toạ độ GPS thiết bị: ${currentPosition[1].toFixed(5)}°, ${currentPosition[0].toFixed(5)}°`
-                    : 'Đang đợi tín hiệu GPS...'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Card 3: Main Photo Upload (Ảnh chụp thực địa) */}
+          {/* Card 2: Khu vực tải/chụp 1 ảnh thực địa duy nhất */}
           <View
             style={[
               styles.uploadCard,
@@ -356,49 +334,66 @@ export function RecaptureCameraScreen() {
               </Text>
             </View>
 
-            {mainPhoto ? (
+            {photo ? (
               <View style={styles.previewContainer}>
-                <ExpoImage contentFit="cover" source={{ uri: mainPhoto.uri }} style={styles.mainPreviewImage} />
+                <ExpoImage contentFit="cover" source={{ uri: photo.uri }} style={styles.previewImage} />
+
+                {/* Badge trạng thái toạ độ trên ảnh */}
                 <View style={styles.previewOverlayBadge}>
-                  <MaterialCommunityIcons color="#16A34A" name="check-circle" size={14} />
-                  <Text style={styles.previewBadgeText}>
-                    {mainPhoto.gps ? 'Có metadata GPS' : 'Ảnh đã chọn'}
+                  <MaterialCommunityIcons
+                    color={photo.hasExifGps ? '#16A34A' : theme.primary}
+                    name={photo.hasExifGps ? 'check-circle' : 'crosshairs-gps'}
+                    size={14}
+                  />
+                  <Text
+                    style={[
+                      styles.previewBadgeText,
+                      { color: photo.hasExifGps ? '#16A34A' : theme.primary },
+                    ]}
+                  >
+                    {photo.hasExifGps
+                      ? `Có metadata GPS (${photo.gps?.latitude.toFixed(4)}°, ${photo.gps?.longitude.toFixed(4)}°)`
+                      : 'Sử dụng GPS thiết bị'}
                   </Text>
                 </View>
 
+                {/* Hàng nút thay đổi ảnh */}
                 <View style={styles.previewActionsRow}>
                   <AppButton
-                    accessibilityLabel="Đổi ảnh thực địa"
-                    onPress={() => handlePickPhoto('main', 'library')}
-                    style={styles.actionSmallBtn}
-                    variant="surface"
-                  >
-                    <MaterialCommunityIcons color={theme.text} name="image-edit-outline" size={16} />
-                    <Text style={[styles.actionSmallBtnText, { color: theme.text }]}>Đổi ảnh</Text>
-                  </AppButton>
-
-                  <AppButton
                     accessibilityLabel="Chụp lại ảnh"
-                    onPress={() => handlePickPhoto('main', 'camera')}
+                    onPress={handleLaunchCamera}
                     style={styles.actionSmallBtn}
                     variant="surface"
                   >
                     <MaterialCommunityIcons color={theme.text} name="camera-retake-outline" size={16} />
                     <Text style={[styles.actionSmallBtnText, { color: theme.text }]}>Chụp lại</Text>
                   </AppButton>
+
+                  <AppButton
+                    accessibilityLabel="Đổi ảnh từ thư viện"
+                    onPress={handlePickLibrary}
+                    style={styles.actionSmallBtn}
+                    variant="surface"
+                  >
+                    <MaterialCommunityIcons color={theme.text} name="image-edit-outline" size={16} />
+                    <Text style={[styles.actionSmallBtnText, { color: theme.text }]}>Thư viện ảnh</Text>
+                  </AppButton>
                 </View>
               </View>
             ) : (
               <View style={[styles.emptyPickBox, { backgroundColor: theme.neutral, borderColor: theme.border }]}>
-                <MaterialCommunityIcons color={theme.placeholder} name="camera-plus-outline" size={38} />
-                <Text style={[styles.emptyPickLabel, { color: theme.textSecondary }]}>
+                <MaterialCommunityIcons color={theme.placeholder} name="camera-plus-outline" size={42} />
+                <Text style={[styles.emptyPickTitle, { color: theme.text }]}>
                   Chưa có ảnh nào được chọn
+                </Text>
+                <Text style={[styles.emptyPickDesc, { color: theme.grey }]}>
+                  Ưu tiên ảnh chụp thực địa có lưu toạ độ GPS trong phạm vi ≤ 100m.
                 </Text>
 
                 <View style={styles.pickButtonsRow}>
                   <AppButton
-                    accessibilityLabel="Chụp ảnh mới"
-                    onPress={() => handlePickPhoto('main', 'camera')}
+                    accessibilityLabel="Chụp ảnh mới tại hiện trường"
+                    onPress={handleLaunchCamera}
                     style={styles.pickButtonPrimary}
                     variant="primary"
                   >
@@ -407,8 +402,8 @@ export function RecaptureCameraScreen() {
                   </AppButton>
 
                   <AppButton
-                    accessibilityLabel="Chọn từ thư viện"
-                    onPress={() => handlePickPhoto('main', 'library')}
+                    accessibilityLabel="Chọn ảnh từ thư viện"
+                    onPress={handlePickLibrary}
                     style={styles.pickButtonSurface}
                     variant="surface"
                   >
@@ -420,101 +415,61 @@ export function RecaptureCameraScreen() {
             )}
           </View>
 
-          {/* Card 4 (Tùy chọn): Ảnh cận cảnh chi tiết */}
+          {/* Card 3: Kiểm tra vị trí & Khoảng cách Geofence */}
           <View
             style={[
-              styles.optionalCard,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              styles.geofenceCard,
+              {
+                backgroundColor: isWithinGeofence
+                  ? 'rgba(22, 163, 74, 0.08)'
+                  : 'rgba(239, 68, 68, 0.06)',
+                borderColor: isWithinGeofence ? '#86EFAC' : '#FCA5A5',
+              },
             ]}
           >
-            <View style={styles.optionalHeader}>
-              <View style={styles.optionalTitleCol}>
-                <Text style={[styles.optionalTitle, { color: theme.text }]}>
-                  Ảnh cận cảnh biển báo (Tùy chọn)
-                </Text>
-                <Text style={[styles.optionalDesc, { color: theme.grey }]}>
-                  Mặc định hệ thống tự động trích xuất từ ảnh thực địa ở trên.
-                </Text>
-              </View>
-
-              {!isCustomCropVisible && !customCropPhoto ? (
-                <AppButton
-                  accessibilityLabel="Bổ sung ảnh cận cảnh"
-                  onPress={() => setIsCustomCropVisible(true)}
-                  style={styles.addCropBtn}
-                  variant="ghost"
-                >
-                  <MaterialCommunityIcons color={theme.primary} name="plus-circle-outline" size={16} />
-                  <Text style={[styles.addCropBtnText, { color: theme.primary }]}>Thêm ảnh riêng</Text>
-                </AppButton>
-              ) : null}
+            <View style={styles.geofenceHeader}>
+              <MaterialCommunityIcons
+                color={isWithinGeofence ? '#16A34A' : '#DC2626'}
+                name={isWithinGeofence ? 'check-circle' : 'alert-circle-outline'}
+                size={20}
+              />
+              <Text
+                style={[
+                  styles.geofenceTitle,
+                  { color: isWithinGeofence ? '#16A34A' : '#DC2626' },
+                ]}
+              >
+                {isWithinGeofence
+                  ? `Vị trí hợp lệ: Cách biển báo ${Math.round(distanceMeters ?? 0)}m (≤ 100m)`
+                  : distanceMeters != null
+                    ? `Chưa đủ điều kiện: Cách biển báo ${Math.round(distanceMeters)}m (Quy định: ≤ 100m)`
+                    : 'Đang xác định toạ độ GPS...'}
+              </Text>
             </View>
 
-            {(isCustomCropVisible || customCropPhoto) && (
-              <View style={styles.customCropContent}>
-                {customCropPhoto ? (
-                  <View style={styles.cropPreviewRow}>
-                    <ExpoImage
-                      contentFit="cover"
-                      source={{ uri: customCropPhoto.uri }}
-                      style={styles.cropThumb}
-                    />
-                    <View style={styles.cropInfoCol}>
-                      <Text style={[styles.cropSelectedText, { color: theme.text }]}>
-                        Đã chọn ảnh cận cảnh riêng
-                      </Text>
-                      <View style={styles.cropBtnGroup}>
-                        <AppButton
-                          onPress={() => handlePickPhoto('crop', 'camera')}
-                          style={styles.miniBtn}
-                          variant="ghost"
-                        >
-                          <Text style={[styles.miniBtnText, { color: theme.primary }]}>Chụp lại</Text>
-                        </AppButton>
-                        <AppButton
-                          onPress={() => setCustomCropPhoto(null)}
-                          style={styles.miniBtn}
-                          variant="ghost"
-                        >
-                          <Text style={[styles.miniBtnText, { color: '#EF4444' }]}>Xóa</Text>
-                        </AppButton>
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.cropActionRow}>
-                    <AppButton
-                      onPress={() => handlePickPhoto('crop', 'camera')}
-                      style={styles.cropActionBtn}
-                      variant="surface"
-                    >
-                      <MaterialCommunityIcons color={theme.text} name="camera-outline" size={16} />
-                      <Text style={[styles.cropActionBtnText, { color: theme.text }]}>Chụp cận cảnh</Text>
-                    </AppButton>
-
-                    <AppButton
-                      onPress={() => handlePickPhoto('crop', 'library')}
-                      style={styles.cropActionBtn}
-                      variant="surface"
-                    >
-                      <MaterialCommunityIcons color={theme.text} name="image-outline" size={16} />
-                      <Text style={[styles.cropActionBtnText, { color: theme.text }]}>Từ thư viện</Text>
-                    </AppButton>
-                  </View>
-                )}
-              </View>
-            )}
+            <View style={styles.geofenceMetaRow}>
+              <Text style={[styles.gpsSubtext, { color: theme.grey }]}>
+                {effectiveCoords
+                  ? `📍 Toạ độ hiệu lực: ${effectiveCoords.latitude.toFixed(5)}°, ${effectiveCoords.longitude.toFixed(5)}° (${photo?.hasExifGps ? 'Metadata ảnh' : 'GPS thiết bị'})`
+                  : 'Đang đợi tín hiệu GPS từ ảnh hoặc thiết bị...'}
+              </Text>
+              {!isWithinGeofence && (
+                <Text style={[styles.geofenceHint, { color: theme.grey }]}>
+                  Mẹo: Bạn có thể chọn ảnh chụp tại thực địa có lưu sẵn toạ độ GPS trong thư viện.
+                </Text>
+              )}
+            </View>
           </View>
 
-          {/* Submit Button Section */}
+          {/* Card 4: Nút Nộp & Hướng dẫn */}
           <View style={styles.submitSection}>
             <AppButton
               accessibilityLabel="Nộp lại ảnh chụp thực địa"
-              disabled={!mainPhoto || !isWithinGeofence || submitMutation.isPending}
+              disabled={!photo || !isWithinGeofence || submitMutation.isPending}
               onPress={handleSubmit}
               style={[
                 styles.submitButton,
-                (!mainPhoto || !isWithinGeofence) && styles.submitButtonDisabled,
+                (!photo || !isWithinGeofence) && styles.submitButtonDisabled,
               ]}
               variant="primary"
             >
@@ -528,16 +483,21 @@ export function RecaptureCameraScreen() {
               )}
             </AppButton>
 
-            {!isWithinGeofence && (
-              <View style={styles.guardrailNotice}>
-                <MaterialCommunityIcons color="#D97706" name="alert-outline" size={15} />
+            <View style={styles.guardrailNotice}>
+              {!photo ? (
                 <Text style={[styles.guardrailNoticeText, { color: theme.grey }]}>
-                  {distanceMeters != null
-                    ? `Vị trí cách biển báo ${Math.round(distanceMeters)}m. Nút nộp sẽ mở khi trong bán kính ≤ 100m.`
-                    : 'Đang đợi vị trí GPS hợp lệ (≤ 100m) để mở nút nộp.'}
+                  Vui lòng chụp hoặc chọn ảnh thực địa để tiếp tục.
                 </Text>
-              </View>
-            )}
+              ) : !isWithinGeofence ? (
+                <Text style={[styles.guardrailNoticeText, { color: '#DC2626' }]}>
+                  ⚠️ Nút nộp sẽ sáng lên khi bạn đứng cách biển báo ≤ 100m hoặc chọn ảnh có metadata GPS hợp lệ.
+                </Text>
+              ) : (
+                <Text style={[styles.guardrailNoticeText, { color: '#16A34A' }]}>
+                  ✓ Đã sẵn sàng nộp bằng chứng thay thế cho ban thẩm định.
+                </Text>
+              )}
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -645,34 +605,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: Fonts.body,
     fontWeight: '700',
-    color: '#DC2626',
   },
   noteText: {
     fontSize: 12,
     fontFamily: Fonts.body,
+    fontStyle: 'italic',
     lineHeight: 16,
   },
-  geofenceCard: {
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    padding: Spacing.three,
-    gap: 4,
-  },
-  geofenceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  geofenceTitle: {
-    fontSize: 13,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-    flex: 1,
-  },
-  geofenceMetaRow: {
-    paddingLeft: 26,
-  },
-  gpsSubtext: {
+  targetCoordText: {
     fontSize: 11,
     fontFamily: Fonts.mono,
   },
@@ -707,9 +647,9 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginTop: 4,
   },
-  mainPreviewImage: {
+  previewImage: {
     width: '100%',
-    height: 180,
+    height: 220,
     borderRadius: Rounded.md,
   },
   previewOverlayBadge: {
@@ -723,12 +663,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Rounded.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   previewBadgeText: {
     fontSize: 11,
     fontFamily: Fonts.body,
     fontWeight: '700',
-    color: '#16A34A',
   },
   previewActionsRow: {
     flexDirection: 'row',
@@ -753,22 +697,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Rounded.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
     paddingVertical: Spacing.four,
     paddingHorizontal: Spacing.three,
-    gap: Spacing.two,
+    gap: Spacing.one,
     marginTop: 4,
   },
-  emptyPickLabel: {
-    fontSize: 13,
+  emptyPickTitle: {
+    fontSize: 14,
     fontFamily: Fonts.body,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  emptyPickDesc: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 6,
   },
   pickButtonsRow: {
     flexDirection: 'row',
     gap: Spacing.two,
     width: '100%',
-    marginTop: 4,
   },
   pickButtonPrimary: {
     flex: 1,
@@ -776,8 +728,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: Rounded.md,
+    backgroundColor: '#0671eb',
   },
   pickButtonPrimaryText: {
     fontSize: 13,
@@ -791,7 +744,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 42,
+    minHeight: 44,
     borderRadius: Rounded.md,
   },
   pickButtonSurfaceText: {
@@ -799,97 +752,36 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontWeight: '700',
   },
-  optionalCard: {
+  geofenceCard: {
     borderRadius: Rounded.lg,
     borderWidth: 1,
     padding: Spacing.three,
-    gap: Spacing.two,
+    gap: 4,
   },
-  optionalHeader: {
+  geofenceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
+    gap: 6,
   },
-  optionalTitleCol: {
-    flex: 1,
-    gap: 2,
-  },
-  optionalTitle: {
-    fontSize: 14,
+  geofenceTitle: {
+    fontSize: 13,
     fontFamily: Fonts.body,
     fontWeight: '700',
+    flex: 1,
   },
-  optionalDesc: {
+  geofenceMetaRow: {
+    paddingLeft: 26,
+    gap: 2,
+  },
+  gpsSubtext: {
+    fontSize: 11,
+    fontFamily: Fonts.mono,
+  },
+  geofenceHint: {
     fontSize: 11,
     fontFamily: Fonts.body,
-    lineHeight: 15,
-  },
-  addCropBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 0,
-    minHeight: 32,
-  },
-  addCropBtnText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-  },
-  customCropContent: {
-    marginTop: 4,
-  },
-  cropPreviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  cropThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: Rounded.sm,
-  },
-  cropInfoCol: {
-    flex: 1,
-    gap: 2,
-  },
-  cropSelectedText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '600',
-  },
-  cropBtnGroup: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  miniBtn: {
-    paddingHorizontal: 0,
-    minHeight: 28,
-  },
-  miniBtnText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-  },
-  cropActionRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    marginTop: 4,
-  },
-  cropActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minHeight: 38,
-    borderRadius: Rounded.md,
-  },
-  cropActionBtnText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   submitSection: {
     marginTop: Spacing.two,
@@ -902,6 +794,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 48,
     borderRadius: Rounded.md,
+    backgroundColor: '#0671eb',
   },
   submitButtonDisabled: {
     opacity: 0.5,
@@ -916,7 +809,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
     paddingHorizontal: Spacing.two,
     marginTop: 4,
   },
