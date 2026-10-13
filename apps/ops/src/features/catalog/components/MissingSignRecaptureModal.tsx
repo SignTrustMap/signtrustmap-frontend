@@ -150,7 +150,7 @@ export function MissingSignRecaptureModal({
             <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-blue-700 dark:text-blue-300 text-[11px]">
               <WarningCircle size={16} className="shrink-0 mt-0.5" />
               <span>
-                Hồ sơ sẽ chuyển sang trạng thái <strong>Cần bổ sung</strong>. Surveyor ban đầu sẽ nhận được thông báo kèm vị trí GPS để đến chụp lại tại thực địa (bán kính $\le 100\text{m}$).
+                Hồ sơ sẽ chuyển sang trạng thái <strong>Cần bổ sung</strong>. Surveyor ban đầu sẽ nhận được thông báo kèm vị trí GPS để đến chụp lại tại thực địa (bán kính ≤ 100m).
               </span>
             </div>
 
