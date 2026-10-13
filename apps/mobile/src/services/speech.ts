@@ -19,15 +19,30 @@ export const speechService = {
   speak(text: string, options?: SpeakOptions) {
     try {
       Speech.stop();
+      console.log('[Speech] Speaking:', text, 'language:', options?.language ?? 'default');
       Speech.speak(text, {
         language: options?.language,
         pitch: options?.pitch ?? 1.0,
         rate: options?.rate ?? 0.95,
         onDone: options?.onDone,
-        onError: options?.onError,
+        onError: (error) => {
+          console.warn('[Speech] Error speaking with language', options?.language, error);
+          if (options?.language) {
+            // Fallback: try speaking with device default voice if specific language failed
+            console.log('[Speech] Attempting fallback with system default voice...');
+            Speech.speak(text, {
+              pitch: options?.pitch ?? 1.0,
+              rate: options?.rate ?? 0.95,
+              onDone: options?.onDone,
+              onError: options?.onError,
+            });
+          } else {
+            options?.onError?.(error);
+          }
+        },
       });
-    } catch {
-      // Gracefully handle environments without native TTS
+    } catch (e) {
+      console.warn('[Speech] TTS speak exception:', e);
     }
   },
 

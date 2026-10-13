@@ -610,16 +610,17 @@ export function NavigationMapView({
   // hardcoded mock coordinate).
   const cameraCenter = destination?.coordinate;
   const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
-  const routeGeoJson = routeCoordinates?.length
-    ? ({
-      type: 'Feature',
+  const routeGeoJson = useMemo(() => {
+    if (!routeCoordinates?.length) return null;
+    return {
+      type: 'Feature' as const,
       properties: {},
       geometry: {
-        type: 'LineString',
+        type: 'LineString' as const,
         coordinates: routeCoordinates,
       },
-    } as GeoJSON.Feature<GeoJSON.LineString>)
-    : null;
+    };
+  }, [routeCoordinates]);
 
   // Calculate forward bearing aligned with the route ahead for Google Maps-style navigation
   const forwardBearing = useMemo(() => {
@@ -796,10 +797,14 @@ export function NavigationMapView({
         ) : null}
 
         {routeGeoJson ? (
-          <GeoJSONSource data={routeGeoJson} id="selected-route-source">
+          <GeoJSONSource
+            data={routeGeoJson}
+            id={`selected-route-source-${String(vehicleMode || 'driving').toLowerCase()}`}
+            key={`selected-route-source-${String(vehicleMode || 'driving').toLowerCase()}-${routeCoordinates?.length ?? 0}`}
+          >
             <Layer
-              id={`selected-route-casing-${isMotorcycle ? 'bike' : 'car'}`}
-              key={`selected-route-casing-${isMotorcycle ? 'bike' : 'car'}`}
+              id={`selected-route-casing-${String(vehicleMode || 'driving').toLowerCase()}`}
+              key={`selected-route-casing-${String(vehicleMode || 'driving').toLowerCase()}`}
               type="line"
               style={{
                 lineCap: 'round',
@@ -809,8 +814,8 @@ export function NavigationMapView({
               }}
             />
             <Layer
-              id={`selected-route-line-${isMotorcycle ? 'bike' : 'car'}`}
-              key={`selected-route-line-${isMotorcycle ? 'bike' : 'car'}`}
+              id={`selected-route-line-${String(vehicleMode || 'driving').toLowerCase()}`}
+              key={`selected-route-line-${String(vehicleMode || 'driving').toLowerCase()}`}
               type="line"
               style={{
                 lineCap: 'round',

@@ -291,15 +291,13 @@ export function NavigationMapView({
     destinationMarkerRef.current = null;
     startMarkerRef.current = null;
 
-    if (map.getLayer('selected-route-line')) {
-      map.removeLayer('selected-route-line');
-    }
-
-    if (map.getSource('selected-route-source')) {
-      map.removeSource('selected-route-source');
-    }
-
     if (!destination) {
+      if (map.getLayer('selected-route-line')) {
+        map.removeLayer('selected-route-line');
+      }
+      if (map.getSource('selected-route-source')) {
+        map.removeSource('selected-route-source');
+      }
       if (focusCoordinate) {
         map.flyTo({
           center: focusCoordinate,
@@ -318,42 +316,72 @@ export function NavigationMapView({
       .addTo(map);
 
     const renderRoute = () => {
-      if (!routeStart || !routeCoordinates?.length) return;
+      if (!routeStart || !routeCoordinates?.length) {
+        if (map.getLayer('selected-route-line')) {
+          map.removeLayer('selected-route-line');
+        }
+        if (map.getSource('selected-route-source')) {
+          map.removeSource('selected-route-source');
+        }
+        return;
+      }
 
-      map.addSource('selected-route-source', {
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: routeCoordinates,
-          },
-        },
-        type: 'geojson',
-      });
       const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
       const isBicycle = vehicleMode === 'CYCLING';
       const isWalking = vehicleMode === 'WALKING';
       const routeLineColor = isWalking ? '#10B981' : isBicycle ? '#F59E0B' : isMotorcycle ? '#0D9488' : theme.primary;
-      map.addLayer({
-        id: 'selected-route-line',
-        source: 'selected-route-source',
-        type: 'line',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
-        paint: {
-          'line-color': routeLineColor,
-          'line-width': 5,
-        },
-      });
 
-      startMarkerRef.current = new Marker({
-        element: createStartMarkerElement(),
-      })
-        .setLngLat(routeStart)
-        .addTo(map);
+      const geoJsonData = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: routeCoordinates,
+        },
+      };
+
+      const existingSource = map.getSource('selected-route-source') as any;
+      if (existingSource && typeof existingSource.setData === 'function') {
+        existingSource.setData(geoJsonData);
+        if (map.getLayer('selected-route-line')) {
+          map.setPaintProperty('selected-route-line', 'line-color', routeLineColor);
+        }
+      } else {
+        if (map.getLayer('selected-route-line')) {
+          map.removeLayer('selected-route-line');
+        }
+        if (map.getSource('selected-route-source')) {
+          map.removeSource('selected-route-source');
+        }
+
+        map.addSource('selected-route-source', {
+          data: geoJsonData,
+          type: 'geojson',
+        });
+        map.addLayer({
+          id: 'selected-route-line',
+          source: 'selected-route-source',
+          type: 'line',
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': routeLineColor,
+            'line-width': 5,
+          },
+        });
+      }
+
+      if (!startMarkerRef.current) {
+        startMarkerRef.current = new Marker({
+          element: createStartMarkerElement(),
+        })
+          .setLngLat(routeStart)
+          .addTo(map);
+      } else {
+        startMarkerRef.current.setLngLat(routeStart);
+      }
 
       map.fitBounds([routeStart, destination.coordinate], {
         duration: 900,

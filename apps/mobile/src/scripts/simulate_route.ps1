@@ -80,18 +80,23 @@ try {
         $lat = $pt.latitude
         $lon = $pt.longitude
         Write-Host "[$($i + 1)/$($points.Count)] Setting location to Lat: $lat, Lon: $lon" -ForegroundColor Gray
-        adb shell cmd location providers set-test-provider-location gps --location "$lat,$lon" --accuracy 5
-        adb shell cmd location providers set-test-provider-location fused --location "$lat,$lon" --accuracy 5
+        # 1. Native emulator hardware GPS update (lon lat)
+        adb emu geo fix $lon $lat | Out-Null
+        # 2. Android mock location provider fallback (lat,lon)
+        adb shell cmd location providers set-test-provider-location gps --location "$lat,$lon" --accuracy 5 2>$null
+        adb shell cmd location providers set-test-provider-location fused --location "$lat,$lon" --accuracy 5 2>$null
         Start-Sleep -Seconds $IntervalSeconds
     }
     Write-Host "[Simulation] Route playback completed successfully!" -ForegroundColor Green
 } finally {
     Write-Host "`n[Simulation] Setting location back to Crescent Mall ($CrescentMallLat, $CrescentMallLon)..." -ForegroundColor Yellow
-    adb shell cmd location providers set-test-provider-location gps --location "$CrescentMallLat,$CrescentMallLon" --accuracy 5
-    adb shell cmd location providers set-test-provider-location fused --location "$CrescentMallLat,$CrescentMallLon" --accuracy 5
-    Start-Sleep -Milliseconds 800
-    Write-Host "[Simulation] Cleaning up mock location providers..." -ForegroundColor Yellow
-    adb shell cmd location providers remove-test-provider gps
-    adb shell cmd location providers remove-test-provider fused
+    # 1. Native emulator hardware GPS reset (lon lat)
+    adb emu geo fix $CrescentMallLon $CrescentMallLat | Out-Null
+    # 2. Android mock location provider fallback (lat,lon)
+    adb shell cmd location providers set-test-provider-location gps --location "$CrescentMallLat,$CrescentMallLon" --accuracy 5 2>$null
+    adb shell cmd location providers set-test-provider-location fused --location "$CrescentMallLat,$CrescentMallLon" --accuracy 5 2>$null
+    Start-Sleep -Milliseconds 500
+    adb shell cmd location providers remove-test-provider gps 2>$null
+    adb shell cmd location providers remove-test-provider fused 2>$null
     Write-Host "[Simulation] Done. Device location is now at Crescent Mall." -ForegroundColor Green
 }
