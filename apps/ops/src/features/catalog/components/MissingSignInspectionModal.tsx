@@ -348,7 +348,7 @@ export function MissingSignInspectionModal({
                       onClick={onOpenIncomplete}
                       className="inline-flex items-center px-4 py-2 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50/80 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
                     >
-                      <span>Yêu cầu bổ sung</span>
+                      <span>Yêu cầu chụp lại</span>
                     </button>
                   )}
 
@@ -395,7 +395,7 @@ export function MissingSignInspectionModal({
               {report.status === 'Incomplete' && (
                 <div className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300 font-medium bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                  <span>Đang chờ người gửi bổ sung thông tin</span>
+                  <span>Đang chờ Surveyor chụp lại ảnh mới</span>
                 </div>
               )}
             </div>

@@ -27,6 +27,8 @@ import {
   MissingSignEscalateModal,
   MissingSignRejectModal,
   ApproveAndCreateSignTypeModal,
+  MissingSignRecaptureModal,
+  type RecaptureReasonCode,
   type MissingRejectReasonKey,
 } from './components'
 
@@ -116,7 +118,9 @@ export default function MissingSignsPage() {
   const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
+  const [isRecaptureModalOpen, setIsRecaptureModalOpen] = useState(false)
   const [isSubmittingApprove, setIsSubmittingApprove] = useState(false)
+  const [isSubmittingRecapture, setIsSubmittingRecapture] = useState(false)
 
   const [selectedCatalogCode, setSelectedCatalogCode] = useState('P.102')
   const [selectedSignTypeId, setSelectedSignTypeId] = useState<number | null>(null)
@@ -216,12 +220,13 @@ export default function MissingSignsPage() {
         else if (isEscalateModalOpen) setIsEscalateModalOpen(false)
         else if (isRejectModalOpen) setIsRejectModalOpen(false)
         else if (isApproveModalOpen) setIsApproveModalOpen(false)
+        else if (isRecaptureModalOpen) setIsRecaptureModalOpen(false)
         else if (selectedReport) setSelectedReport(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isMergeModalOpen, isEscalateModalOpen, isRejectModalOpen, isApproveModalOpen, selectedReport])
+  }, [isMergeModalOpen, isEscalateModalOpen, isRejectModalOpen, isApproveModalOpen, isRecaptureModalOpen, selectedReport])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -337,22 +342,35 @@ export default function MissingSignsPage() {
     }
   }
 
-  async function handleIncompleteSubmit() {
+  async function handleRecaptureSubmit(reason: RecaptureReasonCode, note: string) {
     if (!selectedReport) return
-    const updatedId = selectedReport.id
-    const staffNote = 'Yêu cầu người dùng cung cấp thêm ảnh chụp rõ nét hơn hoặc tọa độ chi tiết.'
+    const reportId = selectedReport.id
+    const candidateId = selectedReport.candidateId
+    setIsSubmittingRecapture(true)
     try {
-      await catalogService.updateMissingReport(updatedId, {
+      // 1. Cập nhật Missing Report về INCOMPLETE
+      await catalogService.updateMissingReport(reportId, {
         status: 'INCOMPLETE',
-        staffNotes: staffNote,
+        staffNotes: note,
       })
-      success('Đã đánh dấu yêu cầu bổ sung thông tin cho báo cáo #' + updatedId)
+
+      // 2. Nếu có candidateId gắn liền, gọi request-recapture tới backend để đổi candidate status sang RECAPTURE_REQUESTED
+      if (candidateId) {
+        await catalogService.requestCandidateRecapture(candidateId, {
+          reason,
+          note,
+        })
+      }
+
+      success(`Đã gửi yêu cầu chụp lại ảnh cho báo cáo #${reportId.slice(0, 8)}`)
+      setIsRecaptureModalOpen(false)
+      setSelectedReport(null)
       fetchReports()
     } catch (err: any) {
-      console.error('Failed to set incomplete report:', err)
-      error(err?.message || 'Không thể cập nhật trạng thái báo cáo')
+      console.error('Failed to request recapture:', err)
+      error(err?.message || 'Không thể gửi yêu cầu chụp lại cho máy chủ')
     } finally {
-      setSelectedReport(null)
+      setIsSubmittingRecapture(false)
     }
   }
 
@@ -566,7 +584,8 @@ export default function MissingSignsPage() {
         !isMergeModalOpen &&
         !isEscalateModalOpen &&
         !isRejectModalOpen &&
-        !isApproveModalOpen && (
+        !isApproveModalOpen &&
+        !isRecaptureModalOpen && (
           <MissingSignInspectionModal
             report={selectedReport}
             isAdmin={isAdmin}
@@ -580,7 +599,7 @@ export default function MissingSignsPage() {
             onOpenEscalate={() => setIsEscalateModalOpen(true)}
             onOpenReject={() => setIsRejectModalOpen(true)}
             onOpenApprove={() => setIsApproveModalOpen(true)}
-            onOpenIncomplete={handleIncompleteSubmit}
+            onOpenIncomplete={() => setIsRecaptureModalOpen(true)}
           />
         )}
 
@@ -626,6 +645,15 @@ export default function MissingSignsPage() {
         onClose={() => setIsApproveModalOpen(false)}
         onSubmit={handleApproveSubmit}
         isSubmitting={isSubmittingApprove}
+      />
+
+      {/* Surveyor Recapture Request Modal */}
+      <MissingSignRecaptureModal
+        isOpen={isRecaptureModalOpen}
+        selectedReport={selectedReport}
+        onClose={() => setIsRecaptureModalOpen(false)}
+        onSubmit={handleRecaptureSubmit}
+        isSubmitting={isSubmittingRecapture}
       />
     </div>
   )

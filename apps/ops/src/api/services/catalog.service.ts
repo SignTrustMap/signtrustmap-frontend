@@ -210,6 +210,13 @@ export const catalogService = {
     return http.patch<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id), data)
   },
 
+  requestCandidateRecapture: async (
+    candidateId: string,
+    data: { reason: string; note?: string }
+  ): Promise<{ success: boolean; requestId?: string; message?: string }> => {
+    return http.post(API_ENDPOINTS.MODERATION.REQUEST_RECAPTURE(candidateId), data)
+  },
+
   approveAndCreateType: async (
     id: string,
     data: ApproveAndCreateSignTypeInput
