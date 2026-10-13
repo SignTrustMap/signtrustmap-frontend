@@ -60,5 +60,6 @@ export function toRouteSign(sign: VerifiedMapSign): RouteSign {
     displayAddress: sign.displayAddress,
     lastVerifiedAt: sign.lastVerifiedAt,
     createdAt: sign.createdAt ? String(sign.createdAt) : undefined,
+    allowedVehicles: (sign.signType as unknown as { allowedVehicles?: RouteSign['allowedVehicles'] })?.allowedVehicles,
   };
 }

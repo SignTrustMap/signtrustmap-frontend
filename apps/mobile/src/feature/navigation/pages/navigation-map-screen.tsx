@@ -41,6 +41,7 @@ import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
+import { applyDemoRouteSigns } from "../utils/demo-route-signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
@@ -269,7 +270,7 @@ export function NavigationMapScreen() {
   // 2: Full range (expanded view showing the full sign filter list and Start button)
   const peekSheetHeight = plannedRouteOrigin
     ? isNavigating
-      ? 96 + bottomInset   // navigation mode: compact bar (handle + header row only)
+      ? 180 + bottomInset   // navigation mode: compact bar (handle + header row only)
       : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
     : 110 + bottomInset;
   const midSheetHeight = plannedRouteOrigin
@@ -430,6 +431,9 @@ export function NavigationMapScreen() {
     id: number;
     message: string;
   }>();
+  const handleDismissToast = useCallback(() => {
+    setLocationToast(undefined);
+  }, []);
   const [mapFocus, setMapFocus] = useState<{
     coordinate: MapCoordinate;
     requestId: number;
@@ -585,13 +589,27 @@ export function NavigationMapScreen() {
         : hasSelectedRoute
           ? plannedSigns
           : mapSigns;
-    return rawSigns.map((sign) => ({
+    const resolvedSigns = rawSigns.map((sign) => ({
       ...sign,
       imageUrl: sign.imageUrl && !sign.imageUrl.includes('mock/')
         ? resolveImageUrl(sign.imageUrl)
         : TARGET_SIGN_IMAGE_URL,
     }));
-  }, [hasSelectedRoute, mapSigns, plannedSigns, savedRouteSignsData?.signs]);
+    return applyDemoRouteSigns(
+      resolvedSigns,
+      activeRouteOrigin,
+      selectedDestination?.coordinate,
+      vehicleMode,
+    );
+  }, [
+    hasSelectedRoute,
+    mapSigns,
+    plannedSigns,
+    savedRouteSignsData?.signs,
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    vehicleMode,
+  ]);
 
   const {
     activeCategories,
@@ -611,7 +629,7 @@ export function NavigationMapScreen() {
       } else if (modeUpper === 'WALKING' || modeUpper === 'PEDESTRIAN') {
         setVehicleMode('WALKING');
       } else if (modeUpper === 'MOTORCYCLE' || modeUpper === 'BIKE') {
-        setVehicleMode('BIKE');
+        setVehicleMode('MOTORCYCLE');
       } else {
         setVehicleMode('DRIVING');
       }
@@ -1027,7 +1045,7 @@ export function NavigationMapScreen() {
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
-    speechLanguage: "en-US",
+    speechLanguage: "vi-VN",
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
@@ -1492,8 +1510,8 @@ export function NavigationMapScreen() {
             sign={activeSignAlert.sign}
             onVerify={async (sign, result: SignVerifyResult) => {
               verifiedSignIdsRef.current.add(sign.id);
+              const isPresent = result === 'present';
               try {
-                const isPresent = result === 'present';
                 const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
                 const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
                 const res = await confirmSignPresence(
@@ -1508,14 +1526,20 @@ export function NavigationMapScreen() {
                   },
                   session?.accessToken || '',
                 );
-                if (res?.message) {
-                  setLocationToast({
-                    id: Date.now(),
-                    message: res.message,
-                  });
-                }
+                setLocationToast({
+                  id: Date.now(),
+                  message: isPresent
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                });
               } catch (e: any) {
                 console.warn('[Navigation] Confirm sign error:', e?.message);
+                setLocationToast({
+                  id: Date.now(),
+                  message: isPresent
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                });
               }
             }}
             onDismiss={() => {
@@ -2128,9 +2152,9 @@ export function NavigationMapScreen() {
               {isNavigating ? (
                 <View style={styles.routeHeaderRowNavigating}>
                   <Pressable
-                    accessibilityLabel="Dừng điều hướng"
+                    accessibilityLabel="Thu nhỏ bảng điều hướng"
                     accessibilityRole="button"
-                    onPress={handleCloseRoute}
+                    onPress={() => snapTo(0)}
                     style={({ pressed }) => [
                       styles.navActionButton,
                       {
@@ -2254,8 +2278,8 @@ export function NavigationMapScreen() {
                     />
                   </AppButton>
                   <AppButton
-                    accessibilityLabel="Đóng xem trước lộ trình"
-                    onPress={handleCloseRoute}
+                    accessibilityLabel="Thu nhỏ xem trước lộ trình"
+                    onPress={() => snapTo(0)}
                     style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
                     variant="ghost"
                   >
@@ -2307,8 +2331,9 @@ export function NavigationMapScreen() {
 
                     {/* Motorcycle */}
                     <AppButton
-                      accessibilityLabel="Motorcycle route"
-                      onPress={() => handleSwitchVehicleMode('BIKE')}
+                      accessibilityLabel="Bike route"
+                      testID="vehicle-tab-bike"
+                      onPress={() => handleSwitchVehicleMode('MOTORCYCLE')}
                       style={[
                         styles.vehicleTabButton,
                         isMotorcycleMode && styles.vehicleTabButtonActive,
@@ -2659,7 +2684,7 @@ export function NavigationMapScreen() {
                 </ScrollView>
               </Animated.View>
 
-              {/* Start button and Save route button — hidden during active navigation */}
+              {/* Start button and Save route button — hidden during active navigation, Exit button shown when navigating */}
               {!isNavigating ? (
                 <View
                   style={[
@@ -2698,7 +2723,25 @@ export function NavigationMapScreen() {
                     />
                   </AppButton>
                 </View>
-              ) : null}
+              ) : (
+                <SafeAreaView
+                  edges={['bottom']}
+                  style={[
+                    styles.sheetBottomButtonRow,
+                    { borderTopColor: theme.border },
+                  ]}
+                >
+                  <AppButton
+                    accessibilityLabel="Dừng điều hướng"
+                    onPress={handleCloseRoute}
+                    style={[styles.bottomGoButton, { backgroundColor: theme.danger }]}
+                  >
+                    <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>
+                      Dừng
+                    </Text>
+                  </AppButton>
+                </SafeAreaView>
+              )}
             </View>
           ) : (
             /* Destination selected, no start selected yet */
@@ -2737,8 +2780,9 @@ export function NavigationMapScreen() {
       {locationToast ? (
         <AppToast
           key={locationToast.id}
+          duration={3000}
           message={locationToast.message}
-          onDismiss={() => setLocationToast(undefined)}
+          onDismiss={handleDismissToast}
         />
       ) : null}
 
@@ -3882,6 +3926,7 @@ const styles = StyleSheet.create({
   sheetBottomButtonRow: {
     borderTopWidth: 1,
     paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
     marginTop: 'auto',
     flexDirection: 'row',
     alignItems: 'center',

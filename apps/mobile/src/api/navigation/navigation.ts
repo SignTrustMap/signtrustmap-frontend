@@ -44,6 +44,7 @@ export type RouteSign = {
     lastVerifiedAt?: string;
     createdAt?: string;
     taskId?: string;
+    allowedVehicles?: VehicleType[];
 };
 
 type DirectionsResponse = {
