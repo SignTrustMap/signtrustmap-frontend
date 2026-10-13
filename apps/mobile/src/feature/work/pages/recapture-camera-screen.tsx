@@ -198,19 +198,29 @@ export function RecaptureCameraScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Pressable
+        {/* Top Header */}
+        <View
+          style={[
+            styles.topBar,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderBottomColor: theme.border,
+            },
+          ]}
+        >
+          <AppButton
             accessibilityLabel="Quay lại"
             onPress={() => router.back()}
-            style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+            pressedOpacity={0.6}
+            style={styles.backButton}
+            variant="ghost"
           >
-            <MaterialCommunityIcons name="chevron-left" size={28} color={theme.text} />
-          </Pressable>
+            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+          </AppButton>
 
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>Chụp lại thực địa</Text>
-            <Text style={[styles.headerSubtitle, { color: theme.grey }]}>
+          <View style={styles.topBarTitle}>
+            <Text style={[styles.screenTitle, { color: theme.text }]}>Chụp lại thực địa</Text>
+            <Text style={[styles.screenSubtitle, { color: theme.grey }]}>
               Hồ sơ #{candidateId ? candidateId.slice(0, 8) : ''}
             </Text>
           </View>
@@ -442,30 +452,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
     borderBottomWidth: 1,
+    gap: Spacing.two,
   },
   backButton: {
-    padding: Spacing.half,
-    marginLeft: -Spacing.half,
+    width: 40,
+    height: 40,
+    minHeight: 40,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitleWrap: {
+  topBarTitle: {
     flex: 1,
-    marginLeft: Spacing.half,
+    gap: 2,
   },
-  headerTitle: {
-    fontSize: 18,
+  screenTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+  },
+  screenSubtitle: {
     fontFamily: Fonts.body,
-    fontWeight: 'bold',
-  },
-  headerSubtitle: {
     fontSize: 12,
-    fontFamily: Fonts.body,
-    marginTop: 1,
+    fontWeight: '500',
+    lineHeight: 16,
   },
   content: {
     padding: Spacing.md,

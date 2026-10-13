@@ -1,13 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Linking,
   Platform,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -25,12 +24,12 @@ import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import type { RecaptureReason, SurveyorRecaptureItem } from '@/types/reviewsType';
 
 const REASON_LABELS: Record<RecaptureReason, { label: string; color: string; bg: string }> = {
-  BLURRY: { label: 'Ảnh mờ / rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.12)' },
-  POOR_LIGHTING: { label: 'Thiếu sáng / ngược sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.12)' },
-  WRONG_ANGLE: { label: 'Góc chụp nghiêng / lệch', color: '#D97706', bg: 'rgba(217, 119, 6, 0.12)' },
-  OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.12)' },
-  MISSING_CONTEXT: { label: 'Thiếu góc toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.12)' },
-  OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.12)' },
+  BLURRY: { label: 'Ảnh mờ / rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
+  POOR_LIGHTING: { label: 'Thiếu sáng / ngược sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  WRONG_ANGLE: { label: 'Góc chụp nghiêng / lệch', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
+  MISSING_CONTEXT: { label: 'Thiếu góc toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
+  OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
 };
 
 function formatDistance(meters: number): string {
@@ -47,7 +46,7 @@ export function RecapturesScreen() {
 
   const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
 
-  // Poll / fetch GPS position on mount
+  // Cập nhật vị trí GPS định kỳ
   useEffect(() => {
     let isMounted = true;
     async function updateGps() {
@@ -73,28 +72,31 @@ export function RecapturesScreen() {
     void Linking.openURL(scheme);
   };
 
-  const handleStartRecapture = useCallback((item: SurveyorRecaptureItem) => {
-    router.push({
-      pathname: '/work/recapture-camera',
-      params: {
-        candidateId: item.candidate_id,
-        targetLat: String(item.latitude),
-        targetLon: String(item.longitude),
-        signTitle: item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất',
-        reason: item.reason,
-        note: item.note || '',
-        oldSignCropUrl: item.sign_crop_url || '',
-      },
-    });
-  }, [router]);
+  const handleStartRecapture = useCallback(
+    (item: SurveyorRecaptureItem) => {
+      router.push({
+        pathname: '/work/recapture-camera',
+        params: {
+          candidateId: item.candidate_id,
+          targetLat: String(item.latitude),
+          targetLon: String(item.longitude),
+          signTitle: item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất',
+          reason: item.reason,
+          note: item.note || '',
+          oldSignCropUrl: item.sign_crop_url || '',
+        },
+      });
+    },
+    [router],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: SurveyorRecaptureItem }) => {
       const meta =
         (REASON_LABELS as Record<string, { label: string; color: string; bg: string }>)[item.reason] ?? {
           label: item.reason || 'Lý do khác',
-          color: '#D97706',
-          bg: 'rgba(217, 119, 6, 0.12)',
+          color: theme.primary,
+          bg: theme.backgroundSelected,
         };
       const imageUrl = resolveS3Url(item.sign_crop_url || item.best_frame_url);
 
@@ -109,17 +111,25 @@ export function RecapturesScreen() {
         <View
           style={[
             styles.card,
-            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+            },
           ]}
         >
           {/* Card Top: Image + Info */}
           <View style={styles.cardHeader}>
-            <View style={styles.imageWrapper}>
+            <View style={[styles.imageWrapper, { backgroundColor: theme.neutral }]}>
               {imageUrl ? (
-                <Image source={{ uri: imageUrl }} style={styles.signImage} resizeMode="cover" />
+                <Image
+                  contentFit="cover"
+                  source={{ uri: imageUrl }}
+                  style={styles.signImage}
+                  transition={200}
+                />
               ) : (
-                <View style={[styles.placeholderImage, { backgroundColor: theme.border }]}>
-                  <MaterialCommunityIcons name="image-off-outline" size={24} color={theme.grey} />
+                <View style={styles.placeholderImage}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="image-off-outline" size={26} />
                 </View>
               )}
             </View>
@@ -129,22 +139,32 @@ export function RecapturesScreen() {
                 <Text numberOfLines={1} style={[styles.signTitle, { color: theme.text }]}>
                   {item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất'}
                 </Text>
-                {item.sign_code && (
-                  <View style={[styles.codeBadge, { backgroundColor: theme.border }]}>
-                    <Text style={[styles.codeBadgeText, { color: theme.text }]}>{item.sign_code}</Text>
+                {item.sign_code ? (
+                  <View
+                    style={[
+                      styles.codeBadge,
+                      {
+                        backgroundColor: theme.backgroundSelected,
+                        borderColor: `${theme.primary}40`,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.codeBadgeText, { color: theme.primary }]}>
+                      {item.sign_code}
+                    </Text>
                   </View>
-                )}
+                ) : null}
               </View>
 
               {/* Reason Badge */}
               <View style={[styles.reasonBadge, { backgroundColor: meta.bg }]}>
-                <MaterialCommunityIcons name="alert-circle-outline" size={13} color={meta.color} />
+                <MaterialCommunityIcons color={meta.color} name="alert-circle-outline" size={13} />
                 <Text style={[styles.reasonBadgeText, { color: meta.color }]}>{meta.label}</Text>
               </View>
 
               {/* Reviewer Note */}
               {item.note ? (
-                <Text numberOfLines={2} style={[styles.reviewerNote, { color: theme.grey }]}>
+                <Text numberOfLines={2} style={[styles.reviewerNote, { color: theme.textSecondary }]}>
                   {`💬 "${item.note}"`}
                 </Text>
               ) : null}
@@ -154,7 +174,7 @@ export function RecapturesScreen() {
           {/* Location & Geofence Status */}
           <View style={[styles.locationRow, { borderTopColor: theme.border }]}>
             <View style={styles.locationLeft}>
-              <MaterialCommunityIcons name="map-marker-outline" size={15} color={theme.grey} />
+              <MaterialCommunityIcons color={theme.placeholder} name="map-marker-outline" size={15} />
               <Text style={[styles.coordsText, { color: theme.grey }]}>
                 {item.latitude.toFixed(5)}°, {item.longitude.toFixed(5)}°
               </Text>
@@ -166,48 +186,49 @@ export function RecapturesScreen() {
                   styles.distanceBadge,
                   {
                     backgroundColor: isWithinGeofence
-                      ? 'rgba(16, 185, 129, 0.12)'
-                      : 'rgba(245, 158, 11, 0.12)',
+                      ? 'rgba(22, 163, 74, 0.12)'
+                      : theme.backgroundSelected,
                   },
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={isWithinGeofence ? 'check-circle-outline' : 'crosshairs-gps'}
+                  color={isWithinGeofence ? '#16A34A' : theme.primary}
+                  name={isWithinGeofence ? 'check-circle' : 'navigation-variant'}
                   size={13}
-                  color={isWithinGeofence ? '#10B981' : '#D97706'}
                 />
                 <Text
                   style={[
                     styles.distanceText,
-                    { color: isWithinGeofence ? '#10B981' : '#D97706' },
+                    { color: isWithinGeofence ? '#16A34A' : theme.primary },
                   ]}
                 >
-                  {formatDistance(distanceMeters)} {isWithinGeofence ? '(Hợp lệ)' : '(Cần lại gần)'}
+                  {isWithinGeofence
+                    ? `✓ Cách ${formatDistance(distanceMeters)} (Hợp lệ)`
+                    : `Cách ${formatDistance(distanceMeters)} (Cần lại gần)`}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Action Buttons */}
+          {/* Action Buttons Row */}
           <View style={styles.cardActions}>
-            <Pressable
+            <AppButton
+              accessibilityLabel="Chỉ đường tới biển báo"
               onPress={() => handleOpenDirections(item.latitude, item.longitude)}
-              style={({ pressed }) => [
-                styles.directionsButton,
-                { borderColor: theme.border },
-                pressed && { opacity: 0.7 },
-              ]}
+              style={styles.directionsButton}
+              variant="surface"
             >
-              <MaterialCommunityIcons name="navigation-variant-outline" size={16} color={theme.text} />
+              <MaterialCommunityIcons color={theme.text} name="navigation-variant-outline" size={16} />
               <Text style={[styles.directionsButtonText, { color: theme.text }]}>Chỉ đường</Text>
-            </Pressable>
+            </AppButton>
 
             <AppButton
+              accessibilityLabel="Bắt đầu chụp lại ảnh biển báo"
               onPress={() => handleStartRecapture(item)}
               style={styles.recaptureButton}
               variant="primary"
             >
-              <MaterialCommunityIcons name="camera-retake-outline" size={16} color="#fff" />
+              <MaterialCommunityIcons color="#FFFFFF" name="camera-retake-outline" size={16} />
               <Text style={styles.recaptureButtonText}>Chụp lại ngay</Text>
             </AppButton>
           </View>
@@ -220,67 +241,100 @@ export function RecapturesScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Pressable
-            accessibilityLabel="Quay lại"
+        {/* Top Header */}
+        <View
+          style={[
+            styles.topBar,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderBottomColor: theme.border,
+            },
+          ]}
+        >
+          <AppButton
+            accessibilityLabel="Quay lại công việc"
             onPress={() => router.back()}
-            style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+            pressedOpacity={0.6}
+            style={styles.backButton}
+            variant="ghost"
           >
-            <MaterialCommunityIcons name="chevron-left" size={28} color={theme.text} />
-          </Pressable>
+            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+          </AppButton>
 
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>Yêu cầu chụp lại</Text>
-            <Text style={[styles.headerSubtitle, { color: theme.grey }]}>
+          <View style={styles.topBarTitle}>
+            <Text style={[styles.screenTitle, { color: theme.text }]}>Yêu cầu chụp lại</Text>
+            <Text style={[styles.screenSubtitle, { color: theme.grey }]}>
               {items.length} biển báo cần bổ sung ảnh thực địa
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => refetch()}
-            style={({ pressed }) => [styles.refreshButton, pressed && { opacity: 0.7 }]}
+          <AppButton
+            accessibilityLabel="Làm mới danh sách"
+            disabled={isRefetching}
+            onPress={() => void refetch()}
+            pressedOpacity={0.6}
+            style={styles.backButton}
+            variant="ghost"
           >
             <MaterialCommunityIcons
-              name="refresh"
+              color={theme.primary}
+              name="reload"
               size={22}
-              color={theme.text}
               style={isRefetching ? styles.spinning : undefined}
             />
-          </Pressable>
+          </AppButton>
         </View>
 
-        {/* Info Banner */}
-        <View style={[styles.banner, { backgroundColor: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.25)' }]}>
-          <MaterialCommunityIcons name="information-outline" size={18} color="#D97706" style={styles.bannerIcon} />
+        {/* Helpful Guideline Banner */}
+        <View
+          style={[
+            styles.banner,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+              borderLeftColor: theme.primary,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            color={theme.primary}
+            name="map-marker-radius-outline"
+            size={20}
+            style={styles.bannerIcon}
+          />
           <Text style={[styles.bannerText, { color: theme.text }]}>
-            Vui lòng di chuyển đến thực địa trong phạm vi <Text style={styles.boldText}>≤ 100m</Text> so với biển báo gốc để nộp ảnh hợp lệ.
+            Di chuyển đến vị trí biển báo (bán kính <Text style={styles.boldText}>≤ 100m</Text>) để chụp và nộp ảnh thay thế hợp lệ.
           </Text>
         </View>
 
         {/* Content List */}
         {isLoading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#F59E0B" />
-            <Text style={[styles.loadingText, { color: theme.grey }]}>Đang tải danh sách yêu cầu...</Text>
+            <ActivityIndicator color={theme.primary} size="large" />
+            <Text style={[styles.loadingText, { color: theme.grey }]}>
+              Đang tải danh sách yêu cầu...
+            </Text>
           </View>
         ) : items.length === 0 ? (
           <View style={styles.centerContainer}>
-            <MaterialCommunityIcons name="check-decagram-outline" size={56} color="#10B981" />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có yêu cầu chụp lại nào</Text>
+            <MaterialCommunityIcons color="#10B981" name="check-decagram-outline" size={56} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              Không có yêu cầu chụp lại nào
+            </Text>
             <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
               Tất cả các biển báo bạn khảo sát đã đạt yêu cầu hoặc chưa có yêu cầu bổ sung mới.
             </Text>
           </View>
         ) : (
           <FlatList
+            contentContainerStyle={styles.listContent}
             data={items}
             keyExtractor={(it) => String(it.request_id)}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
             refreshControl={
-              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#F59E0B" />
+              <RefreshControl onRefresh={refetch} refreshing={isRefetching} tintColor={theme.primary} />
             }
+            renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
           />
         )}
       </SafeAreaView>
@@ -295,33 +349,39 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
     borderBottomWidth: 1,
+    gap: Spacing.two,
   },
   backButton: {
-    padding: Spacing.half,
-    marginLeft: -Spacing.half,
+    width: 40,
+    height: 40,
+    minHeight: 40,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitleWrap: {
+  topBarTitle: {
     flex: 1,
-    marginLeft: Spacing.half,
+    gap: 2,
   },
-  headerTitle: {
-    fontSize: 18,
+  screenTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+  },
+  screenSubtitle: {
     fontFamily: Fonts.body,
-    fontWeight: 'bold',
-  },
-  headerSubtitle: {
     fontSize: 12,
-    fontFamily: Fonts.body,
-    marginTop: 1,
-  },
-  refreshButton: {
-    padding: Spacing.half,
+    fontWeight: '500',
+    lineHeight: 16,
   },
   spinning: {
     transform: [{ rotate: '45deg' }],
@@ -329,31 +389,38 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.half,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    marginHorizontal: Spacing.four,
+    marginTop: Spacing.three,
+    marginBottom: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
     borderRadius: Rounded.md,
     borderWidth: 1,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   bannerIcon: {
-    marginRight: Spacing.sm,
+    marginRight: Spacing.two,
   },
   bannerText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: Fonts.body,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   boldText: {
     fontFamily: Fonts.body,
-    fontWeight: 'bold',
-    color: '#D97706',
+    fontWeight: '700',
   },
   listContent: {
-    padding: Spacing.md,
-    gap: Spacing.md,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.six,
+    gap: Spacing.three,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
@@ -361,19 +428,25 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Rounded.lg,
     borderWidth: 1,
-    padding: Spacing.md,
-    gap: Spacing.sm,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: Spacing.three,
   },
   imageWrapper: {
     width: 76,
     height: 76,
     borderRadius: Rounded.md,
     overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   signImage: {
     width: '100%',
@@ -387,29 +460,32 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 4,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.half,
+    gap: Spacing.one,
   },
   signTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: Fonts.body,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    lineHeight: 22,
     flex: 1,
   },
   codeBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: Rounded.sm,
+    borderWidth: 1,
   },
   codeBadgeText: {
     fontSize: 11,
     fontFamily: Fonts.mono,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   reasonBadge: {
     flexDirection: 'row',
@@ -419,17 +495,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Rounded.sm,
-    marginVertical: 4,
   },
   reasonBadgeText: {
     fontSize: 11,
     fontFamily: Fonts.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   reviewerNote: {
     fontSize: 12,
     fontFamily: Fonts.body,
-    fontStyle: 'italic',
     lineHeight: 16,
   },
   locationRow: {
@@ -437,7 +511,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    paddingTop: Spacing.half,
+    paddingTop: Spacing.two,
   },
   locationLeft: {
     flexDirection: 'row',
@@ -453,18 +527,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: Rounded.sm,
   },
   distanceText: {
     fontSize: 11,
-    fontFamily: Fonts.mono,
-    fontWeight: '600',
+    fontFamily: Fonts.body,
+    fontWeight: '700',
   },
   cardActions: {
     flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: 4,
+    gap: Spacing.two,
+    marginTop: 2,
   },
   directionsButton: {
     flex: 1,
@@ -472,37 +546,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    minHeight: 42,
+    paddingHorizontal: Spacing.two,
     borderRadius: Rounded.md,
-    borderWidth: 1,
   },
   directionsButtonText: {
     fontSize: 13,
     fontFamily: Fonts.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   recaptureButton: {
-    flex: 1.5,
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    minHeight: 42,
+    paddingHorizontal: Spacing.two,
     borderRadius: Rounded.md,
-    backgroundColor: '#F59E0B',
   },
   recaptureButtonText: {
     fontSize: 13,
     fontFamily: Fonts.body,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   centerContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: Spacing.lg,
-    gap: Spacing.sm,
+    padding: Spacing.five,
+    gap: Spacing.two,
   },
   loadingText: {
     fontSize: 13,
@@ -510,16 +584,18 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontFamily: Fonts.body,
-    fontWeight: 'bold',
+    fontFamily: Fonts.title,
+    fontWeight: '700',
     textAlign: 'center',
-    marginTop: Spacing.sm,
+    marginTop: Spacing.two,
   },
   emptySubtitle: {
     fontSize: 13,
     fontFamily: Fonts.body,
     textAlign: 'center',
     lineHeight: 18,
+    maxWidth: 320,
   },
 });
+
 export default RecapturesScreen;
