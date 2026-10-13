@@ -20,7 +20,6 @@ import { useSubmitRecaptureMutation } from '@/feature/review/hooks/use-recapture
 import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
-import type { RecaptureReason } from '@/types/reviewsType';
 
 interface SelectedPhoto {
   uri: string;
@@ -181,24 +180,27 @@ export function RecaptureCameraScreen() {
     }
   };
 
-  // 3. Nộp ảnh chụp lại
+  // 3. Nộp ảnh chụp lại (Kiểm tra điều kiện khi nộp)
   const handleSubmit = async () => {
     if (!candidateId) {
       Alert.alert('Lỗi', 'Không tìm thấy mã hồ sơ biển báo.');
       return;
     }
     if (!photo) {
-      Alert.alert('Chưa có ảnh', 'Vui lòng chụp hoặc chọn ảnh thực địa của biển báo.');
+      Alert.alert('Chưa có ảnh', 'Vui lòng chụp ảnh hoặc chọn ảnh thực địa của biển báo.');
       return;
     }
     if (!effectiveCoords) {
-      Alert.alert('Chưa có vị trí', 'Đang xác định toạ độ GPS, vui lòng đợi giây lát hoặc chọn ảnh có metadata GPS.');
+      Alert.alert(
+        'Chưa có toạ độ vị trí',
+        'Không tìm thấy toạ độ GPS. Vui lòng bật định vị trên máy hoặc chọn ảnh có lưu toạ độ GPS.',
+      );
       return;
     }
     if (!isWithinGeofence) {
       Alert.alert(
-        'Vị trí không hợp lệ',
-        `Vị trí hiện tại cách biển báo ${Math.round(distanceMeters ?? 0)}m. Yêu cầu ảnh chụp phải nằm trong bán kính ≤ 100m.`,
+        'Không đủ điều kiện khoảng cách',
+        `Vị trí ảnh chụp cách biển báo gốc ${Math.round(distanceMeters ?? 0)}m (Quy định: ≤ 100m). Vui lòng di chuyển đến gần biển báo hoặc chọn ảnh chụp thực địa có lưu toạ độ GPS.`,
       );
       return;
     }
@@ -270,7 +272,7 @@ export function RecaptureCameraScreen() {
           </AppButton>
 
           <View style={styles.topBarTitle}>
-            <Text style={[styles.screenTitle, { color: theme.text }]}>Chụp lại thực địa</Text>
+            <Text style={[styles.screenTitle, { color: theme.text }]}>Yêu cầu chụp lại</Text>
             <Text style={[styles.screenSubtitle, { color: theme.grey }]}>
               Hồ sơ #{candidateId ? candidateId.slice(0, 8) : ''}
             </Text>
@@ -387,7 +389,7 @@ export function RecaptureCameraScreen() {
                   Chưa có ảnh nào được chọn
                 </Text>
                 <Text style={[styles.emptyPickDesc, { color: theme.grey }]}>
-                  Ưu tiên ảnh chụp thực địa có lưu toạ độ GPS trong phạm vi ≤ 100m.
+                  Chọn ảnh chụp thực địa có lưu toạ độ GPS hoặc chụp trực tiếp.
                 </Text>
 
                 <View style={styles.pickButtonsRow}>
@@ -415,61 +417,15 @@ export function RecaptureCameraScreen() {
             )}
           </View>
 
-          {/* Card 3: Kiểm tra vị trí & Khoảng cách Geofence */}
-          <View
-            style={[
-              styles.geofenceCard,
-              {
-                backgroundColor: isWithinGeofence
-                  ? 'rgba(22, 163, 74, 0.08)'
-                  : 'rgba(239, 68, 68, 0.06)',
-                borderColor: isWithinGeofence ? '#86EFAC' : '#FCA5A5',
-              },
-            ]}
-          >
-            <View style={styles.geofenceHeader}>
-              <MaterialCommunityIcons
-                color={isWithinGeofence ? '#16A34A' : '#DC2626'}
-                name={isWithinGeofence ? 'check-circle' : 'alert-circle-outline'}
-                size={20}
-              />
-              <Text
-                style={[
-                  styles.geofenceTitle,
-                  { color: isWithinGeofence ? '#16A34A' : '#DC2626' },
-                ]}
-              >
-                {isWithinGeofence
-                  ? `Vị trí hợp lệ: Cách biển báo ${Math.round(distanceMeters ?? 0)}m (≤ 100m)`
-                  : distanceMeters != null
-                    ? `Chưa đủ điều kiện: Cách biển báo ${Math.round(distanceMeters)}m (Quy định: ≤ 100m)`
-                    : 'Đang xác định toạ độ GPS...'}
-              </Text>
-            </View>
-
-            <View style={styles.geofenceMetaRow}>
-              <Text style={[styles.gpsSubtext, { color: theme.grey }]}>
-                {effectiveCoords
-                  ? `📍 Toạ độ hiệu lực: ${effectiveCoords.latitude.toFixed(5)}°, ${effectiveCoords.longitude.toFixed(5)}° (${photo?.hasExifGps ? 'Metadata ảnh' : 'GPS thiết bị'})`
-                  : 'Đang đợi tín hiệu GPS từ ảnh hoặc thiết bị...'}
-              </Text>
-              {!isWithinGeofence && (
-                <Text style={[styles.geofenceHint, { color: theme.grey }]}>
-                  Mẹo: Bạn có thể chọn ảnh chụp tại thực địa có lưu sẵn toạ độ GPS trong thư viện.
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Card 4: Nút Nộp & Hướng dẫn */}
+          {/* Card 3: Nút Nộp ảnh */}
           <View style={styles.submitSection}>
             <AppButton
-              accessibilityLabel="Nộp lại ảnh chụp thực địa"
-              disabled={!photo || !isWithinGeofence || submitMutation.isPending}
+              accessibilityLabel="Nộp ảnh chụp lại"
+              disabled={!photo || submitMutation.isPending}
               onPress={handleSubmit}
               style={[
                 styles.submitButton,
-                (!photo || !isWithinGeofence) && styles.submitButtonDisabled,
+                (!photo || submitMutation.isPending) && styles.submitButtonDisabled,
               ]}
               variant="primary"
             >
@@ -478,26 +434,10 @@ export function RecaptureCameraScreen() {
               ) : (
                 <>
                   <MaterialCommunityIcons color="#FFFFFF" name="cloud-upload-outline" size={20} />
-                  <Text style={styles.submitButtonText}>Nộp lại ảnh chụp thực địa</Text>
+                  <Text style={styles.submitButtonText}>Nộp ảnh chụp lại</Text>
                 </>
               )}
             </AppButton>
-
-            <View style={styles.guardrailNotice}>
-              {!photo ? (
-                <Text style={[styles.guardrailNoticeText, { color: theme.grey }]}>
-                  Vui lòng chụp hoặc chọn ảnh thực địa để tiếp tục.
-                </Text>
-              ) : !isWithinGeofence ? (
-                <Text style={[styles.guardrailNoticeText, { color: '#DC2626' }]}>
-                  ⚠️ Nút nộp sẽ sáng lên khi bạn đứng cách biển báo ≤ 100m hoặc chọn ảnh có metadata GPS hợp lệ.
-                </Text>
-              ) : (
-                <Text style={[styles.guardrailNoticeText, { color: '#16A34A' }]}>
-                  ✓ Đã sẵn sàng nộp bằng chứng thay thế cho ban thẩm định.
-                </Text>
-              )}
-            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -752,40 +692,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontWeight: '700',
   },
-  geofenceCard: {
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    padding: Spacing.three,
-    gap: 4,
-  },
-  geofenceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  geofenceTitle: {
-    fontSize: 13,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-    flex: 1,
-  },
-  geofenceMetaRow: {
-    paddingLeft: 26,
-    gap: 2,
-  },
-  gpsSubtext: {
-    fontSize: 11,
-    fontFamily: Fonts.mono,
-  },
-  geofenceHint: {
-    fontSize: 11,
-    fontFamily: Fonts.body,
-    fontStyle: 'italic',
-    marginTop: 2,
-  },
   submitSection: {
     marginTop: Spacing.two,
-    gap: Spacing.one,
   },
   submitButton: {
     flexDirection: 'row',
@@ -804,19 +712,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  guardrailNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.two,
-    marginTop: 4,
-  },
-  guardrailNoticeText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });
 
