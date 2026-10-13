@@ -90,7 +90,12 @@ export function RecapturesScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: SurveyorRecaptureItem }) => {
-      const meta = REASON_LABELS[item.reason] ?? REASON_LABELS.OTHER;
+      const meta =
+        (REASON_LABELS as Record<string, { label: string; color: string; bg: string }>)[item.reason] ?? {
+          label: item.reason || 'Lý do khác',
+          color: '#D97706',
+          bg: 'rgba(217, 119, 6, 0.12)',
+        };
       const imageUrl = resolveS3Url(item.sign_crop_url || item.best_frame_url);
 
       const distanceMeters =

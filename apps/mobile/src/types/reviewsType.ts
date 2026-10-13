@@ -132,9 +132,9 @@ export type RecaptureReason =
     | 'OTHER';
 
 export interface SurveyorRecaptureItem {
-    request_id: number;
+    request_id: string;
     candidate_id: string;
-    reason: RecaptureReason;
+    reason: RecaptureReason | string;
     note: string | null;
     missing_type_report_id: string | null;
     completed_at: string | null;
