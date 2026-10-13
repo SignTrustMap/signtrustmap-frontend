@@ -88,9 +88,6 @@ type DeclineReason = (typeof declineReasons)[number]['value'];
 
 export type ReportIssueType =
   | 'missing_type'
-  | 'inappropriate'
-  | 'poor_quality'
-  | 'fraud'
   | 'other';
 
 export const REPORT_ISSUE_OPTIONS: Array<{
@@ -102,18 +99,6 @@ export const REPORT_ISSUE_OPTIONS: Array<{
     id: 'missing_type',
     label: 'Sign not in catalog',
     badge: 'Flow 4',
-  },
-  {
-    id: 'inappropriate',
-    label: 'Inappropriate content',
-  },
-  {
-    id: 'poor_quality',
-    label: 'Poor image quality',
-  },
-  {
-    id: 'fraud',
-    label: 'Suspected fraud / fake sign',
   },
   {
     id: 'other',

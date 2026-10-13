@@ -11,6 +11,7 @@ import {
     MyReviewHistoryResponse,
     ReviewerStatsResponse,
     CreateMissingTypeReportDto,
+    MyRecapturesResponse,
 } from '@/types/reviewsType';
 
 import { API_PATHS } from '@/api/api';
@@ -161,6 +162,49 @@ export function reportMissingType(
         request,
         accessToken,
         signal,
+    );
+}
+
+export function getMyRecaptures(
+    params: { page?: number; pageSize?: number } = {},
+    accessToken: string,
+    signal?: AbortSignal,
+) {
+    const queryParams = new URLSearchParams({
+        page: String(params.page ?? 1),
+        pageSize: String(params.pageSize ?? 20),
+    });
+
+    return apiRequest<MyRecapturesResponse>(
+        `${API_PATHS.REVIEWS}/me/recaptures?${queryParams}`,
+        { signal },
+        accessToken,
+    );
+}
+
+export function submitCandidateRecapture(
+    candidateId: string,
+    formData: FormData,
+    accessToken: string,
+    signal?: AbortSignal,
+) {
+    return apiRequest<{
+        success: boolean;
+        candidateId: string;
+        requestId: number;
+        status: string;
+        evidence: {
+            signCropUrl: string;
+            bestFrameUrl: string;
+        };
+    }>(
+        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(candidateId)}/recapture`,
+        {
+            method: 'POST',
+            body: formData,
+            signal,
+        },
+        accessToken,
     );
 }
 
