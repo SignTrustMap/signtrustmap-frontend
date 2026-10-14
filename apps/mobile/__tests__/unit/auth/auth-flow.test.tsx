@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, cleanup } from '@testing-library/react-native';
 import { Pressable, Text, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -139,6 +139,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   });
 
   afterEach(async () => {
+    cleanup();
     await new Promise((resolve) => setTimeout(resolve, 50));
   });
 
@@ -147,27 +148,45 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 1: Render Login Page', () => {
     it('renders logo, titles, email and password inputs, submit button, google button, and sign up link', async () => {
-      const { getByText, getByPlaceholderText } = await renderScreen(<LoginScreen />);
+      const { getByText, queryByText, getByPlaceholderText, getByRole } = await renderScreen(<LoginScreen />);
 
       // Brand headers
       expect(getByText('SignTrustMap')).toBeTruthy();
-      expect(getByText('Welcome back. Please enter your details.')).toBeTruthy();
+      expect(getByText(/nắm bắt/i)).toBeTruthy();
 
       // Form inputs
       expect(getByPlaceholderText('demo@stm.dev')).toBeTruthy();
-      expect(getByPlaceholderText('Enter your password')).toBeTruthy();
+      expect(getByPlaceholderText('Nhập mật khẩu của bạn')).toBeTruthy();
 
       // Action buttons & links
-      expect(getByText('Forgot Password?')).toBeTruthy();
-      expect(getByText('Login')).toBeTruthy();
-      expect(getByText('Log in with google')).toBeTruthy();
-      expect(getByText("Don't have an account?")).toBeTruthy();
-      expect(getByText('Sign Up')).toBeTruthy();
+      expect(getByText('Quên mật khẩu?')).toBeTruthy();
+      expect(getByRole('button', { name: 'Đăng nhập' })).toBeTruthy();
+      expect(getByText('Google')).toBeTruthy();
+      expect(getByText('Chưa có tài khoản?')).toBeTruthy();
+      expect(getByText(' Đăng ký')).toBeTruthy();
 
       // Dev quick login shortcuts (since __DEV__ is true in Jest)
-      expect(getByText('DEV QUICK LOGIN')).toBeTruthy();
-      expect(getByText('Demo (All Roles)')).toBeTruthy();
+      expect(getByText('ĐĂNG NHẬP NHANH (DEV)')).toBeTruthy();
+      expect(getByText('Demo (All roles)')).toBeTruthy();
       expect(getByText('Reviewer 1')).toBeTruthy();
+
+      // Toggle mock button to hide / show dev login
+      const toggleDevBtn = getByRole('button', { name: 'Ẩn Mock' });
+      expect(toggleDevBtn).toBeTruthy();
+
+      await fireEvent.press(toggleDevBtn);
+      await waitFor(() => {
+        expect(queryByText('Demo (All roles)')).toBeNull();
+        expect(queryByText('Reviewer 1')).toBeNull();
+        expect(getByText('Hiện Mock')).toBeTruthy();
+      });
+
+      await fireEvent.press(getByRole('button', { name: 'Hiện Mock' }));
+      await waitFor(() => {
+        expect(getByText('Demo (All roles)')).toBeTruthy();
+        expect(getByText('Reviewer 1')).toBeTruthy();
+        expect(getByText('Ẩn Mock')).toBeTruthy();
+      });
     });
   });
 
@@ -178,12 +197,12 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('updates email and password fields when user enters credentials', async () => {
       const { getByPlaceholderText } = await renderScreen(<LoginScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'surveyor@signtrust.org');
-      fireEvent.changeText(getByPlaceholderText('Enter your password'), 'SecurePass123!');
+      await fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'surveyor@signtrust.org');
+      await fireEvent.changeText(getByPlaceholderText('Nhập mật khẩu của bạn'), 'SecurePass123!');
 
       await waitFor(() => {
         expect(getByPlaceholderText('demo@stm.dev').props.value).toBe('surveyor@signtrust.org');
-        expect(getByPlaceholderText('Enter your password').props.value).toBe('SecurePass123!');
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.value).toBe('SecurePass123!');
       });
     });
   });
@@ -193,29 +212,28 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 3: Form Error and Real-time Recovery', () => {
     it('validates email format and password length, then clears errors when filled correctly', async () => {
-      const { getByPlaceholderText, getByText, queryByText } = await renderScreen(<LoginScreen />);
-
+      const { getByPlaceholderText, getByText, queryByText, getByRole } = await renderScreen(<LoginScreen />);
       // 1. Submit with empty fields
-      fireEvent.press(getByText('Login'));
+      await fireEvent.press(getByRole('button', { name: 'Đăng nhập' }));
 
       // Validation errors should appear
       await waitFor(() => {
-        expect(getByText('Must be a valid email address.')).toBeTruthy();
-        expect(getByText('Password must be greater than 1 character.')).toBeTruthy();
+        expect(getByText('Email không hợp lệ.')).toBeTruthy();
+        expect(getByText('Mật khẩu phải có từ 2 ký tự trở lên.')).toBeTruthy();
       });
       expect(mockApiLogin).not.toHaveBeenCalled();
 
       // 2. Correct the email field -> email error should disappear
-      fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'valid@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'valid@stm.dev');
       await waitFor(() => {
-        expect(queryByText('Must be a valid email address.')).toBeNull();
-        expect(getByText('Password must be greater than 1 character.')).toBeTruthy();
+        expect(queryByText('Email không hợp lệ.')).toBeNull();
+        expect(getByText('Mật khẩu phải có từ 2 ký tự trở lên.')).toBeTruthy();
       });
 
       // 3. Correct the password field -> password error should disappear
-      fireEvent.changeText(getByPlaceholderText('Enter your password'), 'ValidPassword');
+      await fireEvent.changeText(getByPlaceholderText('Nhập mật khẩu của bạn'), 'ValidPassword');
       await waitFor(() => {
-        expect(queryByText('Password must be greater than 1 character.')).toBeNull();
+        expect(queryByText('Mật khẩu phải có từ 2 ký tự trở lên.')).toBeNull();
       });
     });
   });
@@ -235,17 +253,17 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
         },
       });
 
-      const { getByPlaceholderText, getByText } = await renderScreen(<LoginScreen />);
+      const { getByPlaceholderText, getByRole } = await renderScreen(<LoginScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'surveyor@stm.dev');
-      fireEvent.changeText(getByPlaceholderText('Enter your password'), 'SurveyorPass123');
+      await fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'surveyor@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('Nhập mật khẩu của bạn'), 'SurveyorPass123');
 
       await waitFor(() => {
         expect(getByPlaceholderText('demo@stm.dev').props.value).toBe('surveyor@stm.dev');
-        expect(getByPlaceholderText('Enter your password').props.value).toBe('SurveyorPass123');
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.value).toBe('SurveyorPass123');
       });
 
-      fireEvent.press(getByText('Login'));
+      await fireEvent.press(getByRole('button', { name: 'Đăng nhập' }));
 
       await waitFor(() => {
         expect(mockApiLogin).toHaveBeenCalledWith({
@@ -274,17 +292,17 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('displays error message on failed request and clears it on correction and successful retry', async () => {
       mockApiLogin.mockRejectedValueOnce(new Error('Invalid email or password.'));
 
-      const { getByPlaceholderText, getByText, queryByText } = await renderScreen(<LoginScreen />);
+      const { getByPlaceholderText, getByText, queryByText, getByRole } = await renderScreen(<LoginScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'wrong@stm.dev');
-      fireEvent.changeText(getByPlaceholderText('Enter your password'), 'WrongPass');
+      await fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'wrong@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('Nhập mật khẩu của bạn'), 'WrongPass');
 
       await waitFor(() => {
         expect(getByPlaceholderText('demo@stm.dev').props.value).toBe('wrong@stm.dev');
-        expect(getByPlaceholderText('Enter your password').props.value).toBe('WrongPass');
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.value).toBe('WrongPass');
       });
 
-      fireEvent.press(getByText('Login'));
+      await fireEvent.press(getByRole('button', { name: 'Đăng nhập' }));
 
       // Error alert should be displayed
       await waitFor(() => {
@@ -292,7 +310,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
       });
 
       // Editing the email clears the error banner
-      fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'correct@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('demo@stm.dev'), 'correct@stm.dev');
       await waitFor(() => {
         expect(getByPlaceholderText('demo@stm.dev').props.value).toBe('correct@stm.dev');
         expect(queryByText('Invalid email or password.')).toBeNull();
@@ -304,12 +322,12 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
         account: { id: 'u1', email: 'correct@stm.dev', displayName: 'Correct User', roles: ['driver'] },
       });
 
-      fireEvent.changeText(getByPlaceholderText('Enter your password'), 'CorrectPass');
+      await fireEvent.changeText(getByPlaceholderText('Nhập mật khẩu của bạn'), 'CorrectPass');
       await waitFor(() => {
-        expect(getByPlaceholderText('Enter your password').props.value).toBe('CorrectPass');
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.value).toBe('CorrectPass');
       });
 
-      fireEvent.press(getByText('Login'));
+      await fireEvent.press(getByRole('button', { name: 'Đăng nhập' }));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/');
@@ -322,20 +340,19 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 6: Render Sign Up Page', () => {
     it('renders STM branding, title, input fields for full name, email, phone, password, and login link', async () => {
-      const { getByText, getByPlaceholderText } = await renderScreen(<RegisterScreen />);
+      const { getByText, getByPlaceholderText, getByRole } = await renderScreen(<RegisterScreen />);
 
-      expect(getByText('STM')).toBeTruthy();
-      expect(getByText('Create your account')).toBeTruthy();
-      expect(getByText('Register to start using SignTrustMap.')).toBeTruthy();
+      expect(getByText('SignTrustMap')).toBeTruthy();
+      expect(getByText(/đơn giản hóa/i)).toBeTruthy();
 
-      expect(getByPlaceholderText('Your full name')).toBeTruthy();
+      expect(getByPlaceholderText('Họ và tên của bạn')).toBeTruthy();
       expect(getByPlaceholderText('you@example.com')).toBeTruthy();
-      expect(getByPlaceholderText('Your phone number')).toBeTruthy();
-      expect(getByPlaceholderText('At least 8 characters')).toBeTruthy();
+      expect(getByPlaceholderText('Số điện thoại của bạn')).toBeTruthy();
+      expect(getByPlaceholderText('Tối thiểu 8 ký tự')).toBeTruthy();
 
-      expect(getByText('Create account')).toBeTruthy();
-      expect(getByText('Already have an account?')).toBeTruthy();
-      expect(getByText('Log in')).toBeTruthy();
+      expect(getByRole('button', { name: 'Tạo tài khoản' })).toBeTruthy();
+      expect(getByText('Đã có tài khoản?')).toBeTruthy();
+      expect(getByText(' Đăng nhập')).toBeTruthy();
     });
   });
 
@@ -344,57 +361,57 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 7: Sign Up Form Validation and Real-time Recovery', () => {
     it('validates empty and short inputs, and clears errors individually as user enters values', async () => {
-      const { getByPlaceholderText, getByText, queryByText } = await renderScreen(<RegisterScreen />);
+      const { getByPlaceholderText, getByText, queryByText, getByRole } = await renderScreen(<RegisterScreen />);
 
       // Click create account with empty fields
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
 
       // Check all validation error messages
       await waitFor(() => {
-        expect(getByText('Enter your full name.')).toBeTruthy();
-        expect(getByText('Enter a valid email address.')).toBeTruthy();
-        expect(getByText('Enter your phone number.')).toBeTruthy();
-        expect(getByText('Use at least 8 characters.')).toBeTruthy();
+        expect(getByText('Nhập họ và tên của bạn.')).toBeTruthy();
+        expect(getByText('Nhập địa chỉ email hợp lệ.')).toBeTruthy();
+        expect(getByText('Nhập số điện thoại của bạn.')).toBeTruthy();
+        expect(getByText('Mật khẩu tối thiểu 8 ký tự.')).toBeTruthy();
       });
       expect(mockApiRegister).not.toHaveBeenCalled();
 
       // Clear full name error on input
-      fireEvent.changeText(getByPlaceholderText('Your full name'), 'Jane Doe');
+      await fireEvent.changeText(getByPlaceholderText('Họ và tên của bạn'), 'Jane Doe');
       await waitFor(() => {
-        expect(getByPlaceholderText('Your full name').props.value).toBe('Jane Doe');
-        expect(queryByText('Enter your full name.')).toBeNull();
-        expect(getByText('Enter a valid email address.')).toBeTruthy();
+        expect(getByPlaceholderText('Họ và tên của bạn').props.value).toBe('Jane Doe');
+        expect(queryByText('Nhập họ và tên của bạn.')).toBeNull();
+        expect(getByText('Nhập địa chỉ email hợp lệ.')).toBeTruthy();
       });
 
       // Clear email error on valid input
-      fireEvent.changeText(getByPlaceholderText('you@example.com'), 'jane@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('you@example.com'), 'jane@stm.dev');
       await waitFor(() => {
         expect(getByPlaceholderText('you@example.com').props.value).toBe('jane@stm.dev');
-        expect(queryByText('Enter a valid email address.')).toBeNull();
+        expect(queryByText('Nhập địa chỉ email hợp lệ.')).toBeNull();
       });
 
       // Clear phone error
-      fireEvent.changeText(getByPlaceholderText('Your phone number'), '+84901234567');
+      await fireEvent.changeText(getByPlaceholderText('Số điện thoại của bạn'), '+84901234567');
       await waitFor(() => {
-        expect(getByPlaceholderText('Your phone number').props.value).toBe('+84901234567');
-        expect(queryByText('Enter your phone number.')).toBeNull();
+        expect(getByPlaceholderText('Số điện thoại của bạn').props.value).toBe('+84901234567');
+        expect(queryByText('Nhập số điện thoại của bạn.')).toBeNull();
       });
 
       // Password with < 8 chars still shows error
-      fireEvent.changeText(getByPlaceholderText('At least 8 characters'), '12345');
+      await fireEvent.changeText(getByPlaceholderText('Tối thiểu 8 ký tự'), '12345');
       await waitFor(() => {
-        expect(getByPlaceholderText('At least 8 characters').props.value).toBe('12345');
+        expect(getByPlaceholderText('Tối thiểu 8 ký tự').props.value).toBe('12345');
       });
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
       await waitFor(() => {
-        expect(getByText('Use at least 8 characters.')).toBeTruthy();
+        expect(getByText('Mật khẩu tối thiểu 8 ký tự.')).toBeTruthy();
       });
 
       // Provide >= 8 chars password
-      fireEvent.changeText(getByPlaceholderText('At least 8 characters'), 'Pass12345678');
+      await fireEvent.changeText(getByPlaceholderText('Tối thiểu 8 ký tự'), 'Pass12345678');
       await waitFor(() => {
-        expect(getByPlaceholderText('At least 8 characters').props.value).toBe('Pass12345678');
-        expect(queryByText('Use at least 8 characters.')).toBeNull();
+        expect(getByPlaceholderText('Tối thiểu 8 ký tự').props.value).toBe('Pass12345678');
+        expect(queryByText('Mật khẩu tối thiểu 8 ký tự.')).toBeNull();
       });
     });
   });
@@ -406,21 +423,21 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('submits valid registration request with trimmed form fields', async () => {
       mockApiRegister.mockResolvedValueOnce({ message: 'User registered successfully.' });
 
-      const { getByPlaceholderText, getByText } = await renderScreen(<RegisterScreen />);
+      const { getByPlaceholderText, getByRole } = await renderScreen(<RegisterScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('Your full name'), 'Alex Morgan');
-      fireEvent.changeText(getByPlaceholderText('you@example.com'), 'alex@stm.dev');
-      fireEvent.changeText(getByPlaceholderText('Your phone number'), '0987654321');
-      fireEvent.changeText(getByPlaceholderText('At least 8 characters'), 'StrongSecretPassword');
+      await fireEvent.changeText(getByPlaceholderText('Họ và tên của bạn'), 'Alex Morgan');
+      await fireEvent.changeText(getByPlaceholderText('you@example.com'), 'alex@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('Số điện thoại của bạn'), '0987654321');
+      await fireEvent.changeText(getByPlaceholderText('Tối thiểu 8 ký tự'), 'StrongSecretPassword');
 
       await waitFor(() => {
-        expect(getByPlaceholderText('Your full name').props.value).toBe('Alex Morgan');
+        expect(getByPlaceholderText('Họ và tên của bạn').props.value).toBe('Alex Morgan');
         expect(getByPlaceholderText('you@example.com').props.value).toBe('alex@stm.dev');
-        expect(getByPlaceholderText('Your phone number').props.value).toBe('0987654321');
-        expect(getByPlaceholderText('At least 8 characters').props.value).toBe('StrongSecretPassword');
+        expect(getByPlaceholderText('Số điện thoại của bạn').props.value).toBe('0987654321');
+        expect(getByPlaceholderText('Tối thiểu 8 ký tự').props.value).toBe('StrongSecretPassword');
       });
 
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
 
       await waitFor(() => {
         expect(mockApiRegister).toHaveBeenCalledWith({
@@ -440,28 +457,28 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('displays error alert on server failure and clears it on modification and successful retry', async () => {
       mockApiRegister.mockRejectedValueOnce(new Error('Email is already registered.'));
 
-      const { getByPlaceholderText, getByText, queryByText } = await renderScreen(<RegisterScreen />);
+      const { getByPlaceholderText, getByText, queryByText, getByRole } = await renderScreen(<RegisterScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('Your full name'), 'Existing User');
-      fireEvent.changeText(getByPlaceholderText('you@example.com'), 'existing@stm.dev');
-      fireEvent.changeText(getByPlaceholderText('Your phone number'), '0900000000');
-      fireEvent.changeText(getByPlaceholderText('At least 8 characters'), 'ExistingPass123');
+      await fireEvent.changeText(getByPlaceholderText('Họ và tên của bạn'), 'Existing User');
+      await fireEvent.changeText(getByPlaceholderText('you@example.com'), 'existing@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('Số điện thoại của bạn'), '0900000000');
+      await fireEvent.changeText(getByPlaceholderText('Tối thiểu 8 ký tự'), 'ExistingPass123');
 
       await waitFor(() => {
-        expect(getByPlaceholderText('Your full name').props.value).toBe('Existing User');
+        expect(getByPlaceholderText('Họ và tên của bạn').props.value).toBe('Existing User');
         expect(getByPlaceholderText('you@example.com').props.value).toBe('existing@stm.dev');
-        expect(getByPlaceholderText('Your phone number').props.value).toBe('0900000000');
-        expect(getByPlaceholderText('At least 8 characters').props.value).toBe('ExistingPass123');
+        expect(getByPlaceholderText('Số điện thoại của bạn').props.value).toBe('0900000000');
+        expect(getByPlaceholderText('Tối thiểu 8 ký tự').props.value).toBe('ExistingPass123');
       });
 
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
 
       await waitFor(() => {
         expect(getByText('Email is already registered.')).toBeTruthy();
       });
 
       // Typing into email clears the server error
-      fireEvent.changeText(getByPlaceholderText('you@example.com'), 'new_unique@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('you@example.com'), 'new_unique@stm.dev');
       await waitFor(() => {
         expect(getByPlaceholderText('you@example.com').props.value).toBe('new_unique@stm.dev');
         expect(queryByText('Email is already registered.')).toBeNull();
@@ -469,7 +486,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
 
       // Next attempt succeeds
       mockApiRegister.mockResolvedValueOnce({ message: 'Registered' });
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith({
@@ -487,21 +504,21 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('redirects to /login with registered: true parameter upon successful account creation', async () => {
       mockApiRegister.mockResolvedValueOnce({ message: 'Success' });
 
-      const { getByPlaceholderText, getByText } = await renderScreen(<RegisterScreen />);
+      const { getByPlaceholderText, getByRole } = await renderScreen(<RegisterScreen />);
 
-      fireEvent.changeText(getByPlaceholderText('Your full name'), 'Test User');
-      fireEvent.changeText(getByPlaceholderText('you@example.com'), 'newuser@stm.dev');
-      fireEvent.changeText(getByPlaceholderText('Your phone number'), '0912345678');
-      fireEvent.changeText(getByPlaceholderText('At least 8 characters'), 'Password123');
+      await fireEvent.changeText(getByPlaceholderText('Họ và tên của bạn'), 'Test User');
+      await fireEvent.changeText(getByPlaceholderText('you@example.com'), 'newuser@stm.dev');
+      await fireEvent.changeText(getByPlaceholderText('Số điện thoại của bạn'), '0912345678');
+      await fireEvent.changeText(getByPlaceholderText('Tối thiểu 8 ký tự'), 'Password123');
 
       await waitFor(() => {
-        expect(getByPlaceholderText('Your full name').props.value).toBe('Test User');
+        expect(getByPlaceholderText('Họ và tên của bạn').props.value).toBe('Test User');
         expect(getByPlaceholderText('you@example.com').props.value).toBe('newuser@stm.dev');
-        expect(getByPlaceholderText('Your phone number').props.value).toBe('0912345678');
-        expect(getByPlaceholderText('At least 8 characters').props.value).toBe('Password123');
+        expect(getByPlaceholderText('Số điện thoại của bạn').props.value).toBe('0912345678');
+        expect(getByPlaceholderText('Tối thiểu 8 ký tự').props.value).toBe('Password123');
       });
 
-      fireEvent.press(getByText('Create account'));
+      await fireEvent.press(getByRole('button', { name: 'Tạo tài khoản' }));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith({
@@ -517,12 +534,12 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 11: Google Sign-in Fallback Notice', () => {
     it('displays notice when user attempts to log in with Google', async () => {
-      const { getByText } = await renderScreen(<LoginScreen />);
+      const { getByText, getByLabelText } = await renderScreen(<LoginScreen />);
 
-      fireEvent.press(getByText('Log in with google'));
+      await fireEvent.press(getByLabelText('Đăng nhập với Google'));
 
       await waitFor(() => {
-        expect(getByText('Google sign-in is not available in the mobile app yet.')).toBeTruthy();
+        expect(getByText('Đăng nhập Google hiện chưa khả dụng trên ứng dụng di động.')).toBeTruthy();
       });
     });
   });
@@ -534,22 +551,22 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     it('toggles password visibility between secure and plain text', async () => {
       const { getByPlaceholderText, getByLabelText, queryByLabelText } = await renderScreen(<LoginScreen />);
 
-      expect(getByPlaceholderText('Enter your password').props.secureTextEntry).toBe(true);
-      const showButton = getByLabelText('Show password');
+      expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.secureTextEntry).toBe(true);
+      const showButton = getByLabelText('Hiện mật khẩu');
       expect(showButton).toBeTruthy();
 
-      fireEvent.press(showButton);
+      await fireEvent.press(showButton);
 
       await waitFor(() => {
-        expect(getByPlaceholderText('Enter your password').props.secureTextEntry).toBe(false);
-        expect(queryByLabelText('Show password')).toBeNull();
-        expect(getByLabelText('Hide password')).toBeTruthy();
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.secureTextEntry).toBe(false);
+        expect(queryByLabelText('Hiện mật khẩu')).toBeNull();
+        expect(getByLabelText('Ẩn mật khẩu')).toBeTruthy();
       });
 
-      fireEvent.press(getByLabelText('Hide password'));
+      await fireEvent.press(getByLabelText('Ẩn mật khẩu'));
 
       await waitFor(() => {
-        expect(getByPlaceholderText('Enter your password').props.secureTextEntry).toBe(true);
+        expect(getByPlaceholderText('Nhập mật khẩu của bạn').props.secureTextEntry).toBe(true);
       });
     });
   });
@@ -559,9 +576,9 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   // =========================================================================
   describe('Case 14: Screen Navigation Transitions', () => {
     it('navigates to /register when clicking Sign Up on LoginScreen', async () => {
-      const { getByText } = await renderScreen(<LoginScreen />);
+      const { getByLabelText } = await renderScreen(<LoginScreen />);
 
-      fireEvent.press(getByText('Sign Up'));
+      await fireEvent.press(getByLabelText('Đăng ký'));
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith('/register');
@@ -569,9 +586,9 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     });
 
     it('navigates to /login when clicking Log in on RegisterScreen', async () => {
-      const { getByText } = await renderScreen(<RegisterScreen />);
+      const { getByLabelText } = await renderScreen(<RegisterScreen />);
 
-      fireEvent.press(getByText('Log in'));
+      await fireEvent.press(getByLabelText('Đăng nhập'));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/login');
@@ -647,13 +664,13 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
       });
 
       // 2. Toggle 'reviewer' role on
-      fireEvent.press(getByTestId('toggle-reviewer-on'));
+      await fireEvent.press(getByTestId('toggle-reviewer-on'));
       await waitFor(() => {
         expect(getByTestId('user-roles').props.children).toContain('reviewer');
       });
 
       // 3. Toggle 'surveyor' role off
-      fireEvent.press(getByTestId('toggle-surveyor-off'));
+      await fireEvent.press(getByTestId('toggle-surveyor-off'));
       await waitFor(() => {
         const roles = getByTestId('user-roles').props.children;
         expect(roles).not.toContain('surveyor');
@@ -662,7 +679,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
       });
 
       // 4. Log out
-      fireEvent.press(getByTestId('logout-btn'));
+      await fireEvent.press(getByTestId('logout-btn'));
       await waitFor(() => {
         expect(getByTestId('user-email').props.children).toBe('no-user');
         expect(mockStorage.get('session')).toBeUndefined();
