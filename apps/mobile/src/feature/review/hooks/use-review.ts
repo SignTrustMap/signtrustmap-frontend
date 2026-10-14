@@ -1,4 +1,4 @@
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
@@ -38,6 +38,7 @@ export function useGetMyReviewHistory(params: MyReviewHistoryParams, enabled = t
   return useQuery({
     queryKey: reviewKeys.history(session?.account.id, params),
     queryFn: session ? ({ signal }) => getMyReviewHistory(params, session.accessToken, signal) : skipToken,
+    placeholderData: keepPreviousData,
     enabled,
   });
 }

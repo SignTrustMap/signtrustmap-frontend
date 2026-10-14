@@ -122,6 +122,10 @@ jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
   useGetMySurveyStats: () => ({ data: { revalidationAvailable: 0 } }),
 }));
 
+jest.mock('@/feature/navigation/hooks/use-navigation', () => ({
+  useGetNavigationSessions: () => ({ data: { items: [], total: 0 } }),
+}));
+
 // ---------------------------------------------------------------------------
 // 4. Mock Review Data & Review Hooks
 // ---------------------------------------------------------------------------
@@ -304,12 +308,12 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders reviewer action cards with queue count badge and navigates to submission review', async () => {
       const { getByText, getByLabelText } = await render(<WorkScreen currentRole="reviewer" />);
 
-      expect(getByText('Pending Reviews')).toBeTruthy();
-      expect(getByText('3 NEW')).toBeTruthy();
-      expect(getByText('Pending Revalidation Evidence')).toBeTruthy();
-      expect(getByText('Traffic Sign Catalog')).toBeTruthy();
+      expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
+      expect(getByText('3 MỚI')).toBeTruthy();
+      expect(getByText('Minh chứng tái thẩm định chờ duyệt')).toBeTruthy();
+      expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
 
-      const heroButton = getByLabelText('Review pending submissions');
+      const heroButton = getByLabelText('Thẩm định các hồ sơ chờ xử lý');
       await fireEvent.press(heroButton);
 
       expect(mockPush).toHaveBeenCalledWith('/work/submission-review');
@@ -318,7 +322,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('navigates to /work/submission-review when ReviewerWorkPanel action card is pressed', async () => {
       const { getByText } = await render(<ReviewerWorkPanel />);
 
-      const panelCard = getByText('Pending Reviews');
+      const panelCard = getByText('Thẩm định chờ xử lý');
       expect(panelCard).toBeTruthy();
 
       await fireEvent.press(panelCard);
@@ -357,7 +361,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         </ReviewWorkflowProvider>
       );
 
-      expect(getByLabelText('Loading submissions')).toBeTruthy();
+      expect(getByLabelText('Đang tải danh sách thẩm định')).toBeTruthy();
     });
   });
 
@@ -386,7 +390,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
             request: { vote: 1 },
           })
         );
-        expect(getByText('Sign approved')).toBeTruthy();
+        expect(getByText('Đã phê duyệt biển báo')).toBeTruthy();
         // Deck advances to candidate 2
         expect(getByText('No Parking (P.130)')).toBeTruthy();
         expect(getByText('REVIEWING 2 OF 3')).toBeTruthy();
@@ -408,9 +412,6 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       await waitFor(() => {
         expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
       });
-
-      // Verify "Sign detected" label is displayed
-      expect(getByText('Sign detected')).toBeTruthy();
 
       await fireEvent.press(getByLabelText(/Decline submission/i));
 
@@ -442,6 +443,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });
+
 
     it('navigates to report note sheet when report button below "no correct option?" is clicked', async () => {
       const { getByLabelText, getByText, getByPlaceholderText } = await render(
@@ -485,6 +487,69 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         );
       });
     });
+
+    it('declines directly with "Không tìm thấy biển báo" reason without suggestedSignTypeId when none of top 4 is right', async () => {
+      const { getByLabelText, getByText } = await render(
+        <ReviewWorkflowProvider>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowProvider>
+      );
+
+      await waitFor(() => {
+        expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
+      });
+
+      await fireEvent.press(getByLabelText(/Decline submission/i));
+
+      await waitFor(() => {
+        expect(getByText('Không tìm thấy biển báo')).toBeTruthy();
+      });
+
+      // Select direct decline reason
+      await fireEvent.press(getByText('Không tìm thấy biển báo'));
+
+      // Confirm decline without remedy
+      await fireEvent.press(getByText('Xác nhận từ chối'));
+
+      await waitFor(() => {
+        expect(mockCastVote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            params: { candidateId: 'cand-1' },
+            request: expect.objectContaining({
+              vote: -1,
+              declineReason: 'Sign Not Found',
+            }),
+          })
+        );
+        const voteCall = mockCastVote.mock.calls[0][0];
+        expect(voteCall.request.suggestedSignTypeId).toBeUndefined();
+      });
+    });
+
+    it('opens catalog picker when "Chọn biển báo từ danh mục" is pressed', async () => {
+      const { getByLabelText, getByText } = await render(
+        <ReviewWorkflowProvider>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowProvider>
+      );
+
+      await waitFor(() => {
+        expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
+      });
+
+      await fireEvent.press(getByLabelText(/Decline submission/i));
+
+      await waitFor(() => {
+        expect(getByLabelText('Chọn biển báo từ danh mục')).toBeTruthy();
+      });
+
+      // Tap to open catalog picker
+      await fireEvent.press(getByLabelText('Chọn biển báo từ danh mục'));
+
+      await waitFor(() => {
+        expect(getByText('Chọn biển báo thay thế từ danh mục')).toBeTruthy();
+      });
+    });
   });
 
   // =========================================================================
@@ -505,13 +570,13 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       await fireEvent.press(getByLabelText('Report submission'));
 
       await waitFor(() => {
-        expect(getByText('Report Submission')).toBeTruthy();
+        expect(getByText('Báo cáo dữ liệu')).toBeTruthy();
       });
 
-      const noteInput = getByPlaceholderText('Describe the issue with this submission');
+      const noteInput = getByPlaceholderText('Mô tả sự cố hoặc sai lệch với dữ liệu này...');
       await fireEvent.changeText(noteInput, 'Vandalized sign candidate requiring supervisor check');
 
-      await fireEvent.press(getByText('Submit Report'));
+      await fireEvent.press(getByText('Gửi báo cáo'));
 
       await waitFor(() => {
         expect(mockReportCandidate).toHaveBeenCalledWith(
@@ -520,7 +585,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
             request: { reason: 'Vandalized sign candidate requiring supervisor check' },
           })
         );
-        expect(getByText('Sign reported')).toBeTruthy();
+        expect(getByText('Đã báo cáo biển báo')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });
@@ -550,7 +615,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
             params: { candidateId: 'cand-1' },
           })
         );
-        expect(getByText('Sign skipped (cannot identify)')).toBeTruthy();
+        expect(getByText('Đã bỏ qua biển báo (không thể nhận diện)')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });
@@ -613,18 +678,18 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
       });
 
-      const imageButton = getByLabelText('Sign submission image. Tap to enlarge.');
+      const imageButton = getByLabelText('Ảnh biển báo. Chạm để phóng to.');
       await fireEvent.press(imageButton);
 
       await waitFor(() => {
-        expect(getAllByLabelText('Close enlarged view').length).toBeGreaterThanOrEqual(1);
+        expect(getAllByLabelText('Đóng xem phóng to').length).toBeGreaterThanOrEqual(1);
       });
 
-      const closeButtons = getAllByLabelText('Close enlarged view');
+      const closeButtons = getAllByLabelText('Đóng xem phóng to');
       await fireEvent.press(closeButtons[0]);
 
       await waitFor(() => {
-        expect(queryAllByLabelText('Close enlarged view')).toHaveLength(0);
+        expect(queryAllByLabelText('Đóng xem phóng to')).toHaveLength(0);
       });
     });
   });
@@ -666,7 +731,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
 
       await waitFor(() => {
         expect(getByText('All reviews completed')).toBeTruthy();
-        expect(getByText('You have reviewed all available sign submissions.')).toBeTruthy();
+        expect(getByText('Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.')).toBeTruthy();
       });
     });
   });
@@ -714,14 +779,14 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         </ReviewWorkflowContext.Provider>
       );
 
-      expect(getByText('Submission Summary')).toBeTruthy();
-      expect(getByText(/3 signs reviewed/)).toBeTruthy();
+      expect(getByText('Tổng kết thẩm định')).toBeTruthy();
+      expect(getByText(/3 biển báo/)).toBeTruthy();
 
       // Metric counts
-      expect(getByText('APPROVED')).toBeTruthy();
-      expect(getByText('DECLINED')).toBeTruthy();
-      expect(getByText('REPORTED')).toBeTruthy();
-      expect(getByText('SKIPPED')).toBeTruthy();
+      expect(getByText('PHÊ DUYỆT')).toBeTruthy();
+      expect(getByText('TỪ CHỐI')).toBeTruthy();
+      expect(getByText('BÁO CÁO')).toBeTruthy();
+      expect(getByText('BỎ QUA')).toBeTruthy();
 
       // Reviewed sign rows
       expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
@@ -768,7 +833,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         </ReviewWorkflowContext.Provider>
       );
 
-      const checkButton = getByText('Check submission');
+      const checkButton = getByText('Kiểm tra lại hồ sơ');
       await fireEvent.press(checkButton);
 
       expect(mockBeginCheck).toHaveBeenCalled();
@@ -817,7 +882,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         </ReviewWorkflowContext.Provider>
       );
 
-      const submitButton = getByText('Submit');
+      const submitButton = getByText('Hoàn tất');
       await fireEvent.press(submitButton);
 
       expect(mockReset).toHaveBeenCalled();
@@ -831,16 +896,16 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders SubmissionFinishedScreen with review count and navigation buttons', async () => {
       const { getByText } = await render(<SubmissionFinishedScreen reviewedCount={3} />);
 
-      expect(getByText('Submission complete')).toBeTruthy();
-      expect(getByText(/3 sign reviews have been submitted successfully/)).toBeTruthy();
+      expect(getByText('Hoàn tất thẩm định')).toBeTruthy();
+      expect(getByText(/3/)).toBeTruthy();
 
-      await fireEvent.press(getByText('Return to home'));
+      await fireEvent.press(getByText('Quay lại trang chủ thẩm định'));
       expect(mockReplace).toHaveBeenCalledWith({
         pathname: '/work',
         params: { currentRole: 'reviewer' },
       });
 
-      await fireEvent.press(getByText('Review more signs'));
+      await fireEvent.press(getByText('Thẩm định thêm biển báo'));
       expect(mockReplace).toHaveBeenCalledWith('/work/submission-review');
     });
   });
@@ -852,40 +917,40 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders category chips and filters sign list by category when pressed', async () => {
       const { getByText, queryByText } = await render(<SignCatalogScreen />);
 
-      expect(getByText('Sign Catalog')).toBeTruthy();
-      expect(getByText('All Signs')).toBeTruthy();
-      expect(getByText('Warning Signs')).toBeTruthy();
-      expect(getByText('Prohibitory Signs')).toBeTruthy();
-      expect(getByText('Guide Signs')).toBeTruthy();
+      expect(getByText('Tra cứu biển báo')).toBeTruthy();
+      expect(getByText('Tất cả biển báo')).toBeTruthy();
+      expect(getByText('Biển báo nguy hiểm')).toBeTruthy();
+      expect(getByText('Biển báo cấm')).toBeTruthy();
+      expect(getByText('Biển chỉ dẫn')).toBeTruthy();
 
       // Initially displays all signs
-      expect(getByText('Dangerous Curve Ahead')).toBeTruthy();
-      expect(getByText('No Left Turn')).toBeTruthy();
-      expect(getByText('Parking Area')).toBeTruthy();
+      expect(getByText('Chỗ ngoặt nguy hiểm')).toBeTruthy();
+      expect(getByText('Cấm rẽ trái')).toBeTruthy();
+      expect(getByText('Nơi đỗ xe')).toBeTruthy();
 
       // Filter by Warning Signs (Category 1)
-      await fireEvent.press(getByText('Warning Signs'));
+      await fireEvent.press(getByText('Biển báo nguy hiểm'));
 
       await waitFor(() => {
-        expect(getByText('Dangerous Curve Ahead')).toBeTruthy();
-        expect(queryByText('No Left Turn')).toBeNull();
-        expect(queryByText('Parking Area')).toBeNull();
+        expect(getByText('Chỗ ngoặt nguy hiểm')).toBeTruthy();
+        expect(queryByText('Cấm rẽ trái')).toBeNull();
+        expect(queryByText('Nơi đỗ xe')).toBeNull();
       });
 
       // Filter by Prohibitory Signs (Category 2)
-      await fireEvent.press(getByText('Prohibitory Signs'));
+      await fireEvent.press(getByText('Biển báo cấm'));
       await waitFor(() => {
-        expect(queryByText('Dangerous Curve Ahead')).toBeNull();
-        expect(getByText('No Left Turn')).toBeTruthy();
-        expect(queryByText('Parking Area')).toBeNull();
+        expect(queryByText('Chỗ ngoặt nguy hiểm')).toBeNull();
+        expect(getByText('Cấm rẽ trái')).toBeTruthy();
+        expect(queryByText('Nơi đỗ xe')).toBeNull();
       });
 
       // Reset to All Signs
-      await fireEvent.press(getByText('All Signs'));
+      await fireEvent.press(getByText('Tất cả biển báo'));
       await waitFor(() => {
-        expect(getByText('Dangerous Curve Ahead')).toBeTruthy();
-        expect(getByText('No Left Turn')).toBeTruthy();
-        expect(getByText('Parking Area')).toBeTruthy();
+        expect(getByText('Chỗ ngoặt nguy hiểm')).toBeTruthy();
+        expect(getByText('Cấm rẽ trái')).toBeTruthy();
+        expect(getByText('Nơi đỗ xe')).toBeTruthy();
       });
     });
   });

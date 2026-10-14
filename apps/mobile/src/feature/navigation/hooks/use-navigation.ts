@@ -7,12 +7,14 @@ import {
     getCustomAlertProfiles,
     getNavigationPreferences,
     getNavigationRoute,
+    getNavigationSessions,
     getVehicleModes,
     initiateNavigationSession,
     previewNavigationRoute,
     type RoutingOptions,
     updateNavigationPreferences,
 } from '@/api/navigation/navigation';
+import { useSession } from '@/context/session-provider';
 import type {
     CreateAlertProfileDto,
     InitiateNavigationSessionDto,
@@ -88,6 +90,21 @@ export function useUpdateNavigationPreferences(accessToken?: string) {
     });
 }
 
+export function useGetNavigationSessions(
+    params: { page?: number; pageSize?: number } = { page: 1, pageSize: 20 },
+    enabled = true,
+) {
+    const { session } = useSession();
+    return useQuery({
+        queryKey: ['navigation-sessions', session?.account.id, params],
+        queryFn: session
+            ? ({ signal }) => getNavigationSessions(params, session.accessToken, signal)
+            : skipToken,
+        enabled: Boolean(session?.accessToken) && enabled,
+        staleTime: 30_000,
+    });
+}
+
 export function useInitiateNavigationSession(accessToken?: string) {
     const queryClient = useQueryClient();
     return useMutation({
@@ -97,15 +114,20 @@ export function useInitiateNavigationSession(accessToken?: string) {
         },
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+            void queryClient.invalidateQueries({ queryKey: ['navigation-sessions'] });
         },
     });
 }
 
 export function useEndNavigationSession(accessToken?: string) {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (sessionId: string) => {
             if (!accessToken) throw new Error('Authentication required');
             return endNavigationSession(sessionId, accessToken);
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: ['navigation-sessions'] });
         },
     });
 }

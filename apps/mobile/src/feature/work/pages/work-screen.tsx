@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from '@/components/ui/button';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
-import { useGetReviewQueue } from '@/feature/review/hooks/use-review';
+import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
+import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
 import {
   useGetMyPendingSubmissions,
   useGetMySubmissions,
@@ -73,10 +74,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const selectedRole = availableRoles.includes(activeRole) ? activeRole : 'driver';
 
+  const isDriverActive = Boolean(session && selectedRole === 'driver');
   const isSurveyorActive = Boolean(session && selectedRole === 'surveyor');
   const isReviewerActive = Boolean(session && selectedRole === 'reviewer');
 
-  // Live queries for surveyor and reviewer counts run only for their active section
+  // Live queries for driver, surveyor and reviewer counts run only for their active section
+  const { data: driverSessions } = useGetNavigationSessions({ page: 1, pageSize: 1 }, isDriverActive);
+  const { data: reviewerStats } = useGetMyReviewerStats(isReviewerActive);
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyorActive);
   const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewerActive);
   const { data: revalEvidenceQueue } = useGetRevalidationEvidenceQueue(
@@ -86,6 +90,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const { data: surveyStats } = useGetMySurveyStats(isSurveyorActive);
   const { data: firstRevalSign } = useGetFirstRevalidationSign(undefined, isSurveyorActive);
 
+  const driverSessionsTotal = driverSessions?.total ?? 0;
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
@@ -298,6 +303,20 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
               />
 
+              {/* Action Card: Reviewer Stats */}
+              <WorkActionCard
+                accentColor="#10B981"
+                count={reviewerStats?.totalReviews}
+                icon="chart-timeline-variant-shimmer"
+                label="Thống kê thẩm định"
+                onPress={() => router.push('/work/reviewer-stats')}
+                subtitle={
+                  reviewerStats
+                    ? `Độ tin cậy: ${Math.round((reviewerStats.reliabilityScore ?? 0) * 100)}% · Tỷ lệ chính xác: ${Math.round((reviewerStats.accuracyRate ?? 0) * 100)}%`
+                    : 'Xem độ tin cậy, tỷ lệ chính xác và lịch sử thẩm định của bạn'
+                }
+              />
+
               {/* Secondary Standout Action: Sign Catalog */}
               <WorkActionCard
                 accentColor="#8B5CF6"
@@ -308,31 +327,43 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               />
             </View>
           ) : (
-            <AppButton
-              accessibilityLabel="Xem biển báo đã ghi nhận khi phát trực tiếp"
-              onPress={() => router.push('/work/recorded-signs')}
-              pressedOpacity={0.88}
-              style={[
-                styles.recordedSignsButton,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              variant="ghost"
-            >
-              <View style={styles.recordedSignsLeft}>
-                <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
-                  <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
+            <View style={styles.actionList}>
+              {/* Standout Action: Driver Navigation History */}
+              <WorkActionCard
+                accentColor="#0671eb"
+                count={driverSessionsTotal}
+                icon="map-clock-outline"
+                label="Lịch sử di chuyển"
+                onPress={() => router.push('/work/navigation-history')}
+                subtitle="Xem lại các lộ trình và chuyến đi bạn đã điều hướng"
+              />
+
+              <AppButton
+                accessibilityLabel="Xem biển báo đã ghi nhận khi phát trực tiếp"
+                onPress={() => router.push('/work/recorded-signs')}
+                pressedOpacity={0.88}
+                style={[
+                  styles.recordedSignsButton,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                variant="ghost"
+              >
+                <View style={styles.recordedSignsLeft}>
+                  <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
+                    <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
+                  </View>
+                  <View style={styles.recordedSignsCopy}>
+                    <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
+                      Biển báo đã ghi nhận
+                    </Text>
+                    <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
+                      Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.recordedSignsCopy}>
-                  <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
-                    Biển báo đã ghi nhận
-                  </Text>
-                  <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
-                    Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn
-                  </Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
-            </AppButton>
+                <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
+              </AppButton>
+            </View>
           )}
         </ScrollView >
 
