@@ -242,6 +242,10 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
     isPending: mockCatalogLoading,
     error: mockCatalogError,
   }),
+  useRefreshCatalog: () => ({
+    mutateAsync: jest.fn().mockResolvedValue(mockCatalogData),
+    isPending: false,
+  }),
   useGetMyReviewerStats: () => ({
     data: {
       reviewerId: 'reviewer-user-1',

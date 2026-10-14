@@ -27,5 +27,8 @@ export const API_PATHS = {
     SAVED_ROUTES: '/saved-routes',
     PLACES_SAVED: '/places/saved',
     PLACES_RECENT_SEARCHES: '/places/recent-searches',
+    NOTIFICATIONS: '/notifications',
+    NOTIFICATIONS_UNREAD_COUNT: '/notifications/unread-count',
+    NOTIFICATIONS_READ_ALL: '/notifications/read-all',
 } as const;
 

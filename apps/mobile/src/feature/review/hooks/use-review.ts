@@ -4,7 +4,7 @@ import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
   reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats
 } from '@/api/reviews/review';
-import { getCatalog } from '@/api/reviews/catalog';
+import { getCatalog, CATALOG_TTL_MS } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
 import { SIGN_IN_TO_REVIEW_MESSAGE } from '@/constants/message';
 import { selectReviewHistory, selectReviewQueue } from '@/api/reviews/review-workflow';
@@ -109,8 +109,28 @@ export function useGetCatalog(enabled = true) {
   const { session } = useSession();
   return useQuery({
     queryKey: reviewKeys.catalog(session?.account.id),
-    queryFn: session ? ({ signal }) => getCatalog(session.accessToken, signal) : skipToken,
+    queryFn: session ? ({ signal }) => getCatalog(session.accessToken, { signal }) : skipToken,
     enabled,
+    staleTime: CATALOG_TTL_MS, // 1 week TTL
+    gcTime: Infinity,          // Keep cached indefinitely in memory
+  });
+}
+
+/**
+ * Force refresh the catalog from remote API and overwrite the device local storage cache.
+ */
+export function useRefreshCatalog() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
+      return getCatalog(session.accessToken, { forceRefresh: true });
+    },
+    onSuccess: (freshData) => {
+      queryClient.setQueryData(reviewKeys.catalog(session?.account.id), freshData);
+    },
   });
 }
 

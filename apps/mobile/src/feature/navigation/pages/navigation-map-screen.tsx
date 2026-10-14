@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Animated, BackHandler, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -45,6 +45,7 @@ import { applyDemoRouteSigns } from "../utils/demo-route-signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
+import { useGetUnreadNotificationCount } from '@/feature/notifications/hooks/use-notifications';
 import {
   ensureLocationPermission,
   fetchFreshGpsPosition,
@@ -109,6 +110,7 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
+  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -1764,39 +1766,60 @@ export function NavigationMapScreen() {
                 </View>
               ) : (
                 <>
-                  <View
-                    style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
-                  >
-                    <AppButton
-                      accessibilityLabel="Tìm kiếm điểm đến"
-                      onPress={() => router.push('/home/search')}
-                      style={styles.searchButton}
-                      variant="ghost"
+                  <View style={styles.searchBarHeaderRow}>
+                    <View
+                      style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                     >
-                      <Image
-                        accessibilityLabel="Logo ứng dụng"
-                        resizeMode="contain"
-                        source={AppLogo}
-                        style={styles.appLogo}
-                      />
-                      <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                        Bắt đầu tìm kiếm...
-                      </Text>
-                    </AppButton>
-                    <AppButton
-                      accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
-                      onPress={() => router.push('/credits/top-up')}
-                      pressedOpacity={0.68}
-                      style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                      variant="ghost"
+                      <AppButton
+                        accessibilityLabel="Tìm kiếm điểm đến"
+                        onPress={() => router.push('/home/search')}
+                        style={styles.searchButton}
+                        variant="ghost"
+                      >
+                        <Image
+                          accessibilityLabel="Logo ứng dụng"
+                          resizeMode="contain"
+                          source={AppLogo}
+                          style={styles.appLogo}
+                        />
+                        <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                          Bắt đầu tìm kiếm...
+                        </Text>
+                      </AppButton>
+                      <AppButton
+                        accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
+                        onPress={() => router.push('/credits/top-up')}
+                        pressedOpacity={0.68}
+                        style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                        variant="ghost"
+                      >
+                        <Text style={[styles.creditText, { color: theme.text }]}>
+                          {walletData?.wallet?.balance ?? '—'}
+                        </Text>
+                        <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                          <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                        </View>
+                      </AppButton>
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                      accessibilityRole="button"
+                      onPress={() => router.push('/notifications')}
+                      style={({ pressed }) => [
+                        styles.notificationCircleButton,
+                        pressed && { opacity: 0.8 },
+                      ]}
                     >
-                      <Text style={[styles.creditText, { color: theme.text }]}>
-                        {walletData?.wallet?.balance ?? '—'}
-                      </Text>
-                      <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                        <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                      </View>
-                    </AppButton>
+                      <Ionicons name="notifications" size={24} color="#000000" />
+                      {unreadNotificationCount > 0 && (
+                        <View style={styles.notificationBadge}>
+                          <Text style={styles.notificationBadgeText}>
+                            {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
                   </View>
                   <>
                     <AppButton
@@ -3397,7 +3420,13 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
   },
+  searchBarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   searchBar: {
+    flex: 1,
     minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
@@ -3408,6 +3437,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
+  },
+  notificationCircleButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 13,
   },
   searchButton: {
     flex: 1,
