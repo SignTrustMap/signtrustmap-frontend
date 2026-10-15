@@ -89,20 +89,16 @@ export function ReviewerStatsScreen() {
 
   // Reputation tier calculation
   let tierLabel = 'Thẩm định viên tập sự';
-  let tierWeight = 'Trọng số: 1.0x';
   let tierColor = '#0284C7';
 
   if (reliabilityPercent >= 90) {
     tierLabel = 'Thẩm định viên cao cấp';
-    tierWeight = 'Trọng số biểu quyết: 1.5x';
     tierColor = '#10B981';
   } else if (reliabilityPercent >= 75) {
     tierLabel = 'Thẩm định viên tin cậy';
-    tierWeight = 'Trọng số biểu quyết: 1.2x';
     tierColor = theme.primary;
   } else if (reliabilityPercent < 50 && totalReviews > 10) {
     tierLabel = 'Cần cải thiện độ chính xác';
-    tierWeight = 'Trọng số biểu quyết: 0.7x';
     tierColor = '#EF4444';
   }
 
@@ -217,10 +213,8 @@ export function ReviewerStatsScreen() {
               <View style={[styles.heroCard, { backgroundColor: theme.primary }]}>
                 <View style={styles.heroTopRow}>
                   <View style={styles.heroBadgeBox}>
-                    <View style={[styles.heroStatusDot, { backgroundColor: tierColor }]} />
                     <Text style={styles.heroTierText}>{tierLabel}</Text>
                   </View>
-                  <Text style={styles.heroWeightText}>{tierWeight}</Text>
                 </View>
 
                 <View style={styles.heroScoreRow}>
@@ -230,9 +224,9 @@ export function ReviewerStatsScreen() {
                   </View>
 
                   <View style={styles.heroScoreInfo}>
-                    <Text style={styles.heroScoreHeading}>Điểm tín nhiệm thẩm định</Text>
+                    <Text style={styles.heroScoreHeading}>Điểm tín nhiệm</Text>
                     <Text style={styles.heroScoreDesc}>
-                      Dựa trên sự đồng thuận của cộng đồng với các quyết định thẩm định biển báo của bạn.
+                      Dựa trên sự đồng thuận của cộng đồng SignTrustMap với các phiếu thẩm định biển báo của bạn.
                     </Text>
 
                     {streak > 1 ? (

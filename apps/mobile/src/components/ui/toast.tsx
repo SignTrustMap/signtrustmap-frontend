@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing, Colors } from '@/constants/theme';
 
 type AppToastProps = {
   duration?: number;
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     borderRadius: Rounded.md,
-    backgroundColor: '#666666',
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     shadowColor: '#000000',

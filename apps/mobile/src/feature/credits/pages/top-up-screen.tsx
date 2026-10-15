@@ -65,7 +65,7 @@ export function TopUpScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Current balance */}
         <View style={[styles.balancePanel, { backgroundColor: theme.backgroundSelected }]}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số dư hiện tại</Text>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số điểm hiện tại</Text>
           <Text style={[styles.balanceValue, { color: theme.text }]}>
             {balance} <Text style={styles.balanceUnit}>Credits</Text>
           </Text>

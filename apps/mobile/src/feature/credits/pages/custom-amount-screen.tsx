@@ -34,7 +34,7 @@ export function CustomAmountScreen() {
       <CreditScreenHeader onBack={() => router.back()} title="Số lượng tùy chỉnh" />
       <View style={styles.content}>
         <View style={styles.balanceRow}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số dư hiện tại</Text>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số điểm hiện tại</Text>
           <Text style={[styles.balanceValue, { color: theme.text }]}>
             {walletData?.wallet?.balance ?? 0} Credits
           </Text>

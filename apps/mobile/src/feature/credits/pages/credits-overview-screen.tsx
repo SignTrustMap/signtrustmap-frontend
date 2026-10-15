@@ -32,7 +32,7 @@ export function CreditsOverviewScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.balanceCard, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Số dư hiện tại</Text>
+            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Số điểm hiện tại</Text>
             <View style={styles.balanceRow}>
               {isLoading ? (
                 <ActivityIndicator color={theme.onPrimary} size="small" />

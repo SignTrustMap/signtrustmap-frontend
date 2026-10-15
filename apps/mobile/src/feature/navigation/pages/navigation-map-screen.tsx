@@ -38,6 +38,8 @@ import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { confirmSignPresence } from '@/api/sign-map/sign-map';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
+import { speechService } from '@/services/speech';
+import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
@@ -449,6 +451,36 @@ export function NavigationMapScreen() {
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
+  const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    getStorageItemAsync('signtrust_tts_enabled')
+      .then((val) => {
+        if (isMounted && val !== null) {
+          const enabled = val === 'true';
+          setIsTtsEnabled(enabled);
+          speechService.setEnabled(enabled);
+        }
+      })
+      .catch(() => { });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleToggleTts = useCallback(() => {
+    setIsTtsEnabled((prev) => {
+      const next = !prev;
+      speechService.setEnabled(next);
+      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => { });
+      setLocationToast({
+        id: Date.now(),
+        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
+      });
+      return next;
+    });
+  }, []);
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
   // Use rerouteOrigin when available (off-route rerouting), otherwise the
   // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
@@ -1048,6 +1080,7 @@ export function NavigationMapScreen() {
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
     speechLanguage: "vi-VN",
+    ttsEnabled: isTtsEnabled,
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
@@ -1787,7 +1820,7 @@ export function NavigationMapScreen() {
                         </Text>
                       </AppButton>
                       <AppButton
-                        accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
+                        accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletData?.wallet?.balance ?? 0}`}
                         onPress={() => router.push('/credits/top-up')}
                         pressedOpacity={0.68}
                         style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
@@ -2071,6 +2104,28 @@ export function NavigationMapScreen() {
 
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
+                {/* 0. Toggle TTS service button */}
+                <AppButton
+                  accessibilityLabel={
+                    isTtsEnabled
+                      ? "Tắt thông báo giọng nói"
+                      : "Bật thông báo giọng nói"
+                  }
+                  onPress={handleToggleTts}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    styles.ttsActionButton,
+                  ]}
+                  variant="surface"
+                >
+                  <MaterialCommunityIcons
+                    name={isTtsEnabled ? "volume-high" : "volume-off"}
+                    size={22}
+                    color="#000000"
+                  />
+                </AppButton>
+
                 {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
                   accessibilityLabel={
@@ -3271,6 +3326,10 @@ const styles = StyleSheet.create({
   locationActionButton: {
     borderWidth: 1,
   },
+  ttsActionButton: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+  },
   filterActiveBadge: {
     position: "absolute",
     top: 6,
@@ -3286,7 +3345,7 @@ const styles = StyleSheet.create({
   homeFilterCard: {
     position: "absolute",
     right: Spacing.four,
-    bottom: 124,
+    bottom: 194,
     width: 260,
     borderRadius: Rounded.lg,
     borderWidth: 1,

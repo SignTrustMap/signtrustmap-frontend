@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/ui/button';
@@ -97,6 +97,18 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
 
+  const activeIndex = availableRoles.indexOf(selectedRole);
+  const [switcherWidth, setSwitcherWidth] = useState<number>(0);
+  const slideAnimation = useRef(new Animated.Value(activeIndex >= 0 ? activeIndex : 0)).current;
+
+  const tabWidth = switcherWidth > 0 && availableRoles.length > 0
+    ? switcherWidth / availableRoles.length
+    : 0;
+  const translateX = slideAnimation.interpolate({
+    inputRange: availableRoles.map((_, i) => i),
+    outputRange: availableRoles.map((_, i) => i * tabWidth),
+  });
+
   const handleOpenRevalidationMap = async () => {
     let targetSign = firstRevalSign;
     if (!targetSign) {
@@ -141,6 +153,21 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
     );
   }, [mySubmissionsData?.items]);
 
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      Animated.spring(slideAnimation, {
+        toValue: activeIndex,
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 18,
+      }).start();
+    }
+  }, [activeIndex]);
+
+  const onSwitcherLayout = (e: LayoutChangeEvent) => {
+    setSwitcherWidth(e.nativeEvent.layout.width);
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -152,17 +179,32 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Clean Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
-            <Text style={[styles.subtitle, { color: theme.grey }]}>
-              Chọn vai trò để xem các công việc và nhiệm vụ được phân công.
-            </Text>
           </View>
 
           {/* Role Switcher Tabs */}
           <View
             accessibilityLabel="Vai trò công việc"
             accessibilityRole="tablist"
-            style={[styles.roleSwitcher, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            onLayout={onSwitcherLayout}
+            style={[
+              styles.roleSwitcher,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
           >
+            {/* The Sliding Pill Indicator */}
+            {tabWidth > 0 ? (
+              <Animated.View
+                style={[
+                  styles.slidingIndicator,
+                  {
+                    width: tabWidth,
+                    transform: [{ translateX }],
+                    backgroundColor: theme.primary,
+                  },
+                ]}
+              />
+            ) : null}
+
             {availableRoles.map((role) => {
               const isActive = selectedRole === role;
               const meta = roleMeta[role];
@@ -174,27 +216,26 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     : undefined;
 
               return (
-                <AppButton
+                <Pressable
+                  accessibilityLabel={`Vai trò ${meta.label}`}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                   key={role}
                   onPress={() => setActiveRole(role)}
-                  pressedOpacity={0.8}
-                  style={[
+                  style={({ pressed }) => [
                     styles.roleTab,
-                    isActive && [styles.roleTabActive, { borderBottomColor: theme.primary }],
+                    { opacity: pressed ? 0.8 : 1 },
                   ]}
-                  variant="ghost"
                 >
                   <MaterialCommunityIcons
-                    color={isActive ? "#fff" : theme.grey}
+                    color={isActive ? "#FFFFFF" : theme.grey}
                     name={meta.icon}
                     size={20}
                   />
                   <Text
                     style={[
                       styles.roleTabText,
-                      { color: isActive ? "#fff" : theme.text },
+                      { color: isActive ? "#FFFFFF" : theme.text },
                     ]}
                   >
                     {meta.label}
@@ -204,13 +245,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     <Text
                       style={[
                         styles.tabBadgeText,
-                        { color: isActive ? theme.onPrimary : theme.text },
+                        { color: isActive ? "#FFFFFF" : theme.text },
                       ]}
                     >
                       {badgeCount > 10 ? "10+" : badgeCount}
                     </Text>
                   ) : null}
-                </AppButton>
+                </Pressable>
               );
             })}
           </View>
@@ -220,7 +261,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             <Text style={[styles.roleTitle, { color: theme.text }]}>
               Nhiệm vụ {roleMeta[selectedRole].label}
             </Text>
-            <Text style={[styles.roleDescription, { color: theme.grey }]}>
+            <Text style={[styles.roleDescription, { color: theme.text }]}>
               {roleMeta[selectedRole].description}
             </Text>
           </View>
@@ -231,7 +272,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
               {/* Standout Action: Pending Submissions */}
               <WorkActionCard
-                accentColor="#0671eb"
+                accentColor={theme.primary}
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
                 label="Lịch sử khảo sát"
@@ -276,7 +317,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   </View>
                   <View style={styles.heroText}>
                     <View style={styles.heroTitleRow}>
-                      <Text style={styles.heroTitle}>Thẩm định chờ xử lý</Text>
+                      <Text style={styles.heroTitle}>Thẩm định chờ duyệt</Text>
                       {reviewQueueTotal > 0 ? (
                         <View style={styles.heroBadge}>
                           <Text style={styles.heroBadgeText}>{reviewQueueTotal} MỚI</Text>
@@ -285,8 +326,8 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     </View>
                     <Text style={styles.heroSubtitle}>
                       {reviewQueueTotal > 0
-                        ? `${reviewQueueTotal} biển báo ứng viên đang chờ phiếu xác minh của bạn`
-                        : 'Thẩm định hồ sơ biển báo trước khi đưa vào bản đồ'}
+                        ? `${reviewQueueTotal} biển báo cần bạn xác minh`
+                        : 'Không có biển báo cần xác minh'}
                     </Text>
                   </View>
                 </View>
@@ -298,7 +339,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#0284C7"
                 count={revalEvidenceCount}
                 icon="clipboard-check-outline"
-                label="Minh chứng tái thẩm định chờ duyệt"
+                label="Tái thẩm định"
                 onPress={() => router.push('/work/revalidation-review')}
                 subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
               />
@@ -308,7 +349,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor="#10B981"
                 count={reviewerStats?.totalReviews}
                 icon="chart-timeline-variant-shimmer"
-                label="Thống kê thẩm định"
+                label="Thống kê của bạn"
                 onPress={() => router.push('/work/reviewer-stats')}
                 subtitle={
                   reviewerStats
@@ -330,7 +371,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             <View style={styles.actionList}>
               {/* Standout Action: Driver Navigation History */}
               <WorkActionCard
-                accentColor="#0671eb"
+                accentColor={theme.primary}
                 count={driverSessionsTotal}
                 icon="map-clock-outline"
                 label="Lịch sử di chuyển"
@@ -417,10 +458,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   roleSwitcher: {
+    position: 'relative',
     flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: Rounded.round,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  slidingIndicator: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: Rounded.round,
+    zIndex: 0,
   },
   roleTab: {
     flex: 1,
@@ -428,14 +479,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: Spacing.one,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
     borderRadius: Rounded.round,
-  },
-  roleTabActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   roleTabText: {
     fontFamily: Fonts.body,
