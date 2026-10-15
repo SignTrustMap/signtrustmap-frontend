@@ -152,7 +152,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
 
       // Brand headers
       expect(getByText('SignTrustMap')).toBeTruthy();
-      expect(getByText(/nắm bắt/i)).toBeTruthy();
+      expect(getByText(/quay trở lại/i)).toBeTruthy();
 
       // Form inputs
       expect(getByPlaceholderText('demo@stm.dev')).toBeTruthy();
@@ -343,7 +343,7 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
       const { getByText, getByPlaceholderText, getByRole } = await renderScreen(<RegisterScreen />);
 
       expect(getByText('SignTrustMap')).toBeTruthy();
-      expect(getByText(/đơn giản hóa/i)).toBeTruthy();
+      expect(getByText(/Cùng nhau trở thành/i)).toBeTruthy();
 
       expect(getByPlaceholderText('Họ và tên của bạn')).toBeTruthy();
       expect(getByPlaceholderText('you@example.com')).toBeTruthy();

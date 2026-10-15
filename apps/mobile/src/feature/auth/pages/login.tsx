@@ -2,30 +2,36 @@ import { useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useLogin } from '@/feature/auth/hooks/use-login';
 import { useTheme } from '@/hooks/use-theme';
 
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const THEME_TEAL = '#007B8B';
 const TEAL_ACCENT = '#5EEAD4';
 
 export default function LoginScreen() {
   const loginMutation = useLogin();
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,6 +40,11 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loginError, setLoginError] = useState<string>();
   const [showDevLogin, setShowDevLogin] = useState(true);
+
+  const toggleDevLogin = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowDevLogin((prev) => !prev);
+  };
 
   const isSubmitting = loginMutation.isPending;
   const displayedLoginError = loginError ?? loginMutation.error?.message;
@@ -74,7 +85,7 @@ export default function LoginScreen() {
     try {
       await loginMutation.mutateAsync({ email: quickEmail, password: quickPass });
       router.replace('/');
-    } catch {}
+    } catch { }
   };
 
   return (
@@ -92,17 +103,20 @@ export default function LoginScreen() {
           {/* Top Hero Themed Section */}
           <View style={styles.heroSection}>
             {/* Subtle decorative curved background motifs */}
-            <View style={styles.decorCircleLarge} />
-            <View style={styles.decorCircleSmall} />
-            <View style={styles.decorRoadCurve} />
+            <View pointerEvents="none" style={styles.decorCircleLarge} />
+            <View pointerEvents="none" style={styles.decorCircleMedium} />
+            <View pointerEvents="none" style={styles.decorCircleSmall} />
+            <View pointerEvents="none" style={styles.decorCircleFloat} />
+            <View pointerEvents="none" style={styles.decorCircleDot} />
+            <View pointerEvents="none" style={styles.decorCircleDot2} />
+            <View pointerEvents="none" style={styles.decorRoadCurve} />
 
             <SafeAreaView edges={['top']} style={styles.heroSafeArea}>
               <View style={styles.heroHeader}>
                 <Text style={styles.heroGreeting}>SignTrustMap</Text>
                 <Text style={styles.heroHeadline}>
-                  Đăng nhập để{' '}
-                  <Text style={styles.heroHeadlineAccent}>nắm bắt</Text>
-                  {'\n'}mọi nhiệm vụ và dự án.
+                  Chào mừng quay trở lại, {' '}
+                  <Text style={styles.heroHeadlineAccent}>SignTrustMapper</Text>
                 </Text>
               </View>
             </SafeAreaView>
@@ -110,7 +124,12 @@ export default function LoginScreen() {
 
           {/* Bottom Card Section */}
           <View style={styles.bottomCardContainer}>
-            <View style={styles.bottomCard}>
+            <View
+              style={[
+                styles.bottomCard,
+                { paddingBottom: Math.max(Spacing.five, insets.bottom + 16) },
+              ]}
+            >
               {/* Form Title & Subtitle */}
               <View style={styles.titleArea}>
                 <Text style={styles.cardTitle}>Đăng nhập</Text>
@@ -228,7 +247,7 @@ export default function LoginScreen() {
                     style={styles.rememberMeContainer}
                   >
                     <Ionicons
-                      color={rememberMe ? THEME_TEAL : '#CBD5E1'}
+                      color={rememberMe ? theme.primary : '#CBD5E1'}
                       name={rememberMe ? 'checkbox' : 'square-outline'}
                       size={20}
                     />
@@ -306,7 +325,7 @@ export default function LoginScreen() {
                       accessibilityLabel={showDevLogin ? 'Ẩn Mock' : 'Hiện Mock'}
                       accessibilityRole="button"
                       hitSlop={8}
-                      onPress={() => setShowDevLogin((prev) => !prev)}
+                      onPress={toggleDevLogin}
                       style={styles.devToggleBtn}
                     >
                       <Ionicons
@@ -368,7 +387,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
   },
   keyboardView: {
     flex: 1,
@@ -379,34 +398,71 @@ const styles = StyleSheet.create({
 
   /* Hero Section */
   heroSection: {
-    minHeight: 220,
-    backgroundColor: THEME_TEAL,
+    flex: 1,
+    minHeight: 180,
+    backgroundColor: Colors.primary,
     position: 'relative',
     overflow: 'hidden',
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
-    justifyContent: 'flex-end',
   },
   decorCircleLarge: {
     position: 'absolute',
     top: -40,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderStyle: 'dashed',
+    right: -30,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  decorCircleMedium: {
+    position: 'absolute',
+    bottom: 20,
+    left: -35,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   decorCircleSmall: {
     position: 'absolute',
     top: 60,
-    right: 80,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    right: 70,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  decorCircleFloat: {
+    position: 'absolute',
+    bottom: 35,
+    right: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  decorCircleDot: {
+    position: 'absolute',
+    top: 28,
+    left: 24,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  decorCircleDot2: {
+    position: 'absolute',
+    bottom: 70,
+    right: 120,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
   },
   decorRoadCurve: {
     position: 'absolute',
@@ -415,12 +471,11 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     borderStyle: 'dashed',
   },
   heroSafeArea: {
-    paddingTop: Platform.OS === 'android' ? 24 : 8,
+    paddingTop: Platform.OS === 'android' ? 12 : 8,
   },
   heroHeader: {
     gap: 8,
@@ -447,11 +502,9 @@ const styles = StyleSheet.create({
 
   /* Bottom White Card */
   bottomCardContainer: {
-    flex: 1,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
   },
   bottomCard: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 36,
     borderTopRightRadius: 36,
@@ -492,7 +545,7 @@ const styles = StyleSheet.create({
   subtitleLink: {
     fontSize: 14,
     fontWeight: '700',
-    color: THEME_TEAL,
+    color: Colors.primary,
     fontFamily: Fonts.sans,
   },
 
@@ -557,7 +610,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontSize: 13,
     fontWeight: '600',
-    color: THEME_TEAL,
+    color: Colors.primary,
     fontFamily: Fonts.sans,
   },
 
@@ -584,11 +637,11 @@ const styles = StyleSheet.create({
   submitButton: {
     height: 52,
     borderRadius: 26,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.three,
-    shadowColor: THEME_TEAL,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

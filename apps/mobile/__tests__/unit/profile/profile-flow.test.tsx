@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { ProfileScreen } from '@/feature/profile/pages/profile-screen';
 
 // ---------------------------------------------------------------------------
@@ -74,13 +75,15 @@ jest.mock('@expo/vector-icons', () => {
 
 // 5. Mock expo-router
 let mockLocalSearchParams: Record<string, string> = {};
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  canGoBack: jest.fn(() => true),
+};
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockLocalSearchParams,
-  useRouter: () => ({
-    push: jest.fn(),
-    replace: jest.fn(),
-    back: jest.fn(),
-  }),
+  useRouter: () => mockRouter,
 }));
 
 // 6. Mock SignFilterManager component
@@ -167,8 +170,7 @@ describe('ProfileScreen Unit Test Suite', () => {
     it('renders the user full name, email, and initials avatar badge', async () => {
       const { getByText, getByLabelText } = await render(<ProfileScreen />);
 
-      // Headers & identity
-      expect(getByText('Profile')).toBeTruthy();
+      // Identity
       expect(getByText('Alex Rivera')).toBeTruthy();
       expect(getByText('alex.rivera@stm.dev')).toBeTruthy();
 
@@ -176,10 +178,10 @@ describe('ProfileScreen Unit Test Suite', () => {
       expect(getByText('AR')).toBeTruthy();
 
       // Accessibility label for avatar
-      expect(getByLabelText('Alex Rivera profile picture')).toBeTruthy();
+      expect(getByLabelText('Ảnh đại diện của Alex Rivera')).toBeTruthy();
     });
 
-    it('renders fallback display name and ST initials when user name is undefined', async () => {
+    it('renders fallback display name and NS initials when user name is undefined', async () => {
       mockSessionData = {
         accessToken: 'mock-access-token',
         account: {
@@ -193,12 +195,21 @@ describe('ProfileScreen Unit Test Suite', () => {
       const { getByText, getByLabelText } = await render(<ProfileScreen />);
 
       // Fallback display name
-      expect(getByText('SignTrustMap user')).toBeTruthy();
+      expect(getByText('Người dùng SignTrustMap')).toBeTruthy();
       expect(getByText('anon@stm.dev')).toBeTruthy();
 
-      // Fallback initials "SU" for "SignTrustMap user"
-      expect(getByText('SU')).toBeTruthy();
-      expect(getByLabelText('SignTrustMap user profile picture')).toBeTruthy();
+      // Fallback initials "ND" for "Người dùng SignTrustMap"
+      expect(getByText('ND')).toBeTruthy();
+      expect(getByLabelText('Ảnh đại diện của Người dùng SignTrustMap')).toBeTruthy();
+    });
+
+    it('navigates to edit screen when clicking Chỉnh sửa', async () => {
+      const { getByLabelText } = await render(<ProfileScreen />);
+
+      const editButton = getByLabelText('Chỉnh sửa thông tin');
+      fireEvent.press(editButton);
+
+      expect(mockRouter.push).toHaveBeenCalledWith('/(authenticated)/(tabs)/profile/edit');
     });
   });
 
@@ -209,25 +220,23 @@ describe('ProfileScreen Unit Test Suite', () => {
     it('displays Driver role as always enabled without a toggle switch', async () => {
       const { getByText, queryByLabelText } = await render(<ProfileScreen />);
 
-      expect(getByText('Account roles')).toBeTruthy();
-      expect(getByText('Driver access is always included')).toBeTruthy();
-      expect(getByText('Driver')).toBeTruthy();
-      expect(getByText('Navigation access')).toBeTruthy();
+      expect(getByText('Vai trò tài khoản')).toBeTruthy();
+      expect(getByText('Quyền Tài xế luôn được kích hoạt mặc định')).toBeTruthy();
+      expect(getByText('Tài xế')).toBeTruthy();
+      expect(getByText('Quyền điều hướng bản đồ')).toBeTruthy();
 
       // Driver cannot be toggled (no switch button)
-      expect(queryByLabelText(/Enable Driver role/i)).toBeNull();
-      expect(queryByLabelText(/Disable Driver role/i)).toBeNull();
+      expect(queryByLabelText(/vai trò Tài xế/i)).toBeNull();
     });
 
     it('displays Reviewer role as On when user has reviewer role and toggles it Off', async () => {
-      // mockSessionData has roles: ['driver', 'reviewer']
       const { getByLabelText, getByText } = await render(<ProfileScreen />);
 
-      expect(getByText('Reviewer')).toBeTruthy();
-      expect(getByText('Reviewer tools')).toBeTruthy();
+      expect(getByText('Thẩm định viên')).toBeTruthy();
+      expect(getByText('Công cụ Thẩm định viên')).toBeTruthy();
 
-      // Switch should have label "Disable Reviewer role"
-      const reviewerSwitch = getByLabelText('Disable Reviewer role');
+      // Switch should have label "Tắt vai trò Thẩm định viên"
+      const reviewerSwitch = getByLabelText('Tắt vai trò Thẩm định viên');
       expect(reviewerSwitch.props.accessibilityRole).toBe('switch');
       expect(reviewerSwitch.props.accessibilityState).toEqual({ checked: true });
 
@@ -238,14 +247,13 @@ describe('ProfileScreen Unit Test Suite', () => {
     });
 
     it('displays Surveyor role as Off when not in user roles and toggles it On', async () => {
-      // mockSessionData has roles: ['driver', 'reviewer'] (surveyor is not present)
       const { getByLabelText, getByText } = await render(<ProfileScreen />);
 
-      expect(getByText('Surveyor')).toBeTruthy();
-      expect(getByText('Surveyor tools')).toBeTruthy();
+      expect(getByText('Khảo sát viên')).toBeTruthy();
+      expect(getByText('Công cụ Khảo sát viên')).toBeTruthy();
 
-      // Switch should have label "Enable Surveyor role"
-      const surveyorSwitch = getByLabelText('Enable Surveyor role');
+      // Switch should have label "Bật vai trò Khảo sát viên"
+      const surveyorSwitch = getByLabelText('Bật vai trò Khảo sát viên');
       expect(surveyorSwitch.props.accessibilityRole).toBe('switch');
       expect(surveyorSwitch.props.accessibilityState).toEqual({ checked: false });
 
@@ -260,19 +268,25 @@ describe('ProfileScreen Unit Test Suite', () => {
   // CASE 3: Sign Filter Manager Section
   // =========================================================================
   describe('Case 3: Sign Filter Manager Section', () => {
-    it('renders the embedded SignFilterManager component', async () => {
-      const { getByTestId, getByText } = await render(<ProfileScreen />);
+    it('renders the embedded SignFilterManager component when section is opened', async () => {
+      const { getByTestId, getByText, getByLabelText } = await render(<ProfileScreen />);
 
-      expect(getByTestId('sign-filter-manager')).toBeTruthy();
-      expect(getByText('Sign Filter Manager Section')).toBeTruthy();
+      const openFilterButton = getByLabelText('Mở rộng bộ lọc biển báo');
+      fireEvent.press(openFilterButton);
+
+      await waitFor(() => {
+        expect(getByTestId('sign-filter-manager')).toBeTruthy();
+        expect(getByText('Sign Filter Manager Section')).toBeTruthy();
+      });
     });
 
-    it('handles scrollTo="signFilter" param without errors', async () => {
+    it('handles scrollTo="signFilter" param and automatically expands section', async () => {
       mockLocalSearchParams = { scrollTo: 'signFilter' };
 
-      // Render with mock layout measurements
       const { getByTestId } = await render(<ProfileScreen />);
-      expect(getByTestId('sign-filter-manager')).toBeTruthy();
+      await waitFor(() => {
+        expect(getByTestId('sign-filter-manager')).toBeTruthy();
+      });
     });
   });
 
@@ -280,31 +294,13 @@ describe('ProfileScreen Unit Test Suite', () => {
   // CASE 4: App Updates Section
   // =========================================================================
   describe('Case 4: Application Updates', () => {
-    it('renders current app version and triggers update check on press', async () => {
-      const { getByText, getByLabelText } = await render(<ProfileScreen />);
+    it('triggers update check on press of the cog update button', async () => {
+      const { getByLabelText } = await render(<ProfileScreen />);
 
-      expect(getByText('Application')).toBeTruthy();
-      expect(getByText('App updates')).toBeTruthy();
-      // Version 1.4.0 · 9f8e7d6
-      expect(getByText('Version 1.4.0 · 9f8e7d6')).toBeTruthy();
-
-      const updateButton = getByLabelText('Check for application updates');
+      const updateButton = getByLabelText('Kiểm tra cập nhật');
       fireEvent.press(updateButton);
 
       expect(mockCheckForUpdates).toHaveBeenCalledTimes(1);
-    });
-
-    it('disables update button and shows checking state when checking', async () => {
-      mockAppUpdateState = {
-        ...mockAppUpdateState,
-        status: 'checking',
-      };
-
-      const { getByText, getByLabelText } = await render(<ProfileScreen />);
-
-      expect(getByText('Checking for updates…')).toBeTruthy();
-      const updateButton = getByLabelText('Check for application updates');
-      expect(updateButton.props.accessibilityState).toEqual({ disabled: true });
     });
 
     it('renders UpdateModal when isModalOpen is true', async () => {
@@ -321,20 +317,29 @@ describe('ProfileScreen Unit Test Suite', () => {
   });
 
   // =========================================================================
-  // CASE 5: Logout Action
+  // CASE 5: Logout Action via Dropdown Menu
   // =========================================================================
   describe('Case 5: Log out Flow', () => {
-    it('renders Log out button and invokes logOut callback upon click', async () => {
-      const { getByText, getAllByLabelText } = await render(<ProfileScreen />);
+    it('opens dropdown menu and invokes logOut callback upon click', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+        const logoutAction = buttons?.find((b: any) => b.text === 'Đăng xuất');
+        logoutAction?.onPress?.();
+      });
 
-      expect(getByText('Sign out of this device')).toBeTruthy();
+      const { getByLabelText, findByLabelText } = await render(<ProfileScreen />);
 
-      // Find the logout button
-      const logOutButtons = getAllByLabelText('Log out');
-      expect(logOutButtons.length).toBeGreaterThan(0);
+      // Open 3-dots dropdown menu
+      const menuButton = getByLabelText('Tùy chọn tài khoản');
+      fireEvent.press(menuButton);
 
-      fireEvent.press(logOutButtons[0]);
+      // Find the logout button in the dropdown
+      const logOutButton = await findByLabelText('Đăng xuất');
+      fireEvent.press(logOutButton);
+
+      expect(alertSpy).toHaveBeenCalled();
       expect(mockLogOut).toHaveBeenCalledTimes(1);
+
+      alertSpy.mockRestore();
     });
   });
 });

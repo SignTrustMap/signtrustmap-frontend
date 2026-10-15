@@ -10,15 +10,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useRegister } from '@/feature/auth/hooks/use-register';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const THEME_TEAL = '#007B8B';
 const TEAL_ACCENT = '#5EEAD4';
 
 type FormErrors = Partial<Record<'email' | 'password' | 'fullName' | 'phone', string>>;
@@ -26,6 +26,8 @@ type FormErrors = Partial<Record<'email' | 'password' | 'fullName' | 'phone', st
 export default function RegisterScreen() {
   const router = useRouter();
   const registerMutation = useRegister();
+  const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,17 +87,21 @@ export default function RegisterScreen() {
         >
           {/* Top Hero Themed Section */}
           <View style={styles.heroSection}>
-            <View style={styles.decorCircleLarge} />
-            <View style={styles.decorCircleSmall} />
-            <View style={styles.decorRoadCurve} />
+            <View pointerEvents="none" style={styles.decorCircleLarge} />
+            <View pointerEvents="none" style={styles.decorCircleMedium} />
+            <View pointerEvents="none" style={styles.decorCircleSmall} />
+            <View pointerEvents="none" style={styles.decorCircleFloat} />
+            <View pointerEvents="none" style={styles.decorCircleDot} />
+            <View pointerEvents="none" style={styles.decorCircleDot2} />
+            <View pointerEvents="none" style={styles.decorRoadCurve} />
 
             <SafeAreaView edges={['top']} style={styles.heroSafeArea}>
               <View style={styles.heroHeader}>
                 <Text style={styles.heroGreeting}>SignTrustMap</Text>
                 <Text style={styles.heroHeadline}>
-                  Tạo tài khoản và{' '}
-                  <Text style={styles.heroHeadlineAccent}>đơn giản hóa</Text>
-                  {'\n'}công việc khảo sát.
+                  Cùng nhau trở thành một {' '}
+                  <Text style={styles.heroHeadlineAccent}>SignTrustMapper</Text>
+                  {'\n'}để xây dựng một nền tảng đáng tin cậy.
                 </Text>
               </View>
             </SafeAreaView>
@@ -103,7 +109,12 @@ export default function RegisterScreen() {
 
           {/* Bottom Card Section */}
           <View style={styles.bottomCardContainer}>
-            <View style={styles.bottomCard}>
+            <View
+              style={[
+                styles.bottomCard,
+                { paddingBottom: Math.max(Spacing.five, insets.bottom + 16) },
+              ]}
+            >
               {/* Form Title & Subtitle */}
               <View style={styles.titleArea}>
                 <Text style={styles.cardTitle}>Đăng ký</Text>
@@ -286,7 +297,7 @@ export default function RegisterScreen() {
                     style={styles.rememberMeContainer}
                   >
                     <Ionicons
-                      color={rememberMe ? THEME_TEAL : '#CBD5E1'}
+                      color={rememberMe ? theme.primary : '#CBD5E1'}
                       name={rememberMe ? 'checkbox' : 'square-outline'}
                       size={20}
                     />
@@ -357,7 +368,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
   },
   keyboardView: {
     flex: 1,
@@ -368,34 +379,73 @@ const styles = StyleSheet.create({
 
   /* Hero Section */
   heroSection: {
+    flex: 1,
     minHeight: 180,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
     position: 'relative',
     overflow: 'hidden',
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
-    justifyContent: 'flex-end',
   },
   decorCircleLarge: {
     position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderStyle: 'dashed',
+    top: -40,
+    right: -30,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  decorCircleMedium: {
+    position: 'absolute',
+    bottom: 20,
+    left: -35,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   decorCircleSmall: {
     position: 'absolute',
-    top: 50,
+    top: 60,
     right: 70,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  decorCircleFloat: {
+    position: 'absolute',
+    bottom: 35,
+    right: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  decorCircleDot: {
+    position: 'absolute',
+    top: 28,
+    left: 24,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  decorCircleDot2: {
+    position: 'absolute',
+    bottom: 70,
+    right: 120,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
   },
   decorRoadCurve: {
     position: 'absolute',
@@ -409,7 +459,7 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   heroSafeArea: {
-    paddingTop: Platform.OS === 'android' ? 24 : 8,
+    paddingTop: Platform.OS === 'android' ? 12 : 8,
   },
   heroHeader: {
     gap: 8,
@@ -436,11 +486,9 @@ const styles = StyleSheet.create({
 
   /* Bottom White Card */
   bottomCardContainer: {
-    flex: 1,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
   },
   bottomCard: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 36,
     borderTopRightRadius: 36,
@@ -481,7 +529,7 @@ const styles = StyleSheet.create({
   subtitleLink: {
     fontSize: 14,
     fontWeight: '700',
-    color: THEME_TEAL,
+    color: Colors.primary,
     fontFamily: Fonts.sans,
   },
 
@@ -566,11 +614,11 @@ const styles = StyleSheet.create({
   submitButton: {
     height: 52,
     borderRadius: 26,
-    backgroundColor: THEME_TEAL,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: Spacing.three,
-    shadowColor: THEME_TEAL,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

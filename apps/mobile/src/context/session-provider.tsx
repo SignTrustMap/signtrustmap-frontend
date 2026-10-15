@@ -27,6 +27,7 @@ type SessionContextValue = {
   logOut: () => Promise<void>;
   session: AppSession | null;
   setRoleEnabled: (role: OptionalAccountRole, enabled: boolean) => Promise<void>;
+  updateAccount?: (updates: Partial<Account>) => Promise<void>;
 };
 
 const AuthContext = createContext<SessionContextValue | null>(null);
@@ -150,9 +151,22 @@ export function SessionProvider({ children }: PropsWithChildren) {
     await setStorageItemAsync('session', JSON.stringify(nextSession));
   }
 
+  async function updateAccount(updates: Partial<Account>) {
+    if (!session) return;
+    const nextSession = {
+      ...session,
+      account: {
+        ...session.account,
+        ...updates,
+      },
+    };
+    setSession(nextSession);
+    await setStorageItemAsync('session', JSON.stringify(nextSession));
+  }
+
   return (
     <AuthContext.Provider
-      value={{ isInitializing, isLoading, logIn, logOut, session, setRoleEnabled }}
+      value={{ isInitializing, isLoading, logIn, logOut, session, setRoleEnabled, updateAccount }}
     >
       {children}
     </AuthContext.Provider>
