@@ -21,6 +21,7 @@ import {
   useGetFirstRevalidationSign,
   useGetRevalidationEvidenceQueue,
 } from '@/feature/revalidation/hooks/use-revalidation';
+import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
 import {
   getFallbackMissionsForRole,
@@ -96,10 +97,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   );
   const { data: surveyStats } = useGetMySurveyStats(isSurveyorActive);
   const { data: firstRevalSign } = useGetFirstRevalidationSign(undefined, isSurveyorActive);
+  const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyorActive);
 
   const driverSessionsTotal = driverSessions?.total ?? 0;
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
+  const recapturesCount = recapturesData?.total ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
   const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
@@ -229,7 +232,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               const meta = roleMeta[role];
               const badgeCount =
                 role === 'surveyor'
-                  ? draftCount + pendingSurveyCount
+                  ? draftCount + pendingSurveyCount + recapturesCount
                   : role === 'reviewer'
                     ? reviewQueueTotal
                     : undefined;
@@ -344,6 +347,15 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 label="Tái xác nhận biển báo"
                 onPress={handleOpenRevalidationMap}
                 subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
+              />
+              {/* Standout Action: Recaptures Requested */}
+              <WorkActionCard
+                accentColor="#F59E0B"
+                count={recapturesCount}
+                icon="camera-retake-outline"
+                label="Yêu cầu chụp lại ảnh"
+                onPress={() => router.push('/work/recaptures')}
+                subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
               />
             </View>
           ) : selectedRole === 'reviewer' ? (

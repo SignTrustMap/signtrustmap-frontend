@@ -41,6 +41,12 @@ const actionDetails: Record<
     summary: 'Không thể nhận diện biển báo.',
     symbol: '↷',
   },
+  reported_new_sign: {
+    color: Colors.warning,
+    label: 'New Sign Type',
+    summary: 'Reported new sign type for catalog review.',
+    symbol: '★',
+  },
 };
 
 function SummaryMetric({ action, count }: { action: ReviewActionType; count: number }) {
@@ -106,8 +112,8 @@ export function SubmissionSummaryScreen() {
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
   const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
-    (result, review) => ({ ...result, [review.action]: result[review.action] + 1 }),
-    { approved: 0, declined: 0, reported: 0, skipped: 0 },
+    (result, review) => ({ ...result, [review.action]: (result[review.action] || 0) + 1 }),
+    { approved: 0, declined: 0, reported: 0, skipped: 0, reported_new_sign: 0 },
   );
 
   return (
@@ -124,7 +130,7 @@ export function SubmissionSummaryScreen() {
           <View style={styles.metrics}>
             <SummaryMetric action="approved" count={counts.approved} />
             <SummaryMetric action="declined" count={counts.declined} />
-            <SummaryMetric action="reported" count={counts.reported} />
+            <SummaryMetric action="reported_new_sign" count={counts.reported_new_sign} />
             <SummaryMetric action="skipped" count={counts.skipped} />
           </View>
 

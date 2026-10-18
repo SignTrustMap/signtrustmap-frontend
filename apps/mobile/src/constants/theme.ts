@@ -16,6 +16,7 @@ export const Colors = {
   textSecondary: '#007b8b',
   placeholder: '#888888',
   danger: '#FF0000',
+  warning: '#f59e0b',
   grey: '#888888',
 } as const;
 

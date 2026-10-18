@@ -34,7 +34,10 @@ export interface MissingSignTypeReport {
   tempLabel: string
   category: string
   sampleImageUrl: string
+  bestFrameUrl?: string
+  cropImageUrl?: string
   reportedBy: string
+  reporterId?: string
   reportedAt: string
   lat: number
   lng: number
@@ -44,12 +47,24 @@ export interface MissingSignTypeReport {
   priority?: 'Cao' | 'Vừa' | 'Thấp'
   reporterNote: string
   similarCatalogEntries: string[]
-  status: 'Open' | 'Approved' | 'Rejected' | 'Merged'
+  status: 'Open' | 'Approved' | 'Rejected' | 'Merged' | 'Escalated' | 'Incomplete'
+  rawStatus?: 'PENDING' | 'MERGED' | 'ESCALATED_ADMIN' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE' | 'IN_REVIEW'
+  candidateId?: string | null
+  proposedCategoryId?: number | null
+  suggestedShape?: string | null
+  suggestedColorScheme?: string | null
+  mergedIntoSignTypeId?: number | null
+  staffNotes?: string | null
+  reviewedBy?: string | null
+  createdAt?: string
+  updatedAt?: string
+  resolvedAt?: string | null
 }
 
 export interface AvailableSignOption {
+  id?: number
   code: string
-  nameKey: string
+  nameKey?: string
   codeTitle: string
 }
 

@@ -5,6 +5,7 @@ import {
   useGetReviewHistory,
   useCastVoteOnSignCandidate,
   useReportSignCandidate,
+  useReportMissingType,
   useSkipSign,
   useUndoVoteOnCandidate,
 } from '@/feature/review/hooks/use-review';
@@ -13,12 +14,13 @@ import {
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
+import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
 import {
   REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
   UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
 } from '@/constants/message';
 
-export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped';
+export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped' | 'reported_new_sign';
 
 export type CompletedReview = {
   action: ReviewActionType;
@@ -32,7 +34,12 @@ export type ReviewWorkflowContextValue = {
   isCheckingSubmission: boolean;
   completeCurrentReview: (
     actionOrDecision: ReviewActionType | ReviewDecision,
-    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
+    details?: {
+      declineReason?: string;
+      declineNote?: string;
+      suggestedSignTypeId?: number | string;
+      newSignReport?: CreateMissingTypeReportDto;
+    }
   ) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
@@ -66,6 +73,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
   const { mutateAsync: reportCandidate } = useReportSignCandidate();
+  const { mutateAsync: reportMissingTypeMutation } = useReportMissingType();
   const { mutateAsync: skipSign } = useSkipSign();
   const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
 
@@ -185,7 +193,12 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const completeCurrentReview = async (
     actionOrDecision: ReviewActionType | ReviewDecision,
-    details?: { declineReason?: string; declineNote?: string; suggestedSignTypeId?: number | string }
+    details?: {
+      declineReason?: string;
+      declineNote?: string;
+      suggestedSignTypeId?: number | string;
+      newSignReport?: CreateMissingTypeReportDto;
+    }
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
@@ -220,7 +233,14 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     // 2. Dispatch backend network call in background without blocking state progression
     const params = { candidateId: submission.id };
     try {
-      if (action === 'reported') {
+      if (action === 'reported_new_sign') {
+        if (details?.newSignReport) {
+          await reportMissingTypeMutation({
+            ...details.newSignReport,
+            candidateId: submission.id,
+          });
+        }
+      } else if (action === 'reported') {
         await reportCandidate({
           params,
           request: {

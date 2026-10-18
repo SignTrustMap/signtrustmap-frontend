@@ -70,7 +70,7 @@ export function DataFilterBar({
       {/* Top row: Search input + Controls (Sort Dropdown, Custom Selects, View toggles via children) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-0">
+        <div className="relative flex-1 min-w-[200px] sm:min-w-[240px]">
           <MagnifyingGlass
             size={16}
             weight="bold"
@@ -95,9 +95,9 @@ export function DataFilterBar({
         </div>
 
         {/* Right controls: Category Dropdown (if select mode) + Sort Dropdown + Additional Controls (children) */}
-        <div className="flex items-center gap-3 sm:gap-4 flex-wrap sm:flex-nowrap shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
           {isSelectMode && categories.length > 0 && onSelectCategory && selectedCategory && (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 whitespace-nowrap">
                 {categorySelectLabel || t('filter.category', 'Phân loại')}:
               </span>
@@ -110,7 +110,7 @@ export function DataFilterBar({
                   label: cat.label,
                   count: cat.count,
                 }))}
-                className="w-48 sm:w-60 md:w-64 max-w-[280px] min-w-0"
+                className="w-40 sm:w-48 md:w-52 max-w-[240px] min-w-0"
               />
             </div>
           )}

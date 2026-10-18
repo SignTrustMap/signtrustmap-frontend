@@ -67,6 +67,7 @@ export const API_ENDPOINTS = {
     REBUILD_PROTOTYPES: '/api/v1/catalog/rebuild-prototypes',
     PUBLISH_VERSION: '/api/v1/catalog/publish-version',
     SYNC_EMBEDDINGS: '/api/v1/catalog/sync-embeddings',
+    REPROCESS: (id: number | string) => `/api/v1/catalog/sign-types/${id}/reprocess-candidates`,
     MISSING_REPORTS: {
       BASE: '/api/v1/moderation/missing-type-reports',
       DETAIL: (id: string) => `/api/v1/moderation/missing-type-reports/${id}`,
@@ -87,6 +88,7 @@ export const API_ENDPOINTS = {
     CANDIDATES: '/api/v1/reviews/queue',
     CANDIDATE_DETAIL: (id: string) => `/api/v1/reviews/candidates/${id}`,
     DECISION: (id: string) => `/api/v1/reviews/${id}/vote`,
+    REQUEST_RECAPTURE: (candidateId: string) => `/api/v1/reviews/candidates/${candidateId}/request-recapture`,
     REPORTS: '/api/v1/moderation/cases',
     TASKS: '/api/v1/revalidation/tasks',
   },

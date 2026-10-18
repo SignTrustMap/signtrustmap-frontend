@@ -76,20 +76,41 @@ export interface CreateSignCategoryInput {
 
 export interface UpdateSignCategoryInput extends Partial<CreateSignCategoryInput> {}
 
+export interface CandidateEnriched {
+  id: string
+  predictedSignTypeId?: number
+  confidenceScore?: number
+  bestFrameUrl?: string
+  signCropUrl?: string
+  status?: string
+  latitude?: number
+  longitude?: number
+}
+
 export interface MissingTypeReportItem {
   id: string
-  submittedBy: string
+  reporterId?: string
+  submittedBy?: string
+  candidateId?: string | null
   originalCandidateId?: string | null
-  suggestedCode?: string | null
+  proposedCategoryId?: number | null
+  proposedName: string
   suggestedNameVi?: string | null
   suggestedNameEn?: string | null
+  suggestedCode?: string | null
+  description?: string | null
+  suggestedShape?: string | null
+  suggestedColorScheme?: string | null
   cropImageUrl?: string | null
-  status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
+  status: 'PENDING' | 'MERGED' | 'ESCALATED_ADMIN' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE' | 'IN_REVIEW'
+  mergedIntoSignTypeId?: number | null
+  reviewedBy?: string | null
   staffNotes?: string | null
   resolvedBy?: string | null
   resolvedAt?: string | null
   createdAt: string
   updatedAt: string
+  candidate?: CandidateEnriched | null
 }
 
 export interface PaginatedMissingReportsResponse {
@@ -101,21 +122,34 @@ export interface PaginatedMissingReportsResponse {
 }
 
 export interface ApproveAndCreateSignTypeInput {
+  proposedCategoryId?: number
   categoryId?: number
-  signCode: string
-  nameVi: string
-  nameEn: string
+  signCode?: string
+  nameVi?: string
+  nameEn?: string
   description?: string
+  suggestedShape?: string
   shape?: string
+  suggestedColorScheme?: string
   colorScheme?: string
   aiLabelPrompt?: string
+  staffNotes?: string
   representativeImageKey?: string
 }
 
 export const catalogService = {
   // ── Categories ──────────────────────────────────────────────────
   getCategories: async (): Promise<SignCategoryItem[]> => {
-    return http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
+    const res = await http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
+    if (Array.isArray(res)) {
+      return res.filter(
+        (c) =>
+          !c.code?.toLowerCase().includes('mock') &&
+          !c.nameVi?.toLowerCase().includes('mock') &&
+          !c.nameEn?.toLowerCase().includes('mock')
+      )
+    }
+    return []
   },
 
   getCategoryById: async (id: number): Promise<SignCategoryItem> => {
@@ -141,9 +175,50 @@ export const catalogService = {
     if (params?.isActive !== undefined) q.isActive = params.isActive
     if (params?.search || params?.q) q.search = params.search || params.q
     if (params?.page !== undefined) q.page = params.page
-    if (params?.size || params?.pageSize) q.size = params.size || params.pageSize
+    const clampedSize = params?.size || params?.pageSize ? Math.min(100, Math.max(1, (params?.size || params?.pageSize)!)) : 100
+    q.size = clampedSize
 
-    return http.get<PaginatedSignTypesResponse>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params: q })
+    const res = await http.get<any>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params: q })
+    const items: CatalogSignTypeItem[] = res?.content || res?.items || (Array.isArray(res) ? res : [])
+    const total: number = res?.totalElements ?? res?.total ?? items.length
+    const page: number = res?.page ?? 0
+    const pageSize: number = res?.size ?? clampedSize
+    const totalPages: number = res?.totalPages ?? Math.ceil(total / Math.max(1, pageSize))
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
+  },
+
+  getAllSignTypes: async (params?: Omit<ListSignTypesParams, 'page' | 'size' | 'pageSize'>): Promise<{
+    items: CatalogSignTypeItem[]
+    total: number
+  }> => {
+    const firstPage = await catalogService.getSignTypes({ ...params, page: 0, size: 100 })
+    const all = [...(firstPage.items || [])]
+    const total = firstPage.total || all.length
+    const totalPages = firstPage.totalPages || Math.ceil(total / 100)
+
+    if (totalPages > 1) {
+      const remainingPromises = []
+      for (let p = 1; p < totalPages; p++) {
+        remainingPromises.push(
+          catalogService.getSignTypes({ ...params, page: p, size: 100 }).catch(() => ({ items: [] }))
+        )
+      }
+      const rest = await Promise.all(remainingPromises)
+      rest.forEach((batch) => {
+        if (batch.items && batch.items.length > 0) {
+          all.push(...batch.items)
+        }
+      })
+    }
+
+    return { items: all, total }
   },
 
   getSignTypeById: async (id: number): Promise<CatalogSignTypeItem> => {
@@ -181,16 +256,76 @@ export const catalogService = {
     return http.get<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id))
   },
 
-  updateMissingReport: async (id: string, data: { status?: string; staffNotes?: string }): Promise<MissingTypeReportItem> => {
+  updateMissingReport: async (
+    id: string,
+    data: {
+      status?: string
+      staffNotes?: string
+      actionNote?: string
+      mergedSignTypeId?: number
+      mergedIntoSignTypeId?: number
+      suggestedShape?: string
+      suggestedColorScheme?: string
+    }
+  ): Promise<MissingTypeReportItem> => {
     return http.patch<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id), data)
   },
 
-  approveAndCreateType: async (id: string, data: ApproveAndCreateSignTypeInput | FormData): Promise<{ message: string; signType: CatalogSignTypeItem }> => {
+  requestCandidateRecapture: async (
+    candidateId: string,
+    data: { reason: string; note?: string }
+  ): Promise<{ success: boolean; requestId?: string; message?: string }> => {
+    return http.post(API_ENDPOINTS.MODERATION.REQUEST_RECAPTURE(candidateId), data)
+  },
+
+  approveAndCreateType: async (
+    id: string,
+    data: ApproveAndCreateSignTypeInput | FormData,
+    file?: File
+  ): Promise<{ message?: string; report?: MissingTypeReportItem; createdSignType?: CatalogSignTypeItem; signType?: CatalogSignTypeItem }> => {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
-    return http.post<{ message: string; signType: CatalogSignTypeItem }>(
+    if (isFormData) {
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        data,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
+    if (file) {
+      const formData = new FormData()
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          formData.append(key, String(val))
+        }
+      })
+      formData.append('file', file)
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
+    return http.post(
       API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
-      data,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      data
+    )
+  },
+
+  reprocessCandidates: async (
+    signTypeId: number,
+    similarityThreshold = 0.70
+  ): Promise<{ message: string; reprocessedCount: number }> => {
+    return http.post<{ message: string; reprocessedCount: number }>(
+      API_ENDPOINTS.CATALOG.REPROCESS(signTypeId),
+      { similarityThreshold }
     )
   },
 

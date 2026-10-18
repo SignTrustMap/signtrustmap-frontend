@@ -14,6 +14,15 @@ export type VoteDto = {
     declineNote?: string;
 }
 
+export type CreateMissingTypeReportDto = {
+    candidateId?: string;
+    proposedCategoryId?: number;
+    proposedName: string;
+    description?: string;
+    suggestedShape?: string;
+    suggestedColorScheme?: string;
+}
+
 export type RemedySignDto = {
     id: number;
     signCode: string;
@@ -126,4 +135,38 @@ export type ReviewerStatsResponse = {
     accuracyRate: number;
     currentStreak: number;
 };
+
+export type RecaptureReason =
+    | 'BLURRY'
+    | 'POOR_LIGHTING'
+    | 'WRONG_ANGLE'
+    | 'OCCLUDED'
+    | 'MISSING_CONTEXT'
+    | 'OTHER';
+
+export interface SurveyorRecaptureItem {
+    request_id: string;
+    candidate_id: string;
+    reason: RecaptureReason | string;
+    note: string | null;
+    missing_type_report_id: string | null;
+    completed_at: string | null;
+    requested_at: string;
+    sign_crop_url: string | null;
+    best_frame_url: string | null;
+    confidence_score: number | null;
+    sign_code: string | null;
+    name_vi: string | null;
+    name_en: string | null;
+    longitude: number;
+    latitude: number;
+}
+
+export interface MyRecapturesResponse {
+    items: SurveyorRecaptureItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+}
 
