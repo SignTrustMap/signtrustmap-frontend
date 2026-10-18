@@ -48,7 +48,6 @@ export function CatalogProposalStepView({
   targetData,
   initialNotes = '',
   candidateCropUrl,
-  candidateFrameUrl,
   isEn = false,
   onBack,
   onSuccess,

@@ -6,14 +6,12 @@ import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
 import CustomSelect from '@/components/common/CustomSelect'
 import { ModalPortal } from '@/components/common/ModalPortal'
-import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 import { SignMiniMap } from '@/features/catalog/components/SignMiniMap'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 import { CategoryBadge } from '@/features/catalog/components/MissingSignsBadges'
 import {
   X,
   XCircle,
-  Scales,
   ArrowsClockwise,
   CircleNotch,
   Copy,
@@ -21,16 +19,13 @@ import {
   Clock,
   User,
   ShieldCheck,
-  ShieldWarning,
   Camera,
   UserMinus,
   Check,
   ArrowSquareOut,
   MapPin,
   Image as ImageIcon,
-  WarningCircle,
   CalendarBlank,
-  ArrowLeft,
   ChatText,
 } from '@phosphor-icons/react'
 import {
@@ -442,7 +437,6 @@ export default function AdminEscalationsPage() {
   let lat: number | null = null
   let lng: number | null = null
   let locationAddress: string | null = null
-  let voteCount: number | null = null
   let proposedCategoryId: number | null = null
   let description: string | null = null
   let staffNotes: string | null = null
@@ -503,7 +497,6 @@ export default function AdminEscalationsPage() {
         lng = Number(cand.longitude)
       }
       locationAddress = raw.locationContext?.displayLocation || null
-      voteCount = raw.voteCount ?? null
     } else if (isRevalidation) {
       const ev = raw.evidences?.[0]
       cropUrl = resolveImageUrl(ev?.media_url || ev?.mediaUrl)
@@ -1057,7 +1050,7 @@ export default function AdminEscalationsPage() {
                             </div>
                             {(latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at) && (
                               <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                                {formatDate(latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at)}
+                                {formatDate(latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at || undefined)}
                               </span>
                             )}
                           </div>
