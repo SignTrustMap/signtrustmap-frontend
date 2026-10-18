@@ -24,6 +24,8 @@ import {
   type SavedRoute,
   type UpdateSavedRouteDto,
 } from '@/types/savedRouteType';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { queryClient } from '@/api/query-client';
 
 export const SIGN_FILTER_STORAGE_KEY = 'stm_sign_filter_presets_v1';
 
@@ -155,7 +157,37 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
       categories: SignCategory[],
       options?: CreatePresetOptions
     ) => {
-      const trimmedName = name.trim() || `Lộ trình ${presets.length + 1}`;
+      let effectiveOriginName = options?.originName || 'Điểm xuất phát';
+      if (
+        effectiveOriginName === 'Vị trí hiện tại' &&
+        options?.originLatitude != null &&
+        options?.originLongitude != null
+      ) {
+        try {
+          const resolved = await resolveLocation(
+            options.originLatitude,
+            options.originLongitude,
+            accessToken,
+          );
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            effectiveOriginName = formatted;
+          }
+        } catch {
+          // keep fallback
+        }
+      }
+
+      const defaultRouteName =
+        effectiveOriginName && options?.destinationName
+          ? `${effectiveOriginName} ➔ ${options.destinationName}`
+          : `Lộ trình ${presets.length + 1}`;
+      const rawTrimmed = name.trim();
+      const trimmedName = rawTrimmed
+        ? (rawTrimmed.startsWith('Vị trí hiện tại ➔') && effectiveOriginName !== 'Vị trí hiện tại'
+            ? rawTrimmed.replace('Vị trí hiện tại ➔', `${effectiveOriginName} ➔`)
+            : rawTrimmed)
+        : defaultRouteName;
       const onlyFixed = options?.onlyFixedSigns !== false;
       const cats: SignCategory[] = categories.length > 0 ? categories : ['MANDATORY'];
 
@@ -163,15 +195,15 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         const createDto: CreateSavedRouteDto = {
           title: trimmedName,
           vehicleMode: options?.vehicleMode || 'MOTORCYCLE',
-          originName: options?.originName || 'Điểm xuất phát',
+          originName: effectiveOriginName,
           originLatitude: options?.originLatitude ?? 10.7769,
           originLongitude: options?.originLongitude ?? 106.7009,
           destinationName: options?.destinationName || trimmedName,
           destinationLatitude: options?.destinationLatitude ?? 10.85,
           destinationLongitude: options?.destinationLongitude ?? 106.772,
           encodedPolyline: options?.encodedPolyline,
-          distanceMeters: options?.distanceMeters,
-          durationSeconds: options?.durationSeconds,
+          distanceMeters: options?.distanceMeters != null ? Math.round(options.distanceMeters) : undefined,
+          durationSeconds: options?.durationSeconds != null ? Math.round(options.durationSeconds) : undefined,
           filterRules: {
             onlyFixedSigns: onlyFixed,
             categories: cats.map(categoryToCode),
@@ -190,6 +222,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
 
         setPresets((prev) => [newPreset, ...prev.filter((p) => p.id !== newPreset.id)]);
         setActivePresetIdState(newPreset.id);
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
         return newPreset;
       }
 
@@ -200,6 +233,27 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         categories: cats,
         onlyFixedSigns: onlyFixed,
         createdAt: Date.now(),
+        ...(options?.originName && options?.destinationName
+          ? {
+              savedRoute: {
+                id: `route_${Date.now()}`,
+                userId: 'local',
+                title: trimmedName,
+                vehicleMode: options.vehicleMode || 'MOTORCYCLE',
+                originName: effectiveOriginName,
+                originLatitude: options.originLatitude ?? 10.7769,
+                originLongitude: options.originLongitude ?? 106.7009,
+                destinationName: options.destinationName,
+                destinationLatitude: options.destinationLatitude ?? 10.85,
+                destinationLongitude: options.destinationLongitude ?? 106.772,
+                distanceMeters: options.distanceMeters != null ? Math.round(options.distanceMeters) : 0,
+                durationSeconds: options.durationSeconds != null ? Math.round(options.durationSeconds) : 0,
+                encodedPolyline: options.encodedPolyline ?? '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
       };
 
       setPresets((prev) => [...prev, newPreset]);
@@ -243,6 +297,9 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
               : p
           )
         );
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route', id] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route-signs', id] });
         return;
       }
 
@@ -279,6 +336,9 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.error('Failed to delete saved route from backend:', err);
         }
+        queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route', id] });
+        queryClient.invalidateQueries({ queryKey: ['saved-route-signs', id] });
       }
 
       setPresets((prev) => prev.filter((p) => p.id !== id));
@@ -288,6 +348,7 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
   );
 
   const refetchPresets = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
     await loadSavedRoutesFromBackend();
   }, [loadSavedRoutesFromBackend]);
 

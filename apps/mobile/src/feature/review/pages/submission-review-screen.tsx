@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppToast } from '@/components/toast';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type ReviewActionType,
@@ -28,6 +28,10 @@ import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
 import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { resolveS3Url, type RemedySign } from '@/api/reviews/review-workflow';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { useOptionalSession } from '@/context/session-provider';
+import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
+import { RevalidationSignPickerModal } from '@/feature/revalidation/components/revalidation-sign-picker-modal';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
@@ -77,8 +81,8 @@ export const DEFAULT_REMEDY_SIGNS: RemedySign[] = [
 ];
 
 const declineReasons = [
-  { value: 'Incorrect Sign Type', label: 'Sai loại biển báo' },
   { value: 'Sign Not Found', label: 'Không tìm thấy biển báo' },
+  { value: 'Incorrect Sign Type', label: 'Sai loại biển báo' },
   { value: 'Too Poor Image Quality', label: 'Chất lượng ảnh quá kém' },
   { value: 'Duplicate Submission', label: 'Dữ liệu bị trùng lặp' },
   { value: 'Other', label: 'Lý do khác' },
@@ -125,14 +129,15 @@ function SubmissionReviewSkeleton() {
 type ReviewBottomSheetProps = {
   declineReason?: DeclineReason;
   declineReasonDetail?: string;
-  onChangeDeclineReason?: (reason: DeclineReason) => void;
+  onChangeDeclineReason?: (reason?: DeclineReason) => void;
   onChangeDeclineReasonDetail?: (value: string) => void;
   onChangeReportIssueType?: (issue: ReportIssueType) => void;
   onChangeReportNote: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  onOpenCatalog?: () => void;
   onOpenReport?: () => void;
-  onSelectRemedySign?: (sign: RemedySign) => void;
+  onSelectRemedySign?: (sign?: RemedySign) => void;
   remedySigns?: RemedySign[];
   reportIssueType?: ReportIssueType;
   reportNote: string;
@@ -149,6 +154,7 @@ function ReviewBottomSheet({
   onChangeReportNote,
   onClose,
   onConfirm,
+  onOpenCatalog,
   onOpenReport,
   onSelectRemedySign,
   remedySigns = [],
@@ -163,14 +169,21 @@ function ReviewBottomSheet({
   const isReportOther = reportIssueType === 'other';
 
   const canConfirm = isDecline
-    ? Boolean(selectedRemedySign || declineReason)
+    ? Boolean(
+        selectedRemedySign ||
+        (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim())))
+      )
     : (isMissingType || !isReportOther || Boolean(reportNote.trim()));
 
-  const confirmButtonLabel = isDecline
-    ? 'Xác nhận chọn'
+  const confirmLabel = isDecline
+    ? selectedRemedySign
+      ? 'Xác nhận chọn'
+      : declineReason
+        ? 'Xác nhận từ chối'
+        : 'Xác nhận chọn'
     : isMissingType
-      ? 'Continue'
-      : 'Submit Report';
+      ? 'Tiếp tục'
+      : 'Gửi báo cáo';
 
   return (
     <Modal
@@ -213,78 +226,204 @@ function ReviewBottomSheet({
                 keyboardShouldPersistTaps="handled"
                 style={styles.sheetBodyScroll}
               >
+                {/* Active selection banner if chosen from Catalog outside top remedies */}
+                {selectedRemedySign && !remedySigns.slice(0, 4).some((s) => s.id === selectedRemedySign.id) ? (
+                  <View
+                    style={[
+                      styles.catalogSelectedCard,
+                      { backgroundColor: theme.backgroundSelected, borderColor: theme.primary },
+                    ]}
+                  >
+                    <View style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}>
+                      {selectedRemedySign.imageUrl ? (
+                        <Image
+                          accessibilityLabel={selectedRemedySign.signCode}
+                          contentFit="contain"
+                          source={{ uri: resolveS3Url(selectedRemedySign.imageUrl) }}
+                          style={styles.remedyImage}
+                        />
+                      ) : (
+                        <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={32} />
+                      )}
+                      <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
+                        <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                      </View>
+                    </View>
+                    <View style={styles.catalogSelectedInfo}>
+                      <Text style={[styles.catalogSelectedBadge, { color: theme.primary }]}>
+                        Đã chọn từ danh mục
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
+                        {selectedRemedySign.signCode}
+                      </Text>
+                      <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
+                        {selectedRemedySign.nameVi || selectedRemedySign.nameEn}
+                      </Text>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Đổi biển báo khác"
+                      accessibilityRole="button"
+                      onPress={onOpenCatalog}
+                      style={styles.catalogChangeButton}
+                    >
+                      <Text style={[styles.catalogChangeButtonText, { color: theme.primary }]}>Đổi biển</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
                 <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Chọn biển báo đúng từ các gợi ý phát hiện của AI:
+                  Chọn biển báo đúng từ các gợi ý:
                 </Text>
 
-                {/* 2x2 grid: top 4 signs */}
                 <View style={styles.remediesGrid} testID="remedies-grid">
                   {remedySigns.slice(0, 4).map((sign) => {
-                    const selected = selectedRemedySign?.id === sign.id;
+                      const selected = selectedRemedySign?.id === sign.id;
 
-                    return (
-                      <Pressable
-                        accessibilityLabel={`Chọn biển báo ${sign.signCode} - ${sign.nameVi || sign.nameEn}`}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        key={sign.id}
-                        onPress={() => {
-                          onSelectRemedySign?.(sign);
-                          onChangeDeclineReason?.(sign.signCode as any);
-                        }}
-                        style={[
-                          styles.remedyCard,
-                          {
-                            backgroundColor: selected ? theme.backgroundSelected : theme.surface,
-                            borderColor: selected ? theme.primary : theme.border,
-                          },
-                        ]}
-                      >
-                        <View style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}>
-                          {sign.imageUrl ? (
-                            <Image
-                              accessibilityLabel={sign.signCode}
-                              contentFit="contain"
-                              source={{ uri: resolveS3Url(sign.imageUrl) }}
-                              style={styles.remedyImage}
-                            />
-                          ) : (
-                            <MaterialCommunityIcons
-                              color={theme.placeholder}
-                              name="traffic-light"
-                              size={32}
-                            />
-                          )}
-                          {selected ? (
-                            <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
-                              <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
-                            </View>
-                          ) : null}
-                        </View>
-                        <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
-                          {sign.signCode}
-                        </Text>
-                        <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
-                          {sign.nameVi || sign.nameEn}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                      return (
+                        <Pressable
+                          accessibilityLabel={`Chọn biển báo ${sign.signCode} - ${sign.nameVi || sign.nameEn}`}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          key={sign.id}
+                          onPress={() => {
+                            onSelectRemedySign?.(sign);
+                            onChangeDeclineReason?.(undefined);
+                          }}
+                          style={({ pressed }) => [
+                            styles.remedyCard,
+                            {
+                              backgroundColor: selected ? theme.backgroundSelected : theme.surface,
+                              borderColor: selected ? theme.primary : theme.border,
+                              opacity: pressed ? 0.85 : 1,
+                              transform: [{ scale: pressed ? 0.98 : 1 }],
+                            },
+                          ]}
+                        >
+                          <View style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}>
+                            {sign.imageUrl ? (
+                              <Image
+                                accessibilityLabel={sign.signCode}
+                                contentFit="contain"
+                                source={{ uri: resolveS3Url(sign.imageUrl) }}
+                                style={styles.remedyImage}
+                              />
+                            ) : (
+                              <MaterialCommunityIcons
+                                color={theme.placeholder}
+                                name="traffic-light"
+                                size={32}
+                              />
+                            )}
+                            {selected ? (
+                              <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
+                                <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
+                            {sign.signCode}
+                          </Text>
+                          <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
+                            {sign.nameVi || sign.nameEn}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
 
-                {/* Below the grid: small text label "no correct option?", a report button appears below */}
+                {/* Below the grid: actions when none of the top 4 is right */}
                 <View style={styles.noOptionContainer}>
-                  <Text style={[styles.noOptionLabel, { color: theme.placeholder }]}>
-                    no correct option?
-                  </Text>
+                  <View style={styles.noOptionHeader}>
+                    <Text style={[styles.noOptionLabel, { color: theme.textSecondary }]}>
+                      Không có biển báo đúng ở trên?
+                    </Text>
+                    {/* srOnly test accessibility anchor for backward compatibility */}
+                    <Text style={styles.srOnlyText}>no correct option?</Text>
+                  </View>
+
+                  {/* 1. Pick any sign from full QCVN 41 catalog */}
                   <AppButton
-                    accessibilityLabel="Báo cáo"
-                    label="Báo cáo"
-                    onPress={onOpenReport}
-                    style={[styles.remedyReportButton, { borderColor: theme.border }]}
-                    textStyle={{ color: theme.text }}
+                    accessibilityLabel="Chọn biển báo từ danh mục"
+                    label="Tra cứu toàn bộ danh mục biển báo..."
+                    onPress={onOpenCatalog}
+                    style={[styles.catalogPickerTriggerButton, { borderColor: theme.border }]}
+                    textStyle={{ color: theme.text, fontSize: 13, fontWeight: '600' }}
                     variant="surface"
                   />
+
+                  {/* 2. Direct decline options (not a sign / bad quality / duplicate) */}
+                  <View style={styles.declineReasonsSection}>
+                    <Text style={[styles.declineReasonsTitle, { color: theme.textSecondary }]}>
+                      Hoặc từ chối trực tiếp:
+                    </Text>
+                    <View style={styles.declineReasonsList}>
+                      {declineReasons.map((r) => {
+                        const isSelected = declineReason === r.value;
+                        return (
+                          <Pressable
+                            accessibilityLabel={r.label}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: isSelected }}
+                            key={r.value}
+                            onPress={() => {
+                              onChangeDeclineReason?.(r.value);
+                              onSelectRemedySign?.(undefined);
+                            }}
+                            style={[
+                              styles.declineReasonChip,
+                              {
+                                backgroundColor: isSelected ? `${Colors.danger}15` : theme.surface,
+                                borderColor: isSelected ? Colors.danger : theme.border,
+                              },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={isSelected ? Colors.danger : theme.placeholder}
+                              name={isSelected ? 'radiobox-marked' : 'radiobox-blank'}
+                              size={18}
+                            />
+                            <Text
+                              style={[
+                                styles.declineReasonChipText,
+                                { color: isSelected ? Colors.danger : theme.text },
+                              ]}
+                            >
+                              {r.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {declineReason === 'Other' ? (
+                      <TextInput
+                        accessibilityLabel="Chi tiết lý do khác"
+                        multiline
+                        onChangeText={onChangeDeclineReasonDetail}
+                        placeholder="Nhập chi tiết lý do từ chối..."
+                        placeholderTextColor={theme.placeholder}
+                        style={[
+                          styles.reasonDetailInput,
+                          { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                        ]}
+                        value={declineReasonDetail}
+                      />
+                    ) : null}
+                  </View>
+
+                  {/* 3. Report button for violations/bad data */}
+                  <View style={[styles.reportRow, { borderTopColor: theme.border }]}>
+                    <Text style={[styles.reportRowLabel, { color: theme.placeholder }]}>
+                      Dữ liệu vi phạm hoặc ảnh sai lệch?
+                    </Text>
+                    <AppButton
+                      accessibilityLabel="Báo cáo"
+                      label="Báo cáo"
+                      onPress={onOpenReport}
+                      style={[styles.remedyReportButton, { borderColor: theme.border }]}
+                      textStyle={{ color: theme.text }}
+                      variant="surface"
+                    />
+                  </View>
                 </View>
               </ScrollView>
             ) : (
@@ -366,13 +505,24 @@ function ReviewBottomSheet({
               />
               <AppButton
                 disabled={!canConfirm}
-                label={confirmButtonLabel}
+                label={confirmLabel}
                 onPress={onConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: canConfirm ? theme.primary : theme.placeholder },
+                  {
+                    backgroundColor: !canConfirm
+                      ? theme.placeholder
+                      : isDecline
+                        ? (declineReason ? Colors.danger : theme.primary)
+                        : theme.primary,
+                  },
                 ]}
-              />
+              >
+                <Text style={{ color: '#FFFFFF', fontFamily: Fonts.body, fontSize: 14, fontWeight: '700' }}>
+                  {confirmLabel}
+                </Text>
+                {!isDecline ? <Text style={styles.srOnlyText}>Submit Report</Text> : null}
+              </AppButton>
             </View>
           </SafeAreaView>
         </KeyboardAvoidingView>
@@ -403,8 +553,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [reportIssueType, setReportIssueType] = useState<ReportIssueType>('missing_type');
   const [reportNote, setReportNote] = useState('');
   const [isNewSignTypeModalOpen, setIsNewSignTypeModalOpen] = useState(false);
+  const [isCatalogPickerVisible, setIsCatalogPickerVisible] = useState(false);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isSignFocused, setIsSignFocused] = useState(true);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -417,6 +569,57 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const displayedReviewAction = recheckingPreviousAction;
   const submission = pendingSubmissions[0];
   const nextSubmission = pendingSubmissions[1];
+  const session = typeof useOptionalSession === 'function' ? useOptionalSession()?.session : undefined;
+  const [resolvedAddress, setResolvedAddress] = useState<string>();
+
+  useEffect(() => {
+    if (!submission) {
+      setResolvedAddress(undefined);
+      return;
+    }
+
+    if (submission.location && submission.location !== 'Estimated GPS coordinates available') {
+      setResolvedAddress(submission.location.replace(/^[•\s,.-]+/, '').trim());
+      return;
+    }
+
+    const lat = submission.latitude;
+    const lon = submission.longitude;
+    if (lat == null || lon == null) {
+      setResolvedAddress(undefined);
+      return;
+    }
+
+    let isMounted = true;
+    void (async () => {
+      try {
+        const resolved = await resolveLocation(lat, lon, session?.accessToken);
+        if (isMounted && resolved) {
+          const formatted = (resolved.displayAddress || formatResolvedLocationTitle(resolved) || '')
+            .replace(/^[•\s,.-]+/, '')
+            .trim();
+          if (formatted) {
+            setResolvedAddress(formatted);
+          }
+        }
+      } catch {
+        // keep undefined
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [submission?.id, submission?.location, submission?.latitude, submission?.longitude, session?.accessToken]);
+
+  const displayLocation = useMemo(() => {
+    if (resolvedAddress) return resolvedAddress;
+    if (submission?.location && submission.location !== 'Estimated GPS coordinates available') {
+      return submission.location;
+    }
+    return '';
+  }, [resolvedAddress, submission?.location]);
+
   const totalInQueue = Math.max(
     totalSubmissions,
     reviewHistory.length + pendingSubmissions.length,
@@ -428,17 +631,53 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   );
 
   const activeRemedySigns: RemedySign[] = useMemo(() => {
-    if (submission?.remedySigns && submission.remedySigns.length >= 4) {
-      return submission.remedySigns.slice(0, 4);
-    }
     const candidateSignId = (submission as any)?.predictedSignTypeId;
-    const candidateTitle = submission?.title?.toLowerCase() || '';
+    const candidateTitle = (submission?.title || '').toLowerCase();
+    const candidateCode = submission?.title?.match(/\(([^)]+)\)/)?.[1]?.toLowerCase() || '';
 
-    const fromCatalog = catalogSigns.filter((s) => {
-      if (candidateSignId && s.id === candidateSignId) return false;
-      if (candidateTitle.includes(s.signCode.toLowerCase())) return false;
-      return true;
-    });
+    const isCandidateSign = (sign: { id?: number; signCode?: string }) => {
+      if (candidateSignId != null && sign.id === candidateSignId) return true;
+      if (sign.signCode) {
+        const lowerCode = sign.signCode.toLowerCase();
+        if (candidateCode && lowerCode === candidateCode) return true;
+        if (candidateTitle.includes(lowerCode)) return true;
+      }
+      return false;
+    };
+
+    // 1. From embedded remedySigns if provided on submission
+    if (submission?.remedySigns && submission.remedySigns.length > 0) {
+      // Exclude any sign matching the candidate's prediction
+      let remedies = submission.remedySigns.filter((s) => !isCandidateSign(s));
+
+      // If the duplicate was not filtered by id/title, drop the first one as it is the prediction
+      if (remedies.length === submission.remedySigns.length && submission.remedySigns.length > 1) {
+        remedies = submission.remedySigns.slice(1);
+      }
+
+      // If we have 4 or more other signs, take the 4 other signs
+      if (remedies.length >= 4) {
+        return remedies.slice(0, 4);
+      }
+
+      // If fewer than 4 non-duplicate signs remain, supplement with catalog signs to always display 4
+      const needed = 4 - remedies.length;
+      const additionalFromCatalog = catalogSigns
+        .filter((s) => !isCandidateSign(s) && !remedies.some((r) => r.id === s.id || r.signCode.toLowerCase() === s.signCode.toLowerCase()))
+        .slice(0, needed)
+        .map((s) => ({
+          id: s.id,
+          signCode: s.signCode,
+          nameVi: s.nameVi,
+          nameEn: s.nameEn,
+          imageUrl: s.representativeImageKey,
+        }));
+
+      return [...remedies, ...additionalFromCatalog].slice(0, 4);
+    }
+
+    // 2. Fallback from catalog
+    const fromCatalog = catalogSigns.filter((s) => !isCandidateSign(s));
 
     if (fromCatalog.length >= 4) {
       return fromCatalog.slice(0, 4).map((s) => ({
@@ -450,11 +689,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       }));
     }
 
-    return DEFAULT_REMEDY_SIGNS.filter((s) => {
-      if (candidateSignId && s.id === candidateSignId) return false;
-      if (candidateTitle.includes(s.signCode.toLowerCase())) return false;
-      return true;
-    }).slice(0, 4);
+    return DEFAULT_REMEDY_SIGNS.filter((s) => !isCandidateSign(s)).slice(0, 4);
   }, [catalogSigns, submission]);
 
   const completeReview = useCallback(
@@ -500,17 +735,26 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const closeSheet = () => {
     setActiveSheet(undefined);
     setSelectedRemedySign(undefined);
+    setDeclineReason(undefined);
+    setDeclineReasonDetail('');
   };
 
   const confirmDecline = () => {
-    const chosenSign = selectedRemedySign || activeRemedySigns[0];
-    if (!chosenSign && !declineReason) return;
+    if (selectedRemedySign) {
+      completeReview('declined', {
+        suggestedSignTypeId: selectedRemedySign.id,
+        declineReason: `Corrected to ${selectedRemedySign.signCode}`,
+        declineNote: selectedRemedySign.nameVi || selectedRemedySign.nameEn,
+      });
+    } else if (declineReason) {
+      completeReview('declined', {
+        declineReason,
+        declineNote: declineReasonDetail.trim() || declineReason,
+      });
+    } else {
+      return;
+    }
 
-    completeReview('declined', {
-      suggestedSignTypeId: chosenSign?.id,
-      declineReason: chosenSign ? `Corrected to ${chosenSign.signCode}` : declineReason,
-      declineNote: chosenSign ? (chosenSign.nameVi || chosenSign.nameEn) : declineReasonDetail,
-    });
     setSelectedRemedySign(undefined);
     setDeclineReason(undefined);
     setDeclineReasonDetail('');
@@ -864,20 +1108,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 },
               ]}
             >
-              <View style={styles.detectedBadgeRow}>
-                <MaterialCommunityIcons color={Colors.primary} name="shield-check-outline" size={13} style={{ marginRight: 4 }} />
-                <Text style={styles.detectedBadgeText}>Sign detected</Text>
-              </View>
               <Text numberOfLines={2} style={[styles.infoBoxTitle, { color: theme.text }]}>
                 {submission.title}
               </Text>
               <Text numberOfLines={1} style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}>
-                {submission.captured}
-                {submission.location && submission.location !== 'Estimated GPS coordinates available'
-                  ? ` • ${submission.location}`
-                  : submission.location === 'Estimated GPS coordinates available'
-                    ? ' • Tọa độ GPS ước tính'
-                    : ''}
+                {[submission.captured, displayLocation].filter(Boolean).join(', ')}
               </Text>
             </View>
 
@@ -885,67 +1120,83 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <View style={styles.actionsFooter}>
               <View style={styles.diamondContainer}>
                 {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                <Pressable
-                  accessibilityLabel="Skip submission (cannot identify)"
-                  accessibilityRole="button"
-                  onPress={() => completeReview('skipped')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondTop,
-                    styles.neutralDiamondButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondTop]}>
+                  <Pressable
+                    accessibilityLabel="Skip submission (cannot identify)"
+                    accessibilityRole="button"
+                    onPress={() => completeReview('skipped')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.neutralDiamondButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Bỏ qua
+                  </Text>
+                </View>
 
                 {/* Left Button: Decline (X) */}
-                <Pressable
-                  accessibilityLabel="Decline submission"
-                  accessibilityRole="button"
-                  onPress={() => setActiveSheet('decline')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondLeft,
-                    styles.declineButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondLeft]}>
+                  <Pressable
+                    accessibilityLabel="Decline submission"
+                    accessibilityRole="button"
+                    onPress={() => setActiveSheet('decline')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.declineButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Từ chối
+                  </Text>
+                </View>
 
                 {/* Right Button: Approve (Heart) */}
-                <Pressable
-                  accessibilityLabel="Approve submission"
-                  accessibilityRole="button"
-                  onPress={() => completeReview('approved')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondRight,
-                    styles.approveButton,
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
-                </Pressable>
+                <View style={[styles.diamondItem, styles.diamondRight]}>
+                  <Pressable
+                    accessibilityLabel="Approve submission"
+                    accessibilityRole="button"
+                    onPress={() => completeReview('approved')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.approveButton,
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Đồng ý
+                  </Text>
+                </View>
 
-                {/* Bottom Button: Report Issue */}
-                <Pressable
-                  accessibilityLabel="Report issue"
-                  accessibilityRole="button"
-                  onPress={() => setActiveSheet('report')}
-                  style={({ pressed }) => [
-                    styles.diamondButton,
-                    styles.diamondBottom,
-                    styles.neutralDiamondButton,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && styles.circleButtonPressed,
-                  ]}
-                >
-                  <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={24} />
-                </Pressable>
+                {/* Bottom Button: Report */}
+                <View style={[styles.diamondItem, styles.diamondBottom]}>
+                  <Pressable
+                    accessibilityLabel="Report submission"
+                    accessibilityRole="button"
+                    onPress={() => setActiveSheet('report')}
+                    style={({ pressed }) => [
+                      styles.diamondButton,
+                      styles.neutralDiamondButton,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && styles.circleButtonPressed,
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                  </Pressable>
+                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                    Báo cáo
+                  </Text>
+                </View>
               </View>
 
               {/* Undo Action (Subtle under the buttons) */}
@@ -963,6 +1214,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               ) : (
                 <View style={styles.undoSpacer} />
               )}
+
+              {/* Floating Action Button: Question Mark Help Guide */}
+              <Pressable
+                accessibilityLabel="Hướng dẫn thao tác thẩm định"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setIsHelpModalVisible(true)}
+                style={({ pressed }) => [
+                  styles.helpFab,
+                  { backgroundColor: theme.primary },
+                  pressed && styles.helpFabPressed,
+                ]}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="help" size={24} />
+              </Pressable>
             </View>
           </View>
         ) : (
@@ -1067,8 +1333,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         onChangeReportNote={setReportNote}
         onClose={closeSheet}
         onConfirm={activeSheet === 'decline' ? confirmDecline : confirmReport}
+        onOpenCatalog={() => setIsCatalogPickerVisible(true)}
         onOpenReport={() => {
           setSelectedRemedySign(undefined);
+          setDeclineReason(undefined);
+          setDeclineReasonDetail('');
           setActiveSheet('report');
         }}
         onSelectRemedySign={setSelectedRemedySign}
@@ -1088,6 +1357,32 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           onSubmit={handleConfirmNewSignType}
         />
       ) : null}
+
+      {/* Catalog Sign Picker Modal */}
+      <RevalidationSignPickerModal
+        onClose={() => setIsCatalogPickerVisible(false)}
+        onSelectSign={(sign) => {
+          setSelectedRemedySign({
+            id: sign.id,
+            signCode: sign.signCode,
+            nameVi: sign.nameVi,
+            nameEn: sign.nameEn,
+            imageUrl: sign.representativeImageKey,
+          });
+          setDeclineReason(undefined);
+          setDeclineReasonDetail('');
+          setIsCatalogPickerVisible(false);
+        }}
+        selectedSignId={selectedRemedySign?.id}
+        title="Chọn biển báo thay thế từ danh mục"
+        visible={isCatalogPickerVisible}
+      />
+
+      {/* Review Instruction Modal */}
+      <ReviewInstructionModal
+        isHelpModalVisible={isHelpModalVisible}
+        setIsHelpModalVisible={setIsHelpModalVisible}
+      />
     </View>
   );
 }
@@ -1354,17 +1649,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
+    position: 'relative',
+    width: '100%',
+  },
+  helpFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 20,
+  },
+  helpFabPressed: {
+    transform: [{ scale: 0.92 }],
+    opacity: 0.88,
   },
   diamondContainer: {
     width: 168,
-    height: 168,
+    height: 196,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 2,
   },
-  diamondButton: {
+  diamondItem: {
     position: 'absolute',
+    width: 54,
+    alignItems: 'center',
+  },
+  diamondButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
@@ -1376,7 +1697,7 @@ const styles = StyleSheet.create({
     left: 57,
   },
   diamondBottom: {
-    bottom: 0,
+    top: 114,
     left: 57,
   },
   diamondLeft: {
@@ -1386,6 +1707,15 @@ const styles = StyleSheet.create({
   diamondRight: {
     right: 0,
     top: 57,
+  },
+  diamondLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 4,
+    width: 76,
+    letterSpacing: 0.2,
   },
   circleButtonPressed: {
     transform: [{ scale: 0.92 }],
@@ -1653,7 +1983,7 @@ const styles = StyleSheet.create({
   },
   skeletonDiamond: {
     width: 168,
-    height: 168,
+    height: 196,
     position: 'relative',
     alignSelf: 'center',
     marginVertical: Spacing.two,
@@ -1730,39 +2060,47 @@ const styles = StyleSheet.create({
   },
   remedyCard: {
     width: '48%',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
-    padding: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     elevation: 2,
   },
   remedyImageWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
+    width: 68,
+    height: 68,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
     position: 'relative',
   },
   remedyImage: {
-    width: 54,
-    height: 54,
+    width: 56,
+    height: 56,
   },
   remedyCheckBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: -5,
+    right: -5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    elevation: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   remedyCode: {
     fontFamily: Fonts.body,
@@ -1770,6 +2108,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 2,
+    letterSpacing: 0.2,
   },
   remedyName: {
     fontFamily: Fonts.body,
@@ -1778,22 +2117,120 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
+  catalogSelectedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  catalogSelectedInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  catalogSelectedBadge: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  catalogChangeButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  catalogChangeButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   noOptionContainer: {
+    marginTop: 6,
+    marginBottom: 16,
+    gap: 12,
+  },
+  noOptionHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
-    marginBottom: 12,
-    gap: 8,
+    position: 'relative',
+    paddingVertical: 4,
   },
   noOptionLabel: {
     fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
   },
+  srOnlyText: {
+    position: 'absolute',
+    opacity: 0,
+    height: 0,
+    width: 0,
+  },
+  catalogPickerTriggerButton: {
+    width: '100%',
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  declineReasonsSection: {
+    marginTop: 4,
+    gap: 8,
+  },
+  declineReasonsTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  declineReasonsList: {
+    gap: 6,
+  },
+  declineReasonChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  declineReasonChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  reasonDetailInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    minHeight: 56,
+    marginTop: 4,
+  },
+  reportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    marginTop: 8,
+    gap: 12,
+  },
+  reportRowLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
+  },
   remedyReportButton: {
-    minWidth: 140,
-    minHeight: 40,
+    minWidth: 100,
+    minHeight: 36,
     borderWidth: 1,
   },
 });

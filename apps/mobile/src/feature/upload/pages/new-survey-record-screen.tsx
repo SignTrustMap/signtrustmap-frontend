@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+﻿import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -22,7 +22,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppButton } from '@/components/button';
 import {
   CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE,
   CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
@@ -54,6 +55,7 @@ type SelectedSurveyMedia = {
   uri: string;
   duration?: number;
   assetId?: string;
+  gps?: ImageGpsCoordinates | null;
 };
 
 type SelectedGpxFile = {
@@ -268,8 +270,10 @@ export function NewSurveyRecordScreen() {
   const savedDraftId = useRef<string | undefined>(undefined);
   const [isOpeningGallery, setIsOpeningGallery] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
-  const [selectedAsset, setSelectedAsset] = useState<SelectedSurveyMedia>();
-  const [selectedGps, setSelectedGps] = useState<ImageGpsCoordinates | null>(null);
+  const [selectedAssets, setSelectedAssets] = useState<SelectedSurveyMedia[]>([]);
+  const [activeAssetIndex, setActiveAssetIndex] = useState<number>(0);
+  const selectedAsset = selectedAssets[activeAssetIndex];
+  const selectedGps = selectedAsset?.gps ?? null;
   const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
   const [showAdvancedGpx, setShowAdvancedGpx] = useState(false);
   const [gpxPickerError, setGpxPickerError] = useState<string>();
@@ -281,7 +285,8 @@ export function NewSurveyRecordScreen() {
   const [androidGalleryHasNextPage, setAndroidGalleryHasNextPage] = useState(false);
   const [androidGalleryError, setAndroidGalleryError] = useState<string>();
   const [isAndroidGalleryLoading, setIsAndroidGalleryLoading] = useState(false);
-  const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
+  const [selectedAndroidAssetIds, setSelectedAndroidAssetIds] = useState<string[]>([]);
+  const [isSelectingAndroidAssets, setIsSelectingAndroidAssets] = useState(false);
   const isLoadingAndroidGallery = useRef(false);
 
   useFocusEffect(useCallback(() => {
@@ -335,90 +340,112 @@ export function NewSurveyRecordScreen() {
     setAndroidGalleryCursor(undefined);
     setAndroidGalleryHasNextPage(false);
     setAndroidGalleryError(undefined);
+    setSelectedAndroidAssetIds([]);
     setIsAndroidGalleryVisible(true);
     await loadAndroidGalleryPage();
   };
 
-  const handleSelectAndroidAsset = async (asset: MediaLibraryAsset) => {
-    if (selectingAndroidAssetId) return;
+  const handleToggleAndroidAsset = (assetId: string) => {
+    setSelectedAndroidAssetIds((prev) =>
+      prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId],
+    );
+  };
 
-    setSelectingAndroidAssetId(asset.id);
+  const handleConfirmAndroidSelection = async () => {
+    if (selectedAndroidAssetIds.length === 0 || isSelectingAndroidAssets) return;
+    setIsSelectingAndroidAssets(true);
     setAndroidGalleryError(undefined);
 
     try {
-      const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
-      const assetType = asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
+      const selectedMap = new Map(androidGalleryAssets.map((a) => [a.id, a]));
+      const chosen = selectedAndroidAssetIds
+        .map((id) => selectedMap.get(id))
+        .filter(Boolean) as MediaLibraryAsset[];
+      const processed: SelectedSurveyMedia[] = [];
 
-      const exif = assetInfo.exif as Record<string, unknown> | undefined;
-      const exifCoordinates = extractImageGpsCoordinates(exif);
-      const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
-        ? {
-          latitude: assetInfo.location.latitude,
-          longitude: assetInfo.location.longitude,
+      for (const asset of chosen) {
+        try {
+          const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+          const assetType =
+            asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
+
+          const exif = assetInfo.exif as Record<string, unknown> | undefined;
+          const exifCoordinates = extractImageGpsCoordinates(exif);
+          const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+            ? {
+              latitude: assetInfo.location.latitude,
+              longitude: assetInfo.location.longitude,
+            }
+            : exifCoordinates;
+
+          if (assetType === 'video') {
+            const videoMeta = await extractVideoMetadataAsync({
+              id: asset.id,
+              uri: assetInfo.localUri ?? asset.uri,
+              filename: asset.filename,
+              duration: asset.duration,
+              creationTime: asset.creationTime,
+              location: gpsCoordinates,
+              exif,
+            });
+
+            processed.push({
+              capturedAt: videoMeta.capturedAt,
+              fileName: asset.filename,
+              type: 'video',
+              uri: assetInfo.localUri ?? asset.uri,
+              duration: videoMeta.durationSeconds,
+              assetId: asset.id,
+              gps: videoMeta.hasDeviceGps
+                ? {
+                  latitude: videoMeta.startCoordinate[1],
+                  longitude: videoMeta.startCoordinate[0],
+                }
+                : null,
+            });
+          } else {
+            processed.push({
+              capturedAt:
+                asset.creationTime > 0
+                  ? new Date(asset.creationTime).toISOString()
+                  : undefined,
+              fileName: asset.filename,
+              type: 'image',
+              uri: assetInfo.localUri ?? asset.uri,
+              duration: asset.duration,
+              assetId: asset.id,
+              gps: gpsCoordinates ?? null,
+            });
+          }
+        } catch (err) {
+          console.warn('[Surveyor] Error reading asset info:', err);
         }
-        : exifCoordinates;
-
-      console.log('[Surveyor] Selected MediaStore asset:', {
-        assetId: asset.id,
-        fileName: asset.filename,
-        mediaType: asset.mediaType,
-        location: assetInfo.location ?? null,
-        duration: asset.duration,
-      });
-      console.log(
-        '[Surveyor] Extracted GPS data:',
-        gpsCoordinates ? { ...gpsCoordinates, source: 'media-library-original' } : null,
-      );
-
-      if (assetType === 'video') {
-        const videoMeta = await extractVideoMetadataAsync({
-          id: asset.id,
-          uri: assetInfo.localUri ?? asset.uri,
-          filename: asset.filename,
-          duration: asset.duration,
-          creationTime: asset.creationTime,
-          location: gpsCoordinates,
-          exif,
-        });
-
-        console.log('[Surveyor] Video GPS & duration result:', {
-          hasDeviceGps: videoMeta.hasDeviceGps,
-          startCoordinate: videoMeta.startCoordinate,
-          durationSeconds: videoMeta.durationSeconds,
-        });
-
-        setSelectedAsset({
-          capturedAt: videoMeta.capturedAt,
-          fileName: asset.filename,
-          type: 'video',
-          uri: assetInfo.localUri ?? asset.uri,
-          duration: videoMeta.durationSeconds,
-          assetId: asset.id,
-        });
-        setSelectedGps(videoMeta.hasDeviceGps ? {
-          latitude: videoMeta.startCoordinate[1],
-          longitude: videoMeta.startCoordinate[0],
-        } : null);
-      } else {
-        setSelectedAsset({
-          capturedAt: asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
-          fileName: asset.filename,
-          type: 'image',
-          uri: assetInfo.localUri ?? asset.uri,
-          duration: asset.duration,
-          assetId: asset.id,
-        });
-        setSelectedGps(gpsCoordinates ?? null);
       }
-      setSelectedGpxFile(undefined);
-      setGpxPickerError(undefined);
-      setIsAndroidGalleryVisible(false);
+
+      if (processed.length > 0) {
+        setSelectedAssets((prev) => [...prev, ...processed]);
+        setActiveAssetIndex(0);
+        setSelectedGpxFile(undefined);
+        setGpxPickerError(undefined);
+        setIsAndroidGalleryVisible(false);
+        setSelectedAndroidAssetIds([]);
+      }
     } catch (error) {
-      console.warn('[Surveyor] Unable to read selected MediaStore asset:', error);
+      console.warn('[Surveyor] Unable to process selected Android assets:', error);
       setAndroidGalleryError(UNABLE_TO_READ_FILE_MESSAGE);
     } finally {
-      setSelectingAndroidAssetId(undefined);
+      setIsSelectingAndroidAssets(false);
     }
+  };
+
+  const handleRemoveAsset = (indexToRemove: number) => {
+    setSelectedAssets((prev) => {
+      const updated = prev.filter((_, idx) => idx !== indexToRemove);
+      if (activeAssetIndex >= updated.length) {
+        setActiveAssetIndex(Math.max(0, updated.length - 1));
+      }
+      return updated;
+    });
   };
 
   const handleOpenGallery = async () => {
@@ -434,7 +461,7 @@ export function NewSurveyRecordScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
         defaultTab: 'photos',
         exif: true,
         mediaTypes: ['images', 'videos'],
@@ -442,48 +469,60 @@ export function NewSurveyRecordScreen() {
         quality: 1,
       });
 
-      if (!result.canceled) {
-        const asset = result.assets[0];
-        const assetType = asset.type === 'video' ? 'video' : 'image';
-        const gpsCoordinates = await extractSelectedAssetGps(asset);
+      if (!result.canceled && result.assets.length > 0) {
+        const processed: SelectedSurveyMedia[] = [];
 
-        if (assetType === 'video') {
-          const videoMeta = await extractVideoMetadataAsync({
-            id: asset.assetId ?? undefined,
-            uri: asset.uri,
-            filename: asset.fileName,
-            duration: asset.duration ? asset.duration / 1000 : undefined,
-            location: gpsCoordinates ? { latitude: gpsCoordinates.latitude, longitude: gpsCoordinates.longitude } : null,
-            exif: asset.exif as Record<string, unknown> | undefined,
-          });
+        for (const asset of result.assets) {
+          const assetType = asset.type === 'video' ? 'video' : 'image';
+          const gpsCoordinates = await extractSelectedAssetGps(asset);
 
-          setSelectedAsset({
-            capturedAt: videoMeta.capturedAt,
-            fileName: asset.fileName,
-            mimeType: asset.mimeType,
-            type: 'video',
-            uri: asset.uri,
-            duration: videoMeta.durationSeconds,
-            assetId: asset.assetId ?? undefined,
-          });
-          setSelectedGps(videoMeta.hasDeviceGps ? {
-            latitude: videoMeta.startCoordinate[1],
-            longitude: videoMeta.startCoordinate[0],
-          } : null);
-        } else {
-          setSelectedAsset({
-            capturedAt: captureTimeFromExif(asset.exif),
-            fileName: asset.fileName,
-            mimeType: asset.mimeType,
-            type: 'image',
-            uri: asset.uri,
-            duration: asset.duration ? asset.duration / 1000 : undefined,
-            assetId: asset.assetId ?? undefined,
-          });
-          setSelectedGps(gpsCoordinates);
+          if (assetType === 'video') {
+            const videoMeta = await extractVideoMetadataAsync({
+              id: asset.assetId ?? undefined,
+              uri: asset.uri,
+              filename: asset.fileName,
+              duration: asset.duration ? asset.duration / 1000 : undefined,
+              location: gpsCoordinates
+                ? { latitude: gpsCoordinates.latitude, longitude: gpsCoordinates.longitude }
+                : null,
+              exif: asset.exif as Record<string, unknown> | undefined,
+            });
+
+            processed.push({
+              capturedAt: videoMeta.capturedAt,
+              fileName: asset.fileName,
+              mimeType: asset.mimeType,
+              type: 'video',
+              uri: asset.uri,
+              duration: videoMeta.durationSeconds,
+              assetId: asset.assetId ?? undefined,
+              gps: videoMeta.hasDeviceGps
+                ? {
+                  latitude: videoMeta.startCoordinate[1],
+                  longitude: videoMeta.startCoordinate[0],
+                }
+                : null,
+            });
+          } else {
+            processed.push({
+              capturedAt: captureTimeFromExif(asset.exif),
+              fileName: asset.fileName,
+              mimeType: asset.mimeType,
+              type: 'image',
+              uri: asset.uri,
+              duration: asset.duration ? asset.duration / 1000 : undefined,
+              assetId: asset.assetId ?? undefined,
+              gps: gpsCoordinates,
+            });
+          }
         }
-        setSelectedGpxFile(undefined);
-        setGpxPickerError(undefined);
+
+        if (processed.length > 0) {
+          setSelectedAssets((prev) => [...prev, ...processed]);
+          setActiveAssetIndex(0);
+          setSelectedGpxFile(undefined);
+          setGpxPickerError(undefined);
+        }
       }
     } catch (error) {
       setPickerError(
@@ -516,14 +555,22 @@ export function NewSurveyRecordScreen() {
         setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
         const gpxData = await extractGpxGpsData(file.uri);
         if (gpxData?.firstPoint) {
-          setSelectedGps({
+          const gpxGps = {
             latitude: gpxData.firstPoint.latitude,
             longitude: gpxData.firstPoint.longitude,
-          });
+          };
           console.log('[Surveyor] Extracted GPX GPS coordinates:', gpxData.firstPoint);
-          if (gpxData.startTime) {
-            setSelectedAsset((prev) => (prev && !prev.capturedAt ? { ...prev, capturedAt: gpxData.startTime } : prev));
-          }
+          setSelectedAssets((prev) =>
+            prev.map((asset, idx) =>
+              idx === activeAssetIndex
+                ? {
+                  ...asset,
+                  gps: gpxGps,
+                  capturedAt: !asset.capturedAt && gpxData.startTime ? gpxData.startTime : asset.capturedAt,
+                }
+                : asset,
+            ),
+          );
         }
       }
     } catch (error) {
@@ -554,34 +601,49 @@ export function NewSurveyRecordScreen() {
   };
 
   const handleSubmitRecord = async () => {
-    if (!selectedAsset || isOpeningGallery || scanInProgress.current) return;
+    if (selectedAssets.length === 0 || isOpeningGallery || scanInProgress.current) return;
     scanInProgress.current = true;
     scanFinished.current = false;
     savedDraftId.current = undefined;
     setPickerError(undefined);
     setIsSaving(true);
     setIsScanning(true);
-    const isVideo = selectedAsset.type === 'video';
+
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-    const parsedCaptureTime = selectedAsset.capturedAt ? Date.parse(selectedAsset.capturedAt) : NaN;
-    const isCaptureValid =
-      !Number.isNaN(parsedCaptureTime) &&
-      (Date.now() - parsedCaptureTime) >= 0 &&
-      (Date.now() - parsedCaptureTime) < THIRTY_DAYS_MS;
-    const safeCapturedAt = isCaptureValid ? selectedAsset.capturedAt! : new Date().toISOString();
 
     try {
-      savedDraftId.current = await saveDraft({
-        fileName: selectedAsset.fileName ?? undefined,
-        mimeType: selectedAsset.mimeType,
-        type: selectedAsset.type,
-        uri: selectedAsset.uri,
-      }, {
-        submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-        capturedAt: safeCapturedAt,
-        coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
-        ...(selectedGps ?? {}),
-      }, draftId, selectedGpxFile);
+      const savedIds: string[] = [];
+
+      for (const asset of selectedAssets) {
+        const isVideo = asset.type === 'video';
+        const parsedCaptureTime = asset.capturedAt ? Date.parse(asset.capturedAt) : NaN;
+        const isCaptureValid =
+          !Number.isNaN(parsedCaptureTime) &&
+          Date.now() - parsedCaptureTime >= 0 &&
+          Date.now() - parsedCaptureTime < THIRTY_DAYS_MS;
+        const safeCapturedAt = isCaptureValid ? asset.capturedAt! : new Date().toISOString();
+
+        const id = await saveDraft(
+          {
+            fileName: asset.fileName ?? undefined,
+            mimeType: asset.mimeType,
+            type: asset.type,
+            uri: asset.uri,
+          },
+          {
+            submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
+            capturedAt: safeCapturedAt,
+            coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
+            ...(asset.gps ?? {}),
+          },
+          draftId && savedIds.length === 0 ? draftId : undefined,
+          selectedGpxFile,
+        );
+
+        savedIds.push(id);
+      }
+
+      savedDraftId.current = savedIds[0];
       openSavedDraft();
     } catch (error) {
       console.warn('[Surveyor] Unable to save survey draft:', error);
@@ -683,21 +745,28 @@ export function NewSurveyRecordScreen() {
               }}
               onEndReachedThreshold={0.5}
               renderItem={({ item }) => {
-                const isSelecting = selectingAndroidAssetId === item.id;
+                const isSelected = selectedAndroidAssetIds.includes(item.id);
                 const isVideo = item.mediaType === LegacyMediaLibrary.MediaType.video;
 
                 return (
                   <Pressable
-                    accessibilityLabel={`Select ${item.filename}`}
+                    accessibilityLabel={`Chọn ${item.filename}`}
                     accessibilityRole="button"
-                    disabled={Boolean(selectingAndroidAssetId)}
-                    onPress={() => void handleSelectAndroidAsset(item)}
+                    disabled={isSelectingAndroidAssets}
+                    onPress={() => handleToggleAndroidAsset(item.id)}
                     style={({ pressed }) => [
                       styles.galleryItem,
-                      { opacity: pressed || isSelecting ? 0.65 : 1 },
+                      { opacity: pressed ? 0.75 : 1 },
                     ]}
                   >
                     <Image contentFit="cover" source={{ uri: item.uri }} style={styles.galleryImage} />
+                    {isSelected ? (
+                      <View style={[styles.galleryCheckCircle, { backgroundColor: theme.primary }]}>
+                        <MaterialCommunityIcons color="#FFFFFF" name="check" size={13} />
+                      </View>
+                    ) : (
+                      <View style={styles.galleryUncheckCircle} />
+                    )}
                     {isVideo ? (
                       <View style={styles.galleryVideoBadge}>
                         <SymbolView
@@ -708,15 +777,26 @@ export function NewSurveyRecordScreen() {
                         />
                       </View>
                     ) : null}
-                    {isSelecting ? (
-                      <View style={styles.gallerySelectingOverlay}>
-                        <ActivityIndicator color="#FFFFFF" />
-                      </View>
-                    ) : null}
                   </Pressable>
                 );
               }}
             />
+
+            {/* Android Multi-Select Confirmation Footer */}
+            <View style={[styles.galleryFooterBar, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+              <Text style={[styles.gallerySelectedCountText, { color: theme.text }]}>
+                {selectedAndroidAssetIds.length > 0
+                  ? `Đã chọn ${selectedAndroidAssetIds.length} tệp`
+                  : 'Chưa chọn tệp nào'}
+              </Text>
+              <AppButton
+                accessibilityLabel={`Xác nhận chọn ${selectedAndroidAssetIds.length} tệp`}
+                disabled={selectedAndroidAssetIds.length === 0 || isSelectingAndroidAssets}
+                label={isSelectingAndroidAssets ? 'Đang đọc...' : `Xác nhận (${selectedAndroidAssetIds.length})`}
+                onPress={handleConfirmAndroidSelection}
+                style={styles.galleryConfirmButton}
+              />
+            </View>
           </SafeAreaView>
         </View>
       </Modal>
@@ -742,69 +822,168 @@ export function NewSurveyRecordScreen() {
             <Text style={[styles.title, { color: theme.text }]}>Ghi nhận khảo sát mới</Text>
           </View>
 
-          <AppButton
-            accessibilityLabel={
-              selectedAsset ? 'Đổi ảnh đã chọn' : 'Chọn ảnh từ thư viện'
-            }
-            disabled={isOpeningGallery || isScanning}
-            onPress={handleOpenGallery}
-            pressedOpacity={0.78}
-            style={[
-              styles.uploadPlaceholder,
-              {
-                backgroundColor: theme.neutral,
-                borderColor: theme.border,
-                padding: selectedAsset ? 0 : Spacing.four,
-              },
-            ]}
-            variant="surface"
-          >
-            {selectedAsset ? (
-              selectedAsset.type === 'video' ? (
-                <View style={styles.videoPreview}>
-                  <SymbolView
-                    fallback={<Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>}
-                    name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
-                    size={36}
-                    tintColor={theme.onPrimary}
+          {/* Media Carousel Preview or Upload Placeholder */}
+          {selectedAssets.length > 0 && selectedAsset ? (
+            <View style={styles.carouselContainer}>
+              <Pressable
+                accessibilityLabel="Đổi hoặc thêm ảnh từ thư viện"
+                accessibilityRole="button"
+                disabled={isOpeningGallery || isScanning}
+                onPress={handleOpenGallery}
+                style={[
+                  styles.uploadPlaceholder,
+                  {
+                    backgroundColor: theme.neutral,
+                    borderColor: theme.border,
+                    padding: 0,
+                    overflow: 'hidden',
+                    position: 'relative',
+                  },
+                ]}
+              >
+                {selectedAsset.type === 'video' ? (
+                  <View style={styles.videoPreview}>
+                    <SymbolView
+                      fallback={<Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>}
+                      name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
+                      size={36}
+                      tintColor={theme.onPrimary}
+                    />
+                    <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
+                      {selectedAsset.fileName ?? 'Đã chọn video'}
+                    </Text>
+                    {selectedAsset.duration ? (
+                      <Text style={{ color: theme.onPrimary, fontSize: 12, marginTop: 4 }}>
+                        Thời lượng: {Math.round(selectedAsset.duration)}s
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Image
+                    accessibilityLabel={`Tệp khảo sát ${activeAssetIndex + 1}`}
+                    contentFit="cover"
+                    source={{ uri: selectedAsset.uri }}
+                    style={styles.selectedImage}
                   />
-                  <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
-                    {selectedAsset.fileName ?? 'Đã chọn video'}
+                )}
+
+                {/* Counter Badge on top-left of image */}
+                <View style={styles.carouselBadge}>
+                  <Text style={styles.carouselBadgeText}>
+                    {selectedAsset.type === 'video' ? 'Video' : 'Ảnh'} {activeAssetIndex + 1}/{selectedAssets.length}
                   </Text>
                 </View>
-              ) : (
-                <Image
-                  accessibilityLabel="Tệp khảo sát đã chọn"
-                  contentFit="cover"
-                  source={{ uri: selectedAsset.uri }}
-                  style={styles.selectedImage}
-                />
-              )
-            ) : (
-              <>
-                <SymbolView
-                  fallback={
-                    <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
-                  }
-                  name={{
-                    android: 'image',
-                    ios: 'photo',
-                    web: 'image',
+
+                {/* Remove button on top-right of image */}
+                <Pressable
+                  accessibilityLabel="Xóa tệp này"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleRemoveAsset(activeAssetIndex);
                   }}
-                  size={38}
-                  tintColor={theme.placeholder}
-                />
-                <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
-                  {isOpeningGallery
-                    ? 'Đang mở thư viện...'
-                    : 'Tải lên ảnh hoặc video'}
-                </Text>
-              </>
-            )}
-          </AppButton>
+                  style={styles.carouselRemoveButton}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="close" size={16} />
+                </Pressable>
+
+                {/* Left Arrow Button */}
+                {selectedAssets.length > 1 && activeAssetIndex > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Xem tệp trước"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setActiveAssetIndex((prev) => Math.max(0, prev - 1));
+                    }}
+                    style={[styles.carouselArrowButton, styles.carouselArrowLeft]}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="chevron-left" size={28} />
+                  </Pressable>
+                ) : null}
+
+                {/* Right Arrow Button */}
+                {selectedAssets.length > 1 && activeAssetIndex < selectedAssets.length - 1 ? (
+                  <Pressable
+                    accessibilityLabel="Xem tệp tiếp theo"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setActiveAssetIndex((prev) => Math.min(selectedAssets.length - 1, prev + 1));
+                    }}
+                    style={[styles.carouselArrowButton, styles.carouselArrowRight]}
+                  >
+                    <MaterialCommunityIcons color="#FFFFFF" name="chevron-right" size={28} />
+                  </Pressable>
+                ) : null}
+              </Pressable>
+
+              {/* Dot Indicators below image */}
+              {selectedAssets.length > 1 ? (
+                <View style={styles.paginationDotsRow}>
+                  {selectedAssets.map((asset, index) => {
+                    const isActive = index === activeAssetIndex;
+                    return (
+                      <Pressable
+                        key={`${asset.uri}-${index}`}
+                        accessibilityLabel={`Chọn tệp ${index + 1}`}
+                        hitSlop={6}
+                        onPress={() => setActiveAssetIndex(index)}
+                        style={[
+                          styles.dotItem,
+                          isActive
+                            ? [styles.dotItemActive, { backgroundColor: theme.primary }]
+                            : { backgroundColor: `${theme.grey}50` },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <AppButton
+              accessibilityLabel="Chọn ảnh từ thư viện"
+              disabled={isOpeningGallery || isScanning}
+              onPress={handleOpenGallery}
+              pressedOpacity={0.78}
+              style={[
+                styles.uploadPlaceholder,
+                {
+                  backgroundColor: theme.neutral,
+                  borderColor: theme.border,
+                  padding: Spacing.four,
+                },
+              ]}
+              variant="surface"
+            >
+              <SymbolView
+                fallback={
+                  <Text style={[styles.imageFallback, { color: theme.placeholder }]}>IMG</Text>
+                }
+                name={{
+                  android: 'image',
+                  ios: 'photo',
+                  web: 'image',
+                }}
+                size={38}
+                tintColor={theme.placeholder}
+              />
+              <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
+                {isOpeningGallery
+                  ? 'Đang mở thư viện...'
+                  : 'Tải lên ảnh hoặc video'}
+              </Text>
+            </AppButton>
+          )}
 
           <Text style={[styles.helperText, { color: theme.placeholder }]}>
-            {selectedAsset ? 'Nhấn vào bản xem trước để chọn tệp khác' : 'Tải lên hình ảnh hoặc video biển báo tại đây'}
+            {selectedAssets.length > 0
+              ? 'Nhấn vào ảnh để đổi hoặc thêm tệp khác'
+              : 'Tải lên hình ảnh hoặc video biển báo tại đây'}
           </Text>
 
           {pickerError ? (
@@ -893,9 +1072,31 @@ export function NewSurveyRecordScreen() {
             </View>
           ) : null}
 
+          {/* Secondary Button: Submit another survey */}
+
+          {selectedAssets.length > 2 && (
+            <AppButton
+              accessibilityLabel="Gửi khảo sát khác"
+              disabled={isOpeningGallery || isScanning || isSaving}
+              label="Gửi khảo sát khác"
+              onPress={handleOpenGallery}
+              style={[
+                styles.secondarySubmitButton,
+                { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+              ]}
+              variant="surface"
+            />
+          )}
+
           <AppButton
-            disabled={!selectedAsset || isOpeningGallery || isScanning || isSaving}
-            label={isSaving ? "Đang lưu bản nháp..." : "Tiếp tục ghi nhận"}
+            disabled={selectedAssets.length === 0 || isOpeningGallery || isScanning || isSaving}
+            label={
+              isSaving
+                ? "Đang lưu bản nháp..."
+                : selectedAssets.length > 1
+                  ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
+                  : "Tiếp tục ghi nhận"
+            }
             onPress={handleSubmitRecord}
             style={styles.submitButton}
           />
@@ -1194,5 +1395,119 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 600,
     textDecorationLine: 'underline',
+  },
+  galleryCheckCircle: {
+    position: 'absolute',
+    top: Spacing.one,
+    right: Spacing.one,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  galleryUncheckCircle: {
+    position: 'absolute',
+    top: Spacing.one,
+    right: Spacing.one,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  galleryFooterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderTopWidth: 1,
+  },
+  gallerySelectedCountText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: 600,
+  },
+  galleryConfirmButton: {
+    minHeight: 40,
+    paddingHorizontal: Spacing.three,
+  },
+  carouselContainer: {
+    width: '100%',
+    position: 'relative',
+  },
+  carouselBadge: {
+    position: 'absolute',
+    top: Spacing.one,
+    left: Spacing.one,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Rounded.round,
+    zIndex: 10,
+  },
+  carouselBadgeText: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#FFFFFF',
+  },
+  carouselRemoveButton: {
+    position: 'absolute',
+    top: Spacing.one,
+    right: Spacing.one,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  carouselArrowButton: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.50)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  carouselArrowLeft: {
+    left: Spacing.one,
+  },
+  carouselArrowRight: {
+    right: Spacing.one,
+  },
+  paginationDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: Spacing.two,
+  },
+  dotItem: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotItemActive: {
+    width: 22,
+    borderRadius: 4,
+  },
+  secondarySubmitButton: {
+    width: '100%',
+    marginBottom: Spacing.two,
+    borderWidth: 1,
   },
 });

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Animated, BackHandler, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -8,8 +8,9 @@ import { SymbolView } from "expo-symbols";
 import { Camera } from "expo-camera";
 import { Image as ExpoImage } from "expo-image";
 import { Image } from "react-native";
-import { AppButton } from "@/components/ui/button";
-import { AppToast } from "@/components/ui/toast";
+import { AppButton } from "@/components/button";
+import { Badge } from "@/components/badge";
+import { AppToast } from "@/components/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
@@ -21,7 +22,7 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { useOptionalSession } from "@/context/session-provider";
 import { useNavigationActive } from "@/context/navigation-active-provider";
-import { useSignFilter } from "@/context/sign-filter-provider";
+import { useSignFilter, type SignFilterPreset } from "@/context/sign-filter-provider";
 import {
   useCreateSavedRoute,
   useGetSavedRoute,
@@ -33,16 +34,21 @@ import { categoryToCode, codeToCategory } from "@/types/savedRouteType";
 const AppLogo = require('@/assets/images/app-logo.png') as number;
 import { NavigationMapView } from "../components/navigation-map-view";
 import { getNavigationRoute, type NavigationStep, type RouteSign } from '@/api/navigation/navigation';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { confirmSignPresence } from '@/api/sign-map/sign-map';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
+import { speechService } from '@/services/speech';
+import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
+import { applyDemoRouteSigns } from "../utils/demo-route-signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
+import { useGetUnreadNotificationCount } from '@/feature/notifications/hooks/use-notifications';
 import {
   ensureLocationPermission,
   fetchFreshGpsPosition,
@@ -107,6 +113,7 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
+  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -193,6 +200,8 @@ export function NavigationMapScreen() {
     }
   }, [selectedDestination, userCoordinate]);
 
+  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
+
   const plannedRouteOrigin = isCustomStart
     ? customStartCoordinate
     : (savedRouteData && !fallbackCurrentLocation
@@ -204,10 +213,35 @@ export function NavigationMapScreen() {
       ? "Điểm xuất phát"
       : (savedRouteData
         ? savedRouteData.originName
-        : (plannedRouteOrigin ? "Vị trí hiện tại" : undefined)));
+        : (resolvedOriginTitle ?? (plannedRouteOrigin ? "Vị trí hiện tại" : undefined))));
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const isMotorcycleMode = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
   const session = useOptionalSession()?.session;
+
+  useEffect(() => {
+    if (isCustomStart || startTitle || savedRouteData || !plannedRouteOrigin) {
+      return;
+    }
+
+    let isMounted = true;
+    const [lon, lat] = plannedRouteOrigin;
+
+    void (async () => {
+      try {
+        const resolved = await resolveLocation(lat, lon, session?.accessToken);
+        const title = formatResolvedLocationTitle(resolved);
+        if (isMounted && title) {
+          setResolvedOriginTitle(title);
+        }
+      } catch {
+        // keep fallback
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isCustomStart, startTitle, savedRouteData, plannedRouteOrigin, session?.accessToken]);
   const [navigationSession, setNavigationSession] = useState<{
     hasLiveLocation: boolean;
     destinationId: string;
@@ -241,7 +275,7 @@ export function NavigationMapScreen() {
   // 2: Full range (expanded view showing the full sign filter list and Start button)
   const peekSheetHeight = plannedRouteOrigin
     ? isNavigating
-      ? 96 + bottomInset   // navigation mode: compact bar (handle + header row only)
+      ? 180 + bottomInset   // navigation mode: compact bar (handle + header row only)
       : 188 + bottomInset  // pre-navigation: full peek with vehicle tabs
     : 110 + bottomInset;
   const midSheetHeight = plannedRouteOrigin
@@ -402,6 +436,9 @@ export function NavigationMapScreen() {
     id: number;
     message: string;
   }>();
+  const handleDismissToast = useCallback(() => {
+    setLocationToast(undefined);
+  }, []);
   const [mapFocus, setMapFocus] = useState<{
     coordinate: MapCoordinate;
     requestId: number;
@@ -415,13 +452,43 @@ export function NavigationMapScreen() {
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
+  const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    getStorageItemAsync('signtrust_tts_enabled')
+      .then((val) => {
+        if (isMounted && val !== null) {
+          const enabled = val === 'true';
+          setIsTtsEnabled(enabled);
+          speechService.setEnabled(enabled);
+        }
+      })
+      .catch(() => { });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleToggleTts = useCallback(() => {
+    setIsTtsEnabled((prev) => {
+      const next = !prev;
+      speechService.setEnabled(next);
+      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => { });
+      setLocationToast({
+        id: Date.now(),
+        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
+      });
+      return next;
+    });
+  }, []);
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
   // Use rerouteOrigin when available (off-route rerouting), otherwise the
   // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
   // triggers an automatic re-fetch for the new path.
   const activeRouteOrigin = rerouteOrigin ?? plannedRouteOrigin;
 
-  // Dual query: Fetch both Car and Motorcycle directions simultaneously
+  // Quad query: Fetch Car, Motorcycle, Bicycle, and Walking directions simultaneously
   const {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
@@ -442,16 +509,61 @@ export function NavigationMapScreen() {
     'BIKE',
   );
 
+  const {
+    data: cyclingRouteResult,
+    isLoading: isCyclingRouteLoading,
+    error: cyclingRouteError,
+  } = useGetNavigationRoute(
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    'CYCLING',
+  );
+
+  const {
+    data: walkingRouteResult,
+    isLoading: isWalkingRouteLoading,
+    error: walkingRouteError,
+  } = useGetNavigationRoute(
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    'WALKING',
+  );
+
   // Store durations and distances in corresponding variables
   const carDuration = carRouteResult?.duration;
   const motorcycleDuration = motorcycleRouteResult?.duration;
+  const cyclingDuration = cyclingRouteResult?.duration;
+  const walkingDuration = walkingRouteResult?.duration;
   const carDistance = carRouteResult?.distance;
   const motorcycleDistance = motorcycleRouteResult?.distance;
+  const cyclingDistance = cyclingRouteResult?.distance;
+  const walkingDistance = walkingRouteResult?.distance;
 
   // Active route depends on selected vehicle mode tab
-  const activeRouteResult = isMotorcycleMode ? motorcycleRouteResult : carRouteResult;
-  const activeRouteError = isMotorcycleMode ? motorcycleRouteError : carRouteError;
-  const isRouteLoading = isMotorcycleMode ? isMotorcycleRouteLoading : isCarRouteLoading;
+  const activeRouteResult =
+    vehicleMode === 'CYCLING'
+      ? cyclingRouteResult
+      : vehicleMode === 'WALKING'
+        ? walkingRouteResult
+        : isMotorcycleMode
+          ? motorcycleRouteResult
+          : carRouteResult;
+  const activeRouteError =
+    vehicleMode === 'CYCLING'
+      ? cyclingRouteError
+      : vehicleMode === 'WALKING'
+        ? walkingRouteError
+        : isMotorcycleMode
+          ? motorcycleRouteError
+          : carRouteError;
+  const isRouteLoading =
+    vehicleMode === 'CYCLING'
+      ? isCyclingRouteLoading
+      : vehicleMode === 'WALKING'
+        ? isWalkingRouteLoading
+        : isMotorcycleMode
+          ? isMotorcycleRouteLoading
+          : isCarRouteLoading;
 
   const [mapBounds, setMapBounds] = useState<FindSignsInBoundsParams>();
   const hasSelectedRoute = Boolean(plannedRouteOrigin && selectedDestination);
@@ -486,9 +598,10 @@ export function NavigationMapScreen() {
     return () => setNavigationActive(false);
   }, [isNavigating, setNavigationActive]);
 
-  // Automatically reduce the bottom sheet to peek range (vehicle mode, ETA & distance) when navigating
+  // Automatically reduce the bottom sheet to peek range and switch to manual categories when navigating
   useEffect(() => {
     if (isNavigating) {
+      setFilterViewMode('categories');
       snapTo(0);
     }
   }, [isNavigating, snapTo]);
@@ -511,13 +624,27 @@ export function NavigationMapScreen() {
         : hasSelectedRoute
           ? plannedSigns
           : mapSigns;
-    return rawSigns.map((sign) => ({
+    const resolvedSigns = rawSigns.map((sign) => ({
       ...sign,
       imageUrl: sign.imageUrl && !sign.imageUrl.includes('mock/')
         ? resolveImageUrl(sign.imageUrl)
         : TARGET_SIGN_IMAGE_URL,
     }));
-  }, [hasSelectedRoute, mapSigns, plannedSigns, savedRouteSignsData?.signs]);
+    return applyDemoRouteSigns(
+      resolvedSigns,
+      activeRouteOrigin,
+      selectedDestination?.coordinate,
+      vehicleMode,
+    );
+  }, [
+    hasSelectedRoute,
+    mapSigns,
+    plannedSigns,
+    savedRouteSignsData?.signs,
+    activeRouteOrigin,
+    selectedDestination?.coordinate,
+    vehicleMode,
+  ]);
 
   const {
     activeCategories,
@@ -525,15 +652,22 @@ export function NavigationMapScreen() {
     activePreset,
     activePresetId,
     presets,
+    refetchPresets,
     setActivePresetId,
   } = useSignFilter();
 
   useEffect(() => {
     if (savedRouteData && !isNavigating) {
-      const isBike =
-        savedRouteData.vehicleMode?.toUpperCase() === 'MOTORCYCLE' ||
-        savedRouteData.vehicleMode?.toUpperCase() === 'BIKE';
-      setVehicleMode(isBike ? 'BIKE' : 'DRIVING');
+      const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
+      if (modeUpper === 'CYCLING' || modeUpper === 'BICYCLE') {
+        setVehicleMode('CYCLING');
+      } else if (modeUpper === 'WALKING' || modeUpper === 'PEDESTRIAN') {
+        setVehicleMode('WALKING');
+      } else if (modeUpper === 'MOTORCYCLE' || modeUpper === 'BIKE') {
+        setVehicleMode('MOTORCYCLE');
+      } else {
+        setVehicleMode('DRIVING');
+      }
       void setActivePresetId(savedRouteData.id);
       snapTo(1);
     }
@@ -583,6 +717,86 @@ export function NavigationMapScreen() {
     }
   }, [presets, setActivePresetId]);
 
+  const isPresetMatchingCurrentRoute = useCallback(
+    (preset: SignFilterPreset): boolean => {
+      if (!plannedRouteOrigin || !selectedDestination) return false;
+
+      // 1. Direct ID match if loaded from saved route or just created
+      if (
+        activeSavedRouteId &&
+        (preset.id === activeSavedRouteId || preset.savedRoute?.id === activeSavedRouteId)
+      ) {
+        return true;
+      }
+      if (
+        savedRouteData?.id &&
+        (preset.id === savedRouteData.id || preset.savedRoute?.id === savedRouteData.id)
+      ) {
+        return true;
+      }
+
+      const sr = preset.savedRoute;
+      if (!sr) return false;
+
+      // 2. Coordinate proximity check (within ~300 meters, ~0.003 deg)
+      const [currOriginLng, currOriginLat] = plannedRouteOrigin;
+      const [currDestLng, currDestLat] = selectedDestination.coordinate;
+
+      const originDiff =
+        Math.abs(sr.originLatitude - currOriginLat) +
+        Math.abs(sr.originLongitude - currOriginLng);
+      const destDiff =
+        Math.abs(sr.destinationLatitude - currDestLat) +
+        Math.abs(sr.destinationLongitude - currDestLng);
+
+      if (originDiff < 0.003 && destDiff < 0.003) {
+        return true;
+      }
+
+      // 3. Name matching fallback
+      const norm = (s?: string) =>
+        (s || '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[,\-–—.]/g, ' ')
+          .replace(/\s+/g, ' ');
+
+      const srOrigin = norm(sr.originName);
+      const srDest = norm(sr.destinationName);
+      const currOrigin = norm(routeStartTitle);
+      const currDest = norm(selectedDestination.title);
+
+      if (
+        srOrigin.length > 2 &&
+        srDest.length > 2 &&
+        currOrigin.length > 2 &&
+        currDest.length > 2 &&
+        (srOrigin === currOrigin || currOrigin.includes(srOrigin) || srOrigin.includes(currOrigin)) &&
+        (srDest === currDest || currDest.includes(srDest) || srDest.includes(currDest))
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [plannedRouteOrigin, selectedDestination, activeSavedRouteId, savedRouteData, routeStartTitle]
+  );
+
+  const routeMatchingPresets = useMemo(() => {
+    return presets.filter(isPresetMatchingCurrentRoute);
+  }, [presets, isPresetMatchingCurrentRoute]);
+
+  useEffect(() => {
+    if (activePresetId && plannedRouteOrigin && selectedDestination) {
+      const isMatching = routeMatchingPresets.some((p) => p.id === activePresetId);
+      if (!isMatching) {
+        void setActivePresetId(null);
+      }
+    }
+  }, [activePresetId, plannedRouteOrigin, selectedDestination, routeMatchingPresets, setActivePresetId]);
+
   const handleLivestreamPress = useCallback(async () => {
     // Request camera permission
     const cameraResult = await Camera.requestCameraPermissionsAsync();
@@ -595,7 +809,12 @@ export function NavigationMapScreen() {
   }, [router]);
 
   const filteredSigns = useMemo(() => {
-    if (filterViewMode === 'categories') {
+    const isCategoriesActive =
+      isNavigating ||
+      filterViewMode === 'categories' ||
+      routeMatchingPresets.length === 0;
+
+    if (isCategoriesActive) {
       if (manualCategories.size === SIGN_CATEGORIES.length) {
         return visibleSigns;
       }
@@ -611,18 +830,22 @@ export function NavigationMapScreen() {
     }
     return visibleSigns.filter((sign) => {
       const cat = getSignCategory(sign);
-      if (activeOnlyFixedSigns && (cat === 'TEMPORARY' || (sign as any).isTemporary)) {
-        return false;
-      }
       return activeCategories.has(cat);
     });
-  }, [filterViewMode, manualCategories, visibleSigns, activeCategories, activePresetId, activeOnlyFixedSigns]);
+  }, [
+    isNavigating,
+    filterViewMode,
+    routeMatchingPresets.length,
+    manualCategories,
+    visibleSigns,
+    activeCategories,
+    activePresetId,
+  ]);
 
   const createSavedRouteMutation = useCreateSavedRoute();
   const updateSavedRouteMutation = useUpdateSavedRoute();
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
   const [bookmarkTitleInput, setBookmarkTitleInput] = useState('');
-  const [bookmarkOnlyFixedSigns, setBookmarkOnlyFixedSigns] = useState(true);
   const [bookmarkCategories, setBookmarkCategories] = useState<Set<SignCategory>>(
     new Set(['MANDATORY', 'WARNING', 'PROHIBITORY'])
   );
@@ -641,11 +864,8 @@ export function NavigationMapScreen() {
     if (!selectedDestination || !plannedRouteOrigin) return;
     const currentName =
       savedRouteData?.title ||
-      `${selectedDestination.title} (${isMotorcycleMode ? 'Xe máy' : 'Ô tô'})`;
+      `${routeStartTitle || 'Điểm xuất phát'} ➔ ${selectedDestination.title}`;
     setBookmarkTitleInput(currentName);
-    setBookmarkOnlyFixedSigns(
-      savedRouteData?.filterRules?.onlyFixedSigns ?? activeOnlyFixedSigns ?? true
-    );
     if (savedRouteData?.filterRules?.categories && savedRouteData.filterRules.categories.length > 0) {
       setBookmarkCategories(new Set(savedRouteData.filterRules.categories.map(codeToCategory)));
     } else if (activeCategories && activeCategories.size > 0) {
@@ -658,9 +878,8 @@ export function NavigationMapScreen() {
   }, [
     selectedDestination,
     plannedRouteOrigin,
+    routeStartTitle,
     savedRouteData,
-    isMotorcycleMode,
-    activeOnlyFixedSigns,
     activeCategories,
   ]);
 
@@ -681,41 +900,74 @@ export function NavigationMapScreen() {
     try {
       const categoriesArray = Array.from(bookmarkCategories).map(categoryToCode);
       const polylineStr = routeCoordinates?.length ? encodePolyline(routeCoordinates) : undefined;
+      const targetVehicleMode =
+        vehicleMode === 'CYCLING'
+          ? 'CYCLING'
+          : vehicleMode === 'WALKING'
+            ? 'WALKING'
+            : isMotorcycleMode
+              ? 'MOTORCYCLE'
+              : 'CAR';
+
+      // Resolve real origin name if it is currently "Vị trí hiện tại"
+      let effectiveOrigin = routeStartTitle || 'Điểm xuất phát';
+      if (effectiveOrigin === 'Vị trí hiện tại' && plannedRouteOrigin) {
+        try {
+          const resolved = await resolveLocation(
+            plannedRouteOrigin[1],
+            plannedRouteOrigin[0],
+            session?.accessToken,
+          );
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            effectiveOrigin = formatted;
+            setResolvedOriginTitle(formatted);
+          }
+        } catch {
+          // keep fallback
+        }
+      }
+
+      const finalTitle = trimmed.startsWith('Vị trí hiện tại ➔') && effectiveOrigin !== 'Vị trí hiện tại'
+        ? trimmed.replace('Vị trí hiện tại ➔', `${effectiveOrigin} ➔`)
+        : trimmed;
 
       if (activeSavedRouteId && savedRouteData) {
         await updateSavedRouteMutation.mutateAsync({
           id: activeSavedRouteId,
           dto: {
-            title: trimmed,
-            vehicleMode: isMotorcycleMode ? 'MOTORCYCLE' : 'CAR',
+            title: finalTitle,
+            vehicleMode: targetVehicleMode,
             filterRules: {
-              onlyFixedSigns: bookmarkOnlyFixedSigns,
+              onlyFixedSigns: true,
               categories: categoriesArray,
             },
           },
         });
+        await refetchPresets();
         setLocationToast({
           id: Date.now(),
           message: 'Đã cập nhật lộ trình đã lưu!',
         });
       } else {
         const created = await createSavedRouteMutation.mutateAsync({
-          title: trimmed,
-          vehicleMode: isMotorcycleMode ? 'MOTORCYCLE' : 'CAR',
-          originName: routeStartTitle || 'Điểm xuất phát',
+          title: finalTitle,
+          vehicleMode: targetVehicleMode,
+          originName: effectiveOrigin,
           originLatitude: plannedRouteOrigin![1],
           originLongitude: plannedRouteOrigin![0],
           destinationName: selectedDestination!.title,
           destinationLatitude: selectedDestination!.coordinate[1],
           destinationLongitude: selectedDestination!.coordinate[0],
           encodedPolyline: polylineStr,
-          distanceMeters: routeDistance,
-          durationSeconds: routeDuration,
+          distanceMeters: routeDistance != null ? Math.round(routeDistance) : undefined,
+          durationSeconds: routeDuration != null ? Math.round(routeDuration) : undefined,
           filterRules: {
-            onlyFixedSigns: bookmarkOnlyFixedSigns,
+            onlyFixedSigns: true,
             categories: categoriesArray,
           },
         });
+        await refetchPresets();
         setActiveSavedRouteId(created.id);
         void setActivePresetId(created.id);
         setLocationToast({
@@ -736,8 +988,8 @@ export function NavigationMapScreen() {
     activeSavedRouteId,
     savedRouteData,
     updateSavedRouteMutation,
+    vehicleMode,
     isMotorcycleMode,
-    bookmarkOnlyFixedSigns,
     createSavedRouteMutation,
     routeStartTitle,
     plannedRouteOrigin,
@@ -745,6 +997,7 @@ export function NavigationMapScreen() {
     routeDistance,
     routeDuration,
     setActivePresetId,
+    refetchPresets,
   ]);
   const maneuverProgresses = useMemo(
     () =>
@@ -827,7 +1080,8 @@ export function NavigationMapScreen() {
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
-    speechLanguage: "en-US",
+    speechLanguage: "vi-VN",
+    ttsEnabled: isTtsEnabled,
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
@@ -1058,6 +1312,10 @@ export function NavigationMapScreen() {
         destinationId: selectedDestination.id,
         vehicleMode,
       });
+      setFilterViewMode('categories');
+      if (activeCategories && activeCategories.size > 0 && activePresetId !== null) {
+        setManualCategories(new Set(activeCategories));
+      }
     } catch (error) {
       console.error("[GPS] Failed to begin navigation:", error);
       setNavigationError(GPS_UNAVAILABLE_MESSAGE);
@@ -1288,8 +1546,8 @@ export function NavigationMapScreen() {
             sign={activeSignAlert.sign}
             onVerify={async (sign, result: SignVerifyResult) => {
               verifiedSignIdsRef.current.add(sign.id);
+              const isPresent = result === 'present';
               try {
-                const isPresent = result === 'present';
                 const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
                 const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
                 const res = await confirmSignPresence(
@@ -1304,14 +1562,20 @@ export function NavigationMapScreen() {
                   },
                   session?.accessToken || '',
                 );
-                if (res?.message) {
-                  setLocationToast({
-                    id: Date.now(),
-                    message: res.message,
-                  });
-                }
+                setLocationToast({
+                  id: Date.now(),
+                  message: isPresent
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                });
               } catch (e: any) {
                 console.warn('[Navigation] Confirm sign error:', e?.message);
+                setLocationToast({
+                  id: Date.now(),
+                  message: isPresent
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                });
               }
             }}
             onDismiss={() => {
@@ -1391,82 +1655,68 @@ export function NavigationMapScreen() {
           </Pressable>
         ) : null}
 
-        {/* Floating Quick-Preset Bar during active navigation (Driver-friendly UX) */}
-        {isNavigating && presets.length > 0 ? (
-          <View
-            style={[
-              styles.navDrivingFilterContainer,
-              { bottom: 158 + bottomInset },
+        {/* Floating Sign Filter button during navigation */}
+        {isNavigating ? (
+          <Pressable
+            accessibilityLabel="Bộ lọc biển báo"
+            accessibilityRole="button"
+            onPress={() => {
+              setFilterViewMode('categories');
+              const nextSnap = snapIndexRef.current === 0 ? 1 : 0;
+              snapTo(nextSnap);
+            }}
+            style={({ pressed }) => [
+              styles.navFilterButton,
+              {
+                backgroundColor:
+                  manualCategories.size < SIGN_CATEGORIES.length
+                    ? theme.backgroundSelected
+                    : theme.backgroundElement,
+                borderColor:
+                  manualCategories.size < SIGN_CATEGORIES.length
+                    ? theme.primary
+                    : theme.border,
+                bottom: 108 + bottomInset,
+                opacity: pressed ? 0.75 : 1,
+              },
             ]}
           >
-            <ScrollView
-              contentContainerStyle={styles.navDrivingFilterScrollContent}
-              horizontal
-              showsHorizontalScrollIndicator={false}
+            <MaterialCommunityIcons
+              name="filter-variant"
+              size={16}
+              color={
+                manualCategories.size < SIGN_CATEGORIES.length
+                  ? theme.primary
+                  : theme.text
+              }
+            />
+            <Text
+              style={[
+                styles.navRecenterText,
+                {
+                  color:
+                    manualCategories.size < SIGN_CATEGORIES.length
+                      ? theme.primary
+                      : theme.text,
+                },
+              ]}
             >
-              <Pressable
-                accessibilityLabel={`Tất cả biển báo, không lọc, ${activePresetId === null ? 'đang chọn' : 'nhấn để chọn'}`}
-                accessibilityRole="button"
-                onPress={() => void setActivePresetId(null)}
-                style={({ pressed }) => [
-                  styles.navDrivingChip,
+              Bộ lọc
+            </Text>
+            {manualCategories.size < SIGN_CATEGORIES.length ? (
+              <View
+                style={[
+                  styles.filterActiveBadge,
                   {
-                    backgroundColor:
-                      activePresetId === null ? theme.primary : theme.backgroundElement,
-                    borderColor: activePresetId === null ? theme.primary : theme.border,
-                    opacity: pressed ? 0.75 : 1,
+                    backgroundColor: theme.primary,
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
                   },
                 ]}
-              >
-                <MaterialCommunityIcons
-                  color={activePresetId === null ? theme.onPrimary : theme.text}
-                  name={activePresetId === null ? 'check' : 'filter-variant'}
-                  size={16}
-                />
-                <Text
-                  style={[
-                    styles.navDrivingChipText,
-                    { color: activePresetId === null ? theme.onPrimary : theme.text },
-                  ]}
-                >
-                  Tất cả biển báo
-                </Text>
-              </Pressable>
-
-              {presets.map((preset) => {
-                const isActive = activePresetId === preset.id;
-                return (
-                  <Pressable
-                    accessibilityLabel={`Bộ lọc ${preset.name}, ${isActive ? 'đang chọn' : 'nhấn để chọn'}`}
-                    accessibilityRole="button"
-                    key={preset.id}
-                    onPress={() => void setActivePresetId(preset.id)}
-                    style={({ pressed }) => [
-                      styles.navDrivingChip,
-                      {
-                        backgroundColor: isActive ? theme.primary : theme.backgroundElement,
-                        borderColor: isActive ? theme.primary : theme.border,
-                        opacity: pressed ? 0.75 : 1,
-                      },
-                    ]}
-                  >
-                    {isActive ? (
-                      <MaterialCommunityIcons color={theme.onPrimary} name="check" size={16} />
-                    ) : null}
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.navDrivingChipText,
-                        { color: isActive ? theme.onPrimary : theme.text },
-                      ]}
-                    >
-                      {preset.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
+              />
+            ) : null}
+          </Pressable>
         ) : null}
 
         {!isNavigating ? (
@@ -1550,39 +1800,58 @@ export function NavigationMapScreen() {
                 </View>
               ) : (
                 <>
-                  <View
-                    style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
-                  >
-                    <AppButton
-                      accessibilityLabel="Tìm kiếm điểm đến"
-                      onPress={() => router.push('/home/search')}
-                      style={styles.searchButton}
-                      variant="ghost"
+                  <View style={styles.searchBarHeaderRow}>
+                    <View
+                      style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                     >
-                      <Image
-                        accessibilityLabel="Logo ứng dụng"
-                        resizeMode="contain"
-                        source={AppLogo}
-                        style={styles.appLogo}
+                      <AppButton
+                        accessibilityLabel="Tìm kiếm điểm đến"
+                        onPress={() => router.push('/home/search')}
+                        style={styles.searchButton}
+                        variant="ghost"
+                      >
+                        <Image
+                          accessibilityLabel="Logo ứng dụng"
+                          resizeMode="contain"
+                          source={AppLogo}
+                          style={styles.appLogo}
+                        />
+                        <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                          Bắt đầu tìm kiếm...
+                        </Text>
+                      </AppButton>
+                      <AppButton
+                        accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletData?.wallet?.balance ?? 0}`}
+                        onPress={() => router.push('/credits/top-up')}
+                        pressedOpacity={0.68}
+                        style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                        variant="ghost"
+                      >
+                        <Text style={[styles.creditText, { color: theme.text }]}>
+                          {walletData?.wallet?.balance ?? '—'}
+                        </Text>
+                        <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                          <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                        </View>
+                      </AppButton>
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                      accessibilityRole="button"
+                      onPress={() => router.push('/notifications')}
+                      style={({ pressed }) => [
+                        styles.notificationCircleButton,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                    >
+                      <Ionicons name="notifications" size={24} color="#000000" />
+                      <Badge
+                        count={unreadNotificationCount}
+                        maxCount={9}
+                        style={styles.notificationBadge}
                       />
-                      <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                        Bắt đầu tìm kiếm...
-                      </Text>
-                    </AppButton>
-                    <AppButton
-                      accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
-                      onPress={() => router.push('/credits/top-up')}
-                      pressedOpacity={0.68}
-                      style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                      variant="ghost"
-                    >
-                      <Text style={[styles.creditText, { color: theme.text }]}>
-                        {walletData?.wallet?.balance ?? '—'}
-                      </Text>
-                      <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                        <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                      </View>
-                    </AppButton>
+                    </Pressable>
                   </View>
                   <>
                     <AppButton
@@ -1714,7 +1983,9 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <Text numberOfLines={1} style={[styles.homeFilterRowLabel, { color: theme.text }]}>
-                                {preset.name}
+                                {preset.savedRoute?.originName && preset.savedRoute?.destinationName
+                                  ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
+                                  : preset.name}
                               </Text>
                               <Text style={[styles.homeFilterRowSublabel, { color: theme.textSecondary }]}>
                                 {preset.categories.length} danh mục
@@ -1832,6 +2103,28 @@ export function NavigationMapScreen() {
 
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
+                {/* 0. Toggle TTS service button */}
+                <AppButton
+                  accessibilityLabel={
+                    isTtsEnabled
+                      ? "Tắt thông báo giọng nói"
+                      : "Bật thông báo giọng nói"
+                  }
+                  onPress={handleToggleTts}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    styles.ttsActionButton,
+                  ]}
+                  variant="surface"
+                >
+                  <MaterialCommunityIcons
+                    name={isTtsEnabled ? "volume-high" : "volume-off"}
+                    size={22}
+                    color="#000000"
+                  />
+                </AppButton>
+
                 {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
                   accessibilityLabel={
@@ -1896,75 +2189,7 @@ export function NavigationMapScreen() {
         ) : null}
       </View>
 
-      {/* Quick Filter Chip Bar for Drivers while Navigating */}
-      {isNavigating && presets.length > 0 ? (
-        <View style={[styles.navDrivingFilterContainer, { bottom: insets.bottom + 90 }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.navDrivingFilterScrollContent}
-          >
-            <Pressable
-              accessibilityLabel="Lọc khi lái xe: Tất cả biển báo"
-              onPress={() => handleSelectPreset(null)}
-              style={({ pressed }) => [
-                styles.navDrivingChip,
-                {
-                  backgroundColor: activePresetId === null ? theme.primary : theme.backgroundElement,
-                  borderColor: activePresetId === null ? theme.primary : theme.border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="filter-outline"
-                size={16}
-                color={activePresetId === null ? '#FFFFFF' : theme.primary}
-              />
-              <Text
-                style={[
-                  styles.navDrivingChipText,
-                  { color: activePresetId === null ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                Tất cả
-              </Text>
-            </Pressable>
-            {presets.map((preset) => {
-              const isSelected = activePresetId === preset.id;
-              return (
-                <Pressable
-                  key={preset.id}
-                  accessibilityLabel={`Lọc khi lái xe: ${preset.name}`}
-                  onPress={() => handleSelectPreset(preset.id)}
-                  style={({ pressed }) => [
-                    styles.navDrivingChip,
-                    {
-                      backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
-                      borderColor: isSelected ? theme.primary : theme.border,
-                      opacity: pressed ? 0.75 : 1,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="playlist-check"
-                    size={16}
-                    color={isSelected ? '#FFFFFF' : theme.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.navDrivingChipText,
-                      { color: isSelected ? '#FFFFFF' : theme.text },
-                    ]}
-                  >
-                    {preset.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
+
 
       {selectedDestination ? (
         <Animated.View
@@ -2004,9 +2229,9 @@ export function NavigationMapScreen() {
               {isNavigating ? (
                 <View style={styles.routeHeaderRowNavigating}>
                   <Pressable
-                    accessibilityLabel="Dừng điều hướng"
+                    accessibilityLabel="Thu nhỏ bảng điều hướng"
                     accessibilityRole="button"
-                    onPress={handleCloseRoute}
+                    onPress={() => snapTo(0)}
                     style={({ pressed }) => [
                       styles.navActionButton,
                       {
@@ -2023,7 +2248,15 @@ export function NavigationMapScreen() {
                     {/* Dòng trên: Vehicle icon + Estimated time + leaf icon */}
                     <View style={styles.navEstimatedTimeRow}>
                       <MaterialCommunityIcons
-                        name={isMotorcycleMode ? 'motorbike' : 'car'}
+                        name={
+                          vehicleMode === 'CYCLING'
+                            ? 'bicycle'
+                            : vehicleMode === 'WALKING'
+                              ? 'walk'
+                              : isMotorcycleMode
+                                ? 'motorbike'
+                                : 'car'
+                        }
                         size={18}
                         color={theme.primary}
                         style={{ marginRight: 6 }}
@@ -2057,6 +2290,7 @@ export function NavigationMapScreen() {
                     accessibilityLabel="Tùy chọn lộ trình"
                     accessibilityRole="button"
                     onPress={() => {
+                      setFilterViewMode('categories');
                       const nextIndex = ((snapIndexRef.current + 1) % 3) as 0 | 1 | 2;
                       snapTo(nextIndex);
                     }}
@@ -2085,7 +2319,13 @@ export function NavigationMapScreen() {
                     style={styles.routeHeaderInfo}
                   >
                     <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
-                      {isMotorcycleMode ? 'Xe máy' : 'Ô tô'}
+                      {vehicleMode === 'CYCLING'
+                        ? 'Xe đạp'
+                        : vehicleMode === 'WALKING'
+                          ? 'Đi bộ'
+                          : isMotorcycleMode
+                            ? 'Xe máy'
+                            : 'Ô tô'}
                     </Text>
                     {routeDuration !== undefined && routeDistance !== undefined ? (
                       <>
@@ -2115,8 +2355,8 @@ export function NavigationMapScreen() {
                     />
                   </AppButton>
                   <AppButton
-                    accessibilityLabel="Đóng xem trước lộ trình"
-                    onPress={handleCloseRoute}
+                    accessibilityLabel="Thu nhỏ xem trước lộ trình"
+                    onPress={() => snapTo(0)}
                     style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
                     variant="ghost"
                   >
@@ -2125,66 +2365,138 @@ export function NavigationMapScreen() {
                 </View>
               )}
 
-              {/* Vehicle picker: visible in preview, and in navigation mode when expanded (snap index > 0) */}
-              {!isNavigating || sheetSnapIndex > 0 ? (
-                <View style={[styles.vehicleTabsRow, { borderBottomColor: theme.border }]}>
-                  <AppButton
-                    accessibilityLabel="Car route"
-                    onPress={() => handleSwitchVehicleMode('DRIVING')}
-                    style={[
-                      styles.vehicleTabButton,
-                      vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
-                    ]}
-                    variant="ghost"
+              {/* Vehicle picker: visible in preview, hidden during active navigation */}
+              {!isNavigating ? (
+                <View style={[styles.vehicleTabsContainer, { borderBottomColor: theme.border }]}>
+                  <ScrollView
+                    contentContainerStyle={styles.vehicleTabsScroll}
+                    horizontal
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.vehicleTabsScrollView}
                   >
-                    <MaterialCommunityIcons
-                      name="car"
-                      size={24}
-                      color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
-                    />
-                    <Text
+                    {/* Car */}
+                    <AppButton
+                      accessibilityLabel="Car route"
+                      onPress={() => handleSwitchVehicleMode('DRIVING')}
                       style={[
-                        styles.vehicleTabDurationText,
-                        { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                        styles.vehicleTabButton,
+                        vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
                       ]}
+                      variant="ghost"
                     >
-                      {carDuration !== undefined
-                        ? formatRouteDuration(carDuration)
-                        : (isCarRouteLoading ? '...' : '--')}
-                    </Text>
-                    {vehicleMode === 'DRIVING' ? (
-                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                    ) : null}
-                  </AppButton>
+                      <MaterialCommunityIcons
+                        name="car"
+                        size={22}
+                        color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {carDuration !== undefined
+                          ? formatRouteDuration(carDuration)
+                          : (isCarRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'DRIVING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
 
-                  <AppButton
-                    accessibilityLabel="Bike route"
-                    onPress={() => handleSwitchVehicleMode('BIKE')}
-                    style={[
-                      styles.vehicleTabButton,
-                      isMotorcycleMode && styles.vehicleTabButtonActive,
-                    ]}
-                    variant="ghost"
-                  >
-                    <MaterialCommunityIcons
-                      name="motorbike"
-                      size={24}
-                      color={isMotorcycleMode ? theme.primary : theme.textSecondary}
-                    />
-                    <Text
+                    {/* Motorcycle */}
+                    <AppButton
+                      accessibilityLabel="Bike route"
+                      testID="vehicle-tab-bike"
+                      onPress={() => handleSwitchVehicleMode('MOTORCYCLE')}
                       style={[
-                        styles.vehicleTabDurationText,
-                        { color: isMotorcycleMode ? theme.primary : theme.textSecondary },
+                        styles.vehicleTabButton,
+                        isMotorcycleMode && styles.vehicleTabButtonActive,
                       ]}
+                      variant="ghost"
                     >
-                      {motorcycleDuration !== undefined
-                        ? formatRouteDuration(motorcycleDuration)
-                        : (isMotorcycleRouteLoading ? '...' : '--')}
-                    </Text>
-                    {isMotorcycleMode ? (
-                      <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
-                    ) : null}
-                  </AppButton>
+                      <MaterialCommunityIcons
+                        name="motorbike"
+                        size={22}
+                        color={isMotorcycleMode ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: isMotorcycleMode ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {motorcycleDuration !== undefined
+                          ? formatRouteDuration(motorcycleDuration)
+                          : (isMotorcycleRouteLoading ? '...' : '--')}
+                      </Text>
+                      {isMotorcycleMode ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+
+                    {/* Bicycle */}
+                    <AppButton
+                      accessibilityLabel="Bicycle route"
+                      onPress={() => handleSwitchVehicleMode('CYCLING')}
+                      style={[
+                        styles.vehicleTabButton,
+                        vehicleMode === 'CYCLING' && styles.vehicleTabButtonActive,
+                      ]}
+                      variant="ghost"
+                    >
+                      <MaterialCommunityIcons
+                        name="bicycle"
+                        size={22}
+                        color={vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {cyclingDuration !== undefined
+                          ? formatRouteDuration(cyclingDuration)
+                          : (isCyclingRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'CYCLING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+
+                    {/* Walking */}
+                    <AppButton
+                      accessibilityLabel="Walking route"
+                      onPress={() => handleSwitchVehicleMode('WALKING')}
+                      style={[
+                        styles.vehicleTabButton,
+                        vehicleMode === 'WALKING' && styles.vehicleTabButtonActive,
+                      ]}
+                      variant="ghost"
+                    >
+                      <MaterialCommunityIcons
+                        name="walk"
+                        size={22}
+                        color={vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleTabDurationText,
+                          { color: vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary },
+                        ]}
+                      >
+                        {walkingDuration !== undefined
+                          ? formatRouteDuration(walkingDuration)
+                          : (isWalkingRouteLoading ? '...' : '--')}
+                      </Text>
+                      {vehicleMode === 'WALKING' ? (
+                        <View style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]} />
+                      ) : null}
+                    </AppButton>
+                  </ScrollView>
                 </View>
               ) : null}
 
@@ -2202,34 +2514,54 @@ export function NavigationMapScreen() {
                   { opacity: expandableContentOpacity },
                 ]}
               >
-                {/* Divider between vehicle tabs and sign filter */}
-                <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
                 {/* Sign filter section: filter by WARNING, MANDATORY, PROHIBITORY, INFORMATION, TEMPORARY */}
                 <View style={styles.signFilterHeader}>
                   <View style={styles.signFilterTitleGroup}>
-                    <Text style={[styles.signFilterTitle, { color: theme.text }]}>
-                      {filterViewMode === 'lists' ? 'Bộ lọc biển báo' : 'Danh mục biển báo'}
-                    </Text>
-                    <View style={[styles.signFilterTotalBadge, { backgroundColor: theme.backgroundSelected }]}>
-                      <Text style={[styles.signFilterTotalText, { color: theme.primary }]}>
-                        {filteredSigns.length}/{visibleSigns.length}
+                    <View style={[styles.signFilterTotalBadge]}>
+                      <Text style={[styles.signFilterTotalText, { color: theme.text }]}>
+                        {filteredSigns.length === 0 && visibleSigns.length === 0
+                          ? 'Không có biển báo thỏa điều kiện'
+                          : `${filteredSigns.length}/${visibleSigns.length} biển báo đang hiển thị`}
                       </Text>
                     </View>
                   </View>
-                  <AppButton
-                    accessibilityLabel={
-                      filterViewMode === 'lists'
-                        ? 'Chuyển sang lọc theo danh mục'
-                        : 'Chuyển sang danh sách lọc'
-                    }
-                    onPress={handleToggleFilterViewMode}
-                    style={styles.toggleAllButton}
-                    variant="ghost"
-                  >
-                    <Text style={[styles.toggleAllText, { color: theme.primary }]}>
-                      {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
-                    </Text>
-                  </AppButton>
+                  {!isNavigating && routeMatchingPresets.length > 0 ? (
+                    <AppButton
+                      accessibilityLabel={
+                        filterViewMode === 'lists'
+                          ? 'Chuyển sang lọc theo danh mục'
+                          : 'Chuyển sang danh sách lọc'
+                      }
+                      onPress={handleToggleFilterViewMode}
+                      style={styles.toggleAllButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                        {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
+                      </Text>
+                    </AppButton>
+                  ) : (
+                    <AppButton
+                      accessibilityLabel={
+                        manualCategories.size === SIGN_CATEGORIES.length
+                          ? 'Bỏ chọn tất cả danh mục'
+                          : 'Chọn tất cả danh mục'
+                      }
+                      onPress={() => {
+                        if (manualCategories.size === SIGN_CATEGORIES.length) {
+                          setManualCategories(new Set());
+                        } else {
+                          setManualCategories(new Set(SIGN_CATEGORIES.map((c) => c.id)));
+                        }
+                      }}
+                      style={styles.toggleAllButton}
+                      variant="ghost"
+                    >
+                      <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                        {manualCategories.size === SIGN_CATEGORIES.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                      </Text>
+                    </AppButton>
+                  )}
                 </View>
 
                 <ScrollView
@@ -2238,7 +2570,7 @@ export function NavigationMapScreen() {
                   showsVerticalScrollIndicator
                   style={styles.signFilterScrollView}
                 >
-                  {filterViewMode === 'lists' ? (
+                  {!isNavigating && filterViewMode === 'lists' && routeMatchingPresets.length > 0 ? (
                     <>
                       {/* Option 1: All signs (No filter) */}
                       <Pressable
@@ -2261,7 +2593,7 @@ export function NavigationMapScreen() {
                         </View>
                         <View style={styles.signCatInfo}>
                           <View style={styles.signCatTitleRow}>
-                            <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
                               Tất cả biển báo (Không lọc)
                             </Text>
                             <View style={[styles.signCountBadge, { backgroundColor: theme.primary }]}>
@@ -2285,8 +2617,8 @@ export function NavigationMapScreen() {
                         </View>
                       </Pressable>
 
-                      {/* User presets */}
-                      {presets.map((preset) => {
+                      {/* User presets matching current route */}
+                      {routeMatchingPresets.map((preset) => {
                         const isSelected = activePresetId === preset.id;
                         const matchingCount = visibleSigns.filter((s) =>
                           preset.categories.includes(getSignCategory(s))
@@ -2314,8 +2646,10 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={styles.signCatInfo}>
                               <View style={styles.signCatTitleRow}>
-                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
-                                  {preset.name}
+                                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
+                                  {preset.savedRoute?.originName && preset.savedRoute?.destinationName
+                                    ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
+                                    : preset.name}
                                 </Text>
                                 <View
                                   style={[
@@ -2352,50 +2686,6 @@ export function NavigationMapScreen() {
                           </Pressable>
                         );
                       })}
-
-                      {presets.length === 0 ? (
-                        <View style={styles.sheetFilterEmptyContainer}>
-                          <Text style={[styles.sheetFilterEmptyText, { color: theme.placeholder }]}>
-                            Chưa có danh sách bộ lọc tùy chỉnh nào.
-                          </Text>
-                          <AppButton
-                            accessibilityLabel="Tạo danh sách lọc trong Cá nhân"
-                            onPress={() =>
-                              router.push({
-                                pathname: '/(authenticated)/(tabs)/profile',
-                                params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                              })
-                            }
-                            style={styles.sheetFilterCreateBtn}
-                            variant="surface"
-                          >
-                            <MaterialCommunityIcons name="plus" size={16} color={theme.primary} />
-                            <Text style={[styles.sheetFilterCreateBtnText, { color: theme.primary }]}>
-                              Tạo danh sách trong Cá nhân
-                            </Text>
-                          </AppButton>
-                        </View>
-                      ) : null}
-
-                      {/* Manage underline text under the list */}
-                      <Pressable
-                        accessibilityLabel="Quản lý danh sách lọc trong Cá nhân"
-                        accessibilityRole="link"
-                        onPress={() =>
-                          router.push({
-                            pathname: '/(authenticated)/(tabs)/profile',
-                            params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                          })
-                        }
-                        style={({ pressed }) => [
-                          styles.sheetFilterManageRow,
-                          { opacity: pressed ? 0.6 : 1 },
-                        ]}
-                      >
-                        <Text style={[styles.sheetFilterManageText, { color: theme.primary }]}>
-                          Quản lý
-                        </Text>
-                      </Pressable>
                     </>
                   ) : (
                     /* Categories view: directly filter sign categories without creating a list */
@@ -2428,7 +2718,7 @@ export function NavigationMapScreen() {
                             </View>
                             <View style={styles.signCatInfo}>
                               <View style={styles.signCatTitleRow}>
-                                <Text style={[styles.signCatLabel, { color: theme.text }]}>
+                                <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.signCatLabel, { color: theme.text }]}>
                                   {cat.label}
                                 </Text>
                                 <View
@@ -2471,9 +2761,14 @@ export function NavigationMapScreen() {
                 </ScrollView>
               </Animated.View>
 
-              {/* Start button and Save route button — hidden during active navigation */}
+              {/* Start button and Save route button — hidden during active navigation, Exit button shown when navigating */}
               {!isNavigating ? (
-                <View style={styles.sheetBottomButtonRow}>
+                <View
+                  style={[
+                    styles.sheetBottomButtonRow,
+                    { borderTopColor: theme.border },
+                  ]}
+                >
                   <AppButton
                     accessibilityLabel={
                       isStartingNavigation
@@ -2500,12 +2795,30 @@ export function NavigationMapScreen() {
                   >
                     <MaterialCommunityIcons
                       name={isRouteBookmarked ? "bookmark" : "bookmark-outline"}
-                      size={22}
+                      size={24}
                       color={isRouteBookmarked ? theme.primary : theme.text}
                     />
                   </AppButton>
                 </View>
-              ) : null}
+              ) : (
+                <SafeAreaView
+                  edges={['bottom']}
+                  style={[
+                    styles.sheetBottomButtonRow,
+                    { borderTopColor: theme.border },
+                  ]}
+                >
+                  <AppButton
+                    accessibilityLabel="Dừng điều hướng"
+                    onPress={handleCloseRoute}
+                    style={[styles.bottomGoButton, { backgroundColor: theme.danger }]}
+                  >
+                    <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>
+                      Dừng
+                    </Text>
+                  </AppButton>
+                </SafeAreaView>
+              )}
             </View>
           ) : (
             /* Destination selected, no start selected yet */
@@ -2536,29 +2849,6 @@ export function NavigationMapScreen() {
                   onPress={handleGo}
                   style={[styles.goButton, styles.destinationActionButton]}
                 />
-                <AppButton
-                  accessibilityLabel={`Chia sẻ ${selectedDestination.title}`}
-                  label="Chia sẻ"
-                  onPress={async () => {
-                    try {
-                      const [longitude, latitude] = selectedDestination.coordinate;
-                      await Share.share({
-                        title: selectedDestination.title,
-                        message: `${selectedDestination.title}\nhttps://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
-                      });
-                    } catch {
-                      setLocationToast((current) => ({
-                        id: (current?.id ?? 0) + 1,
-                        message: CANNOT_SHARE_DESTINATION_MESSAGE,
-                      }));
-                    }
-                  }}
-                  style={[styles.destinationActionButton, {
-                    backgroundColor: theme.backgroundSelected, borderColor: 'transparent',
-                  }]}
-                  textStyle={{ color: theme.textSecondary }}
-                  variant="surface"
-                />
               </View>
             </>
           )}
@@ -2567,8 +2857,9 @@ export function NavigationMapScreen() {
       {locationToast ? (
         <AppToast
           key={locationToast.id}
+          duration={3000}
           message={locationToast.message}
-          onDismiss={() => setLocationToast(undefined)}
+          onDismiss={handleDismissToast}
         />
       ) : null}
 
@@ -2630,12 +2921,27 @@ export function NavigationMapScreen() {
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={isMotorcycleMode ? 'motorbike' : 'car'}
+                  name={
+                    vehicleMode === 'CYCLING'
+                      ? 'bicycle'
+                      : vehicleMode === 'WALKING'
+                        ? 'walk'
+                        : isMotorcycleMode
+                          ? 'motorbike'
+                          : 'car'
+                  }
                   size={20}
                   color={theme.primary}
                 />
                 <Text style={[styles.bookmarkVehicleText, { color: theme.text }]}>
-                  {`Phương tiện: ${isMotorcycleMode ? 'Xe máy' : 'Ô tô'}`}
+                  {`Phương tiện: ${vehicleMode === 'CYCLING'
+                    ? 'Xe đạp'
+                    : vehicleMode === 'WALKING'
+                      ? 'Đi bộ'
+                      : isMotorcycleMode
+                        ? 'Xe máy'
+                        : 'Ô tô'
+                    }`}
                 </Text>
                 {routeDistance !== undefined ? (
                   <Text style={[styles.bookmarkVehicleSub, { color: theme.textSecondary }]}>
@@ -2643,51 +2949,6 @@ export function NavigationMapScreen() {
                   </Text>
                 ) : null}
               </View>
-
-              {/* Only Fixed Signs option */}
-              <Pressable
-                accessibilityLabel={`Chỉ hiển thị biển báo cố định, ${bookmarkOnlyFixedSigns ? 'bật' : 'tắt'}`}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: bookmarkOnlyFixedSigns }}
-                onPress={() => setBookmarkOnlyFixedSigns((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.catOptionRow,
-                  {
-                    backgroundColor: bookmarkOnlyFixedSigns ? theme.backgroundSelected : theme.background,
-                    borderColor: bookmarkOnlyFixedSigns ? theme.primary : theme.border,
-                    opacity: pressed ? 0.75 : 1,
-                    marginTop: Spacing.two,
-                    marginBottom: Spacing.one,
-                  },
-                ]}
-              >
-                <View style={[styles.catIconShell, { backgroundColor: '#10B9811A' }]}>
-                  <MaterialCommunityIcons color="#10B981" name="shield-check" size={18} />
-                </View>
-
-                <View style={styles.catOptionCopy}>
-                  <Text style={[styles.catOptionTitle, { color: theme.text }]}>
-                    Chỉ hiển thị biển cố định
-                  </Text>
-                  <Text style={[styles.catOptionSublabel, { color: theme.placeholder }]}>
-                    Bỏ qua các biển báo tạm thời, công trường, phân luồng sửa chữa
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.catCheckbox,
-                    {
-                      backgroundColor: bookmarkOnlyFixedSigns ? theme.primary : 'transparent',
-                      borderColor: bookmarkOnlyFixedSigns ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  {bookmarkOnlyFixedSigns ? (
-                    <MaterialCommunityIcons color="#FFFFFF" name="check" size={13} />
-                  ) : null}
-                </View>
-              </Pressable>
 
               <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
                 Quy tắc lọc danh mục biển báo
@@ -3064,6 +3325,10 @@ const styles = StyleSheet.create({
   locationActionButton: {
     borderWidth: 1,
   },
+  ttsActionButton: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+  },
   filterActiveBadge: {
     position: "absolute",
     top: 6,
@@ -3079,7 +3344,7 @@ const styles = StyleSheet.create({
   homeFilterCard: {
     position: "absolute",
     right: Spacing.four,
-    bottom: 124,
+    bottom: 194,
     width: 260,
     borderRadius: Rounded.lg,
     borderWidth: 1,
@@ -3213,7 +3478,13 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
   },
+  searchBarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   searchBar: {
+    flex: 1,
     minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
@@ -3224,6 +3495,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
+  },
+  notificationCircleButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 13,
   },
   searchButton: {
     flex: 1,
@@ -3552,6 +3858,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: Spacing.one,
     flexWrap: 'wrap',
+    paddingLeft: Spacing.two,
   },
   headerTimeDistanceGroup: {
     flexDirection: 'row',
@@ -3580,20 +3887,25 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     marginLeft: Spacing.two,
   },
-  vehicleTabsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  vehicleTabsContainer: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.two,
   },
+  vehicleTabsScrollView: {
+    flexGrow: 0,
+  },
+  vehicleTabsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   vehicleTabButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.two,
+    gap: 8,
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.one,
+    paddingHorizontal: Spacing.two,
     minHeight: 46,
     position: 'relative',
     borderRadius: 0,
@@ -3601,7 +3913,7 @@ const styles = StyleSheet.create({
   vehicleTabButtonActive: {},
   vehicleTabDurationText: {
     fontFamily: Fonts.body,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
   },
   vehicleTabActiveLine: {
@@ -3634,10 +3946,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   signFilterTotalBadge: {
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
-    marginLeft: Spacing.half,
+    // paddingHorizontal: Spacing.one,
+    // paddingVertical: 2,
+    // borderRadius: Rounded.round,
+    // marginLeft: Spacing.half,
   },
   signFilterTotalText: {
     fontFamily: Fonts.body,
@@ -3679,21 +3991,31 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   signCatInfo: {
     flex: 1,
     minWidth: 0,
+    overflow: 'hidden',
   },
   signCatTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
+    gap: Spacing.one,
     marginBottom: 2,
   },
   signCatLabel: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontFamily: Fonts.body,
     fontSize: 15,
     fontWeight: '800',
+    paddingRight: Spacing.half,
   },
   signCatSublabel: {
     fontFamily: Fonts.body,
@@ -3701,6 +4023,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   signCountBadge: {
+    flexShrink: 0,
     paddingHorizontal: Spacing.one,
     paddingVertical: 1,
     borderRadius: Rounded.round,
@@ -3720,9 +4043,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   sheetBottomButtonRow: {
+    borderTopWidth: 1,
     paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
     marginTop: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
@@ -3757,7 +4083,10 @@ const styles = StyleSheet.create({
   bottomBookmarkButton: {
     width: 52,
     height: 52,
-    borderRadius: Rounded.round,
+    minHeight: 52,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -3793,6 +4122,23 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 12,
     fontWeight: 900,
+  },
+  navFilterButton: {
+    position: 'absolute',
+    right: Spacing.two,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 22,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 10,
   },
   navDrivingFilterContainer: {
     position: 'absolute',

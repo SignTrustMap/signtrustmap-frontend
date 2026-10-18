@@ -135,7 +135,6 @@ export function ErrorFallbackView({
         <View style={styles.contentContainer}>
           {/* Top Status Pill */}
           <View style={styles.statusPill}>
-            <View style={styles.statusPillDot} />
             <Text style={styles.statusPillText}>Lỗi ứng dụng</Text>
           </View>
 
@@ -149,7 +148,7 @@ export function ErrorFallbackView({
 
           {/* Heading & Friendly Description */}
           <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-          <Text style={[styles.description, { color: theme.placeholder }]}>{message}</Text>
+          <Text style={[styles.description, { color: theme.text }]}>{message}</Text>
 
           {/* Primary Action Buttons */}
           <View style={styles.actionGroup}>
@@ -190,58 +189,6 @@ export function ErrorFallbackView({
               <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Quay về trang chủ</Text>
             </Pressable>
           </View>
-
-          {/* Technical Details Accordion */}
-          <View style={[styles.detailsCard, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-            <Pressable
-              accessibilityLabel={showDetails ? 'Ẩn chi tiết kỹ thuật' : 'Xem chi tiết kỹ thuật'}
-              accessibilityRole="button"
-              onPress={() => setShowDetails((prev) => !prev)}
-              style={styles.detailsToggleRow}
-            >
-              <View style={styles.detailsToggleLeft}>
-                <MaterialCommunityIcons color={theme.placeholder} name="code-tags" size={18} />
-                <Text style={[styles.detailsToggleText, { color: theme.text }]}>Chi tiết kỹ thuật</Text>
-                <View style={styles.errorNameBadge}>
-                  <Text numberOfLines={1} style={styles.errorNameBadgeText}>{errorName}</Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons
-                color={theme.placeholder}
-                name={showDetails ? 'chevron-up' : 'chevron-down'}
-                size={20}
-              />
-            </Pressable>
-
-            {showDetails ? (
-              <View style={styles.detailsBody}>
-                <View style={styles.codeBox}>
-                  <Text style={styles.codeMessage}>{errorMessage}</Text>
-                  {error?.stack ? (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <Text style={styles.codeStack}>{error.stack}</Text>
-                    </ScrollView>
-                  ) : null}
-                </View>
-
-                <Pressable
-                  accessibilityLabel="Sao chép chi tiết lỗi"
-                  accessibilityRole="button"
-                  onPress={handleCopyDetails}
-                  style={styles.copyButton}
-                >
-                  <MaterialCommunityIcons
-                    color={isCopied ? '#10B981' : '#64748B'}
-                    name={isCopied ? 'check' : 'content-copy'}
-                    size={15}
-                  />
-                  <Text style={[styles.copyButtonText, isCopied && { color: '#10B981' }]}>
-                    {isCopied ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép chi tiết'}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -261,7 +208,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     // Hide splash screen so user is never trapped behind native splash screen
-    SplashScreen.hideAsync().catch(() => {});
+    SplashScreen.hideAsync().catch(() => { });
     return { hasError: true, error };
   }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from '@phosphor-icons/react'
+import { X, UploadSimple, Link as LinkIcon, Trash } from '@phosphor-icons/react'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import CustomSelect from '@/components/common/CustomSelect'
 import type { CatalogCategory, CatalogEntry } from '@/data/catalogData'
@@ -10,8 +10,8 @@ export interface CreateSignModalProps {
   isOpen: boolean
   /** Callback fired to close modal without saving. */
   onClose: () => void
-  /** Callback fired with the validated new CatalogEntry to publish. */
-  onCreate: (newEntry: CatalogEntry) => void
+  /** Callback fired with the validated new CatalogEntry to publish and optional image file. */
+  onCreate: (newEntry: CatalogEntry, file?: File) => void
 }
 
 /**
@@ -36,6 +36,13 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   const [newAiPrompt, setNewAiPrompt] = useState('')
   const [newOsmMapping, setNewOsmMapping] = useState('')
 
+  // Representative Image state (Mandatory)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageUrl, setImageUrl] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
+  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload')
+  const [imageError, setImageError] = useState('')
+
   if (!isOpen) return null
 
   const resetForm = () => {
@@ -49,12 +56,44 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
     setNewCategory('prohibitory')
     setNewShape('Circle')
     setNewColor('Red-White')
+    setImageFile(null)
+    setImageUrl('')
+    setImagePreview('')
+    setImageError('')
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      setImagePreview(URL.createObjectURL(file))
+      setImageError('')
+    }
+  }
+
+  const handleUrlChange = (val: string) => {
+    setImageUrl(val)
+    setImagePreview(val.trim())
+    if (val.trim()) setImageError('')
+  }
+
+  const handleClearImage = () => {
+    setImageFile(null)
+    setImageUrl('')
+    setImagePreview('')
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newCode.trim()) return
 
+    const hasImage = Boolean(imageFile || imageUrl.trim())
+    if (!hasImage) {
+      setImageError(t('catalog.err_image_required'))
+      return
+    }
+
+    const resolvedImg = imageUrl.trim() || imagePreview
     const newEntry: CatalogEntry = {
       id: `CAT-${newCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`,
       code: newCode.trim(),
@@ -73,9 +112,11 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       standardRef: 'QCVN 41:2019/BGTVT',
       status: 'Active',
       version: 'v2.5',
+      imageUrl: resolvedImg,
+      representativeImageKey: imageUrl.trim() || undefined,
     }
 
-    onCreate(newEntry)
+    onCreate(newEntry, imageFile || undefined)
     resetForm()
     onClose()
   }
@@ -209,6 +250,114 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
                   ]}
                 />
               </div>
+            </div>
+
+            {/* Representative Image (Required) */}
+            <div className="space-y-2 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block font-mono font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide text-xs">
+                    {t('catalog.field_representative_image')} *
+                  </label>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    {t('catalog.field_representative_image_hint')}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1 bg-gray-200/60 dark:bg-white/10 p-1 rounded-lg text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setImageMode('upload')}
+                    className={`px-2 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer ${
+                      imageMode === 'upload'
+                        ? 'bg-white dark:bg-[#061115] text-[#007b8b] dark:text-[#00c4de] shadow-xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <UploadSimple size={13} weight="bold" />
+                    <span>Tải ảnh</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageMode('url')}
+                    className={`px-2 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer ${
+                      imageMode === 'url'
+                        ? 'bg-white dark:bg-[#061115] text-[#007b8b] dark:text-[#00c4de] shadow-xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <LinkIcon size={13} weight="bold" />
+                    <span>URL</span>
+                  </button>
+                </div>
+              </div>
+
+              {imageMode === 'upload' ? (
+                <div>
+                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-white/15 rounded-xl hover:border-[#007b8b] dark:hover:border-[#00c4de] hover:bg-gray-100/50 dark:hover:bg-white/5 transition-all cursor-pointer">
+                    <UploadSimple size={24} className="text-[#007b8b] dark:text-[#00c4de] mb-1.5" />
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                      {t('catalog.upload_or_drag')}
+                    </span>
+                    <span className="text-[10px] text-gray-400 mt-0.5">
+                      {t('catalog.upload_hint')}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <input
+                    type="url"
+                    placeholder="https://s3.signmap.site/stm-sign-crops/representative/..."
+                    value={imageUrl}
+                    onChange={(e) => handleUrlChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                  />
+                </div>
+              )}
+
+              {/* Preview Card */}
+              {imagePreview && (
+                <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#061115]">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                      <img
+                        src={imagePreview}
+                        alt="Representative Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate block">
+                        {imageFile?.name || (imageUrl ? 'URL Image' : 'Selected image')}
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        ✓ Ảnh đại diện đã sẵn sàng
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearImage}
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+                    title="Xóa ảnh"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
+              )}
+
+              {imageError && (
+                <p className="text-xs text-red-500 font-semibold mt-1">
+                  ⚠ {imageError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

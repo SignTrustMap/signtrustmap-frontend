@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing, Colors } from '@/constants/theme';
 
 type AppToastProps = {
   duration?: number;
@@ -19,12 +19,15 @@ export function AppToast({
   placement = 'bottom',
   tone = 'default',
 }: AppToastProps) {
-  useEffect(() => {
-    if (!onDismiss) return;
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
-    const timeout = setTimeout(onDismiss, duration);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      onDismissRef.current?.();
+    }, duration);
     return () => clearTimeout(timeout);
-  }, [duration, onDismiss]);
+  }, [duration, message]);
 
   return (
     <SafeAreaView
@@ -64,7 +67,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     borderRadius: Rounded.md,
-    backgroundColor: '#666666',
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     shadowColor: '#000000',

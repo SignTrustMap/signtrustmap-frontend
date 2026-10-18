@@ -4,6 +4,8 @@ import type {
     EndNavigationSessionResponse,
     InitiateNavigationSessionDto,
     InitiateNavigationSessionResponse,
+    ListNavigationSessionsResponse,
+    NavigationSessionItem,
     MapCoordinate,
     NavigationPreferences,
     NavigationResponseDto,
@@ -44,6 +46,7 @@ export type RouteSign = {
     lastVerifiedAt?: string;
     createdAt?: string;
     taskId?: string;
+    allowedVehicles?: VehicleType[];
 };
 
 type DirectionsResponse = {
@@ -268,6 +271,39 @@ export async function endNavigationSession(
         { method: 'POST', signal },
         accessToken,
     );
+}
+
+/** List user navigation sessions: GET /navigation/sessions */
+export async function getNavigationSessions(
+    params: { page?: number; pageSize?: number } = { page: 1, pageSize: 20 },
+    accessToken?: string,
+    signal?: AbortSignal,
+): Promise<ListNavigationSessionsResponse> {
+    const queryParams = new URLSearchParams({
+        page: String(params.page ?? 1),
+        pageSize: String(params.pageSize ?? 20),
+    });
+    const res = await apiRequest<any>(
+        `${API_PATHS.NAVIGATION_SESSIONS}?${queryParams.toString()}`,
+        { signal },
+        accessToken,
+    );
+    if (Array.isArray(res)) {
+        return {
+            items: res,
+            total: res.length,
+            page: params.page ?? 1,
+            pageSize: params.pageSize ?? 20,
+            totalPages: 1,
+        };
+    }
+    return {
+        items: res?.items ?? [],
+        total: res?.total ?? (res?.items?.length ?? 0),
+        page: res?.page ?? (params.page ?? 1),
+        pageSize: res?.pageSize ?? (params.pageSize ?? 20),
+        totalPages: res?.totalPages ?? Math.max(1, Math.ceil((res?.total ?? 0) / (params.pageSize ?? 20))),
+    };
 }
 
 /** List custom alert profiles: GET /navigation/profiles */

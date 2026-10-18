@@ -64,3 +64,36 @@ export async function register(request: RegisterRequest): Promise<RegisterRespon
     phone: request.phone.trim(),
   });
 }
+
+export type UpdateProfileRequest = {
+  fullName?: string;
+  phone?: string;
+  avatarUrl?: string;
+};
+
+export type UserProfileResponse = {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  roles?: string[];
+};
+
+export async function updateProfile(
+  payload: UpdateProfileRequest,
+  accessToken: string,
+): Promise<UserProfileResponse> {
+  return jsonApiRequest<UserProfileResponse>(
+    '/auth/me',
+    payload,
+    accessToken,
+    undefined,
+    'PATCH',
+  );
+}
+
+export async function getProfile(accessToken: string): Promise<UserProfileResponse> {
+  return jsonApiRequest<UserProfileResponse>('/auth/me', undefined, accessToken, undefined, 'GET');
+}
+

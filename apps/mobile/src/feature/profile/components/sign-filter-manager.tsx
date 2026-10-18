@@ -1,7 +1,8 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -12,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import {
   SIGN_CATEGORIES,
   type SignCategory,
@@ -22,26 +23,63 @@ import {
   useSignFilter,
   type SignFilterPreset,
 } from '@/context/sign-filter-provider';
+import type { ApiPlace } from '@/api/navigation/places';
+import { usePlaceSuggestions } from '@/feature/navigation/hooks/use-places';
+import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { useOptionalSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
+
+type SelectedPlace = {
+  title: string;
+  address?: string | null;
+  latitude: number;
+  longitude: number;
+};
 
 export function SignFilterManager() {
   const theme = useTheme();
   const router = useRouter();
+  const session = useOptionalSession()?.session;
   const {
     activePresetId,
     createPreset,
     deletePreset,
     presets,
+    refetchPresets,
     renamePreset,
     setActivePresetId,
     updatePreset,
   } = useSignFilter();
 
+  useFocusEffect(
+    useCallback(() => {
+      void refetchPresets();
+    }, [refetchPresets])
+  );
+
   // Create / Edit modal state
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<SignFilterPreset | null>(null);
   const [presetNameInput, setPresetNameInput] = useState('');
-  const [onlyFixedSignsInput, setOnlyFixedSignsInput] = useState(true);
+  const [vehicleMode, setVehicleMode] = useState<'MOTORCYCLE' | 'CAR' | 'CYCLING' | 'WALKING'>('MOTORCYCLE');
+
+  // Start point state
+  const [startPoint, setStartPoint] = useState<SelectedPlace | null>(null);
+  const [startQuery, setStartQuery] = useState('');
+  const [isStartFocused, setIsStartFocused] = useState(false);
+  const [isLocatingStart, setIsLocatingStart] = useState(false);
+
+  // Destination point state
+  const [destPoint, setDestPoint] = useState<SelectedPlace | null>(null);
+  const [destQuery, setDestQuery] = useState('');
+  const [isDestFocused, setIsDestFocused] = useState(false);
+  const [isLocatingDest, setIsLocatingDest] = useState(false);
+
+  // Debounced place suggestions
+  const { data: startSuggestions, isLoading: isStartSearching } = usePlaceSuggestions(startQuery);
+  const { data: destSuggestions, isLoading: isDestSearching } = usePlaceSuggestions(destQuery);
+
   const [selectedCategories, setSelectedCategories] = useState<Set<SignCategory>>(
     new Set(['MANDATORY', 'WARNING', 'PROHIBITORY'])
   );
@@ -56,9 +94,15 @@ export function SignFilterManager() {
   // Open editor for new preset
   const handleOpenCreate = () => {
     setEditingPreset(null);
-    setPresetNameInput(`Lộ trình ${presets.length + 1}`);
+    setPresetNameInput('');
+    setStartPoint(null);
+    setStartQuery('');
+    setIsStartFocused(false);
+    setDestPoint(null);
+    setDestQuery('');
+    setIsDestFocused(false);
+    setVehicleMode('MOTORCYCLE');
     setSelectedCategories(new Set(['MANDATORY', 'WARNING', 'PROHIBITORY']));
-    setOnlyFixedSignsInput(true);
     setEditorError('');
     setIsEditorModalOpen(true);
   };
@@ -68,9 +112,137 @@ export function SignFilterManager() {
     setEditingPreset(preset);
     setPresetNameInput(preset.name);
     setSelectedCategories(new Set(preset.categories));
-    setOnlyFixedSignsInput(preset.onlyFixedSigns !== false);
+    if (preset.savedRoute) {
+      setStartPoint({
+        title: preset.savedRoute.originName,
+        latitude: preset.savedRoute.originLatitude,
+        longitude: preset.savedRoute.originLongitude,
+      });
+      setStartQuery(preset.savedRoute.originName);
+      setDestPoint({
+        title: preset.savedRoute.destinationName,
+        latitude: preset.savedRoute.destinationLatitude,
+        longitude: preset.savedRoute.destinationLongitude,
+      });
+      setDestQuery(preset.savedRoute.destinationName);
+      const vMode = preset.savedRoute.vehicleMode?.toUpperCase();
+      if (vMode === 'CYCLING' || vMode === 'BICYCLE') setVehicleMode('CYCLING');
+      else if (vMode === 'WALKING' || vMode === 'PEDESTRIAN') setVehicleMode('WALKING');
+      else if (vMode === 'CAR') setVehicleMode('CAR');
+      else setVehicleMode('MOTORCYCLE');
+    } else {
+      setStartPoint(null);
+      setStartQuery('');
+      setDestPoint(null);
+      setDestQuery('');
+      setVehicleMode('MOTORCYCLE');
+    }
+    setIsStartFocused(false);
+    setIsDestFocused(false);
     setEditorError('');
     setIsEditorModalOpen(true);
+  };
+
+  // GPS for Start
+  const handleSelectCurrentLocationForStart = async () => {
+    setIsLocatingStart(true);
+    try {
+      const pos = await fetchFreshGpsPosition(3500);
+      if (pos) {
+        let resolvedTitle = 'Vị trí hiện tại';
+        let resolvedAddress = 'Tọa độ GPS thiết bị';
+        try {
+          const resolved = await resolveLocation(pos[1], pos[0], session?.accessToken);
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            resolvedTitle = formatted;
+            resolvedAddress = resolved?.displayAddress || resolvedAddress;
+          }
+        } catch {
+          // keep fallback
+        }
+        setStartPoint({
+          title: resolvedTitle,
+          address: resolvedAddress,
+          latitude: pos[1],
+          longitude: pos[0],
+        });
+        setStartQuery(resolvedTitle);
+        setIsStartFocused(false);
+        setEditorError('');
+      } else {
+        Alert.alert('Không thể xác định vị trí', 'Vui lòng kiểm tra quyền truy cập vị trí và bật GPS.');
+      }
+    } catch {
+      Alert.alert('Lỗi GPS', 'Không thể lấy vị trí hiện tại.');
+    } finally {
+      setIsLocatingStart(false);
+    }
+  };
+
+  // GPS for Destination
+  const handleSelectCurrentLocationForDest = async () => {
+    setIsLocatingDest(true);
+    try {
+      const pos = await fetchFreshGpsPosition(3500);
+      if (pos) {
+        let resolvedTitle = 'Vị trí hiện tại';
+        let resolvedAddress = 'Tọa độ GPS thiết bị';
+        try {
+          const resolved = await resolveLocation(pos[1], pos[0], session?.accessToken);
+          const formatted = formatResolvedLocationTitle(resolved);
+          if (formatted) {
+            resolvedTitle = formatted;
+            resolvedAddress = resolved?.displayAddress || resolvedAddress;
+          }
+        } catch {
+          // keep fallback
+        }
+        setDestPoint({
+          title: resolvedTitle,
+          address: resolvedAddress,
+          latitude: pos[1],
+          longitude: pos[0],
+        });
+        setDestQuery(resolvedTitle);
+        setIsDestFocused(false);
+        setEditorError('');
+      } else {
+        Alert.alert('Không thể xác định vị trí', 'Vui lòng kiểm tra quyền truy cập vị trí và bật GPS.');
+      }
+    } catch {
+      Alert.alert('Lỗi GPS', 'Không thể lấy vị trí hiện tại.');
+    } finally {
+      setIsLocatingDest(false);
+    }
+  };
+
+  // Select suggestion for Start
+  const handleSelectStartSuggestion = (item: ApiPlace) => {
+    if (item.latitude == null || item.longitude == null) return;
+    setStartPoint({
+      title: item.title,
+      address: item.address,
+      latitude: item.latitude,
+      longitude: item.longitude,
+    });
+    setStartQuery(item.title);
+    setIsStartFocused(false);
+    setEditorError('');
+  };
+
+  // Select suggestion for Destination
+  const handleSelectDestSuggestion = (item: ApiPlace) => {
+    if (item.latitude == null || item.longitude == null) return;
+    setDestPoint({
+      title: item.title,
+      address: item.address,
+      latitude: item.latitude,
+      longitude: item.longitude,
+    });
+    setDestQuery(item.title);
+    setIsDestFocused(false);
+    setEditorError('');
   };
 
   // Open rename modal
@@ -110,11 +282,6 @@ export function SignFilterManager() {
 
   // Save create / edit
   const handleSaveEditor = async () => {
-    const trimmed = presetNameInput.trim();
-    if (!trimmed) {
-      setEditorError('Vui lòng nhập tên cho lộ trình/danh sách.');
-      return;
-    }
     if (selectedCategories.size === 0) {
       setEditorError('Chọn ít nhất một danh mục biển báo.');
       return;
@@ -122,14 +289,32 @@ export function SignFilterManager() {
 
     const categoriesArray = Array.from(selectedCategories);
     if (editingPreset) {
+      const trimmed = presetNameInput.trim() || editingPreset.name;
       await updatePreset(editingPreset.id, {
         name: trimmed,
         categories: categoriesArray,
-        onlyFixedSigns: onlyFixedSignsInput,
+        onlyFixedSigns: true,
       });
     } else {
-      await createPreset(trimmed, categoriesArray, {
-        onlyFixedSigns: onlyFixedSignsInput,
+      if (!startPoint) {
+        setEditorError('Vui lòng chọn Điểm bắt đầu (nhập tìm kiếm hoặc chọn Vị trí hiện tại).');
+        return;
+      }
+      if (!destPoint) {
+        setEditorError('Vui lòng chọn Điểm đến (nhập tìm kiếm hoặc chọn Vị trí hiện tại).');
+        return;
+      }
+
+      const finalName = presetNameInput.trim() || `${startPoint.title} ➔ ${destPoint.title}`;
+      await createPreset(finalName, categoriesArray, {
+        originName: startPoint.title,
+        originLatitude: startPoint.latitude,
+        originLongitude: startPoint.longitude,
+        destinationName: destPoint.title,
+        destinationLatitude: destPoint.latitude,
+        destinationLongitude: destPoint.longitude,
+        vehicleMode,
+        onlyFixedSigns: true,
       });
     }
     setIsEditorModalOpen(false);
@@ -208,7 +393,7 @@ export function SignFilterManager() {
             <MaterialCommunityIcons color={theme.primary} name="filter-outline" size={22} />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
+            <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>Tất cả biển báo (Không lọc)</Text>
             <Text style={[styles.rowDescription, { color: theme.textSecondary }]}>
               Hiển thị và cảnh báo cho tất cả danh mục biển báo
             </Text>
@@ -226,12 +411,21 @@ export function SignFilterManager() {
             .filter(Boolean)
             .join(', ');
 
-          const vehicleMode = preset.savedRoute?.vehicleMode?.toUpperCase();
-          const isBike = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
-          const vehicleIcon = isBike ? 'motorbike' : 'car';
+          const vMode = preset.savedRoute?.vehicleMode?.toUpperCase();
+          const vehicleIcon =
+            vMode === 'CYCLING' || vMode === 'BICYCLE'
+              ? 'bicycle'
+              : vMode === 'WALKING' || vMode === 'PEDESTRIAN'
+                ? 'walk'
+                : vMode === 'MOTORCYCLE' || vMode === 'BIKE'
+                  ? 'motorbike'
+                  : 'car';
           const hasRouteDetails = Boolean(
             preset.savedRoute?.originName && preset.savedRoute?.destinationName
           );
+          const routeDisplayName = hasRouteDetails
+            ? `${preset.savedRoute!.originName} ➔ ${preset.savedRoute!.destinationName}`
+            : preset.name;
 
           return (
             <View
@@ -242,7 +436,7 @@ export function SignFilterManager() {
               ]}
             >
               <AppButton
-                accessibilityLabel={`${preset.name}, ${isActive ? 'đã chọn' : 'chưa chọn'}`}
+                accessibilityLabel={`${routeDisplayName}, ${isActive ? 'đã chọn' : 'chưa chọn'}`}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: isActive }}
                 onPress={() => void setActivePresetId(preset.id)}
@@ -258,20 +452,14 @@ export function SignFilterManager() {
                 </View>
                 <View style={styles.rowCopy}>
                   <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.text }]}>
-                    {preset.name}
+                    {routeDisplayName}
                   </Text>
-                  {hasRouteDetails ? (
+                  {hasRouteDetails && preset.name && preset.name !== routeDisplayName ? (
                     <Text numberOfLines={1} style={[styles.routePathText, { color: theme.textSecondary }]}>
-                      {`${preset.savedRoute!.originName} → ${preset.savedRoute!.destinationName}`}
+                      {preset.name}
                     </Text>
                   ) : null}
                   <View style={styles.badgeRow}>
-                    {preset.onlyFixedSigns ? (
-                      <View style={[styles.ruleBadge, { backgroundColor: '#10B9811A', borderColor: '#10B981' }]}>
-                        <MaterialCommunityIcons color="#10B981" name="shield-check" size={11} />
-                        <Text style={[styles.ruleBadgeText, { color: '#10B981' }]}>Chỉ biển cố định</Text>
-                      </View>
-                    ) : null}
                     <Text numberOfLines={1} style={[styles.rowDescription, { color: theme.textSecondary, flex: 1 }]}>
                       {categoryLabels || `${preset.categories.length} danh mục`}
                     </Text>
@@ -385,73 +573,304 @@ export function SignFilterManager() {
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalScrollContent}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Tên lộ trình / danh sách</Text>
+            <ScrollView
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Start Point Input */}
+              <View style={styles.pointHeaderRow}>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>Điểm xuất phát</Text>
+                <Pressable
+                  accessibilityLabel="Chọn vị trí hiện tại cho điểm bắt đầu"
+                  onPress={handleSelectCurrentLocationForStart}
+                  disabled={isLocatingStart}
+                  style={({ pressed }) => [
+                    styles.gpsInlineBtn,
+                    {
+                      backgroundColor: startPoint?.title === 'Vị trí hiện tại' ? theme.backgroundSelected : theme.background,
+                      borderColor: startPoint?.title === 'Vị trí hiện tại' ? theme.primary : theme.border,
+                      opacity: pressed || isLocatingStart ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {isLocatingStart ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="crosshairs-gps" size={14} color={theme.primary} />
+                      <Text style={[styles.gpsInlineText, { color: theme.primary }]}>Vị trí hiện tại</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+
+              <View
+                style={[
+                  styles.searchFieldWrapper,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: !startPoint && editorError ? theme.danger : theme.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="map-marker" size={18} color="#10B981" style={styles.inputLeadingIcon} />
+                <TextInput
+                  accessibilityLabel="Nhập điểm bắt đầu"
+                  placeholder="Tìm kiếm điểm xuất phát..."
+                  placeholderTextColor={theme.placeholder}
+                  value={startQuery}
+                  onChangeText={(t) => {
+                    setStartQuery(t);
+                    if (startPoint && t !== startPoint.title) {
+                      setStartPoint(null);
+                    }
+                    setEditorError('');
+                  }}
+                  onFocus={() => {
+                    setIsStartFocused(true);
+                    setIsDestFocused(false);
+                  }}
+                  style={[styles.pointTextInput, { color: theme.text }]}
+                />
+                {startQuery.length > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Xóa điểm bắt đầu"
+                    onPress={() => {
+                      setStartQuery('');
+                      setStartPoint(null);
+                    }}
+                    hitSlop={8}
+                    style={styles.clearBtn}
+                  >
+                    <MaterialCommunityIcons name="close-circle" size={16} color={theme.placeholder} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Start Suggestions Dropdown */}
+              {isStartFocused && !startPoint && (
+                <View style={[styles.suggestionsDropdown, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  {isStartSearching ? (
+                    <View style={styles.suggestionsLoading}>
+                      <ActivityIndicator size="small" color={theme.primary} />
+                      <Text style={[styles.searchingText, { color: theme.textSecondary }]}>Đang tìm kiếm...</Text>
+                    </View>
+                  ) : startSuggestions.length > 0 ? (
+                    <ScrollView style={styles.suggestionsList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {startSuggestions.slice(0, 5).map((item) => (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => handleSelectStartSuggestion(item)}
+                          style={({ pressed }) => [
+                            styles.suggestionItem,
+                            { borderBottomColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                          ]}
+                        >
+                          <MaterialCommunityIcons name="map-marker-outline" size={16} color={theme.primary} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text numberOfLines={1} style={[styles.suggestionTitle, { color: theme.text }]}>
+                              {item.title}
+                            </Text>
+                            {item.address ? (
+                              <Text numberOfLines={1} style={[styles.suggestionSubtitle, { color: theme.textSecondary }]}>
+                                {item.address}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : startQuery.trim().length >= 2 ? (
+                    <Text style={[styles.noSuggestionsText, { color: theme.textSecondary }]}>
+                      Không tìm thấy địa điểm phù hợp
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Destination Point Input */}
+              <View style={[styles.pointHeaderRow, { marginTop: Spacing.two }]}>
+                <Text style={[styles.inputLabel, { color: theme.text }]}>Điểm đến</Text>
+                <Pressable
+                  accessibilityLabel="Chọn vị trí hiện tại cho điểm đến"
+                  onPress={handleSelectCurrentLocationForDest}
+                  disabled={isLocatingDest}
+                  style={({ pressed }) => [
+                    styles.gpsInlineBtn,
+                    {
+                      backgroundColor: destPoint?.title === 'Vị trí hiện tại' ? theme.backgroundSelected : theme.background,
+                      borderColor: destPoint?.title === 'Vị trí hiện tại' ? theme.primary : theme.border,
+                      opacity: pressed || isLocatingDest ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {isLocatingDest ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="crosshairs-gps" size={14} color={theme.primary} />
+                      <Text style={[styles.gpsInlineText, { color: theme.primary }]}>Vị trí hiện tại</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+
+              <View
+                style={[
+                  styles.searchFieldWrapper,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: !destPoint && editorError ? theme.danger : theme.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="flag-checkered" size={18} color="#EF4444" style={styles.inputLeadingIcon} />
+                <TextInput
+                  accessibilityLabel="Nhập điểm đến"
+                  placeholder="Tìm kiếm điểm đến..."
+                  placeholderTextColor={theme.placeholder}
+                  value={destQuery}
+                  onChangeText={(t) => {
+                    setDestQuery(t);
+                    if (destPoint && t !== destPoint.title) {
+                      setDestPoint(null);
+                    }
+                    setEditorError('');
+                  }}
+                  onFocus={() => {
+                    setIsDestFocused(true);
+                    setIsStartFocused(false);
+                  }}
+                  style={[styles.pointTextInput, { color: theme.text }]}
+                />
+                {destQuery.length > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Xóa điểm đến"
+                    onPress={() => {
+                      setDestQuery('');
+                      setDestPoint(null);
+                    }}
+                    hitSlop={8}
+                    style={styles.clearBtn}
+                  >
+                    <MaterialCommunityIcons name="close-circle" size={16} color={theme.placeholder} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Destination Suggestions Dropdown */}
+              {isDestFocused && !destPoint && (
+                <View style={[styles.suggestionsDropdown, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  {isDestSearching ? (
+                    <View style={styles.suggestionsLoading}>
+                      <ActivityIndicator size="small" color={theme.primary} />
+                      <Text style={[styles.searchingText, { color: theme.textSecondary }]}>Đang tìm kiếm...</Text>
+                    </View>
+                  ) : destSuggestions.length > 0 ? (
+                    <ScrollView style={styles.suggestionsList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {destSuggestions.slice(0, 5).map((item) => (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => handleSelectDestSuggestion(item)}
+                          style={({ pressed }) => [
+                            styles.suggestionItem,
+                            { borderBottomColor: theme.border, opacity: pressed ? 0.7 : 1 },
+                          ]}
+                        >
+                          <MaterialCommunityIcons name="map-marker-outline" size={16} color={theme.primary} />
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text numberOfLines={1} style={[styles.suggestionTitle, { color: theme.text }]}>
+                              {item.title}
+                            </Text>
+                            {item.address ? (
+                              <Text numberOfLines={1} style={[styles.suggestionSubtitle, { color: theme.textSecondary }]}>
+                                {item.address}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : destQuery.trim().length >= 2 ? (
+                    <Text style={[styles.noSuggestionsText, { color: theme.textSecondary }]}>
+                      Không tìm thấy địa điểm phù hợp
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Vehicle Preference */}
+              <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
+                Phương tiện di chuyển
+              </Text>
+              <View style={styles.vehicleModeRow}>
+                {[
+                  { id: 'MOTORCYCLE', label: 'Xe máy', icon: 'motorbike' },
+                  { id: 'CAR', label: 'Ô tô', icon: 'car' },
+                  { id: 'CYCLING', label: 'Xe đạp', icon: 'bicycle' },
+                  { id: 'WALKING', label: 'Đi bộ', icon: 'walk' },
+                ].map((v) => {
+                  const isSelected = vehicleMode === v.id;
+                  return (
+                    <Pressable
+                      key={v.id}
+                      onPress={() => setVehicleMode(v.id as any)}
+                      style={[
+                        styles.vehicleModeChip,
+                        {
+                          backgroundColor: isSelected ? theme.backgroundSelected : theme.background,
+                          borderColor: isSelected ? theme.primary : theme.border,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={v.icon as any}
+                        size={16}
+                        color={isSelected ? theme.primary : theme.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.vehicleModeText,
+                          {
+                            color: isSelected ? theme.primary : theme.textSecondary,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {v.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Optional Custom Name */}
+              <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
+                Tên lộ trình (Tùy chọn)
+              </Text>
               <TextInput
-                accessibilityLabel="Tên danh sách lọc"
-                autoFocus
-                maxLength={40}
+                accessibilityLabel="Tên lộ trình tùy chọn"
+                maxLength={60}
                 onChangeText={(t) => {
                   setPresetNameInput(t);
                   setEditorError('');
                 }}
-                placeholder="VD: Đi làm hàng ngày, Lộ trình Q1 đến Q7"
+                placeholder={
+                  startPoint && destPoint
+                    ? `${startPoint.title} ➔ ${destPoint.title}`
+                    : 'Tự động tạo: [Điểm xuất phát] ➔ [Điểm đến]'
+                }
                 placeholderTextColor={theme.placeholder}
                 style={[
                   styles.textInput,
                   {
                     backgroundColor: theme.background,
-                    borderColor: editorError && !presetNameInput.trim() ? theme.danger : theme.border,
+                    borderColor: theme.border,
                     color: theme.text,
                   },
                 ]}
                 value={presetNameInput}
               />
-
-              {/* Only Fixed Signs option */}
-              <Pressable
-                accessibilityLabel={`Chỉ hiển thị biển báo cố định, ${onlyFixedSignsInput ? 'bật' : 'tắt'}`}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: onlyFixedSignsInput }}
-                onPress={() => setOnlyFixedSignsInput((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.catOptionRow,
-                  {
-                    backgroundColor: onlyFixedSignsInput ? theme.backgroundSelected : theme.background,
-                    borderColor: onlyFixedSignsInput ? theme.primary : theme.border,
-                    opacity: pressed ? 0.75 : 1,
-                    marginTop: Spacing.two,
-                    marginBottom: Spacing.one,
-                  },
-                ]}
-              >
-                <View style={[styles.catIconShell, { backgroundColor: '#10B9811A' }]}>
-                  <MaterialCommunityIcons color="#10B981" name="shield-check" size={18} />
-                </View>
-
-                <View style={styles.catOptionCopy}>
-                  <Text style={[styles.catOptionTitle, { color: theme.text }]}>
-                    Chỉ hiển thị biển cố định
-                  </Text>
-                  <Text style={[styles.catOptionSublabel, { color: theme.placeholder }]}>
-                    Bỏ qua biển báo tạm thời, công trường, phân luồng sửa chữa
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.catCheckbox,
-                    {
-                      backgroundColor: onlyFixedSignsInput ? theme.primary : 'transparent',
-                      borderColor: onlyFixedSignsInput ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  {onlyFixedSignsInput ? (
-                    <MaterialCommunityIcons color="#FFFFFF" name="check" size={13} />
-                  ) : null}
-                </View>
-              </Pressable>
 
               <Text style={[styles.inputLabel, { color: theme.text, marginTop: Spacing.two }]}>
                 Chọn danh mục biển báo cần bao gồm
@@ -898,5 +1317,111 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     fontWeight: 700,
+  },
+  pointHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  gpsInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  gpsInlineText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  searchFieldWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing.one,
+    minHeight: 40,
+  },
+  inputLeadingIcon: {
+    marginRight: 6,
+  },
+  pointTextInput: {
+    flex: 1,
+    paddingVertical: Spacing.one,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  suggestionsDropdown: {
+    maxHeight: 180,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  suggestionsLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: Spacing.two,
+  },
+  searchingText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+  },
+  suggestionsList: {
+    maxHeight: 180,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  suggestionTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  suggestionSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    marginTop: 1,
+  },
+  noSuggestionsText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: Spacing.two,
+  },
+  vehicleModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  vehicleModeChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  vehicleModeText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
   },
 });

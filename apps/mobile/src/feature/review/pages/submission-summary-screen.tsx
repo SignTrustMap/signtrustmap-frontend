@@ -1,9 +1,9 @@
-import { Image } from 'expo-image';
+﻿import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type CompletedReview,

@@ -397,8 +397,9 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       server.use(
         http.post(NAVIGATION_ROUTING_PATH, async ({ request }) => {
           const body = (await request.json().catch(() => ({}))) as any;
-          requestedVehicleMode = body.vehicleMode ?? 'DRIVING';
-          if (requestedVehicleMode === 'BIKE') {
+          const mode = body.vehicleMode ?? 'DRIVING';
+          if (mode === 'BIKE' || mode === 'MOTORCYCLE') {
+            requestedVehicleMode = 'BIKE';
             return HttpResponse.json(mockDirectionsBike, { status: 200 });
           }
           return HttpResponse.json(mockDirectionsDriving, { status: 200 });
@@ -544,8 +545,8 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         await fireEvent.press(beginNavBtn);
       });
 
-      // Press Exit Navigation button (accessibilityLabel="Dừng điều hướng")
-      const exitBtn = await findByLabelText('Dừng điều hướng');
+      // Press Exit Navigation button (accessibilityLabel="Dừng" or "Dừng điều hướng")
+      const exitBtn = await findByLabelText(/Dừng/);
       await act(async () => {
         await fireEvent.press(exitBtn);
       });

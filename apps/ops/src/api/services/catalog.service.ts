@@ -134,6 +134,7 @@ export interface ApproveAndCreateSignTypeInput {
   colorScheme?: string
   aiLabelPrompt?: string
   staffNotes?: string
+  representativeImageKey?: string
 }
 
 export const catalogService = {
@@ -224,12 +225,22 @@ export const catalogService = {
     return http.get<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
   },
 
-  createSignType: async (data: CreateSignTypeInput): Promise<CatalogSignTypeItem> => {
-    return http.post<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPES, data)
+  createSignType: async (data: CreateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.post<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPES,
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
   },
 
-  updateSignType: async (id: number, data: UpdateSignTypeInput): Promise<CatalogSignTypeItem> => {
-    return http.patch<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id), data)
+  updateSignType: async (id: number, data: UpdateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.patch<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id),
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
   },
 
   deleteSignType: async (id: number): Promise<{ deleted: boolean; id: number }> => {
@@ -269,9 +280,21 @@ export const catalogService = {
 
   approveAndCreateType: async (
     id: string,
-    data: ApproveAndCreateSignTypeInput,
+    data: ApproveAndCreateSignTypeInput | FormData,
     file?: File
   ): Promise<{ message?: string; report?: MissingTypeReportItem; createdSignType?: CatalogSignTypeItem; signType?: CatalogSignTypeItem }> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    if (isFormData) {
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        data,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
     if (file) {
       const formData = new FormData()
       Object.entries(data).forEach(([key, val]) => {

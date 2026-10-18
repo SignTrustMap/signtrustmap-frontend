@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   LayoutAnimation,
@@ -16,12 +16,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
+import { formatFreshnessScore } from '@/utils/freshness';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { ImageInspectionModal } from '@/components/image-inspection-modal';
@@ -188,12 +189,8 @@ export function RevalidationSignDetailsCard({
     };
   }
 
-  const freshnessColor =
-    displayScore >= 80 && !isExplicitRetired
-      ? '#047857'
-      : displayScore >= 50 && !isExplicitRetired
-        ? '#C2410C'
-        : '#B91C1C';
+  const freshnessInfo = formatFreshnessScore(sign.freshnessScore, sign.status);
+  const freshnessColor = isExplicitRetired ? '#B91C1C' : freshnessInfo.color;
 
   // Clear Action CTA wording
   const primaryCtaText = 'Kiểm tra thực địa';
@@ -263,7 +260,7 @@ export function RevalidationSignDetailsCard({
             <View style={styles.compactMetaRow}>
               <View style={[styles.freshnessMiniDot, { backgroundColor: freshnessColor }]} />
               <Text style={[styles.compactFreshnessText, { color: theme.grey }]}>
-                Độ tươi mới: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{displayScore}%</Text>
+                Độ tươi mới: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{freshnessInfo.label}</Text>
               </Text>
             </View>
           </View>

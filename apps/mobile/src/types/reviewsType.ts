@@ -86,8 +86,21 @@ export type ReviewCandidate = {
     submission?: {
         createdAt?: string;
         surveyorId?: string;
+        latitude?: number | null;
+        longitude?: number | null;
     };
     submissionId: string;
+    locationContext?: {
+        coordinates?: {
+            latitude: number;
+            longitude: number;
+        };
+        displayLocation?: string;
+        nearbyRoad?: string | null;
+        direction?: number | null;
+    };
+    latitude?: number | null;
+    longitude?: number | null;
 };
 
 export type ReviewQueueResponse = {

@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,14 +19,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useQueryClient } from '@tanstack/react-query';
 
-import { AppButton } from '@/components/ui/button';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppToast } from '@/components/toast';
 import { CANNOT_RECORD_VOTE_MESSAGE } from '@/constants/message';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/utils/format-date';
 import type {
-  EvidenceVoteDto,
   RevalDecision,
   RevalidationQueueEvidenceItem,
 } from '@/types/revalidationType';
@@ -36,6 +35,8 @@ import {
 } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
+import type { CatalogSign } from '@/api/reviews/catalog';
+import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
 
@@ -179,7 +180,8 @@ type RevalidationBottomSheetProps = {
 function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBottomSheetProps) {
   const theme = useTheme();
   const [note, setNote] = useState('');
-  const [suggestedTypeId, setSuggestedTypeId] = useState('');
+  const [selectedSign, setSelectedSign] = useState<CatalogSign | undefined>();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const title =
     type === 'changed'
@@ -190,7 +192,7 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
 
   const helperText =
     type === 'changed'
-      ? 'Giải thích biển báo thực tế khác biệt như thế nào so với dữ liệu gốc:'
+      ? 'Chọn loại biển báo thực tế quan sát được và giải thích điểm khác biệt:'
       : type === 'removed'
         ? 'Xác nhận rằng biển báo giao thông không còn hiện diện tại vị trí này:'
         : 'Nêu rõ lý do minh chứng không rõ ràng (ví dụ: mờ, bị che khuất, chói sáng ban đêm, sai vị trí):';
@@ -198,16 +200,17 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
   const confirmColor =
     type === 'removed' ? Colors.danger : type === 'changed' ? '#D97706' : theme.primary;
 
+  const canConfirm = true;
+
   const handleConfirm = () => {
-    const parsedId = suggestedTypeId.trim() ? parseInt(suggestedTypeId.trim(), 10) : undefined;
-    onConfirm(note, Number.isFinite(parsedId) ? parsedId : undefined);
+    onConfirm(note, selectedSign?.id);
     setNote('');
-    setSuggestedTypeId('');
+    setSelectedSign(undefined);
   };
 
   const handleClose = () => {
     setNote('');
-    setSuggestedTypeId('');
+    setSelectedSign(undefined);
     onClose();
   };
 
@@ -253,29 +256,99 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
               {type === 'changed' ? (
                 <View style={styles.reasonInputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.text }]}>
-                    ID loại biển đề xuất (tùy chọn)
+                    Biển báo thay thế thực tế (tùy chọn)
                   </Text>
-                  <TextInput
-                    accessibilityLabel="Mã loại biển báo đề xuất"
-                    keyboardType="number-pad"
-                    onChangeText={setSuggestedTypeId}
-                    placeholder="Ví dụ: 42"
-                    placeholderTextColor={theme.placeholder}
-                    style={[
-                      styles.singleLineInput,
-                      {
-                        backgroundColor: theme.background,
-                        borderColor: theme.border,
-                        color: theme.text,
-                      },
-                    ]}
-                    value={suggestedTypeId}
+
+                  {selectedSign ? (
+                    <View
+                      style={[
+                        styles.selectedSignCard,
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.primary,
+                        },
+                      ]}
+                    >
+                      <View style={[styles.selectedSignImageWrapper, { backgroundColor: theme.neutral }]}>
+                        {selectedSign.representativeImageKey ? (
+                          <Image
+                            contentFit="contain"
+                            source={{ uri: resolveS3Url(selectedSign.representativeImageKey) }}
+                            style={styles.selectedSignImage}
+                          />
+                        ) : (
+                          <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={26} />
+                        )}
+                      </View>
+                      <View style={styles.selectedSignInfo}>
+                        <View style={styles.selectedSignBadgeRow}>
+                          <View style={[styles.selectedSignCodeBadge, { backgroundColor: theme.primary }]}>
+                            <Text style={styles.selectedSignCodeText}>{selectedSign.signCode}</Text>
+                          </View>
+                          <Text numberOfLines={1} style={[styles.selectedSignCategoryText, { color: theme.textSecondary }]}>
+                            {(selectedSign.category as any)?.nameVi || selectedSign.category?.nameEn}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={2} style={[styles.selectedSignNameText, { color: theme.text }]}>
+                          {selectedSign.nameVi || selectedSign.nameEn}
+                        </Text>
+                      </View>
+                      <View style={styles.selectedSignActions}>
+                        <Pressable
+                          accessibilityLabel="Đổi biển báo khác"
+                          hitSlop={8}
+                          onPress={() => setIsPickerOpen(true)}
+                          style={[styles.changeSignBtn, { backgroundColor: theme.backgroundSelected }]}
+                        >
+                          <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={18} />
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel="Bỏ chọn biển báo"
+                          hitSlop={8}
+                          onPress={() => setSelectedSign(undefined)}
+                          style={[styles.changeSignBtn, { backgroundColor: theme.neutral }]}
+                        >
+                          <MaterialCommunityIcons color={theme.textSecondary} name="close" size={18} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Pressable
+                      accessibilityLabel="Mở danh mục chọn biển báo"
+                      accessibilityRole="button"
+                      onPress={() => setIsPickerOpen(true)}
+                      style={[
+                        styles.signPickerTrigger,
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.signPickerTriggerLeft}>
+                        <MaterialCommunityIcons color={theme.primary} name="magnify" size={20} />
+                        <Text style={[styles.signPickerTriggerText, { color: theme.placeholder }]}>
+                          Chọn biển báo từ danh mục (nếu có)...
+                        </Text>
+                      </View>
+                      <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
+                    </Pressable>
+                  )}
+
+                  {/* Sign Picker Modal */}
+                  <RevalidationSignPickerModal
+                    onClose={() => setIsPickerOpen(false)}
+                    onSelectSign={(sign) => {
+                      setSelectedSign(sign);
+                    }}
+                    selectedSignId={selectedSign?.id}
+                    visible={isPickerOpen}
                   />
                 </View>
               ) : null}
               <View style={styles.reasonInputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Ghi chú của thẩm định viên {type === 'changed' ? <Text style={{ color: Colors.danger }}>*</Text> : '(tùy chọn)'}
+                  Ghi chú của thẩm định viên (tùy chọn)
                 </Text>
                 <TextInput
                   accessibilityLabel="Ghi chú quan sát của thẩm định viên"
@@ -305,11 +378,12 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
                 variant="surface"
               />
               <AppButton
+                disabled={!canConfirm}
                 label="Xác nhận bình chọn"
                 onPress={handleConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: confirmColor },
+                  { backgroundColor: confirmColor, opacity: canConfirm ? 1 : 0.5 },
                 ]}
               />
             </View>
@@ -345,6 +419,7 @@ export function RevalidationReviewScreen() {
   const [activeSheet, setActiveSheet] = useState<SheetType>();
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
+  const [isCatalogBrowserOpen, setIsCatalogBrowserOpen] = useState(false);
   const [toast, setToast] = useState<{ id: number; message: string; tone: 'default' | 'success' }>();
 
   // Synchronize incoming queue items
@@ -928,12 +1003,12 @@ export function RevalidationReviewScreen() {
             <View style={styles.actionsFooter}>
               {/* Floating Action Buttons */}
               <View style={styles.fabColumn}>
-                {/* Catalog Screen FAB (Placeholder - No routing) */}
+                {/* Catalog Screen FAB */}
                 <AppButton
                   accessibilityLabel="Xem danh mục biển báo"
                   accessibilityRole="button"
                   onPress={() => {
-                    // Placeholder: navigate to catalog screen
+                    setIsCatalogBrowserOpen(true);
                   }}
                   style={[
                     styles.fabButton,
@@ -1260,6 +1335,13 @@ export function RevalidationReviewScreen() {
           tone={toast.tone}
         />
       ) : null}
+
+      {/* Standalone Catalog Browser Modal from FAB */}
+      <RevalidationSignPickerModal
+        onClose={() => setIsCatalogBrowserOpen(false)}
+        title="Tra cứu danh mục biển báo"
+        visible={isCatalogBrowserOpen}
+      />
     </View>
   );
 }
@@ -1924,6 +2006,89 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+  selectedSignCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  selectedSignImageWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedSignImage: {
+    width: 44,
+    height: 44,
+  },
+  selectedSignInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  selectedSignBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectedSignCodeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  selectedSignCodeText: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  selectedSignCategoryText: {
+    fontFamily: Fonts.body,
+    fontSize: 10,
+    fontWeight: '600',
+    flex: 1,
+  },
+  selectedSignNameText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  selectedSignActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  changeSignBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signPickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    paddingHorizontal: Spacing.two,
+  },
+  signPickerTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  signPickerTriggerText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '500',
   },
   sheetFooter: {
     flexDirection: 'row',

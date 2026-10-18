@@ -1,13 +1,14 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
-import { AppInput } from '@/components/ui/input';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppInput } from '@/components/input';
+import { AppToast } from '@/components/toast';
+import { SearchSuggestionSkeleton } from '@/components/skeleton';
 import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {
@@ -43,12 +44,19 @@ export function RouteSearchScreen() {
     [startLat, startLng],
   );
   const routeStart = coordinateStart;
-  const { savedRoutes } = useSavedRoutes();
+  const { savedRoutes, refetch: refetchSavedRoutes } = useSavedRoutes();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchSavedRoutes();
+    }, [refetchSavedRoutes])
+  );
 
   const handleSelectSavedRoute = (saved: SavedRouteItem) => {
     router.replace({
       pathname: '/home',
       params: {
+        savedRouteId: saved.id,
         destinationLat: String(saved.destinationLatitude),
         destinationLng: String(saved.destinationLongitude),
         destinationSubtitle: saved.destinationName,
@@ -156,40 +164,49 @@ export function RouteSearchScreen() {
             <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
               TUYẾN ĐƯỜNG YÊU THÍCH (WISHLIST)
             </Text>
-            {savedRoutes.map((saved) => (
-              <AppButton
-                accessibilityLabel={saved.name}
-                key={saved.id}
-                onPress={() => handleSelectSavedRoute(saved)}
-                pressedOpacity={0.72}
-                style={[styles.locationRow, { borderColor: theme.border }]}
-                variant="ghost"
-              >
-                <View style={[styles.recentIconCircle, { backgroundColor: '#0671EB15' }]}>
-                  <AntDesign color="#F59E0B" name="star" size={17} />
-                </View>
-                <View style={styles.locationCopy}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={[styles.locationTitle, { color: theme.text }]}>{saved.name}</Text>
-                    <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
-                        {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
-                      </Text>
-                    </View>
+            {savedRoutes.map((saved) => {
+              const displayName = saved.name || (saved as any).title || `${saved.originName} ➔ ${saved.destinationName}`;
+              return (
+                <AppButton
+                  accessibilityLabel={displayName}
+                  key={saved.id}
+                  onPress={() => handleSelectSavedRoute(saved)}
+                  pressedOpacity={0.72}
+                  style={[styles.locationRow, { borderColor: theme.border }]}
+                  variant="ghost"
+                >
+                  <View style={[styles.recentIconCircle, { backgroundColor: '#0671EB15' }]}>
+                    <AntDesign color="#F59E0B" name="star" size={17} />
                   </View>
-                  <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
-                    {saved.originName} ➔ {saved.destinationName}
-                  </Text>
-                </View>
-              </AppButton>
-            ))}
+                  <View style={styles.locationCopy}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.locationTitle, { color: theme.text }]}>{displayName}</Text>
+                      <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
+                          {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+                      {saved.originName} ➔ {saved.destinationName}
+                    </Text>
+                  </View>
+                </AppButton>
+              );
+            })}
           </>
         ) : null}
 
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'ĐÃ LƯU & GẦN ĐÂY'}
         </Text>
-        {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
+        {isLoading ? (
+          <SearchSuggestionSkeleton
+            circleSize={36}
+            count={5}
+            itemStyle={[styles.locationRow, { borderColor: theme.border }]}
+          />
+        ) : null}
         {!isLoading && error ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}

@@ -105,6 +105,37 @@ export type EndNavigationSessionResponse = {
   status?: string;
 };
 
+export type NavigationSessionItem = {
+  id: string;
+  userId?: string;
+  origin?: { latitude: number; longitude: number } | null;
+  destination?: { latitude: number; longitude: number } | null;
+  originLatitude?: number;
+  originLongitude?: number;
+  originName?: string;
+  destinationLatitude?: number;
+  destinationLongitude?: number;
+  destinationName?: string;
+  vehicleType?: string;
+  vehicleMode?: string;
+  status: string;
+  creditsDeducted?: number;
+  distanceMeters?: number;
+  durationSeconds?: number;
+  startedAt?: string;
+  endedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type ListNavigationSessionsResponse = {
+  items: NavigationSessionItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages?: number;
+};
+
 /** Custom alert profile: POST / PUT / GET /navigation/profiles */
 export type CreateAlertProfileDto = {
   name: string;

@@ -56,6 +56,8 @@ function mapBackendSignTypeToEntry(s: CatalogSignTypeItem): CatalogEntry {
     standardRef: 'QCVN 41:2019/BGTVT',
     status: s.isActive ? 'Active' : 'Deprecated',
     version: 'v2.5',
+    imageUrl: s.representativeImageKey || undefined,
+    representativeImageKey: s.representativeImageKey || undefined,
   }
 }
 
@@ -333,7 +335,7 @@ export default function CatalogPage() {
   /**
    * Adds newly published sign to catalog state and backend API.
    */
-  const handleCreateEntry = async (newEntry: CatalogEntry) => {
+  const handleCreateEntry = async (newEntry: CatalogEntry, file?: File) => {
     try {
       const catMap: Record<string, number> = {
         prohibitory: 1,
@@ -345,18 +347,36 @@ export default function CatalogPage() {
       }
       const categoryId = catMap[newEntry.category] || 1
 
-      const created = await catalogService.createSignType({
-        categoryId,
-        signCode: newEntry.code,
-        nameVi: newEntry.nameVi,
-        nameEn: newEntry.nameEn,
-        description: newEntry.descriptionVi,
-        shape: newEntry.shape,
-        colorScheme: newEntry.color,
-        aiLabelPrompt: newEntry.aiPrompt,
-        osmMapping: newEntry.osmMapping,
-        isActive: true,
-      })
+      let created: CatalogSignTypeItem | undefined
+      if (file) {
+        const formData = new FormData()
+        formData.append('categoryId', String(categoryId))
+        formData.append('signCode', newEntry.code)
+        formData.append('nameVi', newEntry.nameVi)
+        formData.append('nameEn', newEntry.nameEn)
+        if (newEntry.descriptionVi) formData.append('description', newEntry.descriptionVi)
+        if (newEntry.shape) formData.append('shape', newEntry.shape)
+        if (newEntry.color) formData.append('colorScheme', newEntry.color)
+        if (newEntry.aiPrompt) formData.append('aiLabelPrompt', newEntry.aiPrompt)
+        if (newEntry.osmMapping) formData.append('osmMapping', newEntry.osmMapping)
+        formData.append('isActive', 'true')
+        formData.append('file', file)
+        created = await catalogService.createSignType(formData)
+      } else {
+        created = await catalogService.createSignType({
+          categoryId,
+          signCode: newEntry.code,
+          nameVi: newEntry.nameVi,
+          nameEn: newEntry.nameEn,
+          description: newEntry.descriptionVi,
+          shape: newEntry.shape,
+          colorScheme: newEntry.color,
+          aiLabelPrompt: newEntry.aiPrompt,
+          osmMapping: newEntry.osmMapping,
+          representativeImageKey: newEntry.representativeImageKey || newEntry.imageUrl,
+          isActive: true,
+        })
+      }
 
       const mappedEntry = created ? mapBackendSignTypeToEntry(created) : newEntry
       setCatalog((prev) => [mappedEntry, ...prev])
@@ -368,6 +388,11 @@ export default function CatalogPage() {
       toast.success(t('catalog.toast_published'))
       setCurrentPage(1)
     }
+  }
+
+  const handleSignUpdated = (updated: CatalogEntry) => {
+    setCatalog((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+    setSelectedSign(updated)
   }
 
   /**
@@ -602,6 +627,7 @@ export default function CatalogPage() {
         getSignSecondaryDesc={getSignSecondaryDesc}
         getShapeLabel={getShapeLabel}
         renderColorPill={renderColorPill}
+        onSignUpdated={handleSignUpdated}
       />
 
       {isAdmin && (
