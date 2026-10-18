@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Animated, BackHandler, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -8,8 +8,9 @@ import { SymbolView } from "expo-symbols";
 import { Camera } from "expo-camera";
 import { Image as ExpoImage } from "expo-image";
 import { Image } from "react-native";
-import { AppButton } from "@/components/ui/button";
-import { AppToast } from "@/components/ui/toast";
+import { AppButton } from "@/components/button";
+import { Badge } from "@/components/badge";
+import { AppToast } from "@/components/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
@@ -1845,13 +1846,11 @@ export function NavigationMapScreen() {
                       ]}
                     >
                       <Ionicons name="notifications" size={24} color="#000000" />
-                      {unreadNotificationCount > 0 && (
-                        <View style={styles.notificationBadge}>
-                          <Text style={styles.notificationBadgeText}>
-                            {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-                          </Text>
-                        </View>
-                      )}
+                      <Badge
+                        count={unreadNotificationCount}
+                        maxCount={9}
+                        style={styles.notificationBadge}
+                      />
                     </Pressable>
                   </View>
                   <>

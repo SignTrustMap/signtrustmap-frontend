@@ -1,4 +1,4 @@
-import AntDesign from '@expo/vector-icons/AntDesign';
+﻿import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
@@ -19,8 +19,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { resolveS3Url } from '@/api/reviews/review-workflow';
-import { AppButton } from '@/components/ui/button';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppToast } from '@/components/toast';
 import {
   SURVEY_RESUBMITTED_SUCCESS_MESSAGE,
   UNABLE_TO_RESUBMIT_MESSAGE,

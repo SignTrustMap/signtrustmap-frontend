@@ -1,7 +1,7 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useBackButton } from '@/hooks/use-back-button';

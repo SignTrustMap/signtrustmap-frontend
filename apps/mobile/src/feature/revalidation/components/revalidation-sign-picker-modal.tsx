@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import {
@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CatalogCategory, CatalogSign } from '@/api/reviews/catalog';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useGetCatalog } from '@/feature/review/hooks/use-review';
 import { useTheme } from '@/hooks/use-theme';

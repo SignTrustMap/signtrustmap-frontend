@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppToast } from '@/components/toast';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type ReviewActionType,

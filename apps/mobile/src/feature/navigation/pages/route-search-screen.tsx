@@ -1,13 +1,13 @@
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+﻿import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
-import { AppInput } from '@/components/ui/input';
-import { AppToast } from '@/components/ui/toast';
+import { AppButton } from '@/components/button';
+import { AppInput } from '@/components/input';
+import { AppToast } from '@/components/toast';
 import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {

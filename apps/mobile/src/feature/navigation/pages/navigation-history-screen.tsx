@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
 import { useBackButton } from '@/hooks/use-back-button';

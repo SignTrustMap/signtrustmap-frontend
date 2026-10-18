@@ -1,11 +1,12 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
+import { Badge } from '@/components/badge';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
@@ -259,16 +260,11 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     {meta.label}
                   </Text>
 
-                  {badgeCount !== undefined && badgeCount > 0 ? (
-                    <Text
-                      style={[
-                        styles.tabBadgeText,
-                        { color: isActive ? "#FFFFFF" : theme.text },
-                      ]}
-                    >
-                      {badgeCount > 10 ? "10+" : badgeCount}
-                    </Text>
-                  ) : null}
+                  <Badge
+                    count={badgeCount}
+                    maxCount={9}
+                    size="sm"
+                  />
                 </Pressable>
               );
             })}
@@ -290,17 +286,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
             </View>
-            {streak > 0 ? (
-              <View
-                style={[
-                  styles.streakBadge,
-                  { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
-                ]}
-              >
-                <Text style={styles.streakEmoji}>🔥</Text>
-                <Text style={styles.streakText}>Chuỗi {streak} ngày</Text>
-              </View>
-            ) : null}
           </View>
 
           <View style={styles.actionList}>

@@ -1,4 +1,4 @@
-import * as Clipboard from 'expo-clipboard';
+﻿import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { Octicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { UNHANDLED_EXCEPTION_MESSAGE } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

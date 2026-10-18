@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   LayoutAnimation,
@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';

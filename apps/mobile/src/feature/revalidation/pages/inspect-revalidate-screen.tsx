@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,7 +35,7 @@ import {
   UNABLE_TO_LOAD_PHOTO_LIBRARY_SIMPLE_MESSAGE,
 } from '@/constants/message';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/context/session-provider';

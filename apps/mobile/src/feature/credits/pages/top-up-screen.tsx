@@ -1,9 +1,9 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+﻿import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { PAYMENT_FAILED_MESSAGE } from '@/constants/message';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

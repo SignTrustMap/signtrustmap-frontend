@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -15,7 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   ACCOUNT_ROLES,

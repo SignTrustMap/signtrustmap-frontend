@@ -1,4 +1,4 @@
-import AntDesign from '@expo/vector-icons/AntDesign';
+﻿import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
   DRAFT_NO_UPLOADED_MEDIA_MESSAGE,
@@ -40,7 +40,7 @@ import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-s
 import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
-import { AppInput } from '@/components/ui/input';
+import { AppInput } from '@/components/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
 import { executeChunkedVideoUpload, type UploadProgressInfo } from '@/feature/upload/utils/chunk-upload-manager';
@@ -969,6 +969,18 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <AppButton
+            accessibilityLabel="Gửi khảo sát khác"
+            disabled={isSubmitting}
+            label="Gửi khảo sát khác"
+            onPress={() => router.push('/work/new-survey')}
+            style={[
+              styles.secondarySubmitButton,
+              { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+            ]}
+            variant="surface"
+          />
+
+          <AppButton
             disabled={isSubmitting || isLocating || isLocatingEnd || !isDraftLoaded || !isEditable}
             label={isSubmitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
             onPress={handleSubmit}
@@ -1176,6 +1188,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 14,
     lineHeight: 20,
+  },
+  secondarySubmitButton: {
+    alignSelf: 'stretch',
+    marginBottom: Spacing.two,
+    borderWidth: 1,
   },
   submitButton: {
     alignSelf: 'stretch',

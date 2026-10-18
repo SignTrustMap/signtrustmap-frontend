@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
+import { Badge } from '@/components/badge';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { MissionCardItem } from '@/feature/work/components/mission-card-item';
 import {
@@ -419,25 +420,10 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     {tab.label}
                   </Text>
 
-                  {pendingCount > 0 ? (
-                    <View
-                      style={[
-                        styles.tabBadge,
-                        {
-                          backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${theme.primary}18`,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.tabBadgeText,
-                          { color: isActive ? '#FFFFFF' : theme.primary },
-                        ]}
-                      >
-                        {pendingCount}
-                      </Text>
-                    </View>
-                  ) : null}
+                  <Badge
+                    count={pendingCount}
+                    size="sm"
+                  />
                 </Pressable>
               );
             })}

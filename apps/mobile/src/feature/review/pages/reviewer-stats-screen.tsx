@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -14,8 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { resolveS3Url } from '@/api/reviews/review-workflow';
-import { AppButton } from '@/components/ui/button';
-import { ListSkeleton, Skeleton } from '@/components/ui/skeleton';
+import { AppButton } from '@/components/button';
+import { ListSkeleton, Skeleton } from '@/components/skeleton';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMyReviewHistory, useGetMyReviewerStats } from '@/feature/review/hooks/use-review';
 import { useBackButton } from '@/hooks/use-back-button';
