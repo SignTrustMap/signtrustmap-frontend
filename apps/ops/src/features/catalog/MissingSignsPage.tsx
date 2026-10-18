@@ -21,6 +21,7 @@ import {
   MissingSignMergeModal,
   MissingSignEscalateModal,
   MissingSignRejectModal,
+  MissingSignApproveCreateModal,
   type MissingRejectReasonKey,
 } from './components'
 
@@ -98,6 +99,7 @@ export default function MissingSignsPage() {
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
   const [isEscalateModalOpen, setIsEscalateModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+  const [isApproveCreateModalOpen, setIsApproveCreateModalOpen] = useState(false)
 
   const [selectedCatalogCode, setSelectedCatalogCode] = useState('P.102')
   const [catalogSearch, setCatalogSearch] = useState('')
@@ -110,12 +112,13 @@ export default function MissingSignsPage() {
         if (isMergeModalOpen) setIsMergeModalOpen(false)
         else if (isEscalateModalOpen) setIsEscalateModalOpen(false)
         else if (isRejectModalOpen) setIsRejectModalOpen(false)
+        else if (isApproveCreateModalOpen) setIsApproveCreateModalOpen(false)
         else if (selectedReport) setSelectedReport(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isMergeModalOpen, isEscalateModalOpen, isRejectModalOpen, selectedReport])
+  }, [isMergeModalOpen, isEscalateModalOpen, isRejectModalOpen, isApproveCreateModalOpen, selectedReport])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -415,10 +418,11 @@ export default function MissingSignsPage() {
       )}
 
       {/* ─── INSPECTION MODAL ────────────────────────────────────────── */}
-      {selectedReport && !isMergeModalOpen && !isEscalateModalOpen && !isRejectModalOpen && (
+      {selectedReport && !isMergeModalOpen && !isEscalateModalOpen && !isRejectModalOpen && !isApproveCreateModalOpen && (
         <MissingSignInspectionModal
           report={selectedReport}
           onClose={() => setSelectedReport(null)}
+          onOpenApproveCreate={() => setIsApproveCreateModalOpen(true)}
           onOpenMerge={() => setIsMergeModalOpen(true)}
           onOpenEscalate={() => setIsEscalateModalOpen(true)}
           onOpenReject={() => setIsRejectModalOpen(true)}
@@ -426,6 +430,30 @@ export default function MissingSignsPage() {
       )}
 
       {/* ─── ACTION MODALS ───────────────────────────────────────────── */}
+      <MissingSignApproveCreateModal
+        isOpen={isApproveCreateModalOpen}
+        selectedReport={selectedReport}
+        onClose={() => setIsApproveCreateModalOpen(false)}
+        onSuccess={(signCode) => {
+          if (selectedReport) {
+            setReports((prev) =>
+              prev.map((r) =>
+                r.id === selectedReport.id
+                  ? {
+                      ...r,
+                      status: 'Approved',
+                      tempLabel: `${signCode} - ${r.tempLabel}`,
+                    }
+                  : r
+              )
+            )
+          }
+          setIsApproveCreateModalOpen(false)
+          setSelectedReport(null)
+          fetchReports()
+        }}
+      />
+
       <MissingSignMergeModal
         isOpen={isMergeModalOpen}
         selectedReport={selectedReport}

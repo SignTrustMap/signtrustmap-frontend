@@ -9,6 +9,7 @@ import {
   ArrowsMerge,
   RocketLaunch,
   Prohibit,
+  PlusCircle,
 } from '@phosphor-icons/react'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
@@ -21,6 +22,7 @@ interface MissingSignInspectionModalProps {
   onOpenMerge: () => void
   onOpenEscalate: () => void
   onOpenReject: () => void
+  onOpenApproveCreate?: () => void
 }
 
 export function MissingSignInspectionModal({
@@ -29,6 +31,7 @@ export function MissingSignInspectionModal({
   onOpenMerge,
   onOpenEscalate,
   onOpenReject,
+  onOpenApproveCreate,
 }: MissingSignInspectionModalProps) {
   const { t } = useTranslation('ops')
   const { success } = useToast()
@@ -202,9 +205,20 @@ export function MissingSignInspectionModal({
 
           {/* Modal Footer Quick Actions */}
           <div className="p-4 sm:p-5 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-2">
-              {report.status === 'Open' ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {report.status === 'Open' || report.status === 'Approved' ? (
                 <>
+                  {onOpenApproveCreate && (
+                    <button
+                      type="button"
+                      onClick={onOpenApproveCreate}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                    >
+                      <PlusCircle size={15} weight="bold" />
+                      <span>{t('missing_signs.btn_approve_and_create')}</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={onOpenMerge}
@@ -214,14 +228,16 @@ export function MissingSignInspectionModal({
                     <span>{t('missing_signs.btn_merge_catalog')}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={onOpenEscalate}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                  >
-                    <RocketLaunch size={15} weight="bold" />
-                    <span>{t('missing_signs.btn_escalate_admin')}</span>
-                  </button>
+                  {report.status === 'Open' && (
+                    <button
+                      type="button"
+                      onClick={onOpenEscalate}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+                    >
+                      <RocketLaunch size={15} weight="bold" />
+                      <span>{t('missing_signs.btn_escalate_admin')}</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"

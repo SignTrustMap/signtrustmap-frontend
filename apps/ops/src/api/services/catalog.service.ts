@@ -101,13 +101,15 @@ export interface PaginatedMissingReportsResponse {
 }
 
 export interface ApproveAndCreateSignTypeInput {
-  categoryId: number
+  categoryId?: number
   signCode: string
   nameVi: string
   nameEn: string
   description?: string
   shape?: string
   colorScheme?: string
+  aiLabelPrompt?: string
+  representativeImageKey?: string
 }
 
 export const catalogService = {
@@ -148,12 +150,22 @@ export const catalogService = {
     return http.get<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
   },
 
-  createSignType: async (data: CreateSignTypeInput): Promise<CatalogSignTypeItem> => {
-    return http.post<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPES, data)
+  createSignType: async (data: CreateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.post<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPES,
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
   },
 
-  updateSignType: async (id: number, data: UpdateSignTypeInput): Promise<CatalogSignTypeItem> => {
-    return http.patch<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id), data)
+  updateSignType: async (id: number, data: UpdateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.patch<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id),
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
   },
 
   deleteSignType: async (id: number): Promise<{ deleted: boolean; id: number }> => {
@@ -173,10 +185,12 @@ export const catalogService = {
     return http.patch<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id), data)
   },
 
-  approveAndCreateType: async (id: string, data: ApproveAndCreateSignTypeInput): Promise<{ message: string; signType: CatalogSignTypeItem }> => {
+  approveAndCreateType: async (id: string, data: ApproveAndCreateSignTypeInput | FormData): Promise<{ message: string; signType: CatalogSignTypeItem }> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
     return http.post<{ message: string; signType: CatalogSignTypeItem }>(
       API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
-      data
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
     )
   },
 

@@ -25,6 +25,8 @@ export interface CatalogEntry {
   standardRef?: string
   status: 'Active' | 'Deprecated' | 'Draft'
   version: string
+  imageUrl?: string
+  representativeImageKey?: string
 }
 
 export interface MissingSignTypeReport {
