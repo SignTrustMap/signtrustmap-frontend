@@ -1,13 +1,14 @@
-﻿import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
 import { AppToast } from '@/components/toast';
+import { SearchSuggestionSkeleton } from '@/components/skeleton';
 import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import {
@@ -199,7 +200,13 @@ export function RouteSearchScreen() {
         <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
           {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'ĐÃ LƯU & GẦN ĐÂY'}
         </Text>
-        {isLoading ? <ActivityIndicator color={theme.primary} style={styles.loading} /> : null}
+        {isLoading ? (
+          <SearchSuggestionSkeleton
+            circleSize={36}
+            count={5}
+            itemStyle={[styles.locationRow, { borderColor: theme.border }]}
+          />
+        ) : null}
         {!isLoading && error ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
         ) : null}

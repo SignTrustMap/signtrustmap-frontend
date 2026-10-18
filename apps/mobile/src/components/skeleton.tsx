@@ -171,6 +171,50 @@ export function ListSkeleton({
   );
 }
 
+export type SearchSuggestionSkeletonProps = {
+  count?: number;
+  style?: StyleProp<ViewStyle>;
+  itemStyle?: StyleProp<ViewStyle>;
+  circleSize?: number;
+};
+
+export function SearchSuggestionSkeleton({
+  count = 3,
+  style,
+  itemStyle,
+  circleSize = 32,
+}: SearchSuggestionSkeletonProps) {
+  return (
+    <View style={style}>
+      {Array.from({ length: count }).map((_, index) => (
+        <View
+          key={`search-skeleton-${index}`}
+          style={[styles.searchRowContainer, itemStyle]}
+        >
+          <Skeleton
+            borderRadius={circleSize / 2}
+            height={circleSize}
+            width={circleSize}
+          />
+          <View style={styles.searchBody}>
+            <Skeleton
+              borderRadius={4}
+              height={14}
+              width={index % 2 === 0 ? '72%' : '60%'}
+            />
+            <Skeleton
+              borderRadius={4}
+              height={11}
+              style={{ marginTop: 2 }}
+              width={index % 2 === 0 ? '45%' : '55%'}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   cardContainer: {
     flexDirection: 'row',
@@ -199,5 +243,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
+  },
+  searchRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 10,
+    gap: Spacing.two,
+  },
+  searchBody: {
+    flex: 1,
+    gap: 4,
   },
 });
