@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -50,23 +51,18 @@ function getInitials(displayName?: string) {
     .join('');
 }
 
-// 14 opacity slices from 0.95 to 0.0 creating a continuous gradient from theme.primary to white
-const GRADIENT_STOPS = [
-  0.96, 0.90, 0.82, 0.72, 0.61, 0.49, 0.38, 0.28, 0.18, 0.10, 0.05, 0.02, 0.0,
-];
+// Continuous 256-step linear gradient from brand primary teal (#007B8B) to white (#FFFFFF)
+const GRADIENT_BASE64 =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAADQ0lEQVR4nH3EdVAWdgDH4e+6u5xzrru7u7t36936Vre6xc1AZ4K0dHdJg5QgJQiCtAiCSElIi4gSfna/lxcXt9vzxyMtWIP+vyP+1UJL9taO/I+O+qtFlhzQ0f/sGEuLZzt2sePfO86SzWzH2zhZO2HJbCfO5GztpKWznTyTCzrlj9lOnckVnbZsttNNZyxfa+3Mw521ws3a2aZzVlpyR+daWuWOzjPNWeWB5qz2QOeb5q72RHNtPdEFpnm2XmienRe60DTfzhvNX+ONLjJdbLrE3sfapQ4+6DIHX3S5JUc/dIXpSic/dJWTv7Wrnf3RNc4B6FqXAHTdTIHoetdAdINrELpxbRC6yXSzW7C1W9yD0a3uIeg20+0eoegO052eoeguzzB0t5elcHSPdzi61zsC3ecTge43PeAbiR40PeQXhR42PeIfjR41PRYQjR4PiEFPBMagJwPXoaeC1qGng2LRM8Gx6NngOPRcSBx6PiQevRAaj140vRSWgF42vRKeiF6NSESvRSSh1yOT0BuRyejNqGT0VlQKejs6Bb0TnYrejUlF761bj943fRCbhj40fRSXjj6OT0efxGegTxMy0GcJmejzxCz0RVIW+jJpA/oqeQP6OjkbfZOSjb5NzUHfmb5fvxH9kLYR/ZiWi35Kz0M/m37JyEe/Zuaj3zIL0O9ZBWjBhkK00LQoexOyySlCS0xLNxajZbnFaHnuZrQirwStzC9Bq/NLkW1BKbIr3ILsC8uQw6Yy5FhUjpxNLsVbkevmCuRmci+pRJ6llchrSxXy3lKNfMuqkV95DfIvr0WBW2tRUEUdCqnchkJNYVX1KKK6HkXWbEfRNQ0oprYBxdY1orhtO1C8KbG+CSVtb0YpDc0otWEnSmtsQek7WlBm0y6U1dSKsptbUc7ONpTb0o7ydrWjgl0dqLC1ExW17UbF7btRSXsXKu3oRmWd3Wjr7h5U0dWLqrp7UXX3HlTb04fqevtR/Z5+1NA3gBr7BlFT/xBqHhhCLYPDqHVoBLUNj6CO4b2oc2QUde3dh3pG96HefWOob2w/GhgbR4P7x9Hw+AG098BBNHpwAo1NTKDxyUl0YHIKTUxNo6npaTR96BAC+BN/8b+pDO2n3AAAAABJRU5ErkJggg==';
 
 function PrimaryToWhiteGradient() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {GRADIENT_STOPS.map((opacity, idx) => (
-        <View
-          key={idx}
-          style={{
-            flex: 1,
-            backgroundColor: `rgba(0, 123, 139, ${opacity})`,
-          }}
-        />
-      ))}
+      <Image
+        resizeMode="stretch"
+        source={{ uri: GRADIENT_BASE64 }}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
@@ -209,14 +205,6 @@ export function ProfileScreen() {
                 <Text style={[styles.avatarText, { color: theme.primary }]}>
                   {getInitials(displayName)}
                 </Text>
-                <View
-                  style={[
-                    styles.avatarBadge,
-                    { backgroundColor: theme.secondary, borderColor: theme.primary },
-                  ]}
-                >
-                  <MaterialCommunityIcons color={theme.primary} name="shield-check" size={13} />
-                </View>
               </View>
 
               <View style={styles.userDetails}>
@@ -575,17 +563,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.title,
     fontSize: 28,
     fontWeight: '700',
-  },
-  avatarBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   userDetails: {
     flex: 1,

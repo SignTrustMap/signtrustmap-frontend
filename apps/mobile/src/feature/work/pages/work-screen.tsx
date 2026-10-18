@@ -21,6 +21,7 @@ import {
   useGetRevalidationEvidenceQueue,
 } from '@/feature/revalidation/hooks/use-revalidation';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
+import { WorkMissionsSection } from '@/feature/work/components/work-missions-section';
 import { useTheme } from '@/hooks/use-theme';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -259,17 +260,27 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Role Summary */}
           <View style={styles.roleSummary}>
             <Text style={[styles.roleTitle, { color: theme.text }]}>
-              Nhiệm vụ {roleMeta[selectedRole].label}
+              Vai trò: {roleMeta[selectedRole].label}
             </Text>
             <Text style={[styles.roleDescription, { color: theme.text }]}>
               {roleMeta[selectedRole].description}
             </Text>
           </View>
 
+          {/* Role-Specific Daily Missions Section */}
+          <WorkMissionsSection role={selectedRole} />
+
+          {/* Section Title: Role-Specific Features / Actions */}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleWithIcon}>
+              <MaterialCommunityIcons color={theme.primary} name="view-grid-outline" size={22} />
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Chức năng</Text>
+            </View>
+          </View>
+
           {/* Role-Specific Work Actions */}
           {selectedRole === 'surveyor' ? (
             <View style={styles.actionList}>
-
               {/* Standout Action: Pending Submissions */}
               <WorkActionCard
                 accentColor={theme.primary}
@@ -293,7 +304,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               />
               {/* Standout Action: Revalidation Map */}
               <WorkActionCard
-                accentColor="#10B981"
+                accentColor={theme.primary}
                 count={revalidationTaskCount}
                 icon="map-search-outline"
                 label="Tái xác nhận biển báo"
@@ -336,7 +347,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
               {/* Action Card: Pending Revalidation Evidence */}
               <WorkActionCard
-                accentColor="#0284C7"
+                accentColor={theme.primary}
                 count={revalEvidenceCount}
                 icon="clipboard-check-outline"
                 label="Tái thẩm định"
@@ -346,7 +357,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
               {/* Action Card: Reviewer Stats */}
               <WorkActionCard
-                accentColor="#10B981"
+                accentColor={theme.primary}
                 count={reviewerStats?.totalReviews}
                 icon="chart-timeline-variant-shimmer"
                 label="Thống kê của bạn"
@@ -360,7 +371,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
               {/* Secondary Standout Action: Sign Catalog */}
               <WorkActionCard
-                accentColor="#8B5CF6"
+                accentColor={theme.primary}
                 icon="database-search-outline"
                 label="Tra cứu biển báo giao thông"
                 onPress={() => router.push('/work/sign-catalog')}
@@ -379,31 +390,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 subtitle="Xem lại các lộ trình và chuyến đi bạn đã điều hướng"
               />
 
-              <AppButton
-                accessibilityLabel="Xem biển báo đã ghi nhận khi phát trực tiếp"
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="video-outline"
+                label="Biển báo đã ghi nhận"
                 onPress={() => router.push('/work/recorded-signs')}
-                pressedOpacity={0.88}
-                style={[
-                  styles.recordedSignsButton,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-                variant="ghost"
-              >
-                <View style={styles.recordedSignsLeft}>
-                  <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
-                    <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
-                  </View>
-                  <View style={styles.recordedSignsCopy}>
-                    <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
-                      Biển báo đã ghi nhận
-                    </Text>
-                    <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
-                      Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn
-                    </Text>
-                  </View>
-                </View>
-                <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
-              </AppButton>
+                subtitle="Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn"
+              />
             </View>
           )}
         </ScrollView >
@@ -509,6 +502,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.two,
+  },
+  sectionTitleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 18,
   },
   actionList: {
     gap: Spacing.three,
