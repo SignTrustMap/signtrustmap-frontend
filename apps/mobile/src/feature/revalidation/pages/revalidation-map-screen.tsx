@@ -4,17 +4,24 @@ import {
   Animated,
   FlatList,
   Image,
+  Keyboard,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useDebounce } from '@/hooks/use-debounce';
+import { SearchSuggestionSkeleton } from '@/components/skeleton';
+import { searchPlaces, type ApiPlace } from '@/api/navigation/places';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
@@ -32,6 +39,8 @@ import { getFreshnessInfo } from '../components/revalidation-sign-marker';
 import { RevalidationSignDetailsCard } from '../components/revalidation-sign-details-card';
 
 type FreshnessFilter = 'ALL' | 'NEEDS_REVALIDATION' | 'MODERATE' | 'FRESH';
+
+const FILTER_PANEL_WIDTH = 200;
 
 const ZOOM_THRESHOLDS = [
   { id: 'detail', label: '17.5x', name: 'Chi tiết', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Cột & biển báo' },
@@ -108,6 +117,43 @@ export function RevalidationMapScreen() {
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSignListOpen, setIsSignListOpen] = useState(false);
+
+  // Search bar and place search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const debouncedSearchQuery = useDebounce(searchQuery.trim(), 350);
+
+  const { data: searchResults = [], isFetching: isSearching } = useQuery({
+    queryKey: ['revalidation-place-search', debouncedSearchQuery],
+    queryFn: ({ signal }) => searchPlaces(debouncedSearchQuery, signal),
+    enabled: debouncedSearchQuery.length >= 2,
+    staleTime: 60_000,
+  });
+
+  const isSearchLoading =
+    isSearching || (searchQuery.trim().length >= 2 && debouncedSearchQuery !== searchQuery.trim());
+
+  // Urgency filter slide drawer on left edge
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const filterSlideAnim = useRef(new Animated.Value(0)).current; // 0 = collapsed/hidden, 1 = expanded
+
+  const toggleFilter = useCallback((forceState?: boolean) => {
+    setIsFilterExpanded((current) => {
+      const nextState = forceState !== undefined ? forceState : !current;
+      Animated.spring(filterSlideAnim, {
+        toValue: nextState ? 1 : 0,
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 16,
+      }).start();
+      return nextState;
+    });
+  }, [filterSlideAnim]);
+
+  const filterTranslateX = filterSlideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-FILTER_PANEL_WIDTH, 0],
+  });
 
   // Dynamic positioning for floating buttons above sign details or sign list
   const [detailsCardHeight, setDetailsCardHeight] = useState(0);
@@ -306,7 +352,35 @@ export function RevalidationMapScreen() {
     }
     setOverrideSign(null);
     setIsZoomMenuOpen(false);
+    setIsSearchDropdownOpen(false);
+    Keyboard.dismiss();
   }, []);
+
+  const handleSelectPlace = useCallback((place: ApiPlace) => {
+    if (place.latitude != null && place.longitude != null) {
+      setSearchQuery(place.title);
+      setIsSearchDropdownOpen(false);
+      Keyboard.dismiss();
+      setFocusCoordinate([place.longitude, place.latitude]);
+      setFocusRequestId((prev) => prev + 1);
+      setZoomLevel(17.5);
+      setActiveZoomId('detail');
+      setZoomRequestId((prev) => prev + 1);
+    }
+  }, []);
+
+  const matchingSigns = useMemo(() => {
+    if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) return [];
+    const q = debouncedSearchQuery.toLowerCase();
+    return rawSigns
+      .filter(
+        (s) =>
+          (s.signCode && s.signCode.toLowerCase().includes(q)) ||
+          (s.name && s.name.toLowerCase().includes(q)) ||
+          (s.roadName && s.roadName.toLowerCase().includes(q)),
+      )
+      .slice(0, 5);
+  }, [debouncedSearchQuery, rawSigns]);
 
   // Filter signs based on active freshness tab
   const filteredSigns = useMemo(() => {
@@ -359,6 +433,11 @@ export function RevalidationMapScreen() {
   const freshCount = useMemo(() => {
     return rawSigns.filter((s) => getFreshnessInfo(s).isFresh).length;
   }, [rawSigns]);
+
+  const displayListSigns = useMemo(() => {
+    if (activeFilter === 'NEEDS_REVALIDATION') return staleSigns;
+    return filteredSigns;
+  }, [activeFilter, staleSigns, filteredSigns]);
 
   const handleSignListItemPress = useCallback((sign: RouteSign) => {
     setIsSignListOpen(false);
@@ -421,123 +500,387 @@ export function RevalidationMapScreen() {
         zoomRequestId={zoomRequestId}
       />
 
-      {/* Compact Floating Header UI */}
+      {/* Floating Top Search Bar Header (like Map Screen) */}
       <SafeAreaView edges={['top']} pointerEvents="box-none" style={styles.topOverlay}>
+        <View style={styles.searchHeaderRow}>
+          {/* Back button */}
+          <Pressable
+            accessibilityLabel="Quay lại Công việc"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => router.back()}
+            style={[
+              styles.backCircleButton,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={20} />
+          </Pressable>
+
+          {/* Search Input and Output Wrapper (constrained to exact same width on all phones) */}
+          <View style={styles.searchBarWrapper}>
+            <View
+              style={[
+                styles.searchBarContainer,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons color={theme.placeholder} name="magnify" size={20} />
+              <TextInput
+                accessibilityLabel="Tìm kiếm vị trí trên bản đồ tái thẩm định"
+                autoCapitalize="none"
+                autoCorrect={false}
+                clearButtonMode="never"
+                onChangeText={(text) => {
+                  setSearchQuery(text);
+                  setIsSearchDropdownOpen(true);
+                }}
+                onFocus={() => {
+                  if (searchQuery.trim().length >= 2) {
+                    setIsSearchDropdownOpen(true);
+                  }
+                }}
+                placeholder="Tìm vị trí, địa điểm kiểm tra..."
+                placeholderTextColor={theme.placeholder}
+                returnKeyType="search"
+                style={[styles.searchInput, { color: theme.text }]}
+                value={searchQuery}
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable
+                  accessibilityLabel="Xóa tìm kiếm"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setIsSearchDropdownOpen(false);
+                  }}
+                >
+                  <MaterialCommunityIcons color={theme.placeholder} name="close-circle" size={18} />
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Search Suggestions Floating Dropdown */}
+            {isSearchDropdownOpen && debouncedSearchQuery.length >= 2 ? (
+              <View
+                style={[
+                  styles.searchDropdownCard,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                  style={styles.searchDropdownScroll}
+                >
+                  {/* Skeleton loading when searching */}
+                  {isSearchLoading ? (
+                    <View style={styles.dropdownSection}>
+                      <SearchSuggestionSkeleton count={3} />
+                    </View>
+                  ) : null}
+
+                  {/* Matching Signs Section */}
+                  {!isSearchLoading && matchingSigns.length > 0 ? (
+                    <View style={styles.dropdownSection}>
+                      <Text style={[styles.dropdownSectionHeader, { color: theme.placeholder }]}>
+                        BIỂN BÁO GẦN ĐÂY
+                      </Text>
+                      {matchingSigns.map((sign) => (
+                        <Pressable
+                          key={`sign-${sign.id}`}
+                          accessibilityLabel={`Đến vị trí biển ${sign.signCode || sign.name}`}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            setSearchQuery(sign.signCode || sign.name || '');
+                            setIsSearchDropdownOpen(false);
+                            Keyboard.dismiss();
+                            handleSignListItemPress(sign);
+                          }}
+                          style={({ pressed }) => [
+                            styles.dropdownItemRow,
+                            pressed && { backgroundColor: theme.backgroundSelected },
+                          ]}
+                        >
+                          <View style={[styles.dropdownItemIcon, { backgroundColor: 'rgba(6, 113, 235, 0.1)' }]}>
+                            <MaterialCommunityIcons color={theme.primary} name="sign-caution" size={18} />
+                          </View>
+                          <View style={styles.dropdownItemTextCol}>
+                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
+                              {sign.signCode ? `${sign.signCode} - ${sign.name || ''}` : sign.name || 'Biển báo'}
+                            </Text>
+                            {sign.roadName ? (
+                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                                {sign.roadName}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={16} />
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {/* Place Search Results Section */}
+                  {!isSearchLoading && searchResults.length > 0 ? (
+                    <View style={styles.dropdownSection}>
+                      <Text style={[styles.dropdownSectionHeader, { color: theme.placeholder }]}>
+                        ĐỊA ĐIỂM & ĐƯỜNG PHỐ
+                      </Text>
+                      {searchResults.map((place) => (
+                        <Pressable
+                          key={`place-${place.id}`}
+                          accessibilityLabel={`Chọn địa điểm ${place.title}`}
+                          accessibilityRole="button"
+                          onPress={() => handleSelectPlace(place)}
+                          style={({ pressed }) => [
+                            styles.dropdownItemRow,
+                            pressed && { backgroundColor: theme.backgroundSelected },
+                          ]}
+                        >
+                          <View style={[styles.dropdownItemIcon, { backgroundColor: `${theme.grey}15` }]}>
+                            <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={18} />
+                          </View>
+                          <View style={styles.dropdownItemTextCol}>
+                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
+                              {place.title}
+                            </Text>
+                            {place.address ? (
+                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                                {place.address}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {/* Empty State */}
+                  {!isSearchLoading && searchResults.length === 0 && matchingSigns.length === 0 ? (
+                    <View style={styles.dropdownEmptyRow}>
+                      <MaterialCommunityIcons color={theme.placeholder} name="map-marker-off-outline" size={20} />
+                      <Text style={[styles.dropdownEmptyText, { color: theme.placeholder }]}>
+                        Không tìm thấy địa điểm nào
+                      </Text>
+                    </View>
+                  ) : null}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* Floating Urgency Filter on Left Edge with Slide Animation */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.filterDrawerContainer,
+          {
+            top: Math.max(16, insets.top + 60),
+            transform: [{ translateX: filterTranslateX }],
+          },
+        ]}
+      >
+        {/* Expanded Filter Panel */}
         <View
           style={[
-            styles.headerCard,
+            styles.filterPanelCard,
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
             },
           ]}
         >
-          {/* Top Row: Back button + Title & Nearby Count */}
-          <View style={styles.headerTopRow}>
+          <View style={styles.filterPanelHeader}>
+            <View style={styles.filterPanelTitleRow}>
+              <MaterialCommunityIcons color={theme.primary} name="filter-variant" size={16} />
+              <Text style={[styles.filterPanelTitle, { color: theme.text }]}>Mức độ khẩn cấp</Text>
+            </View>
             <Pressable
-              accessibilityLabel="Quay lại Công việc"
+              accessibilityLabel="Ẩn bộ lọc"
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => router.back()}
-              style={[styles.backButton, { backgroundColor: theme.background }]}
+              onPress={() => toggleFilter(false)}
+              style={[styles.filterPanelCloseBtn, { backgroundColor: theme.background }]}
             >
-              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={18} />
+              <MaterialCommunityIcons color={theme.grey} name="chevron-left" size={16} />
             </Pressable>
-
-            <View style={styles.titleContainer}>
-              <Text style={[styles.headerTitle, { color: theme.text }]}>Tái thẩm định</Text>
-              <Text style={[styles.headerSubtitle, { color: theme.grey }]}>
-                {rawSigns.length} biển báo gần đây
-              </Text>
-            </View>
           </View>
 
-          {/* Compact Segmented Filter Pills */}
-          <View style={styles.filterRow}>
+          <View style={[styles.filterPanelDivider, { backgroundColor: theme.border }]} />
+
+          <View style={styles.filterOptionsCol}>
+            {/* Tất cả */}
             <Pressable
-              accessibilityLabel={`Hiển thị tất cả ${rawSigns.length} biển báo`}
+              accessibilityLabel={`Lọc tất cả ${rawSigns.length} biển báo`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('ALL')}
               style={[
-                styles.filterChip,
-                activeFilter === 'ALL' && styles.filterChipActive,
+                styles.filterOptionItem,
+                activeFilter === 'ALL' && [styles.filterOptionItemActive, { backgroundColor: `${theme.primary}16`, borderColor: theme.primary }],
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: activeFilter === 'ALL' ? '#FFFFFF' : theme.text },
-                ]}
-              >
-                Tất cả {rawSigns.length}
-              </Text>
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionDot, { backgroundColor: theme.primary }]} />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterOptionLabel,
+                    { color: activeFilter === 'ALL' ? theme.primary : theme.text },
+                    activeFilter === 'ALL' && styles.filterOptionLabelActive,
+                  ]}
+                >
+                  Tất cả
+                </Text>
+              </View>
+              <View style={[styles.filterOptionBadge, { backgroundColor: `${theme.grey}20` }]}>
+                <Text style={[styles.filterOptionBadgeText, { color: activeFilter === 'ALL' ? theme.primary : theme.text }]}>
+                  {rawSigns.length}
+                </Text>
+              </View>
             </Pressable>
 
+            {/* Cần kiểm tra */}
             <Pressable
-              accessibilityLabel={`Hiển thị ${staleCount} biển báo cần kiểm tra`}
+              accessibilityLabel={`Lọc ${staleCount} biển báo cần kiểm tra khẩn cấp`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('NEEDS_REVALIDATION')}
               style={[
-                styles.filterChip,
-                activeFilter === 'NEEDS_REVALIDATION' && styles.filterChipActive,
+                styles.filterOptionItem,
+                activeFilter === 'NEEDS_REVALIDATION' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(225, 29, 72, 0.12)', borderColor: '#E11D48' }],
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color: activeFilter === 'NEEDS_REVALIDATION' ? '#FFFFFF' : '#E11D48',
-                  },
-                ]}
-              >
-                Cần kiểm tra {staleCount}
-              </Text>
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionDot, { backgroundColor: '#E11D48' }]} />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterOptionLabel,
+                    { color: activeFilter === 'NEEDS_REVALIDATION' ? '#E11D48' : theme.text },
+                    activeFilter === 'NEEDS_REVALIDATION' && styles.filterOptionLabelActive,
+                  ]}
+                >
+                  Cần kiểm tra
+                </Text>
+              </View>
+              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(225, 29, 72, 0.14)' }]}>
+                <Text style={[styles.filterOptionBadgeText, { color: '#E11D48' }]}>
+                  {staleCount}
+                </Text>
+              </View>
             </Pressable>
 
+            {/* Trung bình */}
             <Pressable
-              accessibilityLabel={`Hiển thị ${moderateCount} biển báo mức trung bình`}
+              accessibilityLabel={`Lọc ${moderateCount} biển báo mức độ trung bình`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('MODERATE')}
               style={[
-                styles.filterChip,
-                activeFilter === 'MODERATE' && styles.filterChipActive,
+                styles.filterOptionItem,
+                activeFilter === 'MODERATE' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' }],
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color: activeFilter === 'MODERATE' ? '#FFFFFF' : theme.text,
-                  },
-                ]}
-              >
-                Trung bình {moderateCount}
-              </Text>
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionDot, { backgroundColor: '#F59E0B' }]} />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterOptionLabel,
+                    { color: activeFilter === 'MODERATE' ? '#D97706' : theme.text },
+                    activeFilter === 'MODERATE' && styles.filterOptionLabelActive,
+                  ]}
+                >
+                  Trung bình
+                </Text>
+              </View>
+              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}>
+                <Text style={[styles.filterOptionBadgeText, { color: '#D97706' }]}>
+                  {moderateCount}
+                </Text>
+              </View>
             </Pressable>
 
+            {/* Tươi mới */}
             <Pressable
-              accessibilityLabel={`Hiển thị ${freshCount} biển báo mới`}
+              accessibilityLabel={`Lọc ${freshCount} biển báo tươi mới`}
               accessibilityRole="button"
               onPress={() => setActiveFilter('FRESH')}
               style={[
-                styles.filterChip,
-                activeFilter === 'FRESH' && styles.filterChipActive,
+                styles.filterOptionItem,
+                activeFilter === 'FRESH' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }],
               ]}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  {
-                    color: activeFilter === 'FRESH' ? '#FFFFFF' : theme.text,
-                  },
-                ]}
-              >
-                Tươi mới {freshCount}
-              </Text>
+              <View style={styles.filterOptionLeft}>
+                <View style={[styles.filterOptionDot, { backgroundColor: '#10B981' }]} />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.filterOptionLabel,
+                    { color: activeFilter === 'FRESH' ? '#059669' : theme.text },
+                    activeFilter === 'FRESH' && styles.filterOptionLabelActive,
+                  ]}
+                >
+                  Tươi mới
+                </Text>
+              </View>
+              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+                <Text style={[styles.filterOptionBadgeText, { color: '#059669' }]}>
+                  {freshCount}
+                </Text>
+              </View>
             </Pressable>
           </View>
         </View>
-      </SafeAreaView>
+
+        {/* Protruding Handle on the Right of the Filter Drawer */}
+        <Pressable
+          accessibilityLabel={isFilterExpanded ? 'Ẩn bộ lọc mức độ khẩn cấp' : 'Hiển thị bộ lọc mức độ khẩn cấp'}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => toggleFilter()}
+          style={[
+            styles.filterHandleButton,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            color={theme.primary}
+            name={isFilterExpanded ? 'chevron-left' : 'chevron-right'}
+            size={22}
+          />
+          {!isFilterExpanded && activeFilter !== 'ALL' ? (
+            <View
+              style={[
+                styles.filterHandleDot,
+                {
+                  backgroundColor:
+                    activeFilter === 'NEEDS_REVALIDATION'
+                      ? '#E11D48'
+                      : activeFilter === 'MODERATE'
+                        ? '#F59E0B'
+                        : '#10B981',
+                },
+              ]}
+            />
+          ) : null}
+        </Pressable>
+      </Animated.View>
 
       {/* Floating Action Controls on Bottom-Right */}
       <Animated.View
@@ -716,9 +1059,17 @@ export function RevalidationMapScreen() {
                 <MaterialCommunityIcons color="#E11D48" name="alert-decagram-outline" size={18} />
               </View>
               <View>
-                <Text style={[styles.signListTitle, { color: theme.text }]}>Cần tái thẩm định</Text>
+                <Text style={[styles.signListTitle, { color: theme.text }]}>
+                  {activeFilter === 'NEEDS_REVALIDATION'
+                    ? 'Cần tái thẩm định'
+                    : activeFilter === 'MODERATE'
+                      ? 'Mức độ trung bình'
+                      : activeFilter === 'FRESH'
+                        ? 'Biển báo tươi mới'
+                        : 'Tất cả biển báo'}
+                </Text>
                 <Text style={[styles.signListSubtitle, { color: theme.grey }]}>
-                  {staleSigns.length} biển báo cần xác minh tại hiện trường
+                  {displayListSigns.length} biển báo theo bộ lọc
                 </Text>
               </View>
             </View>
@@ -737,23 +1088,23 @@ export function RevalidationMapScreen() {
           <View style={[styles.signListDivider, { backgroundColor: theme.border }]} />
 
           {/* Scrollable Sign List */}
-          {isLoadingAllTasks && staleSigns.length === 0 ? (
+          {isLoadingAllTasks && displayListSigns.length === 0 ? (
             <View style={styles.signListEmpty}>
               <ActivityIndicator color={theme.primary} size="small" />
               <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
-                Đang tải biển báo tái thẩm định...
+                Đang tải biển báo...
               </Text>
             </View>
-          ) : staleSigns.length === 0 ? (
+          ) : displayListSigns.length === 0 ? (
             <View style={styles.signListEmpty}>
               <MaterialCommunityIcons color={theme.grey} name="check-circle-outline" size={32} />
               <Text style={[styles.signListEmptyText, { color: theme.grey }]}>
-                Không có biển báo cần tái thẩm định
+                Không có biển báo nào phù hợp
               </Text>
             </View>
           ) : (
             <FlatList
-              data={staleSigns}
+              data={displayListSigns}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => {
                 const info = getFreshnessInfo(item);
@@ -847,66 +1198,240 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
-    paddingHorizontal: Spacing.four,
+    zIndex: 20,
+    paddingHorizontal: Spacing.three,
     paddingTop: Spacing.one,
   },
-  headerCard: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    gap: 8,
-  },
-  headerTopRow: {
+  searchHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.two,
   },
-  backButton: {
+  backCircleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 100,
+  },
+  searchBarContainer: {
+    width: '100%',
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 8,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '500',
+    paddingVertical: 0,
+  },
+  searchDropdownCard: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    borderRadius: 16,
+    borderWidth: 1,
+    maxHeight: 300,
+    overflow: 'hidden',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 100,
+  },
+  searchDropdownScroll: {
+    flexGrow: 0,
+  },
+  dropdownSection: {
+    paddingVertical: 4,
+  },
+  dropdownSectionHeader: {
+    fontSize: 10,
+    fontFamily: Fonts.sans,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    gap: 10,
+  },
+  dropdownItemIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleContainer: {
+  dropdownItemTextCol: {
     flex: 1,
+    gap: 2,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+  dropdownItemTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
   },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 1,
+  dropdownItemSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
   },
-  filterRow: {
+  dropdownEmptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  dropdownEmptyText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  /* ── Filter Drawer on Left Edge ─────────────────────── */
+  filterDrawerContainer: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterPanelCard: {
+    width: FILTER_PANEL_WIDTH,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    padding: 12,
+    gap: 8,
+    shadowColor: '#09233C',
+    shadowOffset: { width: 3, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  filterPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterPanelTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexWrap: 'wrap',
   },
-  filterChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+  filterPanelTitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: -0.1,
+  },
+  filterPanelCloseBtn: {
+    width: 24,
+    height: 24,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  filterChipActive: {
-    backgroundColor: '#0671EB',
+  filterPanelDivider: {
+    height: 1,
   },
-  filterChipText: {
-    fontSize: 11,
+  filterOptionsCol: {
+    gap: 4,
+  },
+  filterOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterOptionItemActive: {
+    borderWidth: 1,
+  },
+  filterOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flex: 1,
+  },
+  filterOptionDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  filterOptionLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  filterOptionLabelActive: {
     fontWeight: '700',
+  },
+  filterOptionBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+  },
+  filterOptionBadgeText: {
+    fontFamily: Fonts.sans,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  filterHandleButton: {
+    width: 32,
+    height: 44,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    borderWidth: 1,
+    borderLeftWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  filterHandleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 2,
   },
   floatingControlsGroup: {
     position: 'absolute',

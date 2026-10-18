@@ -1,7 +1,7 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { useTheme } from '@/hooks/use-theme';
 import { Fonts, Spacing } from '@/constants/theme';
 

@@ -315,11 +315,13 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
         </View>
 
         <View style={styles.sheetHeaderInfo}>
-          <Text numberOfLines={2} style={[styles.sheetSignTitle, { color: theme.text }]}>
-            {signTitle}
-          </Text>
-          <View style={styles.sheetFreshnessRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.one }}>
+            <Text numberOfLines={2} style={[styles.sheetSignTitle, { color: theme.text }]}>
+              {signTitle}
+            </Text>
             <View style={[styles.sheetFreshnessDot, { backgroundColor: freshness.color }]} />
+          </View>
+          <View style={styles.sheetFreshnessRow}>
             <Text style={[styles.sheetFreshnessText, { color: freshness.color }]}>
               {freshness.label}
             </Text>
@@ -347,9 +349,8 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
 
       {/* 2. Text(Verified sign images) */}
       <View style={styles.sheetSectionHeader}>
-        <MaterialCommunityIcons color="#10B981" name="check-decagram" size={16} />
         <Text style={[styles.sheetSectionTitle, { color: theme.text }]}>
-          Ảnh biển báo đã xác thực (Verified sign images)
+          Ảnh biển báo đã xác thực
         </Text>
       </View>
 

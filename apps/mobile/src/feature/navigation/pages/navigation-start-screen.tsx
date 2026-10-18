@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,8 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AntDesign from '@expo/vector-icons/AntDesign';
 
-import { AppButton } from "@/components/ui/button";
-import { AppToast } from "@/components/ui/toast";
+import { AppButton } from "@/components/button";
+import { AppToast } from "@/components/toast";
+import { SearchSuggestionSkeleton } from "@/components/skeleton";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import { useSession } from "@/context/session-provider";
 import {
@@ -279,7 +279,11 @@ export function NavigationStartScreen() {
         </View>
 
         {isLoading ? (
-          <ActivityIndicator color={theme.primary} style={styles.loading} />
+          <SearchSuggestionSkeleton
+            circleSize={38}
+            count={5}
+            itemStyle={[styles.locationRow, { borderColor: theme.border }]}
+          />
         ) : null}
         {!isLoading && error ? (
           <Text

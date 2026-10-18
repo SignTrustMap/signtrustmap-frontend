@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import {
   SIGN_CATEGORIES,
   type SignCategory,

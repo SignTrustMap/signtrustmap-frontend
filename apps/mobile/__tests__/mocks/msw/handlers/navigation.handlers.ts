@@ -19,10 +19,46 @@ export const ADDRESSES_SEARCH_PATH = '*/api/v1/addresses/search*';
 export const SIGNS_PATH = '*/api/v1/signs*';
 export const SIGNS_ALONG_ROUTE_PATH = '*/api/v1/signs/along-route';
 export const WALLET_PATH = '*/api/v1/wallet*';
+export const NOTIFICATIONS_UNREAD_COUNT_PATH = '*/api/v1/notifications/unread-count';
+export const NOTIFICATIONS_PATH = '*/api/v1/notifications*';
 
 export const navigationHandlers = [
   http.get(WALLET_PATH, () => {
     return HttpResponse.json({ balance: 100, pendingReward: 10 }, { status: 200 });
+  }),
+
+  http.get(NOTIFICATIONS_UNREAD_COUNT_PATH, () => {
+    return HttpResponse.json({ unreadCount: 3 }, { status: 200 });
+  }),
+
+  http.get(NOTIFICATIONS_PATH, () => {
+    return HttpResponse.json({
+      items: [
+        {
+          id: 'notif-1',
+          userId: 'user-1',
+          type: 'SIGN_MISSING_DISPATCH',
+          title: 'Cần kiểm tra biển báo báo mất',
+          message: 'Biển báo P.102 được báo cáo không còn tồn tại. Nhiệm vụ kiểm tra đã được kích hoạt (+30 credits).',
+          relatedEntityType: 'revalidation_task',
+          relatedEntityId: 'task-123',
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+    }, { status: 200 });
+  }),
+
+  http.patch('*/api/v1/notifications/read-all', () => {
+    return HttpResponse.json({ updated: true }, { status: 200 });
+  }),
+
+  http.patch('*/api/v1/notifications/:id/read', ({ params }) => {
+    return HttpResponse.json({ id: params.id, isRead: true }, { status: 200 });
   }),
 
   // 1. POST /routing/directions

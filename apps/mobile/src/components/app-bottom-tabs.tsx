@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState, type ComponentProps } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -32,7 +32,7 @@ export function CreditsOverviewScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.balanceCard, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Số dư hiện tại</Text>
+            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Số điểm hiện tại</Text>
             <View style={styles.balanceRow}>
               {isLoading ? (
                 <ActivityIndicator color={theme.onPrimary} size="small" />

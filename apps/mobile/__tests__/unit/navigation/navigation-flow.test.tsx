@@ -83,6 +83,10 @@ jest.mock('@/feature/credits/hooks/use-wallet', () => ({
   useGetWallet: jest.fn(() => ({ data: undefined })),
 }));
 
+jest.mock('@/feature/notifications/hooks/use-notifications', () => ({
+  useGetUnreadNotificationCount: jest.fn(() => ({ data: 0 })),
+}));
+
 jest.mock('@/feature/navigation/hooks/use-places', () => ({
   usePlaceSuggestions: jest.fn(() => ({ data: [] })),
 }));

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

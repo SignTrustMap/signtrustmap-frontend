@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Animated, BackHandler, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -8,8 +8,9 @@ import { SymbolView } from "expo-symbols";
 import { Camera } from "expo-camera";
 import { Image as ExpoImage } from "expo-image";
 import { Image } from "react-native";
-import { AppButton } from "@/components/ui/button";
-import { AppToast } from "@/components/ui/toast";
+import { AppButton } from "@/components/button";
+import { Badge } from "@/components/badge";
+import { AppToast } from "@/components/toast";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
@@ -38,6 +39,8 @@ import { useGetNavigationRoute } from '../hooks/use-navigation';
 import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
 import { confirmSignPresence } from '@/api/sign-map/sign-map';
 import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
+import { speechService } from '@/services/speech';
+import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { getRouteProgressMeters } from "../utils/route-progress";
 import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
@@ -45,6 +48,7 @@ import { applyDemoRouteSigns } from "../utils/demo-route-signs";
 import { getDistanceToRouteMeters } from "../utils/geo";
 import { getMapLibre } from "@/services/maplibre";
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
+import { useGetUnreadNotificationCount } from '@/feature/notifications/hooks/use-notifications';
 import {
   ensureLocationPermission,
   fetchFreshGpsPosition,
@@ -109,6 +113,7 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const { data: walletData } = useGetWallet();
+  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
@@ -447,6 +452,36 @@ export function NavigationMapScreen() {
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
   const [isHomeSignFilterOpen, setIsHomeSignFilterOpen] = useState(false);
+  const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    getStorageItemAsync('signtrust_tts_enabled')
+      .then((val) => {
+        if (isMounted && val !== null) {
+          const enabled = val === 'true';
+          setIsTtsEnabled(enabled);
+          speechService.setEnabled(enabled);
+        }
+      })
+      .catch(() => { });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleToggleTts = useCallback(() => {
+    setIsTtsEnabled((prev) => {
+      const next = !prev;
+      speechService.setEnabled(next);
+      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => { });
+      setLocationToast({
+        id: Date.now(),
+        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
+      });
+      return next;
+    });
+  }, []);
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
   // Use rerouteOrigin when available (off-route rerouting), otherwise the
   // plannedRouteOrigin. Changing rerouteOrigin changes the query key which
@@ -1046,6 +1081,7 @@ export function NavigationMapScreen() {
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
     speechLanguage: "vi-VN",
+    ttsEnabled: isTtsEnabled,
   });
 
   // 3 nearest upcoming signs on the route, ahead of the user's current position
@@ -1764,39 +1800,58 @@ export function NavigationMapScreen() {
                 </View>
               ) : (
                 <>
-                  <View
-                    style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
-                  >
-                    <AppButton
-                      accessibilityLabel="Tìm kiếm điểm đến"
-                      onPress={() => router.push('/home/search')}
-                      style={styles.searchButton}
-                      variant="ghost"
+                  <View style={styles.searchBarHeaderRow}>
+                    <View
+                      style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}
                     >
-                      <Image
-                        accessibilityLabel="Logo ứng dụng"
-                        resizeMode="contain"
-                        source={AppLogo}
-                        style={styles.appLogo}
+                      <AppButton
+                        accessibilityLabel="Tìm kiếm điểm đến"
+                        onPress={() => router.push('/home/search')}
+                        style={styles.searchButton}
+                        variant="ghost"
+                      >
+                        <Image
+                          accessibilityLabel="Logo ứng dụng"
+                          resizeMode="contain"
+                          source={AppLogo}
+                          style={styles.appLogo}
+                        />
+                        <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                          Bắt đầu tìm kiếm...
+                        </Text>
+                      </AppButton>
+                      <AppButton
+                        accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletData?.wallet?.balance ?? 0}`}
+                        onPress={() => router.push('/credits/top-up')}
+                        pressedOpacity={0.68}
+                        style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                        variant="ghost"
+                      >
+                        <Text style={[styles.creditText, { color: theme.text }]}>
+                          {walletData?.wallet?.balance ?? '—'}
+                        </Text>
+                        <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                          <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                        </View>
+                      </AppButton>
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                      accessibilityRole="button"
+                      onPress={() => router.push('/notifications')}
+                      style={({ pressed }) => [
+                        styles.notificationCircleButton,
+                        pressed && { opacity: 0.8 },
+                      ]}
+                    >
+                      <Ionicons name="notifications" size={24} color="#000000" />
+                      <Badge
+                        count={unreadNotificationCount}
+                        maxCount={9}
+                        style={styles.notificationBadge}
                       />
-                      <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                        Bắt đầu tìm kiếm...
-                      </Text>
-                    </AppButton>
-                    <AppButton
-                      accessibilityLabel={`Nạp Credits. Số dư hiện tại: ${walletData?.wallet?.balance ?? 0}`}
-                      onPress={() => router.push('/credits/top-up')}
-                      pressedOpacity={0.68}
-                      style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                      variant="ghost"
-                    >
-                      <Text style={[styles.creditText, { color: theme.text }]}>
-                        {walletData?.wallet?.balance ?? '—'}
-                      </Text>
-                      <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                        <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                      </View>
-                    </AppButton>
+                    </Pressable>
                   </View>
                   <>
                     <AppButton
@@ -2048,6 +2103,28 @@ export function NavigationMapScreen() {
 
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
+                {/* 0. Toggle TTS service button */}
+                <AppButton
+                  accessibilityLabel={
+                    isTtsEnabled
+                      ? "Tắt thông báo giọng nói"
+                      : "Bật thông báo giọng nói"
+                  }
+                  onPress={handleToggleTts}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    styles.ttsActionButton,
+                  ]}
+                  variant="surface"
+                >
+                  <MaterialCommunityIcons
+                    name={isTtsEnabled ? "volume-high" : "volume-off"}
+                    size={22}
+                    color="#000000"
+                  />
+                </AppButton>
+
                 {/* 1. Filter signs button (replaced previous my_location button) */}
                 <AppButton
                   accessibilityLabel={
@@ -3248,6 +3325,10 @@ const styles = StyleSheet.create({
   locationActionButton: {
     borderWidth: 1,
   },
+  ttsActionButton: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+  },
   filterActiveBadge: {
     position: "absolute",
     top: 6,
@@ -3263,7 +3344,7 @@ const styles = StyleSheet.create({
   homeFilterCard: {
     position: "absolute",
     right: Spacing.four,
-    bottom: 124,
+    bottom: 194,
     width: 260,
     borderRadius: Rounded.lg,
     borderWidth: 1,
@@ -3397,7 +3478,13 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
   },
+  searchBarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
   searchBar: {
+    flex: 1,
     minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
@@ -3408,6 +3495,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
+  },
+  notificationCircleButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 4,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 13,
   },
   searchButton: {
     flex: 1,

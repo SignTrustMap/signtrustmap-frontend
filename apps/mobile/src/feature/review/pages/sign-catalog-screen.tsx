@@ -1,13 +1,13 @@
-import { Image } from 'expo-image';
+﻿import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
-import { useGetCatalog } from '@/feature/review/hooks/use-review';
+import { useGetCatalog, useRefreshCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import {
   type CatalogSign,
@@ -91,9 +91,18 @@ export function SignCatalogScreen() {
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
   const { data: catalog, isPending: isLoading, error: catalogError } = useGetCatalog();
+  const { mutateAsync: refreshCatalog, isPending: isRefreshing } = useRefreshCatalog();
   const categories = catalog?.categories ?? [];
   const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
   const error = catalogError?.message;
+
+  const handleRefresh = async () => {
+    try {
+      await refreshCatalog();
+    } catch {
+      // Handled by query client state
+    }
+  };
 
   const filteredSigns = useMemo(() => {
     const query = normalizeSearch(search);
@@ -134,7 +143,18 @@ export function SignCatalogScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              colors={[theme.primary]}
+              onRefresh={handleRefresh}
+              refreshing={isRefreshing}
+              tintColor={theme.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           <View
             style={[
               styles.searchShell,

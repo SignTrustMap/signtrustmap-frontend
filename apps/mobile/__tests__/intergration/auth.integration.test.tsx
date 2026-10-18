@@ -152,12 +152,12 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
   // TEST 1: Full Login Flow (Happy Path with Demo User)
   // =========================================================================
   it('authenticates user end-to-end, normalizes backend roles, saves session to storage, and navigates to root', async () => {
-    const { getByPlaceholderText, getByText } = await renderWithAuthProviders(<LoginScreen />);
+    const { getByPlaceholderText, getByText, getByRole } = await renderWithAuthProviders(<LoginScreen />);
 
     // 1. Fill in valid demo credentials
     const emailInput = getByPlaceholderText('demo@stm.dev');
-    const passwordInput = getByPlaceholderText('Enter your password');
-    const submitButton = getByText('Login');
+    const passwordInput = getByPlaceholderText('Nhập mật khẩu của bạn');
+    const submitButton = getByRole('button', { name: 'Đăng nhập' });
 
     await fireEvent.changeText(emailInput, mockLoginRequests.validDemo.email);
     await fireEvent.changeText(passwordInput, mockLoginRequests.validDemo.password);
@@ -215,13 +215,13 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
   // TEST 3: Login Failure - 401 Unauthorized (Invalid Password)
   // =========================================================================
   it('displays 401 Unauthorized error message and does not create a session', async () => {
-    const { getByPlaceholderText, getByText } = await renderWithAuthProviders(
+    const { getByPlaceholderText, getByText, getByRole } = await renderWithAuthProviders(
       <LoginScreen />
     );
 
     const emailInput = getByPlaceholderText('demo@stm.dev');
-    const passwordInput = getByPlaceholderText('Enter your password');
-    const submitButton = getByText('Login');
+    const passwordInput = getByPlaceholderText('Nhập mật khẩu của bạn');
+    const submitButton = getByRole('button', { name: 'Đăng nhập' });
 
     // Fill with wrong password
     await fireEvent.changeText(emailInput, mockLoginRequests.invalidWrongPassword.email);
@@ -248,13 +248,13 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
   // TEST 4: Login Failure - 403 Forbidden (Deactivated Account)
   // =========================================================================
   it('handles 403 Forbidden when deactivated user attempts to log in', async () => {
-    const { getByPlaceholderText, getByText } = await renderWithAuthProviders(
+    const { getByPlaceholderText, getByText, getByRole } = await renderWithAuthProviders(
       <LoginScreen />
     );
 
     const emailInput = getByPlaceholderText('demo@stm.dev');
-    const passwordInput = getByPlaceholderText('Enter your password');
-    const submitButton = getByText('Login');
+    const passwordInput = getByPlaceholderText('Nhập mật khẩu của bạn');
+    const submitButton = getByRole('button', { name: 'Đăng nhập' });
 
     await fireEvent.changeText(emailInput, mockLoginRequests.invalidDeactivatedUser.email);
     await fireEvent.changeText(passwordInput, mockLoginRequests.invalidDeactivatedUser.password);
@@ -277,11 +277,11 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
   // TEST 5: Network Disconnection & Recovery on Login
   // =========================================================================
   it('shows network error on connection failure and succeeds on retry', async () => {
-    const { getByPlaceholderText, getByText } = await renderWithAuthProviders(<LoginScreen />);
+    const { getByPlaceholderText, getByText, getByRole } = await renderWithAuthProviders(<LoginScreen />);
 
     const emailInput = getByPlaceholderText('demo@stm.dev');
-    const passwordInput = getByPlaceholderText('Enter your password');
-    const submitButton = getByText('Login');
+    const passwordInput = getByPlaceholderText('Nhập mật khẩu của bạn');
+    const submitButton = getByRole('button', { name: 'Đăng nhập' });
 
     // Step 1: Trigger simulated network drop
     await fireEvent.changeText(emailInput, mockLoginRequests.networkErrorTrigger.email);
@@ -296,7 +296,7 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
 
     // Network error message caught by apiClient
     await waitFor(() => {
-      expect(getByText(/Failed to connect to backend/i)).toBeTruthy();
+      expect(getByText(/Không thể kết nối đến máy chủ|Failed to connect to backend/i)).toBeTruthy();
     });
 
     // Step 2: User fixes connection/credentials and retries
@@ -325,10 +325,10 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
       <RegisterScreen />
     );
 
-    const nameInput = getByPlaceholderText('Your full name');
+    const nameInput = getByPlaceholderText('Họ và tên của bạn');
     const emailInput = getByPlaceholderText('you@example.com');
-    const phoneInput = getByPlaceholderText('Your phone number');
-    const passwordInput = getByPlaceholderText('At least 8 characters');
+    const phoneInput = getByPlaceholderText('Số điện thoại của bạn');
+    const passwordInput = getByPlaceholderText('Tối thiểu 8 ký tự');
 
     // Fill all registration inputs matching RegisterScreen placeholders
     await fireEvent.changeText(nameInput, mockRegisterRequests.validNewUser.fullName);
@@ -343,7 +343,7 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
       expect(passwordInput.props.value).toBe(mockRegisterRequests.validNewUser.password);
     });
 
-    const submitButton = getByRole('button', { name: 'Create account' });
+    const submitButton = getByRole('button', { name: 'Tạo tài khoản' });
     await fireEvent.press(submitButton);
 
     // Verify navigation to login screen with registered parameter
@@ -363,10 +363,10 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
       <RegisterScreen />
     );
 
-    const nameInput = getByPlaceholderText('Your full name');
+    const nameInput = getByPlaceholderText('Họ và tên của bạn');
     const emailInput = getByPlaceholderText('you@example.com');
-    const phoneInput = getByPlaceholderText('Your phone number');
-    const passwordInput = getByPlaceholderText('At least 8 characters');
+    const phoneInput = getByPlaceholderText('Số điện thoại của bạn');
+    const passwordInput = getByPlaceholderText('Tối thiểu 8 ký tự');
 
     // Fill with existing demo user email
     await fireEvent.changeText(nameInput, mockRegisterRequests.invalidExistingEmail.fullName);
@@ -381,7 +381,7 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
       expect(passwordInput.props.value).toBe(mockRegisterRequests.invalidExistingEmail.password);
     });
 
-    const submitButton = getByRole('button', { name: 'Create account' });
+    const submitButton = getByRole('button', { name: 'Tạo tài khoản' });
     await fireEvent.press(submitButton);
 
     // Verify MSW 409 conflict error message appears
