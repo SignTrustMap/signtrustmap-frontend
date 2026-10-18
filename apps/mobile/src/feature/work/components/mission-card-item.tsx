@@ -1,80 +1,86 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { DailyTaskCompletion, WorkMissionRole } from '@/types/dailyTaskType';
+import type {
+  DailyTaskCompletion,
+  GenericMissionItem,
+  WorkMissionRole,
+} from '@/types/dailyTaskType';
 
-type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-interface MissionCardItemProps {
-  completion: DailyTaskCompletion;
-  role: WorkMissionRole;
+export interface MissionCardItemProps {
+  completion?: DailyTaskCompletion;
+  mission?: GenericMissionItem;
+  role?: WorkMissionRole;
 }
 
-function getIconForActivity(
-  activityType: string,
-  role: WorkMissionRole,
-): MaterialIconName {
-  const act = (activityType || '').toUpperCase();
-
-  if (act.includes('SURVEY')) {
-    return 'camera-outline';
-  }
-  if (act.includes('REVALIDATION')) {
-    return 'map-marker-check-outline';
-  }
-  if (act.includes('REVIEW') || act.includes('CONSENSUS')) {
-    return 'shield-check-outline';
-  }
-  if (act.includes('VOTE')) {
-    return 'vote-outline';
-  }
-  if (act.includes('NAV')) {
-    return 'navigation-variant-outline';
-  }
-  if (act.includes('HAZARD')) {
-    return 'alert-decagram-outline';
-  }
-
-  // Role defaults
-  if (role === 'surveyor') return 'camera-outline';
-  if (role === 'reviewer') return 'shield-check-outline';
-  return 'car-outline';
-}
-
-export function MissionCardItem({ completion, role }: MissionCardItemProps) {
+export function MissionCardItem({ completion, mission, role = 'driver' }: MissionCardItemProps) {
   const theme = useTheme();
   const router = useRouter();
 
-  const task = completion.dailyTask;
-  const progress = Math.min(completion.progress, task.targetCount);
-  const target = task.targetCount || 1;
+  // Normalize data from either DailyTaskCompletion or GenericMissionItem
+  const taskName = completion?.dailyTask.name ?? mission?.title ?? 'Nhiệm vụ đóng góp';
+  const progressCount = completion ? completion.progress : (mission?.progress ?? 0);
+  const targetCount = completion ? completion.dailyTask.targetCount : (mission?.targetCount ?? 1);
+  const target = targetCount > 0 ? targetCount : 1;
+  const progress = Math.min(progressCount, target);
   const percentage = Math.round((progress / target) * 100);
-  const isFinished = completion.isCompleted || progress >= target || completion.claimed;
-
-  const icon = getIconForActivity(task.activityType, role);
-  const accentColor = theme.primary;
+  const isFinished = Boolean(
+    completion?.isCompleted ||
+    completion?.claimed ||
+    mission?.isCompleted ||
+    mission?.claimed ||
+    progress >= target
+  );
+  const rewardCredits = completion?.dailyTask.rewardCredits ?? mission?.rewardCredits ?? 10;
 
   const handleAction = () => {
-    // Quick navigation based on mission type
-    const act = (task.activityType || '').toUpperCase();
+    if (mission?.actionUrl) {
+      router.push(mission.actionUrl as any);
+      return;
+    }
+
+    const code = (mission?.code || '').toUpperCase();
+    if (code === 'VERIFY_3_SIGNS') {
+      router.push('/work/submission-review');
+      return;
+    }
+    if (code === 'APPROVED_ANOMALY_REPORT') {
+      router.push('/work/recorded-signs');
+      return;
+    }
+    if (code.includes('STREAK')) {
+      router.push('/work');
+      return;
+    }
+
+    const act = (completion?.dailyTask.activityType || mission?.activityType || '').toUpperCase();
     if (act.includes('SURVEY')) {
       router.push('/work/new-survey');
-    } else if (act.includes('REVALIDATION_EVIDENCE')) {
+    } else if (act.includes('REVALIDATION_EVIDENCE') || act.includes('REVAL_MAP')) {
       router.push('/work/revalidation-map');
-    } else if (act.includes('REVIEW')) {
+    } else if (act.includes('REVIEW') || act.includes('CONSENSUS')) {
       router.push('/work/submission-review');
     } else if (act.includes('REVALIDATION_VOTE')) {
       router.push('/work/revalidation-review');
-    } else if (act.includes('NAV')) {
+    } else if (act.includes('NAV') || act.includes('DRIVE')) {
       router.push('/home');
-    } else if (act.includes('HAZARD')) {
+    } else if (act.includes('HAZARD') || act.includes('ANOMALY')) {
       router.push('/work/recorded-signs');
+    } else {
+      // Default route based on role
+      if (role === 'surveyor') {
+        router.push('/work/new-survey');
+      } else if (role === 'reviewer') {
+        router.push('/work/submission-review');
+      } else {
+        router.push('/home');
+      }
     }
   };
+
 
   return (
     <View
@@ -82,42 +88,27 @@ export function MissionCardItem({ completion, role }: MissionCardItemProps) {
         styles.card,
         {
           backgroundColor: theme.backgroundElement,
-          borderColor: isFinished ? '#10B98140' : theme.border,
-          borderLeftColor: accentColor,
-          borderLeftWidth: 5,
+          borderColor: theme.border,
         },
       ]}
     >
-      <View style={styles.topRow}>
-        <View style={[styles.iconBox, { backgroundColor: `${accentColor}15` }]}>
-          <MaterialCommunityIcons color={accentColor} name={icon} size={22} />
-        </View>
-
-        <View style={styles.contentCol}>
-          <View style={styles.titleRow}>
-            <Text numberOfLines={1} style={[styles.title, { color: theme.text }]}>
-              {task.name}
-            </Text>
-            <View style={[styles.rewardPill, { backgroundColor: '#F59E0B1A' }]}>
-              <MaterialCommunityIcons color="#D97706" name="hand-coin-outline" size={14} />
-              <Text style={styles.rewardText}>+{task.rewardCredits} Xu</Text>
-            </View>
-          </View>
-
-          {task.description ? (
-            <Text numberOfLines={2} style={[styles.description, { color: theme.grey }]}>
-              {task.description}
-            </Text>
-          ) : null}
-        </View>
+      {/* 1. Title Row: Full width, up to 2 lines */}
+      <View style={styles.titleRow}>
+        <Text
+          ellipsizeMode="tail"
+          numberOfLines={2}
+          style={[styles.title, { color: theme.text }]}
+        >
+          {taskName}
+        </Text>
       </View>
 
-      {/* Progress Bar & Actions */}
-      <View style={styles.bottomRow}>
+      {/* 2. Middle Row: Progress bar on left, +Reward Xu on right */}
+      <View style={styles.progressRow}>
         <View style={styles.progressCol}>
-          <View style={styles.progressLabelRow}>
+          <View style={styles.progressHeaderRow}>
             <Text style={[styles.progressCountText, { color: theme.text }]}>
-              Tiến độ: <Text style={{ fontFamily: Fonts.sans, fontWeight: '700' }}>{progress}</Text>/{target}
+              {progress}/{target}
             </Text>
             <Text style={[styles.progressPercentText, { color: theme.grey }]}>
               {percentage}%
@@ -129,37 +120,46 @@ export function MissionCardItem({ completion, role }: MissionCardItemProps) {
                 styles.progressBarFill,
                 {
                   width: `${percentage}%`,
-                  backgroundColor: isFinished ? '#10B981' : accentColor,
+                  backgroundColor: isFinished ? '#10B981' : theme.primary,
                 },
               ]}
             />
           </View>
         </View>
 
-        {/* Action / Completed Status */}
-        <View style={styles.actionCol}>
-          {isFinished ? (
-            <View style={[styles.completedBadge, { backgroundColor: '#10B98118' }]}>
-              <MaterialCommunityIcons color="#10B981" name="check-circle" size={16} />
-              <Text style={styles.completedText}>Hoàn thành</Text>
-            </View>
-          ) : (
-            <Pressable
-              onPress={handleAction}
-              style={({ pressed }) => [
-                styles.doActionButton,
-                {
-                  borderColor: theme.border,
-                  backgroundColor: pressed ? `${theme.primary}10` : 'transparent',
-                },
-              ]}
-            >
-              <Text style={[styles.doActionText, { color: theme.primary }]}>Làm ngay</Text>
-              <MaterialCommunityIcons color={theme.primary} name="chevron-right" size={16} />
-            </Pressable>
-          )}
+        {/* Reward badge next to progress bar */}
+        <View style={[styles.rewardPill, { backgroundColor: '#F59E0B1A' }]}>
+          <MaterialCommunityIcons color="#D97706" name="hand-coin-outline" size={13} />
+          <Text style={styles.rewardText}>+{rewardCredits} Xu</Text>
         </View>
       </View>
+
+      {/* 3. Bottom Row: Full width button for action & status display */}
+      {isFinished ? (
+        <View
+          accessibilityLabel={`Nhiệm vụ ${taskName} đã hoàn thành`}
+          style={[styles.statusButton, { backgroundColor: '#10B98115', borderColor: '#10B98135' }]}
+        >
+          <MaterialCommunityIcons color="#10B981" name="check-circle" size={16} />
+          <Text style={[styles.statusButtonText, { color: '#10B981' }]}>Hoàn thành</Text>
+        </View>
+      ) : (
+        <Pressable
+          accessibilityLabel={`Làm ngay nhiệm vụ ${taskName}`}
+          accessibilityRole="button"
+          onPress={handleAction}
+          style={({ pressed }) => [
+            styles.actionButton,
+            {
+              borderColor: theme.border,
+              backgroundColor: pressed ? `${theme.primary}18` : `${theme.primary}0C`,
+            },
+          ]}
+        >
+          <Text style={[styles.actionButtonText, { color: theme.primary }]}>Làm ngay</Text>
+          <MaterialCommunityIcons color={theme.primary} name="chevron-right" size={16} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -168,73 +168,36 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Rounded.lg,
     borderWidth: 1,
-    padding: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
     gap: Spacing.two,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
-  },
-  iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: Rounded.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contentCol: {
-    flex: 1,
-    gap: 2,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.one,
+    width: '100%',
   },
   title: {
-    flex: 1,
     fontFamily: Fonts.sans,
     fontWeight: '700',
     fontSize: 15,
+    lineHeight: 20,
   },
-  rewardPill: {
+  progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Rounded.round,
-  },
-  rewardText: {
-    fontFamily: Fonts.sans,
-    fontWeight: '700',
-    fontSize: 12,
-    color: '#D97706',
-  },
-  description: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    marginTop: 2,
+    gap: Spacing.two,
   },
   progressCol: {
     flex: 1,
     gap: 4,
   },
-  progressLabelRow: {
+  progressHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   progressCountText: {
-    fontFamily: Fonts.body,
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
     fontSize: 12,
   },
   progressPercentText: {
@@ -251,36 +214,48 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: Rounded.round,
   },
-  actionCol: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  completedBadge: {
+  rewardPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Rounded.md,
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: Rounded.round,
   },
-  completedText: {
+  rewardText: {
     fontFamily: Fonts.sans,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 12,
-    color: '#10B981',
+    color: '#D97706',
   },
-  doActionButton: {
+  statusButton: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
     borderRadius: Rounded.md,
     borderWidth: 1,
   },
-  doActionText: {
+  statusButtonText: {
     fontFamily: Fonts.sans,
-    fontWeight: '600',
-    fontSize: 12,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  actionButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+  },
+  actionButtonText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 13,
   },
 });

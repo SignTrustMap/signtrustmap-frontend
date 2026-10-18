@@ -78,13 +78,10 @@ export function WorkMissionsSection({ role }: WorkMissionsSectionProps) {
         </View>
       </Pressable>
 
-      {/* Subtitle with stats */}
+      {/* Subtitle */}
       <View style={styles.subtitleRow}>
         <Text style={[styles.subtitle, { color: theme.grey }]}>
           Hoàn thành để nhận thêm Xu thưởng vào ví
-        </Text>
-        <Text style={[styles.counterText, { color: theme.primary }]}>
-          {completedCount}/{totalCount} Đạt
         </Text>
       </View>
 
@@ -170,11 +167,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontFamily: Fonts.body,
     fontSize: 13,
-  },
-  counterText: {
-    fontFamily: Fonts.sans,
-    fontWeight: '700',
-    fontSize: 12,
   },
   missionList: {
     gap: Spacing.two,

@@ -21,7 +21,12 @@ import {
   useGetRevalidationEvidenceQueue,
 } from '@/feature/revalidation/hooks/use-revalidation';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
-import { WorkMissionsSection } from '@/feature/work/components/work-missions-section';
+import {
+  getFallbackMissionsForRole,
+  isTaskForRole,
+  useGetMyMissions,
+  useGetMyTaskCompletions,
+} from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -97,6 +102,18 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const reviewQueueTotal = reviewQueue?.total ?? 0;
   const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
+
+  // Missions queries for action card badge and streak indicator
+  const { data: completionsData } = useGetMyTaskCompletions();
+  const { data: missionsData } = useGetMyMissions();
+  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
+
+  const incompleteMissionsCount = useMemo(() => {
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, selectedRole]);
 
   const activeIndex = availableRoles.indexOf(selectedRole);
   const [switcherWidth, setSwitcherWidth] = useState<number>(0);
@@ -267,8 +284,40 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             </Text>
           </View>
 
-          {/* Role-Specific Daily Missions Section */}
-          <WorkMissionsSection role={selectedRole} />
+          {/* Mission Feature Action Card */}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleWithIcon}>
+              <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
+            </View>
+            {streak > 0 ? (
+              <View
+                style={[
+                  styles.streakBadge,
+                  { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
+                ]}
+              >
+                <Text style={styles.streakEmoji}>🔥</Text>
+                <Text style={styles.streakText}>Chuỗi {streak} ngày</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.actionList}>
+            <WorkActionCard
+              accentColor={theme.primary}
+              count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
+              icon="trophy-outline"
+              label="Nhiệm vụ & Thử thách"
+              onPress={() =>
+                router.push({
+                  pathname: '/work/missions',
+                  params: { role: selectedRole },
+                })
+              }
+              subtitle="Nhiệm vụ hàng ngày, hàng tuần & toàn hệ thống để nhận Xu thưởng"
+            />
+          </View>
 
           {/* Section Title: Role-Specific Features / Actions */}
           <View style={styles.sectionHeaderRow}>
@@ -518,6 +567,24 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     fontWeight: '700',
     fontSize: 18,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  streakEmoji: {
+    fontSize: 12,
+  },
+  streakText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 12,
+    color: '#B45309',
   },
   actionList: {
     gap: Spacing.three,
