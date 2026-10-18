@@ -22,12 +22,12 @@ interface MissingSignRecaptureModalProps {
 }
 
 const REASON_OPTIONS = [
-  { value: 'BLURRY', label: 'Ảnh mờ / rung tay (BLURRY)' },
-  { value: 'POOR_LIGHTING', label: 'Ngược sáng / trời tối (POOR_LIGHTING)' },
-  { value: 'WRONG_ANGLE', label: 'Góc chụp quá nghiêng / lệch (WRONG_ANGLE)' },
-  { value: 'OCCLUDED', label: 'Bị vật cản che khuất (OCCLUDED)' },
-  { value: 'MISSING_CONTEXT', label: 'Thiếu góc toàn cảnh (MISSING_CONTEXT)' },
-  { value: 'OTHER', label: 'Lý do khác (OTHER)' },
+  { value: 'BLURRY', label: 'Ảnh mờ hoặc rung tay' },
+  { value: 'POOR_LIGHTING', label: 'Ngược sáng hoặc thiếu sáng' },
+  { value: 'WRONG_ANGLE', label: 'Góc chụp quá nghiêng' },
+  { value: 'OCCLUDED', label: 'Bị vật cản che khuất' },
+  { value: 'MISSING_CONTEXT', label: 'Thiếu ảnh toàn cảnh' },
+  { value: 'OTHER', label: 'Lý do khác' },
 ]
 
 export function MissingSignRecaptureModal({
@@ -125,6 +125,8 @@ export function MissingSignRecaptureModal({
               <CustomSelect
                 value={reason}
                 onChange={handleReasonChange}
+                direction="down"
+                portal={true}
                 className="w-full"
                 buttonClassName="w-full bg-gray-50 dark:bg-black/40 border-gray-200 dark:border-white/10 text-xs py-2"
                 options={REASON_OPTIONS}

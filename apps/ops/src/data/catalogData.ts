@@ -53,6 +53,10 @@ export interface MissingSignTypeReport {
   suggestedColorScheme?: string | null
   mergedIntoSignTypeId?: number | null
   staffNotes?: string | null
+  reviewedBy?: string | null
+  createdAt?: string
+  updatedAt?: string
+  resolvedAt?: string | null
 }
 
 export interface AvailableSignOption {

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { CaretDown, Check } from '@phosphor-icons/react'
 
 export interface OptionItem {
@@ -24,6 +25,7 @@ export interface CustomSelectProps {
   disabled?: boolean
   direction?: 'down' | 'up' | 'auto'
   align?: 'left' | 'right'
+  portal?: boolean
 }
 
 export function CustomSelect({
@@ -40,39 +42,34 @@ export function CustomSelect({
   disabled = false,
   direction = 'auto',
   align = 'left',
+  portal = false,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [computedDirection, setComputedDirection] = useState<'down' | 'up'>(
     direction === 'up' ? 'up' : 'down'
   )
+  const [coords, setCoords] = useState<{
+    top: number
+    left: number
+    width: number
+    isUp: boolean
+  } | null>(null)
+
   const containerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const selectedOption = options.find((opt) => opt.value === value)
 
-  // Close on click outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
+  // Calculate coordinates for portal positioning
+  const updateCoords = () => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    const estimatedDropdownHeight = Math.min(options.length * 36 + 16, 260)
 
-  // Auto calculate direction (up or down) based on viewport and overflow parent
-  useEffect(() => {
-    if (isOpen && direction === 'auto' && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-      const estimatedDropdownHeight = Math.min(options.length * 36 + 16, 260)
-
-      // Also detect if any scrollable or clipping ancestor constrains space below
+    let isUp = direction === 'up'
+    if (direction === 'auto') {
       let overflowParentBelow = spaceBelow
       let parent = containerRef.current.parentElement
       while (parent && parent !== document.body) {
@@ -85,15 +82,62 @@ export function CustomSelect({
         }
         parent = parent.parentElement
       }
+      isUp = (overflowParentBelow < estimatedDropdownHeight || spaceBelow < estimatedDropdownHeight) && spaceAbove > 80
+    }
 
-      if (
-        (overflowParentBelow < estimatedDropdownHeight || spaceBelow < estimatedDropdownHeight) &&
-        spaceAbove > 80
-      ) {
-        setComputedDirection('up')
-      } else {
-        setComputedDirection('down')
+    setCoords({
+      top: isUp ? rect.top - 6 : rect.bottom + 6,
+      left: align === 'right' ? rect.right : rect.left,
+      width: rect.width,
+      isUp,
+    })
+    setComputedDirection(isUp ? 'up' : 'down')
+  }
+
+  // Close on click outside (handles both container and portaled menu)
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node
+      const isInsideTrigger = containerRef.current && containerRef.current.contains(target)
+      const isInsideMenu = menuRef.current && menuRef.current.contains(target)
+      if (!isInsideTrigger && !isInsideMenu) {
+        setIsOpen(false)
       }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  // Track scroll and resize when portaled menu is open
+  useEffect(() => {
+    if (!isOpen || !portal) return
+    const handleScrollOrResize = () => {
+      updateCoords()
+    }
+    window.addEventListener('scroll', handleScrollOrResize, true)
+    window.addEventListener('resize', handleScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true)
+      window.removeEventListener('resize', handleScrollOrResize)
+    }
+  }, [isOpen, portal, options.length, direction, align])
+
+  const handleToggle = () => {
+    if (disabled) return
+    if (!isOpen) {
+      updateCoords()
+    }
+    setIsOpen((prev) => !prev)
+  }
+
+  // Auto calculate direction (up or down) based on viewport before paint
+  useLayoutEffect(() => {
+    if (isOpen && direction === 'auto' && containerRef.current) {
+      updateCoords()
     } else if (direction !== 'auto') {
       setComputedDirection(direction)
     }
@@ -118,7 +162,7 @@ export function CustomSelect({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         title={fullDisplayTitle}
@@ -164,54 +208,80 @@ export function CustomSelect({
       </button>
 
       {/* Dropdown Menu Popup */}
-      {isOpen && (
-        <div
-          role="listbox"
-          className={`absolute z-50 min-w-full w-max max-w-sm sm:max-w-md rounded-xl bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden py-1 max-h-72 overflow-y-auto focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 ${
-            computedDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-          } ${align === 'right' ? 'right-0' : 'left-0'} ${dropdownClassName}`}
-        >
-          {options.map((opt) => {
-            const isSelected = opt.value === value
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => handleSelect(opt.value)}
-                title={opt.label}
-                className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left cursor-pointer transition-colors duration-150 select-none ${
-                  isSmall ? 'text-xs' : 'text-xs sm:text-sm'
-                } ${
-                  isSelected
-                    ? 'bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] font-semibold'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white font-normal'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                  <span className="truncate flex-1">{opt.label}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {typeof opt.count === 'number' && (
-                    <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 font-medium">
-                      {opt.count}
-                    </span>
-                  )}
-                  {isSelected && (
-                    <Check
-                      size={isSmall ? 12 : 14}
-                      weight="bold"
-                      className="shrink-0 text-[#007b8b] dark:text-[#00c4de]"
-                    />
-                  )}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
+      {isOpen &&
+        (() => {
+          const menuElement = (
+            <div
+              ref={menuRef}
+              role="listbox"
+              style={
+                portal && coords
+                  ? {
+                      position: 'fixed',
+                      top: coords.isUp ? undefined : `${coords.top}px`,
+                      bottom: coords.isUp ? `${window.innerHeight - coords.top}px` : undefined,
+                      left: align === 'right' ? undefined : `${coords.left}px`,
+                      right: align === 'right' ? `${window.innerWidth - coords.left}px` : undefined,
+                      width: `${coords.width}px`,
+                      zIndex: 99999,
+                    }
+                  : undefined
+              }
+              className={`${
+                portal
+                  ? 'rounded-xl bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden py-1 max-h-72 overflow-y-auto focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100'
+                  : `absolute z-50 min-w-full w-max max-w-sm sm:max-w-md rounded-xl bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 shadow-xl overflow-hidden py-1 max-h-72 overflow-y-auto focus:outline-none animate-in fade-in-0 zoom-in-95 duration-100 ${
+                      computedDirection === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                    } ${align === 'right' ? 'right-0' : 'left-0'}`
+              } ${dropdownClassName}`}
+            >
+              {options.map((opt) => {
+                const isSelected = opt.value === value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => handleSelect(opt.value)}
+                    title={opt.label}
+                    className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-left cursor-pointer transition-colors duration-150 select-none ${
+                      isSmall ? 'text-xs' : 'text-xs sm:text-sm'
+                    } ${
+                      isSelected
+                        ? 'bg-[#00c4de]/10 text-[#007b8b] dark:text-[#00c4de] font-semibold'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white font-normal'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                      {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                      <span className="truncate flex-1">{opt.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {typeof opt.count === 'number' && (
+                        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400 font-medium">
+                          {opt.count}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <Check
+                          size={isSmall ? 12 : 14}
+                          weight="bold"
+                          className="shrink-0 text-[#007b8b] dark:text-[#00c4de]"
+                        />
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )
+
+          if (portal && typeof document !== 'undefined') {
+            return createPortal(menuElement, document.body)
+          }
+          return menuElement
+        })()}
     </div>
   )
 }

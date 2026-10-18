@@ -273,11 +273,19 @@ export async function extractGpsFromImageFile(
   if (Platform.OS === 'web') return null;
 
   try {
-    const base64 = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-      position: 0,
-      length: JPEG_HEADER_READ_SIZE,
-    });
+    let base64: string;
+    try {
+      base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+        position: 0,
+        length: JPEG_HEADER_READ_SIZE,
+      });
+    } catch {
+      // Fallback: full read if range-based read fails on this URI scheme
+      base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    }
 
     const buf = base64ToUint8Array(base64);
     return extractGpsFromJpegBuffer(buf);

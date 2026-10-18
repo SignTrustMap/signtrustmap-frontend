@@ -6,9 +6,8 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
 import CustomSelect, { type OptionItem } from '@/components/common/CustomSelect'
-import { Table, SquaresFour, Funnel, ArrowsClockwise, CircleNotch } from '@phosphor-icons/react'
+import { Funnel, ArrowsClockwise, CircleNotch } from '@phosphor-icons/react'
 import {
-  availableCatalogSigns,
   type MissingSignTypeReport,
   type AvailableSignOption,
 } from '@/data'
@@ -21,7 +20,6 @@ import {
 } from '@/api/services/catalog.service'
 import {
   MissingSignsTableView,
-  MissingSignsGridView,
   MissingSignInspectionModal,
   MissingSignMergeModal,
   MissingSignEscalateModal,
@@ -55,7 +53,11 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     category: r.proposedCategoryId ? `cat_${r.proposedCategoryId}` : 'prohibitory',
     reportedBy: r.reporterId ? `Reviewer #${r.reporterId.slice(0, 8)}` : (r.submittedBy || 'Reviewer'),
     reporterId: r.reporterId,
-    reportedAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : '2026-10-01',
+    reportedAt: r.createdAt || '2026-10-01',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    resolvedAt: r.resolvedAt,
+    reviewedBy: r.reviewedBy,
     lat: candidate?.latitude ?? 10.7769,
     lng: candidate?.longitude ?? 106.7009,
     roadAddress: candidate
@@ -67,7 +69,7 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     sampleImageUrl,
     bestFrameUrl,
     cropImageUrl,
-    reporterNote: r.description || r.staffNotes || 'Báo cáo biển báo chưa có trong danh mục chuẩn QCVN 41:2019',
+    reporterNote: r.description || 'Báo cáo biển báo chưa có trong danh mục chuẩn QCVN 41:2019',
     similarCatalogEntries: ['P.102', 'P.103a'],
     clipPrompt: r.suggestedNameEn || r.proposedName || 'A road traffic sign on street',
     candidateId: r.candidateId,
@@ -80,7 +82,8 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
 }
 
 export default function MissingSignsPage() {
-  const { t } = useTranslation(['ops', 'common'])
+  const { t, i18n } = useTranslation(['ops', 'common'])
+  const isEn = i18n.language?.startsWith('en')
   const { success, error } = useToast()
   const { isCollapsed } = useSidebar()
   const { user } = useAuth()
@@ -101,7 +104,7 @@ export default function MissingSignsPage() {
   })
 
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
-  const [availableSigns, setAvailableSigns] = useState<AvailableSignOption[]>(availableCatalogSigns)
+  const [availableSigns, setAvailableSigns] = useState<AvailableSignOption[]>([])
 
   const [selectedReport, setSelectedReport] = useState<MissingSignTypeReport | null>(null)
   const [activeTab, setActiveTab] = useState<
@@ -109,7 +112,9 @@ export default function MissingSignsPage() {
   >('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  const [selectedSort, setSelectedSort] = useState<
+    'newest' | 'oldest' | 'confidence_asc' | 'confidence_desc' | 'name_asc'
+  >('newest')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -122,19 +127,19 @@ export default function MissingSignsPage() {
   const [isSubmittingApprove, setIsSubmittingApprove] = useState(false)
   const [isSubmittingRecapture, setIsSubmittingRecapture] = useState(false)
 
-  const [selectedCatalogCode, setSelectedCatalogCode] = useState('P.102')
+  const [selectedCatalogCode, setSelectedCatalogCode] = useState('')
   const [selectedSignTypeId, setSelectedSignTypeId] = useState<number | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
   const [escalateNote, setEscalateNote] = useState('')
   const [rejectReasonKey, setRejectReasonKey] = useState<MissingRejectReasonKey>('reason_not_sign')
 
-  // Load Categories & Real Catalog Sign Types for lookup
+  // Load Categories & Real Catalog Sign Types for lookup from API
   useEffect(() => {
     async function loadCatalogMeta() {
       try {
         const [cats, typesRes] = await Promise.all([
           catalogService.getCategories(),
-          catalogService.getSignTypes({ pageSize: 100 }),
+          catalogService.getAllSignTypes(),
         ])
         if (Array.isArray(cats) && cats.length > 0) {
           setCategories(cats)
@@ -230,25 +235,57 @@ export default function MissingSignsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [activeTab, searchQuery, selectedCategory])
+  }, [activeTab, searchQuery, selectedCategory, selectedSort])
 
-  // Category filter options
+  // Status filter options
+  const statusOptions: OptionItem[] = useMemo(() => [
+    { value: 'all', label: isEn ? 'All Statuses' : 'Tất cả trạng thái', count: kpiCounts.total },
+    { value: 'Open', label: isEn ? 'Pending Triage' : 'Chờ thẩm định', count: kpiCounts.pending },
+    { value: 'Escalated', label: isEn ? 'Escalated to Admin' : 'Chờ Admin duyệt', count: kpiCounts.escalated },
+    { value: 'Approved', label: isEn ? 'Approved' : 'Đã phê duyệt', count: kpiCounts.approved },
+    { value: 'Merged', label: isEn ? 'Merged into Catalog' : 'Đã gộp Catalog', count: kpiCounts.merged },
+    { value: 'Incomplete', label: isEn ? 'Needs Info' : 'Cần bổ sung', count: kpiCounts.incomplete },
+    { value: 'Rejected', label: isEn ? 'Rejected' : 'Đã từ chối', count: kpiCounts.rejected },
+  ], [isEn, kpiCounts])
+
+  // Category filter options - clean mock data and sort by standard hierarchy
   const categoryOptions: OptionItem[] = useMemo(() => {
-    const base: OptionItem[] = [{ value: 'all', label: t('missing_signs.cat_all') }]
+    const base: OptionItem[] = [{ value: 'all', label: t('missing_signs.cat_all', isEn ? 'All Categories' : 'Tất cả nhóm') }]
     if (categories.length > 0) {
-      categories.forEach((c) => {
-        base.push({ value: `cat_${c.id}`, label: c.nameVi })
+      // Filter out test/mock categories like "Mock Traffic Signs"
+      const cleanCategories = categories.filter(
+        (c) =>
+          !c.nameVi?.toLowerCase().includes('mock') &&
+          !c.nameEn?.toLowerCase().includes('mock') &&
+          !c.code?.toLowerCase().includes('mock')
+      )
+
+      // Sort by sortOrder if available
+      cleanCategories.sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99))
+
+      cleanCategories.forEach((c) => {
+        base.push({ value: `cat_${c.id}`, label: isEn ? (c.nameEn || c.nameVi) : c.nameVi })
       })
     } else {
       base.push(
-        { value: 'prohibitory', label: t('missing_signs.cat_prohibitory') },
-        { value: 'warning', label: t('missing_signs.cat_warning') },
-        { value: 'mandatory', label: t('missing_signs.cat_mandatory') },
-        { value: 'guide', label: t('missing_signs.cat_guide') }
+        { value: 'prohibitory', label: isEn ? 'Prohibitory signs' : 'Biển báo cấm' },
+        { value: 'warning', label: isEn ? 'Warning signs' : 'Biển cảnh báo' },
+        { value: 'mandatory', label: isEn ? 'Mandatory signs' : 'Biển hiệu lệnh' },
+        { value: 'guide', label: isEn ? 'Information signs' : 'Biển chỉ dẫn' },
+        { value: 'supplementary', label: isEn ? 'Supplementary signs' : 'Biển phụ' }
       )
     }
     return base
-  }, [categories, t])
+  }, [categories, t, isEn])
+
+  // Sort filter options
+  const sortOptions: OptionItem[] = useMemo(() => [
+    { value: 'newest', label: isEn ? 'Newest first' : 'Mới nhất' },
+    { value: 'oldest', label: isEn ? 'Oldest (Longest waiting)' : 'Cũ nhất (Chờ lâu nhất)' },
+    { value: 'confidence_asc', label: isEn ? 'AI Confidence (Low → High)' : 'Độ tin cậy AI: Thấp → Cao' },
+    { value: 'confidence_desc', label: isEn ? 'AI Confidence (High → Low)' : 'Độ tin cậy AI: Cao → Thấp' },
+    { value: 'name_asc', label: isEn ? 'Sign Name (A → Z)' : 'Tên biển (A → Z)' },
+  ], [isEn])
 
   // Catalog search filtering for Merge modal
   const filteredCatalogSigns = useMemo(() => {
@@ -259,9 +296,9 @@ export default function MissingSignsPage() {
     )
   }, [availableSigns, catalogSearch])
 
-  // Main reports filtering
+  // Main reports filtering & sorting
   const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
+    const list = reports.filter((r) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -276,7 +313,33 @@ export default function MissingSignsPage() {
 
       return matchesSearch && matchesCategory
     })
-  }, [reports, searchQuery, selectedCategory])
+
+    return list.sort((a, b) => {
+      switch (selectedSort) {
+        case 'newest': {
+          const dateA = new Date(a.reportedAt || 0).getTime()
+          const dateB = new Date(b.reportedAt || 0).getTime()
+          return dateB - dateA
+        }
+        case 'oldest': {
+          const dateA = new Date(a.reportedAt || 0).getTime()
+          const dateB = new Date(b.reportedAt || 0).getTime()
+          return dateA - dateB
+        }
+        case 'confidence_desc': {
+          return (b.aiConfidence ?? 0) - (a.aiConfidence ?? 0)
+        }
+        case 'confidence_asc': {
+          return (a.aiConfidence ?? 0) - (b.aiConfidence ?? 0)
+        }
+        case 'name_asc': {
+          return a.tempLabel.localeCompare(b.tempLabel, 'vi')
+        }
+        default:
+          return 0
+      }
+    })
+  }, [reports, searchQuery, selectedCategory, selectedSort])
 
   const paginatedReports = filteredReports
 
@@ -303,13 +366,14 @@ export default function MissingSignsPage() {
     }
   }
 
-  async function handleEscalateSubmit() {
+  async function handleEscalateSubmit(noteOverride?: string) {
     if (!selectedReport) return
     const updatedId = selectedReport.id
+    const note = (typeof noteOverride === 'string' && noteOverride.trim()) ? noteOverride.trim() : (escalateNote || 'Escalated to Admin for Catalog creation')
     try {
       await catalogService.updateMissingReport(updatedId, {
         status: 'ESCALATED_ADMIN',
-        staffNotes: escalateNote || 'Escalated to Admin for Catalog creation',
+        staffNotes: note,
       })
       success(t('missing_signs.toast_escalated', { id: updatedId }))
       fetchReports()
@@ -322,10 +386,11 @@ export default function MissingSignsPage() {
     }
   }
 
-  async function handleRejectSubmit() {
+  async function handleRejectSubmit(reasonKeyOverride?: MissingRejectReasonKey) {
     if (!selectedReport) return
     const updatedId = selectedReport.id
-    const reasonText = t(`missing_signs.${rejectReasonKey}`)
+    const key = reasonKeyOverride || rejectReasonKey
+    const reasonText = t(`missing_signs.${key}`)
     try {
       await catalogService.updateMissingReport(updatedId, {
         status: 'REJECTED',
@@ -413,129 +478,75 @@ export default function MissingSignsPage() {
       {/* ─── HEADER ─────────────────────────────────────────────────── */}
       <PageHeader
         title={t('missing_signs.title', 'Đề xuất Biển mới')}
-        subtitle={t('missing_signs.subtitle', 'Xem xét và sơ thẩm các báo cáo biển báo thực tế do cộng đồng gửi lên.')}
+        subtitle={t('missing_signs.subtitle', 'Xem xét và thẩm tra các báo cáo biển báo thực tế chưa có trong danh mục do cộng đồng đóng góp.')}
         actions={
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-              Tổng <strong className="font-mono text-gray-900 dark:text-white">{totalCount}</strong> đề xuất
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                Tổng <strong className="font-mono text-gray-900 dark:text-white">{totalCount}</strong> đề xuất
+              </span>
+            </div>
+
+            {/* Refresh Button placed in Header like /escalations */}
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={fetchReports}
+              className="p-2 border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
+              title="Làm mới dữ liệu"
+            >
+              <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+            </button>
           </div>
         }
       />
 
-      {/* ─── UNIFIED SINGLE-ROW PRO FILTER BAR (Matches /catalog on Web) ── */}
+      {/* ─── DATA FILTER BAR (Clean Single-Row matching /escalations) ──── */}
       <DataFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('missing_signs.search_placeholder', 'Tìm kiếm đề xuất, vị trí, người gửi...')}
-        categoryFilterMode="select"
-        categorySelectLabel={t('missing_signs.filter_status', 'Trạng thái')}
-        categories={[
-          {
-            id: 'all',
-            label: t('missing_signs.tab_all', 'Tất cả đề xuất'),
-            count: kpiCounts.total,
-          },
-          {
-            id: 'Open',
-            label: t('missing_signs.tab_open', 'Chờ sơ thẩm'),
-            count: kpiCounts.pending,
-          },
-          {
-            id: 'Escalated',
-            label: t('missing_signs.tab_escalated', 'Chờ Admin duyệt'),
-            count: kpiCounts.escalated,
-          },
-          {
-            id: 'Approved',
-            label: t('missing_signs.tab_approved', 'Đã phê duyệt'),
-            count: kpiCounts.approved,
-          },
-          {
-            id: 'Merged',
-            label: t('missing_signs.tab_merged', 'Đã gộp Catalog'),
-            count: kpiCounts.merged,
-          },
-          {
-            id: 'Incomplete',
-            label: t('missing_signs.tab_incomplete', 'Cần bổ sung'),
-            count: kpiCounts.incomplete,
-          },
-          {
-            id: 'Rejected',
-            label: t('missing_signs.tab_rejected', 'Đã từ chối'),
-            count: kpiCounts.rejected,
-          },
-        ]}
-        selectedCategory={activeTab}
-        onSelectCategory={(id) =>
-          setActiveTab(
-            id as 'all' | 'Open' | 'Escalated' | 'Approved' | 'Merged' | 'Incomplete' | 'Rejected'
-          )
-        }
+        searchPlaceholder={isEn ? 'Search by proposal ID, label, reporter...' : 'Tìm mã đề xuất, tên biển, người tạo...'}
       >
-        {/* Nhóm biển dropdown */}
-        <div className="w-36 sm:w-44 shrink-0">
-          <CustomSelect
-            options={categoryOptions}
-            value={selectedCategory}
-            onChange={setSelectedCategory}
-            prefixLabel={t('missing_signs.filter_category', 'Nhóm biển')}
-            leftIcon={<Funnel size={14} className="text-gray-400" />}
-            size="sm"
-          />
-        </div>
+        {/* 1. Trạng thái Filter */}
+        <CustomSelect
+          options={statusOptions}
+          value={activeTab}
+          onChange={(val) => setActiveTab(val as any)}
+          prefixLabel={isEn ? 'Status' : 'Trạng thái'}
+          size="sm"
+          className="w-full sm:w-48"
+        />
 
-        {/* Refresh Button */}
-        <button
-          type="button"
-          disabled={isLoading}
-          onClick={fetchReports}
-          className="p-2 border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
-          title="Làm mới báo cáo"
-        >
-          <ArrowsClockwise size={15} weight="bold" className={isLoading ? 'animate-spin' : ''} />
-        </button>
+        {/* 2. Nhóm biển Filter */}
+        <CustomSelect
+          options={categoryOptions}
+          value={selectedCategory}
+          onChange={setSelectedCategory}
+          prefixLabel={isEn ? 'Category' : 'Nhóm biển'}
+          leftIcon={<Funnel size={14} className="text-gray-400" />}
+          size="sm"
+          className="w-full sm:w-48"
+        />
 
-        {/* View mode toggle (Table / Grid) */}
-        <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10 shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            title={t('missing_signs.view_mode_table', 'Dạng bảng')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs font-bold'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-            }`}
-          >
-            <Table size={14} weight={viewMode === 'table' ? 'bold' : 'regular'} />
-            <span className="hidden xl:inline">{t('missing_signs.view_mode_table', 'Bảng')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            title={t('missing_signs.view_mode_grid', 'Dạng lưới')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              viewMode === 'grid'
-                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs font-bold'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-            }`}
-          >
-            <SquaresFour size={14} weight={viewMode === 'grid' ? 'bold' : 'regular'} />
-            <span className="hidden xl:inline">{t('missing_signs.view_mode_grid', 'Lưới')}</span>
-          </button>
-        </div>
+        {/* 3. Sắp xếp Filter */}
+        <CustomSelect
+          options={sortOptions}
+          value={selectedSort}
+          onChange={(val) => setSelectedSort(val as any)}
+          prefixLabel={isEn ? 'Sort by' : 'Sắp xếp'}
+          size="sm"
+          className="w-full sm:w-52"
+        />
       </DataFilterBar>
 
-      {/* ─── MAIN CONTENT: TABLE VIEW OR GRID VIEW ──────────────────── */}
+      {/* ─── MAIN CONTENT: TABLE VIEW ONLY (Consistent with /escalations) ── */}
       {isLoading ? (
         <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
           <CircleNotch size={28} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
           <p className="text-xs text-neutral-500 font-medium">Đang tải danh sách báo cáo biển mới/thiếu...</p>
         </div>
-      ) : viewMode === 'table' ? (
+      ) : (
         <MissingSignsTableView
           reports={paginatedReports}
           totalItems={filteredReports.length === reports.length ? totalCount : filteredReports.length}
@@ -548,34 +559,6 @@ export default function MissingSignsPage() {
             setCurrentPage(1)
           }}
           onSelectReport={setSelectedReport}
-        />
-      ) : (
-        <MissingSignsGridView
-          reports={paginatedReports}
-          totalItems={filteredReports.length === reports.length ? totalCount : filteredReports.length}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize)
-            setCurrentPage(1)
-          }}
-          onSelectReport={setSelectedReport}
-          onOpenMergeModal={(r) => {
-            setSelectedReport(r)
-            if (r.similarCatalogEntries && r.similarCatalogEntries.length > 0) {
-              setSelectedCatalogCode(r.similarCatalogEntries[0])
-            }
-            setIsMergeModalOpen(true)
-          }}
-          onOpenEscalateModal={(r) => {
-            setSelectedReport(r)
-            setIsEscalateModalOpen(true)
-          }}
-          onOpenRejectModal={(r) => {
-            setSelectedReport(r)
-            setIsRejectModalOpen(true)
-          }}
         />
       )}
 
@@ -600,6 +583,9 @@ export default function MissingSignsPage() {
             onOpenReject={() => setIsRejectModalOpen(true)}
             onOpenApprove={() => setIsApproveModalOpen(true)}
             onOpenIncomplete={() => setIsRecaptureModalOpen(true)}
+            onDirectEscalate={handleEscalateSubmit}
+            onDirectReject={handleRejectSubmit}
+            onDirectRecapture={handleRecaptureSubmit}
           />
         )}
 

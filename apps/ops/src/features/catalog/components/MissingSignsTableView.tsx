@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkle, MapPin, Eye, Image as ImageIcon, User, CalendarBlank } from '@phosphor-icons/react'
+import { Sparkle, Image as ImageIcon } from '@phosphor-icons/react'
 import { Pagination } from '@/components/common/Pagination'
-import { CategoryBadge, StatusBadge } from './MissingSignsBadges'
 import type { MissingSignTypeReport } from '@/data'
 
 interface MissingSignsTableViewProps {
@@ -16,29 +15,85 @@ interface MissingSignsTableViewProps {
   onSelectReport: (report: MissingSignTypeReport) => void
 }
 
-function formatShapeVi(shape?: string) {
-  if (!shape) return ''
-  const map: Record<string, string> = {
-    circle: 'Tròn',
-    triangle: 'Tam giác đều',
-    octagon: 'Bát giác đều',
-    rectangle: 'Chữ nhật',
-    square: 'Hình vuông',
-    diamond: 'Hình thoi',
+function formatDate(val?: string, isEn = false): string {
+  if (!val) return '—'
+  try {
+    const d = new Date(val)
+    if (isNaN(d.getTime())) return val
+    return isEn
+      ? d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
+      : d.toLocaleDateString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch {
+    return val
   }
-  return map[shape.toLowerCase()] || shape
 }
 
-function formatColorVi(color?: string) {
-  if (!color) return ''
-  const map: Record<string, string> = {
-    'red-white': 'Đỏ - Trắng',
-    'blue-white': 'Xanh dương - Trắng',
-    'yellow-black': 'Vàng - Đen',
-    'white-black': 'Trắng - Đen',
-    'green-white': 'Xanh lá - Trắng',
+function getCategoryName(category?: string, categoryId?: number | null, isEn = false): string {
+  let id = categoryId
+  if (!id && category && category.startsWith('cat_')) {
+    const parsed = parseInt(category.replace('cat_', ''), 10)
+    if (!Number.isNaN(parsed)) id = parsed
   }
-  return map[color.toLowerCase()] || color
+  if (id === 1 || category === 'prohibitory') return isEn ? 'Biển báo cấm (P)' : 'Biển báo cấm'
+  if (id === 2 || category === 'warning') return isEn ? 'Biển cảnh báo (W)' : 'Biển cảnh báo'
+  if (id === 3 || category === 'mandatory') return isEn ? 'Biển hiệu lệnh (R)' : 'Biển hiệu lệnh'
+  if (id === 4 || category === 'guide' || category === 'information') return isEn ? 'Biển chỉ dẫn (I)' : 'Biển chỉ dẫn'
+  if (id === 5 || category === 'supplementary') return isEn ? 'Biển phụ (S)' : 'Biển phụ'
+  return category || (isEn ? 'Other' : 'Khác')
+}
+
+function getStatusDisplay(status: MissingSignTypeReport['status'], isEn = false) {
+  switch (status) {
+    case 'Open':
+      return {
+        label: isEn ? 'Pending Triage' : 'Chờ thẩm định',
+        textColor: 'text-amber-600 dark:text-amber-400',
+      }
+    case 'Escalated':
+      return {
+        label: isEn ? 'Escalated to Admin' : 'Chờ Admin duyệt',
+        textColor: 'text-indigo-600 dark:text-indigo-400',
+      }
+    case 'Approved':
+      return {
+        label: isEn ? 'Approved' : 'Đã phê duyệt',
+        textColor: 'text-emerald-600 dark:text-emerald-400',
+      }
+    case 'Merged':
+      return {
+        label: isEn ? 'Merged into Catalog' : 'Đã gộp Catalog',
+        textColor: 'text-purple-600 dark:text-purple-400',
+      }
+    case 'Incomplete':
+      return {
+        label: isEn ? 'Needs Info' : 'Cần bổ sung',
+        textColor: 'text-orange-600 dark:text-orange-400',
+      }
+    case 'Rejected':
+      return {
+        label: isEn ? 'Rejected' : 'Đã từ chối',
+        textColor: 'text-rose-600 dark:text-rose-400',
+      }
+    default:
+      return {
+        label: status || (isEn ? 'Unknown' : 'Không xác định'),
+        textColor: 'text-gray-600 dark:text-gray-400',
+      }
+  }
+}
+
+function getShortReporter(report: MissingSignTypeReport): string {
+  if (report.reporterId) {
+    return `#${report.reporterId.slice(0, 8)}`
+  }
+  const raw = report.reportedBy || ''
+  if (raw.startsWith('Reviewer #')) {
+    return `#${raw.replace('Reviewer #', '').slice(0, 8)}`
+  }
+  if (raw.startsWith('Reviewer ')) {
+    return `#${raw.replace('Reviewer ', '').slice(0, 8)}`
+  }
+  return raw ? `#${raw.slice(0, 8)}` : 'N/A'
 }
 
 export function MissingSignsTableView({
@@ -51,53 +106,74 @@ export function MissingSignsTableView({
   onPageSizeChange,
   onSelectReport,
 }: MissingSignsTableViewProps) {
-  const { t } = useTranslation('ops')
+  const { i18n } = useTranslation(['ops', 'common'])
+  const isEn = i18n.language?.startsWith('en')
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({})
 
   return (
-    <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs">
-      <div className="overflow-x-auto rounded-t-2xl">
+    <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono uppercase border-b border-gray-200 dark:border-white/10">
             <tr>
-              {/* Evidence Photo */}
-              <th className="py-3 px-4 font-semibold w-20">{t('missing_signs.th_sample', 'Ảnh biển báo')}</th>
-              {/* Proposed Sign & Specs */}
-              <th className="py-3 px-4 font-semibold min-w-[200px]">{t('missing_signs.th_temp_label', 'Đề xuất & Quy cách')}</th>
-              {/* Category */}
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('missing_signs.th_category', 'Phân loại')}</th>
-              {/* Location & Submitted */}
-              <th className="py-3 px-4 font-semibold min-w-[170px]">{t('missing_signs.th_location', 'Vị trí & Thời gian')}</th>
-              {/* Reporter */}
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{t('missing_signs.th_reporter', 'Người báo cáo')}</th>
-              {/* Status */}
-              <th className="py-3 px-3 font-semibold text-center whitespace-nowrap">{t('missing_signs.th_status', 'Trạng thái')}</th>
-              {/* Actions */}
-              <th className="py-3 px-4 font-semibold text-right whitespace-nowrap w-28">{t('missing_signs.th_actions', 'Thao tác')}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Proposal ID' : 'Mã Đề Xuất'}</th>
+              <th className="py-3 px-4 font-semibold min-w-[200px]">{isEn ? 'Proposed Sign' : 'Tên Biển Đề Xuất'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Category' : 'Nhóm Biển'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Evidence' : 'Ảnh Thực Địa'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Reporter' : 'Người Tạo'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Created At' : 'Thời Gian Tạo'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Status' : 'Trạng Thái'}</th>
+              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">{isEn ? 'Details' : 'Chi Tiết'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-white/5">
             {reports.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-14 text-center text-gray-400 dark:text-gray-500 space-y-2">
+                <td colSpan={8} className="py-14 text-center text-gray-400 dark:text-gray-500 space-y-2">
                   <Sparkle size={36} className="mx-auto opacity-40 text-[#007b8b] dark:text-[#00c4de]" />
-                  <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('missing_signs.empty_title', 'Không có đề xuất biển mới')}</p>
-                  <p className="text-xs">{t('missing_signs.empty_desc', 'Hiện không có báo cáo nào khớp với bộ lọc tìm kiếm.')}</p>
+                  <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                    {isEn ? 'No new sign proposals found' : 'Không có đề xuất biển mới'}
+                  </p>
+                  <p className="text-xs">
+                    {isEn
+                      ? 'No reports match your current filter criteria.'
+                      : 'Hiện không có báo cáo nào khớp với bộ lọc tìm kiếm.'}
+                  </p>
                 </td>
               </tr>
             ) : (
               reports.map((report) => {
                 const hasImgError = failedImages[report.id] || !report.sampleImageUrl
+                const status = getStatusDisplay(report.status, isEn)
+                const categoryName = getCategoryName(report.category, report.proposedCategoryId, isEn)
+                const shortReporter = getShortReporter(report)
 
                 return (
                   <tr
                     key={report.id}
                     onClick={() => onSelectReport(report)}
-                    className="hover:bg-gray-50/80 dark:hover:bg-white/[0.04] transition-colors group cursor-pointer"
+                    className="hover:bg-neutral-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer group"
                   >
-                    {/* 1. Evidence Photo Thumbnail */}
-                    <td className="py-3 px-4">
-                      <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-black/30 shrink-0 shadow-2xs group-hover:border-[#007b8b]/40 dark:group-hover:border-[#00c4de]/40 transition-colors">
+                    {/* 1. Id của new-types: tóm gọn, có màu nhấn nhẹ font mono */}
+                    <td className="py-3.5 px-4 font-mono font-semibold text-[#007b8b] dark:text-[#00c4de] whitespace-nowrap">
+                      <span className="group-hover:underline">#{report.id.slice(0, 8)}</span>
+                    </td>
+
+                    {/* 2. Tên biển đề xuất (bỏ suggestedColorScheme, suggestedShape, description) */}
+                    <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-gray-100">
+                      <span className="group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors">
+                        {report.tempLabel}
+                      </span>
+                    </td>
+
+                    {/* 3. Nhóm biển: từ ngữ thông dụng chuẩn */}
+                    <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {categoryName}
+                    </td>
+
+                    {/* 4. Ảnh thực địa: thumbnail gọn gàng, bo góc đẹp mắt */}
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-black/30 shrink-0 group-hover:border-[#007b8b]/40 dark:group-hover:border-[#00c4de]/40 transition-colors">
                         {!hasImgError ? (
                           <img
                             src={report.sampleImageUrl}
@@ -107,110 +183,41 @@ export function MissingSignsTableView({
                             loading="lazy"
                           />
                         ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500">
-                            <ImageIcon size={20} weight="light" />
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500">
+                            <ImageIcon size={18} weight="light" />
                           </div>
                         )}
-                        {report.aiConfidence !== undefined && (
-                          <span className="absolute bottom-0 inset-x-0 bg-black/70 backdrop-blur-2xs text-[9px] font-mono text-white text-center py-0.2">
-                            {(report.aiConfidence * 100).toFixed(0)}%
-                          </span>
-                        )}
                       </div>
                     </td>
 
-                    {/* 2. Proposed Sign Name, Specs & Reporter Note */}
-                    <td className="py-3 px-4">
-                      <div className="space-y-1 max-w-[280px] sm:max-w-[340px] lg:max-w-[420px]">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors truncate block"
-                            title={report.tempLabel}
-                          >
-                            {report.tempLabel}
-                          </span>
-                        </div>
-
-                        {/* Specs Pills: Shape, Color Scheme */}
-                        {(report.suggestedShape || report.suggestedColorScheme) && (
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                            {report.suggestedShape && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 font-medium">
-                                {formatShapeVi(report.suggestedShape)}
-                              </span>
-                            )}
-                            {report.suggestedColorScheme && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 font-medium">
-                                {formatColorVi(report.suggestedColorScheme)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Reporter Note */}
-                        {report.reporterNote && (
-                          <p
-                            className="text-[11px] text-gray-500 dark:text-gray-400 truncate italic"
-                            title={report.reporterNote}
-                          >
-                            &ldquo;{report.reporterNote}&rdquo;
-                          </p>
-                        )}
-                      </div>
+                    {/* 5. Người tạo (Id viết tắt dạng #eaa2eac3) */}
+                    <td className="py-3.5 px-4 font-mono text-[11px] text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {shortReporter}
                     </td>
 
-                    {/* 3. Category */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <CategoryBadge category={report.category} categoryId={report.proposedCategoryId} />
+                    {/* 6. Thời gian tạo */}
+                    <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400 font-mono text-[11px] whitespace-nowrap">
+                      {formatDate(report.reportedAt, isEn)}
                     </td>
 
-                    {/* 4. Location & Submitted Time */}
-                    <td className="py-3 px-4 text-gray-700 dark:text-gray-300">
-                      <div className="space-y-1 min-w-[150px]">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin size={13} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
-                          <span className="font-mono text-xs truncate" title={report.roadAddress || `${report.lat}° N, ${report.lng}° E`}>
-                            {report.lat.toFixed(4)}°, {report.lng.toFixed(4)}°
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500 font-mono">
-                          <CalendarBlank size={12} className="shrink-0" />
-                          <span>{report.reportedAt}</span>
-                        </div>
-                      </div>
+                    {/* 7. Trạng thái: chữ có màu sắc ngữ cảnh nhẹ nhàng giống /escalations */}
+                    <td className="py-3.5 px-4 whitespace-nowrap">
+                      <span className={`font-medium ${status.textColor}`}>
+                        {status.label}
+                      </span>
                     </td>
 
-                    {/* 5. Reporter */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-gray-800 dark:text-gray-200 font-medium text-xs">
-                        <div className="w-5 h-5 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-500 dark:text-gray-400 shrink-0">
-                          <User size={11} />
-                        </div>
-                        <span className="font-mono text-[11px]">{report.reportedBy}</span>
-                      </div>
-                    </td>
-
-                    {/* 6. Status */}
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <StatusBadge status={report.status} />
-                    </td>
-
-                    {/* 7. Action Button */}
-                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                    {/* 8. Chi Tiết: nút bấm nhẹ nhàng, có hover rõ nét giống /escalations */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           onSelectReport(report)
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-[#007b8b] hover:bg-[#007b8b]/10 dark:hover:bg-[#00c4de]/10 text-gray-700 dark:text-gray-200 hover:text-[#007b8b] dark:hover:text-[#00c4de] text-xs font-semibold transition-all cursor-pointer shadow-2xs group-hover:border-[#007b8b]/30"
+                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-[#007b8b] hover:text-white dark:bg-white/10 dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
                       >
-                        <Eye size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
-                        <span>
-                          {report.status === 'Open' || report.status === 'Escalated'
-                            ? t('missing_signs.btn_inspect_triage', 'Thẩm định')
-                            : t('missing_signs.btn_view_details', 'Chi tiết')}
-                        </span>
+                        {isEn ? 'Chi tiết' : 'Chi tiết'}
                       </button>
                     </td>
                   </tr>
@@ -221,8 +228,8 @@ export function MissingSignsTableView({
         </table>
       </div>
 
-      {/* Footer pagination */}
-      <div className="px-4 py-3 border-t border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] rounded-b-2xl">
+      {/* Pagination Footer */}
+      <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
         <Pagination
           currentPage={currentPage}
           totalItems={totalItems}
@@ -235,4 +242,5 @@ export function MissingSignsTableView({
     </div>
   )
 }
+
 export default MissingSignsTableView

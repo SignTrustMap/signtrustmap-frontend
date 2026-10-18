@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +21,7 @@ import { useSubmitRecaptureMutation } from '@/feature/review/hooks/use-recapture
 import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
+import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 
 interface SelectedPhoto {
   uri: string;
@@ -38,6 +40,28 @@ const REASON_LABELS: Record<string, { label: string; color: string; bg: string }
   MISSING_CONTEXT: { label: 'Thiếu góc toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
   OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
 };
+
+/**
+ * Chuyển local file URI thành Blob chuẩn tương thích với WinterCG fetch của Expo / React Native
+ */
+async function uriToBlob(uri: string, mimeType = 'image/jpeg'): Promise<Blob> {
+  try {
+    const res = await fetch(uri);
+    return await res.blob();
+  } catch (fetchErr) {
+    console.warn('[Recapture] fetch uri to blob failed, falling back to FileSystem:', fetchErr);
+    const FileSystem = await import('expo-file-system/legacy');
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType });
+  }
+}
 
 export function RecaptureCameraScreen() {
   const router = useRouter();
@@ -65,7 +89,7 @@ export function RecaptureCameraScreen() {
 
   const submitMutation = useSubmitRecaptureMutation();
 
-  // Định kỳ cập nhật toạ độ GPS của thiết bị
+  // Định kỳ cập nhật toạ độ GPS của thiết bị khi mở app
   useEffect(() => {
     let isMounted = true;
     async function updateGps() {
@@ -82,18 +106,17 @@ export function RecaptureCameraScreen() {
     };
   }, []);
 
-  // Toạ độ hiệu lực: Ưu tiên GPS từ metadata EXIF của ảnh; nếu ảnh không có metadata GPS thì dùng GPS thiết bị
+  // Toạ độ hiệu lực: Chỉ lấy từ chính bức ảnh đã chọn
+  // - Nếu chụp từ Camera: GPS thiết bị tại thời điểm chụp
+  // - Nếu chọn từ Thư viện: GPS trích xuất từ metadata EXIF của bức ảnh (không dùng GPS thiết bị)
   const effectiveCoords: { latitude: number; longitude: number } | null = useMemo(() => {
     if (photo?.gps) {
       return photo.gps;
     }
-    if (currentPosition) {
-      return { latitude: currentPosition[1], longitude: currentPosition[0] };
-    }
     return null;
-  }, [photo?.gps, currentPosition]);
+  }, [photo?.gps]);
 
-  // Khoảng cách tới vị trí biển báo gốc
+  // Khoảng cách từ vị trí ảnh tới vị trí biển báo gốc
   const distanceMeters = useMemo(() => {
     if (!effectiveCoords || Number.isNaN(targetLat) || Number.isNaN(targetLon)) {
       return null;
@@ -106,7 +129,7 @@ export function RecaptureCameraScreen() {
 
   const isWithinGeofence = distanceMeters != null && distanceMeters <= 100;
 
-  // 1. Chụp ảnh trực tiếp tại hiện trường (tự động gắn GPS thiết bị)
+  // 1. Chụp ảnh trực tiếp tại hiện trường (bắt buộc mở app chụp để đính kèm GPS thiết bị)
   const handleLaunchCamera = async () => {
     try {
       const ImagePicker = await import('expo-image-picker');
@@ -124,20 +147,28 @@ export function RecaptureCameraScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const a = result.assets[0];
-        // Lấy GPS tươi từ thiết bị tại thời điểm chụp
+        // Chụp tại chỗ: Lấy toạ độ GPS của thiết bị tại thời điểm đứng ở hiện trường
         const freshGps = await fetchFreshGpsPosition(3000);
-        const photoGps = freshGps
+        const deviceGps = freshGps
           ? { latitude: freshGps[1], longitude: freshGps[0] }
           : extractImageGpsCoordinates(a.exif) ||
             (currentPosition ? { latitude: currentPosition[1], longitude: currentPosition[0] } : undefined);
+
+        if (!deviceGps) {
+          Alert.alert(
+            'Không lấy được vị trí GPS',
+            'Không thể xác định vị trí hiện tại của thiết bị. Vui lòng bật định vị GPS trên điện thoại để chụp ảnh tại hiện trường.',
+          );
+          return;
+        }
 
         setPhoto({
           uri: a.uri,
           fileName: a.fileName || `recapture-camera-${Date.now()}.jpg`,
           mimeType: a.mimeType || 'image/jpeg',
-          gps: photoGps,
+          gps: deviceGps,
           source: 'camera',
-          hasExifGps: Boolean(extractImageGpsCoordinates(a.exif)),
+          hasExifGps: false,
         });
       }
     } catch (err) {
@@ -146,12 +177,43 @@ export function RecaptureCameraScreen() {
     }
   };
 
-  // 2. Chọn ảnh từ thư viện (Ưu tiên trích xuất metadata GPS từ EXIF)
-  const handlePickLibrary = async () => {
+  // 2. Chọn ảnh từ thiết bị (Android dùng Storage Access Framework để giữ nguyên 100% EXIF GPS)
+  const handlePickImage = async () => {
     try {
+      if (Platform.OS === 'android') {
+        const DocumentPicker = await import('expo-document-picker');
+        const result = await DocumentPicker.getDocumentAsync({
+          type: ['image/jpeg', 'image/png', 'image/webp', 'image/*'],
+          copyToCacheDirectory: true,
+        });
+
+        if (result.canceled || !result.assets?.[0]) return;
+        const a = result.assets[0];
+
+        const fileGps = await extractGpsFromImageFile(a.uri);
+        if (!fileGps) {
+          Alert.alert(
+            'Ảnh không có toạ độ GPS',
+            'Bức ảnh này không chứa thông tin định vị (EXIF metadata). Vui lòng chọn ảnh gốc có lưu vị trí hoặc sử dụng tính năng "Chụp ảnh" trực tiếp tại hiện trường.',
+          );
+          return;
+        }
+
+        setPhoto({
+          uri: a.uri,
+          fileName: a.name || `recapture-file-${Date.now()}.jpg`,
+          mimeType: a.mimeType || 'image/jpeg',
+          gps: fileGps,
+          source: 'library',
+          hasExifGps: true,
+        });
+        return;
+      }
+
+      // iOS: Thư viện ảnh hỗ trợ đầy đủ EXIF
       const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
-        quality: 0.9,
+        quality: 1,
         allowsEditing: false,
         mediaTypes: ['images'],
         exif: true,
@@ -159,24 +221,31 @@ export function RecaptureCameraScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const a = result.assets[0];
-        // Trích xuất metadata GPS từ ảnh
-        const exifGps = extractImageGpsCoordinates(a.exif);
-        const photoGps =
-          exifGps ||
-          (currentPosition ? { latitude: currentPosition[1], longitude: currentPosition[0] } : undefined);
+        let exifGps = extractImageGpsCoordinates(a.exif);
+        if (!exifGps) {
+          exifGps = await extractGpsFromImageFile(a.uri);
+        }
+
+        if (!exifGps) {
+          Alert.alert(
+            'Ảnh không có toạ độ GPS',
+            'Bức ảnh này không chứa thông tin định vị (EXIF metadata). Vui lòng chọn ảnh gốc có lưu vị trí hoặc sử dụng tính năng "Chụp ảnh" trực tiếp tại hiện trường.',
+          );
+          return;
+        }
 
         setPhoto({
           uri: a.uri,
           fileName: a.fileName || `recapture-lib-${Date.now()}.jpg`,
           mimeType: a.mimeType || 'image/jpeg',
-          gps: photoGps,
+          gps: exifGps,
           source: 'library',
-          hasExifGps: Boolean(exifGps),
+          hasExifGps: true,
         });
       }
     } catch (err) {
-      console.error('[Recapture] Library pick error:', err);
-      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh.');
+      console.error('[Recapture] Pick image error:', err);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh từ thiết bị.');
     }
   };
 
@@ -193,7 +262,9 @@ export function RecaptureCameraScreen() {
     if (!effectiveCoords) {
       Alert.alert(
         'Chưa có toạ độ vị trí',
-        'Không tìm thấy toạ độ GPS. Vui lòng bật định vị trên máy hoặc chọn ảnh có lưu toạ độ GPS.',
+        photo.source === 'library'
+          ? 'Ảnh từ thư viện không có metadata GPS. Vui lòng chọn ảnh có lưu toạ độ hoặc chụp ảnh trực tiếp tại hiện trường.'
+          : 'Không thể xác định vị trí chụp. Vui lòng bật định vị GPS trên thiết bị.',
       );
       return;
     }
@@ -206,20 +277,17 @@ export function RecaptureCameraScreen() {
     }
 
     try {
+      const fileName = photo.fileName || 'recapture-evidence.jpg';
+      const mimeType = photo.mimeType || 'image/jpeg';
+      const fileBlob = await uriToBlob(photo.uri, mimeType);
+
       const formData = new FormData();
       formData.append('latitude', String(effectiveCoords.latitude));
       formData.append('longitude', String(effectiveCoords.longitude));
 
-      const filePayload = {
-        uri: photo.uri,
-        name: photo.fileName || 'recapture-evidence.jpg',
-        type: photo.mimeType || 'image/jpeg',
-      } as any;
-
-      // Gửi đồng thời image, bestFrame, signCrop để tương thích 100% với cả backend cũ lẫn mới:
-      formData.append('image', filePayload);
-      formData.append('bestFrame', filePayload);
-      formData.append('signCrop', filePayload);
+      // Backend NestJS FileFieldsInterceptor yêu cầu cả 2 trường: signCrop và bestFrame
+      formData.append('signCrop', fileBlob, fileName);
+      formData.append('bestFrame', fileBlob, fileName);
 
       await submitMutation.mutateAsync({
         candidateId,
@@ -343,19 +411,19 @@ export function RecaptureCameraScreen() {
                 {/* Badge trạng thái toạ độ trên ảnh */}
                 <View style={styles.previewOverlayBadge}>
                   <MaterialCommunityIcons
-                    color={photo.hasExifGps ? '#16A34A' : theme.primary}
-                    name={photo.hasExifGps ? 'check-circle' : 'crosshairs-gps'}
+                    color={photo.source === 'library' ? '#16A34A' : theme.primary}
+                    name={photo.source === 'library' ? 'check-circle' : 'crosshairs-gps'}
                     size={14}
                   />
                   <Text
                     style={[
                       styles.previewBadgeText,
-                      { color: photo.hasExifGps ? '#16A34A' : theme.primary },
+                      { color: photo.source === 'library' ? '#16A34A' : theme.primary },
                     ]}
                   >
-                    {photo.hasExifGps
-                      ? `Có metadata GPS (${photo.gps?.latitude.toFixed(4)}°, ${photo.gps?.longitude.toFixed(4)}°)`
-                      : 'Sử dụng GPS thiết bị'}
+                    {photo.source === 'library'
+                      ? `GPS từ metadata ảnh (${photo.gps?.latitude.toFixed(4)}°, ${photo.gps?.longitude.toFixed(4)}°)`
+                      : `GPS chụp tại chỗ (${photo.gps?.latitude.toFixed(4)}°, ${photo.gps?.longitude.toFixed(4)}°)`}
                   </Text>
                 </View>
 
@@ -372,13 +440,13 @@ export function RecaptureCameraScreen() {
                   </AppButton>
 
                   <AppButton
-                    accessibilityLabel="Đổi ảnh từ thư viện"
-                    onPress={handlePickLibrary}
+                    accessibilityLabel="Đổi ảnh khác"
+                    onPress={handlePickImage}
                     style={styles.actionSmallBtn}
                     variant="surface"
                   >
                     <MaterialCommunityIcons color={theme.text} name="image-edit-outline" size={16} />
-                    <Text style={[styles.actionSmallBtnText, { color: theme.text }]}>Thư viện ảnh</Text>
+                    <Text style={[styles.actionSmallBtnText, { color: theme.text }]}>Đổi ảnh</Text>
                   </AppButton>
                 </View>
               </View>
@@ -389,7 +457,7 @@ export function RecaptureCameraScreen() {
                   Chưa có ảnh nào được chọn
                 </Text>
                 <Text style={[styles.emptyPickDesc, { color: theme.grey }]}>
-                  Chọn ảnh chụp thực địa có lưu toạ độ GPS hoặc chụp trực tiếp.
+                  Chụp tại hiện trường hoặc chọn ảnh có toạ độ GPS từ máy.
                 </Text>
 
                 <View style={styles.pickButtonsRow}>
@@ -404,13 +472,13 @@ export function RecaptureCameraScreen() {
                   </AppButton>
 
                   <AppButton
-                    accessibilityLabel="Chọn ảnh từ thư viện"
-                    onPress={handlePickLibrary}
+                    accessibilityLabel="Chọn ảnh từ thiết bị"
+                    onPress={handlePickImage}
                     style={styles.pickButtonSurface}
                     variant="surface"
                   >
                     <MaterialCommunityIcons color={theme.text} name="image-multiple-outline" size={18} />
-                    <Text style={[styles.pickButtonSurfaceText, { color: theme.text }]}>Thư viện ảnh</Text>
+                    <Text style={[styles.pickButtonSurfaceText, { color: theme.text }]}>Chọn ảnh</Text>
                   </AppButton>
                 </View>
               </View>

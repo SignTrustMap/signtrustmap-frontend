@@ -7,14 +7,14 @@ import {
   BookOpen,
   MagnifyingGlass,
   CircleNotch,
-  Sparkle,
+  Tag,
 } from '@phosphor-icons/react'
 import {
   catalogService,
   type CatalogSignTypeItem,
   type SignCategoryItem,
 } from '@/api/services/catalog.service'
-import { mockCatalogData, type AvailableSignOption, type MissingSignTypeReport } from '@/data'
+import type { AvailableSignOption, MissingSignTypeReport } from '@/data'
 
 export interface MissingSignMergeModalProps {
   isOpen: boolean
@@ -41,13 +41,13 @@ export function MissingSignMergeModal({
   const [search, setSearch] = useState('')
   const [selectedCatId, setSelectedCatId] = useState<number | 'all'>('all')
 
-  // Live Catalog State from Backend API
+  // Live Catalog State from Backend API (100% Real API, zero mock data)
   const [signTypes, setSignTypes] = useState<CatalogSignTypeItem[]>([])
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
 
-  // Fetch live categories and sign types when modal opens
+  // Fetch live categories and all sign types from NestJS Backend API
   useEffect(() => {
     if (!isOpen || hasLoaded) return
 
@@ -56,7 +56,7 @@ export function MissingSignMergeModal({
 
     Promise.all([
       catalogService.getCategories().catch(() => []),
-      catalogService.getSignTypes({ pageSize: 300 }).catch(() => ({ items: [], total: 0 })),
+      catalogService.getAllSignTypes().catch(() => ({ items: [], total: 0 })),
     ])
       .then(([cats, signsRes]) => {
         if (!active) return
@@ -65,42 +65,13 @@ export function MissingSignMergeModal({
           setCategories(cats)
         }
 
-        if (signsRes?.items && signsRes.items.length > 0) {
+        if (signsRes?.items && Array.isArray(signsRes.items)) {
           setSignTypes(signsRes.items)
-        } else {
-          // Fallback to mock catalog
-          const fallback: CatalogSignTypeItem[] = mockCatalogData.map((s, idx) => ({
-            id: idx + 100,
-            categoryId: 1,
-            signCode: s.code,
-            nameVi: s.nameVi,
-            nameEn: s.nameEn,
-            description: s.descriptionVi || s.description,
-            shape: s.shape,
-            colorScheme: s.color,
-            isActive: true,
-          }))
-          setSignTypes(fallback)
         }
         setHasLoaded(true)
       })
       .catch((err) => {
-        console.warn('[MissingSignMergeModal] Fallback to mock catalog:', err)
-        if (active) {
-          const fallback: CatalogSignTypeItem[] = mockCatalogData.map((s, idx) => ({
-            id: idx + 100,
-            categoryId: 1,
-            signCode: s.code,
-            nameVi: s.nameVi,
-            nameEn: s.nameEn,
-            description: s.descriptionVi || s.description,
-            shape: s.shape,
-            colorScheme: s.color,
-            isActive: true,
-          }))
-          setSignTypes(fallback)
-          setHasLoaded(true)
-        }
+        console.error('[MissingSignMergeModal] Failed to load catalog from backend API:', err)
       })
       .finally(() => {
         if (active) setIsLoading(false)
@@ -176,7 +147,7 @@ export function MissingSignMergeModal({
           className="bg-white dark:bg-[#071317] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 text-gray-800 dark:text-gray-200"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* ─── MODAL HEADER (Identical to /review) ──────────────────── */}
+          {/* ─── MODAL HEADER (Y hệt trang /review web) ────────────────── */}
           <div className="p-5 sm:p-6 border-b border-gray-200 dark:border-white/10 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center shrink-0">
@@ -185,14 +156,14 @@ export function MissingSignMergeModal({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-extrabold text-base sm:text-lg text-gray-900 dark:text-white">
-                    {t('reviewer.modal_catalog_title', 'Danh mục Biển báo QCVN 41:2019')}
+                    {t('reviewer.modal_catalog_title', 'Chọn đúng loại biển từ Danh mục')}
                   </h3>
                   <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                     {signTypes.length} {t('reviewer.catalog_signs_count', 'biển báo')}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  Chọn đúng loại biển báo theo quy chuẩn để khớp đề xuất &ldquo;{selectedReport.tempLabel}&rdquo; (#{selectedReport.id.slice(0, 8)})
+                  Chọn đúng loại biển báo theo quy chuẩn QCVN 41:2019 để gộp đề xuất &ldquo;{selectedReport.tempLabel}&rdquo; (#{selectedReport.id.slice(0, 8)})
                 </p>
               </div>
             </div>
@@ -206,7 +177,7 @@ export function MissingSignMergeModal({
             </button>
           </div>
 
-          {/* ─── SEARCH & FILTER TOOLBAR (Pro Single-Row Layout) ───────── */}
+          {/* ─── SEARCH & FILTER TOOLBAR (Y hệt trang /review web) ─────── */}
           <div className="p-3.5 sm:p-4 border-b border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/30 shrink-0 relative z-20">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               {/* Search Input */}
@@ -255,7 +226,7 @@ export function MissingSignMergeModal({
             </div>
           </div>
 
-          {/* ─── SIGNS SCROLLABLE LIST (Exact /review style) ───────────── */}
+          {/* ─── SIGNS SCROLLABLE LIST (Y hệt trang /review web) ────────── */}
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-white/5 p-3 sm:p-4 min-h-[260px]">
             {isLoading ? (
               <div className="h-64 flex flex-col items-center justify-center gap-3">
@@ -319,13 +290,18 @@ export function MissingSignMergeModal({
                 })}
               </div>
             ) : (
-              <div className="h-60 flex flex-col items-center justify-center text-center p-6 space-y-2">
-                <Sparkle size={32} className="text-gray-300 dark:text-gray-600 mx-auto" />
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Không tìm thấy biển báo nào khớp với bộ lọc
+              <div className="py-16 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 mx-auto flex items-center justify-center">
+                  <Tag size={24} />
+                </div>
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                  {t('reviewer.catalog_no_match', 'Không tìm thấy biển báo phù hợp')}
                 </p>
-                <p className="text-xs text-gray-400 max-w-sm">
-                  Thử tìm với mã hiệu khác (ví dụ: P.102, W.205) hoặc xóa bộ lọc để xem toàn bộ danh mục.
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  {t(
+                    'reviewer.catalog_no_match_desc',
+                    'Thử tìm với từ khóa khác hoặc xóa bộ lọc để xem toàn bộ danh mục QCVN 41.'
+                  )}
                 </p>
                 {search && (
                   <button
@@ -336,14 +312,14 @@ export function MissingSignMergeModal({
                     }}
                     className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer pt-1"
                   >
-                    Xóa bộ lọc tìm kiếm
+                    {t('reviewer.catalog_clear_filters', 'Xóa bộ lọc tìm kiếm')}
                   </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* ─── MODAL FOOTER (Exact /review style) ────────────────────── */}
+          {/* ─── MODAL FOOTER (Y hệt trang /review web) ────────────────── */}
           <div className="p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between flex-wrap gap-2 text-xs bg-gray-50/70 dark:bg-white/[0.01] shrink-0">
             <span className="text-gray-500 dark:text-gray-400">
               {t(
@@ -356,7 +332,7 @@ export function MissingSignMergeModal({
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
-              {t('missing_signs.btn_cancel', 'Đóng')}
+              {t('common.cancel', 'Đóng')}
             </button>
           </div>
         </div>

@@ -139,7 +139,16 @@ export interface ApproveAndCreateSignTypeInput {
 export const catalogService = {
   // ── Categories ──────────────────────────────────────────────────
   getCategories: async (): Promise<SignCategoryItem[]> => {
-    return http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
+    const res = await http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
+    if (Array.isArray(res)) {
+      return res.filter(
+        (c) =>
+          !c.code?.toLowerCase().includes('mock') &&
+          !c.nameVi?.toLowerCase().includes('mock') &&
+          !c.nameEn?.toLowerCase().includes('mock')
+      )
+    }
+    return []
   },
 
   getCategoryById: async (id: number): Promise<SignCategoryItem> => {
@@ -165,9 +174,50 @@ export const catalogService = {
     if (params?.isActive !== undefined) q.isActive = params.isActive
     if (params?.search || params?.q) q.search = params.search || params.q
     if (params?.page !== undefined) q.page = params.page
-    if (params?.size || params?.pageSize) q.size = params.size || params.pageSize
+    const clampedSize = params?.size || params?.pageSize ? Math.min(100, Math.max(1, (params?.size || params?.pageSize)!)) : 100
+    q.size = clampedSize
 
-    return http.get<PaginatedSignTypesResponse>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params: q })
+    const res = await http.get<any>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params: q })
+    const items: CatalogSignTypeItem[] = res?.content || res?.items || (Array.isArray(res) ? res : [])
+    const total: number = res?.totalElements ?? res?.total ?? items.length
+    const page: number = res?.page ?? 0
+    const pageSize: number = res?.size ?? clampedSize
+    const totalPages: number = res?.totalPages ?? Math.ceil(total / Math.max(1, pageSize))
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
+  },
+
+  getAllSignTypes: async (params?: Omit<ListSignTypesParams, 'page' | 'size' | 'pageSize'>): Promise<{
+    items: CatalogSignTypeItem[]
+    total: number
+  }> => {
+    const firstPage = await catalogService.getSignTypes({ ...params, page: 0, size: 100 })
+    const all = [...(firstPage.items || [])]
+    const total = firstPage.total || all.length
+    const totalPages = firstPage.totalPages || Math.ceil(total / 100)
+
+    if (totalPages > 1) {
+      const remainingPromises = []
+      for (let p = 1; p < totalPages; p++) {
+        remainingPromises.push(
+          catalogService.getSignTypes({ ...params, page: p, size: 100 }).catch(() => ({ items: [] }))
+        )
+      }
+      const rest = await Promise.all(remainingPromises)
+      rest.forEach((batch) => {
+        if (batch.items && batch.items.length > 0) {
+          all.push(...batch.items)
+        }
+      })
+    }
+
+    return { items: all, total }
   },
 
   getSignTypeById: async (id: number): Promise<CatalogSignTypeItem> => {
@@ -219,8 +269,27 @@ export const catalogService = {
 
   approveAndCreateType: async (
     id: string,
-    data: ApproveAndCreateSignTypeInput
+    data: ApproveAndCreateSignTypeInput,
+    file?: File
   ): Promise<{ message?: string; report?: MissingTypeReportItem; createdSignType?: CatalogSignTypeItem; signType?: CatalogSignTypeItem }> => {
+    if (file) {
+      const formData = new FormData()
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          formData.append(key, String(val))
+        }
+      })
+      formData.append('file', file)
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
     return http.post(
       API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
       data
