@@ -63,7 +63,7 @@ export function ClassesTab({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono uppercase border-b border-gray-200 dark:border-white/10">
+              <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
                 <tr>
                   <th className="py-3 px-4 font-semibold w-24">{t('mlops.classes_th_id')}</th>
                   <th className="py-3 px-4 font-semibold w-64">{t('mlops.classes_th_name')}</th>

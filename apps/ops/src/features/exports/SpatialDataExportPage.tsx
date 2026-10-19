@@ -292,7 +292,7 @@ export default function SpatialDataExportPage() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/80 dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 font-mono uppercase text-[11px] border-b border-gray-200/80 dark:border-white/10">
+            <thead className="bg-gray-50/80 dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 font-mono text-[11px] border-b border-gray-200/80 dark:border-white/10">
               <tr>
                 <th className="py-3 px-4 font-semibold">{t('exports.th_job_id')}</th>
                 <th className="py-3 px-4 font-semibold">{t('exports.th_format')}</th>

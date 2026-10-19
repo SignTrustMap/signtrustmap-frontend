@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
@@ -23,12 +23,17 @@ import {
  * Handles credential-based login for Staff and Admin roles with RBAC enforcement.
  */
 export default function LoginPage() {
-  const { login, isLoading } = useAuth()
+  const { login, isLoading, isAuthenticated } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { t, i18n } = useTranslation('common')
   const toast = useToast()
   const navigate = useNavigate()
-  const [params] = useSearchParams()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -97,13 +102,7 @@ export default function LoginPage() {
 
     try {
       await login(cleanEmail, password)
-      const next = params.get('next') ?? null
-      const isAdmin = email.toLowerCase().includes('admin')
-      if (next) {
-        navigate(next, { replace: true })
-      } else {
-        navigate(isAdmin ? '/' : '/', { replace: true })
-      }
+      navigate('/', { replace: true })
     } catch (err) {
       let msg = t('login.err_login_failed')
       if (

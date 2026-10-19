@@ -284,7 +284,7 @@ export function Sidebar() {
             {isCollapsed ? (
               sIdx > 0 && <div className="w-8 h-px bg-gray-200 dark:bg-white/10 mx-auto my-2" />
             ) : (
-              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono select-none">
+              <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-gray-400 dark:text-gray-500 select-none">
                 {section.title}
               </p>
             )}

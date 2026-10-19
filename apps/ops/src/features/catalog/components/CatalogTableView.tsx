@@ -34,7 +34,7 @@ export const CatalogTableView: React.FC<CatalogTableViewProps> = ({
     <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono uppercase border-b border-gray-200 dark:border-white/10">
+          <thead className="bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
             <tr>
               <th className="py-3 px-4 font-semibold text-center w-16">{t('catalog.th_preview')}</th>
               <th className="py-3 px-4 font-semibold">{t('catalog.th_code_name')}</th>

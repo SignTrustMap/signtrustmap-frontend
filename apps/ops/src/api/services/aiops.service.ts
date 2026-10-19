@@ -1,7 +1,7 @@
 import { http, type ApiResponse } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
 import { edgeFetch } from '../edgeClient'
-import type { ModelRetrainingRun } from '@/data/adminGovernanceData'
+import type { ModelRetrainingRun } from '@shared/types'
 
 export interface SystemHardwareMetrics {
   timestamp: string

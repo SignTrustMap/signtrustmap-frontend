@@ -525,10 +525,10 @@ export default function AdminEscalationsPage() {
   const hasValidMapLocation = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full animate-in fade-in duration-200">
+    <div className="p-6 sm:p-8 w-full max-w-[1680px] mx-auto space-y-6 animate-in fade-in duration-200">
       {/* ─── PAGE HEADER ──────────────────────────────────────────────── */}
       <PageHeader
-        title={t('escalations.title', isEn ? 'High-Level Escalations' : 'Phê duyệt Cấp cao')}
+        title={t('escalations.title', isEn ? 'High-Level Escalations' : 'Phê duyệt cấp cao')}
         actions={
           <button
             type="button"
@@ -584,14 +584,14 @@ export default function AdminEscalationsPage() {
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono uppercase border-b border-gray-200 dark:border-white/10">
+            <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
               <tr>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'ID' : 'Mã Ca'}</th>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'Case Type' : 'Phân Loại'}</th>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'Target Entity' : 'Đối Tượng'}</th>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'Status' : 'Trạng Thái'}</th>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'Created At' : 'Thời Gian Tạo'}</th>
-                <th className="py-3 px-4 font-semibold text-center">{isEn ? 'Details' : 'Chi Tiết'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'ID' : 'Mã ca'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Case type' : 'Phân loại'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Target entity' : 'Đối tượng'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Status' : 'Trạng thái'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Created at' : 'Thời gian tạo'}</th>
+                <th className="py-3 px-4 font-semibold text-center">{isEn ? 'Details' : 'Chi tiết'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">

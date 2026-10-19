@@ -114,16 +114,16 @@ export function MissingSignsTableView({
     <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono uppercase border-b border-gray-200 dark:border-white/10">
+          <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
             <tr>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Proposal ID' : 'Mã Đề Xuất'}</th>
-              <th className="py-3 px-4 font-semibold min-w-[200px]">{isEn ? 'Proposed Sign' : 'Tên Biển Đề Xuất'}</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Category' : 'Nhóm Biển'}</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Evidence' : 'Ảnh Thực Địa'}</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Reporter' : 'Người Tạo'}</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Created At' : 'Thời Gian Tạo'}</th>
-              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Status' : 'Trạng Thái'}</th>
-              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">{isEn ? 'Details' : 'Chi Tiết'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Proposal ID' : 'Mã đề xuất'}</th>
+              <th className="py-3 px-4 font-semibold min-w-[200px]">{isEn ? 'Proposed sign' : 'Tên biển đề xuất'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Category' : 'Nhóm biển'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Evidence' : 'Ảnh thực địa'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Reporter' : 'Người tạo'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Created at' : 'Thời gian tạo'}</th>
+              <th className="py-3 px-4 font-semibold whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
+              <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">{isEn ? 'Details' : 'Chi tiết'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-white/5">

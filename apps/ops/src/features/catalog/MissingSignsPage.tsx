@@ -477,7 +477,7 @@ export default function MissingSignsPage() {
     <div className="p-4 sm:p-6 lg:p-8 w-full max-w-[1680px] mx-auto space-y-6">
       {/* ─── HEADER ─────────────────────────────────────────────────── */}
       <PageHeader
-        title={t('missing_signs.title', 'Đề xuất Biển mới')}
+        title={t('missing_signs.title', 'Đề xuất biển mới')}
         subtitle={t('missing_signs.subtitle', 'Xem xét và thẩm tra các báo cáo biển báo thực tế chưa có trong danh mục do cộng đồng đóng góp.')}
         actions={
           <div className="flex items-center gap-2">
