@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Animated, BackHandler, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -11,6 +11,7 @@ import { Image } from "react-native";
 import { AppButton } from "@/components/button";
 import { Badge } from "@/components/badge";
 import { AppToast } from "@/components/toast";
+import { OfflineMapModal } from "@/components/offline-map-modal";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";
@@ -845,6 +846,7 @@ export function NavigationMapScreen() {
   const createSavedRouteMutation = useCreateSavedRoute();
   const updateSavedRouteMutation = useUpdateSavedRoute();
   const [isBookmarkModalOpen, setIsBookmarkModalOpen] = useState(false);
+  const [isOfflineMapModalOpen, setIsOfflineMapModalOpen] = useState(false);
   const [bookmarkTitleInput, setBookmarkTitleInput] = useState('');
   const [bookmarkCategories, setBookmarkCategories] = useState<Set<SignCategory>>(
     new Set(['MANDATORY', 'WARNING', 'PROHIBITORY'])
@@ -1854,6 +1856,27 @@ export function NavigationMapScreen() {
                     </Pressable>
                   </View>
                   <>
+                    <AppButton
+                      accessibilityLabel="Bản đồ ngoại tuyến"
+                      variant="ghost"
+                      onPress={() => setIsOfflineMapModalOpen(true)}
+                      style={[
+                        {
+                          backgroundColor: theme.background,
+                          boxShadow: '0px 4px 12px 1px #ccc',
+                          marginLeft: 'auto',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: Spacing.half,
+                        }
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name="map-marker-down"
+                        size={22}
+                        color={theme.primary}
+                      />
+                    </AppButton>
                     <AppButton
                       accessibilityLabel="Phát trực tiếp"
                       variant="ghost"
@@ -3050,6 +3073,12 @@ export function NavigationMapScreen() {
           </View>
         </View>
       </Modal>
+
+      <OfflineMapModal
+        accessToken={session?.accessToken}
+        onClose={() => setIsOfflineMapModalOpen(false)}
+        visible={isOfflineMapModalOpen}
+      />
     </View>
   );
 }

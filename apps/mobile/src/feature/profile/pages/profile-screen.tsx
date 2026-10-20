@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
+import { OfflineMapModal } from '@/components/offline-map-modal';
 import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -80,6 +81,7 @@ export function ProfileScreen() {
   const [isFilterSectionOpen, setIsFilterSectionOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 195, right: 20 });
+  const [isOfflineMapModalOpen, setIsOfflineMapModalOpen] = useState(false);
 
   const performScrollToSignFilter = useCallback(() => {
     if (scrollTo !== 'signFilter' && scrollTo !== 'sign-filter') return;
@@ -424,6 +426,38 @@ export function ProfileScreen() {
               </View>
             ) : null}
           </View>
+
+          {/* Section 3: Offline Maps Card */}
+          <View
+            style={[
+              styles.collapsibleCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Mở quản lý bản đồ ngoại tuyến"
+              accessibilityRole="button"
+              onPress={() => setIsOfflineMapModalOpen(true)}
+              style={styles.collapsibleHeader}
+            >
+              <View style={styles.headerLeft}>
+                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                  <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
+                </View>
+                <View style={styles.headerTitles}>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                  <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
+                    Tải và quản lý gói dữ liệu PMTiles ngoại tuyến
+                  </Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons
+                color={theme.placeholder}
+                name="chevron-right"
+                size={22}
+              />
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
 
@@ -476,6 +510,29 @@ export function ProfileScreen() {
             <View style={[styles.dropdownDivider, { backgroundColor: theme.border }]} />
 
             <Pressable
+              accessibilityLabel="Bản đồ ngoại tuyến"
+              accessibilityRole="button"
+              onPress={() => {
+                setIsMenuOpen(false);
+                setIsOfflineMapModalOpen(true);
+              }}
+              style={({ pressed }) => [
+                styles.dropdownItem,
+                { backgroundColor: pressed ? theme.background : 'transparent' },
+              ]}
+            >
+              <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={18} />
+              <View style={styles.dropdownItemTextGroup}>
+                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                <Text style={[styles.dropdownItemSublabel, { color: theme.placeholder }]}>
+                  Quản lý gói PMTiles
+                </Text>
+              </View>
+            </Pressable>
+
+            <View style={[styles.dropdownDivider, { backgroundColor: theme.border }]} />
+
+            <Pressable
               accessibilityLabel="Đăng xuất"
               accessibilityRole="button"
               onPress={() => {
@@ -503,6 +560,12 @@ export function ProfileScreen() {
         releaseInfo={releaseInfo}
         status={status}
         visible={isModalOpen}
+      />
+
+      <OfflineMapModal
+        accessToken={session?.accessToken}
+        onClose={() => setIsOfflineMapModalOpen(false)}
+        visible={isOfflineMapModalOpen}
       />
     </View>
   );

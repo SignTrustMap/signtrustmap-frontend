@@ -881,6 +881,7 @@ export function MissingSignInspectionModal({
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2 font-bold">
                         <div className={`flex items-center gap-1.5 ${decisionConfig.titleClass}`}>
+                          <DecisionIcon size={15} weight="fill" className={decisionConfig.iconClass} />
                           <span>Kết quả xử lý</span>
                         </div>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${decisionConfig.badgeClass}`}>

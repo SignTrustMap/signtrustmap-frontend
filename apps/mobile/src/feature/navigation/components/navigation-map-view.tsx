@@ -19,11 +19,13 @@ import {
   type MapCoordinate,
   type PreviousLocation,
   type VehicleMode,
+  type InstalledOfflineMapPack,
 } from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
+import { offlineMapService } from '@/services/offline-map-service';
 import {
   MAP_BUILD_REQUIRED_DESCRIPTION,
   MAP_BUILD_REQUIRED_TITLE,
@@ -468,10 +470,20 @@ export function NavigationMapView({
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignPressTimeRef = useRef<number>(0);
   const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
+  const [activeOfflinePack, setActiveOfflinePack] = useState<InstalledOfflineMapPack | null>(null);
   // Tracks whether the navigation Camera's native view is ready to receive setStop commands.
   // When navigationActive flips on the Camera key changes, causing a remount — calling
   // setStop before the native view is attached causes the 'reactTag null' crash.
   const cameraReadyRef = useRef(false);
+
+  useEffect(() => {
+    void offlineMapService.getActiveOfflinePack().then(setActiveOfflinePack);
+    const unsub = offlineMapService.subscribeToMetadata((meta) => {
+      const active = meta.activePackId ? meta.installedPacks[meta.activePackId] || null : null;
+      setActiveOfflinePack(active);
+    });
+    return unsub;
+  }, []);
 
   // Auto-dismiss the callout after 4 seconds ONLY when a destination is selected
   useEffect(() => {
@@ -918,6 +930,15 @@ export function NavigationMapView({
           sign={selectedSign}
         />
       ) : null}
+
+      {activeOfflinePack ? (
+        <View style={styles.offlineIndicatorBadge}>
+          <MaterialCommunityIcons color="#059669" name="map-check" size={14} />
+          <Text style={styles.offlineIndicatorText} numberOfLines={1}>
+            Offline: {activeOfflinePack.name}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -926,6 +947,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative',
+  },
+  offlineIndicatorBadge: {
+    position: 'absolute',
+    top: 56,
+    right: 16,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Rounded.full,
+    borderWidth: 1,
+    borderColor: '#10B98150',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 3,
+    maxWidth: 220,
+  },
+  offlineIndicatorText: {
+    fontFamily: Fonts.heading,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
   },
   map: {
     flex: 1,

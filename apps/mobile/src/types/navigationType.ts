@@ -168,3 +168,63 @@ export type ConfirmSignDto = {
   photoEvidenceUrl?: string;
   note?: string;
 };
+
+// ── Offline PMTiles Map Packs ───────────────────────────────────────────────
+
+export type OfflineMapPack = {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  countryCode: string;
+  format: string;
+  fileName: string;
+  sizeBytes: number;
+  sizeMb: number;
+  minZoom: number;
+  maxZoom: number;
+  bounds: [number, number, number, number];
+  isAvailable: boolean;
+  lastModified?: string | null;
+  downloadUrl: string;
+};
+
+export type OfflineMapPacksResponse = {
+  packs: OfflineMapPack[];
+  total: number;
+};
+
+export type OfflinePackDownloadStatus =
+  | 'idle'
+  | 'downloading'
+  | 'paused'
+  | 'completed'
+  | 'error';
+
+export type OfflineMapPackDownloadProgress = {
+  packId: string;
+  totalBytes: number;
+  downloadedBytes: number;
+  percentage: number;
+  status: OfflinePackDownloadStatus;
+  errorMessage?: string;
+};
+
+export type InstalledOfflineMapPack = {
+  packId: string;
+  name: string;
+  fileName: string;
+  localPath: string;
+  fileUri: string;
+  sizeBytes: number;
+  installedAt: number;
+  bounds: [number, number, number, number];
+  minZoom: number;
+  maxZoom: number;
+};
+
+export type OfflineMapStorageMetadata = {
+  installedPacks: Record<string, InstalledOfflineMapPack>;
+  activePackId: string | null;
+};
+
