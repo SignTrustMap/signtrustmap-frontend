@@ -8,14 +8,14 @@ Hệ thống Design Tokens và thư viện giao diện cơ sở (UI Primitives) 
 
 ## 🏛️ Kiến trúc 3 tầng quản lý Design Tokens
 
-```
-                ┌──────────────────────────────┐
-                │ 3. UI Primitives (@shared/ui)│ <- Button, Card, Badge, Select, FilterBar
-                ├──────────────────────────────┤
-                │ 2. Tailwind v4 Theme (@theme)│ <- apps/web & apps/ops index.css
-                ├──────────────────────────────┤
-                │ 1. Tokens SSOT (TypeScript)  │ <- packages/ui/src/tokens/index.ts
-                └──────────────────────────────┘
+```mermaid
+flowchart TD
+    T3["3. UI Primitives (@shared/ui)<br/>Button, Card, Badge, Select, FilterBar"]
+    T2["2. Tailwind v4 Theme (@theme)<br/>apps/web & apps/ops index.css"]
+    T1["1. Tokens SSOT (TypeScript)<br/>packages/ui/src/tokens/index.ts"]
+
+    T3 -->|"Consumes theme"| T2
+    T2 -->|"Builds upon SSOT"| T1
 ```
 
 ---
