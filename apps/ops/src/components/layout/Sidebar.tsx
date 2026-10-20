@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react'
 import { UserDropdownMenu } from './UserDropdownMenu'
 import { ProfileModal } from './ProfileModal'
+import { useNavBadges } from '@/hooks/useNavBadges'
 
 interface NavSection {
   title: string
@@ -36,6 +37,7 @@ interface NavSection {
 
 export function Sidebar() {
   const { user } = useAuth()
+  const { badges } = useNavBadges()
   const { t } = useTranslation('common')
   const location = useLocation()
   const { isCollapsed } = useSidebar()
@@ -77,7 +79,7 @@ export function Sidebar() {
           icon: <ShieldWarning size={18} weight="duotone" />,
           label: t('nav.escalations'),
           href: '/escalations',
-          badge: 5,
+          badge: badges.escalations,
         },
         {
           icon: <Users size={18} weight="duotone" />,
@@ -157,7 +159,7 @@ export function Sidebar() {
           icon: <ShieldCheck size={18} weight="duotone" />,
           label: t('nav.candidates'),
           href: '/candidates',
-          badge: 4,
+          badge: badges.candidates,
         },
         {
           icon: <MapTrifold size={18} weight="duotone" />,
@@ -168,7 +170,7 @@ export function Sidebar() {
           icon: <CheckSquare size={18} weight="duotone" />,
           label: t('nav.tasks'),
           href: '/tasks',
-          badge: 3,
+          badge: badges.tasks,
         },
         {
           icon: <ClipboardText size={18} weight="duotone" />,
@@ -189,7 +191,7 @@ export function Sidebar() {
           icon: <Question size={18} weight="duotone" />,
           label: t('nav.new_types'),
           href: '/catalog/new-types',
-          badge: 4,
+          badge: badges.newTypes,
         },
         {
           icon: <CurrencyCircleDollar size={18} weight="duotone" />,

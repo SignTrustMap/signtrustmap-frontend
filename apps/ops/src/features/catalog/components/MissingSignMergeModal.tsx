@@ -20,9 +20,10 @@ export interface MissingSignMergeModalProps {
   isOpen: boolean
   selectedReport: MissingSignTypeReport | null
   selectedCatalogCode?: string
+  initialNote?: string
   onClose: () => void
   onSelectCatalogCode?: (code: string, signTypeId?: number) => void
-  onSubmit?: (overrideCode?: string, overrideSignTypeId?: number) => void
+  onSubmit?: (overrideCode?: string, overrideSignTypeId?: number, note?: string) => void
   // Optional backward compatibility props
   catalogSearch?: string
   filteredCatalogSigns?: AvailableSignOption[]
@@ -32,6 +33,7 @@ export interface MissingSignMergeModalProps {
 export function MissingSignMergeModal({
   isOpen,
   selectedReport,
+  initialNote = '',
   onClose,
   onSelectCatalogCode,
   onSubmit,
@@ -40,6 +42,13 @@ export function MissingSignMergeModal({
 
   const [search, setSearch] = useState('')
   const [selectedCatId, setSelectedCatId] = useState<number | 'all'>('all')
+  const [note, setNote] = useState(initialNote)
+
+  useEffect(() => {
+    if (isOpen) {
+      setNote(initialNote || '')
+    }
+  }, [isOpen, initialNote])
 
   // Live Catalog State from Backend API (100% Real API, zero mock data)
   const [signTypes, setSignTypes] = useState<CatalogSignTypeItem[]>([])
@@ -132,7 +141,7 @@ export function MissingSignMergeModal({
 
   const handleSelectSign = (sign: CatalogSignTypeItem) => {
     onSelectCatalogCode?.(sign.signCode, sign.id)
-    onSubmit?.(sign.signCode, sign.id)
+    onSubmit?.(sign.signCode, sign.id, note.trim())
   }
 
   if (!isOpen || !selectedReport) return null
@@ -320,17 +329,24 @@ export function MissingSignMergeModal({
           </div>
 
           {/* ─── MODAL FOOTER (Y hệt trang /review web) ────────────────── */}
-          <div className="p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between flex-wrap gap-2 text-xs bg-gray-50/70 dark:bg-white/[0.01] shrink-0">
-            <span className="text-gray-500 dark:text-gray-400">
-              {t(
-                'reviewer.catalog_not_found',
-                'Không tìm thấy biển báo cần thiết trong quy chuẩn QCVN 41?'
-              )}
-            </span>
+          <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-between flex-wrap gap-3 text-xs bg-gray-50/70 dark:bg-white/[0.01] shrink-0">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px] max-w-md">
+              <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 shrink-0">
+                Ghi chú:
+              </span>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Nhập ghi chú gộp biển (không bắt buộc)..."
+                className="w-full px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-black/50 border-gray-300 dark:border-white/15 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] transition-colors"
+              />
+            </div>
+
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0 ml-auto"
             >
               {t('common.cancel', 'Đóng')}
             </button>

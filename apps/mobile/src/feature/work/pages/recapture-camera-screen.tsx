@@ -33,11 +33,11 @@ interface SelectedPhoto {
 }
 
 const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  BLURRY: { label: 'Ảnh mờ / rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
-  POOR_LIGHTING: { label: 'Thiếu sáng / ngược sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
-  WRONG_ANGLE: { label: 'Góc chụp nghiêng / lệch', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
+  POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
   OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
-  MISSING_CONTEXT: { label: 'Thiếu góc toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
+  MISSING_CONTEXT: { label: 'Thiếu ảnh toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
   OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
 };
 
@@ -376,7 +376,7 @@ export function RecaptureCameraScreen() {
                 </View>
                 {note ? (
                   <Text numberOfLines={2} style={[styles.noteText, { color: theme.textSecondary }]}>
-                    {`Hướng dẫn: "${note}"`}
+                    {`Ghi chú: "${note}"`}
                   </Text>
                 ) : null}
                 {!Number.isNaN(targetLat) && !Number.isNaN(targetLon) ? (

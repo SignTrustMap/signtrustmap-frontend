@@ -161,6 +161,7 @@ export default function TasksPage() {
     } finally {
       setIsFinalizing(false)
       setSelectedTask(null)
+      window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     }
   }
 

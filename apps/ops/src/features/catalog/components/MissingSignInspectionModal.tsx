@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ModalPortal } from '@/components/common/ModalPortal'
+import { catalogService } from '@/api/services/catalog.service'
 import {
   X,
   Copy,
@@ -21,8 +22,17 @@ import {
 import { CategoryBadge } from './MissingSignsBadges'
 import { SignMiniMap } from './SignMiniMap'
 import CustomSelect from '@/components/common/CustomSelect'
-import type { MissingSignTypeReport } from '@/data'
+import { type MissingSignTypeReport, candidateRecaptureCache } from '@/data'
 import type { RecaptureReasonCode, MissingRejectReasonKey } from './index'
+
+export const REASON_TEXT_MAP: Record<string, string> = {
+  BLURRY: 'Ảnh mờ hoặc rung tay',
+  POOR_LIGHTING: 'Ngược sáng hoặc thiếu sáng',
+  WRONG_ANGLE: 'Góc chụp quá nghiêng',
+  OCCLUDED: 'Bị vật cản che khuất',
+  MISSING_CONTEXT: 'Thiếu ảnh toàn cảnh',
+  OTHER: 'Lý do khác',
+}
 
 const RECAPTURE_REASON_OPTIONS = [
   { value: 'BLURRY', label: 'Ảnh mờ hoặc rung tay' },
@@ -43,7 +53,7 @@ interface MissingSignInspectionModalProps {
   report: MissingSignTypeReport
   isAdmin?: boolean
   onClose: () => void
-  onOpenMerge: () => void
+  onOpenMerge: (note?: string) => void
   onOpenEscalate?: () => void
   onOpenReject?: () => void
   onOpenApprove?: () => void
@@ -232,12 +242,81 @@ export function MissingSignInspectionModal({
   })
 
   const [escalateNotes, setEscalateNotes] = useState('')
+  const [mergeNotes, setMergeNotes] = useState('')
   const [recaptureReason, setRecaptureReason] = useState<RecaptureReasonCode>('BLURRY')
   const [recaptureNote, setRecaptureNote] = useState(
     'Ảnh biển báo bị mờ hoặc rung tay, vui lòng chụp thẳng góc và rõ nét hơn tại vị trí này.'
   )
   const [rejectReason, setRejectReason] = useState<MissingRejectReasonKey>('reason_not_sign')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [recaptureDetails, setRecaptureDetails] = useState<{
+    reason?: string
+    note?: string
+    createdAt?: string
+  } | null>(() => {
+    if (report.status !== 'Incomplete') return null
+    if (report.recaptureRequest) {
+      if (report.candidateId) candidateRecaptureCache.set(report.candidateId, report.recaptureRequest)
+      return report.recaptureRequest
+    }
+    if (report.candidateId && candidateRecaptureCache.has(report.candidateId)) {
+      return candidateRecaptureCache.get(report.candidateId)!
+    }
+    return null
+  })
+
+  const [isLoadingRecapture, setIsLoadingRecapture] = useState<boolean>(() => {
+    if (report.status !== 'Incomplete' || !report.candidateId) return false
+    if (report.recaptureRequest || candidateRecaptureCache.has(report.candidateId)) return false
+    return true
+  })
+
+  useEffect(() => {
+    if (report.status !== 'Incomplete' || !report.candidateId) {
+      setRecaptureDetails(null)
+      setIsLoadingRecapture(false)
+      return
+    }
+
+    const cached = report.recaptureRequest || candidateRecaptureCache.get(report.candidateId)
+    if (cached) {
+      setRecaptureDetails(cached)
+      setIsLoadingRecapture(false)
+      return
+    }
+
+    let active = true
+    setIsLoadingRecapture(true)
+
+    catalogService
+      .getCandidateRecaptures(report.candidateId)
+      .then((res) => {
+        if (!active) return
+        if (Array.isArray(res) && res.length > 0) {
+          const latest = res[0]
+          const data = {
+            reason: latest.reason,
+            note: latest.note || '',
+            createdAt: latest.createdAt || latest.created_at,
+          }
+          candidateRecaptureCache.set(report.candidateId!, data)
+          setRecaptureDetails(data)
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load candidate recaptures:', err)
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingRecapture(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [report.status, report.candidateId, report.recaptureRequest])
 
   const hasContextFrame = Boolean(report.bestFrameUrl)
   const activeImageUrl =
@@ -292,7 +371,7 @@ export function MissingSignInspectionModal({
     }
 
     if (actionType === 'MERGE') {
-      onOpenMerge()
+      onOpenMerge(mergeNotes.trim())
       return
     }
 
@@ -710,9 +789,23 @@ export function MissingSignInspectionModal({
                     )}
 
                     {actionType === 'MERGE' && (
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 py-0.5 leading-relaxed">
-                        Gộp đề xuất này vào một loại biển báo đã tồn tại trong Catalog. Bước tiếp theo sẽ mở danh mục tra cứu để chọn biển báo chuẩn.
-                      </p>
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 py-0.5 leading-relaxed">
+                          Gộp đề xuất này vào một loại biển báo đã tồn tại trong Catalog. Bước tiếp theo sẽ mở danh mục tra cứu để chọn biển báo chuẩn.
+                        </p>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                            Ghi chú:
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={mergeNotes}
+                            onChange={(e) => setMergeNotes(e.target.value)}
+                            placeholder="Nhập ghi chú gộp biển (không bắt buộc)..."
+                            className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {actionType === 'ESCALATE' && (
@@ -749,13 +842,13 @@ export function MissingSignInspectionModal({
                         </div>
                         <div className="space-y-1">
                           <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                            Hướng dẫn cụ thể: <span className="text-red-500">*</span>
+                            Ghi chú: <span className="text-red-500">*</span>
                           </label>
                           <textarea
                             rows={2}
                             value={recaptureNote}
                             onChange={(e) => setRecaptureNote(e.target.value)}
-                            placeholder="Nhập yêu cầu chụp lại cho Surveyor..."
+                            placeholder="Nhập ghi chú..."
                             className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
                           />
                         </div>
@@ -784,26 +877,58 @@ export function MissingSignInspectionModal({
 
                 {/* Resolved / Closed State View - Clean, direct, no parentheses or quotation marks */}
                 {isResolvedOrClosed && (
-                  <div className={`p-3 rounded-xl border ${decisionConfig.cardClass} space-y-1.5`}>
+                  <div className={`p-3 rounded-xl border ${decisionConfig.cardClass} space-y-2`}>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2 font-bold">
                         <div className={`flex items-center gap-1.5 ${decisionConfig.titleClass}`}>
-                          <DecisionIcon size={15} weight="fill" className={decisionConfig.iconClass} />
                           <span>Kết quả xử lý</span>
                         </div>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${decisionConfig.badgeClass}`}>
                           {decisionConfig.label}
                         </span>
                       </div>
-                      {(report.resolvedAt || report.updatedAt) && (
+                      {(report.status === 'Incomplete'
+                        ? recaptureDetails?.createdAt
+                        : (report.resolvedAt || report.updatedAt)) && (
                         <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                          {formatDate(report.resolvedAt || report.updatedAt)}
+                          {formatDate(
+                            report.status === 'Incomplete'
+                              ? recaptureDetails?.createdAt
+                              : (report.resolvedAt || report.updatedAt)
+                          )}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
-                      {report.staffNotes || decisionConfig.defaultNote}
-                    </p>
+
+                    {report.status === 'Incomplete' ? (
+                      isLoadingRecapture ? (
+                        <div className="space-y-2 py-1 animate-pulse">
+                          <div className="h-3.5 bg-amber-200/50 dark:bg-amber-800/30 rounded w-1/3" />
+                          <div className="h-3.5 bg-amber-200/40 dark:bg-amber-800/20 rounded w-2/3" />
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-800 dark:text-gray-200 space-y-1.5 pt-0.5">
+                          {recaptureDetails?.reason && (
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Lý do:</span>
+                              <span className="font-semibold text-amber-700 dark:text-amber-400">
+                                {REASON_TEXT_MAP[recaptureDetails.reason] || recaptureDetails.reason}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-gray-500 dark:text-gray-400 shrink-0 font-medium">Ghi chú:</span>
+                            <span className="leading-relaxed">
+                              {recaptureDetails?.note || report.staffNotes || decisionConfig.defaultNote}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
+                        {report.staffNotes || decisionConfig.defaultNote}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

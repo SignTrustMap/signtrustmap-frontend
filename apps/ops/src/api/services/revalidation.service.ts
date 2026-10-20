@@ -37,8 +37,8 @@ export const revalidationService = {
   /**
    * List revalidation verification tasks
    */
-  getTasks: async (params?: ListTasksParams): Promise<PaginatedRevalidationTasksResponse> => {
-    return http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASKS, { params })
+  getTasks: async (params?: ListTasksParams, config?: Record<string, any>): Promise<PaginatedRevalidationTasksResponse> => {
+    return http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASKS, { params, ...config })
   },
 
   /**

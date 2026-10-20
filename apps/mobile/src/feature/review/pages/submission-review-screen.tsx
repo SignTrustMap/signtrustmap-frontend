@@ -102,7 +102,6 @@ export const REPORT_ISSUE_OPTIONS: Array<{
   {
     id: 'missing_type',
     label: 'Sign not in catalog',
-    badge: 'Flow 4',
   },
   {
     id: 'other',

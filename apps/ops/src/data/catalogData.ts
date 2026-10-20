@@ -59,7 +59,17 @@ export interface MissingSignTypeReport {
   createdAt?: string
   updatedAt?: string
   resolvedAt?: string | null
+  recaptureRequest?: {
+    reason: string
+    note: string
+    createdAt?: string
+  } | null
 }
+
+export const candidateRecaptureCache = new Map<
+  string,
+  { reason: string; note: string; createdAt?: string }
+>()
 
 export interface AvailableSignOption {
   id?: number

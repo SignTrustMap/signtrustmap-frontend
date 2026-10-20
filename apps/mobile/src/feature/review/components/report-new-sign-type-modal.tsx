@@ -251,7 +251,7 @@ export function ReportNewSignTypeModal({
               {/* Description */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Description / Real-world Context
+                  Description
                 </Text>
                 <TextInput
                   accessibilityLabel="Description"
@@ -268,10 +268,6 @@ export function ReportNewSignTypeModal({
                   value={description}
                 />
               </View>
-
-              <Text style={[styles.noticeNote, { color: theme.textSecondary }]}>
-                💡 This candidate will be held in MISSING_TYPE_HOLD status and paused from peer consensus voting until appraised by Staff/Admin.
-              </Text>
             </ScrollView>
 
             <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>

@@ -89,6 +89,7 @@ export const API_ENDPOINTS = {
     CANDIDATE_DETAIL: (id: string) => `/api/v1/reviews/candidates/${id}`,
     DECISION: (id: string) => `/api/v1/reviews/${id}/vote`,
     REQUEST_RECAPTURE: (candidateId: string) => `/api/v1/reviews/candidates/${candidateId}/request-recapture`,
+    CANDIDATE_RECAPTURES: (candidateId: string) => `/api/v1/reviews/candidates/${candidateId}/recaptures`,
     REPORTS: '/api/v1/moderation/cases',
     TASKS: '/api/v1/revalidation/tasks',
   },

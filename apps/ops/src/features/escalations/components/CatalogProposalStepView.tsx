@@ -4,6 +4,7 @@ import CustomSelect from '@/components/common/CustomSelect'
 import { CircleNotch } from '@phosphor-icons/react'
 import {
   catalogService,
+  STANDARD_SIGN_CATEGORIES,
   type SignCategoryItem,
 } from '@/api/services/catalog.service'
 import { escalationService } from '@/api/services/escalation.service'
@@ -98,20 +99,23 @@ export function CatalogProposalStepView({
             !c.nameVi?.toLowerCase().includes('mock') &&
             !c.nameEn?.toLowerCase().includes('mock')
         )
-        setCategories(cleanCats)
+        const effectiveCats = cleanCats.length > 0 ? cleanCats : STANDARD_SIGN_CATEGORIES
+        setCategories(effectiveCats)
 
         // Pre-select category if specified in report
         const repCatId = raw.proposedCategoryId ?? raw.categoryId
-        if (repCatId && cleanCats.some((c) => c.id === repCatId)) {
+        if (repCatId && effectiveCats.some((c) => c.id === repCatId)) {
           setCategoryId(repCatId)
-        } else if (cleanCats.length > 0) {
+        } else if (effectiveCats.length > 0) {
           // Default to prohibition signs (P) if available, or first category
-          const defaultCat = cleanCats.find((c) => c.code === 'P' || c.code === 'PROHIBITORY') || cleanCats[0]
+          const defaultCat = effectiveCats.find((c) => c.code === 'P' || c.code === 'PROHIBITORY') || effectiveCats[0]
           setCategoryId(defaultCat.id)
         }
       })
-      .catch((err) => {
-        console.warn('Failed to load categories for step view:', err)
+      .catch(() => {
+        if (!isMounted) return
+        setCategories(STANDARD_SIGN_CATEGORIES)
+        setCategoryId(1)
       })
       .finally(() => {
         if (isMounted) setIsLoadingCategories(false)

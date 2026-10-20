@@ -385,6 +385,7 @@ export default function AdminEscalationsPage() {
       )
       setSelectedCase(null)
       fetchCases()
+      window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     } catch (err: any) {
       console.error('Failed to resolve moderation case:', err)
       error(err?.message || (isEn ? 'Failed to resolve case' : 'Không thể giải quyết vụ việc trên máy chủ'))

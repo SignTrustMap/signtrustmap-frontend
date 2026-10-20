@@ -10,6 +10,7 @@ import { Funnel, ArrowsClockwise, CircleNotch } from '@phosphor-icons/react'
 import {
   type MissingSignTypeReport,
   type AvailableSignOption,
+  candidateRecaptureCache,
 } from '@/data'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 import {
@@ -130,6 +131,7 @@ export default function MissingSignsPage() {
   const [selectedCatalogCode, setSelectedCatalogCode] = useState('')
   const [selectedSignTypeId, setSelectedSignTypeId] = useState<number | null>(null)
   const [catalogSearch, setCatalogSearch] = useState('')
+  const [mergeNote, setMergeNote] = useState('')
   const [escalateNote, setEscalateNote] = useState('')
   const [rejectReasonKey, setRejectReasonKey] = useState<MissingRejectReasonKey>('reason_not_sign')
 
@@ -188,6 +190,40 @@ export default function MissingSignsPage() {
         const mapped = response.items.map(mapBackendReportToMissingSign)
         setReports(mapped)
         setTotalCount(response.total ?? mapped.length)
+
+        // Preload recapture details for any incomplete reports to eliminate UI delay
+        const incompleteWithCandidate = mapped.filter(
+          (r) => r.status === 'Incomplete' && r.candidateId
+        )
+        if (incompleteWithCandidate.length > 0) {
+          Promise.all(
+            incompleteWithCandidate.map(async (rep) => {
+              try {
+                const recaptures = await catalogService.getCandidateRecaptures(rep.candidateId!)
+                if (Array.isArray(recaptures) && recaptures.length > 0) {
+                  const latest = recaptures[0]
+                  const req = {
+                    reason: latest.reason,
+                    note: latest.note || '',
+                    createdAt: latest.createdAt || latest.created_at,
+                  }
+                  rep.recaptureRequest = req
+                  candidateRecaptureCache.set(rep.candidateId!, req)
+                }
+              } catch {}
+            })
+          ).then(() => {
+            setReports((prev) => [...prev])
+            setSelectedReport((current) => {
+              if (!current || current.status !== 'Incomplete' || !current.candidateId) return current
+              const cached = candidateRecaptureCache.get(current.candidateId)
+              if (cached && !current.recaptureRequest) {
+                return { ...current, recaptureRequest: cached }
+              }
+              return current
+            })
+          })
+        }
       } else {
         setReports([])
         setTotalCount(0)
@@ -211,6 +247,7 @@ export default function MissingSignsPage() {
       setTotalCount(0)
     } finally {
       setIsLoading(false)
+      window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     }
   }, [currentPage, pageSize, activeTab])
 
@@ -344,16 +381,22 @@ export default function MissingSignsPage() {
   const paginatedReports = filteredReports
 
   // Handlers
-  async function handleMergeSubmit(overrideCode?: string, overrideSignTypeId?: number) {
+  async function handleMergeSubmit(overrideCode?: string, overrideSignTypeId?: number, noteOverride?: string) {
     if (!selectedReport) return
     const code = typeof overrideCode === 'string' ? overrideCode : selectedCatalogCode
     const signTypeId = typeof overrideSignTypeId === 'number' ? overrideSignTypeId : selectedSignTypeId
     const updatedId = selectedReport.id
+    const finalNote =
+      typeof noteOverride === 'string' && noteOverride.trim()
+        ? noteOverride.trim()
+        : mergeNote.trim()
+          ? mergeNote.trim()
+          : `Đã gộp vào biển ${code} trong Catalog chuẩn.`
     try {
       await catalogService.updateMissingReport(updatedId, {
         status: 'MERGED',
         mergedIntoSignTypeId: signTypeId ?? undefined,
-        staffNotes: `Merged to ${code}`,
+        staffNotes: finalNote,
       })
       success(t('missing_signs.toast_merged', { id: updatedId, code }))
       fetchReports()
@@ -363,6 +406,7 @@ export default function MissingSignsPage() {
     } finally {
       setIsMergeModalOpen(false)
       setSelectedReport(null)
+      setMergeNote('')
     }
   }
 
@@ -424,6 +468,11 @@ export default function MissingSignsPage() {
         await catalogService.requestCandidateRecapture(candidateId, {
           reason,
           note,
+        })
+        candidateRecaptureCache.set(candidateId, {
+          reason,
+          note,
+          createdAt: new Date().toISOString(),
         })
       }
 
@@ -558,7 +607,16 @@ export default function MissingSignsPage() {
             setPageSize(newSize)
             setCurrentPage(1)
           }}
-          onSelectReport={setSelectedReport}
+          onSelectReport={(rep) => {
+            if (rep.status === 'Incomplete' && rep.candidateId && !rep.recaptureRequest) {
+              const cached = candidateRecaptureCache.get(rep.candidateId)
+              if (cached) {
+                setSelectedReport({ ...rep, recaptureRequest: cached })
+                return
+              }
+            }
+            setSelectedReport(rep)
+          }}
         />
       )}
 
@@ -573,7 +631,8 @@ export default function MissingSignsPage() {
             report={selectedReport}
             isAdmin={isAdmin}
             onClose={() => setSelectedReport(null)}
-            onOpenMerge={() => {
+            onOpenMerge={(note?: string) => {
+              setMergeNote(note || '')
               if (selectedReport?.similarCatalogEntries?.[0]) {
                 setSelectedCatalogCode(selectedReport.similarCatalogEntries[0])
               }
@@ -594,6 +653,7 @@ export default function MissingSignsPage() {
         isOpen={isMergeModalOpen}
         selectedReport={selectedReport}
         selectedCatalogCode={selectedCatalogCode}
+        initialNote={mergeNote}
         catalogSearch={catalogSearch}
         filteredCatalogSigns={filteredCatalogSigns}
         onClose={() => setIsMergeModalOpen(false)}

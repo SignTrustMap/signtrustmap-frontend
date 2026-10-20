@@ -137,19 +137,54 @@ export interface ApproveAndCreateSignTypeInput {
   representativeImageKey?: string
 }
 
+export const STANDARD_SIGN_CATEGORIES: SignCategoryItem[] = [
+  { id: 1, code: 'P', nameVi: 'Biển báo cấm', nameEn: 'Prohibitory signs', sortOrder: 1 },
+  { id: 2, code: 'W', nameVi: 'Biển cảnh báo', nameEn: 'Warning signs', sortOrder: 2 },
+  { id: 3, code: 'R', nameVi: 'Biển hiệu lệnh', nameEn: 'Mandatory signs', sortOrder: 3 },
+  { id: 4, code: 'I', nameVi: 'Biển chỉ dẫn', nameEn: 'Information signs', sortOrder: 4 },
+  { id: 5, code: 'S', nameVi: 'Biển phụ', nameEn: 'Supplementary signs', sortOrder: 5 },
+]
+
+let categoriesMemoryCache: SignCategoryItem[] | null = null
+let categoriesInFlight: Promise<SignCategoryItem[]> | null = null
+
 export const catalogService = {
   // ── Categories ──────────────────────────────────────────────────
-  getCategories: async (): Promise<SignCategoryItem[]> => {
-    const res = await http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES)
-    if (Array.isArray(res)) {
-      return res.filter(
-        (c) =>
-          !c.code?.toLowerCase().includes('mock') &&
-          !c.nameVi?.toLowerCase().includes('mock') &&
-          !c.nameEn?.toLowerCase().includes('mock')
-      )
+  getCategories: async (force = false): Promise<SignCategoryItem[]> => {
+    if (!force && categoriesMemoryCache && categoriesMemoryCache.length > 0) {
+      return categoriesMemoryCache
     }
-    return []
+
+    if (categoriesInFlight) {
+      return categoriesInFlight
+    }
+
+    categoriesInFlight = (async () => {
+      try {
+        const res = await http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES, {
+          timeout: 8000,
+        })
+        if (Array.isArray(res) && res.length > 0) {
+          const clean = res.filter(
+            (c) =>
+              !c.code?.toLowerCase().includes('mock') &&
+              !c.nameVi?.toLowerCase().includes('mock') &&
+              !c.nameEn?.toLowerCase().includes('mock')
+          )
+          if (clean.length > 0) {
+            categoriesMemoryCache = clean
+            return clean
+          }
+        }
+      } catch {
+        // Fall back gracefully to cache or standard QCVN 41 categories on timeout or network error
+      } finally {
+        categoriesInFlight = null
+      }
+      return categoriesMemoryCache || STANDARD_SIGN_CATEGORIES
+    })()
+
+    return categoriesInFlight
   },
 
   getCategoryById: async (id: number): Promise<SignCategoryItem> => {
@@ -247,9 +282,11 @@ export const catalogService = {
     return http.delete<{ deleted: boolean; id: number }>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
   },
 
-  // ── Missing Sign Type Reports (Moderation) ──────────────────────
-  getMissingReports: async (params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedMissingReportsResponse> => {
-    return http.get<PaginatedMissingReportsResponse>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORTS, { params })
+  getMissingReports: async (
+    params?: { status?: string; page?: number; pageSize?: number },
+    config?: Record<string, any>
+  ): Promise<PaginatedMissingReportsResponse> => {
+    return http.get<PaginatedMissingReportsResponse>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORTS, { params, ...config })
   },
 
   getMissingReportById: async (id: string): Promise<MissingTypeReportItem> => {
@@ -276,6 +313,22 @@ export const catalogService = {
     data: { reason: string; note?: string }
   ): Promise<{ success: boolean; requestId?: string; message?: string }> => {
     return http.post(API_ENDPOINTS.MODERATION.REQUEST_RECAPTURE(candidateId), data)
+  },
+
+  getCandidateRecaptures: async (
+    candidateId: string
+  ): Promise<
+    Array<{
+      id: string
+      candidateId?: string
+      candidate_id?: string
+      reason: string
+      note?: string
+      createdAt?: string
+      created_at?: string
+    }>
+  > => {
+    return http.get(API_ENDPOINTS.MODERATION.CANDIDATE_RECAPTURES(candidateId))
   },
 
   approveAndCreateType: async (
@@ -364,7 +417,7 @@ export const catalogService = {
     return catalogService.updateMissingReport(reportId, { status: 'APPROVED', staffNotes: data?.catalogCode })
   },
   mergeMissingReport: async (reportId: string, targetCatalogCode: string): Promise<any> => {
-    return catalogService.updateMissingReport(reportId, { status: 'APPROVED', staffNotes: `Merged to ${targetCatalogCode}` })
+    return catalogService.updateMissingReport(reportId, { status: 'APPROVED', staffNotes: `Đã gộp vào biển ${targetCatalogCode} trong Catalog chuẩn.` })
   },
 }
 

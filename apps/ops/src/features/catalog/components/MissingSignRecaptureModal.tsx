@@ -136,12 +136,12 @@ export function MissingSignRecaptureModal({
             {/* Notes for Surveyor */}
             <div>
               <label className="block text-gray-500 dark:text-gray-400 font-mono uppercase text-[11px] mb-1 font-semibold">
-                Ghi chú hướng dẫn cho Surveyor <span className="text-red-500">*</span>
+                Ghi chú <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Nhập hướng dẫn chụp lại..."
+                placeholder="Nhập ghi chú..."
                 rows={3}
                 required
                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/40 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-hidden focus:ring-2 focus:ring-amber-500/30"
@@ -152,7 +152,7 @@ export function MissingSignRecaptureModal({
             <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-blue-700 dark:text-blue-300 text-[11px]">
               <WarningCircle size={16} className="shrink-0 mt-0.5" />
               <span>
-                Hồ sơ sẽ chuyển sang trạng thái <strong>Cần bổ sung</strong>. Surveyor ban đầu sẽ nhận được thông báo kèm vị trí GPS để đến chụp lại tại thực địa (bán kính ≤ 100m).
+                Hồ sơ sẽ chuyển sang trạng thái <strong>Cần bổ sung</strong>. Surveyor ban đầu sẽ nhận được thông báo kèm vị trí GPS để đến chụp lại tại thực địa trong bán kính tối đa 100 mét.
               </span>
             </div>
 
