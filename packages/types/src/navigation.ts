@@ -124,3 +124,63 @@ export interface DirectionsRawResponse {
     }[]
   }
 }
+
+// ── Offline PMTiles Map Packs ───────────────────────────────────────────────
+
+export interface OfflineMapPack {
+  id: string
+  name: string
+  description: string
+  region: string
+  countryCode: string
+  format: string
+  fileName: string
+  sizeBytes: number
+  sizeMb: number
+  minZoom: number
+  maxZoom: number
+  bounds: [number, number, number, number]
+  isAvailable: boolean
+  lastModified?: string | null
+  downloadUrl: string
+}
+
+export interface OfflineMapPacksResponse {
+  packs: OfflineMapPack[]
+  total: number
+}
+
+export type OfflinePackDownloadStatus =
+  | 'idle'
+  | 'downloading'
+  | 'paused'
+  | 'completed'
+  | 'error'
+
+export interface OfflineMapPackDownloadProgress {
+  packId: string
+  totalBytes: number
+  downloadedBytes: number
+  percentage: number
+  status: OfflinePackDownloadStatus
+  errorMessage?: string
+}
+
+export interface InstalledOfflineMapPack {
+  packId: string
+  name: string
+  fileName: string
+  localPath: string
+  fileUri: string
+  sizeBytes: number
+  installedAt: number
+  bounds: [number, number, number, number]
+  minZoom: number
+  maxZoom: number
+}
+
+export interface OfflineMapStorageMetadata {
+  installedPacks: Record<string, InstalledOfflineMapPack>
+  activePackId: string | null
+}
+

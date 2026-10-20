@@ -1,15 +1,18 @@
-import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
+  type InstalledOfflineMapPack,
   type MapCoordinate,
   type PreviousLocation,
 } from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
+import { offlineMapService } from '@/services/offline-map-service';
 
 
 type NavigationMapViewProps = {
@@ -175,6 +178,7 @@ export function NavigationMapView({
   vehicleMode = 'DRIVING',
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const [activeOfflinePack, setActiveOfflinePack] = useState<InstalledOfflineMapPack | null>(null);
   const destinationMarkerRef = useRef<Marker | null>(null);
   const currentLocationMarkerRef = useRef<Marker | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -216,6 +220,15 @@ export function NavigationMapView({
       mapRef.current = null;
       map.remove();
     };
+  }, []);
+
+  useEffect(() => {
+    void offlineMapService.getActiveOfflinePack().then(setActiveOfflinePack);
+    const unsub = offlineMapService.subscribeToMetadata((meta) => {
+      const active = meta.activePackId ? meta.installedPacks[meta.activePackId] || null : null;
+      setActiveOfflinePack(active);
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -408,6 +421,14 @@ export function NavigationMapView({
   return (
     <View style={styles.container}>
       <div ref={mapContainerRef} style={styles.webMap} />
+      {activeOfflinePack ? (
+        <View style={styles.offlineIndicatorBadge}>
+          <MaterialCommunityIcons color="#059669" name="map-check" size={14} />
+          <Text style={styles.offlineIndicatorText} numberOfLines={1}>
+            Offline: {activeOfflinePack.name}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -415,6 +436,33 @@ export function NavigationMapView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
+  },
+  offlineIndicatorBadge: {
+    position: 'absolute',
+    top: 56,
+    right: 16,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#10B98150',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 3,
+    maxWidth: 220,
+  },
+  offlineIndicatorText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
   },
   webMap: {
     height: '100%',

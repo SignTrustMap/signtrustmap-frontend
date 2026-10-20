@@ -33,5 +33,7 @@ export const API_PATHS = {
     DAILY_TASKS: '/daily-tasks',
     DAILY_TASKS_COMPLETIONS_ME: '/daily-tasks/completions/me',
     DAILY_TASKS_MISSIONS_ME: '/daily-tasks/missions/me',
+    SPATIAL_OFFLINE_PACKS: '/spatial/tiles/offline/packs',
+    SPATIAL_OFFLINE_DOWNLOAD: '/spatial/tiles/offline/download',
 } as const;
 
