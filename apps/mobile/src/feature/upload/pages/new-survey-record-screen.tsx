@@ -1,4 +1,4 @@
-﻿import { Image } from 'expo-image';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -23,16 +23,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AppButton } from '@/components/button';
 import {
   CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE,
   CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
   CANNOT_SAVE_DRAFT_MESSAGE,
   GALLERY_DEV_BUILD_REQUIRED_MESSAGE,
+  GPX_SIZE_EXCEEDED_MESSAGE,
+  IMAGE_SIZE_EXCEEDED_MESSAGE,
   MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE,
   SELECT_VALID_GPX_FILE_MESSAGE,
   UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE,
   UNABLE_TO_READ_FILE_MESSAGE,
+  VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -43,6 +47,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
+import {
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
+  MAX_SURVEY_IMAGE_SIZE_BYTES,
+  MAX_SURVEY_GPX_SIZE_BYTES,
+  getVideoFileSizeBytes,
+} from '@/feature/upload/utils/video-processor';
+
 import { extractGpsFromVideoFile } from '@/feature/upload/utils/video-file-gps';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 
@@ -56,6 +67,7 @@ type SelectedSurveyMedia = {
   duration?: number;
   assetId?: string;
   gps?: ImageGpsCoordinates | null;
+  hasEmbeddedGps?: boolean;
 };
 
 type SelectedGpxFile = {
@@ -274,6 +286,9 @@ export function NewSurveyRecordScreen() {
   const [activeAssetIndex, setActiveAssetIndex] = useState<number>(0);
   const selectedAsset = selectedAssets[activeAssetIndex];
   const selectedGps = selectedAsset?.gps ?? null;
+  const isVideoAsset = selectedAsset?.type === 'video';
+  const hasValidGps = isValidGpsCoordinates(selectedGps);
+  const isVideoMissingGpx = isVideoAsset && !hasValidGps && !selectedGpxFile;
   const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
   const [showAdvancedGpx, setShowAdvancedGpx] = useState(false);
   const [gpxPickerError, setGpxPickerError] = useState<string>();
@@ -369,6 +384,26 @@ export function NewSurveyRecordScreen() {
           const assetType =
             asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
 
+          const targetUri = assetInfo.localUri ?? asset.uri;
+          let fileSize = 0;
+          if (Platform.OS !== 'web' && targetUri) {
+            try {
+              const info = await FileSystem.getInfoAsync(targetUri);
+              if (info.exists && typeof info.size === 'number') {
+                fileSize = info.size;
+              }
+            } catch {}
+          }
+
+          if (assetType === 'video' && fileSize > MAX_SURVEY_VIDEO_SIZE_BYTES) {
+            setAndroidGalleryError(VIDEO_SIZE_EXCEEDED_MESSAGE);
+            continue;
+          }
+          if (assetType === 'image' && fileSize > MAX_SURVEY_IMAGE_SIZE_BYTES) {
+            setAndroidGalleryError(IMAGE_SIZE_EXCEEDED_MESSAGE);
+            continue;
+          }
+
           const exif = assetInfo.exif as Record<string, unknown> | undefined;
           const exifCoordinates = extractImageGpsCoordinates(exif);
           const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
@@ -377,6 +412,7 @@ export function NewSurveyRecordScreen() {
               longitude: assetInfo.location.longitude,
             }
             : exifCoordinates;
+
 
           if (assetType === 'video') {
             const videoMeta = await extractVideoMetadataAsync({
@@ -396,6 +432,7 @@ export function NewSurveyRecordScreen() {
               uri: assetInfo.localUri ?? asset.uri,
               duration: videoMeta.durationSeconds,
               assetId: asset.id,
+              hasEmbeddedGps: videoMeta.hasDeviceGps,
               gps: videoMeta.hasDeviceGps
                 ? {
                   latitude: videoMeta.startCoordinate[1],
@@ -474,7 +511,32 @@ export function NewSurveyRecordScreen() {
 
         for (const asset of result.assets) {
           const assetType = asset.type === 'video' ? 'video' : 'image';
+
+          // Validate file size against system limits
+          let fileSize = typeof asset.fileSize === 'number' && asset.fileSize > 0 ? asset.fileSize : 0;
+          if (!fileSize && Platform.OS !== 'web' && asset.uri) {
+            try {
+              const info = await FileSystem.getInfoAsync(asset.uri);
+              if (info.exists && typeof info.size === 'number') {
+                fileSize = info.size;
+              }
+            } catch {}
+          }
+          if (!fileSize && assetType === 'video' && asset.uri) {
+            fileSize = await getVideoFileSizeBytes(asset.uri).catch(() => 0);
+          }
+
+          if (assetType === 'video' && fileSize > MAX_SURVEY_VIDEO_SIZE_BYTES) {
+            setPickerError(VIDEO_SIZE_EXCEEDED_MESSAGE);
+            continue;
+          }
+          if (assetType === 'image' && fileSize > MAX_SURVEY_IMAGE_SIZE_BYTES) {
+            setPickerError(IMAGE_SIZE_EXCEEDED_MESSAGE);
+            continue;
+          }
+
           const gpsCoordinates = await extractSelectedAssetGps(asset);
+
 
           if (assetType === 'video') {
             const videoMeta = await extractVideoMetadataAsync({
@@ -496,6 +558,7 @@ export function NewSurveyRecordScreen() {
               uri: asset.uri,
               duration: videoMeta.durationSeconds,
               assetId: asset.assetId ?? undefined,
+              hasEmbeddedGps: videoMeta.hasDeviceGps,
               gps: videoMeta.hasDeviceGps
                 ? {
                   latitude: videoMeta.startCoordinate[1],
@@ -552,7 +615,23 @@ export function NewSurveyRecordScreen() {
           setGpxPickerError(SELECT_VALID_GPX_FILE_MESSAGE);
           return;
         }
+
+        let gpxSize = typeof file.size === 'number' && file.size > 0 ? file.size : 0;
+        if (!gpxSize && Platform.OS !== 'web' && file.uri) {
+          try {
+            const info = await FileSystem.getInfoAsync(file.uri);
+            if (info.exists && typeof info.size === 'number') {
+              gpxSize = info.size;
+            }
+          } catch {}
+        }
+        if (gpxSize > MAX_SURVEY_GPX_SIZE_BYTES) {
+          setGpxPickerError(GPX_SIZE_EXCEEDED_MESSAGE);
+          return;
+        }
+
         setSelectedGpxFile({ name, uri: file.uri, mimeType: file.mimeType ?? undefined });
+
         const gpxData = await extractGpxGpsData(file.uri);
         if (gpxData?.firstPoint) {
           const gpxGps = {
@@ -571,12 +650,29 @@ export function NewSurveyRecordScreen() {
                 : asset,
             ),
           );
+        } else {
+          setGpxPickerError('Tệp GPX không chứa toạ độ hợp lệ.');
+          return;
         }
       }
     } catch (error) {
       setGpxPickerError(CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE);
       console.log('[Surveyor] Unable to open document picker:', error);
     }
+  };
+
+  const handleRemoveGpx = () => {
+    setSelectedGpxFile(undefined);
+    setGpxPickerError(undefined);
+    setSelectedAssets((prev) =>
+      prev.map((asset, idx) => {
+        if (idx !== activeAssetIndex) return asset;
+        return {
+          ...asset,
+          gps: asset.hasEmbeddedGps ? asset.gps : null,
+        };
+      }),
+    );
   };
 
   const openSavedDraft = () => {
@@ -602,6 +698,18 @@ export function NewSurveyRecordScreen() {
 
   const handleSubmitRecord = async () => {
     if (selectedAssets.length === 0 || isOpeningGallery || scanInProgress.current) return;
+
+    // Check if any video asset lacks GPX/GPS data before moving to details screen
+    for (const asset of selectedAssets) {
+      if (asset.type === 'video') {
+        const hasAssetGps = isValidGpsCoordinates(asset.gps);
+        if (!hasAssetGps && !selectedGpxFile) {
+          setGpxPickerError('Video không có dữ liệu GPS. Vui lòng tải lên tệp GPX hành trình để tiếp tục.');
+          return;
+        }
+      }
+    }
+
     scanInProgress.current = true;
     scanFinished.current = false;
     savedDraftId.current = undefined;
@@ -992,83 +1100,208 @@ export function NewSurveyRecordScreen() {
             </Text>
           ) : null}
 
-          {selectedAsset?.type === 'video' ? (
+          {isVideoAsset ? (
             <View style={styles.videoMetaContainer}>
-              <View
-                style={[
-                  styles.videoGpsCard,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: selectedGps ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <SymbolView
-                  fallback={<Text style={{ color: selectedGps ? theme.primary : theme.placeholder }}>GPS</Text>}
-                  name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                  size={22}
-                  tintColor={selectedGps ? theme.primary : theme.placeholder}
-                />
-                <View style={styles.videoGpsText}>
-                  <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
-                    {selectedGps
-                      ? `Đã phát hiện GPS: ${selectedGps.latitude.toFixed(5)}, ${selectedGps.longitude.toFixed(5)}`
-                      : 'Không tìm thấy tọa độ GPS trong video'}
-                  </Text>
-                  <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
-                    {selectedGps
-                      ? 'Điểm bắt đầu và kết thúc lộ trình sẽ được thể hiện trên bản đồ ở bước tiếp theo'
-                      : 'Bạn có thể chọn hoặc xác nhận vị trí trên bản đồ ở bước tiếp theo'}
-                  </Text>
-                </View>
-              </View>
-
-              <Pressable
-                accessibilityLabel="Chuyển đổi tùy chọn tệp GPX ngoài"
-                accessibilityRole="button"
-                onPress={() => setShowAdvancedGpx((prev) => !prev)}
-                style={styles.advancedGpxToggle}
-              >
-                <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
-                  {showAdvancedGpx ? 'Ẩn tùy chọn tệp GPX ngoài' : 'Tùy chọn nâng cao: Đính kèm tệp GPX ngoài (tùy chọn)'}
-                </Text>
-              </Pressable>
-
-              {showAdvancedGpx ? (
-                <>
-                  <AppButton
-                    accessibilityLabel={selectedGpxFile ? 'Đổi tệp GPX' : 'Tải lên tệp GPX'}
-                    disabled={isScanning || isSaving}
-                    onPress={handlePickGpx}
-                    pressedOpacity={0.78}
+              {isVideoMissingGpx ? (
+                /* Video lacks GPX data -> directly display warning card and GPX upload input */
+                <View style={styles.missingGpxContainer}>
+                  <View
                     style={[
-                      styles.uploadPlaceholder,
-                      styles.gpxPickerButton,
+                      styles.videoGpsCard,
                       {
-                        backgroundColor: theme.neutral,
-                        borderColor: selectedGpxFile ? theme.primary : theme.border,
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: '#F59E0B',
                       },
                     ]}
-                    variant="surface"
                   >
                     <SymbolView
-                      fallback={<Text style={[styles.imageFallback, { color: selectedGpxFile ? theme.primary : theme.placeholder }]}>GPX</Text>}
-                      name={{ android: 'route', ios: 'map', web: 'route' }}
-                      size={28}
-                      tintColor={selectedGpxFile ? theme.primary : theme.placeholder}
+                      fallback={<Text style={{ color: '#F59E0B', fontWeight: '700' }}>!</Text>}
+                      name={{ android: 'warning', ios: 'exclamationmark.triangle.fill', web: 'warning' }}
+                      size={24}
+                      tintColor="#F59E0B"
                     />
-                    <Text style={[styles.uploadLabel, { color: selectedGpxFile ? theme.primary : theme.textSecondary }]}>
-                      {selectedGpxFile ? selectedGpxFile.name : 'Chọn tệp .gpx từ thiết bị'}
-                    </Text>
-                  </AppButton>
+                    <View style={styles.videoGpsText}>
+                      <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
+                        Không tìm thấy dữ liệu GPS trong video
+                      </Text>
+                      <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
+                        Khảo sát bằng video yêu cầu dữ liệu toạ độ hành trình. Vui lòng tải lên tệp .gpx đồng bộ để tiếp tục.
+                      </Text>
+                    </View>
+                  </View>
 
-                  {gpxPickerError ? (
-                    <Text accessibilityRole="alert" style={styles.errorText}>
-                      {gpxPickerError}
+                  <View style={styles.gpxUploadPromptBox}>
+                    <Text style={[styles.gpxSectionHeader, { color: theme.text }]}>
+                      Tải lên tệp GPX hành trình *
                     </Text>
+                    <AppButton
+                      accessibilityLabel="Tải lên tệp GPX hành trình"
+                      disabled={isScanning || isSaving}
+                      onPress={handlePickGpx}
+                      pressedOpacity={0.78}
+                      style={[
+                        styles.uploadPlaceholder,
+                        styles.gpxPickerButton,
+                        {
+                          backgroundColor: theme.neutral,
+                          borderColor: gpxPickerError ? '#EF4444' : theme.primary,
+                        },
+                      ]}
+                      variant="surface"
+                    >
+                      <SymbolView
+                        fallback={<Text style={[styles.imageFallback, { color: theme.primary }]}>GPX</Text>}
+                        name={{ android: 'route', ios: 'map', web: 'route' }}
+                        size={28}
+                        tintColor={theme.primary}
+                      />
+                      <View style={{ alignItems: 'center', gap: 2 }}>
+                        <Text style={[styles.uploadLabel, { color: theme.primary, fontWeight: '700' }]}>
+                          Chọn tệp GPX (.gpx) từ thiết bị
+                        </Text>
+                        <Text style={[styles.gpxHintText, { color: theme.placeholder }]}>
+                          Định dạng .gpx (Tối đa 10MB)
+                        </Text>
+                      </View>
+                    </AppButton>
+                    {gpxPickerError ? (
+                      <Text accessibilityRole="alert" style={styles.errorText}>
+                        {gpxPickerError}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ) : selectedGpxFile ? (
+                /* GPX file attached */
+                <View style={styles.gpxSuccessContainer}>
+                  <View
+                    style={[
+                      styles.videoGpsCard,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.primary,
+                      },
+                    ]}
+                  >
+                    <SymbolView
+                      fallback={<Text style={{ color: theme.primary, fontWeight: '700' }}>GPX</Text>}
+                      name={{ android: 'route', ios: 'checkmark.circle.fill', web: 'route' }}
+                      size={24}
+                      tintColor={theme.primary}
+                    />
+                    <View style={styles.videoGpsText}>
+                      <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
+                        {`Đã gắn tệp GPX: ${selectedGpxFile.name}`}
+                      </Text>
+                      <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
+                        {selectedGps
+                          ? `Toạ độ bắt đầu: ${selectedGps.latitude.toFixed(5)}, ${selectedGps.longitude.toFixed(5)}`
+                          : 'Đã sẵn sàng chuyển sang bước nhập chi tiết khảo sát'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.gpxActionRow}>
+                    <Pressable
+                      accessibilityLabel="Đổi tệp GPX khác"
+                      accessibilityRole="button"
+                      onPress={handlePickGpx}
+                      style={styles.gpxActionBtn}
+                    >
+                      <Text style={[styles.gpxActionBtnText, { color: theme.primary }]}>
+                        Đổi tệp GPX khác
+                      </Text>
+                    </Pressable>
+                    {!selectedAsset?.hasEmbeddedGps ? (
+                      <Pressable
+                        accessibilityLabel="Gỡ tệp GPX"
+                        accessibilityRole="button"
+                        onPress={handleRemoveGpx}
+                        style={styles.gpxActionBtn}
+                      >
+                        <Text style={[styles.gpxActionBtnText, { color: '#EF4444' }]}>
+                          Gỡ tệp GPX
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              ) : (
+                /* Video has embedded GPS from device */
+                <View style={styles.embeddedGpsContainer}>
+                  <View
+                    style={[
+                      styles.videoGpsCard,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.primary,
+                      },
+                    ]}
+                  >
+                    <SymbolView
+                      fallback={<Text style={{ color: theme.primary }}>GPS</Text>}
+                      name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
+                      size={22}
+                      tintColor={theme.primary}
+                    />
+                    <View style={styles.videoGpsText}>
+                      <Text style={[styles.videoGpsTitle, { color: theme.text }]}>
+                        {`Đã phát hiện GPS từ video: ${selectedGps!.latitude.toFixed(5)}, ${selectedGps!.longitude.toFixed(5)}`}
+                      </Text>
+                      <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
+                        Điểm bắt đầu và kết thúc lộ trình sẽ được thể hiện trên bản đồ ở bước tiếp theo
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Pressable
+                    accessibilityLabel="Chuyển đổi tùy chọn tệp GPX ngoài"
+                    accessibilityRole="button"
+                    onPress={() => setShowAdvancedGpx((prev) => !prev)}
+                    style={styles.advancedGpxToggle}
+                  >
+                    <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
+                      {showAdvancedGpx ? 'Ẩn tùy chọn tệp GPX ngoài' : 'Tùy chọn nâng cao: Đính kèm tệp GPX ngoài (tùy chọn)'}
+                    </Text>
+                  </Pressable>
+
+                  {showAdvancedGpx ? (
+                    <>
+                      <AppButton
+                        accessibilityLabel="Tải lên tệp GPX"
+                        disabled={isScanning || isSaving}
+                        onPress={handlePickGpx}
+                        pressedOpacity={0.78}
+                        style={[
+                          styles.uploadPlaceholder,
+                          styles.gpxPickerButton,
+                          {
+                            backgroundColor: theme.neutral,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        variant="surface"
+                      >
+                        <SymbolView
+                          fallback={<Text style={[styles.imageFallback, { color: theme.placeholder }]}>GPX</Text>}
+                          name={{ android: 'route', ios: 'map', web: 'route' }}
+                          size={28}
+                          tintColor={theme.placeholder}
+                        />
+                        <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
+                          Chọn tệp .gpx từ thiết bị
+                        </Text>
+                      </AppButton>
+
+                      {gpxPickerError ? (
+                        <Text accessibilityRole="alert" style={styles.errorText}>
+                          {gpxPickerError}
+                        </Text>
+                      ) : null}
+                    </>
                   ) : null}
-                </>
-              ) : null}
+                </View>
+              )}
             </View>
           ) : null}
 
@@ -1089,13 +1322,21 @@ export function NewSurveyRecordScreen() {
           )}
 
           <AppButton
-            disabled={selectedAssets.length === 0 || isOpeningGallery || isScanning || isSaving}
+            disabled={
+              selectedAssets.length === 0 ||
+              isOpeningGallery ||
+              isScanning ||
+              isSaving ||
+              isVideoMissingGpx
+            }
             label={
               isSaving
                 ? "Đang lưu bản nháp..."
-                : selectedAssets.length > 1
-                  ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
-                  : "Tiếp tục ghi nhận"
+                : isVideoMissingGpx
+                  ? "Cần tải lên tệp GPX để tiếp tục"
+                  : selectedAssets.length > 1
+                    ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
+                    : "Tiếp tục ghi nhận"
             }
             onPress={handleSubmitRecord}
             style={styles.submitButton}
@@ -1509,5 +1750,44 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: Spacing.two,
     borderWidth: 1,
+  },
+  missingGpxContainer: {
+    gap: Spacing.two,
+  },
+  gpxUploadPromptBox: {
+    gap: Spacing.one,
+  },
+  gpxSectionHeader: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: 600,
+  },
+  gpxHintText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: 400,
+  },
+  gpxSuccessContainer: {
+    gap: Spacing.two,
+  },
+  gpxActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.one,
+  },
+  gpxActionBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  gpxActionBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: 600,
+    textDecorationLine: 'underline',
+  },
+  embeddedGpsContainer: {
+    gap: Spacing.two,
   },
 });

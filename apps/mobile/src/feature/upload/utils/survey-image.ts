@@ -6,10 +6,17 @@ import type { UploadChunkRequest } from '@/types/surveySubmissionType';
 import {
   GPX_EMPTY_MESSAGE,
   GPX_READ_FAILED_MESSAGE,
+  GPX_SIZE_EXCEEDED_MESSAGE,
+  IMAGE_SIZE_EXCEEDED_MESSAGE,
   MEDIA_EMPTY_MESSAGE,
   MEDIA_READ_FAILED_MESSAGE,
   MEDIA_READ_FAILED_OR_EMPTY_MESSAGE,
 } from '@/constants/message';
+import {
+  MAX_SURVEY_IMAGE_SIZE_BYTES,
+  MAX_SURVEY_GPX_SIZE_BYTES,
+} from './video-processor';
+
 
 export type SurveyImage = {
   fileName?: string;
@@ -54,6 +61,9 @@ export async function prepareSurveyImage(image: SurveyImage) {
     if (!info.exists || !info.size) {
       throw new Error(MEDIA_READ_FAILED_OR_EMPTY_MESSAGE);
     }
+    if (info.size > MAX_SURVEY_IMAGE_SIZE_BYTES) {
+      throw new Error(IMAGE_SIZE_EXCEEDED_MESSAGE);
+    }
     const chunk: UploadChunkRequest = {
       chunkIndex: 0,
       fileName,
@@ -74,6 +84,9 @@ export async function prepareSurveyImage(image: SurveyImage) {
     type: response.headers.get('content-type') ?? mimeType,
   });
   if (blob.size < 1) throw new Error(MEDIA_EMPTY_MESSAGE);
+  if (blob.size > MAX_SURVEY_IMAGE_SIZE_BYTES) {
+    throw new Error(IMAGE_SIZE_EXCEEDED_MESSAGE);
+  }
 
   const chunk: UploadChunkRequest = {
     chunkIndex: 0,
@@ -114,6 +127,10 @@ export async function prepareSurveyGpx(gpx: SurveyGpx) {
 
   const encodedBytes = new TextEncoder().encode(xmlContent);
   const sizeBytes = encodedBytes.length;
+  if (sizeBytes > MAX_SURVEY_GPX_SIZE_BYTES) {
+    throw new Error(GPX_SIZE_EXCEEDED_MESSAGE);
+  }
+
 
   if (Platform.OS === 'web') {
     const blob = new Blob([xmlContent], { type: 'application/gpx+xml' });

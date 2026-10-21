@@ -1,4 +1,4 @@
-﻿import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   UNABLE_TO_GET_LOCATION_FOR_END_POINT_MESSAGE,
   UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE,
   USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE,
+  VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
@@ -45,6 +46,11 @@ import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
 import { executeChunkedVideoUpload, type UploadProgressInfo } from '@/feature/upload/utils/chunk-upload-manager';
 import { registerZeroCopyDraft, startSmartPollingSync } from '@/feature/upload/utils/crop-sync-manager';
+import {
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
+  getVideoFileSizeBytes,
+} from '@/feature/upload/utils/video-processor';
+
 
 import { getMapLibre } from '@/services/maplibre';
 
@@ -438,7 +444,13 @@ export function SurveyRecordDetailsScreen() {
           throw new Error(DRAFT_NO_VIDEO_MESSAGE);
         }
 
+        const videoSize = await getVideoFileSizeBytes(imageUri).catch(() => 0);
+        if (videoSize > MAX_SURVEY_VIDEO_SIZE_BYTES) {
+          throw new Error(VIDEO_SIZE_EXCEEDED_MESSAGE);
+        }
+
         const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
+
 
         console.log('[Surveyor] Starting executeChunkedVideoUpload...');
         // 1. Chunked video upload (1-minute temporal chunks down-res 640p + companion GPX)

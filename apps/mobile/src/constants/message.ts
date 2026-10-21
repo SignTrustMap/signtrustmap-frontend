@@ -86,6 +86,14 @@ export const CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE = 'Không thể mở thư viện 
 export const SELECT_VALID_GPX_FILE_MESSAGE = 'Vui lòng chọn tệp GPX hợp lệ (.gpx).';
 export const CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE = 'Không thể mở trình chọn tệp. Vui lòng thử lại.';
 export const CANNOT_SAVE_DRAFT_MESSAGE = 'Không thể lưu bản nháp. Vui lòng thử lại.';
+export const VIDEO_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng video vượt quá giới hạn tối đa 2GB. Vui lòng chọn tệp nhỏ hơn.';
+export const IMAGE_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng ảnh vượt quá giới hạn tối đa 25MB. Vui lòng chọn tệp nhỏ hơn.';
+export const GPX_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng tệp GPX vượt quá giới hạn tối đa 10MB. Vui lòng chọn tệp nhỏ hơn.';
+
+
 
 // ============================================================================
 // Review & Revalidation Error Messages
