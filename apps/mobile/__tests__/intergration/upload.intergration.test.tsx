@@ -463,7 +463,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       );
 
       // 1. Wait for draft submission to load and hydrate into the inputs
-      await findByText('New Survey Record');
+      await findByText('Ghi nhận khảo sát mới');
       const noteInput = await findByDisplayValue('Sample draft note');
 
       // 2. Type updated note into notes field
@@ -472,7 +472,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       });
 
       // 3. Press Submit survey button
-      const submitButton = getByText('Submit');
+      const submitButton = getByText('Gửi hồ sơ');
       await act(async () => {
         await fireEvent.press(submitButton);
       });
@@ -503,6 +503,132 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
         );
       });
     });
+
+    it('disables submit button and displays warning when draft lacks GPS coordinates', async () => {
+      await mockStorage.set(
+        'survey-draft-surveyor-user-1-sub-no-gps-001',
+        JSON.stringify({
+          uri: 'file:///path/to/traffic-sign-no-gps.jpg',
+          fileName: 'traffic-sign-no-gps.jpg',
+          type: 'image',
+          submissionId: 'sub-no-gps-001',
+          uploadCompleted: true,
+          sessionId: 'sess-no-gps-001',
+        }),
+      );
+
+      mockSearchParams = {
+        submissionId: 'sub-no-gps-001',
+      };
+
+      server.use(
+        http.get(SUBMISSION_STATUS_PATH, () => {
+          return HttpResponse.json(
+            {
+              ...mockSubmissionStatusResponse,
+              submission: {
+                ...mockSubmissionStatusResponse.submission,
+                id: 'sub-no-gps-001',
+                latitude: null,
+                longitude: null,
+              },
+            },
+            { status: 200 },
+          );
+        }),
+      );
+
+      const Wrapper = createProvidersWrapper();
+      const { findByText } = await render(
+        <Wrapper>
+          <SurveyRecordDetailsScreen />
+        </Wrapper>,
+      );
+
+      // Verify header rendered
+      await findByText('Ghi nhận khảo sát mới');
+
+      // Verify submit button is in disabled state with 'Chưa có toạ độ GPS' label
+      const disabledButton = await findByText('Chưa có toạ độ GPS');
+      expect(disabledButton).toBeTruthy();
+
+      // Verify GPS missing warning banner is rendered
+      const warningBanner = await findByText(
+        'Chưa có toạ độ GPS. Vui lòng lấy vị trí hiện tại hoặc phóng to bản đồ để chọn vị trí.',
+      );
+      expect(warningBanner).toBeTruthy();
+    });
+
+    it('blocks batch submission when any image in the batch lacks GPS', async () => {
+      // Image 1: Has GPS
+      await mockStorage.set(
+        'survey-draft-surveyor-user-1-sub-batch-001',
+        JSON.stringify({
+          uri: 'file:///path/to/img1.jpg',
+          fileName: 'img1.jpg',
+          type: 'image',
+          submissionId: 'sub-batch-001',
+          uploadCompleted: true,
+          startLat: 10.7769,
+          startLon: 106.7009,
+        }),
+      );
+
+      // Image 2: Missing GPS
+      await mockStorage.set(
+        'survey-draft-surveyor-user-1-sub-batch-002',
+        JSON.stringify({
+          uri: 'file:///path/to/img2.jpg',
+          fileName: 'img2.jpg',
+          type: 'image',
+          submissionId: 'sub-batch-002',
+          uploadCompleted: true,
+        }),
+      );
+
+      mockSearchParams = {
+        submissionId: 'sub-batch-001',
+        batchSubmissionIds: 'sub-batch-001,sub-batch-002',
+        startLat: '10.7769',
+        startLon: '106.7009',
+      };
+
+      server.use(
+        http.get(SUBMISSION_STATUS_PATH, () => {
+          return HttpResponse.json(
+            {
+              ...mockSubmissionStatusResponse,
+              submission: {
+                ...mockSubmissionStatusResponse.submission,
+                id: 'sub-batch-001',
+                latitude: 10.7769,
+                longitude: 106.7009,
+              },
+            },
+            { status: 200 },
+          );
+        }),
+      );
+
+      const Wrapper = createProvidersWrapper();
+      const { findByText } = await render(
+        <Wrapper>
+          <SurveyRecordDetailsScreen />
+        </Wrapper>,
+      );
+
+      await findByText('Ghi nhận khảo sát mới');
+
+      // Submit button should indicate missing GPS: 1 valid out of 2 total
+      const batchDisabledButton = await findByText('Chưa đủ toạ độ GPS (1/2)');
+      expect(batchDisabledButton).toBeTruthy();
+
+      // Warning text identifies photo 2 is missing GPS
+      const batchWarning = await findByText(
+        'Còn 1 ảnh chưa có toạ độ GPS (ảnh 2). Vui lòng chọn ảnh để thiết lập vị trí trước khi gửi.',
+      );
+      expect(batchWarning).toBeTruthy();
+    });
   });
 
   // =========================================================================
@@ -523,11 +649,11 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       );
 
       // Verify title confirmation and reference code
-      expect(getByText('Sign submitted')).toBeTruthy();
-      expect(getByText(/Reference sub-test - QUEUED/i)).toBeTruthy();
+      expect(getByText('Đã gửi hồ sơ khảo sát')).toBeTruthy();
+      expect(getByText(/Mã tham chiếu.*sub-test.*QUEUED/i)).toBeTruthy();
 
       // Press "Return to surveyor's home"
-      const homeBtn = getByText("Return to surveyor's home");
+      const homeBtn = getByText('Quay lại trang khảo sát');
       await fireEvent.press(homeBtn);
 
       expect(mockReplace).toHaveBeenCalledWith(
@@ -538,7 +664,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       );
 
       // Press "Submit another survey"
-      const newSurveyBtn = getByText('Submit another survey');
+      const newSurveyBtn = getByText('Gửi khảo sát khác');
       await fireEvent.press(newSurveyBtn);
 
       expect(mockReplace).toHaveBeenCalledWith('/work/new-survey');

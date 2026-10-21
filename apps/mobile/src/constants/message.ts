@@ -60,6 +60,10 @@ export const LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE =
 export const SESSION_EXPIRED_MESSAGE = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại và thử lại.';
 export const ENTER_MEDIA_DATETIME_MESSAGE =
   'Nhập ngày giờ ghi lại phương tiện, bao gồm cả múi giờ.';
+export const CAPTURE_TIME_FUTURE_MESSAGE =
+  'Thời gian ghi nhận không thể ở tương lai.';
+export const CAPTURE_TIME_TOO_OLD_MESSAGE =
+  'Thời gian ghi nhận không được quá 30 ngày so với hiện tại.';
 export const USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE =
   'Vui lòng sử dụng tệp có dữ liệu GPS hoặc chọn vị trí hiện tại của bạn.';
 export const DRAFT_NO_VIDEO_MESSAGE = 'Bản nháp này không có video hợp lệ. Vui lòng chọn lại tệp.';

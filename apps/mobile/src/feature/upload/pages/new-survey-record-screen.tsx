@@ -280,16 +280,21 @@ export function NewSurveyRecordScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const scanFinished = useRef(false);
   const savedDraftId = useRef<string | undefined>(undefined);
+  const savedBatchIds = useRef<string[]>([]);
   const [isOpeningGallery, setIsOpeningGallery] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
   const [selectedAssets, setSelectedAssets] = useState<SelectedSurveyMedia[]>([]);
   const [activeAssetIndex, setActiveAssetIndex] = useState<number>(0);
   const selectedAsset = selectedAssets[activeAssetIndex];
   const selectedGps = selectedAsset?.gps ?? null;
-  const isVideoAsset = selectedAsset?.type === 'video';
   const hasValidGps = isValidGpsCoordinates(selectedGps);
-  const isVideoMissingGpx = isVideoAsset && !hasValidGps && !selectedGpxFile;
+  const isVideoAsset = selectedAsset?.type === 'video';
   const [selectedGpxFile, setSelectedGpxFile] = useState<SelectedGpxFile>();
+  const isVideoMissingGpx = isVideoAsset && !hasValidGps && !selectedGpxFile;
+  const hasAnyVideoWithoutGps = selectedAssets.some(
+    (a) => a.type === 'video' && !isValidGpsCoordinates(a.gps),
+  );
+  const isAnyVideoMissingGpx = hasAnyVideoWithoutGps && !selectedGpxFile;
   const [showAdvancedGpx, setShowAdvancedGpx] = useState(false);
   const [gpxPickerError, setGpxPickerError] = useState<string>();
   const [isScanning, setIsScanning] = useState(false);
@@ -355,15 +360,31 @@ export function NewSurveyRecordScreen() {
     setAndroidGalleryCursor(undefined);
     setAndroidGalleryHasNextPage(false);
     setAndroidGalleryError(undefined);
-    setSelectedAndroidAssetIds([]);
+    setSelectedAndroidAssetIds(
+      selectedAssets.map((a) => a.assetId).filter((id): id is string => Boolean(id)),
+    );
     setIsAndroidGalleryVisible(true);
     await loadAndroidGalleryPage();
   };
 
   const handleToggleAndroidAsset = (assetId: string) => {
-    setSelectedAndroidAssetIds((prev) =>
-      prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId],
-    );
+    const asset = androidGalleryAssets.find((a) => a.id === assetId);
+    if (!asset) return;
+
+    setSelectedAndroidAssetIds((prev) => {
+      if (prev.includes(assetId)) {
+        setAndroidGalleryError(undefined);
+        return prev.filter((id) => id !== assetId);
+      }
+
+      if (prev.length >= 3) {
+        setAndroidGalleryError('Chỉ được chọn tối đa 3 tệp (ảnh hoặc video).');
+        return prev;
+      }
+
+      setAndroidGalleryError(undefined);
+      return [...prev, assetId];
+    });
   };
 
   const handleConfirmAndroidSelection = async () => {
@@ -373,12 +394,21 @@ export function NewSurveyRecordScreen() {
 
     try {
       const selectedMap = new Map(androidGalleryAssets.map((a) => [a.id, a]));
-      const chosen = selectedAndroidAssetIds
-        .map((id) => selectedMap.get(id))
-        .filter(Boolean) as MediaLibraryAsset[];
+      const chosenIds = selectedAndroidAssetIds.slice(0, 3);
       const processed: SelectedSurveyMedia[] = [];
 
-      for (const asset of chosen) {
+      for (const assetId of chosenIds) {
+        // Reuse already processed asset if available from current selection
+        const existing = selectedAssets.find((a) => a.assetId === assetId);
+        const asset = selectedMap.get(assetId);
+
+        if (existing && !asset) {
+          processed.push(existing);
+          continue;
+        }
+
+        if (!asset) continue;
+
         try {
           const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
           const assetType =
@@ -460,7 +490,7 @@ export function NewSurveyRecordScreen() {
       }
 
       if (processed.length > 0) {
-        setSelectedAssets((prev) => [...prev, ...processed]);
+        setSelectedAssets(processed.slice(0, 3));
         setActiveAssetIndex(0);
         setSelectedGpxFile(undefined);
         setGpxPickerError(undefined);
@@ -499,6 +529,7 @@ export function NewSurveyRecordScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: true,
+        selectionLimit: 3,
         defaultTab: 'photos',
         exif: true,
         mediaTypes: ['images', 'videos'],
@@ -581,7 +612,7 @@ export function NewSurveyRecordScreen() {
         }
 
         if (processed.length > 0) {
-          setSelectedAssets((prev) => [...prev, ...processed]);
+          setSelectedAssets(processed.slice(0, 3));
           setActiveAssetIndex(0);
           setSelectedGpxFile(undefined);
           setGpxPickerError(undefined);
@@ -677,10 +708,13 @@ export function NewSurveyRecordScreen() {
 
   const openSavedDraft = () => {
     if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
+    setIsScanning(false);
+    setIsSaving(false);
     router.replace({
       pathname: '/work/new-survey/details',
       params: {
         submissionId: savedDraftId.current,
+        ...(savedBatchIds.current.length > 1 ? { batchSubmissionIds: savedBatchIds.current.join(',') } : {}),
         ...(selectedGps ? {
           startLat: String(selectedGps.latitude),
           startLon: String(selectedGps.longitude),
@@ -713,60 +747,69 @@ export function NewSurveyRecordScreen() {
     scanInProgress.current = true;
     scanFinished.current = false;
     savedDraftId.current = undefined;
+    savedBatchIds.current = [];
     setPickerError(undefined);
     setIsSaving(true);
     setIsScanning(true);
 
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    try {
-      const savedIds: string[] = [];
+    // Call saveDraft for all selected assets concurrently while scan modal is active
+    const saveTasks = selectedAssets.map(async (asset, i) => {
+      const isVideo = asset.type === 'video';
+      const parsedCaptureTime = asset.capturedAt ? Date.parse(asset.capturedAt) : NaN;
+      const isCaptureValid =
+        !Number.isNaN(parsedCaptureTime) &&
+        Date.now() - parsedCaptureTime >= 0 &&
+        Date.now() - parsedCaptureTime < THIRTY_DAYS_MS;
+      const safeCapturedAt = isCaptureValid ? asset.capturedAt! : new Date().toISOString();
 
-      for (const asset of selectedAssets) {
-        const isVideo = asset.type === 'video';
-        const parsedCaptureTime = asset.capturedAt ? Date.parse(asset.capturedAt) : NaN;
-        const isCaptureValid =
-          !Number.isNaN(parsedCaptureTime) &&
-          Date.now() - parsedCaptureTime >= 0 &&
-          Date.now() - parsedCaptureTime < THIRTY_DAYS_MS;
-        const safeCapturedAt = isCaptureValid ? asset.capturedAt! : new Date().toISOString();
+      return saveDraft(
+        {
+          fileName: asset.fileName ?? undefined,
+          mimeType: asset.mimeType,
+          type: asset.type,
+          uri: asset.uri,
+          startLat: asset.gps?.latitude,
+          startLon: asset.gps?.longitude,
+        },
+        {
+          submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
+          capturedAt: safeCapturedAt,
+          coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
+          ...(asset.gps ?? {}),
+        },
+        draftId && i === 0 ? draftId : undefined,
+        selectedGpxFile,
+      );
+    });
 
-        const id = await saveDraft(
-          {
-            fileName: asset.fileName ?? undefined,
-            mimeType: asset.mimeType,
-            type: asset.type,
-            uri: asset.uri,
-          },
-          {
-            submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-            capturedAt: safeCapturedAt,
-            coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
-            ...(asset.gps ?? {}),
-          },
-          draftId && savedIds.length === 0 ? draftId : undefined,
-          selectedGpxFile,
-        );
-
-        savedIds.push(id);
-      }
-
-      savedDraftId.current = savedIds[0];
-      openSavedDraft();
-    } catch (error) {
-      console.warn('[Surveyor] Unable to save survey draft:', error);
-      setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
-      setIsScanning(false);
-    } finally {
-      setIsSaving(false);
-      scanInProgress.current = false;
-    }
+    Promise.all(saveTasks)
+      .then((savedIds) => {
+        if (savedIds.length > 0) {
+          savedDraftId.current = savedIds[0];
+          savedBatchIds.current = savedIds;
+          if (scanFinished.current) {
+            openSavedDraft();
+          }
+        }
+      })
+      .catch((error) => {
+        console.warn('[Surveyor] Unable to save survey draft:', error);
+        setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
+        setIsScanning(false);
+        setIsSaving(false);
+      })
+      .finally(() => {
+        scanInProgress.current = false;
+      });
   };
 
   const handleScanComplete = () => {
     scanFinished.current = true;
-    setIsScanning(false);
-    openSavedDraft();
+    if (savedDraftId.current) {
+      openSavedDraft();
+    }
   };
 
   return (
@@ -777,7 +820,13 @@ export function NewSurveyRecordScreen() {
           isVideo={selectedAsset.type === 'video'}
           onComplete={handleScanComplete}
           onCancel={() => {
-            handleScanComplete();
+            scanFinished.current = true;
+            if (savedDraftId.current) {
+              openSavedDraft();
+            } else {
+              setIsScanning(false);
+              setIsSaving(false);
+            }
           }}
         />
       ) : null}
@@ -806,7 +855,7 @@ export function NewSurveyRecordScreen() {
               <View style={styles.galleryHeading}>
                 <Text style={[styles.galleryTitle, { color: theme.text }]}>Chọn ảnh hoặc video</Text>
                 <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
-                  Dữ liệu vị trí gốc sẽ được giữ nguyên
+                  Tối đa 3 tệp phương tiện (ảnh hoặc video)
                 </Text>
               </View>
               <AppButton
@@ -894,7 +943,7 @@ export function NewSurveyRecordScreen() {
             <View style={[styles.galleryFooterBar, { borderTopColor: theme.border, backgroundColor: theme.backgroundElement }]}>
               <Text style={[styles.gallerySelectedCountText, { color: theme.text }]}>
                 {selectedAndroidAssetIds.length > 0
-                  ? `Đã chọn ${selectedAndroidAssetIds.length} tệp`
+                  ? `Đã chọn ${selectedAndroidAssetIds.length} tệp (tối đa 3)`
                   : 'Chưa chọn tệp nào'}
               </Text>
               <AppButton
@@ -1100,9 +1149,9 @@ export function NewSurveyRecordScreen() {
             </Text>
           ) : null}
 
-          {isVideoAsset ? (
+          {isVideoAsset || isAnyVideoMissingGpx ? (
             <View style={styles.videoMetaContainer}>
-              {isVideoMissingGpx ? (
+              {isVideoMissingGpx || (!isVideoAsset && isAnyVideoMissingGpx) ? (
                 /* Video lacks GPX data -> directly display warning card and GPX upload input */
                 <View style={styles.missingGpxContainer}>
                   <View
@@ -1327,13 +1376,13 @@ export function NewSurveyRecordScreen() {
               isOpeningGallery ||
               isScanning ||
               isSaving ||
-              isVideoMissingGpx
+              isAnyVideoMissingGpx
             }
             label={
               isSaving
                 ? "Đang lưu bản nháp..."
-                : isVideoMissingGpx
-                  ? "Cần tải lên tệp GPX để tiếp tục"
+                : isAnyVideoMissingGpx
+                  ? "Cần tải lên tệp GPX cho video để tiếp tục"
                   : selectedAssets.length > 1
                     ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
                     : "Tiếp tục ghi nhận"
