@@ -58,7 +58,7 @@ import {
 
 import { getMapLibre } from '@/services/maplibre';
 
-export function isValidCoordinate(coord?: MapCoordinate | null): boolean {
+export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoordinate {
   if (!coord) return false;
   const [lon, lat] = coord;
   return (
@@ -304,8 +304,10 @@ export function SurveyRecordDetailsScreen() {
   const [savedGpxUri, setSavedGpxUri] = useState<string>();
   const [savedGpxName, setSavedGpxName] = useState<string>();
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-  const latitude = draftQuery.data?.submission.latitude;
-  const longitude = draftQuery.data?.submission.longitude;
+  const isSubmissionMatchingCurrent = draftQuery.data?.submission?.id === currentDraftId;
+  const currentSubmission = isSubmissionMatchingCurrent ? draftQuery.data?.submission : undefined;
+  const latitude = currentSubmission?.latitude;
+  const longitude = currentSubmission?.longitude;
   const parsedLatitude = latitude != null ? Number(latitude) : Number.NaN;
   const parsedLongitude = longitude != null ? Number(longitude) : Number.NaN;
   const imageCoordinate: MapCoordinate | undefined =
@@ -340,20 +342,25 @@ export function SurveyRecordDetailsScreen() {
 
   useEffect(() => {
     if (!currentDraftId) return;
+    // CRITICAL: Do NOT sync or save coordinates if the draft hasn't been hydrated for currentDraftId yet!
+    // Stale state from the previous batch item must never leak to this draft.
+    if (hydratedId.current !== currentDraftId) return;
+
     if (isValidCoordinate(effectiveStartCoord)) {
+      const coordToSave = effectiveStartCoord;
       setBatchCoords((prev) => {
         if (
-          prev[currentDraftId]?.[0] === effectiveStartCoord[0] &&
-          prev[currentDraftId]?.[1] === effectiveStartCoord[1]
+          prev[currentDraftId]?.[0] === coordToSave[0] &&
+          prev[currentDraftId]?.[1] === coordToSave[1]
         ) {
           return prev;
         }
-        return { ...prev, [currentDraftId]: effectiveStartCoord };
+        return { ...prev, [currentDraftId]: coordToSave };
       });
       if (session) {
         void updateDraftCoordinates(session.account.id, currentDraftId, {
-          latitude: effectiveStartCoord[1],
-          longitude: effectiveStartCoord[0],
+          latitude: coordToSave[1],
+          longitude: coordToSave[0],
         });
       }
     } else {
@@ -468,9 +475,20 @@ export function SurveyRecordDetailsScreen() {
     }
 
     hydratedId.current = undefined;
+    setIsDraftLoaded(false);
     setIsModified(false);
     setSubmitError(undefined);
     setLocationMessage(undefined);
+
+    // Pre-populate with target draft's known coordinates (if any) or clear stale values
+    const targetCoord = batchCoords[targetId];
+    setStartCoordinate(targetCoord);
+    setSelectedCoordinate(targetCoord);
+    setEndCoordinate(targetCoord ? estimateEndPoint(targetCoord, durationSec) : undefined);
+    setCoordinateSource(targetCoord ? 'IMAGE_EXIF' : undefined);
+    setCapturedAt('');
+    setNote('');
+
     setActiveSubmissionId(targetId);
   };
 
@@ -595,7 +613,7 @@ export function SurveyRecordDetailsScreen() {
 
   useEffect(() => {
     const draft = draftQuery.data?.submission;
-    if (!draft || !session || hydratedId.current === draft.id) return;
+    if (!draft || !session || draft.id !== currentDraftId || hydratedId.current === draft.id) return;
     let active = true;
     void readDraftImage(session.account.id, draft.id).then(async (local) => {
       if (!active) return;
@@ -627,7 +645,7 @@ export function SurveyRecordDetailsScreen() {
       if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
       if (local?.gpxName) setSavedGpxName(local.gpxName);
 
-      const activeGpx = gpxUri || local?.gpxUri;
+      const activeGpx = (draft.id === submissionId ? gpxUri : undefined) || local?.gpxUri;
       if (activeGpx) {
         try {
           const gpxData = await extractGpxGpsData(activeGpx);
@@ -658,7 +676,7 @@ export function SurveyRecordDetailsScreen() {
         capturedAt: formattedCapturedTime,
         longitude: hasCoordinate ? draft.longitude! : undefined,
         latitude: hasCoordinate ? draft.latitude! : undefined,
-        gpxUri: local?.gpxUri ?? gpxUri,
+        gpxUri: local?.gpxUri ?? (draft.id === submissionId ? gpxUri : undefined),
       });
       setIsDraftLoaded(true);
       setIsModified(false);
@@ -669,7 +687,7 @@ export function SurveyRecordDetailsScreen() {
       }
     });
     return () => { active = false; };
-  }, [draftQuery.data, durationSec, gpxUri, session]);
+  }, [draftQuery.data, durationSec, gpxUri, session, currentDraftId, submissionId]);
 
   const handleUseCurrentLocation = async () => {
     if (isLocating || submissionInProgress.current) return;

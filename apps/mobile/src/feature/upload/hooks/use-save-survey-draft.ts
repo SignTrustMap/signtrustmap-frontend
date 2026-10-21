@@ -75,13 +75,14 @@ export function useSaveSurveyDraft() {
     const effectiveLon = image.startLon ?? (typeof request.longitude === 'number' ? request.longitude : undefined);
 
     if (submissionId) {
-      const existing = (attempt.current?.submissionId === submissionId ? attempt.current : undefined)
+      const existing = (attempt.current?.submissionId === submissionId && (!image.uri || attempt.current.uri === image.uri) ? attempt.current : undefined)
         ?? await readDraftImage(session.account.id, submissionId);
+      const isNewMedia = Boolean(existing && image.uri && existing.uri && image.uri !== existing.uri);
       draft = existing ? {
         ...existing,
         ...image,
-        startLat: effectiveLat ?? existing.startLat,
-        startLon: effectiveLon ?? existing.startLon,
+        startLat: isNewMedia ? effectiveLat : (effectiveLat ?? existing.startLat),
+        startLon: isNewMedia ? effectiveLon : (effectiveLon ?? existing.startLon),
       } : {
         ...image,
         startLat: effectiveLat,

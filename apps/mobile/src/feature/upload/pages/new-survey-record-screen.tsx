@@ -116,12 +116,20 @@ async function findOriginalAssetByFileName(
     (asset) => asset.filename?.toLowerCase() === fileName,
   );
 
-  return (
-    matches.find(
+  if (selectedAsset.width && selectedAsset.height) {
+    const exactMatch = matches.find(
       (asset) =>
         asset.width === selectedAsset.width && asset.height === selectedAsset.height,
-    ) ?? matches[0]
-  );
+    );
+    if (exactMatch) return exactMatch;
+  }
+
+  // Only fall back if there is exactly 1 match in the entire library
+  if (matches.length === 1) {
+    return matches[0];
+  }
+
+  return undefined;
 }
 
 async function extractSelectedAssetGps(asset: ImagePickerAsset) {
@@ -436,12 +444,21 @@ export function NewSurveyRecordScreen() {
 
           const exif = assetInfo.exif as Record<string, unknown> | undefined;
           const exifCoordinates = extractImageGpsCoordinates(exif);
-          const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+          let gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
             ? {
               latitude: assetInfo.location.latitude,
               longitude: assetInfo.location.longitude,
             }
             : exifCoordinates;
+
+          if (!gpsCoordinates && assetType === 'image' && targetUri) {
+            try {
+              const fileGps = await extractGpsFromImageFile(targetUri);
+              if (fileGps) {
+                gpsCoordinates = fileGps;
+              }
+            } catch {}
+          }
 
 
           if (assetType === 'video') {
@@ -710,20 +727,22 @@ export function NewSurveyRecordScreen() {
     if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
     setIsScanning(false);
     setIsSaving(false);
+    const initialAsset = selectedAssets[0];
+    const initialGps = initialAsset?.gps ?? null;
     router.replace({
       pathname: '/work/new-survey/details',
       params: {
         submissionId: savedDraftId.current,
         ...(savedBatchIds.current.length > 1 ? { batchSubmissionIds: savedBatchIds.current.join(',') } : {}),
-        ...(selectedGps ? {
-          startLat: String(selectedGps.latitude),
-          startLon: String(selectedGps.longitude),
+        ...(initialGps ? {
+          startLat: String(initialGps.latitude),
+          startLon: String(initialGps.longitude),
         } : {}),
-        ...(selectedAsset?.duration ? {
-          duration: String(Math.round(selectedAsset.duration)),
+        ...(initialAsset?.duration ? {
+          duration: String(Math.round(initialAsset.duration)),
         } : {}),
-        ...(selectedAsset?.assetId ? {
-          assetId: selectedAsset.assetId,
+        ...(initialAsset?.assetId ? {
+          assetId: initialAsset.assetId,
         } : {}),
         ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
       },
