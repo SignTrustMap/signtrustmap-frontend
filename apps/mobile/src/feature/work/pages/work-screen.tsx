@@ -349,14 +349,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
               />
               {/* Standout Action: Recaptures Requested */}
-              {/* <WorkActionCard
+              <WorkActionCard
                 accentColor="#F59E0B"
                 count={recapturesCount}
                 icon="camera-retake-outline"
                 label="Yêu cầu chụp lại ảnh"
                 onPress={() => router.push('/work/recaptures')}
                 subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
-              /> */}
+              />
             </View>
           ) : selectedRole === 'reviewer' ? (
             <View style={styles.actionList}>
