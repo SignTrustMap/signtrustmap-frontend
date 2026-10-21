@@ -15,7 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
-import { OfflineMapModal } from '@/components/offline-map-modal';
+// import { OfflineMapModal } from '@/components/offline-map-modal';
 import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
@@ -99,7 +99,7 @@ export function ProfileScreen() {
               });
             }
           },
-          () => {}
+          () => { }
         );
       }
     }, 200);
@@ -428,7 +428,7 @@ export function ProfileScreen() {
           </View>
 
           {/* Section 3: Offline Maps Card */}
-          <View
+          {/* <View
             style={[
               styles.collapsibleCard,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -457,7 +457,7 @@ export function ProfileScreen() {
                 size={22}
               />
             </Pressable>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
 
@@ -562,11 +562,11 @@ export function ProfileScreen() {
         visible={isModalOpen}
       />
 
-      <OfflineMapModal
+      {/* <OfflineMapModal
         accessToken={session?.accessToken}
         onClose={() => setIsOfflineMapModalOpen(false)}
         visible={isOfflineMapModalOpen}
-      />
+      /> */}
     </View>
   );
 }

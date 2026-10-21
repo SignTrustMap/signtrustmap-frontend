@@ -1856,7 +1856,7 @@ export function NavigationMapScreen() {
                     </Pressable>
                   </View>
                   <>
-                    <AppButton
+                    {/* <AppButton
                       accessibilityLabel="Bản đồ ngoại tuyến"
                       variant="ghost"
                       onPress={() => setIsOfflineMapModalOpen(true)}
@@ -1876,7 +1876,7 @@ export function NavigationMapScreen() {
                         size={22}
                         color={theme.primary}
                       />
-                    </AppButton>
+                    </AppButton> */}
                     <AppButton
                       accessibilityLabel="Phát trực tiếp"
                       variant="ghost"
@@ -3074,11 +3074,11 @@ export function NavigationMapScreen() {
         </View>
       </Modal>
 
-      <OfflineMapModal
+      {/* <OfflineMapModal
         accessToken={session?.accessToken}
         onClose={() => setIsOfflineMapModalOpen(false)}
         visible={isOfflineMapModalOpen}
-      />
+      /> */}
     </View>
   );
 }

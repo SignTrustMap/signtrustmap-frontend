@@ -26,8 +26,8 @@ import { WorkActionCard } from '@/feature/work/components/work-action-card';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
-  useGetMyMissions,
-  useGetMyTaskCompletions,
+  // useGetMyMissions,
+  // useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -108,16 +108,16 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
 
   // Missions queries for action card badge and streak indicator
-  const { data: completionsData } = useGetMyTaskCompletions();
-  const { data: missionsData } = useGetMyMissions();
-  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
+  // const { data: completionsData } = useGetMyTaskCompletions();
+  // const { data: missionsData } = useGetMyMissions();
+  // const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
 
-  const incompleteMissionsCount = useMemo(() => {
-    const rawList = Array.isArray(completionsData) ? completionsData : [];
-    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
-    const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
-    return items.filter((item) => !item.isCompleted && !item.claimed).length;
-  }, [completionsData, selectedRole]);
+  // const incompleteMissionsCount = useMemo(() => {
+  //   const rawList = Array.isArray(completionsData) ? completionsData : [];
+  //   const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
+  //   const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
+  //   return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  // }, [completionsData, selectedRole]);
 
   const activeIndex = availableRoles.indexOf(selectedRole);
   const [switcherWidth, setSwitcherWidth] = useState<number>(0);
@@ -284,14 +284,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           </View>
 
           {/* Mission Feature Action Card */}
-          <View style={styles.sectionHeaderRow}>
+          {/* <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleWithIcon}>
               <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
             </View>
-          </View>
+          </View> */}
 
-          <View style={styles.actionList}>
+          {/* <View style={styles.actionList}>
             <WorkActionCard
               accentColor={theme.primary}
               count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
@@ -305,7 +305,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               }
               subtitle="Nhiệm vụ hàng ngày, hàng tuần & toàn hệ thống để nhận Xu thưởng"
             />
-          </View>
+          </View> */}
 
           {/* Section Title: Role-Specific Features / Actions */}
           <View style={styles.sectionHeaderRow}>
@@ -349,14 +349,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
               />
               {/* Standout Action: Recaptures Requested */}
-              <WorkActionCard
+              {/* <WorkActionCard
                 accentColor="#F59E0B"
                 count={recapturesCount}
                 icon="camera-retake-outline"
                 label="Yêu cầu chụp lại ảnh"
                 onPress={() => router.push('/work/recaptures')}
                 subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
-              />
+              /> */}
             </View>
           ) : selectedRole === 'reviewer' ? (
             <View style={styles.actionList}>
