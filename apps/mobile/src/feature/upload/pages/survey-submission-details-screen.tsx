@@ -1,4 +1,4 @@
-﻿import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
@@ -801,6 +801,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     <NavigationMapView
                       focusCoordinate={startCoord}
                       routeStart={isVideoSubmission ? startCoord : undefined}
+                      isCustomStart={isVideoSubmission}
                       destination={
                         isVideoSubmission && endCoord
                           ? {
@@ -819,7 +820,53 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       }
                       showCurrentLocation={false}
                     />
+                    {isVideoSubmission ? (
+                      <Pressable
+                        accessibilityLabel="Mở toàn màn hình xem lộ trình"
+                        onPress={() => {
+                          const gpx = mediaFiles.find((m) => m.media_type === 'GPX')?.file_url;
+                          router.push({
+                            pathname: '/work/new-survey/route-map',
+                            params: {
+                              gpxUri: gpx ? resolveS3Url(gpx) : undefined,
+                              startLat: startCoord ? String(startCoord[1]) : undefined,
+                              startLon: startCoord ? String(startCoord[0]) : undefined,
+                              endLat: endCoord ? String(endCoord[1]) : undefined,
+                              endLon: endCoord ? String(endCoord[0]) : undefined,
+                              title: 'Lộ trình khảo sát đã gửi',
+                            },
+                          });
+                        }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    ) : null}
                   </View>
+                  {isVideoSubmission ? (
+                    <AppButton
+                      accessibilityLabel="Phóng to bản đồ xem trước"
+                      onPress={() => {
+                        const gpx = mediaFiles.find((m) => m.media_type === 'GPX')?.file_url;
+                        router.push({
+                          pathname: '/work/new-survey/route-map',
+                          params: {
+                            gpxUri: gpx ? resolveS3Url(gpx) : undefined,
+                            startLat: startCoord ? String(startCoord[1]) : undefined,
+                            startLon: startCoord ? String(startCoord[0]) : undefined,
+                            endLat: endCoord ? String(endCoord[1]) : undefined,
+                            endLon: endCoord ? String(endCoord[0]) : undefined,
+                            title: 'Lộ trình khảo sát đã gửi',
+                          },
+                        });
+                      }}
+                      style={[
+                        styles.mapZoomButton,
+                        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      ]}
+                      variant="ghost"
+                    >
+                      <AntDesign name="expand" size={18} color={theme.primary} />
+                    </AppButton>
+                  ) : null}
                 </View>
                 <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
                   {isVideoSubmission && endCoord
@@ -1686,5 +1733,18 @@ const styles = StyleSheet.create({
   candidateMeta: {
     fontFamily: Fonts.body,
     fontSize: 11,
+  },
+  mapZoomButton: {
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.two,
+    width: 36,
+    height: 36,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 3,
   },
 });

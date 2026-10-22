@@ -622,7 +622,33 @@ export function NavigationMapView({
   // nor focusCoordinate is set, no Camera is mounted (avoids snapping to the
   // hardcoded mock coordinate).
   const cameraCenter = destination?.coordinate;
-  const routeBounds = destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
+  const routeBounds = useMemo(() => {
+    if (routeCoordinates && routeCoordinates.length > 1) {
+      let minLon = Number.POSITIVE_INFINITY;
+      let minLat = Number.POSITIVE_INFINITY;
+      let maxLon = Number.NEGATIVE_INFINITY;
+      let maxLat = Number.NEGATIVE_INFINITY;
+      for (const [lon, lat] of routeCoordinates) {
+        if (lon < minLon) minLon = lon;
+        if (lat < minLat) minLat = lat;
+        if (lon > maxLon) maxLon = lon;
+        if (lat > maxLat) maxLat = lat;
+      }
+      if (Number.isFinite(minLon) && Number.isFinite(minLat)) {
+        const dLon = maxLon - minLon;
+        const dLat = maxLat - minLat;
+        const padLon = dLon < 0.001 ? 0.001 : 0;
+        const padLat = dLat < 0.001 ? 0.001 : 0;
+        return [minLon - padLon, minLat - padLat, maxLon + padLon, maxLat + padLat] as [
+          number,
+          number,
+          number,
+          number,
+        ];
+      }
+    }
+    return destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
+  }, [destination, routeCoordinates, routeStart]);
   const routeGeoJson = useMemo(() => {
     if (!routeCoordinates?.length) return null;
     return {
@@ -793,6 +819,7 @@ export function NavigationMapView({
             bounds={routeBounds}
             duration={900}
             easing="fly"
+            key={`route-bounds-${focusRequestId ?? 0}`}
             maxZoom={19}
             minZoom={11}
             padding={{ bottom: 160, left: 44, right: 44, top: 100 }}

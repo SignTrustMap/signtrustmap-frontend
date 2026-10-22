@@ -396,10 +396,33 @@ export function NavigationMapView({
         startMarkerRef.current.setLngLat(routeStart);
       }
 
-      map.fitBounds([routeStart, destination.coordinate], {
-        duration: 900,
-        padding: { bottom: 160, left: 44, right: 44, top: 100 },
-      });
+      if (routeCoordinates && routeCoordinates.length > 1) {
+        let minLon = routeCoordinates[0][0];
+        let minLat = routeCoordinates[0][1];
+        let maxLon = routeCoordinates[0][0];
+        let maxLat = routeCoordinates[0][1];
+        for (const [lon, lat] of routeCoordinates) {
+          if (lon < minLon) minLon = lon;
+          if (lat < minLat) minLat = lat;
+          if (lon > maxLon) maxLon = lon;
+          if (lat > maxLat) maxLat = lat;
+        }
+        map.fitBounds(
+          [
+            [minLon, minLat],
+            [maxLon, maxLat],
+          ],
+          {
+            duration: 900,
+            padding: { bottom: 160, left: 44, right: 44, top: 100 },
+          },
+        );
+      } else {
+        map.fitBounds([routeStart, destination.coordinate], {
+          duration: 900,
+          padding: { bottom: 160, left: 44, right: 44, top: 100 },
+        });
+      }
     };
 
     if (routeStart) {
@@ -416,7 +439,7 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary, vehicleMode]);
+  }, [destination, focusCoordinate, focusRequestId, routeCoordinates, routeStart, theme.primary, vehicleMode]);
 
   return (
     <View style={styles.container}>

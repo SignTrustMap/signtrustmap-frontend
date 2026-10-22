@@ -30,12 +30,15 @@ import {
   CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE,
   CANNOT_SAVE_DRAFT_MESSAGE,
   GALLERY_DEV_BUILD_REQUIRED_MESSAGE,
+  GPX_NO_VALID_COORDINATES_MESSAGE,
   GPX_SIZE_EXCEEDED_MESSAGE,
   IMAGE_SIZE_EXCEEDED_MESSAGE,
+  MAX_UPLOAD_FILES_EXCEEDED_MESSAGE,
   MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE,
   SELECT_VALID_GPX_FILE_MESSAGE,
   UNABLE_TO_LOAD_PHOTO_LIBRARY_MESSAGE,
   UNABLE_TO_READ_FILE_MESSAGE,
+  VIDEO_NO_GPS_DATA_MESSAGE,
   VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -386,7 +389,7 @@ export function NewSurveyRecordScreen() {
       }
 
       if (prev.length >= 3) {
-        setAndroidGalleryError('Chỉ được chọn tối đa 3 tệp (ảnh hoặc video).');
+        setAndroidGalleryError(MAX_UPLOAD_FILES_EXCEEDED_MESSAGE);
         return prev;
       }
 
@@ -430,7 +433,7 @@ export function NewSurveyRecordScreen() {
               if (info.exists && typeof info.size === 'number') {
                 fileSize = info.size;
               }
-            } catch {}
+            } catch { }
           }
 
           if (assetType === 'video' && fileSize > MAX_SURVEY_VIDEO_SIZE_BYTES) {
@@ -457,7 +460,7 @@ export function NewSurveyRecordScreen() {
               if (fileGps) {
                 gpsCoordinates = fileGps;
               }
-            } catch {}
+            } catch { }
           }
 
 
@@ -568,7 +571,7 @@ export function NewSurveyRecordScreen() {
               if (info.exists && typeof info.size === 'number') {
                 fileSize = info.size;
               }
-            } catch {}
+            } catch { }
           }
           if (!fileSize && assetType === 'video' && asset.uri) {
             fileSize = await getVideoFileSizeBytes(asset.uri).catch(() => 0);
@@ -671,7 +674,7 @@ export function NewSurveyRecordScreen() {
             if (info.exists && typeof info.size === 'number') {
               gpxSize = info.size;
             }
-          } catch {}
+          } catch { }
         }
         if (gpxSize > MAX_SURVEY_GPX_SIZE_BYTES) {
           setGpxPickerError(GPX_SIZE_EXCEEDED_MESSAGE);
@@ -699,7 +702,7 @@ export function NewSurveyRecordScreen() {
             ),
           );
         } else {
-          setGpxPickerError('Tệp GPX không chứa toạ độ hợp lệ.');
+          setGpxPickerError(GPX_NO_VALID_COORDINATES_MESSAGE);
           return;
         }
       }
@@ -757,7 +760,7 @@ export function NewSurveyRecordScreen() {
       if (asset.type === 'video') {
         const hasAssetGps = isValidGpsCoordinates(asset.gps);
         if (!hasAssetGps && !selectedGpxFile) {
-          setGpxPickerError('Video không có dữ liệu GPS. Vui lòng tải lên tệp GPX hành trình để tiếp tục.');
+          setGpxPickerError(VIDEO_NO_GPS_DATA_MESSAGE);
           return;
         }
       }
@@ -1372,22 +1375,6 @@ export function NewSurveyRecordScreen() {
               )}
             </View>
           ) : null}
-
-          {/* Secondary Button: Submit another survey */}
-
-          {selectedAssets.length > 2 && (
-            <AppButton
-              accessibilityLabel="Gửi khảo sát khác"
-              disabled={isOpeningGallery || isScanning || isSaving}
-              label="Gửi khảo sát khác"
-              onPress={handleOpenGallery}
-              style={[
-                styles.secondarySubmitButton,
-                { borderColor: theme.border, backgroundColor: theme.backgroundElement },
-              ]}
-              variant="surface"
-            />
-          )}
 
           <AppButton
             disabled={
