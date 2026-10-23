@@ -7,6 +7,10 @@ import { SurveyRecordDetailsScreen, validateCapturedDate } from '@/feature/uploa
 import { SurveyFinishScreen } from '@/feature/upload/pages/survey-finish-screen';
 import { SurveyorWorkPanel } from '@/feature/upload/components/surveyor-work-panel';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
+import {
+  MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE,
+  SELECT_VALID_GPX_FILE_MESSAGE,
+} from '@/constants/message';
 
 // 1. Mock expo-router
 const mockPush = jest.fn();
@@ -366,14 +370,14 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       mockExtractImageGpsCoordinates.mockReturnValueOnce({ latitude: 10.7769, longitude: 106.7009 });
       mockSaveDraft.mockResolvedValueOnce('sub-generated-123');
 
-      const { getByText } = await render(<NewSurveyRecordScreen />);
+      const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
       // Pick image
       fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       // Wait for Submit Record to be enabled
       await waitFor(() => {
-        expect(getByText('Tiếp tục ghi nhận')).toBeTruthy();
+        expect(getByLabelText('Đổi hoặc thêm ảnh từ thư viện')).toBeTruthy();
       });
 
       // Submit record
@@ -414,11 +418,11 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
         expect(mockLegacyRequestPermissionsAsync).toHaveBeenCalledWith(false, ['photo', 'video']);
-        expect(getByText('Media library permission is required to select photos and videos.')).toBeTruthy();
+        expect(getByText(MEDIA_LIBRARY_PERMISSION_REQUIRED_MESSAGE)).toBeTruthy();
       });
     });
 
@@ -445,12 +449,12 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
         expect(mockLegacyGetAssetsAsync).toHaveBeenCalled();
-        expect(getByText('Choose a photo or video')).toBeTruthy();
-        expect(getByLabelText('Select street_sign.jpg')).toBeTruthy();
+        expect(getByText('Chọn ảnh hoặc video')).toBeTruthy();
+        expect(getByLabelText('Chọn street_sign.jpg')).toBeTruthy();
       });
     });
   });
@@ -479,11 +483,11 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
         expect(mockExtractImageGpsCoordinates).toHaveBeenCalled();
-        expect(getByLabelText('Selected survey media')).toBeTruthy();
+        expect(getByLabelText('Tệp khảo sát 1')).toBeTruthy();
       });
     });
 
@@ -504,10 +508,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
-        expect(getByLabelText('Selected survey media')).toBeTruthy();
+        expect(getByLabelText('Tệp khảo sát 1')).toBeTruthy();
       });
     });
   });
@@ -538,19 +542,19 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
         expect(getByText('survey_drive.mp4')).toBeTruthy();
-        expect(getByText('GPS detected: 10.77690, 106.70090')).toBeTruthy();
+        expect(getByText('Đã phát hiện GPS từ video: 10.77690, 106.70090')).toBeTruthy();
       });
 
       // Toggle external GPX picker
-      const gpxToggle = getByLabelText('Toggle advanced GPX file picker');
+      const gpxToggle = getByLabelText('Chuyển đổi tùy chọn tệp GPX ngoài');
       fireEvent.press(gpxToggle);
 
       await waitFor(() => {
-        expect(getByLabelText('Upload GPX file')).toBeTruthy();
+        expect(getByLabelText('Tải lên tệp GPX')).toBeTruthy();
       });
     });
 
@@ -575,17 +579,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
-        expect(getByLabelText('Toggle advanced GPX file picker')).toBeTruthy();
-      });
-
-      // Open GPX toggle
-      fireEvent.press(getByLabelText('Toggle advanced GPX file picker'));
-
-      await waitFor(() => {
-        expect(getByLabelText('Upload GPX file')).toBeTruthy();
+        expect(getByLabelText('Đổi hoặc thêm ảnh từ thư viện')).toBeTruthy();
       });
 
       // Pick an invalid .txt file
@@ -594,10 +591,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         assets: [{ name: 'invalid_track.txt', uri: 'file:///tracks/invalid.txt' }],
       });
 
-      fireEvent.press(getByLabelText('Upload GPX file'));
+      fireEvent.press(getByLabelText('Tải lên tệp GPX hành trình'));
 
       await waitFor(() => {
-        expect(getByText('Please select a valid GPX file (.gpx).')).toBeTruthy();
+        expect(getByText(SELECT_VALID_GPX_FILE_MESSAGE)).toBeTruthy();
       });
     });
 
@@ -622,16 +619,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
-      fireEvent.press(getByText('Upload photo or video'));
+      fireEvent.press(getByText('Tải lên ảnh hoặc video'));
 
       await waitFor(() => {
-        expect(getByLabelText('Toggle advanced GPX file picker')).toBeTruthy();
-      });
-
-      fireEvent.press(getByLabelText('Toggle advanced GPX file picker'));
-
-      await waitFor(() => {
-        expect(getByLabelText('Upload GPX file')).toBeTruthy();
+        expect(getByLabelText('Đổi hoặc thêm ảnh từ thư viện')).toBeTruthy();
       });
 
       mockGetDocumentAsync.mockResolvedValueOnce({
@@ -643,10 +634,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         startTime: '2026-03-01T08:30:00.000Z',
       });
 
-      fireEvent.press(getByLabelText('Upload GPX file'));
+      fireEvent.press(getByLabelText('Tải lên tệp GPX hành trình'));
 
       await waitFor(() => {
-        expect(getByText('route.gpx')).toBeTruthy();
+        expect(getByText('Đã gắn tệp GPX: route.gpx')).toBeTruthy();
       });
     });
   });
@@ -995,6 +986,9 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         account: { id: 'account-surveyor-1', username: 'surveyor1' },
       };
       mockSearchParams = { submissionId: 'sub-no-auth' };
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const expectedDateVal = `${pad(validDate.getDate())}/${pad(validDate.getMonth() + 1)}/${validDate.getFullYear()}`;
       mockSubmissionStatusData = {
         submission: {
           id: 'sub-no-auth',
@@ -1002,7 +996,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
           submissionType: 'SINGLE_IMAGE',
           latitude: 10.7769,
           longitude: 106.7009,
-          capturedAt: '2026-03-01T10:00:00.000Z',
+          capturedAt: validDate.toISOString(),
         },
         mediaFiles: [{ media_type: 'IMAGE', file_url: 'https://example.com/sign.jpg' }],
         sessions: [],
@@ -1017,7 +1011,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       await waitFor(() => {
         expect(
           getByLabelText('Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm').props.value,
-        ).toBe('01/03/2026');
+        ).toBe(expectedDateVal);
       });
 
       fireEvent.press(getByText('Gửi hồ sơ'));
@@ -1206,6 +1200,9 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
   describe('Case 11: Network and Submission Failure Resilience', () => {
     it('displays error banner and keeps draft editable when submission API fails', async () => {
       mockSearchParams = { submissionId: 'sub-network-fail' };
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const expectedDateVal = `${pad(validDate.getDate())}/${pad(validDate.getMonth() + 1)}/${validDate.getFullYear()}`;
       mockSubmissionStatusData = {
         submission: {
           id: 'sub-network-fail',
@@ -1213,7 +1210,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
           submissionType: 'SINGLE_IMAGE',
           latitude: 10.7769,
           longitude: 106.7009,
-          capturedAt: '2026-03-01T10:00:00.000Z',
+          capturedAt: validDate.toISOString(),
         },
         mediaFiles: [{ media_type: 'IMAGE', file_url: 'https://example.com/sign.jpg' }],
         sessions: [],
@@ -1229,7 +1226,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       await waitFor(() => {
         expect(
           getByLabelText('Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm').props.value,
-        ).toBe('01/03/2026');
+        ).toBe(expectedDateVal);
       });
 
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
