@@ -1,6 +1,7 @@
-﻿import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
@@ -71,15 +72,30 @@ function SummaryMetric({ action, count }: { action: ReviewActionType; count: num
   );
 }
 
-function ReviewedSignRow({ review }: { review: CompletedReview }) {
+function ReviewedSignRow({
+  onPress,
+  review,
+}: {
+  onPress?: () => void;
+  review: CompletedReview;
+}) {
   const theme = useTheme();
   const details = actionDetails[review.action];
 
   return (
-    <View
-      style={[
+    <Pressable
+      accessibilityHint="Chạm để thẩm định lại biển báo này"
+      accessibilityLabel={`Biển báo ${review.submission.title}, trạng thái ${details.label}. Chạm để sửa lại lựa chọn.`}
+      accessibilityRole="button"
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.signRow,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+          opacity: pressed ? 0.85 : 1,
+        },
       ]}
     >
       <Image
@@ -102,13 +118,15 @@ function ReviewedSignRow({ review }: { review: CompletedReview }) {
       <View style={[styles.statusBadge, { backgroundColor: `${details.color}18` }]}>
         <Text style={[styles.statusLabel, { color: details.color }]}>{details.label}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const params = useLocalSearchParams<{ resumeIndex?: string }>();
+  const resumeIndex = params?.resumeIndex;
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
   const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
@@ -116,10 +134,33 @@ export function SubmissionSummaryScreen() {
     { approved: 0, declined: 0, reported: 0, skipped: 0, reported_new_sign: 0 },
   );
 
+  const handleBackToReview = () => {
+    if (resumeIndex !== undefined && resumeIndex !== '') {
+      router.replace({
+        pathname: '/work/submission-review',
+        params: { resumeIndex: String(resumeIndex) },
+      });
+    } else {
+      router.replace('/work/submission-review');
+    }
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <View style={styles.content}>
+          <View style={styles.topBar}>
+            <Pressable
+              accessibilityLabel="Quay lại thẩm định"
+              hitSlop={Spacing.one}
+              onPress={handleBackToReview}
+              style={styles.backButton}
+              testID="summary-back-button"
+            >
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+            </Pressable>
+          </View>
+
           <View style={styles.heading}>
             <Text style={[styles.title, { color: theme.text }]}>Tổng kết thẩm định</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
@@ -130,7 +171,7 @@ export function SubmissionSummaryScreen() {
           <View style={styles.metrics}>
             <SummaryMetric action="approved" count={counts.approved} />
             <SummaryMetric action="declined" count={counts.declined} />
-            <SummaryMetric action="reported_new_sign" count={counts.reported_new_sign} />
+            <SummaryMetric action="reported" count={counts.reported + counts.reported_new_sign} />
             <SummaryMetric action="skipped" count={counts.skipped} />
           </View>
 
@@ -139,20 +180,31 @@ export function SubmissionSummaryScreen() {
             showsVerticalScrollIndicator={false}
             style={styles.reviewList}
           >
-            {reviewHistory.map((review) => (
-              <ReviewedSignRow key={review.submission.id} review={review} />
+            {reviewHistory.map((review, index) => (
+              <ReviewedSignRow
+                key={review.submission.id}
+                onPress={() => {
+                  beginSubmissionCheck(index);
+                  router.replace('/work/submission-review');
+                }}
+                review={review}
+              />
             ))}
           </ScrollView>
 
           <View style={styles.footerActions}>
             <AppButton
+              disabled={reviewHistory.length === 0}
               label="Kiểm tra lại hồ sơ"
               onPress={() => {
                 beginSubmissionCheck();
                 router.replace('/work/submission-review');
               }}
-              style={[styles.checkButton, { borderColor: theme.primary }]}
-              textStyle={{ color: theme.primary }}
+              style={[
+                styles.checkButton,
+                { borderColor: reviewHistory.length > 0 ? theme.primary : theme.border },
+              ]}
+              textStyle={{ color: reviewHistory.length > 0 ? theme.primary : theme.placeholder }}
               variant="surface"
             />
             <AppButton
@@ -187,8 +239,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.two,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: -Spacing.one,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heading: { gap: 2 },
   title: { fontFamily: Fonts.body, fontSize: 24, fontWeight: 900, lineHeight: 31 },

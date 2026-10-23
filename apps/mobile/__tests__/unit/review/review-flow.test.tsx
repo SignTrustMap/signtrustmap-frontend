@@ -231,6 +231,9 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
   useReportSignCandidate: () => ({
     mutateAsync: mockReportCandidate,
   }),
+  useReportMissingType: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ success: true }),
+  }),
   useSkipSign: () => ({
     mutateAsync: mockSkipSign,
   }),

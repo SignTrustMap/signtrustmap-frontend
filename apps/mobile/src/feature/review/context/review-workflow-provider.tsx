@@ -28,7 +28,7 @@ export type CompletedReview = {
 };
 
 export type ReviewWorkflowContextValue = {
-  beginSubmissionCheck: () => void;
+  beginSubmissionCheck: (targetSubmissionIndex?: number) => void;
   checkedReviewIndex: number;
   checkingSubmission: boolean;
   isCheckingSubmission: boolean;
@@ -46,6 +46,7 @@ export type ReviewWorkflowContextValue = {
   goToNextCheckedReview: () => void;
   goToPreviousCheckedReview: () => void;
   isLoading: boolean;
+  jumpToSubmissionIndex?: (index: number) => void;
   pendingSubmissions: ReviewSubmission[];
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
@@ -78,6 +79,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
 
   const [pendingSubmissions, setPendingSubmissions] = useState<ReviewSubmission[]>([]);
+  const [initialQueueSubmissions, setInitialQueueSubmissions] = useState<ReviewSubmission[]>([]);
   const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>([]);
   const [isCheckingSubmission, setIsCheckingSubmission] = useState(false);
   const [checkedReviewIndex, setCheckedReviewIndex] = useState(0);
@@ -113,6 +115,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       const data = await refetchWorkflow();
       if (!data?.queue) return;
       setPendingSubmissions(data.queue.submissions);
+      setInitialQueueSubmissions(data.queue.submissions);
       setTotalSubmissions(data.queue.total);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
@@ -139,6 +142,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       .then((data) => {
         if (!active || !data?.queue) return;
         setPendingSubmissions(data.queue.submissions);
+        setInitialQueueSubmissions(data.queue.submissions);
         setTotalSubmissions(data.queue.total);
         setError(undefined);
       })
@@ -153,11 +157,47 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     };
   }, [accessToken, accountId, isReviewActive, refetchWorkflow]);
 
-  const beginSubmissionCheck = () => {
-    setPendingSubmissions((pending) => [
-      ...reviewHistory.map((item) => item.submission),
-      ...pending,
-    ]);
+  const jumpToSubmissionIndex = useCallback(
+    (targetIndex: number) => {
+      if (initialQueueSubmissions.length === 0) return;
+      const clampedIndex = Math.max(0, Math.min(targetIndex, initialQueueSubmissions.length));
+      if (clampedIndex >= initialQueueSubmissions.length) {
+        setPendingSubmissions([]);
+        return;
+      }
+      if (
+        reviewHistory.length === clampedIndex &&
+        pendingSubmissions[0]?.id === initialQueueSubmissions[clampedIndex]?.id
+      ) {
+        return;
+      }
+      setPendingSubmissions(initialQueueSubmissions.slice(clampedIndex));
+      setTotalSubmissions(initialQueueSubmissions.length);
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(false);
+      setRecheckingReviewIndex(undefined);
+      setRecheckingPreviousAction(undefined);
+    },
+    [initialQueueSubmissions, reviewHistory.length, pendingSubmissions],
+  );
+
+  const beginSubmissionCheck = (targetSubmissionIndex?: number) => {
+    if (targetSubmissionIndex !== undefined && reviewHistory[targetSubmissionIndex]) {
+      const target = reviewHistory[targetSubmissionIndex];
+      setPendingSubmissions([target.submission]);
+      setTotalSubmissions(1);
+      setIsRecheckingSubmission(true);
+      setRecheckingReviewIndex(targetSubmissionIndex);
+      setRecheckingPreviousAction(target.action);
+      setReviewHistory((history) => history.filter((_, i) => i !== targetSubmissionIndex));
+      setCheckedReviewIndex(0);
+      setIsCheckingSubmission(false);
+      return;
+    }
+
+    const votedSubmissions = reviewHistory.map((item) => item.submission);
+    setPendingSubmissions(votedSubmissions);
+    setTotalSubmissions(votedSubmissions.length);
     setReviewHistory([]);
     setCheckedReviewIndex(0);
     setIsCheckingSubmission(false);
@@ -179,6 +219,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingPreviousAction(undefined);
     setReviewHistory([]);
     setSessionReviewCount(0);
+    setInitialQueueSubmissions([]);
     hasLoadedRef.current = false;
     await refresh();
   };
@@ -289,6 +330,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const reviewCheckedSubmissionAgain = async (): Promise<boolean> => {
+    if (reviewHistory[checkedReviewIndex]) {
+      beginSubmissionCheck(checkedReviewIndex);
+      return true;
+    }
     return false;
   };
 
@@ -309,6 +354,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         goToNextCheckedReview,
         goToPreviousCheckedReview,
         isLoading,
+        jumpToSubmissionIndex,
         pendingSubmissions,
         refresh,
         recheckingPreviousAction,
