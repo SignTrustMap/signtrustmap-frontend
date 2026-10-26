@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import PageHeader from '@/components/common/PageHeader'
@@ -224,7 +224,7 @@ export default function UsersPage() {
   // Open Edit Modal
   const handleOpenModal = (user: BackendUserItem) => {
     setSelectedUser(user)
-    setSelectedRoles(Array.isArray(user.roles) ? [...user.roles.map((r) => r.toUpperCase())] : [])
+    setSelectedRoles(Array.isArray(user.roles) ? user.roles.map((r) => r.toUpperCase()) : [])
     setSelectedStatus(user.status || 'ACTIVE')
     setStatusReason('')
     setCopiedId(false)

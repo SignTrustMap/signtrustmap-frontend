@@ -219,7 +219,7 @@ export function CatalogProposalStepView({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const cleanCode = signCode.trim().toUpperCase()
+    const cleanCode = signCode.trim().match(/^T\.xxx$/i) ? 'T.xxx' : signCode.trim().toUpperCase()
     const cleanNameVi = nameVi.trim()
     const cleanStaffNotes = staffNotes.trim()
 
@@ -406,7 +406,7 @@ export function CatalogProposalStepView({
                   required
                   value={signCode}
                   onChange={(e) => setSignCode(e.target.value.toUpperCase())}
-                  placeholder="VD: P.130, W.205..."
+                  placeholder="VD: P.130, W.205, T.xxx..."
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs uppercase placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
                 />
               </div>

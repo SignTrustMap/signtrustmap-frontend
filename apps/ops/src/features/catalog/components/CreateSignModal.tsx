@@ -93,10 +93,11 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       return
     }
 
+    const normalizedCode = newCode.trim().match(/^T\.xxx$/i) ? 'T.xxx' : newCode.trim()
     const resolvedImg = imageUrl.trim() || imagePreview
     const newEntry: CatalogEntry = {
-      id: `CAT-${newCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`,
-      code: newCode.trim(),
+      id: `CAT-${normalizedCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`,
+      code: normalizedCode,
       name: newNameVi.trim() || newNameEn.trim(),
       nameVi: newNameVi.trim() || newCode.trim(),
       nameEn: newNameEn.trim() || newNameVi.trim(),
@@ -155,7 +156,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. P.106a"
+                  placeholder="e.g. P.106a, T.xxx"
                   value={newCode}
                   onChange={(e) => setNewCode(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
