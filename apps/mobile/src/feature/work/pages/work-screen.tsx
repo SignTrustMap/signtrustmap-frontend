@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,11 +23,12 @@ import {
 } from '@/feature/revalidation/hooks/use-revalidation';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
+import { OfflineMapModal } from '@/components/offline-map-modal';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
-  // useGetMyMissions,
-  // useGetMyTaskCompletions,
+  useGetMyMissions,
+  useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -74,6 +75,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const [activeRole, setActiveRole] = useState<AccountRole>(currentRole);
   const [prevCurrentRole, setPrevCurrentRole] = useState<CurrentRole>(currentRole);
+  const [isOfflineMapModalOpen, setIsOfflineMapModalOpen] = useState(false);
 
   if (prevCurrentRole !== currentRole) {
     setPrevCurrentRole(currentRole);
@@ -108,16 +110,16 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
   const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
 
   // Missions queries for action card badge and streak indicator
-  // const { data: completionsData } = useGetMyTaskCompletions();
-  // const { data: missionsData } = useGetMyMissions();
-  // const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
+  const { data: completionsData } = useGetMyTaskCompletions();
+  const { data: missionsData } = useGetMyMissions();
+  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
 
-  // const incompleteMissionsCount = useMemo(() => {
-  //   const rawList = Array.isArray(completionsData) ? completionsData : [];
-  //   const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
-  //   const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
-  //   return items.filter((item) => !item.isCompleted && !item.claimed).length;
-  // }, [completionsData, selectedRole]);
+  const incompleteMissionsCount = useMemo(() => {
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, selectedRole]);
 
   const activeIndex = availableRoles.indexOf(selectedRole);
   const [switcherWidth, setSwitcherWidth] = useState<number>(0);
@@ -199,8 +201,22 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           showsVerticalScrollIndicator={false}
         >
           {/* Clean Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Bản đồ ngoại tuyến"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setIsOfflineMapModalOpen(true)}
+              style={[
+                styles.headerOfflineBtn,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
+            </Pressable>
           </View>
 
           {/* Role Switcher Tabs */}
@@ -284,14 +300,14 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           </View>
 
           {/* Mission Feature Action Card */}
-          {/* <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleWithIcon}>
               <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
             </View>
-          </View> */}
+          </View>
 
-          {/* <View style={styles.actionList}>
+          <View style={styles.actionList}>
             <WorkActionCard
               accentColor={theme.primary}
               count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
@@ -305,7 +321,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               }
               subtitle="Nhiệm vụ hàng ngày, hàng tuần & toàn hệ thống để nhận Xu thưởng"
             />
-          </View> */}
+          </View>
 
           {/* Section Title: Role-Specific Features / Actions */}
           <View style={styles.sectionHeaderRow}>
@@ -356,6 +372,28 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 label="Yêu cầu chụp lại ảnh"
                 onPress={() => router.push('/work/recaptures')}
                 subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
+              />
+              {/* Standout Action: Offline Maps */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="map-marker-down"
+                label="Bản đồ ngoại tuyến"
+                onPress={() => setIsOfflineMapModalOpen(true)}
+                subtitle="Tải bản đồ vector PMTiles để khảo sát khi không có sóng di động"
+              />
+
+              {/* Action Card: Sign Catalog */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="database-search-outline"
+                label="Tra cứu biển báo giao thông"
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'surveyor' },
+                  })
+                }
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
               />
             </View>
           ) : selectedRole === 'reviewer' ? (
@@ -420,7 +458,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 accentColor={theme.primary}
                 icon="database-search-outline"
                 label="Tra cứu biển báo giao thông"
-                onPress={() => router.push('/work/sign-catalog')}
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'reviewer' },
+                  })
+                }
                 subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
               />
             </View>
@@ -443,6 +486,20 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 onPress={() => router.push('/work/recorded-signs')}
                 subtitle="Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn"
               />
+
+              {/* Action Card: Sign Catalog */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="database-search-outline"
+                label="Tra cứu biển báo giao thông"
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'driver' },
+                  })
+                }
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
+              />
             </View>
           )}
         </ScrollView >
@@ -460,6 +517,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             </AppButton>
           ) : null
         }
+
+        <OfflineMapModal
+          accessToken={session?.accessToken}
+          onClose={() => setIsOfflineMapModalOpen(false)}
+          visible={isOfflineMapModalOpen}
+        />
       </SafeAreaView >
     </View >
   );
@@ -483,6 +546,19 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: Spacing.half,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerOfflineBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontFamily: Fonts.title,

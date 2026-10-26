@@ -43,9 +43,7 @@ export function useGetTopUpPackages(enabled = true) {
   const { session } = useSession();
   return useQuery<TopUpPackage[]>({
     queryKey: walletKeys.packages(session?.account.id),
-    queryFn: session
-      ? ({ signal }) => getTopUpPackages(session.accessToken, signal)
-      : skipToken,
+    queryFn: ({ signal }) => getTopUpPackages(session?.accessToken, signal),
     enabled,
     staleTime: 60_000 * 5, // packages rarely change — keep for 5 min
   });
@@ -73,10 +71,10 @@ export function useGetPaymentMethods(enabled = true) {
 export function useTopUp() {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  return useMutation<TopUpOrderResponse, Error, { packageId: number }>({
-    mutationFn: ({ packageId }) => {
+  return useMutation<TopUpOrderResponse, Error, { packageId: number; gateway?: string }>({
+    mutationFn: ({ packageId, gateway = 'MOMO' }) => {
       if (!session) throw new Error(UNAUTHENTICATED_MESSAGE);
-      return postTopUp(packageId, session.accessToken);
+      return postTopUp(packageId, session.accessToken, gateway);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: walletKeys.all(session?.account.id) });
@@ -90,10 +88,10 @@ export function useTopUp() {
 export function useTopUpCustom() {
   const { session } = useSession();
   const queryClient = useQueryClient();
-  return useMutation<TopUpOrderResponse, Error, { amount: number }>({
-    mutationFn: ({ amount }) => {
+  return useMutation<TopUpOrderResponse, Error, { amount: number; gateway?: string }>({
+    mutationFn: ({ amount, gateway = 'MOMO' }) => {
       if (!session) throw new Error(UNAUTHENTICATED_MESSAGE);
-      return postTopUpCustom(amount, session.accessToken);
+      return postTopUpCustom(amount, session.accessToken, gateway);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: walletKeys.all(session?.account.id) });

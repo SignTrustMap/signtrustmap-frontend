@@ -895,8 +895,8 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       expect(mockReset).toHaveBeenCalled();
       expect(mockInvalidateWalletAndStats).toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/work/submission-finish',
-        params: { count: '2' },
+        pathname: '/work/submission-complete',
+        params: { count: '2', type: 'review_submission' },
       });
     });
 
@@ -904,13 +904,11 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(<SubmissionFinishedScreen reviewedCount={3} />);
 
       expect(getByText('Hoàn tất thẩm định')).toBeTruthy();
-      expect(getByText(/3/)).toBeTruthy();
+      expect(getByText('Đã gửi kết quả thẩm định cho 3 biển báo thành công.')).toBeTruthy();
+      expect(getByText('3 mục')).toBeTruthy();
 
-      await fireEvent.press(getByText('Quay lại trang chủ thẩm định'));
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/work',
-        params: { currentRole: 'reviewer' },
-      });
+      await fireEvent.press(getByText('Về trang chủ'));
+      expect(mockReplace).toHaveBeenCalledWith('/home');
 
       await fireEvent.press(getByText('Thẩm định thêm biển báo'));
       expect(mockReplace).toHaveBeenCalledWith('/work/submission-review');

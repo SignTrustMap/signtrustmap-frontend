@@ -877,8 +877,9 @@ export function SurveyRecordDetailsScreen() {
       console.log('[Surveyor] Submissions finalized:', { batchCount: batchIds.length, lastStatus });
 
       router.replace({
-        pathname: '/work/survey-finish',
+        pathname: '/work/submission-complete',
         params: {
+          type: 'upload_submission',
           submissionId: currentDraftId,
           batchSubmissionIds: batchIds.join(','),
           submissionStatus: lastStatus,

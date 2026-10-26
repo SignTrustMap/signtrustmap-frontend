@@ -216,8 +216,11 @@ export function SubmissionSummaryScreen() {
                 // home screen and nav bar show fresh data after submission.
                 invalidateWalletAndStats();
                 router.replace({
-                  pathname: '/work/submission-finish',
-                  params: { count: String(reviewedCount) },
+                  pathname: '/work/submission-complete',
+                  params: {
+                    type: 'review_submission',
+                    count: String(reviewedCount),
+                  },
                 });
               }}
               style={styles.submitButton}

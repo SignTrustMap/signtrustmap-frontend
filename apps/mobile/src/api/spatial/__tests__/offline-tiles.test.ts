@@ -1,4 +1,4 @@
-import { fetchOfflineMapPacks, getOfflineMapPackDownloadUrl } from '../offline-tiles';
+import { DEFAULT_OFFLINE_MAP_PACKS, fetchOfflineMapPacks, getOfflineMapPackDownloadUrl } from '../offline-tiles';
 import * as apiClient from '@/api/api-client';
 
 jest.mock('@/api/api-client', () => ({
@@ -47,6 +47,16 @@ describe('Offline Tiles API', () => {
       expect(result.packs).toHaveLength(1);
       expect(result.packs[0].id).toBe('vietnam-osm');
       expect(result.packs[0].sizeMb).toBe(419.43);
+    });
+
+    it('falls back to default offline map packs when the API endpoint errors or returns 404', async () => {
+      (apiClient.apiRequest as jest.Mock).mockRejectedValueOnce(new Error('HTTP error! status: 404'));
+
+      const result = await fetchOfflineMapPacks();
+
+      expect(result.packs).toEqual(DEFAULT_OFFLINE_MAP_PACKS);
+      expect(result.total).toBe(DEFAULT_OFFLINE_MAP_PACKS.length);
+      expect(result.packs.length).toBeGreaterThanOrEqual(1);
     });
   });
 

@@ -548,8 +548,15 @@ export function InspectRevalidateScreen() {
 
       setSubmitSuccess(true);
       setTimeout(() => {
-        handleNavigateBack();
-      }, 1400);
+        router.replace({
+          pathname: '/work/submission-complete',
+          params: {
+            type: 'upload_revalidation',
+            taskId: targetTaskId,
+            signCode,
+          },
+        });
+      }, 1000);
     } catch (err) {
       console.error('[InspectRevalidate] Submission failed:', err);
       setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
