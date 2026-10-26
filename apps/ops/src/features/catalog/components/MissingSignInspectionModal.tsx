@@ -236,7 +236,7 @@ export function MissingSignInspectionModal({
 
   // Action decision form state (Exactly like /escalations)
   const [actionType, setActionType] = useState<ActionType>(() => {
-    if (isAdmin && onOpenApprove) return 'APPROVE'
+    if (isAdmin && report.status === 'Escalated' && onOpenApprove) return 'APPROVE'
     if (!isAdmin && report.status === 'Open') return 'ESCALATE'
     return 'MERGE'
   })
@@ -714,7 +714,7 @@ export function MissingSignInspectionModal({
 
                     {/* Action Choice Pills (Clean, simple, text-only, exactly like /escalations) */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {isAdmin && onOpenApprove && (
+                      {isAdmin && report.status === 'Escalated' && onOpenApprove && (
                         <button
                           type="button"
                           onClick={() => setActionType('APPROVE')}
@@ -811,13 +811,13 @@ export function MissingSignInspectionModal({
                     {actionType === 'ESCALATE' && (
                       <div className="space-y-1">
                         <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                          Ghi chú: <span className="text-red-500">*</span>
+                          Ghi chú sơ bộ về biển (bắt buộc chuyển Admin): <span className="text-red-500">*</span>
                         </label>
                         <textarea
                           rows={2}
                           value={escalateNotes}
                           onChange={(e) => setEscalateNotes(e.target.value)}
-                          placeholder="Nhập ghi chú..."
+                          placeholder="Ghi nhận diện mạo, chức năng hoặc thông tin sơ bộ về biển lạ gửi lên Admin thẩm định..."
                           className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
                         />
                       </div>
@@ -848,10 +848,13 @@ export function MissingSignInspectionModal({
                             rows={2}
                             value={recaptureNote}
                             onChange={(e) => setRecaptureNote(e.target.value)}
-                            placeholder="Nhập ghi chú..."
+                            placeholder="Nhập ghi chú hướng dẫn khảo sát lại..."
                             className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
                           />
                         </div>
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400 pt-0.5">
+                          Hệ thống sẽ chỉ định ngẫu nhiên một Surveyor đang hoạt động đến thực địa chụp lại ảnh trong bán kính GPS 100m.
+                        </p>
                       </div>
                     )}
 

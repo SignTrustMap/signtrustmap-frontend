@@ -317,6 +317,7 @@ export const catalogService = {
   updateMissingReport: async (
     id: string,
     data: {
+      actionType?: 'MERGE' | 'REJECT' | 'ESCALATE_ADMIN' | 'REQUEST_RECAPTURE'
       status?: string
       staffNotes?: string
       actionNote?: string
