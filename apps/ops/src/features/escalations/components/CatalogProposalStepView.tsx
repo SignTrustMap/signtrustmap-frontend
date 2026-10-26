@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/context/ToastContext'
 import CustomSelect from '@/components/common/CustomSelect'
-import { CircleNotch } from '@phosphor-icons/react'
+import { CircleNotch, Check } from '@phosphor-icons/react'
 import {
   catalogService,
   STANDARD_SIGN_CATEGORIES,
+  VEHICLE_TYPE_OPTIONS,
   type SignCategoryItem,
+  type VehicleType,
 } from '@/api/services/catalog.service'
 import { escalationService } from '@/api/services/escalation.service'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
@@ -65,6 +67,7 @@ export function CatalogProposalStepView({
   const [description, setDescription] = useState('')
   const [aiLabelPrompt, setAiLabelPrompt] = useState('')
   const [staffNotes, setStaffNotes] = useState('')
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>(['CAR', 'MOTORCYCLE'])
 
   // Categories list from live backend
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
@@ -227,12 +230,39 @@ export function CatalogProposalStepView({
       warning(isEn ? 'Please enter a sign code!' : 'Vui lòng nhập mã biển!')
       return
     }
+
+    const CODE_REGEX = /^[A-Za-z]+\.\s*\d+[A-Za-z0-9]*$/
+    if (!CODE_REGEX.test(cleanCode)) {
+      warning(
+        isEn
+          ? 'Sign code format is invalid! Must be [PREFIX].[NUMBER][SUFFIX] (e.g. P.102, W.201a, R.301, I.401).'
+          : 'Định dạng mã biển không đúng quy chuẩn! Phải có dạng [TIỀN TỐ].[SỐ][HẬU TỐ] (VD: P.102, W.201a, R.301, I.401).'
+      )
+      return
+    }
+
     if (!cleanNameVi) {
       warning(isEn ? 'Please enter the Vietnamese name!' : 'Vui lòng nhập tên tiếng Việt!')
       return
     }
     if (!categoryId) {
       warning(isEn ? 'Please select a category!' : 'Vui lòng chọn nhóm biển!')
+      return
+    }
+    if (allowedVehicles.length === 0) {
+      warning(
+        isEn
+          ? 'Please select at least one applicable vehicle type!'
+          : 'Vui lòng chọn ít nhất một loại phương tiện áp dụng!'
+      )
+      return
+    }
+    if (!selectedFile) {
+      warning(
+        isEn
+          ? 'Representative image file (SVG or PNG) is required to approve and create a new sign!'
+          : 'Bắt buộc phải tải lên file ảnh đại diện quy chuẩn (SVG hoặc PNG) để tạo biển mới!'
+      )
       return
     }
     if (!cleanStaffNotes) {
@@ -258,8 +288,9 @@ export function CatalogProposalStepView({
           description: description.trim() || undefined,
           aiLabelPrompt: aiLabelPrompt.trim() || undefined,
           staffNotes: cleanStaffNotes,
+          allowedVehicles,
         },
-        selectedFile || undefined
+        selectedFile
       )
 
       const createdSignType = createRes?.createdSignType || createRes?.signType
@@ -285,12 +316,21 @@ export function CatalogProposalStepView({
       onSuccess()
     } catch (err: any) {
       console.error('Failed to approve and create sign type:', err)
-      // CHỐT CHẶN AN TOÀN: BƯỚC 2 TUYỆT ĐỐI KHÔNG CHẠY KHI BƯỚC 1 GẶP LỖI
-      const errorMsg =
-        err?.response?.data?.message ||
-        err?.message ||
-        (isEn ? 'Failed to create sign type. Escalation case status remains unchanged.' : 'Không thể tạo biển mới. Ca chuyển tiếp vẫn được giữ nguyên trạng thái!')
-      error(errorMsg)
+      const status = err?.response?.status || err?.status
+      const msg = String(err?.response?.data?.message || err?.message || '')
+      if (status === 409 || msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('trùng')) {
+        error(
+          isEn
+            ? `Sign code "${cleanCode}" already exists in the catalog! Please choose another code.`
+            : `Mã biển "${cleanCode}" đã tồn tại trong Catalog! Vui lòng chọn mã khác.`
+        )
+      } else {
+        const errorMsg =
+          err?.response?.data?.message ||
+          err?.message ||
+          (isEn ? 'Failed to create sign type. Escalation case status remains unchanged.' : 'Không thể tạo biển mới. Ca chuyển tiếp vẫn được giữ nguyên trạng thái!')
+        error(errorMsg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -310,7 +350,7 @@ export function CatalogProposalStepView({
           <div className="md:col-span-5 flex flex-col h-full">
             <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] flex flex-col h-full justify-between gap-3 shadow-2xs">
               <div className="text-[11px] font-bold text-gray-900 dark:text-white shrink-0">
-                {isEn ? 'Sign Representative Image' : 'Ảnh đại diện biển báo'}
+                {isEn ? 'Sign Representative Image' : 'Ảnh đại diện biển báo'} <span className="text-red-500">*</span>
               </div>
 
               {/* Khung ảnh: flex-1 tự co giãn đồng bộ chiều cao với cột phải */}
@@ -369,8 +409,8 @@ export function CatalogProposalStepView({
                         ? 'Change image'
                         : 'Đổi ảnh khác'
                       : isEn
-                      ? 'Upload SVG / PNG'
-                      : 'Tải ảnh SVG / PNG'}
+                      ? 'Upload SVG / PNG *'
+                      : 'Tải ảnh SVG / PNG *'}
                   </button>
 
                   {previewUrl && (
@@ -379,15 +419,15 @@ export function CatalogProposalStepView({
                       onClick={handleRemoveFile}
                       className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 hover:bg-red-100/90 dark:hover:bg-red-900/40 hover:border-red-400 text-[11px] font-semibold text-red-600 dark:text-red-400 transition-colors cursor-pointer text-center shrink-0 shadow-2xs"
                     >
-                      {isEn ? 'Use sample photo' : 'Dùng lại ảnh mẫu'}
+                      {isEn ? 'Remove' : 'Gỡ ảnh'}
                     </button>
                   )}
                 </div>
 
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
                   {isEn
-                    ? 'Supports SVG, PNG (max 20MB). Automatically uses field crop if no file uploaded.'
-                    : 'Hỗ trợ SVG, PNG (tối đa 20MB). Tự động dùng ảnh hiện trường nếu không tải file.'}
+                    ? 'Supports SVG, PNG (max 20MB). File upload is required for catalog creation.'
+                    : 'Hỗ trợ SVG, PNG (tối đa 20MB). Bắt buộc phải tải file ảnh chuẩn để tạo biển mới.'}
                 </p>
               </div>
             </div>
@@ -486,6 +526,63 @@ export function CatalogProposalStepView({
                   className="w-full text-xs"
                 />
               </div>
+            </div>
+
+            {/* Hàng 3.5: Phương tiện áp dụng (allowedVehicles) */}
+            <div className="space-y-1.5 shrink-0">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                  {isEn ? 'Applicable Vehicles' : 'Phương tiện áp dụng'} <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllowedVehicles(VEHICLE_TYPE_OPTIONS.map((v) => v.value))}
+                    className="text-[10px] text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer font-medium"
+                  >
+                    {isEn ? 'Select all' : 'Chọn tất cả'}
+                  </button>
+                  <span className="text-gray-300 dark:text-white/20">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllowedVehicles([])}
+                    className="text-[10px] text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:underline cursor-pointer font-medium"
+                  >
+                    {isEn ? 'Clear' : 'Bỏ chọn'}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {VEHICLE_TYPE_OPTIONS.map((v) => {
+                  const selected = allowedVehicles.includes(v.value)
+                  return (
+                    <button
+                      key={v.value}
+                      type="button"
+                      onClick={() => {
+                        if (selected) {
+                          setAllowedVehicles(allowedVehicles.filter((item) => item !== v.value))
+                        } else {
+                          setAllowedVehicles([...allowedVehicles, v.value])
+                        }
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                        selected
+                          ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
+                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="truncate">{isEn ? v.labelEn : v.labelVi}</span>
+                      {selected && <Check size={12} weight="bold" className="shrink-0 ml-1" />}
+                    </button>
+                  )
+                })}
+              </div>
+              {allowedVehicles.length === 0 && (
+                <p className="text-[10px] text-red-500 font-medium">
+                  {isEn ? 'At least one vehicle type must be selected.' : 'Vui lòng chọn ít nhất 1 loại phương tiện áp dụng.'}
+                </p>
+              )}
             </div>
 
             {/* Hàng 4: Mô tả biển & Mô tả nhận diện AI (2 cột song song) */}

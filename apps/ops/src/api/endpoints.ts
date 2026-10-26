@@ -81,6 +81,7 @@ export const API_ENDPOINTS = {
     MISSING_TYPE_REPORTS: '/api/v1/moderation/missing-type-reports',
     MISSING_TYPE_REPORT_DETAIL: (id: string) => `/api/v1/moderation/missing-type-reports/${id}`,
     APPROVE_AND_CREATE_TYPE: (id: string) => `/api/v1/moderation/missing-type-reports/${id}/approve-and-create-type`,
+    ADMIN_ACTION: (id: string) => `/api/v1/moderation/missing-type-reports/${id}/admin-action`,
     CASES: '/api/v1/moderation/cases',
     CASE_DETAIL: (id: string) => `/api/v1/moderation/cases/${id}`,
     RESOLVE_CASE: (id: string) => `/api/v1/moderation/cases/${id}/resolve`,

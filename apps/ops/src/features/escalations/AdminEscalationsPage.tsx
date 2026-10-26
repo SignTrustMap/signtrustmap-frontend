@@ -31,6 +31,7 @@ import {
 import {
   escalationService,
   type ModerationCaseItem,
+  type BanTargetRole,
 } from '@/api/services/escalation.service'
 import { CatalogProposalStepView } from './components'
 
@@ -264,6 +265,7 @@ export default function AdminEscalationsPage() {
 
   // Verdict Form
   const [actionType, setActionType] = useState<string>('RESOLVE')
+  const [banTarget, setBanTarget] = useState<BanTargetRole>('SURVEYOR')
   const [decisionNotes, setDecisionNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalStep, setModalStep] = useState<'DETAIL' | 'CATALOG_PROPOSAL'>('DETAIL')
@@ -305,6 +307,7 @@ export default function AdminEscalationsPage() {
     setTargetData(null)
     setDecisionNotes('')
     setActionType('RESOLVE')
+    setBanTarget('SURVEYOR')
     setCopiedId(false)
     setCopiedTargetId(false)
     setActiveImageTab('crop')
@@ -372,8 +375,46 @@ export default function AdminEscalationsPage() {
       return
     }
 
+    const reportId = targetEntityId || selectedCase.targetEntityId || selectedCase.target_entity_id || (targetData && targetData.id)
+
     setIsSubmitting(true)
     try {
+      // Specialized novel sign report actions: REJECT, REQUEST_RECAPTURE, BAN_USER
+      if (isCatProposal && reportId) {
+        let mappedAction: 'REJECT' | 'REQUEST_RECAPTURE' | 'BAN_USER'
+        if (actionType === 'DISMISS') mappedAction = 'REJECT'
+        else if (actionType === 'REQUEST_RECAPTURE') mappedAction = 'REQUEST_RECAPTURE'
+        else if (actionType === 'BAN_USER') mappedAction = 'BAN_USER'
+        else mappedAction = 'REJECT'
+
+        if (mappedAction === 'BAN_USER' && !banTarget) {
+          warning(isEn ? 'Please choose which user to ban!' : 'Vui lòng chọn đối tượng cần khóa tài khoản!')
+          setIsSubmitting(false)
+          return
+        }
+
+        await escalationService.applyAdminMissingReportAction(reportId, {
+          actionType: mappedAction,
+          reason: decisionNotes.trim(),
+          banTarget: mappedAction === 'BAN_USER' ? banTarget : undefined,
+        })
+
+        const actionSuccessMsg = {
+          REJECT: isEn ? `Report #${reportId.slice(0, 8)} rejected successfully!` : `Đã từ chối báo cáo #${reportId.slice(0, 8)}!`,
+          REQUEST_RECAPTURE: isEn ? 'Field recapture task assigned to a random surveyor!' : 'Đã giao nhiệm vụ chụp lại thực địa cho một surveyor ngẫu nhiên!',
+          BAN_USER: isEn
+            ? `User (${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'}) has been banned successfully!`
+            : `Đã khóa tài khoản của ${banTarget === 'SURVEYOR' ? 'Surveyor chụp lại' : banTarget === 'REVIEWER' ? 'Reviewer báo cáo' : 'Staff duyệt'}!`,
+        }[mappedAction]
+
+        success(actionSuccessMsg)
+        setSelectedCase(null)
+        fetchCases()
+        window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
+        return
+      }
+
+      // Standard moderation case resolve
       await escalationService.resolveCase(selectedCase.id, {
         resolutionNote: decisionNotes.trim(),
         actionType,
@@ -1121,6 +1162,62 @@ export default function AdminEscalationsPage() {
                               {isEn ? 'Ban user' : 'Khóa tài khoản'}
                             </button>
                           </div>
+
+                          {/* Ban Target Selector (Rendered when actionType === 'BAN_USER') */}
+                          {actionType === 'BAN_USER' && (
+                            <div className="p-2.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/20 space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-red-700 dark:text-red-400">
+                                <span>{isEn ? 'Select User to Ban' : 'Chọn đối tượng cần khóa tài khoản'} <span className="text-red-500">*</span></span>
+                                <span className="text-[10px] font-normal text-red-600/80 dark:text-red-400/80">
+                                  {isEn ? 'System access will be revoked' : 'Thu hồi quyền truy cập hệ thống'}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                {[
+                                  {
+                                    key: 'SURVEYOR' as const,
+                                    labelVi: 'Surveyor chụp ảnh',
+                                    subVi: 'Người chụp gần nhất',
+                                    labelEn: 'Surveyor',
+                                    subEn: 'Latest photographer',
+                                  },
+                                  {
+                                    key: 'REVIEWER' as const,
+                                    labelVi: 'Reviewer báo cáo',
+                                    subVi: reporterId ? `#${reporterId.slice(0, 8)}` : 'Người báo cáo',
+                                    labelEn: 'Reviewer',
+                                    subEn: reporterId ? `#${reporterId.slice(0, 8)}` : 'Submitter',
+                                  },
+                                  {
+                                    key: 'STAFF' as const,
+                                    labelVi: 'Staff duyệt đơn',
+                                    subVi: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Người chuyển đơn',
+                                    labelEn: 'Staff',
+                                    subEn: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Escalating staff',
+                                  },
+                                ].map((item) => {
+                                  const selected = banTarget === item.key
+                                  return (
+                                    <button
+                                      key={item.key}
+                                      type="button"
+                                      onClick={() => setBanTarget(item.key)}
+                                      className={`flex flex-col text-left px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer ${
+                                        selected
+                                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                                          : 'bg-white dark:bg-black/40 border-red-200/60 dark:border-red-900/40 text-gray-800 dark:text-gray-200 hover:bg-red-50/50'
+                                      }`}
+                                    >
+                                      <span className="font-bold text-[11px]">{isEn ? item.labelEn : item.labelVi}</span>
+                                      <span className={`text-[10px] truncate ${selected ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        {isEn ? item.subEn : item.subVi}
+                                      </span>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Verdict Justification Textarea */}
                           <div className="space-y-1">

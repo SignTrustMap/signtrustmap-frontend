@@ -121,6 +121,26 @@ export interface PaginatedMissingReportsResponse {
   totalPages: number
 }
 
+export type VehicleType = 'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN'
+
+export const VEHICLE_TYPES: VehicleType[] = [
+  'CAR',
+  'MOTORCYCLE',
+  'TRUCK',
+  'BUS',
+  'BICYCLE',
+  'PEDESTRIAN',
+]
+
+export const VEHICLE_TYPE_OPTIONS: Array<{ value: VehicleType; labelVi: string; labelEn: string }> = [
+  { value: 'CAR', labelVi: 'Xe ô tô con', labelEn: 'Car' },
+  { value: 'MOTORCYCLE', labelVi: 'Xe máy / Mô tô', labelEn: 'Motorcycle' },
+  { value: 'TRUCK', labelVi: 'Xe tải', labelEn: 'Truck' },
+  { value: 'BUS', labelVi: 'Xe buýt / Khách', labelEn: 'Bus' },
+  { value: 'BICYCLE', labelVi: 'Xe đạp', labelEn: 'Bicycle' },
+  { value: 'PEDESTRIAN', labelVi: 'Người đi bộ', labelEn: 'Pedestrian' },
+]
+
 export interface ApproveAndCreateSignTypeInput {
   proposedCategoryId?: number
   categoryId?: number
@@ -135,6 +155,7 @@ export interface ApproveAndCreateSignTypeInput {
   aiLabelPrompt?: string
   staffNotes?: string
   representativeImageKey?: string
+  allowedVehicles?: VehicleType[]
 }
 
 export const STANDARD_SIGN_CATEGORIES: SignCategoryItem[] = [
@@ -352,7 +373,11 @@ export const catalogService = {
       const formData = new FormData()
       Object.entries(data).forEach(([key, val]) => {
         if (val !== undefined && val !== null && val !== '') {
-          formData.append(key, String(val))
+          if (Array.isArray(val)) {
+            formData.append(key, JSON.stringify(val))
+          } else {
+            formData.append(key, String(val))
+          }
         }
       })
       formData.append('file', file)
