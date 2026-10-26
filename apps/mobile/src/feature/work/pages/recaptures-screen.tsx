@@ -23,7 +23,8 @@ import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import type { RecaptureReason, SurveyorRecaptureItem } from '@/types/reviewsType';
 
-const REASON_LABELS: Record<RecaptureReason, { label: string; color: string; bg: string }> = {
+const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Yêu cầu chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
   BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
   POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
   WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
@@ -106,6 +107,9 @@ export function RecapturesScreen() {
           : null;
 
       const isWithinGeofence = distanceMeters != null && distanceMeters <= 100;
+      const isNovelSignQuest = Boolean(
+        item.missing_type_report_id || item.reason === 'MISSING_TYPE_RECAPTURE_REQUESTED'
+      );
 
       return (
         <View
@@ -113,10 +117,25 @@ export function RecapturesScreen() {
             styles.card,
             {
               backgroundColor: theme.backgroundElement,
-              borderColor: theme.border,
+              borderColor: isNovelSignQuest ? `${theme.primary}70` : theme.border,
+              borderWidth: isNovelSignQuest ? 1.5 : 1,
             },
           ]}
         >
+          {isNovelSignQuest ? (
+            <View
+              style={[
+                styles.questBanner,
+                { backgroundColor: `${theme.primary}15` },
+              ]}
+            >
+              <MaterialCommunityIcons color={theme.primary} name="compass-outline" size={15} />
+              <Text style={[styles.questBannerText, { color: theme.primary }]}>
+                Nhiệm vụ thực địa: Khảo sát lại biển lạ chưa có trong danh mục
+              </Text>
+            </View>
+          ) : null}
+
           {/* Card Top: Image + Info */}
           <View style={styles.cardHeader}>
             <View style={[styles.imageWrapper, { backgroundColor: theme.neutral }]}>
@@ -434,6 +453,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 2,
+  },
+  questBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    borderRadius: Rounded.md,
+    marginBottom: Spacing.one,
+  },
+  questBannerText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+    flex: 1,
   },
   cardHeader: {
     flexDirection: 'row',

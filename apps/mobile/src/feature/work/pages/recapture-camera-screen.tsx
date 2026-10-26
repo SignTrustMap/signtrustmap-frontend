@@ -33,6 +33,7 @@ interface SelectedPhoto {
 }
 
 const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Yêu cầu chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
   BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
   POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
   WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },

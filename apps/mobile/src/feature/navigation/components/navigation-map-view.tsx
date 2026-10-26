@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.94)',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: Rounded.full,
+    borderRadius: Rounded.round,
     borderWidth: 1,
     borderColor: '#10B98150',
     shadowColor: '#000',
@@ -970,7 +970,7 @@ const styles = StyleSheet.create({
     maxWidth: 220,
   },
   offlineIndicatorText: {
-    fontFamily: Fonts.heading,
+    fontFamily: Fonts.title,
     fontSize: 11,
     fontWeight: '600',
     color: '#065F46',

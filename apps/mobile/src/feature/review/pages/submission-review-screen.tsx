@@ -101,11 +101,11 @@ export const REPORT_ISSUE_OPTIONS: Array<{
 }> = [
   {
     id: 'missing_type',
-    label: 'Sign not in catalog',
+    label: 'Biển lạ chưa có trong danh mục (Gửi Staff)',
   },
   {
     id: 'other',
-    label: 'Other issue',
+    label: 'Vấn đề khác',
   },
 ];
 
@@ -181,7 +181,7 @@ function ReviewBottomSheet({
         ? 'Xác nhận từ chối'
         : 'Xác nhận chọn'
     : isMissingType
-      ? 'Tiếp tục'
+      ? 'Gửi báo cáo biển lạ'
       : 'Gửi báo cáo';
 
   return (
@@ -471,6 +471,23 @@ function ReviewBottomSheet({
                     );
                   })}
                 </View>
+
+                {isMissingType ? (
+                  <View
+                    style={[
+                      styles.missingTypeHintCard,
+                      {
+                        backgroundColor: `${theme.primary}12`,
+                        borderColor: `${theme.primary}30`,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons color={theme.primary} name="shield-alert-outline" size={20} />
+                    <Text style={[styles.missingTypeHintText, { color: theme.text }]}>
+                      Báo cáo sẽ được gửi trực tiếp lên hàng đợi thẩm định của Staff cùng ảnh chụp và tọa độ GPS hiện trường.
+                    </Text>
+                  </View>
+                ) : null}
 
                 {isReportOther ? (
                   <View style={styles.reasonInputGroup}>
@@ -762,8 +779,19 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
   const confirmReport = () => {
     if (reportIssueType === 'missing_type') {
+      if (submission?.id) {
+        completeReview('reported_new_sign', {
+          newSignReport: {
+            candidateId: submission.id,
+          },
+        });
+        setToast({
+          id: Date.now(),
+          message: 'Đã gửi báo cáo biển lạ lên Staff thẩm định!',
+          tone: 'success',
+        });
+      }
       closeSheet();
-      setIsNewSignTypeModalOpen(true);
       return;
     }
 
@@ -1915,6 +1943,21 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  missingTypeHintCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  missingTypeHintText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    lineHeight: 17,
   },
   reasonInputGroup: {
     gap: Spacing.half,

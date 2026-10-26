@@ -63,13 +63,12 @@ export function ReportNewSignTypeModal({
   const [selectedColor, setSelectedColor] = useState<string>('Red-White');
   const [description, setDescription] = useState('');
 
-  const canSubmit = Boolean(proposedName.trim());
+  const canSubmit = true;
 
   const handleConfirm = () => {
-    if (!canSubmit) return;
     onSubmit({
       candidateId,
-      proposedName: proposedName.trim(),
+      proposedName: proposedName.trim() || undefined,
       proposedCategoryId: selectedCategoryId,
       suggestedShape: selectedShape,
       suggestedColorScheme: selectedColor,
@@ -131,7 +130,7 @@ export function ReportNewSignTypeModal({
               {/* Proposed Name */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Proposed Sign Name <Text style={{ color: Colors.danger }}>*</Text>
+                  Proposed Sign Name (Optional)
                 </Text>
                 <TextInput
                   accessibilityLabel="Proposed sign name, required"
@@ -279,11 +278,11 @@ export function ReportNewSignTypeModal({
               />
               <AppButton
                 disabled={!canSubmit}
-                label="Submit Report"
+                label="Gửi báo cáo"
                 onPress={handleConfirm}
                 style={[
                   styles.sheetFooterButton,
-                  { backgroundColor: canSubmit ? theme.primary : theme.placeholder },
+                  { backgroundColor: theme.primary },
                 ]}
               />
             </View>

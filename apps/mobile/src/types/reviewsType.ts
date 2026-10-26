@@ -17,7 +17,7 @@ export type VoteDto = {
 export type CreateMissingTypeReportDto = {
     candidateId?: string;
     proposedCategoryId?: number;
-    proposedName: string;
+    proposedName?: string;
     description?: string;
     suggestedShape?: string;
     suggestedColorScheme?: string;
@@ -137,6 +137,7 @@ export type ReviewerStatsResponse = {
 };
 
 export type RecaptureReason =
+    | 'MISSING_TYPE_RECAPTURE_REQUESTED'
     | 'BLURRY'
     | 'POOR_LIGHTING'
     | 'WRONG_ANGLE'
