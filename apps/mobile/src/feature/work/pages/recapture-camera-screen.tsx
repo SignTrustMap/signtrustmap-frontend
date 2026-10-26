@@ -47,7 +47,11 @@ const REASON_LABELS: Record<string, { label: string; color: string; bg: string }
 async function uriToBlob(uri: string, mimeType = 'image/jpeg'): Promise<Blob> {
   try {
     const res = await fetch(uri);
-    return await res.blob();
+    const blob = await res.blob();
+    if (!blob.type || blob.type === 'text/plain') {
+      return new Blob([blob], { type: mimeType });
+    }
+    return blob;
   } catch (fetchErr) {
     console.warn('[Recapture] fetch uri to blob failed, falling back to FileSystem:', fetchErr);
     const FileSystem = await import('expo-file-system/legacy');

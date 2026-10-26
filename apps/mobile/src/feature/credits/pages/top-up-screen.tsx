@@ -1,4 +1,4 @@
-﻿import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import {
   useGetTopUpPackages,
   useGetPaymentMethods,
   useTopUp,
+  useTopUpCustom,
 } from '../hooks/use-wallet';
 
 export function TopUpScreen() {
@@ -32,6 +33,8 @@ export function TopUpScreen() {
   const { data: packages = [], isLoading: loadingPackages } = useGetTopUpPackages();
   const { data: paymentMethods = [], isLoading: loadingMethods } = useGetPaymentMethods();
   const { mutateAsync: topUp, isPending: isConfirming } = useTopUp();
+  const { mutateAsync: topUpCustom, isPending: isCustomConfirming } = useTopUpCustom();
+  const isPaying = isConfirming || isCustomConfirming;
 
   const balance = walletData?.wallet?.balance ?? 0;
 
@@ -51,6 +54,10 @@ export function TopUpScreen() {
     try {
       if (effectivePackage) {
         await topUp({ packageId: effectivePackage.id });
+      } else if (customCredit && customCredit > 0) {
+        await topUpCustom({ amount: customCredit });
+      } else {
+        return;
       }
       setConfirmSuccess(true);
       setTimeout(() => router.replace('/credits'), 1200);
@@ -179,9 +186,9 @@ export function TopUpScreen() {
       >
         <AppButton
           accessibilityLabel={`Thanh toán ${displayAmount} Credits bằng ${selectedMethod ? `${selectedMethod.cardBrand} ···· ${selectedMethod.cardLast4}` : 'phương thức đã chọn'}`}
-          disabled={displayAmount <= 0 || isConfirming || confirmSuccess}
+          disabled={displayAmount <= 0 || isPaying || confirmSuccess}
           label={
-            isConfirming
+            isPaying
               ? 'Đang xử lý…'
               : `Xác nhận và thanh toán  (${displayAmount} Credits)`
           }
