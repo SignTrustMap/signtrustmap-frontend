@@ -201,7 +201,7 @@ export function MissingSignMergeModal({
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t(
                     'reviewer.modal_search_placeholder',
-                    'Tìm theo mã hiệu (P.102, W.244...), tên biển báo hoặc từ khóa...'
+                    'Tìm theo mã hiệu P.102, W.244, tên biển báo hoặc từ khóa...'
                   )}
                   className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm font-medium rounded-xl border bg-white dark:bg-black/50 border-gray-300 dark:border-white/15 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-2 focus:ring-[#007b8b]/20 dark:focus:ring-[#00c4de]/20 transition-all"
                 />
@@ -338,7 +338,7 @@ export function MissingSignMergeModal({
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Nhập ghi chú gộp biển (không bắt buộc)..."
+                placeholder="Nhập ghi chú gộp biển..."
                 className="w-full px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-black/50 border-gray-300 dark:border-white/15 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] transition-colors"
               />
             </div>

@@ -64,7 +64,7 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     roadAddress: candidate
       ? `${candidate.latitude?.toFixed(5) ?? 10.7769}°, ${candidate.longitude?.toFixed(5) ?? 106.7009}°`
       : 'TP. Hồ Chí Minh, Việt Nam',
-    aiConfidence: candidate?.confidenceScore ?? 0.88,
+    aiConfidence: typeof candidate?.confidenceScore === 'number' ? candidate.confidenceScore : undefined,
     status,
     rawStatus: r.status,
     sampleImageUrl,
@@ -74,9 +74,25 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     similarCatalogEntries: ['P.102', 'P.103a'],
     clipPrompt: r.suggestedNameEn || r.proposedName || 'A road traffic sign on street',
     candidateId: r.candidateId,
-    proposedCategoryId: r.proposedCategoryId,
-    suggestedShape: r.suggestedShape,
-    suggestedColorScheme: r.suggestedColorScheme,
+    proposedCategoryId: r.proposedCategoryId ?? (r as any).proposed_category_id ?? (r as any).categoryId ?? null,
+    suggestedShape:
+      r.suggestedShape ||
+      (r as any).suggested_shape ||
+      (r as any).shape ||
+      (candidate as any)?.shape ||
+      (candidate as any)?.predictedSignType?.shape ||
+      null,
+    suggestedColorScheme:
+      r.suggestedColorScheme ||
+      (r as any).suggested_color_scheme ||
+      (r as any).colorScheme ||
+      (r as any).color_scheme ||
+      (r as any).color ||
+      (candidate as any)?.colorScheme ||
+      (candidate as any)?.color_scheme ||
+      (candidate as any)?.predictedSignType?.colorScheme ||
+      (candidate as any)?.predictedSignType?.color ||
+      null,
     mergedIntoSignTypeId: r.mergedIntoSignTypeId,
     staffNotes: r.staffNotes,
   }
@@ -318,10 +334,10 @@ export default function MissingSignsPage() {
   // Sort filter options
   const sortOptions: OptionItem[] = useMemo(() => [
     { value: 'newest', label: isEn ? 'Newest first' : 'Mới nhất' },
-    { value: 'oldest', label: isEn ? 'Oldest (Longest waiting)' : 'Cũ nhất (Chờ lâu nhất)' },
-    { value: 'confidence_asc', label: isEn ? 'AI Confidence (Low → High)' : 'Độ tin cậy AI: Thấp → Cao' },
-    { value: 'confidence_desc', label: isEn ? 'AI Confidence (High → Low)' : 'Độ tin cậy AI: Cao → Thấp' },
-    { value: 'name_asc', label: isEn ? 'Sign Name (A → Z)' : 'Tên biển (A → Z)' },
+    { value: 'oldest', label: isEn ? 'Oldest' : 'Cũ nhất' },
+    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
+    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
+    { value: 'name_asc', label: isEn ? 'Sign Name: A → Z' : 'Tên biển: A → Z' },
   ], [isEn])
 
   // Catalog search filtering for Merge modal

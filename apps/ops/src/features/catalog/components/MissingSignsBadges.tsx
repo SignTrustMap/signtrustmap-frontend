@@ -21,35 +21,35 @@ export function CategoryBadge({
   if (id === 1 || category === 'prohibitory') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 dark:bg-red-500/15 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/30 whitespace-nowrap">
-        {t('missing_signs.cat_prohibitory', 'Biển báo cấm (P)')}
+        {t('missing_signs.cat_prohibitory', 'Biển báo cấm')}
       </span>
     )
   }
   if (id === 2 || category === 'warning') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 whitespace-nowrap">
-        {t('missing_signs.cat_warning', 'Biển cảnh báo (W)')}
+        {t('missing_signs.cat_warning', 'Biển cảnh báo')}
       </span>
     )
   }
   if (id === 3 || category === 'mandatory') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30 whitespace-nowrap">
-        {t('missing_signs.cat_mandatory', 'Biển hiệu lệnh (R)')}
+        {t('missing_signs.cat_mandatory', 'Biển hiệu lệnh')}
       </span>
     )
   }
   if (id === 4 || category === 'guide' || category === 'information') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 whitespace-nowrap">
-        {t('missing_signs.cat_guide', 'Biển chỉ dẫn (I)')}
+        {t('missing_signs.cat_guide', 'Biển chỉ dẫn')}
       </span>
     )
   }
   if (id === 5 || category === 'supplementary') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30 whitespace-nowrap">
-        {t('missing_signs.cat_supplementary', 'Biển phụ (S)')}
+        {t('missing_signs.cat_supplementary', 'Biển phụ')}
       </span>
     )
   }

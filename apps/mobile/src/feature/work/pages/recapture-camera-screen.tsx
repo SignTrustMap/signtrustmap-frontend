@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +25,11 @@ import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
 interface SelectedPhoto {
   uri: string;
   fileName?: string;
@@ -33,11 +40,11 @@ interface SelectedPhoto {
 }
 
 const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Yêu cầu chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
-  BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
-  POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
-  WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
-  OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
+  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
+  BLURRY: { label: 'Ảnh mờ, rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
+  POOR_LIGHTING: { label: 'Ngược sáng, thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  WRONG_ANGLE: { label: 'Góc chụp nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  OCCLUDED: { label: 'Vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
   MISSING_CONTEXT: { label: 'Thiếu ảnh toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
   OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
 };
@@ -72,6 +79,7 @@ export function RecaptureCameraScreen() {
     targetLat: string;
     targetLon: string;
     signTitle?: string;
+    signCode?: string;
     reason?: string;
     note?: string;
     oldSignCropUrl?: string;
@@ -81,6 +89,7 @@ export function RecaptureCameraScreen() {
   const targetLat = Number(params.targetLat);
   const targetLon = Number(params.targetLon);
   const signTitle = params.signTitle || 'Biển báo mới đề xuất';
+  const signCode = params.signCode || '';
   const reason = params.reason || 'BLURRY';
   const note = params.note || '';
   const oldSignCropUrl = resolveS3Url(params.oldSignCropUrl);
@@ -129,6 +138,25 @@ export function RecaptureCameraScreen() {
   }, [effectiveCoords, targetLat, targetLon]);
 
   const isWithinGeofence = distanceMeters != null && distanceMeters <= 100;
+
+  // Cự ly hiện tại từ vị trí của surveyor đến biển báo
+  const deviceDistanceMeters = useMemo(() => {
+    if (!currentPosition || Number.isNaN(targetLat) || Number.isNaN(targetLon)) {
+      return null;
+    }
+    return calculateDistanceMeters(currentPosition, [targetLon, targetLat]);
+  }, [currentPosition, targetLat, targetLon]);
+
+  const isDeviceNear = deviceDistanceMeters != null && deviceDistanceMeters <= 100;
+
+  const handleOpenDirections = (lat: number, lon: number) => {
+    const scheme = Platform.select({
+      ios: `maps://0,0?q=${lat},${lon}`,
+      android: `geo:0,0?q=${lat},${lon}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
+    });
+    void Linking.openURL(scheme);
+  };
 
   // 1. Chụp ảnh trực tiếp tại hiện trường (bắt buộc mở app chụp để đính kèm GPS thiết bị)
   const handleLaunchCamera = async () => {
@@ -349,15 +377,16 @@ export function RecaptureCameraScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Card 1: Thông tin biển báo cần chụp lại */}
+          {/* Card 1: Thông tin biển báo cần chụp lại & Ghi chú thẩm định */}
           <View
             style={[
               styles.infoCard,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
             ]}
           >
+            {/* Header: Ảnh biển bên trái + Thông tin biển bên phải */}
             <View style={styles.infoTop}>
-              <View style={[styles.oldImageWrapper, { backgroundColor: theme.neutral }]}>
+              <View style={[styles.oldImageWrapper, { backgroundColor: theme.neutral, borderColor: theme.border }]}>
                 {oldSignCropUrl ? (
                   <ExpoImage contentFit="cover" source={{ uri: oldSignCropUrl }} style={styles.oldImage} />
                 ) : (
@@ -366,28 +395,119 @@ export function RecaptureCameraScreen() {
               </View>
 
               <View style={styles.infoText}>
-                <Text numberOfLines={1} style={[styles.targetTitle, { color: theme.text }]}>
+                {/* Badges: Mã biển + Lý do chụp lại (Tối giản, không icon, không lặp từ) */}
+                <View style={styles.badgeRow}>
+                  {signCode ? (
+                    <View
+                      style={[
+                        styles.codeBadge,
+                        {
+                          backgroundColor: theme.secondary,
+                          borderColor: `${theme.primary}40`,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.codeBadgeText, { color: theme.primary }]}>
+                        {signCode}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={[styles.reasonBadge, { backgroundColor: reasonMeta.bg }]}>
+                    <Text style={[styles.reasonBadgeText, { color: reasonMeta.color }]}>
+                      {reasonMeta.label}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Tên biển báo (Tối đa 2 dòng) */}
+                <Text numberOfLines={2} style={[styles.targetTitle, { color: theme.text }]}>
                   {signTitle}
                 </Text>
-                <View style={[styles.reasonBadge, { backgroundColor: reasonMeta.bg }]}>
-                  <MaterialCommunityIcons color={reasonMeta.color} name="alert-circle-outline" size={13} />
-                  <Text style={[styles.reasonBadgeText, { color: reasonMeta.color }]}>
-                    Yêu cầu: {reasonMeta.label}
-                  </Text>
-                </View>
-                {note ? (
-                  <Text numberOfLines={2} style={[styles.noteText, { color: theme.textSecondary }]}>
-                    {`Ghi chú: "${note}"`}
-                  </Text>
-                ) : null}
-                {!Number.isNaN(targetLat) && !Number.isNaN(targetLon) ? (
-                  <Text style={[styles.targetCoordText, { color: theme.grey }]}>
-                    📍 Vị trí gốc: {targetLat.toFixed(5)}°, {targetLon.toFixed(5)}°
-                  </Text>
-                ) : null}
+
+                {/* Toạ độ GPS & Khoảng cách (Đơn giản, dạng text, không icon gây rối mắt) */}
+                <Text style={[styles.coordsDistanceText, { color: theme.grey }]}>
+                  {!Number.isNaN(targetLat) && !Number.isNaN(targetLon)
+                    ? `${targetLat.toFixed(5)}°, ${targetLon.toFixed(5)}°`
+                    : ''}
+                  {deviceDistanceMeters != null
+                    ? ` • Cách ${formatDistance(deviceDistanceMeters)}`
+                    : ''}
+                </Text>
               </View>
             </View>
+
+            {/* Hộp Ghi chú của thẩm định viên (Full-width, rõ ràng, không bị che khuất) */}
+            {note ? (
+              <View
+                style={[
+                  styles.reviewerNoteBox,
+                  {
+                    backgroundColor: theme.neutral,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.reviewerNoteText, { color: theme.text }]}>
+                  <Text style={[styles.reviewerNoteBold, { color: theme.textSecondary }]}>
+                    Ghi chú: {' '}
+                  </Text>
+                  {note}
+                </Text>
+              </View>
+            ) : null}
           </View>
+
+          {/* Thanh trạng thái cự ly (< 100m) & Nút Chỉ đường */}
+          {deviceDistanceMeters != null && (
+            <View
+              style={[
+                styles.proximityCard,
+                {
+                  backgroundColor: isDeviceNear
+                    ? 'rgba(22, 163, 74, 0.08)'
+                    : theme.secondary,
+                  borderColor: isDeviceNear
+                    ? 'rgba(22, 163, 74, 0.25)'
+                    : `${theme.primary}30`,
+                },
+              ]}
+            >
+              <View style={styles.proximityContent}>
+                <Text
+                  style={[
+                    styles.proximityTitle,
+                    { color: isDeviceNear ? '#16A34A' : theme.primary },
+                  ]}
+                >
+                  {isDeviceNear
+                    ? `Đủ điều kiện chụp (cách ${formatDistance(deviceDistanceMeters)})`
+                    : `Cần đến gần hơn (< 100m) • Hiện cách ${formatDistance(deviceDistanceMeters)}`}
+                </Text>
+                <Text style={[styles.proximityDesc, { color: theme.grey }]}>
+                  {isDeviceNear
+                    ? 'Bạn đang trong bán kính 100m quanh biển báo.'
+                    : 'Quy định yêu cầu chụp trong bán kính 100m từ vị trí gốc.'}
+                </Text>
+              </View>
+
+              {!isDeviceNear && (
+                <TouchableOpacity
+                  accessibilityLabel="Chỉ đường tới biển báo"
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenDirections(targetLat, targetLon)}
+                  style={[
+                    styles.directNavButton,
+                    { backgroundColor: theme.surface, borderColor: `${theme.primary}40` },
+                  ]}
+                >
+                  <Text style={[styles.directNavButtonText, { color: theme.primary }]}>
+                    Chỉ đường
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* Card 2: Khu vực tải/chụp 1 ảnh thực địa duy nhất */}
           <View
@@ -465,7 +585,7 @@ export function RecaptureCameraScreen() {
                   <AppButton
                     accessibilityLabel="Chụp ảnh mới tại hiện trường"
                     onPress={handleLaunchCamera}
-                    style={styles.pickButtonPrimary}
+                    style={[styles.pickButtonPrimary, { backgroundColor: theme.primary }]}
                     variant="primary"
                   >
                     <MaterialCommunityIcons color="#FFFFFF" name="camera" size={18} />
@@ -475,11 +595,14 @@ export function RecaptureCameraScreen() {
                   <AppButton
                     accessibilityLabel="Chọn ảnh từ thiết bị"
                     onPress={handlePickImage}
-                    style={styles.pickButtonSurface}
+                    style={[
+                      styles.pickButtonSurface,
+                      { borderColor: `${theme.primary}50`, backgroundColor: theme.surface },
+                    ]}
                     variant="surface"
                   >
-                    <MaterialCommunityIcons color={theme.text} name="image-multiple-outline" size={18} />
-                    <Text style={[styles.pickButtonSurfaceText, { color: theme.text }]}>Chọn ảnh</Text>
+                    <MaterialCommunityIcons color={theme.primary} name="image-multiple-outline" size={18} />
+                    <Text style={[styles.pickButtonSurfaceText, { color: theme.primary }]}>Chọn ảnh</Text>
                   </AppButton>
                 </View>
               </View>
@@ -494,6 +617,7 @@ export function RecaptureCameraScreen() {
               onPress={handleSubmit}
               style={[
                 styles.submitButton,
+                { backgroundColor: theme.primary },
                 (!photo || submitMutation.isPending) && styles.submitButtonDisabled,
               ]}
               variant="primary"
@@ -568,6 +692,7 @@ const styles = StyleSheet.create({
     borderRadius: Rounded.lg,
     borderWidth: 1,
     padding: Spacing.three,
+    gap: Spacing.two,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -576,13 +701,14 @@ const styles = StyleSheet.create({
   },
   infoTop: {
     flexDirection: 'row',
-    gap: Spacing.three,
+    gap: Spacing.two,
   },
   oldImageWrapper: {
     width: 72,
     height: 72,
     borderRadius: Rounded.md,
     overflow: 'hidden',
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -593,21 +719,28 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
   },
-  targetTitle: {
-    fontSize: 16,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  reasonBadge: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  codeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  codeBadgeText: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  reasonBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: Rounded.sm,
   },
   reasonBadgeText: {
@@ -615,15 +748,67 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontWeight: '700',
   },
-  noteText: {
-    fontSize: 12,
+  targetTitle: {
+    fontSize: 15,
     fontFamily: Fonts.body,
-    fontStyle: 'italic',
-    lineHeight: 16,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  targetCoordText: {
+  coordsDistanceText: {
     fontSize: 11,
     fontFamily: Fonts.mono,
+    marginTop: 1,
+  },
+  reviewerNoteBox: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 8,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  reviewerNoteText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    lineHeight: 17,
+  },
+  reviewerNoteBold: {
+    fontWeight: '700',
+  },
+  proximityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 10,
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+  },
+  proximityContent: {
+    flex: 1,
+    gap: 2,
+  },
+  proximityTitle: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  proximityDesc: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    lineHeight: 15,
+  },
+  directNavButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  directNavButtonText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
   },
   uploadCard: {
     borderRadius: Rounded.lg,
@@ -739,7 +924,7 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 44,
     borderRadius: Rounded.md,
-    backgroundColor: '#0671eb',
+    backgroundColor: '#007B8B',
   },
   pickButtonPrimaryText: {
     fontSize: 13,
@@ -755,11 +940,13 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 44,
     borderRadius: Rounded.md,
+    borderWidth: 1,
   },
   pickButtonSurfaceText: {
     fontSize: 13,
     fontFamily: Fonts.body,
     fontWeight: '700',
+    color: '#007B8B',
   },
   submitSection: {
     marginTop: Spacing.two,
@@ -771,7 +958,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 48,
     borderRadius: Rounded.md,
-    backgroundColor: '#0671eb',
+    backgroundColor: '#007B8B',
   },
   submitButtonDisabled: {
     opacity: 0.5,

@@ -101,7 +101,7 @@ export const REPORT_ISSUE_OPTIONS: Array<{
 }> = [
   {
     id: 'missing_type',
-    label: 'Biển lạ chưa có trong danh mục (Gửi Staff)',
+    label: 'Biển chưa có trong danh mục',
   },
   {
     id: 'other',
@@ -180,9 +180,7 @@ function ReviewBottomSheet({
       : declineReason
         ? 'Xác nhận từ chối'
         : 'Xác nhận chọn'
-    : isMissingType
-      ? 'Gửi báo cáo biển lạ'
-      : 'Gửi báo cáo';
+    : 'Gửi báo cáo';
 
   return (
     <Modal
@@ -207,7 +205,7 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Gợi ý biển báo' : 'Report Issue'}
+                {isDecline ? 'Gợi ý biển báo' : 'Báo cáo sự cố'}
               </Text>
               <AppButton
                 accessibilityLabel="Đóng"
@@ -431,10 +429,6 @@ function ReviewBottomSheet({
                 keyboardShouldPersistTaps="handled"
                 style={styles.sheetBodyScroll}
               >
-                <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Please select the issue with this sign submission:
-                </Text>
-
                 <View style={styles.reasonList}>
                   {REPORT_ISSUE_OPTIONS.map((option) => {
                     const selected = reportIssueType === option.id;
@@ -472,33 +466,16 @@ function ReviewBottomSheet({
                   })}
                 </View>
 
-                {isMissingType ? (
-                  <View
-                    style={[
-                      styles.missingTypeHintCard,
-                      {
-                        backgroundColor: `${theme.primary}12`,
-                        borderColor: `${theme.primary}30`,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.primary} name="shield-alert-outline" size={20} />
-                    <Text style={[styles.missingTypeHintText, { color: theme.text }]}>
-                      Báo cáo sẽ được gửi trực tiếp lên hàng đợi thẩm định của Staff cùng ảnh chụp và tọa độ GPS hiện trường.
-                    </Text>
-                  </View>
-                ) : null}
-
                 {isReportOther ? (
                   <View style={styles.reasonInputGroup}>
                     <Text style={[styles.inputLabel, { color: theme.text }]}>
-                      Details <Text style={{ color: Colors.danger }}>*</Text>
+                      Mô tả chi tiết <Text style={{ color: Colors.danger }}>*</Text>
                     </Text>
                     <TextInput
-                      accessibilityLabel="Report details, required"
+                      accessibilityLabel="Chi tiết vấn đề, bắt buộc"
                       multiline
                       onChangeText={onChangeReportNote}
-                      placeholder="Please specify the issue"
+                      placeholder="Nhập chi tiết vấn đề..."
                       placeholderTextColor={theme.placeholder}
                       style={[
                         styles.reasonInput,
@@ -787,7 +764,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         });
         setToast({
           id: Date.now(),
-          message: 'Đã gửi báo cáo biển lạ lên Staff thẩm định!',
+          message: 'Đã gửi báo cáo thành công!',
           tone: 'success',
         });
       }

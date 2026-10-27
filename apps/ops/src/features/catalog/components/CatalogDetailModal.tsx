@@ -168,7 +168,7 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
     setEditCode(sign.code)
     setEditNameVi(sign.nameVi || sign.name || '')
     setEditNameEn(sign.nameEn || '')
-    setEditCategoryId(CATEGORY_MAP[sign.category] || 1)
+    setEditCategoryId(sign.categoryId || CATEGORY_MAP[sign.category] || 1)
     setEditShape(normalizeShapeValue(sign.shape))
     setEditColor(normalizeColorValue(sign.color))
     setEditDescription(sign.descriptionVi || sign.description || '')

@@ -22,19 +22,19 @@ interface ApproveAndCreateSignTypeModalProps {
 }
 
 const SHAPE_OPTIONS: OptionItem[] = [
-  { value: 'Circle', label: 'Hình tròn (Circle - Cấm / Hiệu lệnh)' },
-  { value: 'Triangle', label: 'Hình tam giác đều (Triangle - Cảnh báo)' },
-  { value: 'Rectangle', label: 'Hình chữ nhật / Vuông (Rectangle - Chỉ dẫn)' },
-  { value: 'Octagon', label: 'Hình bát giác (Octagon - Biển dừng P.122)' },
-  { value: 'Diamond', label: 'Hình thoi (Diamond)' },
+  { value: 'Circle', label: 'Hình tròn' },
+  { value: 'Triangle', label: 'Hình tam giác đều' },
+  { value: 'Rectangle', label: 'Hình chữ nhật hoặc vuông' },
+  { value: 'Octagon', label: 'Hình bát giác' },
+  { value: 'Diamond', label: 'Hình thoi' },
 ]
 
 const COLOR_OPTIONS: OptionItem[] = [
-  { value: 'Red-White', label: 'Đỏ - Trắng (Red-White)' },
-  { value: 'Blue-White', label: 'Xanh dương - Trắng (Blue-White)' },
-  { value: 'Yellow-Black', label: 'Vàng - Đen (Yellow-Black)' },
-  { value: 'Green-White', label: 'Xanh lá - Trắng (Green-White)' },
-  { value: 'Black-White', label: 'Đen - Trắng (Black-White)' },
+  { value: 'Red-White', label: 'Đỏ - Trắng' },
+  { value: 'Blue-White', label: 'Xanh dương - Trắng' },
+  { value: 'Yellow-Black', label: 'Vàng - Đen' },
+  { value: 'Green-White', label: 'Xanh lá - Trắng' },
+  { value: 'Black-White', label: 'Đen - Trắng' },
 ]
 
 export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeModalProps> = ({
@@ -73,14 +73,26 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
           : 'Quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.'
       )
 
-      if (report.suggestedShape) {
-        setShape(report.suggestedShape)
+      const rawShape = report.suggestedShape || (report as any).shape || (report as any).suggested_shape
+      if (rawShape) {
+        const lowerS = rawShape.toLowerCase()
+        if (lowerS.includes('triang')) setShape('Triangle')
+        else if (lowerS.includes('rect')) setShape('Rectangle')
+        else if (lowerS.includes('squar')) setShape('Square')
+        else if (lowerS.includes('octag')) setShape('Octagon')
+        else setShape('Circle')
       } else {
         setShape('Circle')
       }
 
-      if (report.suggestedColorScheme) {
-        setColorScheme(report.suggestedColorScheme)
+      const rawColor = report.suggestedColorScheme || (report as any).colorScheme || (report as any).suggested_color_scheme || (report as any).color_scheme || (report as any).color
+      if (rawColor) {
+        const lowerC = rawColor.toLowerCase()
+        if (lowerC.includes('blue') && lowerC.includes('white')) setColorScheme('Blue-White')
+        else if (lowerC.includes('yellow')) setColorScheme('Yellow-Black')
+        else if (lowerC.includes('green')) setColorScheme('Green-White')
+        else if (lowerC.includes('black')) setColorScheme('Black-White')
+        else setColorScheme('Red-White')
       } else {
         setColorScheme('Red-White')
       }
@@ -196,7 +208,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
                 </div>
               </div>
               <div className="text-[11px] text-gray-600 dark:text-gray-300 sm:border-l sm:border-gray-200 sm:dark:border-white/10 sm:pl-4">
-                Thao tác này sẽ tự động: <strong>(1)</strong> Tạo mới TrafficSignType; <strong>(2)</strong> Xuất bản Catalog Version mới; <strong>(3)</strong> Giải phóng candidate về hàng đợi thẩm định; <strong>(4)</strong> Đồng bộ danh mục client.
+                Thao tác này sẽ tự động: <strong>1.</strong> Tạo mới TrafficSignType; <strong>2.</strong> Xuất bản Catalog Version mới; <strong>3.</strong> Giải phóng candidate về hàng đợi thẩm định; <strong>4.</strong> Đồng bộ danh mục client.
               </div>
             </div>
 
@@ -204,7 +216,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                  Mã hiệu biển chuẩn (Sign Code) <span className="text-red-500">*</span>
+                  Mã hiệu biển chuẩn <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -232,7 +244,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
 
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                  Tên biển Tiếng Anh (English)
+                  Tên biển Tiếng Anh
                 </label>
                 <input
                   type="text"
@@ -248,10 +260,10 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                  Nhóm biển (Sign Category) <span className="text-red-500">*</span>
+                  Nhóm biển <span className="text-red-500">*</span>
                 </label>
                 <CustomSelect
-                  options={categoryOptions.length > 0 ? categoryOptions : [{ value: '1', label: 'Biển báo cấm (P)' }]}
+                  options={categoryOptions.length > 0 ? categoryOptions : [{ value: '1', label: 'Biển báo cấm' }]}
                   value={selectedCategoryId}
                   onChange={setSelectedCategoryId}
                   size="sm"
@@ -261,7 +273,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
 
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                  Hình dạng biển (Shape)
+                  Hình dạng biển
                 </label>
                 <CustomSelect
                   options={SHAPE_OPTIONS}
@@ -274,7 +286,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
 
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                  Hệ màu sắc (Color Scheme)
+                  Hệ màu sắc
                 </label>
                 <CustomSelect
                   options={COLOR_OPTIONS}
@@ -289,7 +301,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
             {/* Technical Description */}
             <div>
               <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                Mô tả quy chuẩn kỹ thuật (QCVN 41:2019 Reference)
+                Mô tả quy chuẩn kỹ thuật
               </label>
               <textarea
                 rows={2}
@@ -321,7 +333,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
             {/* Staff / Admin Audit Notes */}
             <div>
               <label className="block text-gray-700 dark:text-gray-300 font-semibold mb-1">
-                Ghi chú phê duyệt &amp; Quyết định ban hành (Audit Log)
+                Ghi chú phê duyệt &amp; Quyết định ban hành
               </label>
               <textarea
                 rows={2}

@@ -48,7 +48,7 @@ export function MissingSignEscalateModal({
             </p>
             <div>
               <label className="block text-gray-500 font-mono uppercase text-[11px] mb-1 font-semibold">
-                Ghi chú sơ bộ về biển (bắt buộc) <span className="text-red-500">*</span>
+                Ghi chú sơ bộ về biển <span className="text-red-500">*</span>
               </label>
               <textarea
                 rows={3}

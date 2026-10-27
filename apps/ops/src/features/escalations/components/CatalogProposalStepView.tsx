@@ -36,14 +36,63 @@ const SHAPE_OPTIONS = [
   { value: 'Other', labelVi: 'Khác', labelEn: 'Other' },
 ]
 
-const COLOR_SCHEME_OPTIONS = [
-  { value: 'Red-White', labelVi: 'Đỏ - Trắng', labelEn: 'Red-White' },
-  { value: 'Blue-White', labelVi: 'Xanh dương - Trắng', labelEn: 'Blue-White' },
-  { value: 'Yellow-Black', labelVi: 'Vàng - Đen', labelEn: 'Yellow-Black' },
-  { value: 'Green-White', labelVi: 'Xanh lá - Trắng', labelEn: 'Green-White' },
-  { value: 'White-Black', labelVi: 'Trắng - Đen', labelEn: 'White-Black' },
-  { value: 'Other', labelVi: 'Khác', labelEn: 'Other' },
-]
+
+/**
+ * Maps a sign category entity to its standard QCVN 41:2019 code prefix (with trailing dot).
+ * Example: Prohibitory -> 'P.', Warning -> 'W.', Mandatory -> 'R.', Guide -> 'I.', Expressway -> 'IE.', Supplementary -> 'S.'
+ */
+export function getCategoryPrefix(category?: SignCategoryItem): string {
+  if (!category) return 'P.'
+  const code = (category.code || '').toUpperCase().trim()
+  const name = `${category.nameVi || ''} ${category.nameEn || ''}`.toLowerCase()
+
+  // 1. Direct standard short code matching
+  if (['P', 'W', 'R', 'I', 'IE', 'S', 'SG', 'DP', 'E'].includes(code)) {
+    return `${code}.`
+  }
+
+  // 2. Expressway indication signs
+  if (code.includes('EXPRESS') || name.includes('cao tốc')) {
+    return 'IE.'
+  }
+
+  // 3. Prohibitory signs (Biển báo cấm)
+  if (code.includes('PROHIBIT') || code.includes('CAM') || name.includes('cấm')) {
+    return 'P.'
+  }
+
+  // 4. Warning signs (Biển cảnh báo)
+  if (code.includes('WARN') || code.includes('CANH_BAO') || name.includes('cảnh báo') || name.includes('nguy hiểm')) {
+    return 'W.'
+  }
+
+  // 5. Mandatory signs (Biển hiệu lệnh)
+  if (code.includes('MANDAT') || code.includes('ORDER') || code.includes('HIEU_LENH') || name.includes('hiệu lệnh')) {
+    return 'R.'
+  }
+
+  // 6. Information / Guide signs (Biển chỉ dẫn)
+  if (code.includes('GUIDE') || code.includes('INFO') || code.includes('CHI_DAN') || name.includes('chỉ dẫn')) {
+    return 'I.'
+  }
+
+  // 7. Supplementary / Additional signs (Biển phụ)
+  if (code.includes('SUPPLE') || code.includes('ADDIT') || code.includes('PHU') || name.includes('phụ')) {
+    return 'S.'
+  }
+
+  // 8. Speed limit signs are prohibitive in VN (P.127)
+  if (code.includes('SPEED') || name.includes('tốc độ')) {
+    return 'P.'
+  }
+
+  // Fallback: if code has 1-3 uppercase letters
+  if (/^[A-Z]{1,3}$/.test(code)) {
+    return `${code}.`
+  }
+
+  return 'P.'
+}
 
 export function CatalogProposalStepView({
   caseId,
@@ -57,17 +106,18 @@ export function CatalogProposalStepView({
 }: CatalogProposalStepViewProps) {
   const { success, error, warning } = useToast()
 
-  // Form Fields
-  const [signCode, setSignCode] = useState('')
+  // Form Fields (Split into uneditable category prefix + numeric input)
+  const [codePrefix, setCodePrefix] = useState('P.')
+  const [codeNumber, setCodeNumber] = useState('')
   const [nameVi, setNameVi] = useState('')
   const [nameEn, setNameEn] = useState('')
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined)
   const [shape, setShape] = useState('Circle')
-  const [colorScheme, setColorScheme] = useState('Red-White')
+  const [colorScheme, setColorScheme] = useState('')
   const [description, setDescription] = useState('')
   const [aiLabelPrompt, setAiLabelPrompt] = useState('')
   const [staffNotes, setStaffNotes] = useState('')
-  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>(['CAR', 'MOTORCYCLE'])
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>([])
 
   // Categories list from live backend
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
@@ -80,6 +130,11 @@ export function CatalogProposalStepView({
 
   // Submitting State
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Existing sign codes for duplicate validation
+  const [existingSignCodes, setExistingSignCodes] = useState<string[]>([])
+  const [isDuplicateCode, setIsDuplicateCode] = useState(false)
+  const [isCheckingApi, setIsCheckingApi] = useState(false)
 
   // Extract raw report data for pre-fill
   const raw = targetData?.data || targetData || {}
@@ -107,21 +162,50 @@ export function CatalogProposalStepView({
 
         // Pre-select category if specified in report
         const repCatId = raw.proposedCategoryId ?? raw.categoryId
+        let initialCat: SignCategoryItem | undefined
         if (repCatId && effectiveCats.some((c) => c.id === repCatId)) {
           setCategoryId(repCatId)
+          initialCat = effectiveCats.find((c) => c.id === repCatId)
         } else if (effectiveCats.length > 0) {
           // Default to prohibition signs (P) if available, or first category
-          const defaultCat = effectiveCats.find((c) => c.code === 'P' || c.code === 'PROHIBITORY') || effectiveCats[0]
+          const defaultCat =
+            effectiveCats.find((c) => c.code === 'P' || c.code === 'PROHIBITORY' || c.nameVi?.toLowerCase().includes('cấm')) ||
+            effectiveCats[0]
           setCategoryId(defaultCat.id)
+          initialCat = defaultCat
+        }
+
+        if (initialCat) {
+          setCodePrefix(getCategoryPrefix(initialCat))
         }
       })
       .catch(() => {
         if (!isMounted) return
         setCategories(STANDARD_SIGN_CATEGORIES)
         setCategoryId(1)
+        setCodePrefix('P.')
       })
       .finally(() => {
         if (isMounted) setIsLoadingCategories(false)
+      })
+
+    // Load ALL existing sign types across all pages to detect duplicate codes
+    catalogService
+      .getAllSignTypes()
+      .then((res) => {
+        if (!isMounted || !res?.items) return
+        const codes = (res.items.map((i) => i.signCode?.toUpperCase()).filter(Boolean) as string[])
+        setExistingSignCodes(codes)
+      })
+      .catch(() => {
+        catalogService
+          .getSignTypes({ page: 0, size: 100 })
+          .then((res) => {
+            if (!isMounted || !res?.items) return
+            const codes = (res.items.map((i) => i.signCode?.toUpperCase()).filter(Boolean) as string[])
+            setExistingSignCodes(codes)
+          })
+          .catch(() => {})
       })
 
     // Pre-fill fields from report
@@ -129,22 +213,46 @@ export function CatalogProposalStepView({
     const rawCode = String(raw.suggestedCode || raw.signCode || '').trim()
 
     // Smart auto-detection of sign code (e.g. if name is "P.130" or matches code regex)
-    let initialCode = rawCode
-    if (!initialCode && proposedName) {
-      const match = proposedName.match(/\b([A-Z]{1,3}\.[0-9]{1,4}[a-z]?)\b/i)
+    let candidateCode = rawCode
+    if (!candidateCode && proposedName) {
+      const match = proposedName.match(/\b([A-Z]{1,3}\.?)?\s*([0-9]{1,4})\b/i)
       if (match) {
-        initialCode = match[1].toUpperCase()
-      } else {
-        initialCode = 'P.'
+        candidateCode = match[0].toUpperCase()
       }
     }
-    if (!initialCode) initialCode = 'P.'
 
-    setSignCode(initialCode)
+    const digitsOnly = candidateCode.replace(/\D/g, '')
+    if (digitsOnly) {
+      setCodeNumber(digitsOnly)
+    }
+
+    const prefixMatch = candidateCode.match(/^([A-Za-z]+)\./)
+    if (prefixMatch) {
+      setCodePrefix(`${prefixMatch[1].toUpperCase()}.`)
+    }
+
     setNameVi(proposedName)
     setNameEn(raw.suggestedNameEn || raw.nameEn || proposedName)
-    setShape(raw.suggestedShape || 'Circle')
-    setColorScheme(raw.suggestedColorScheme || 'Red-White')
+    const effectiveShape =
+      raw.suggestedShape ||
+      raw.suggested_shape ||
+      raw.shape ||
+      rawCandidate?.shape ||
+      rawCandidate?.predictedSignType?.shape ||
+      'Circle'
+    const extractedColor =
+      raw.suggestedColorScheme ||
+      raw.suggested_color_scheme ||
+      raw.colorScheme ||
+      raw.color_scheme ||
+      raw.color ||
+      rawCandidate?.colorScheme ||
+      rawCandidate?.color_scheme ||
+      rawCandidate?.predictedSignType?.colorScheme ||
+      rawCandidate?.predictedSignType?.color ||
+      ''
+    setShape(effectiveShape)
+    setColorScheme(extractedColor || '')
     setDescription(raw.description || raw.reporterNote || '')
     setStaffNotes(
       initialNotes ||
@@ -161,14 +269,6 @@ export function CatalogProposalStepView({
     }
   }, [caseId, initialNotes])
 
-  // Generate / update AI label prompt when relevant fields change
-  useEffect(() => {
-    if (nameVi && !aiLabelPrompt) {
-      setAiLabelPrompt(
-        `Biển báo giao thông "${nameEn || nameVi}". Hình dạng: ${shape}, màu sắc: ${colorScheme}. QCVN 41.`
-      )
-    }
-  }, [nameVi, nameEn, shape, colorScheme])
 
   // Handle file selection (SVG or PNG, max 20MB)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,20 +280,20 @@ export function CatalogProposalStepView({
       warning(
         isEn
           ? 'File size exceeds maximum limit of 20MB!'
-          : 'Dung lượng file vượt quá giới hạn cho phép (tối đa 20MB)!'
+          : 'Dung lượng file vượt quá giới hạn tối đa 20MB!'
       )
       return
     }
 
-    // Validate type (SVG or PNG)
-    const validTypes = ['image/svg+xml', 'image/png']
-    const isSvgExt = file.name.toLowerCase().endsWith('.svg')
-    const isPngExt = file.name.toLowerCase().endsWith('.png')
-    if (!validTypes.includes(file.type) && !isSvgExt && !isPngExt) {
+    // Validate type (JPEG, PNG, WebP, HEIF)
+    const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+    const validExts = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
+    const hasValidExt = validExts.some((ext) => file.name.toLowerCase().endsWith(ext))
+    if (!validMimes.includes(file.type) && !hasValidExt) {
       warning(
         isEn
-          ? 'Only SVG or PNG vector/graphic files are supported!'
-          : 'Chỉ chấp nhận file đồ họa quy chuẩn định dạng SVG hoặc PNG!'
+          ? 'Representative image must be JPEG, PNG, WebP, or HEIF!'
+          : 'Chỉ chấp nhận file ảnh định dạng PNG, JPG, WebP hoặc HEIF!'
       )
       return
     }
@@ -222,21 +322,20 @@ export function CatalogProposalStepView({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const cleanCode = signCode.trim().toUpperCase()
+    const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
     const cleanNameVi = nameVi.trim()
     const cleanStaffNotes = staffNotes.trim()
 
-    if (!cleanCode) {
-      warning(isEn ? 'Please enter a sign code!' : 'Vui lòng nhập mã biển!')
+    if (!codeNumber.trim()) {
+      warning(isEn ? 'Please enter the sign number!' : 'Vui lòng nhập số hiệu biển!')
       return
     }
 
-    const CODE_REGEX = /^[A-Za-z]+\.\s*\d+[A-Za-z0-9]*$/
-    if (!CODE_REGEX.test(cleanCode)) {
+    if (existingSignCodes.some((c) => c.toUpperCase() === fullCode)) {
       warning(
         isEn
-          ? 'Sign code format is invalid! Must be [PREFIX].[NUMBER][SUFFIX] (e.g. P.102, W.201a, R.301, I.401).'
-          : 'Định dạng mã biển không đúng quy chuẩn! Phải có dạng [TIỀN TỐ].[SỐ][HẬU TỐ] (VD: P.102, W.201a, R.301, I.401).'
+          ? `Sign code "${fullCode}" already exists in the catalog! Please choose another number or merge into existing catalog sign.`
+          : `Mã biển "${fullCode}" đã bị trùng (đã tồn tại trong Catalog)! Vui lòng chọn số khác hoặc chuyển sang chức năng Gộp Catalog.`
       )
       return
     }
@@ -260,8 +359,8 @@ export function CatalogProposalStepView({
     if (!selectedFile) {
       warning(
         isEn
-          ? 'Representative image file (SVG or PNG) is required to approve and create a new sign!'
-          : 'Bắt buộc phải tải lên file ảnh đại diện quy chuẩn (SVG hoặc PNG) để tạo biển mới!'
+          ? 'Representative image file (PNG, JPG, WebP) is required to approve and create a new sign!'
+          : 'Bắt buộc phải tải lên file ảnh đại diện quy chuẩn (PNG, JPG, WebP) để tạo biển mới!'
       )
       return
     }
@@ -279,7 +378,7 @@ export function CatalogProposalStepView({
       const createRes = await catalogService.approveAndCreateType(
         reportId,
         {
-          signCode: cleanCode,
+          signCode: fullCode,
           nameVi: cleanNameVi,
           nameEn: nameEn.trim() || cleanNameVi,
           proposedCategoryId: categoryId,
@@ -288,7 +387,7 @@ export function CatalogProposalStepView({
           description: description.trim() || undefined,
           aiLabelPrompt: aiLabelPrompt.trim() || undefined,
           staffNotes: cleanStaffNotes,
-          allowedVehicles,
+          allowedVehicles: allowedVehicles as any,
         },
         selectedFile
       )
@@ -309,8 +408,8 @@ export function CatalogProposalStepView({
 
       success(
         isEn
-          ? `Sign type ${cleanCode} approved!`
-          : `Đã tạo biển ${cleanCode} và phê duyệt ca!`
+          ? `Sign type ${fullCode} approved!`
+          : `Đã tạo biển ${fullCode} và phê duyệt ca!`
       )
 
       onSuccess()
@@ -321,8 +420,8 @@ export function CatalogProposalStepView({
       if (status === 409 || msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('trùng')) {
         error(
           isEn
-            ? `Sign code "${cleanCode}" already exists in the catalog! Please choose another code.`
-            : `Mã biển "${cleanCode}" đã tồn tại trong Catalog! Vui lòng chọn mã khác.`
+            ? `Sign code "${fullCode}" already exists in the catalog! Please choose another code.`
+            : `Mã biển "${fullCode}" đã tồn tại trong Catalog! Vui lòng chọn mã khác.`
         )
       } else {
         const errorMsg =
@@ -335,6 +434,59 @@ export function CatalogProposalStepView({
       setIsSubmitting(false)
     }
   }
+
+  const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+  const hasInputNumber = Boolean(codeNumber.trim())
+
+  // Real-time API check for code duplication with debounce
+  useEffect(() => {
+    if (!hasInputNumber) {
+      setIsDuplicateCode(false)
+      setIsCheckingApi(false)
+      return
+    }
+
+    // 1. Instant check against already known sign codes
+    const isLocalDuplicate = existingSignCodes.some((c) => c.toUpperCase() === fullCode)
+    if (isLocalDuplicate) {
+      setIsDuplicateCode(true)
+    }
+
+    // 2. Query API to verify with live database
+    setIsCheckingApi(true)
+    let isCancelled = false
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await catalogService.getSignTypes({ search: fullCode, size: 20 })
+        if (isCancelled) return
+
+        const isApiDuplicate = Boolean(
+          res?.items?.some((item) => item.signCode?.trim().toUpperCase() === fullCode)
+        )
+
+        if (isApiDuplicate) {
+          setIsDuplicateCode(true)
+          setExistingSignCodes((prev) => (prev.includes(fullCode) ? prev : [...prev, fullCode]))
+        } else {
+          // If not in API and not in local cache
+          const inLocal = existingSignCodes.some((c) => c.toUpperCase() === fullCode)
+          setIsDuplicateCode(Boolean(inLocal))
+        }
+      } catch (err) {
+        console.error('[CatalogProposal] Duplicate check API error:', err)
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingApi(false)
+        }
+      }
+    }, 200)
+
+    return () => {
+      isCancelled = true
+      clearTimeout(timer)
+    }
+  }, [fullCode, hasInputNumber, existingSignCodes])
 
   const categoryOptions = categories.map((c) => ({
     value: String(c.id),
@@ -377,7 +529,7 @@ export function CatalogProposalStepView({
                 <div className="absolute top-2 left-2">
                   {previewUrl ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
-                      SVG / PNG
+                      PNG / JPG
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-800/80 text-white backdrop-blur-xs">
@@ -392,7 +544,7 @@ export function CatalogProposalStepView({
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept=".svg,.png,image/svg+xml,image/png"
+                accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.png,.jpg,.jpeg,.webp"
                 className="hidden"
               />
 
@@ -409,8 +561,8 @@ export function CatalogProposalStepView({
                         ? 'Change image'
                         : 'Đổi ảnh khác'
                       : isEn
-                      ? 'Upload SVG / PNG *'
-                      : 'Tải ảnh SVG / PNG *'}
+                      ? 'Upload image (PNG/JPG) *'
+                      : 'Tải ảnh PNG / JPG *'}
                   </button>
 
                   {previewUrl && (
@@ -426,8 +578,8 @@ export function CatalogProposalStepView({
 
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
                   {isEn
-                    ? 'Supports SVG, PNG (max 20MB). File upload is required for catalog creation.'
-                    : 'Hỗ trợ SVG, PNG (tối đa 20MB). Bắt buộc phải tải file ảnh chuẩn để tạo biển mới.'}
+                    ? 'Supports PNG, JPEG, WebP, max 20MB. File upload is required for catalog creation.'
+                    : 'Hỗ trợ định dạng PNG, JPG, WebP, tối đa 20MB. Bắt buộc phải tải file ảnh chuẩn để tạo biển mới.'}
                 </p>
               </div>
             </div>
@@ -438,17 +590,63 @@ export function CatalogProposalStepView({
             {/* Hàng 1: Mã biển & Nhóm biển */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'Sign code' : 'Mã biển'} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={signCode}
-                  onChange={(e) => setSignCode(e.target.value.toUpperCase())}
-                  placeholder="VD: P.130, W.205..."
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs uppercase placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                    {isEn ? 'Sign code' : 'Mã biển'} <span className="text-red-500">*</span>
+                  </label>
+                  {isCheckingApi ? (
+                    <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                      <CircleNotch size={11} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>{isEn ? 'Checking...' : 'Đang kiểm tra...'}</span>
+                    </span>
+                  ) : isDuplicateCode ? (
+                    <span className="text-[10px] font-mono text-red-500 font-bold">
+                      {isEn ? 'Already exists' : 'Đã tồn tại'}
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* 2 ô nhỏ: Ô đầu tiền tố (không sửa được), Ô 2 chỉ nhập số */}
+                <div className="flex items-center gap-2">
+                  <div className="relative shrink-0">
+                    <input
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={codePrefix}
+                      title={isEn ? 'Prefix (assigned by category)' : 'Tiền tố (tự động gán theo nhóm biển)'}
+                      className={`w-16 sm:w-20 px-2.5 py-2 rounded-lg border text-center font-mono font-bold text-xs select-none outline-none transition-colors cursor-not-allowed ${
+                        hasInputNumber
+                          ? isDuplicateCode
+                            ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-400'
+                            : 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
+                          : 'border-gray-300 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required
+                      value={codeNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '')
+                        setCodeNumber(val)
+                      }}
+                      placeholder="130"
+                      className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs placeholder:text-gray-400 outline-none transition-colors ${
+                        hasInputNumber
+                          ? isDuplicateCode
+                            ? 'border-red-500 focus:border-red-600 focus:ring-1 focus:ring-red-500/20 bg-red-50/10'
+                            : 'border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20'
+                          : 'border-gray-300 dark:border-white/15 focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -457,7 +655,16 @@ export function CatalogProposalStepView({
                 </label>
                 <CustomSelect
                   value={categoryId ? String(categoryId) : ''}
-                  onChange={(val) => setCategoryId(val ? Number(val) : undefined)}
+                  onChange={(val) => {
+                    const newId = val ? Number(val) : undefined
+                    setCategoryId(newId)
+                    if (newId) {
+                      const cat = categories.find((c) => c.id === newId)
+                      if (cat) {
+                        setCodePrefix(getCategoryPrefix(cat))
+                      }
+                    }
+                  }}
                   options={categoryOptions}
                   placeholder={isLoadingCategories ? (isEn ? 'Loading...' : 'Đang tải...') : (isEn ? 'Select category' : 'Chọn nhóm biển')}
                   className="w-full text-xs"
@@ -476,7 +683,7 @@ export function CatalogProposalStepView({
                   required
                   value={nameVi}
                   onChange={(e) => setNameVi(e.target.value)}
-                  placeholder="VD: Cấm dừng xe và đỗ xe"
+                  placeholder="Cấm dừng xe và đỗ xe"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
                 />
               </div>
@@ -489,7 +696,7 @@ export function CatalogProposalStepView({
                   type="text"
                   value={nameEn}
                   onChange={(e) => setNameEn(e.target.value)}
-                  placeholder="VD: No Stopping and Parking"
+                  placeholder="No Stopping and Parking"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
                 />
               </div>
@@ -516,14 +723,13 @@ export function CatalogProposalStepView({
                 <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
                   {isEn ? 'Color scheme' : 'Màu sắc'}
                 </label>
-                <CustomSelect
+                <input
+                  type="text"
+                  maxLength={30}
                   value={colorScheme}
-                  onChange={(val) => setColorScheme(val)}
-                  options={COLOR_SCHEME_OPTIONS.map((c) => ({
-                    value: c.value,
-                    label: isEn ? c.labelEn : c.labelVi,
-                  }))}
-                  className="w-full text-xs"
+                  onChange={(e) => setColorScheme(e.target.value)}
+                  placeholder={isEn ? 'Red - White' : 'Đỏ - Trắng'}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
                 />
               </div>
             </div>
@@ -552,6 +758,7 @@ export function CatalogProposalStepView({
                   </button>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 {VEHICLE_TYPE_OPTIONS.map((v) => {
                   const selected = allowedVehicles.includes(v.value)
@@ -578,11 +785,19 @@ export function CatalogProposalStepView({
                   )
                 })}
               </div>
-              {allowedVehicles.length === 0 && (
-                <p className="text-[10px] text-red-500 font-medium">
-                  {isEn ? 'At least one vehicle type must be selected.' : 'Vui lòng chọn ít nhất 1 loại phương tiện áp dụng.'}
-                </p>
-              )}
+
+              {/* Hàng thông báo cố định chiều cao (Zero Layout Shift): hợp lệ hiện hướng dẫn, bỏ chọn hiện cảnh báo */}
+              <div className="min-h-[16px] flex items-center">
+                {allowedVehicles.length === 0 ? (
+                  <p className="text-[10px] text-red-500 font-medium animate-in fade-in">
+                    {isEn ? 'Please select at least 1 applicable vehicle type.' : 'Vui lòng chọn ít nhất 1 loại phương tiện áp dụng.'}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    {isEn ? 'Select vehicles affected by this sign.' : 'Các loại phương tiện tuân thủ theo quy định của biển báo.'}
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Hàng 4: Mô tả biển & Mô tả nhận diện AI (2 cột song song) */}
@@ -645,9 +860,9 @@ export function CatalogProposalStepView({
         <button
           type="submit"
           form="catalog-proposal-step-form"
-          disabled={isSubmitting || !signCode.trim() || !nameVi.trim() || !staffNotes.trim()}
+          disabled={isSubmitting || !codeNumber.trim() || isDuplicateCode || !nameVi.trim() || !staffNotes.trim() || allowedVehicles.length === 0}
           className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
-            !isSubmitting && signCode.trim() && nameVi.trim() && staffNotes.trim()
+            !isSubmitting && codeNumber.trim() && !isDuplicateCode && nameVi.trim() && staffNotes.trim() && allowedVehicles.length > 0
               ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
               : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
           }`}

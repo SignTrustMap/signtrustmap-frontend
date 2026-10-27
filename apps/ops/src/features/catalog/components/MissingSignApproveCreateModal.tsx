@@ -37,7 +37,7 @@ export function MissingSignApproveCreateModal({
   const [nameEn, setNameEn] = useState('')
   const [category, setCategory] = useState<CatalogCategory>('prohibitory')
   const [shape, setShape] = useState<'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond'>('Circle')
-  const [color, setColor] = useState('Red-White')
+  const [color, setColor] = useState('')
   const [description, setDescription] = useState('')
   const [aiPrompt, setAiPrompt] = useState('')
 
@@ -60,9 +60,9 @@ export function MissingSignApproveCreateModal({
       setNameEn(selectedReport.clipPrompt?.slice(0, 50) || selectedReport.tempLabel || '')
       setCategory((selectedReport.category as CatalogCategory) || 'prohibitory')
       setShape('Circle')
-      setColor('Red-White')
+      setColor('')
       setDescription(selectedReport.reporterNote || '')
-      setAiPrompt(selectedReport.clipPrompt || '')
+      setAiPrompt('')
 
       if (selectedReport.sampleImageUrl) {
         setImageMode('crop')
@@ -307,18 +307,13 @@ export function MissingSignApproveCreateModal({
                 <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                   {t('catalog.field_color')}
                 </label>
-                <CustomSelect
+                <input
+                  type="text"
+                  maxLength={30}
+                  placeholder="VD: Đỏ - Trắng, Xanh - Trắng..."
                   value={color}
-                  onChange={(val) => setColor(val)}
-                  className="w-full"
-                  buttonClassName="w-full"
-                  options={[
-                    { value: 'Red-White', label: t('catalog.colors_red_white') },
-                    { value: 'Yellow-Black', label: t('catalog.colors_yellow_black') },
-                    { value: 'Blue-White', label: t('catalog.colors_blue_white') },
-                    { value: 'Green-White', label: t('catalog.colors_green_white') },
-                    { value: 'Black-White', label: t('catalog.colors_black_white') },
-                  ]}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
             </div>
