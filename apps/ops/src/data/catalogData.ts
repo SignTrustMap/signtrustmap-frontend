@@ -5,6 +5,8 @@ export type CatalogCategory =
   | 'guide'
   | 'speed_limit'
   | 'additional'
+  | 'temporary'
+  | string
 
 export interface CatalogEntry {
   id: string
@@ -12,8 +14,9 @@ export interface CatalogEntry {
   name: string
   nameVi: string
   nameEn: string
+  categoryId?: number
   category: CatalogCategory
-  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond'
+  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond' | string
   color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White' | 'Black-White' | string
   description: string
   descriptionVi: string
@@ -27,6 +30,7 @@ export interface CatalogEntry {
   version: string
   imageUrl?: string
   representativeImageKey?: string
+  allowedVehicles?: Array<'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN'>
 }
 
 export interface MissingSignTypeReport {

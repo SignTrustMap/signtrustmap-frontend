@@ -47,14 +47,14 @@ export function MissingSignEscalateModal({
               {t('missing_signs.modal_escalate_desc')}
             </p>
             <div>
-              <label className="block text-gray-500 font-mono uppercase text-[11px] mb-1">
-                {t('missing_signs.lbl_staff_notes')}
+              <label className="block text-gray-500 font-mono uppercase text-[11px] mb-1 font-semibold">
+                Ghi chú sơ bộ về biển <span className="text-red-500">*</span>
               </label>
               <textarea
                 rows={3}
                 value={escalateNote}
                 onChange={(e) => onEscalateNoteChange(e.target.value)}
-                placeholder={t('missing_signs.lbl_staff_notes')}
+                placeholder="Nhập thông tin sơ bộ về biển lạ gửi lên Admin thẩm định..."
                 className="w-full p-3 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none"
               />
             </div>
@@ -71,7 +71,8 @@ export function MissingSignEscalateModal({
             <button
               type="button"
               onClick={onSubmit}
-              className="px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
+              disabled={!escalateNote.trim()}
+              className="px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
             >
               {t('missing_signs.btn_confirm_escalate')}
             </button>

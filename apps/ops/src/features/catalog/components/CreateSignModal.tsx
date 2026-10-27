@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, UploadSimple, Link as LinkIcon, Trash } from '@phosphor-icons/react'
+import { X, UploadSimple, Link as LinkIcon, Trash, Check, CircleNotch } from '@phosphor-icons/react'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import CustomSelect from '@/components/common/CustomSelect'
 import type { CatalogCategory, CatalogEntry } from '@/data/catalogData'
+import { VEHICLE_TYPE_OPTIONS, type VehicleType, catalogService } from '@/api/services/catalog.service'
 
 export interface CreateSignModalProps {
   /** Controls modal visibility. */
@@ -12,6 +13,26 @@ export interface CreateSignModalProps {
   onClose: () => void
   /** Callback fired with the validated new CatalogEntry to publish and optional image file. */
   onCreate: (newEntry: CatalogEntry, file?: File) => void
+  /** Optional existing sign codes in catalog for duplicate checking */
+  existingCodes?: string[]
+}
+
+function getPrefixForCatalogCategory(cat: CatalogCategory): string {
+  switch (cat) {
+    case 'prohibitory':
+    case 'speed_limit':
+      return 'P.'
+    case 'warning':
+      return 'W.'
+    case 'mandatory':
+      return 'R.'
+    case 'guide':
+      return 'I.'
+    case 'additional':
+      return 'S.'
+    default:
+      return 'P.'
+  }
 }
 
 /**
@@ -22,19 +43,25 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   isOpen,
   onClose,
   onCreate,
+  existingCodes,
 }) => {
   const { t } = useTranslation('ops')
 
-  const [newCode, setNewCode] = useState('')
+  const [codePrefix, setCodePrefix] = useState('P.')
+  const [codeNumber, setCodeNumber] = useState('')
+  const [codeError, setCodeError] = useState('')
+  const [isDuplicateCode, setIsDuplicateCode] = useState(false)
+  const [isCheckingApi, setIsCheckingApi] = useState(false)
   const [newNameVi, setNewNameVi] = useState('')
   const [newNameEn, setNewNameEn] = useState('')
   const [newCategory, setNewCategory] = useState<CatalogCategory>('prohibitory')
   const [newShape, setNewShape] = useState<'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond'>('Circle')
-  const [newColor, setNewColor] = useState('Red-White')
+  const [newColor, setNewColor] = useState('')
   const [newDescriptionVi, setNewDescriptionVi] = useState('')
   const [newDescriptionEn, setNewDescriptionEn] = useState('')
   const [newAiPrompt, setNewAiPrompt] = useState('')
   const [newOsmMapping, setNewOsmMapping] = useState('')
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>([])
 
   // Representative Image state (Mandatory)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -46,7 +73,9 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   if (!isOpen) return null
 
   const resetForm = () => {
-    setNewCode('')
+    setCodePrefix('P.')
+    setCodeNumber('')
+    setCodeError('')
     setNewNameVi('')
     setNewNameEn('')
     setNewDescriptionVi('')
@@ -55,7 +84,8 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
     setNewOsmMapping('')
     setNewCategory('prohibitory')
     setNewShape('Circle')
-    setNewColor('Red-White')
+    setNewColor('')
+    setAllowedVehicles([])
     setImageFile(null)
     setImageUrl('')
     setImagePreview('')
@@ -83,9 +113,70 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
     setImagePreview('')
   }
 
+  const cleanCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+  const hasInputNumber = Boolean(codeNumber.trim())
+
+  // Real-time API check for code duplication with debounce
+  useEffect(() => {
+    if (!hasInputNumber) {
+      setIsDuplicateCode(false)
+      setIsCheckingApi(false)
+      return
+    }
+
+    if (existingCodes?.some((c) => c.toUpperCase() === cleanCode)) {
+      setIsDuplicateCode(true)
+    }
+
+    setIsCheckingApi(true)
+    let isCancelled = false
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await catalogService.getSignTypes({ search: cleanCode, size: 20 })
+        if (isCancelled) return
+
+        const isApiDuplicate = Boolean(
+          res?.items?.some((item) => item.signCode?.trim().toUpperCase() === cleanCode)
+        )
+
+        if (isApiDuplicate) {
+          setIsDuplicateCode(true)
+        } else {
+          const inLocal = existingCodes?.some((c) => c.toUpperCase() === cleanCode)
+          setIsDuplicateCode(Boolean(inLocal))
+        }
+      } catch (err) {
+        console.error('[CreateSignModal] Duplicate check API error:', err)
+      } finally {
+        if (!isCancelled) {
+          setIsCheckingApi(false)
+        }
+      }
+    }, 200)
+
+    return () => {
+      isCancelled = true
+      clearTimeout(timer)
+    }
+  }, [cleanCode, hasInputNumber, existingCodes])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newCode.trim()) return
+    if (!codeNumber.trim()) {
+      setCodeError('Vui lòng nhập số hiệu biển!')
+      return
+    }
+
+    if (isDuplicateCode) {
+      setCodeError(`Mã biển "${cleanCode}" đã bị trùng trong Catalog!`)
+      return
+    }
+
+    if (allowedVehicles.length === 0) {
+      alert('Vui lòng chọn ít nhất một loại phương tiện áp dụng!')
+      return
+    }
 
     const hasImage = Boolean(imageFile || imageUrl.trim())
     if (!hasImage) {
@@ -93,12 +184,13 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       return
     }
 
+    setCodeError('')
     const resolvedImg = imageUrl.trim() || imagePreview
     const newEntry: CatalogEntry = {
-      id: `CAT-${newCode.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}`,
-      code: newCode.trim(),
+      id: `CAT-${cleanCode.replace(/[^a-zA-Z0-9]/g, '')}`,
+      code: cleanCode,
       name: newNameVi.trim() || newNameEn.trim(),
-      nameVi: newNameVi.trim() || newCode.trim(),
+      nameVi: newNameVi.trim() || cleanCode,
       nameEn: newNameEn.trim() || newNameVi.trim(),
       category: newCategory,
       shape: newShape,
@@ -106,14 +198,15 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       description: newDescriptionVi.trim() || 'Standard road sign regulation definition',
       descriptionVi: newDescriptionVi.trim() || 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
       descriptionEn: newDescriptionEn.trim() || 'Standard technical traffic regulation definition.',
-      aiPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${newCode}`,
-      clipPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${newCode}`,
-      osmMapping: newOsmMapping.trim() || `traffic_sign=VN:${newCode}`,
+      aiPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${cleanCode}`,
+      clipPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${cleanCode}`,
+      osmMapping: newOsmMapping.trim() || `traffic_sign=VN:${cleanCode}`,
       standardRef: 'QCVN 41:2019/BGTVT',
       status: 'Active',
       version: 'v2.5',
       imageUrl: resolvedImg,
       representativeImageKey: imageUrl.trim() || undefined,
+      allowedVehicles,
     }
 
     onCreate(newEntry, imageFile || undefined)
@@ -149,17 +242,68 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_code')} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. P.106a"
-                  value={newCode}
-                  onChange={(e) => setNewCode(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
+                <div className="flex items-center justify-between">
+                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                    {t('catalog.field_code')} *
+                  </label>
+                  {isCheckingApi ? (
+                    <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                      <CircleNotch size={11} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>{t('catalog.checking', 'Đang kiểm tra...')}</span>
+                    </span>
+                  ) : isDuplicateCode ? (
+                    <span className="text-[10px] font-mono text-red-500 font-bold">
+                      {t('catalog.already_exists', 'Đã tồn tại')}
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* 2 ô nhỏ: Tiền tố (không sửa được) & Số hiệu (chỉ nhập số) */}
+                <div className="flex items-center gap-2">
+                  <div className="relative shrink-0">
+                    <input
+                      type="text"
+                      readOnly
+                      tabIndex={-1}
+                      value={codePrefix}
+                      title="Tiền tố tự động gán theo nhóm biển (Không sửa được)"
+                      className={`w-16 sm:w-20 px-3 py-2.5 rounded-xl border text-center font-mono font-bold select-none outline-none transition-colors cursor-not-allowed ${
+                        hasInputNumber
+                          ? isDuplicateCode
+                            ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-400'
+                            : 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
+                          : 'border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required
+                      placeholder="130"
+                      value={codeNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '')
+                        setCodeNumber(val)
+                        if (codeError) setCodeError('')
+                      }}
+                      className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-gray-900 dark:text-white outline-none transition-colors ${
+                        hasInputNumber
+                          ? isDuplicateCode
+                            ? 'border border-red-500 focus:border-red-600 focus:ring-1 focus:ring-red-500/20 bg-red-50/10'
+                            : 'border border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20 bg-white dark:bg-[#061115]'
+                          : 'border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {!isDuplicateCode && codeError && (
+                  <p className="text-[11px] text-red-500 font-medium pt-0.5">{codeError}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -168,7 +312,11 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
                 </label>
                 <CustomSelect
                   value={newCategory}
-                  onChange={(val) => setNewCategory(val as CatalogCategory)}
+                  onChange={(val) => {
+                    const nextCat = val as CatalogCategory
+                    setNewCategory(nextCat)
+                    setCodePrefix(getPrefixForCatalogCategory(nextCat))
+                  }}
                   className="w-full"
                   buttonClassName="w-full"
                   options={[
@@ -236,18 +384,13 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
                 <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                   {t('catalog.field_color')}
                 </label>
-                <CustomSelect
+                <input
+                  type="text"
+                  maxLength={30}
+                  placeholder="Đỏ - Trắng"
                   value={newColor}
-                  onChange={(val) => setNewColor(val)}
-                  className="w-full"
-                  buttonClassName="w-full"
-                  options={[
-                    { value: 'Red-White', label: t('catalog.colors_red_white') },
-                    { value: 'Yellow-Black', label: t('catalog.colors_yellow_black') },
-                    { value: 'Blue-White', label: t('catalog.colors_blue_white') },
-                    { value: 'Green-White', label: t('catalog.colors_green_white') },
-                    { value: 'Black-White', label: t('catalog.colors_black_white') },
-                  ]}
+                  onChange={(e) => setNewColor(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
                 />
               </div>
             </div>
@@ -360,13 +503,77 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
               )}
             </div>
 
+            {/* Applicable Vehicle Types */}
+            <div className="space-y-1.5 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02]">
+              <div className="flex items-center justify-between">
+                <label className="block font-mono font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide text-xs">
+                  Phương tiện áp dụng *
+                </label>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setAllowedVehicles(VEHICLE_TYPE_OPTIONS.map((v) => v.value))}
+                    className="text-[#007b8b] dark:text-[#00c4de] hover:underline font-semibold cursor-pointer"
+                  >
+                    Chọn tất cả
+                  </button>
+                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllowedVehicles([])}
+                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold cursor-pointer"
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                {VEHICLE_TYPE_OPTIONS.map((v) => {
+                  const selected = allowedVehicles.includes(v.value)
+                  return (
+                    <button
+                      key={v.value}
+                      type="button"
+                      onClick={() => {
+                        if (selected) {
+                          setAllowedVehicles(allowedVehicles.filter((item) => item !== v.value))
+                        } else {
+                          setAllowedVehicles([...allowedVehicles, v.value])
+                        }
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                        selected
+                          ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
+                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="truncate">{v.labelVi}</span>
+                      {selected && <Check size={12} weight="bold" className="shrink-0 ml-1" />}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="min-h-[16px] flex items-center pt-1">
+                {allowedVehicles.length === 0 ? (
+                  <p className="text-[10px] text-red-500 font-medium animate-in fade-in">
+                    Vui lòng chọn ít nhất 1 loại phương tiện áp dụng.
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                    Các loại phương tiện tuân thủ theo quy định của biển báo.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                 {t('catalog.field_ai_prompt')}
               </label>
               <textarea
                 rows={2}
-                placeholder="a circular red traffic sign with a black truck silhouette indicating no trucks"
+                placeholder="Mô tả nhận diện hình ảnh..."
                 value={newAiPrompt}
                 onChange={(e) => setNewAiPrompt(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"

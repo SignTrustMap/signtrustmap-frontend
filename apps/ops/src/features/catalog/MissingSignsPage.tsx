@@ -64,7 +64,7 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     roadAddress: candidate
       ? `${candidate.latitude?.toFixed(5) ?? 10.7769}°, ${candidate.longitude?.toFixed(5) ?? 106.7009}°`
       : 'TP. Hồ Chí Minh, Việt Nam',
-    aiConfidence: candidate?.confidenceScore ?? 0.88,
+    aiConfidence: typeof candidate?.confidenceScore === 'number' ? candidate.confidenceScore : undefined,
     status,
     rawStatus: r.status,
     sampleImageUrl,
@@ -74,9 +74,25 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTyp
     similarCatalogEntries: ['P.102', 'P.103a'],
     clipPrompt: r.suggestedNameEn || r.proposedName || 'A road traffic sign on street',
     candidateId: r.candidateId,
-    proposedCategoryId: r.proposedCategoryId,
-    suggestedShape: r.suggestedShape,
-    suggestedColorScheme: r.suggestedColorScheme,
+    proposedCategoryId: r.proposedCategoryId ?? (r as any).proposed_category_id ?? (r as any).categoryId ?? null,
+    suggestedShape:
+      r.suggestedShape ||
+      (r as any).suggested_shape ||
+      (r as any).shape ||
+      (candidate as any)?.shape ||
+      (candidate as any)?.predictedSignType?.shape ||
+      null,
+    suggestedColorScheme:
+      r.suggestedColorScheme ||
+      (r as any).suggested_color_scheme ||
+      (r as any).colorScheme ||
+      (r as any).color_scheme ||
+      (r as any).color ||
+      (candidate as any)?.colorScheme ||
+      (candidate as any)?.color_scheme ||
+      (candidate as any)?.predictedSignType?.colorScheme ||
+      (candidate as any)?.predictedSignType?.color ||
+      null,
     mergedIntoSignTypeId: r.mergedIntoSignTypeId,
     staffNotes: r.staffNotes,
   }
@@ -318,10 +334,10 @@ export default function MissingSignsPage() {
   // Sort filter options
   const sortOptions: OptionItem[] = useMemo(() => [
     { value: 'newest', label: isEn ? 'Newest first' : 'Mới nhất' },
-    { value: 'oldest', label: isEn ? 'Oldest (Longest waiting)' : 'Cũ nhất (Chờ lâu nhất)' },
-    { value: 'confidence_asc', label: isEn ? 'AI Confidence (Low → High)' : 'Độ tin cậy AI: Thấp → Cao' },
-    { value: 'confidence_desc', label: isEn ? 'AI Confidence (High → Low)' : 'Độ tin cậy AI: Cao → Thấp' },
-    { value: 'name_asc', label: isEn ? 'Sign Name (A → Z)' : 'Tên biển (A → Z)' },
+    { value: 'oldest', label: isEn ? 'Oldest' : 'Cũ nhất' },
+    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
+    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
+    { value: 'name_asc', label: isEn ? 'Sign Name: A → Z' : 'Tên biển: A → Z' },
   ], [isEn])
 
   // Catalog search filtering for Merge modal
@@ -394,8 +410,8 @@ export default function MissingSignsPage() {
           : `Đã gộp vào biển ${code} trong Catalog chuẩn.`
     try {
       await catalogService.updateMissingReport(updatedId, {
-        status: 'MERGED',
-        mergedIntoSignTypeId: signTypeId ?? undefined,
+        actionType: 'MERGE',
+        mergedSignTypeId: signTypeId ?? undefined,
         staffNotes: finalNote,
       })
       success(t('missing_signs.toast_merged', { id: updatedId, code }))
@@ -413,10 +429,14 @@ export default function MissingSignsPage() {
   async function handleEscalateSubmit(noteOverride?: string) {
     if (!selectedReport) return
     const updatedId = selectedReport.id
-    const note = (typeof noteOverride === 'string' && noteOverride.trim()) ? noteOverride.trim() : (escalateNote || 'Escalated to Admin for Catalog creation')
+    const note = (typeof noteOverride === 'string' && noteOverride.trim()) ? noteOverride.trim() : (escalateNote || '').trim()
+    if (!note) {
+      error('Vui lòng nhập ghi chú thông tin sơ bộ về biển lạ khi chuyển lên Admin!')
+      return
+    }
     try {
       await catalogService.updateMissingReport(updatedId, {
-        status: 'ESCALATED_ADMIN',
+        actionType: 'ESCALATE_ADMIN',
         staffNotes: note,
       })
       success(t('missing_signs.toast_escalated', { id: updatedId }))
@@ -427,6 +447,7 @@ export default function MissingSignsPage() {
     } finally {
       setIsEscalateModalOpen(false)
       setSelectedReport(null)
+      setEscalateNote('')
     }
   }
 
@@ -437,7 +458,7 @@ export default function MissingSignsPage() {
     const reasonText = t(`missing_signs.${key}`)
     try {
       await catalogService.updateMissingReport(updatedId, {
-        status: 'REJECTED',
+        actionType: 'REJECT',
         staffNotes: reasonText,
       })
       error(t('missing_signs.toast_rejected', { id: updatedId, reason: reasonText }))
@@ -457,18 +478,12 @@ export default function MissingSignsPage() {
     const candidateId = selectedReport.candidateId
     setIsSubmittingRecapture(true)
     try {
-      // 1. Cập nhật Missing Report về INCOMPLETE
       await catalogService.updateMissingReport(reportId, {
-        status: 'INCOMPLETE',
+        actionType: 'REQUEST_RECAPTURE',
         staffNotes: note,
       })
 
-      // 2. Nếu có candidateId gắn liền, gọi request-recapture tới backend để đổi candidate status sang RECAPTURE_REQUESTED
       if (candidateId) {
-        await catalogService.requestCandidateRecapture(candidateId, {
-          reason,
-          note,
-        })
         candidateRecaptureCache.set(candidateId, {
           reason,
           note,
@@ -476,7 +491,7 @@ export default function MissingSignsPage() {
         })
       }
 
-      success(`Đã gửi yêu cầu chụp lại ảnh cho báo cáo #${reportId.slice(0, 8)}`)
+      success(`Đã phân bổ Surveyor thực địa chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
       setIsRecaptureModalOpen(false)
       setSelectedReport(null)
       fetchReports()
@@ -640,7 +655,7 @@ export default function MissingSignsPage() {
             }}
             onOpenEscalate={() => setIsEscalateModalOpen(true)}
             onOpenReject={() => setIsRejectModalOpen(true)}
-            onOpenApprove={() => setIsApproveModalOpen(true)}
+            onOpenApprove={isAdmin && selectedReport.status === 'Escalated' ? () => setIsApproveModalOpen(true) : undefined}
             onOpenIncomplete={() => setIsRecaptureModalOpen(true)}
             onDirectEscalate={handleEscalateSubmit}
             onDirectReject={handleRejectSubmit}

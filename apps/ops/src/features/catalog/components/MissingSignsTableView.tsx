@@ -34,11 +34,11 @@ function getCategoryName(category?: string, categoryId?: number | null, isEn = f
     const parsed = parseInt(category.replace('cat_', ''), 10)
     if (!Number.isNaN(parsed)) id = parsed
   }
-  if (id === 1 || category === 'prohibitory') return isEn ? 'Biển báo cấm (P)' : 'Biển báo cấm'
-  if (id === 2 || category === 'warning') return isEn ? 'Biển cảnh báo (W)' : 'Biển cảnh báo'
-  if (id === 3 || category === 'mandatory') return isEn ? 'Biển hiệu lệnh (R)' : 'Biển hiệu lệnh'
-  if (id === 4 || category === 'guide' || category === 'information') return isEn ? 'Biển chỉ dẫn (I)' : 'Biển chỉ dẫn'
-  if (id === 5 || category === 'supplementary') return isEn ? 'Biển phụ (S)' : 'Biển phụ'
+  if (id === 1 || category === 'prohibitory') return isEn ? 'Prohibitory' : 'Biển báo cấm'
+  if (id === 2 || category === 'warning') return isEn ? 'Warning' : 'Biển cảnh báo'
+  if (id === 3 || category === 'mandatory') return isEn ? 'Mandatory' : 'Biển hiệu lệnh'
+  if (id === 4 || category === 'guide' || category === 'information') return isEn ? 'Guide' : 'Biển chỉ dẫn'
+  if (id === 5 || category === 'supplementary') return isEn ? 'Supplementary' : 'Biển phụ'
   return category || (isEn ? 'Other' : 'Khác')
 }
 

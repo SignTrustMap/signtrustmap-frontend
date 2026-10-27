@@ -52,6 +52,14 @@ export interface ResolveCaseInput {
   mergedIntoSignTypeId?: number
 }
 
+export type BanTargetRole = 'SURVEYOR' | 'REVIEWER' | 'STAFF'
+
+export interface AdminMissingReportActionInput {
+  actionType: 'REJECT' | 'REQUEST_RECAPTURE' | 'BAN_USER'
+  reason: string
+  banTarget?: BanTargetRole
+}
+
 // Backwards compatibility types
 export interface ResolveEscalationDto {
   status: 'Resolved' | 'Rejected'
@@ -81,6 +89,16 @@ export const escalationService = {
    */
   resolveCase: async (caseId: string, data: ResolveCaseInput): Promise<any> => {
     return http.put<any>(API_ENDPOINTS.MODERATION.RESOLVE_CASE(caseId), data)
+  },
+
+  /**
+   * Apply dedicated admin decision on escalated novel sign report (REJECT, REQUEST_RECAPTURE, BAN_USER)
+   */
+  applyAdminMissingReportAction: async (
+    reportId: string,
+    data: AdminMissingReportActionInput
+  ): Promise<any> => {
+    return http.patch(API_ENDPOINTS.MODERATION.ADMIN_ACTION(reportId), data)
   },
 
   /**

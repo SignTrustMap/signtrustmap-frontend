@@ -11,7 +11,7 @@ import { Image } from "react-native";
 import { AppButton } from "@/components/button";
 import { Badge } from "@/components/badge";
 import { AppToast } from "@/components/toast";
-import { OfflineMapModal } from "@/components/offline-map-modal";
+// import { OfflineMapModal } from "@/components/offline-map-modal";
 import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
 import { NavigationSignVerifyCard } from "@/components/navigation-sign-verify-card";
 import type { SignVerifyResult } from "@/components/navigation-sign-verify-card";

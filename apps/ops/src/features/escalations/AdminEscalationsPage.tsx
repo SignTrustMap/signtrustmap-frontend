@@ -8,7 +8,6 @@ import CustomSelect from '@/components/common/CustomSelect'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import { SignMiniMap } from '@/features/catalog/components/SignMiniMap'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
-import { CategoryBadge } from '@/features/catalog/components/MissingSignsBadges'
 import {
   X,
   XCircle,
@@ -31,6 +30,7 @@ import {
 import {
   escalationService,
   type ModerationCaseItem,
+  type BanTargetRole,
 } from '@/api/services/escalation.service'
 import { CatalogProposalStepView } from './components'
 
@@ -109,41 +109,6 @@ function getDecisionConfig(actionType?: string | null, status?: string): ActionD
   }
 }
 
-function formatShapeVi(shape?: string | null): string {
-  if (!shape) return ''
-  switch (shape.toLowerCase()) {
-    case 'circle':
-      return 'Hình tròn'
-    case 'triangle':
-      return 'Hình tam giác'
-    case 'rectangle':
-      return 'Hình chữ nhật'
-    case 'square':
-      return 'Hình vuông'
-    case 'octagon':
-      return 'Hình bát giác'
-    default:
-      return shape
-  }
-}
-
-function formatColorVi(color?: string | null): string {
-  if (!color) return ''
-  switch (color.toLowerCase()) {
-    case 'red-white':
-      return 'Đỏ - Trắng'
-    case 'yellow-black':
-      return 'Vàng - Đen'
-    case 'blue-white':
-      return 'Xanh dương - Trắng'
-    case 'green-white':
-      return 'Xanh lá - Trắng'
-    case 'black-white':
-      return 'Đen - Trắng'
-    default:
-      return color
-  }
-}
 
 /** Translate Case Type into standard Vietsub & Engsub with subtle dot indicator */
 function getCaseType(type?: string): { vi: string; en: string; dot: string } {
@@ -257,13 +222,13 @@ export default function AdminEscalationsPage() {
   const [detailedCase, setDetailedCase] = useState<ModerationCaseItem | null>(null)
   const [targetData, setTargetData] = useState<any | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
-  const [copiedId, setCopiedId] = useState(false)
   const [copiedTargetId, setCopiedTargetId] = useState(false)
   const [activeImageTab, setActiveImageTab] = useState<'crop' | 'frame'>('crop')
   const [imgLoadError, setImgLoadError] = useState(false)
 
   // Verdict Form
   const [actionType, setActionType] = useState<string>('RESOLVE')
+  const [banTarget, setBanTarget] = useState<BanTargetRole>('SURVEYOR')
   const [decisionNotes, setDecisionNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalStep, setModalStep] = useState<'DETAIL' | 'CATALOG_PROPOSAL'>('DETAIL')
@@ -305,7 +270,7 @@ export default function AdminEscalationsPage() {
     setTargetData(null)
     setDecisionNotes('')
     setActionType('RESOLVE')
-    setCopiedId(false)
+    setBanTarget('SURVEYOR')
     setCopiedTargetId(false)
     setActiveImageTab('crop')
     setImgLoadError(false)
@@ -372,8 +337,46 @@ export default function AdminEscalationsPage() {
       return
     }
 
+    const reportId = targetEntityId || selectedCase.targetEntityId || selectedCase.target_entity_id || (targetData && targetData.id)
+
     setIsSubmitting(true)
     try {
+      // Specialized novel sign report actions: REJECT, REQUEST_RECAPTURE, BAN_USER
+      if (isCatProposal && reportId) {
+        let mappedAction: 'REJECT' | 'REQUEST_RECAPTURE' | 'BAN_USER'
+        if (actionType === 'DISMISS') mappedAction = 'REJECT'
+        else if (actionType === 'REQUEST_RECAPTURE') mappedAction = 'REQUEST_RECAPTURE'
+        else if (actionType === 'BAN_USER') mappedAction = 'BAN_USER'
+        else mappedAction = 'REJECT'
+
+        if (mappedAction === 'BAN_USER' && !banTarget) {
+          warning(isEn ? 'Please choose which user to ban!' : 'Vui lòng chọn đối tượng cần khóa tài khoản!')
+          setIsSubmitting(false)
+          return
+        }
+
+        await escalationService.applyAdminMissingReportAction(reportId, {
+          actionType: mappedAction,
+          reason: decisionNotes.trim(),
+          banTarget: mappedAction === 'BAN_USER' ? banTarget : undefined,
+        })
+
+        const actionSuccessMsg = {
+          REJECT: isEn ? `Report #${reportId.slice(0, 8)} rejected successfully!` : `Đã từ chối báo cáo #${reportId.slice(0, 8)}!`,
+          REQUEST_RECAPTURE: isEn ? 'Field recapture task assigned to a random surveyor!' : 'Đã giao nhiệm vụ chụp lại thực địa cho một surveyor ngẫu nhiên!',
+          BAN_USER: isEn
+            ? `User ${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'} has been banned successfully!`
+            : `Đã khóa tài khoản của ${banTarget === 'SURVEYOR' ? 'Surveyor chụp lại' : banTarget === 'REVIEWER' ? 'Reviewer báo cáo' : 'Staff duyệt'}!`,
+        }[mappedAction]
+
+        success(actionSuccessMsg)
+        setSelectedCase(null)
+        fetchCases()
+        window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
+        return
+      }
+
+      // Standard moderation case resolve
       await escalationService.resolveCase(selectedCase.id, {
         resolutionNote: decisionNotes.trim(),
         actionType,
@@ -430,27 +433,41 @@ export default function AdminEscalationsPage() {
 
   let cropUrl: string | null = null
   let frameUrl: string | null = null
-  let signCode: string | null = null
   let signName: string | null = null
-  let signShape: string | null = null
-  let signColor: string | null = null
-  let aiConfidence: number | null = null
   let lat: number | null = null
   let lng: number | null = null
   let locationAddress: string | null = null
-  let proposedCategoryId: number | null = null
   let description: string | null = null
-  let staffNotes: string | null = null
   let reporterId: string | null = null
   let reviewedBy: string | null = null
   let targetEntityId: string | null = selectedCase?.targetEntityId || selectedCase?.target_entity_id || null
 
+  const isCaseResolved = selectedCase?.status === 'RESOLVED' || selectedCase?.status === 'DISMISSED'
+
   const activeCase = detailedCase && detailedCase.id === selectedCase?.id ? detailedCase : selectedCase
   const caseActions = activeCase?.actions || selectedCase?.actions || []
-  const latestAction = caseActions.length > 0 ? caseActions[caseActions.length - 1] : null
+
+  // Staff escalation action containing original staff notes and staff reviewer ID
+  const escalateAction = caseActions.find((a) => {
+    const act = (a.actionType || (a as any).action_type || '').toUpperCase()
+    return act.includes('ESCALAT')
+  })
+
+  // Final resolution / verdict action performed by Admin
+  const resolutionAction = [...caseActions].reverse().find((a) => {
+    const act = (a.actionType || (a as any).action_type || '').toUpperCase()
+    return !act.includes('ESCALAT') && act !== 'CREATE'
+  })
+
+  const latestAction = resolutionAction || (caseActions.length > 0 ? caseActions[caseActions.length - 1] : null)
   const decisionActionType = latestAction?.actionType || (selectedCase?.status === 'DISMISSED' ? 'DISMISS' : 'RESOLVE')
   const decisionConfig = getDecisionConfig(decisionActionType, selectedCase?.status)
   const DecisionIcon = decisionConfig.icon
+
+  const adminResolutionNote =
+    resolutionAction?.note || latestAction?.note || selectedCase?.resolutionNote || selectedCase?.resolution_note || null
+
+  let rawStaffNote: string | null = null
 
   if (targetData) {
     const raw = targetData.data || targetData
@@ -462,16 +479,10 @@ export default function AdminEscalationsPage() {
         frameUrl = resolveImageUrl(cand.bestFrameUrl || raw.bestFrameUrl)
         lat = Number(cand.latitude ?? cand.lat ?? raw.lat)
         lng = Number(cand.longitude ?? cand.lng ?? raw.lng)
-        if (typeof cand.confidenceScore === 'number') {
-          aiConfidence = Math.round(cand.confidenceScore * 1000) / 10
-        }
       }
-      signName = raw.proposedName || raw.tempLabel
-      signShape = raw.suggestedShape
-      signColor = raw.suggestedColorScheme
-      proposedCategoryId = raw.proposedCategoryId ?? null
+      signName = raw.proposedName || raw.tempLabel || cand?.predictedSignType?.nameVi || cand?.predictedSignType?.nameEn
       description = raw.description || raw.reporterNote || null
-      staffNotes = raw.staffNotes || selectedCase?.resolutionNote || selectedCase?.resolution_note || null
+      rawStaffNote = raw.staffNotes || null
       reporterId = raw.reporterId || raw.reportedBy || null
       reviewedBy = raw.reviewedBy || selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
       if (raw.id) targetEntityId = raw.id
@@ -480,15 +491,9 @@ export default function AdminEscalationsPage() {
       cropUrl = resolveImageUrl(cand.signCropUrl)
       frameUrl = resolveImageUrl(cand.bestFrameUrl)
       if (cand.predictedSignType) {
-        signCode = cand.predictedSignType.signCode
         signName = isEn
-          ? cand.predictedSignType.nameEn || cand.predictedSignType.nameVi
-          : cand.predictedSignType.nameVi || cand.predictedSignType.nameEn
-        signShape = cand.predictedSignType.shape
-        signColor = cand.predictedSignType.colorScheme
-      }
-      if (typeof cand.confidenceScore === 'number') {
-        aiConfidence = Math.round(cand.confidenceScore * 1000) / 10
+          ? cand.predictedSignType.nameEn || cand.predictedSignType.name_en || cand.predictedSignType.nameVi || cand.predictedSignType.name_vi
+          : cand.predictedSignType.nameVi || cand.predictedSignType.name_vi || cand.predictedSignType.nameEn || cand.predictedSignType.name_en
       }
       if (raw.locationContext?.coordinates) {
         lat = raw.locationContext.coordinates.latitude
@@ -505,8 +510,7 @@ export default function AdminEscalationsPage() {
         lat = Number(raw.location.lat)
         lng = Number(raw.location.lon)
       }
-      if (raw.sign_code) {
-        signCode = raw.sign_code
+      if (raw.name_en || raw.name_vi) {
         signName = isEn
           ? raw.name_en || raw.name_vi
           : raw.name_vi || raw.name_en
@@ -514,12 +518,33 @@ export default function AdminEscalationsPage() {
     }
   }
 
-  if (!staffNotes) {
-    staffNotes = selectedCase?.resolutionNote || selectedCase?.resolution_note || null
+  // Determine effective Staff Notes: prioritize escalateAction.note to prevent overwrite by admin decisions
+  let effectiveStaffNotes: string | null = null
+  if (escalateAction?.note) {
+    effectiveStaffNotes = escalateAction.note
+  } else if (rawStaffNote) {
+    // If backend overwrote raw.staffNotes with the admin resolution note, suppress duplication
+    if (isCaseResolved && adminResolutionNote && rawStaffNote.trim() === adminResolutionNote.trim()) {
+      effectiveStaffNotes = null
+    } else {
+      effectiveStaffNotes = rawStaffNote
+    }
+  } else if (!isCaseResolved) {
+    effectiveStaffNotes = selectedCase?.resolutionNote || selectedCase?.resolution_note || null
   }
-  if (!reviewedBy) {
-    reviewedBy = selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
-  }
+
+  // Determine true Staff Reviewer ID & escalation timestamp
+  const staffReviewerId =
+    escalateAction?.performedBy ||
+    selectedCase?.assignedStaffId ||
+    selectedCase?.assigned_staff_id ||
+    (!isCaseResolved ? reviewedBy : null)
+
+  const staffReviewedAt =
+    escalateAction?.performedAt ||
+    selectedCase?.createdAt ||
+    selectedCase?.created_at ||
+    targetData?.updatedAt
 
   const hasContextFrame = Boolean(frameUrl)
   const activeImageUrl = activeImageTab === 'frame' && frameUrl ? frameUrl : cropUrl
@@ -709,24 +734,6 @@ export default function AdminEscalationsPage() {
               {modalStep === 'CATALOG_PROPOSAL' ? (
                 <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedCase.id)
-                        setCopiedId(true)
-                        setTimeout(() => setCopiedId(false), 2000)
-                      }}
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 transition-colors cursor-pointer"
-                      title={isEn ? 'Copy full case UUID' : 'Sao chép toàn bộ UUID ca'}
-                    >
-                      <span>#{selectedCase.id}</span>
-                      {copiedId ? (
-                        <Check size={12} className="text-emerald-500" />
-                      ) : (
-                        <Copy size={12} className="text-gray-400" />
-                      )}
-                    </button>
-                    <span className="text-gray-300 dark:text-gray-600">•</span>
                     <span className="font-semibold text-gray-900 dark:text-white">
                       {isEn ? 'Create Traffic Sign' : 'Tạo biển báo mới'}
                     </span>
@@ -736,7 +743,7 @@ export default function AdminEscalationsPage() {
                     type="button"
                     onClick={() => setSelectedCase(null)}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-2"
-                    title={isEn ? 'Close modal' : 'Đóng (Esc)'}
+                    title={isEn ? 'Close modal' : 'Đóng'}
                   >
                     <X size={18} weight="bold" />
                   </button>
@@ -744,24 +751,6 @@ export default function AdminEscalationsPage() {
               ) : (
                 <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedCase.id)
-                        setCopiedId(true)
-                        setTimeout(() => setCopiedId(false), 2000)
-                      }}
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 transition-colors cursor-pointer"
-                      title={isEn ? 'Copy full case UUID' : 'Sao chép toàn bộ UUID ca'}
-                    >
-                      <span>#{selectedCase.id}</span>
-                      {copiedId ? (
-                        <Check size={12} className="text-emerald-500" />
-                      ) : (
-                        <Copy size={12} className="text-gray-400" />
-                      )}
-                    </button>
-                    <span className="text-gray-300 dark:text-gray-600">•</span>
                     <span className="font-semibold text-gray-900 dark:text-white">
                       {isEn
                         ? getCaseType(selectedCase.caseType || selectedCase.case_type).en
@@ -777,7 +766,7 @@ export default function AdminEscalationsPage() {
                     type="button"
                     onClick={() => setSelectedCase(null)}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-2"
-                    title="Đóng (Esc)"
+                    title={isEn ? 'Close modal' : 'Đóng'}
                   >
                     <X size={18} weight="bold" />
                   </button>
@@ -804,371 +793,376 @@ export default function AdminEscalationsPage() {
               ) : (
                 <>
                   {/* Modal Body */}
-              <div className="p-4 sm:p-5 overflow-y-auto text-xs sm:text-sm flex-1">
-                {isLoadingDetail && !targetData ? (
-                  <div className="py-16 flex flex-col items-center justify-center gap-3 text-gray-400">
-                    <CircleNotch size={24} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
-                    <span className="text-xs font-medium">
-                      {isEn ? 'Loading dossier & target evidence from server...' : 'Đang tải hồ sơ vụ việc & đối tượng từ máy chủ...'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
-                    {/* ─── LEFT COLUMN: EVIDENCE PHOTO + MINI MAP (5 cols) ───── */}
-                    <div className="md:col-span-5 flex flex-col gap-2.5 h-full">
-                      {/* 1. Evidence Photo Container */}
-                      <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-900 group shadow-2xs flex items-center justify-center shrink-0">
-                        {!imgLoadError && activeImageUrl ? (
-                          <img
-                            src={activeImageUrl}
-                            alt={signName || 'Bằng chứng thực địa'}
-                            onError={() => setImgLoadError(true)}
-                            className="w-full h-full object-contain sm:object-cover transition-transform duration-200 group-hover:scale-102"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-gray-400 space-y-1">
-                            <ImageIcon size={32} weight="light" className="opacity-50" />
-                            <p className="text-xs text-gray-400">{isEn ? 'No image attached' : 'Không có ảnh đính kèm'}</p>
-                          </div>
-                        )}
-
-                        {/* Floating View Switcher Inside Image Container */}
-                        {hasContextFrame && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute top-3 left-3 p-1 rounded-xl backdrop-blur-md border shadow-lg flex items-center gap-1 z-10 transition-colors bg-white/95 dark:bg-[#071317]/90 border-gray-200 dark:border-white/20 shadow-gray-900/10"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveImageTab('crop')
-                                setImgLoadError(false)
-                              }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                activeImageTab === 'crop'
-                                  ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
-                                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
-                              }`}
-                            >
-                              {isEn ? 'Crop' : 'Ảnh cắt'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActiveImageTab('frame')
-                                setImgLoadError(false)
-                              }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                activeImageTab === 'frame'
-                                  ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
-                                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
-                              }`}
-                            >
-                              {isEn ? 'Context' : 'Toàn cảnh'}
-                            </button>
-                          </div>
-                        )}
-
-                        {/* External link to full image */}
-                        {activeImageUrl && !imgLoadError && (
-                          <a
-                            href={activeImageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/75 hover:bg-black/90 backdrop-blur-xs text-white text-[10px] font-mono transition-colors"
-                            title={isEn ? 'Open original image in new tab' : 'Xem ảnh gốc trong tab mới'}
-                          >
-                            <ArrowSquareOut size={12} />
-                            <span>{isEn ? 'Original' : 'Ảnh gốc'}</span>
-                          </a>
-                        )}
+                  <div className="p-4 sm:p-5 overflow-y-auto text-xs sm:text-sm flex-1">
+                    {isLoadingDetail && !targetData ? (
+                      <div className="py-16 flex flex-col items-center justify-center gap-3 text-gray-400">
+                        <CircleNotch size={24} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                        <span className="text-xs font-medium">
+                          {isEn ? 'Loading dossier & target evidence from server...' : 'Đang tải hồ sơ vụ việc & đối tượng từ máy chủ...'}
+                        </span>
                       </div>
-
-                      {/* 2. Map stretching to match the bottom evenly */}
-                      {hasValidMapLocation ? (
-                        <div className="flex-1 flex flex-col min-h-[170px] space-y-1">
-                          <SignMiniMap
-                            lat={lat!}
-                            lng={lng!}
-                            title={signName || (isEn ? 'Field location' : 'Vị trí thực địa')}
-                            heightClassName="w-full flex-1 min-h-[160px]"
-                          />
-                          {locationAddress && (
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate px-1 shrink-0">
-                              {locationAddress}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-gray-400 text-xs min-h-[130px]">
-                          <MapPin size={16} className="mx-auto mb-1 opacity-50" />
-                          <span>{isEn ? 'No GPS coordinates available' : 'Không có toạ độ định vị GPS'}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ─── RIGHT COLUMN: SPECS & VERDICT FORM (7 cols) ───────── */}
-                    <div className="md:col-span-7 flex flex-col gap-3">
-                      {/* Proposed Sign / Object Title */}
-                      <div>
-                        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                          {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
-                        </h3>
-                        {targetEntityId && (
-                          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                            <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
-                            <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">#{targetEntityId}</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(targetEntityId)
-                                setCopiedTargetId(true)
-                                setTimeout(() => setCopiedTargetId(false), 2000)
-                              }}
-                              className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
-                              title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
-                            >
-                              {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Key-Value Specs Card (Clean, neutral layout) */}
-                      <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5 text-xs">
-                        {/* Category */}
-                        {(proposedCategoryId !== null || signCode) && (
-                          <div className="flex items-center justify-between py-1.5 px-3">
-                            <span className="text-gray-500 dark:text-gray-400">{isEn ? 'Category:' : 'Danh mục:'}</span>
-                            {proposedCategoryId !== null ? (
-                              <CategoryBadge categoryId={proposedCategoryId} />
-                            ) : (
-                              <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{signCode}</span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Shape & Color Scheme */}
-                        {(signShape || signColor) && (
-                          <div className="flex items-center justify-between py-1.5 px-3">
-                            <span className="text-gray-500 dark:text-gray-400">{isEn ? 'Visual Specs:' : 'Quy cách hình ảnh:'}</span>
-                            <div className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200">
-                              {signShape && <span>{formatShapeVi(signShape)}</span>}
-                              {signShape && signColor && <span className="text-gray-300 dark:text-gray-600">•</span>}
-                              {signColor && <span>{formatColorVi(signColor)}</span>}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* AI Confidence */}
-                        {aiConfidence !== null && (
-                          <div className="flex items-center justify-between py-1.5 px-3">
-                            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                              <CheckCircle size={13} className="text-[#007b8b] dark:text-[#00c4de]" />
-                              <span>{isEn ? 'AI Confidence:' : 'Độ tin cậy AI:'}</span>
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-[#007b8b] dark:bg-[#00c4de] rounded-full"
-                                  style={{ width: `${Math.min(100, Math.max(0, aiConfidence))}%` }}
-                                />
-                              </div>
-                              <span className="font-mono font-bold text-gray-900 dark:text-white text-xs">
-                                {aiConfidence}%
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Reporter & Submitted Date */}
-                        <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <User size={12} className="text-gray-400 shrink-0" />
-                            <span className="truncate">{reporterId ? (reporterId.startsWith('#') ? reporterId : '#' + reporterId) : (isEn ? 'Anonymous' : 'Hệ thống')}</span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0 ml-2">
-                            <CalendarBlank size={12} />
-                            <span>{formatDate(targetData?.createdAt || selectedCase.createdAt || selectedCase.created_at)}</span>
-                          </div>
-                        </div>
-
-                        {/* Staff Reviewer */}
-                        {reviewedBy && (
-                          <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
-                            <div className="flex items-center gap-1 min-w-0">
-                              <User size={12} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
-                              <span className="truncate">Staff #{reviewedBy}</span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              <Clock size={12} />
-                              <span>{formatDate(targetData?.updatedAt || selectedCase.updatedAt || selectedCase.updated_at)}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Description & Staff Notes - Symmetrical, clean presentation */}
-                      {(description || staffNotes) && (
-                        <div className="space-y-2">
-                          {description && (
-                            <div>
-                              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1">
-                                <ChatText size={12} className="text-gray-400 shrink-0" />
-                                <span>{isEn ? 'Reporter Description:' : 'Mô tả từ người gửi:'}</span>
-                              </span>
-                              <div className="px-2.5 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02] text-gray-800 dark:text-gray-200 text-xs leading-relaxed">
-                                {description}
-                              </div>
-                            </div>
-                          )}
-
-                          {staffNotes && (
-                            <div>
-                              <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 block mb-1">
-                                {isEn ? 'Staff Note:' : 'Ghi chú của Staff:'}
-                              </span>
-                              <div className="px-2.5 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02] text-gray-800 dark:text-gray-200 text-xs leading-relaxed">
-                                {staffNotes}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Resolved / Adjudicated State View */}
-                      {(selectedCase.status === 'RESOLVED' || selectedCase.status === 'DISMISSED') && (
-                        <div className={`p-3 rounded-xl border ${decisionConfig.cardClass} space-y-1.5`}>
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2 font-bold">
-                              <div className={`flex items-center gap-1.5 ${decisionConfig.titleClass}`}>
-                                <DecisionIcon size={15} weight="fill" className={decisionConfig.iconClass} />
-                                <span>{isEn ? 'Resolution Result' : 'Kết quả xử lý'}</span>
-                              </div>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${decisionConfig.badgeClass}`}>
-                                {isEn ? decisionConfig.labelEn : decisionConfig.labelVi}
-                              </span>
-                            </div>
-                            {(latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at) && (
-                              <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                                {formatDate(latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at || undefined)}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
-                            {latestAction?.note || selectedCase.resolutionNote || selectedCase.resolution_note || (isEn ? 'Case resolved under Administrator authority.' : 'Ca đã được giải quyết theo thẩm quyền Quản trị viên.')}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Adjudication / Action Decision Form (If Pending, In Review, Escalated) */}
-                      {(selectedCase.status === 'PENDING' ||
-                        selectedCase.status === 'IN_REVIEW' ||
-                        selectedCase.status === 'ESCALATED_ADMIN') && (
-                        <div className="p-2.5 sm:p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
-                            <ShieldCheck size={15} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
-                            <span>{isEn ? 'Action Decision' : 'Quyết định xử lý'}</span>
-                          </div>
-
-                          {/* Action Choice Pills (Clean, simple, non-flashy, text-only) */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setActionType('RESOLVE')}
-                              className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${
-                                actionType === 'RESOLVE'
-                                  ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
-                                  : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              {isEn ? 'Approve' : 'Phê chuẩn'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setActionType('DISMISS')}
-                              className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${
-                                actionType === 'DISMISS'
-                                  ? 'bg-gray-800 text-white border-gray-800 dark:bg-white dark:text-black dark:border-white shadow-xs'
-                                  : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              {isEn ? 'Dismiss' : 'Bác bỏ'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setActionType('REQUEST_RECAPTURE')}
-                              className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${
-                                actionType === 'REQUEST_RECAPTURE'
-                                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                                  : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              {isEn ? 'Recapture' : 'Yêu cầu chụp lại'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setActionType('BAN_USER')}
-                              className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${
-                                actionType === 'BAN_USER'
-                                  ? 'bg-red-600 text-white border-red-600 shadow-xs'
-                                  : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              {isEn ? 'Ban user' : 'Khóa tài khoản'}
-                            </button>
-                          </div>
-
-                          {/* Verdict Justification Textarea */}
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                              {isEn ? 'Notes: ' : 'Ghi chú: '}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={decisionNotes}
-                              onChange={(e) => setDecisionNotes(e.target.value)}
-                              placeholder={isEn ? 'Enter notes...' : 'Nhập ghi chú...'}
-                              className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer Actions */}
-              {(selectedCase.status === 'PENDING' ||
-                selectedCase.status === 'IN_REVIEW' ||
-                selectedCase.status === 'ESCALATED_ADMIN') && (
-                <div className="px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handleResolveSubmit}
-                    disabled={isSubmitting || !decisionNotes.trim()}
-                    className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 ${
-                      decisionNotes.trim() && !isSubmitting
-                        ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
-                        : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <CircleNotch size={14} className="animate-spin" />
-                        <span>{isEn ? 'Updating...' : 'Đang cập nhật...'}</span>
-                      </span>
                     ) : (
-                      <span>{isEn ? 'Update' : 'Cập nhật'}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                        {/* ─── LEFT COLUMN: EVIDENCE PHOTO + MINI MAP (5 cols) ───── */}
+                        <div className="md:col-span-5 flex flex-col gap-2.5 md:sticky md:top-0">
+                          {/* 1. Evidence Photo Container */}
+                          <div className="relative aspect-4/3 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-900 group shadow-2xs flex items-center justify-center shrink-0">
+                            {!imgLoadError && activeImageUrl ? (
+                              <img
+                                src={activeImageUrl}
+                                alt={signName || 'Bằng chứng thực địa'}
+                                onError={() => setImgLoadError(true)}
+                                className="w-full h-full object-contain sm:object-cover transition-transform duration-200 group-hover:scale-102"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-gray-400 space-y-1">
+                                <ImageIcon size={32} weight="light" className="opacity-50" />
+                                <p className="text-xs text-gray-400">{isEn ? 'No image attached' : 'Không có ảnh đính kèm'}</p>
+                              </div>
+                            )}
+
+                            {/* Floating View Switcher Inside Image Container */}
+                            {hasContextFrame && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute top-3 left-3 p-1 rounded-xl backdrop-blur-md border shadow-lg flex items-center gap-1 z-10 transition-colors bg-white/95 dark:bg-[#071317]/90 border-gray-200 dark:border-white/20 shadow-gray-900/10"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveImageTab('crop')
+                                    setImgLoadError(false)
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeImageTab === 'crop'
+                                      ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
+                                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
+                                    }`}
+                                >
+                                  {isEn ? 'Crop' : 'Ảnh cắt'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveImageTab('frame')
+                                    setImgLoadError(false)
+                                  }}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeImageTab === 'frame'
+                                      ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
+                                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
+                                    }`}
+                                >
+                                  {isEn ? 'Context' : 'Toàn cảnh'}
+                                </button>
+                              </div>
+                            )}
+
+                            {/* External link to full image */}
+                            {activeImageUrl && !imgLoadError && (
+                              <a
+                                href={activeImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black/75 hover:bg-black/90 backdrop-blur-xs text-white text-[10px] font-mono transition-colors"
+                                title={isEn ? 'Open original image in new tab' : 'Xem ảnh gốc trong tab mới'}
+                              >
+                                <ArrowSquareOut size={12} />
+                                <span>{isEn ? 'Original' : 'Ảnh gốc'}</span>
+                              </a>
+                            )}
+                          </div>
+
+                          {/* 2. Map */}
+                          {hasValidMapLocation ? (
+                            <div className="space-y-1">
+                              <SignMiniMap
+                                lat={lat!}
+                                lng={lng!}
+                                title={signName || (isEn ? 'Field location' : 'Vị trí thực địa')}
+                                heightClassName="w-full h-[160px] sm:h-[180px]"
+                              />
+                              {locationAddress && (
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate px-1 shrink-0">
+                                  {locationAddress}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-gray-400 text-xs min-h-[140px]">
+                              <MapPin size={16} className="mx-auto mb-1 opacity-50" />
+                              <span>{isEn ? 'No GPS coordinates available' : 'Không có toạ độ định vị GPS'}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ─── RIGHT COLUMN: SPECS & VERDICT FORM (7 cols) ───────── */}
+                        <div className="md:col-span-7 flex flex-col gap-3">
+                          {/* Proposed Sign / Object Title */}
+                          <div>
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                              {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
+                            </h3>
+                            {targetEntityId && (
+                              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
+                                <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">#{targetEntityId}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(targetEntityId)
+                                    setCopiedTargetId(true)
+                                    setTimeout(() => setCopiedTargetId(false), 2000)
+                                  }}
+                                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
+                                  title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
+                                >
+                                  {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Key-Value Specs Card (Clean, neutral layout) */}
+                          <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5 text-xs">
+
+
+                            {/* Reporter & Submitted Date */}
+                            <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                              <div className="flex items-center gap-1 min-w-0">
+                                <User size={12} className="text-gray-400 shrink-0" />
+                                <span className="truncate">{reporterId ? (reporterId.startsWith('#') ? reporterId : '#' + reporterId) : (isEn ? 'Anonymous' : 'Hệ thống')}</span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <CalendarBlank size={12} />
+                                <span>{formatDate(targetData?.createdAt || selectedCase.createdAt || selectedCase.created_at)}</span>
+                              </div>
+                            </div>
+
+                            {/* Staff Reviewer */}
+                            {staffReviewerId && (
+                              <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <User size={12} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
+                                  <span className="truncate">Staff #{staffReviewerId}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  <Clock size={12} />
+                                  <span>{formatDate(staffReviewedAt)}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Description & Staff Notes - Symmetrical, clean presentation */}
+                          {(description || effectiveStaffNotes) && (
+                            <div className="space-y-2">
+                              {description && (
+                                <div>
+                                  <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-1">
+                                    <ChatText size={12} className="text-gray-400 shrink-0" />
+                                    <span>{isEn ? 'Reporter Description:' : 'Mô tả từ người gửi:'}</span>
+                                  </span>
+                                  <div className="px-2.5 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02] text-gray-800 dark:text-gray-200 text-xs leading-relaxed">
+                                    {description}
+                                  </div>
+                                </div>
+                              )}
+
+                              {effectiveStaffNotes && (
+                                <div>
+                                  <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 block mb-1">
+                                    {isEn ? 'Staff Note:' : 'Ghi chú của Staff:'}
+                                  </span>
+                                  <div className="px-2.5 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02] text-gray-800 dark:text-gray-200 text-xs leading-relaxed">
+                                    {effectiveStaffNotes}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Resolved / Adjudicated State View */}
+                          {isCaseResolved && (
+                            <div className={`p-3 rounded-xl border ${decisionConfig.cardClass} space-y-1.5`}>
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2 font-bold">
+                                  <div className={`flex items-center gap-1.5 ${decisionConfig.titleClass}`}>
+                                    <DecisionIcon size={15} weight="fill" className={decisionConfig.iconClass} />
+                                    <span>{isEn ? 'Resolution Result' : 'Kết quả xử lý'}</span>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${decisionConfig.badgeClass}`}>
+                                    {isEn ? decisionConfig.labelEn : decisionConfig.labelVi}
+                                  </span>
+                                </div>
+                                {(resolutionAction?.performedAt || latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at) && (
+                                  <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                    {formatDate(resolutionAction?.performedAt || latestAction?.performedAt || selectedCase.resolvedAt || selectedCase.resolved_at || undefined)}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
+                                {adminResolutionNote || (isEn ? 'Case resolved under Administrator authority.' : 'Ca đã được giải quyết theo thẩm quyền Quản trị viên.')}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Adjudication / Action Decision Form (If Pending, In Review, Escalated) */}
+                          {(selectedCase.status === 'PENDING' ||
+                            selectedCase.status === 'IN_REVIEW' ||
+                            selectedCase.status === 'ESCALATED_ADMIN') && (
+                              <div className="p-2.5 sm:p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
+                                  <ShieldCheck size={15} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
+                                  <span>{isEn ? 'Action Decision' : 'Quyết định xử lý'}</span>
+                                </div>
+
+                                {/* Action Choice Pills (Clean, simple, non-flashy, text-only) */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActionType('RESOLVE')}
+                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'RESOLVE'
+                                        ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
+                                        : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                      }`}
+                                  >
+                                    {isEn ? 'Approve' : 'Phê chuẩn'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setActionType('DISMISS')}
+                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'DISMISS'
+                                        ? 'bg-gray-800 text-white border-gray-800 dark:bg-white dark:text-black dark:border-white shadow-xs'
+                                        : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                      }`}
+                                  >
+                                    {isEn ? 'Dismiss' : 'Bác bỏ'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setActionType('REQUEST_RECAPTURE')}
+                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'REQUEST_RECAPTURE'
+                                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                        : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                      }`}
+                                  >
+                                    {isEn ? 'Recapture' : 'Yêu cầu chụp lại'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setActionType('BAN_USER')}
+                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'BAN_USER'
+                                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                                        : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                                      }`}
+                                  >
+                                    {isEn ? 'Ban user' : 'Khóa tài khoản'}
+                                  </button>
+                                </div>
+
+                                {/* Ban Target Selector (Rendered when actionType === 'BAN_USER') */}
+                                {actionType === 'BAN_USER' && (
+                                  <div className="p-2.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/20 space-y-1.5">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-red-700 dark:text-red-400">
+                                      <span>{isEn ? 'Select User to Ban' : 'Chọn đối tượng cần khóa tài khoản'} <span className="text-red-500">*</span></span>
+                                      <span className="text-[10px] font-normal text-red-600/80 dark:text-red-400/80">
+                                        {isEn ? 'System access will be revoked' : 'Thu hồi quyền truy cập hệ thống'}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                      {[
+                                        {
+                                          key: 'SURVEYOR' as const,
+                                          labelVi: 'Surveyor chụp ảnh',
+                                          subVi: 'Người chụp gần nhất',
+                                          labelEn: 'Surveyor',
+                                          subEn: 'Latest photographer',
+                                        },
+                                        {
+                                          key: 'REVIEWER' as const,
+                                          labelVi: 'Reviewer báo cáo',
+                                          subVi: reporterId ? `#${reporterId.slice(0, 8)}` : 'Người báo cáo',
+                                          labelEn: 'Reviewer',
+                                          subEn: reporterId ? `#${reporterId.slice(0, 8)}` : 'Submitter',
+                                        },
+                                        {
+                                          key: 'STAFF' as const,
+                                          labelVi: 'Staff duyệt đơn',
+                                          subVi: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Người chuyển đơn',
+                                          labelEn: 'Staff',
+                                          subEn: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Escalating staff',
+                                        },
+                                      ].map((item) => {
+                                        const selected = banTarget === item.key
+                                        return (
+                                          <button
+                                            key={item.key}
+                                            type="button"
+                                            onClick={() => setBanTarget(item.key)}
+                                            className={`flex flex-col text-left px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer ${selected
+                                                ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                                                : 'bg-white dark:bg-black/40 border-red-200/60 dark:border-red-900/40 text-gray-800 dark:text-gray-200 hover:bg-red-50/50'
+                                              }`}
+                                          >
+                                            <span className="font-bold text-[11px]">{isEn ? item.labelEn : item.labelVi}</span>
+                                            <span className={`text-[10px] truncate ${selected ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                                              {isEn ? item.subEn : item.subVi}
+                                            </span>
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Verdict Justification Textarea */}
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                                    {isEn ? 'Notes: ' : 'Ghi chú: '}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={decisionNotes}
+                                    onChange={(e) => setDecisionNotes(e.target.value)}
+                                    placeholder={isEn ? 'Enter notes...' : 'Nhập ghi chú...'}
+                                    className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                        </div>
+                      </div>
                     )}
-                  </button>
-                </div>
-              )}
+                  </div>
+
+                  {/* Modal Footer Actions */}
+                  {(selectedCase.status === 'PENDING' ||
+                    selectedCase.status === 'IN_REVIEW' ||
+                    selectedCase.status === 'ESCALATED_ADMIN') && (
+                      <div className="px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleResolveSubmit}
+                          disabled={isSubmitting || !decisionNotes.trim()}
+                          className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 ${decisionNotes.trim() && !isSubmitting
+                              ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
+                              : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                          {isSubmitting ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <CircleNotch size={14} className="animate-spin" />
+                              <span>{isEn ? 'Updating...' : 'Đang cập nhật...'}</span>
+                            </span>
+                          ) : (
+                            <span>{isEn ? 'Update' : 'Cập nhật'}</span>
+                          )}
+                        </button>
+                      </div>
+                    )}
                 </>
               )}
             </div>

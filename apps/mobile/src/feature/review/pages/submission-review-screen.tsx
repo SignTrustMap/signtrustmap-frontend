@@ -101,11 +101,11 @@ export const REPORT_ISSUE_OPTIONS: Array<{
 }> = [
   {
     id: 'missing_type',
-    label: 'Sign not in catalog',
+    label: 'Biển chưa có trong danh mục',
   },
   {
     id: 'other',
-    label: 'Other issue',
+    label: 'Vấn đề khác',
   },
 ];
 
@@ -180,9 +180,7 @@ function ReviewBottomSheet({
       : declineReason
         ? 'Xác nhận từ chối'
         : 'Xác nhận chọn'
-    : isMissingType
-      ? 'Tiếp tục'
-      : 'Gửi báo cáo';
+    : 'Gửi báo cáo';
 
   return (
     <Modal
@@ -207,7 +205,7 @@ function ReviewBottomSheet({
             <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
             <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {isDecline ? 'Gợi ý biển báo' : 'Report Issue'}
+                {isDecline ? 'Gợi ý biển báo' : 'Báo cáo sự cố'}
               </Text>
               <AppButton
                 accessibilityLabel="Đóng"
@@ -431,10 +429,6 @@ function ReviewBottomSheet({
                 keyboardShouldPersistTaps="handled"
                 style={styles.sheetBodyScroll}
               >
-                <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>
-                  Please select the issue with this sign submission:
-                </Text>
-
                 <View style={styles.reasonList}>
                   {REPORT_ISSUE_OPTIONS.map((option) => {
                     const selected = reportIssueType === option.id;
@@ -475,13 +469,13 @@ function ReviewBottomSheet({
                 {isReportOther ? (
                   <View style={styles.reasonInputGroup}>
                     <Text style={[styles.inputLabel, { color: theme.text }]}>
-                      Details <Text style={{ color: Colors.danger }}>*</Text>
+                      Mô tả chi tiết <Text style={{ color: Colors.danger }}>*</Text>
                     </Text>
                     <TextInput
-                      accessibilityLabel="Report details, required"
+                      accessibilityLabel="Chi tiết vấn đề, bắt buộc"
                       multiline
                       onChangeText={onChangeReportNote}
-                      placeholder="Please specify the issue"
+                      placeholder="Nhập chi tiết vấn đề..."
                       placeholderTextColor={theme.placeholder}
                       style={[
                         styles.reasonInput,
@@ -762,8 +756,19 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
   const confirmReport = () => {
     if (reportIssueType === 'missing_type') {
+      if (submission?.id) {
+        completeReview('reported_new_sign', {
+          newSignReport: {
+            candidateId: submission.id,
+          },
+        });
+        setToast({
+          id: Date.now(),
+          message: 'Đã gửi báo cáo thành công!',
+          tone: 'success',
+        });
+      }
       closeSheet();
-      setIsNewSignTypeModalOpen(true);
       return;
     }
 
@@ -1915,6 +1920,21 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  missingTypeHintCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  missingTypeHintText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    lineHeight: 17,
   },
   reasonInputGroup: {
     gap: Spacing.half,

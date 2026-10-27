@@ -235,10 +235,10 @@
     "btn_cancel": "Cancel",
     "toast_merged": "Matched report {{id}} to {{code}} successfully.",
     "toast_escalated": "Escalated proposal {{id}} to Admin for Catalog inclusion.",
-    "toast_rejected": "Rejected report {{id}} ({{reason}}).",
+    "toast_rejected": "Rejected report {{id}}: {{reason}}.",
     "label_merged_prefix": "Matched to:",
-    "label_pending_admin": "[Pending Admin]",
-    "label_rejected": "[Rejected]",
+    "label_pending_admin": "Pending Admin",
+    "label_rejected": "Rejected",
     "toast_processed": "Processed proposal {{id}}: {{action}}"
   },
   "spatial": {

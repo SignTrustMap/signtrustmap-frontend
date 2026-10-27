@@ -10,6 +10,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +24,8 @@ import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import type { RecaptureReason, SurveyorRecaptureItem } from '@/types/reviewsType';
 
-const REASON_LABELS: Record<RecaptureReason, { label: string; color: string; bg: string }> = {
+const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Yêu cầu chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
   BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
   POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
   WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
@@ -81,6 +83,7 @@ export function RecapturesScreen() {
           targetLat: String(item.latitude),
           targetLon: String(item.longitude),
           signTitle: item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất',
+          signCode: item.sign_code || '',
           reason: item.reason,
           note: item.note || '',
           oldSignCropUrl: item.sign_crop_url || '',
@@ -105,7 +108,9 @@ export function RecapturesScreen() {
           ? calculateDistanceMeters(currentPosition, [item.longitude, item.latitude])
           : null;
 
-      const isWithinGeofence = distanceMeters != null && distanceMeters <= 100;
+      const isNovelSignQuest = Boolean(
+        item.missing_type_report_id || item.reason === 'MISSING_TYPE_RECAPTURE_REQUESTED'
+      );
 
       return (
         <View
@@ -113,13 +118,18 @@ export function RecapturesScreen() {
             styles.card,
             {
               backgroundColor: theme.backgroundElement,
-              borderColor: theme.border,
+              borderColor: isNovelSignQuest ? `${theme.primary}50` : theme.border,
             },
           ]}
         >
-          {/* Card Top: Image + Info */}
-          <View style={styles.cardHeader}>
-            <View style={[styles.imageWrapper, { backgroundColor: theme.neutral }]}>
+          {/* Card Top: Ảnh biển bên trái + Thông tin biển bên phải (Bấm để xem chi tiết / chụp lại) */}
+          <TouchableOpacity
+            accessibilityLabel={`Xem chi tiết ${item.name_vi || item.name_en || item.sign_code || 'biển báo'}`}
+            activeOpacity={0.7}
+            onPress={() => handleStartRecapture(item)}
+            style={styles.cardHeader}
+          >
+            <View style={[styles.imageWrapper, { backgroundColor: theme.neutral, borderColor: theme.border }]}>
               {imageUrl ? (
                 <Image
                   contentFit="cover"
@@ -135,10 +145,8 @@ export function RecapturesScreen() {
             </View>
 
             <View style={styles.cardInfo}>
-              <View style={styles.titleRow}>
-                <Text numberOfLines={1} style={[styles.signTitle, { color: theme.text }]}>
-                  {item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất'}
-                </Text>
+              {/* Badges: Mã biển + Nhãn lý do */}
+              <View style={styles.badgeRow}>
                 {item.sign_code ? (
                   <View
                     style={[
@@ -154,60 +162,59 @@ export function RecapturesScreen() {
                     </Text>
                   </View>
                 ) : null}
+
+                <View style={[styles.reasonBadge, { backgroundColor: meta.bg }]}>
+                  <Text style={[styles.reasonBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                </View>
               </View>
 
-              {/* Reason Badge */}
-              <View style={[styles.reasonBadge, { backgroundColor: meta.bg }]}>
-                <Text style={[styles.reasonBadgeText, { color: meta.color }]}>{meta.label}</Text>
-              </View>
+              {/* Tên biển báo (Hiển thị tối đa 2 dòng, trọn vẹn, không bị cắt cụt) */}
+              <Text numberOfLines={2} style={[styles.signTitle, { color: theme.text }]}>
+                {item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất'}
+              </Text>
 
-              {/* Reviewer Note */}
-              {item.note ? (
-                <Text numberOfLines={2} style={[styles.reviewerNote, { color: theme.textSecondary }]}>
-                  {item.note}
+              {/* Toạ độ GPS & Khoảng cách gọn gàng */}
+              <View style={styles.coordsRow}>
+                {distanceMeters != null && (
+                  <>
+                    <MaterialCommunityIcons color={theme.primary} name="navigation-variant" size={12} />
+                    <Text style={[styles.distanceInlineText, { color: theme.primary }]}>
+                      Cách {formatDistance(distanceMeters)}
+                    </Text>
+                    <Text style={[styles.dotSeparator, { color: theme.border }]}>•</Text>
+                  </>
+                )}
+                <MaterialCommunityIcons color={theme.placeholder} name="map-marker-outline" size={12} />
+                <Text style={[styles.coordsText, { color: theme.grey }]}>
+                  {item.latitude.toFixed(5)}°, {item.longitude.toFixed(5)}°
                 </Text>
-              ) : null}
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          {/* Location & Geofence Status */}
-          <View style={[styles.locationRow, { borderTopColor: theme.border }]}>
-            <View style={styles.locationLeft}>
-              <MaterialCommunityIcons color={theme.placeholder} name="map-marker-outline" size={15} />
-              <Text style={[styles.coordsText, { color: theme.grey }]}>
-                {item.latitude.toFixed(5)}°, {item.longitude.toFixed(5)}°
+          {/* Hộp Ghi Chú / Hướng Dẫn Thẩm Định Viên (Trải rộng 100%, đọc rõ ràng, không bị che khuất) */}
+          {item.note ? (
+            <View
+              style={[
+                styles.reviewerNoteBox,
+                {
+                  backgroundColor: theme.neutral,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={theme.placeholder}
+                name="alert-circle-outline"
+                size={14}
+                style={styles.reviewerNoteIcon}
+              />
+              <Text style={[styles.reviewerNoteText, { color: theme.text }]}>
+                <Text style={[styles.reviewerNoteBold, { color: theme.textSecondary }]}>Ghi chú: </Text>
+                {item.note}
               </Text>
             </View>
-
-            {distanceMeters != null && (
-              <View
-                style={[
-                  styles.distanceBadge,
-                  {
-                    backgroundColor: isWithinGeofence
-                      ? 'rgba(22, 163, 74, 0.12)'
-                      : theme.backgroundSelected,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={isWithinGeofence ? '#16A34A' : theme.primary}
-                  name={isWithinGeofence ? 'check-circle' : 'navigation-variant'}
-                  size={13}
-                />
-                <Text
-                  style={[
-                    styles.distanceText,
-                    { color: isWithinGeofence ? '#16A34A' : theme.primary },
-                  ]}
-                >
-                  {isWithinGeofence
-                    ? `Cách ${formatDistance(distanceMeters)} • Đủ điều kiện chụp`
-                    : `Cách ${formatDistance(distanceMeters)} • Cần đến gần hơn`}
-                </Text>
-              </View>
-            )}
-          </View>
+          ) : null}
 
           {/* Action Buttons Row */}
           <View style={styles.cardActions}>
@@ -438,6 +445,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     gap: Spacing.three,
+    alignItems: 'center',
   },
   imageWrapper: {
     width: 76,
@@ -446,6 +454,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   signImage: {
     width: '100%',
@@ -460,24 +469,17 @@ const styles = StyleSheet.create({
   cardInfo: {
     flex: 1,
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
   },
-  titleRow: {
+  badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.one,
-  },
-  signTitle: {
-    fontSize: 16,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-    lineHeight: 22,
-    flex: 1,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   codeBadge: {
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 1.5,
     borderRadius: Rounded.sm,
     borderWidth: 1,
   },
@@ -487,12 +489,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reasonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
     borderRadius: Rounded.sm,
   },
   reasonBadgeText: {
@@ -500,38 +498,51 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontWeight: '700',
   },
-  reviewerNote: {
-    fontSize: 12,
+  signTitle: {
+    fontSize: 15,
     fontFamily: Fonts.body,
-    lineHeight: 16,
+    fontWeight: '700',
+    lineHeight: 20,
   },
-  locationRow: {
+  coordsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    paddingTop: Spacing.two,
-  },
-  locationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    gap: 3,
+    marginTop: 2,
+    flexWrap: 'wrap',
   },
   coordsText: {
     fontSize: 11,
     fontFamily: Fonts.mono,
   },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: Rounded.sm,
-  },
-  distanceText: {
+  distanceInlineText: {
     fontSize: 11,
     fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  dotSeparator: {
+    fontSize: 11,
+    marginHorizontal: 1,
+  },
+  reviewerNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 7,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  reviewerNoteIcon: {
+    marginTop: 1,
+  },
+  reviewerNoteText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    lineHeight: 17,
+    flex: 1,
+  },
+  reviewerNoteBold: {
     fontWeight: '700',
   },
   cardActions: {
