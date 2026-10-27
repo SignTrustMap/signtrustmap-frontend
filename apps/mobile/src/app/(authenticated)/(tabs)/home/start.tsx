@@ -1,5 +1,6 @@
-import { NavigationStartScreen } from '@/feature/navigation/pages/navigation-start-screen';
+import { Redirect } from 'expo-router';
 
 export default function NavigationStartRoute() {
-  return <NavigationStartScreen />;
+  return <Redirect href="/home" />;
 }
+

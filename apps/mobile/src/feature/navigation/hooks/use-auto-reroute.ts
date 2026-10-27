@@ -11,6 +11,7 @@ export interface UseAutoRerouteProps {
   userCoordinate?: MapCoordinate;
   routeCoordinates?: MapCoordinate[];
   destinationId?: string;
+  onRerouteTriggered?: (newOrigin: MapCoordinate) => void;
   onRerouteApplied?: (newOrigin: MapCoordinate) => void;
   onClearNavigationError?: () => void;
 }
@@ -22,12 +23,21 @@ export function useAutoReroute({
   userCoordinate,
   routeCoordinates,
   destinationId,
+  onRerouteTriggered,
   onRerouteApplied,
   onClearNavigationError,
 }: UseAutoRerouteProps) {
   const [rerouteOrigin, setRerouteOrigin] = useState<MapCoordinate>();
   const isReroutingRef = useRef(false);
   const consecutiveOffRouteCountRef = useRef(0);
+  const prevRouteKeyRef = useRef<string>("");
+
+  const onRerouteTriggeredRef = useRef(onRerouteTriggered);
+  onRerouteTriggeredRef.current = onRerouteTriggered;
+  const onRerouteAppliedRef = useRef(onRerouteApplied);
+  onRerouteAppliedRef.current = onRerouteApplied;
+  const onClearNavigationErrorRef = useRef(onClearNavigationError);
+  onClearNavigationErrorRef.current = onClearNavigationError;
 
   useEffect(() => {
     if (
@@ -62,7 +72,9 @@ export function useAutoReroute({
       "[GPS] Triggering auto-reroute from current GPS position:",
       userCoordinate,
     );
-    setRerouteOrigin([...userCoordinate]);
+    const newOrigin = [...userCoordinate] as MapCoordinate;
+    setRerouteOrigin(newOrigin);
+    onRerouteTriggeredRef.current?.(newOrigin);
   }, [
     isNavigating,
     isCustomStart,
@@ -71,25 +83,28 @@ export function useAutoReroute({
     routeCoordinates,
   ]);
 
-  // Reset reroute lock and clear rerouteOrigin whenever new route coordinates arrive
+  // Reset reroute lock and clear rerouteOrigin whenever genuinely new route coordinates arrive
   useEffect(() => {
-    if (routeCoordinates?.length) {
+    if (!routeCoordinates?.length) return;
+    const currentRouteKey = `${routeCoordinates[0]?.[0]},${routeCoordinates[0]?.[1]}:${routeCoordinates.length}`;
+    if (prevRouteKeyRef.current !== currentRouteKey) {
+      prevRouteKeyRef.current = currentRouteKey;
       if (rerouteOrigin) {
-        onRerouteApplied?.(rerouteOrigin);
+        onRerouteAppliedRef.current?.(rerouteOrigin);
         setRerouteOrigin(undefined);
       }
       isReroutingRef.current = false;
       consecutiveOffRouteCountRef.current = 0;
     }
-  }, [routeCoordinates, rerouteOrigin, onRerouteApplied]);
+  }, [routeCoordinates, rerouteOrigin]);
 
   // Reset reroute state whenever the core destination changes
   useEffect(() => {
     setRerouteOrigin(undefined);
     isReroutingRef.current = false;
     consecutiveOffRouteCountRef.current = 0;
-    onClearNavigationError?.();
-  }, [destinationId, onClearNavigationError]);
+    onClearNavigationErrorRef.current?.();
+  }, [destinationId]);
 
   const resetReroute = () => {
     setRerouteOrigin(undefined);

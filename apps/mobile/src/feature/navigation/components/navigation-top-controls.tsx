@@ -26,9 +26,9 @@ export interface NavigationTopControlsProps {
   onTopUpPress: () => void;
   onNotificationsPress: () => void;
   onLivestreamPress: () => void;
-  onChangeStartPress: () => void;
+  onChangeStartPress?: () => void;
   onChangeDestinationPress: () => void;
-  onSwapRoutePress: () => void;
+  onSwapRoutePress?: () => void;
 }
 
 export function NavigationTopControls({
@@ -41,9 +41,7 @@ export function NavigationTopControls({
   onTopUpPress,
   onNotificationsPress,
   onLivestreamPress,
-  onChangeStartPress,
   onChangeDestinationPress,
-  onSwapRoutePress,
 }: NavigationTopControlsProps) {
   const theme = useTheme();
 
@@ -57,11 +55,9 @@ export function NavigationTopControls({
           ]}
         >
           <View style={styles.selectedRouteFields}>
-            <AppButton
-              accessibilityLabel="Thay đổi điểm xuất phát"
-              onPress={onChangeStartPress}
+            <View
+              accessibilityLabel="Điểm xuất phát từ vị trí hiện tại"
               style={styles.selectedRouteInput}
-              variant="ghost"
             >
               <View
                 style={[
@@ -73,14 +69,14 @@ export function NavigationTopControls({
                 numberOfLines={1}
                 style={[styles.selectedStartText, { color: theme.text }]}
               >
-                {routeStartTitle}
+                {routeStartTitle || "Vị trí của bạn"}
               </Text>
-            </AppButton>
+            </View>
             <View
               pointerEvents="none"
               style={[
                 styles.routeFieldDivider,
-                { backgroundColor: theme.border },
+                { backgroundColor: theme.border, marginRight: Spacing.two },
               ]}
             />
             <View pointerEvents="none" style={styles.selectedRouteConnector}>
@@ -99,7 +95,7 @@ export function NavigationTopControls({
               onPress={onChangeDestinationPress}
               style={[
                 styles.selectedRouteInput,
-                styles.destinationWithSwap,
+                { paddingRight: Spacing.two },
               ]}
               variant="ghost"
             >
@@ -115,19 +111,6 @@ export function NavigationTopControls({
               </Text>
             </AppButton>
           </View>
-          <AppButton
-            accessibilityLabel="Đổi chiều điểm đi và đến"
-            onPress={onSwapRoutePress}
-            style={styles.routeSwapButton}
-            variant="ghost"
-          >
-            <AntDesign
-              name="swap"
-              size={20}
-              color={theme.text}
-              style={{ transform: [{ rotate: "90deg" }] }}
-            />
-          </AppButton>
         </View>
       ) : selectedDestination ? (
         <View

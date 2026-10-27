@@ -158,27 +158,14 @@ export function NavigationMapScreen() {
     savedRouteData,
   ]);
 
-  const isCustomStart = Boolean(
-    startLat &&
-      startLng &&
-      startTitle !== "Vị trí hiện tại" &&
-      startTitle !== "Current Location" &&
-      startId &&
-      startId !== "current-location",
-  );
-  const customStartCoordinate = useMemo(
-    () =>
-      isCustomStart && startLng && startLat
-        ? ([Number(startLng), Number(startLat)] as MapCoordinate)
-        : undefined,
-    [isCustomStart, startLat, startLng],
-  );
+  const isCustomStart = false;
+  const customStartCoordinate = undefined;
   const fallbackCurrentLocation = useMemo(
     () =>
-      !isCustomStart && startLng && startLat
+      startLng && startLat
         ? ([Number(startLng), Number(startLat)] as MapCoordinate)
         : undefined,
-    [isCustomStart, startLat, startLng],
+    [startLat, startLng],
   );
 
   const { userCoordinate, setUserCoordinate, startGpsListening } =
@@ -217,20 +204,16 @@ export function NavigationMapScreen() {
 
   const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
 
-  const plannedRouteOrigin = isCustomStart
-    ? customStartCoordinate
-    : savedRouteData && !fallbackCurrentLocation
+  const plannedRouteOrigin =
+    savedRouteData && !fallbackCurrentLocation
       ? ([savedRouteData.originLongitude, savedRouteData.originLatitude] as MapCoordinate)
       : (fallbackCurrentLocation ?? initialGpsOrigin);
 
   const routeStartTitle =
-    startTitle ??
-    (isCustomStart
-      ? "Điểm xuất phát"
-      : savedRouteData
-        ? savedRouteData.originName
-        : (resolvedOriginTitle ??
-          (plannedRouteOrigin ? "Vị trí hiện tại" : undefined)));
+    savedRouteData && !fallbackCurrentLocation
+      ? savedRouteData.originName
+      : (resolvedOriginTitle ?? "Vị trí của bạn");
+
 
   const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
   const isMotorcycleMode = vehicleMode === "MOTORCYCLE" || vehicleMode === "BIKE";
@@ -363,17 +346,7 @@ export function NavigationMapScreen() {
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
 
   // Quad query: Fetch Car, Motorcycle, Bicycle, and Walking directions in parallel
-  const { rerouteOrigin, resetReroute } = useAutoReroute({
-    isNavigating,
-    isCustomStart,
-    hasLiveLocation: Boolean(isNavigating && navigationSession?.hasLiveLocation),
-    userCoordinate,
-    routeCoordinates: undefined, // Populated after route query below
-    destinationId: selectedDestination?.id,
-    onRerouteApplied: (newOrigin) => setInitialGpsOrigin(newOrigin),
-    onClearNavigationError: () => setNavigationError(undefined),
-  });
-
+  const [rerouteOrigin, setRerouteOrigin] = useState<MapCoordinate>();
   const activeRouteOrigin = rerouteOrigin ?? plannedRouteOrigin;
 
   const {
@@ -458,6 +431,24 @@ export function NavigationMapScreen() {
     (routeSignsError ? UNABLE_TO_LOAD_SIGNS_FOR_ROUTE_MESSAGE : undefined);
 
   const routeCoordinates = activeRouteResult?.coordinates;
+
+  const { resetReroute } = useAutoReroute({
+    isNavigating,
+    isCustomStart,
+    hasLiveLocation: Boolean(isNavigating && navigationSession?.hasLiveLocation),
+    userCoordinate,
+    routeCoordinates,
+    destinationId: selectedDestination?.id,
+    onRerouteTriggered: (newOrigin) => {
+      setRerouteOrigin(newOrigin);
+    },
+    onRerouteApplied: (newOrigin) => {
+      setRerouteOrigin(undefined);
+      setInitialGpsOrigin(newOrigin);
+    },
+    onClearNavigationError: () => setNavigationError(undefined),
+  });
+
   const routeDistance = activeRouteResult?.distance;
   const routeDuration = activeRouteResult?.duration;
   const routeSteps = activeRouteResult?.steps;
@@ -888,6 +879,10 @@ export function NavigationMapScreen() {
     try {
       const hasPermission = await ensureLocationPermission();
       if (!hasPermission) {
+        setLocationToast({
+          id: Date.now(),
+          message: LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE,
+        });
         setNavigationError(LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE);
         return;
       }
@@ -967,25 +962,6 @@ export function NavigationMapScreen() {
     }
   };
 
-  const handleSwapSelectedRoute = () => {
-    if (!selectedDestination || !plannedRouteOrigin) return;
-    setNavigationSession(undefined);
-    router.replace({
-      pathname: "/home",
-      params: {
-        destinationId: startId ?? "swapped-start",
-        destinationLat: String(plannedRouteOrigin[1]),
-        destinationLng: String(plannedRouteOrigin[0]),
-        destinationTitle: routeStartTitle ?? "Điểm xuất phát",
-        destinationSubtitle: "",
-        startId: selectedDestination.id,
-        startLat: String(selectedDestination.coordinate[1]),
-        startLng: String(selectedDestination.coordinate[0]),
-        startTitle: selectedDestination.title,
-      },
-    });
-  };
-
   const handleCloseRoute = () => {
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
@@ -994,49 +970,22 @@ export function NavigationMapScreen() {
   };
 
   const handleChangeDestination = () => {
-    router.push({
-      pathname: "/home/search",
-      params: {
-        ...(startId ? { startId } : {}),
-        ...(isCustomStart && customStartCoordinate
-          ? {
-              startLat: String(customStartCoordinate[1]),
-              startLng: String(customStartCoordinate[0]),
-              startTitle: startTitle ?? "Starting point",
-            }
-          : {}),
-      },
-    });
+    router.push("/home/search");
   };
 
   const handleGo = async () => {
     if (!selectedDestination) return;
-
-    if (isCustomStart && customStartCoordinate) {
-      return;
-    }
-
-    const destinationParams = {
-      destinationId: selectedDestination.id,
-      destinationLat: String(selectedDestination.coordinate[1]),
-      destinationLng: String(selectedDestination.coordinate[0]),
-      destinationSubtitle: selectedDestination.subtitle,
-      destinationTitle: selectedDestination.title,
-    };
-
-    const navigateToStartSelection = () => {
-      router.push({
-        pathname: "/home/start",
-        params: destinationParams,
-      });
-    };
 
     if (Platform.OS !== "web") {
       setIsStartingNavigation(true);
       try {
         const hasPermission = await ensureLocationPermission();
         if (!hasPermission) {
-          navigateToStartSelection();
+          setLocationToast({
+            id: Date.now(),
+            message: LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE,
+          });
+          setNavigationError(LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE);
           return;
         }
 
@@ -1053,17 +1002,23 @@ export function NavigationMapScreen() {
           return;
         }
 
-        navigateToStartSelection();
+        setLocationToast({
+          id: Date.now(),
+          message: GPS_UNAVAILABLE_MESSAGE,
+        });
+        setNavigationError(GPS_UNAVAILABLE_MESSAGE);
       } catch (error) {
         console.error("[GPS] handleGo error:", error);
-        navigateToStartSelection();
+        setLocationToast({
+          id: Date.now(),
+          message: GPS_UNAVAILABLE_MESSAGE,
+        });
+        setNavigationError(GPS_UNAVAILABLE_MESSAGE);
       } finally {
         setIsStartingNavigation(false);
       }
       return;
     }
-
-    navigateToStartSelection();
   };
 
   return (
@@ -1260,20 +1215,7 @@ export function NavigationMapScreen() {
               onTopUpPress={() => router.push("/credits/top-up")}
               onNotificationsPress={() => router.push("/notifications")}
               onLivestreamPress={handleLivestreamPress}
-              onChangeStartPress={() =>
-                router.push({
-                  pathname: "/home/start",
-                  params: {
-                    destinationId: selectedDestination!.id,
-                    destinationLat: String(selectedDestination!.coordinate[1]),
-                    destinationLng: String(selectedDestination!.coordinate[0]),
-                    destinationSubtitle: selectedDestination!.subtitle,
-                    destinationTitle: selectedDestination!.title,
-                  },
-                })
-              }
               onChangeDestinationPress={handleChangeDestination}
-              onSwapRoutePress={handleSwapSelectedRoute}
             />
 
             <HomeSignFilterCard

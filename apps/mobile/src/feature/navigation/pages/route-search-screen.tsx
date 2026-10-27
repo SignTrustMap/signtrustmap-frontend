@@ -89,9 +89,6 @@ export function RouteSearchScreen() {
         destinationLng: String(destination.longitude),
         destinationSubtitle: destination.address ?? '',
         destinationTitle: destination.title,
-        ...(startId ? { startId } : {}),
-        ...(startLat && startLng ? { startLat, startLng } : {}),
-        ...(startTitle ? { startTitle } : {}),
       },
     });
   };

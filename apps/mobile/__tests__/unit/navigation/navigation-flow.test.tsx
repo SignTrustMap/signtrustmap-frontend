@@ -112,6 +112,14 @@ jest.mock('@/services/maplibre', () => ({
   getMapLibre: jest.fn(() => null),
 }));
 
+jest.mock('@/api/spatial/spatial', () => ({
+  resolveLocation: jest.fn().mockResolvedValue({
+    displayAddress: 'Bitexco Financial Tower',
+    roadName: 'Hai Trieu',
+  }),
+  formatResolvedLocationTitle: jest.fn(() => 'Vị trí hiện tại'),
+}));
+
 // 7. Mock NavigationMapView so we can inspect props passed to the map
 const mockMapProps: any = {};
 jest.mock('@/feature/navigation/components/navigation-map-view', () => ({
@@ -199,26 +207,23 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('user clicks "Start route" when GPS permission is denied: redirects to starting point selection screen', async () => {
+  it('user clicks "Start route" when GPS permission is denied: requires location permission and does not redirect to start selection', async () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(false);
 
-    const { getByLabelText } = await render(<NavigationMapScreen />);
+    const { getByLabelText, findByText } = await render(<NavigationMapScreen />);
 
     const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/home/start',
-        params: {
-          destinationId: 'dest-bitexco',
-          destinationLat: '10.771674',
-          destinationLng: '106.704688',
-          destinationSubtitle: '2 Hai Trieu, Ben Nghe, District 1',
-          destinationTitle: 'Bitexco Financial Tower',
-        },
-      });
+      expect(mockPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/home/start' }),
+      );
     });
+
+    expect(
+      await findByText('Cần cấp quyền truy cập vị trí để bắt đầu điều hướng.'),
+    ).toBeTruthy();
 
     // Route API was never called with any origin
     expect(useGetNavigationRoute).not.toHaveBeenCalledWith(
@@ -228,27 +233,24 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     );
   });
 
-  it('user clicks "Start route" when GPS fix is unavailable: redirects to starting point selection screen', async () => {
+  it('user clicks "Start route" when GPS fix is unavailable: displays error toast and does not redirect to start selection', async () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
     (fetchFreshGpsPosition as jest.Mock).mockResolvedValue(null);
 
-    const { getByLabelText } = await render(<NavigationMapScreen />);
+    const { getByLabelText, findByText } = await render(<NavigationMapScreen />);
 
     const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/home/start',
-        params: {
-          destinationId: 'dest-bitexco',
-          destinationLat: '10.771674',
-          destinationLng: '106.704688',
-          destinationSubtitle: '2 Hai Trieu, Ben Nghe, District 1',
-          destinationTitle: 'Bitexco Financial Tower',
-        },
-      });
+      expect(mockPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/home/start' }),
+      );
     });
+
+    expect(
+      await findByText('Không thể lấy vị trí hiện tại của bạn. Vui lòng bật Vị trí/GPS và thử lại.'),
+    ).toBeTruthy();
   });
 
   describe('Vehicle mode switching', () => {
