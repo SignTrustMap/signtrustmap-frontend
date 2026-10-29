@@ -29,16 +29,19 @@ export type ReviewHistoryItem = {
 
 const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') || process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') || 'https://s3.signmap.site';
 
+const KNOWN_BUCKETS = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs', 'stm-raw-images'];
+
 export function resolveS3Url(url?: string | null): string {
   if (!url) return '';
+  if (url.startsWith('file://') || url.startsWith('content://')) return url;
   if (url.startsWith('https://cdn.signmap.site/')) {
     const rawPath = url.slice('https://cdn.signmap.site/'.length).replace(/^\/+/, '');
-    const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => rawPath.startsWith(b + '/'));
+    const hasBucket = KNOWN_BUCKETS.some((b) => rawPath.startsWith(b + '/'));
     return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${rawPath}`;
   }
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   const clean = url.replace(/^\/+/, '');
-  const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => clean.startsWith(b + '/'));
+  const hasBucket = KNOWN_BUCKETS.some((b) => clean.startsWith(b + '/'));
   return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${clean}`;
 }
 

@@ -19,6 +19,7 @@ import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { formatDate } from '@/utils/format-date';
 import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
@@ -444,12 +445,15 @@ export function SurveyRecordDetailsScreen() {
     setActiveSubmissionId(targetId);
   };
 
-  const remoteGpx = draftQuery.data?.mediaFiles?.find((f) => f.media_type === 'GPX');
+  const remoteGpx = draftQuery.data?.mediaFiles?.find(
+    (f: any) => (f.mediaType || f.media_type) === 'GPX',
+  );
+  const remoteGpxUrl = remoteGpx ? (remoteGpx.fileUrl || remoteGpx.file_url) : undefined;
   const activeGpxUri = gpxUri || savedGpxUri;
   const activeGpxName = gpxName || savedGpxName;
   const displayGpxName = activeGpxName
     || (activeGpxUri ? activeGpxUri.split('/').pop()?.split('?')[0] : undefined)
-    || (remoteGpx ? (remoteGpx.file_url?.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
+    || (remoteGpxUrl ? (remoteGpxUrl.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
 
   const handleOpenRouteMap = () => {
     router.push({
@@ -621,8 +625,13 @@ export function SurveyRecordDetailsScreen() {
       }
       setCoordinateSource(hasCoordinate ? (draft.coordinateSource ?? 'IMAGE_EXIF') : undefined);
       setLocationMessage(hasCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE);
-      const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')?.file_url;
-      setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
+      const remoteItem = draftQuery.data?.mediaFiles?.find((file: any) => {
+        const type = (file.mediaType || file.media_type || '').toUpperCase();
+        return type === 'IMAGE' || type === 'VIDEO';
+      });
+      const remoteKey = remoteItem ? (remoteItem.fileUrl || remoteItem.file_url) : undefined;
+      const remoteResolved = remoteKey ? resolveS3Url(remoteKey) : undefined;
+      setImageUri(local?.uri ?? remoteResolved);
       setImageName(local?.fileName);
       setImageMimeType(local?.mimeType);
       if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
@@ -834,10 +843,16 @@ export function SurveyRecordDetailsScreen() {
         const { submissionType: _submissionType, ...updates } = request;
         await updateSubmission({ submissionId: currentDraftId, request: updates });
 
-        const mediaFiles = draftQuery.data?.mediaFiles ?? [];
-        const sessions = draftQuery.data?.sessions ?? [];
-        const hasMainMedia = mediaFiles.some((file) => file.media_type === 'IMAGE')
-          || sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
+        const mediaFiles = (draftQuery.data?.mediaFiles ?? []) as any[];
+        const sessions = (draftQuery.data?.sessions ?? []) as any[];
+        const hasMainMedia = mediaFiles.some((file) => {
+          const type = (file.mediaType || file.media_type || '').toUpperCase();
+          return type === 'IMAGE';
+        })
+          || sessions.some((upload) => {
+            const type = (upload.mediaType || upload.media_type || '').toUpperCase();
+            return type === 'IMAGE' && upload.status === 'COMPLETED';
+          });
 
         if (!hasMainMedia) {
           if (!imageUri) throw new Error(DRAFT_NO_UPLOADED_MEDIA_MESSAGE);
@@ -1113,7 +1128,10 @@ export function SurveyRecordDetailsScreen() {
             )}
           </View>
 
-          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO') && !imageUri ? (
+          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file: any) => {
+            const type = (file.mediaType || file.media_type || '').toUpperCase();
+            return type === 'IMAGE' || type === 'VIDEO';
+          }) && !imageUri ? (
             <AppButton label="Chọn phương tiện bản nháp" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: currentDraftId } })} />
           ) : null}
           <View style={styles.section}>
