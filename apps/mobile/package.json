@@ -65,7 +65,15 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "pretypecheck": "expo customize tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e:survey": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/survey-record-flow.yaml",
+    "test:e2e:upload": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/survey-record-flow.yaml",
+    "test:e2e:login": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/login-flow.yaml",
+    "test:e2e:reviewer": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/reviewer-flow.yaml",
+    "test:e2e:reval": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/revalidation-review-flow.yaml",
+    "test:e2e:navigation": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e/navigation-flow.yaml",
+    "test:e2e": "maestro test --test-output-dir __tests__/report --format HTML __tests__/e2e",
+    "maestro:studio": "maestro studio"
   },
   "private": true
 }

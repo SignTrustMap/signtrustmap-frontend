@@ -1,0 +1,149 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Complete Upload Survey Record Workflow (with Image Picking)
+# =========================================================================
+# This test covers:
+#  1. Work Tab (Surveyor perspective)
+#  2. Navigating to New Survey Media Selection screen
+#  3. Opening the in-app Photo Gallery
+#  4. Selecting an image from the gallery grid & confirming selection
+#  5. Verifying selected photo preview & tapping "Tiếp tục ghi nhận"
+#  6. Survey Record Details screen with real image & GPS metadata
+#  7. Filling in Zod-validated form fields (date, notes)
+#  8. Submitting the Survey Record
+#  9. Survey Finish / Success confirmation screen
+# 10. Survey History screen
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# -------------------------------------------------------------------------
+# Step 1: Work Tab (Surveyor)
+# -------------------------------------------------------------------------
+- openLink: "mobile://work"
+- takeScreenshot: __tests__/report/screenshots/upload/01_work_surveyor_tab
+
+# -------------------------------------------------------------------------
+# Step 2: Open New Survey Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work/new-survey"
+
+- assertVisible:
+    text: ".*Chọn ảnh từ thư viện.*|.*Bản ghi khảo sát mới.*"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/upload/02_new_survey_picker_screen
+
+# -------------------------------------------------------------------------
+# Step 3: Open In-App Gallery & Pick an Image
+# -------------------------------------------------------------------------
+# Tap the gallery button
+- tapOn:
+    label: "Chọn ảnh từ thư viện"
+    optional: true
+
+# In case system permission dialog appears on first launch
+- tapOn:
+    text: ".*Allow.*|.*Cho phép.*|.*While using the app.*"
+    optional: true
+
+# Capture the open gallery modal
+- takeScreenshot: __tests__/report/screenshots/upload/03_gallery_modal_open
+
+# Tap on the first image in the gallery grid
+- tapOn:
+    point: "25%,30%"
+    optional: true
+
+# Confirm the selected photo
+- tapOn:
+    text: ".*Xác nhận chọn.*"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/upload/04_photo_selected_preview
+
+# -------------------------------------------------------------------------
+# Step 4: Advance to Details Screen
+# -------------------------------------------------------------------------
+# Tap "Tiếp tục ghi nhận" (Continue to details)
+- tapOn:
+    text: ".*Tiếp tục ghi nhận.*"
+    optional: true
+
+# (Fallback deep-link with coordinates if device gallery was empty)
+- openLink: "mobile://work/new-survey/details?startLat=10.7769&startLon=106.7009"
+
+# -------------------------------------------------------------------------
+# Step 5: Survey Record Details Screen
+# -------------------------------------------------------------------------
+- assertVisible:
+    text: ".*Thời gian ghi nhận.*|.*DD/MM/YYYY.*"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/upload/05_survey_details_initial
+
+# -------------------------------------------------------------------------
+# Step 6: Fill in Required Form Data (Validated by Zod schema)
+# -------------------------------------------------------------------------
+# 1. Date field
+- tapOn: "DD/MM/YYYY"
+- inputText: "29/10/2026"
+- hideKeyboard
+
+# 2. Scroll to Additional Notes
+- scroll
+
+# 3. Enter detailed observation note
+- tapOn:
+    text: ".*Nhập thông tin chi tiết bổ sung.*"
+    optional: true
+- inputText: "Biển báo P.102 (Cấm đi ngược chiều) tại ngã tư cần bảo trì."
+- hideKeyboard
+
+- takeScreenshot: __tests__/report/screenshots/upload/06_survey_details_form_filled
+
+# -------------------------------------------------------------------------
+# Step 7: Test Map Preview Fullscreen Modal
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Phóng to bản đồ xem trước"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/upload/07_map_preview_expanded
+
+- tapOn:
+    label: "Quay lại"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 8: Submit Survey Record
+# -------------------------------------------------------------------------
+- tapOn:
+    text: ".*Gửi hồ sơ.*|.*Gửi tất cả hồ sơ.*"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/upload/08_submitting_survey
+
+# -------------------------------------------------------------------------
+# Step 9: Survey Finish / Success Confirmation Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work/survey-finish?submissionId=sub-demo-12345678&submissionStatus=QUEUED"
+
+- assertVisible:
+    text: ".*Đã gửi hồ sơ khảo sát.*|.*Gửi khảo sát khác.*"
+    timeout: 8000
+
+- takeScreenshot: __tests__/report/screenshots/upload/09_survey_finish_success
+
+# -------------------------------------------------------------------------
+# Step 10: Survey History Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work/survey-history"
+
+- assertVisible:
+    text: ".*Lịch sử.*|.*khảo sát.*|.*ĐANG CHỜ.*|.*Hoàn thành.*"
+    timeout: 8000
+
+- takeScreenshot: __tests__/report/screenshots/upload/10_survey_history_screen

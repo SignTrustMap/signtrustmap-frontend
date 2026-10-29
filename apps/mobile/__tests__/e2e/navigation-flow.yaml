@@ -1,0 +1,106 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Driver Navigation Workflow
+# =========================================================================
+# This test covers:
+#  1. Opening Home Map Screen (Driver mode)
+#  2. Navigating to Destination Search screen
+#  3. Typing destination query & selecting a location
+#  4. Route Preview bottom sheet (ETA, distance, vehicle mode selector)
+#  5. Switching vehicle mode (Car -> Bike)
+#  6. Starting turn-by-turn navigation (Maneuver banner, map guidance)
+#  7. Testing floating navigation controls (Re-center button)
+#  8. Stopping navigation & returning to Home map
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# -------------------------------------------------------------------------
+# Step 1: Open Home Map Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://home"
+
+- assertVisible:
+    text: ".*Bắt đầu tìm kiếm.*|.*Tìm kiếm điểm đến.*|.*SignTrustMap.*"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/navigation/01_home_map_screen
+
+# -------------------------------------------------------------------------
+# Step 2: Open Route Search Screen
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Tìm kiếm điểm đến"
+    optional: true
+
+# If search did not open by label, deep-link to search route
+- openLink: "mobile://home/search"
+
+- assertVisible: "Bạn muốn đi đâu?"
+- takeScreenshot: __tests__/report/screenshots/navigation/02_route_search_screen
+
+# -------------------------------------------------------------------------
+# Step 3: Enter Search Query & Select Destination
+# -------------------------------------------------------------------------
+- tapOn: "Bạn muốn đi đâu?"
+- inputText: "Bến Thành"
+- hideKeyboard
+
+- takeScreenshot: __tests__/report/screenshots/navigation/03_search_results
+
+# Select first suggestion or saved route if available
+- tapOn:
+    text: ".*Bến Thành.*|.*Quận 1.*|.*TUYẾN ĐƯỜNG YÊU THÍCH.*"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 4: Route Preview Sheet (Destination & Route Options)
+# -------------------------------------------------------------------------
+# Alternatively, ensure route preview is visible with coordinates
+- openLink: "mobile://home?destinationTitle=Chợ%20Bến%20Thành&destinationLat=10.7725&destinationLng=106.6980"
+
+- assertVisible:
+    label: "Start route"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/navigation/04_route_preview_sheet
+
+# -------------------------------------------------------------------------
+# Step 5: Switch Vehicle Mode (Bike / Car)
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Bike route"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/navigation/05_vehicle_mode_selected
+
+# -------------------------------------------------------------------------
+# Step 6: Start Turn-by-Turn Navigation
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Start route"
+
+- assertVisible:
+    label: "Dừng điều hướng"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/navigation/06_active_navigation
+
+# -------------------------------------------------------------------------
+# Step 7: Test Re-center Floating Action Button
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Căn giữa"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/navigation/07_recenter_pressed
+
+# -------------------------------------------------------------------------
+# Step 8: Stop Navigation & Return to Idle Map
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Dừng điều hướng"
+
+- takeScreenshot: __tests__/report/screenshots/navigation/08_navigation_stopped

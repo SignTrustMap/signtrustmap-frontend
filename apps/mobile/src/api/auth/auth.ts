@@ -97,3 +97,81 @@ export async function getProfile(accessToken: string): Promise<UserProfileRespon
   return jsonApiRequest<UserProfileResponse>('/auth/me', undefined, accessToken, undefined, 'GET');
 }
 
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ForgotPasswordResponse = {
+  sent: boolean;
+  message?: string;
+  otp?: string;
+  expiresAt?: string | Date;
+};
+
+export type VerifyOtpRequest = {
+  email: string;
+  otp: string;
+};
+
+export type VerifyOtpResponse = {
+  valid: boolean;
+  email: string;
+};
+
+export type ResendOtpRequest = {
+  email: string;
+};
+
+export type ResendOtpResponse = {
+  sent: boolean;
+  message?: string;
+  otp?: string;
+  expiresAt?: string | Date;
+};
+
+export type ResetPasswordRequest = {
+  email: string;
+  otp: string;
+  newPassword: string;
+};
+
+export type ResetPasswordResponse = {
+  reset: boolean;
+  message?: string;
+};
+
+export async function forgotPassword(
+  request: ForgotPasswordRequest,
+): Promise<ForgotPasswordResponse> {
+  return jsonApiRequest<ForgotPasswordResponse>(API_PATHS.AUTH_FORGOT_PASSWORD, {
+    email: request.email.trim(),
+  });
+}
+
+export async function verifyOtp(
+  request: VerifyOtpRequest,
+): Promise<VerifyOtpResponse> {
+  return jsonApiRequest<VerifyOtpResponse>(API_PATHS.AUTH_VERIFY_OTP, {
+    email: request.email.trim(),
+    otp: request.otp.trim(),
+  });
+}
+
+export async function resendOtp(
+  request: ResendOtpRequest,
+): Promise<ResendOtpResponse> {
+  return jsonApiRequest<ResendOtpResponse>(API_PATHS.AUTH_RESEND_OTP, {
+    email: request.email.trim(),
+  });
+}
+
+export async function resetPassword(
+  request: ResetPasswordRequest,
+): Promise<ResetPasswordResponse> {
+  return jsonApiRequest<ResetPasswordResponse>(API_PATHS.AUTH_RESET_PASSWORD, {
+    email: request.email.trim(),
+    otp: request.otp.trim(),
+    newPassword: request.newPassword,
+  });
+}
+

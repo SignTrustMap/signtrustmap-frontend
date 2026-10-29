@@ -1,0 +1,31 @@
+appId: com.anonymous.mobile
+---
+# ==========================================
+# Maestro E2E: Login Flow
+# ==========================================
+
+- launchApp:
+    clearState: false
+
+# Navigate to Login or launch root
+- openLink: "mobile://login"
+
+# 1. Capture Login Screen
+- takeScreenshot: __tests__/report/screenshots/01_login_screen
+
+# 2. Tap on Email field
+- tapOn:
+    text: ".*Email.*"
+    optional: true
+- inputText: "test@signtrustmap.vn"
+- hideKeyboard
+
+# 3. Tap on Password field
+- tapOn:
+    text: ".*Mật khẩu.*"
+    optional: true
+- inputText: "Pass123456@"
+- hideKeyboard
+
+# 4. Capture filled login screen
+- takeScreenshot: __tests__/report/screenshots/02_login_filled

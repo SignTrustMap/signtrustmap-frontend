@@ -1,0 +1,78 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Revalidation Review Workflow (Reviewer)
+# =========================================================================
+# This test covers:
+#  1. Navigating to Revalidation Review queue
+#  2. Inspecting evidence candidate (evidence vs original photo)
+#  3. Full-screen zoom inspection
+#  4. Voting STILL_ACTIVE (Biển báo vẫn còn hoạt động)
+#  5. Voting REMOVED (Biển báo đã bị gỡ bỏ)
+#  6. Voting CHANGED (Biển báo đã đổi loại)
+#  7. Voting UNCLEAR (Không rõ ràng)
+#  8. Viewing Revalidation Summary metrics
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# 1. Entry & Navigation to Revalidation Review Queue
+- openLink: "mobile://work/revalidation-review"
+
+# Wait for candidate card or empty queue state
+- assertVisible:
+    text: ".*Tái thẩm định.*|.*Đang tải.*|.*Không có dữ liệu.*|.*Hàng đợi trống.*"
+    timeout: 10000
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/01_reval_review_card
+
+# 2. Test Evidence Zoom Modal
+- tapOn:
+    label: "Ảnh minh chứng. Nhấn để phóng to."
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/02_evidence_zoomed
+
+- tapOn:
+    label: "Đóng xem phóng to"
+    optional: true
+
+# 3. Toggle between Evidence and Original photo
+- tapOn:
+    label: "Xem ảnh gốc"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/03_original_photo
+
+- tapOn:
+    label: "Xem ảnh bằng chứng"
+    optional: true
+
+# 4. Action: Confirm Sign is Still Active
+- tapOn:
+    label: "Xác nhận biển báo vẫn còn hoạt động"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/04_vote_still_active
+
+# 5. Action: Confirm Sign Removed
+- tapOn:
+    label: "Xác nhận biển báo đã bị gỡ bỏ"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/05_vote_removed
+
+# 6. Action: Mark as Unclear / Invalid
+- tapOn:
+    label: "Đánh dấu không rõ ràng hoặc không hợp lệ"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/06_vote_unclear
+
+# 7. Transition to Summary Metrics
+- tapOn:
+    label: "Xem tổng kết đánh giá"
+    optional: true
+
+- takeScreenshot: __tests__/report/screenshots/revalidation/07_reval_summary

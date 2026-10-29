@@ -258,6 +258,7 @@ export default function LoginScreen() {
                     accessibilityLabel="Quên mật khẩu?"
                     accessibilityRole="button"
                     hitSlop={6}
+                    onPress={() => router.push('/forgot-password')}
                   >
                     <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
                   </Pressable>
