@@ -23,7 +23,6 @@ appId: com.anonymous.mobile
 # Step 1: Work Tab (Surveyor)
 # -------------------------------------------------------------------------
 - openLink: "mobile://work"
-- takeScreenshot: __tests__/report/screenshots/upload/01_work_surveyor_tab
 
 # -------------------------------------------------------------------------
 # Step 2: Open New Survey Screen
@@ -32,8 +31,6 @@ appId: com.anonymous.mobile
 
 - assertVisible:
     text: ".*Chọn ảnh từ thư viện.*|.*Bản ghi khảo sát mới.*"
-
-- takeScreenshot: __tests__/report/screenshots/upload/02_new_survey_picker_screen
 
 # -------------------------------------------------------------------------
 # Step 3: Open In-App Gallery & Pick an Image
@@ -48,9 +45,6 @@ appId: com.anonymous.mobile
     text: ".*Allow.*|.*Cho phép.*|.*While using the app.*"
     optional: true
 
-# Capture the open gallery modal
-- takeScreenshot: __tests__/report/screenshots/upload/03_gallery_modal_open
-
 # Tap on the first image in the gallery grid
 - tapOn:
     point: "25%,30%"
@@ -60,8 +54,6 @@ appId: com.anonymous.mobile
 - tapOn:
     text: ".*Xác nhận chọn.*"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/upload/04_photo_selected_preview
 
 # -------------------------------------------------------------------------
 # Step 4: Advance to Details Screen
@@ -79,8 +71,6 @@ appId: com.anonymous.mobile
 # -------------------------------------------------------------------------
 - assertVisible:
     text: ".*Thời gian ghi nhận.*|.*DD/MM/YYYY.*"
-
-- takeScreenshot: __tests__/report/screenshots/upload/05_survey_details_initial
 
 # -------------------------------------------------------------------------
 # Step 6: Fill in Required Form Data (Validated by Zod schema)
@@ -100,16 +90,12 @@ appId: com.anonymous.mobile
 - inputText: "Biển báo P.102 (Cấm đi ngược chiều) tại ngã tư cần bảo trì."
 - hideKeyboard
 
-- takeScreenshot: __tests__/report/screenshots/upload/06_survey_details_form_filled
-
 # -------------------------------------------------------------------------
 # Step 7: Test Map Preview Fullscreen Modal
 # -------------------------------------------------------------------------
 - tapOn:
     label: "Phóng to bản đồ xem trước"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/upload/07_map_preview_expanded
 
 - tapOn:
     label: "Quay lại"
@@ -122,8 +108,6 @@ appId: com.anonymous.mobile
     text: ".*Gửi hồ sơ.*|.*Gửi tất cả hồ sơ.*"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/upload/08_submitting_survey
-
 # -------------------------------------------------------------------------
 # Step 9: Survey Finish / Success Confirmation Screen
 # -------------------------------------------------------------------------
@@ -132,8 +116,6 @@ appId: com.anonymous.mobile
 - assertVisible:
     text: ".*Đã gửi hồ sơ khảo sát.*|.*Gửi khảo sát khác.*"
 
-- takeScreenshot: __tests__/report/screenshots/upload/09_survey_finish_success
-
 # -------------------------------------------------------------------------
 # Step 10: Survey History Screen
 # -------------------------------------------------------------------------
@@ -141,5 +123,3 @@ appId: com.anonymous.mobile
 
 - assertVisible:
     text: ".*Lịch sử.*|.*khảo sát.*|.*ĐANG CHỜ.*|.*Hoàn thành.*"
-
-- takeScreenshot: __tests__/report/screenshots/upload/10_survey_history_screen

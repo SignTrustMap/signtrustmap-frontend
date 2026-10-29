@@ -59,12 +59,14 @@ export function NavigationTopControls({
               accessibilityLabel="Điểm xuất phát từ vị trí hiện tại"
               style={styles.selectedRouteInput}
             >
-              <View
-                style={[
-                  styles.routeOriginCircle,
-                  { borderColor: theme.textSecondary },
-                ]}
-              />
+              <View style={styles.routeIconWrapper}>
+                <View
+                  style={[
+                    styles.routeOriginCircle,
+                    { borderColor: theme.primary },
+                  ]}
+                />
+              </View>
               <Text
                 numberOfLines={1}
                 style={[styles.selectedStartText, { color: theme.text }]}
@@ -76,7 +78,7 @@ export function NavigationTopControls({
               pointerEvents="none"
               style={[
                 styles.routeFieldDivider,
-                { backgroundColor: theme.border, marginRight: Spacing.two },
+                { backgroundColor: theme.border },
               ]}
             />
             <View pointerEvents="none" style={styles.selectedRouteConnector}>
@@ -99,7 +101,9 @@ export function NavigationTopControls({
               ]}
               variant="ghost"
             >
-              <AntDesign name="environment" size={17} color={theme.danger} />
+              <View style={styles.routeIconWrapper}>
+                <AntDesign name="environment" size={18} color={theme.danger} />
+              </View>
               <Text
                 numberOfLines={1}
                 style={[

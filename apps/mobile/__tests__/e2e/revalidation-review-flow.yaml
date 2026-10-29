@@ -24,14 +24,10 @@ appId: com.anonymous.mobile
 - assertVisible:
     text: ".*Tái thẩm định.*|.*Đang tải.*|.*Không có dữ liệu.*|.*Hàng đợi trống.*"
 
-- takeScreenshot: __tests__/report/screenshots/revalidation/01_reval_review_card
-
 # 2. Test Evidence Zoom Modal
 - tapOn:
     label: "Ảnh minh chứng. Nhấn để phóng to."
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/revalidation/02_evidence_zoomed
 
 - tapOn:
     label: "Đóng xem phóng to"
@@ -42,8 +38,6 @@ appId: com.anonymous.mobile
     label: "Xem ảnh gốc"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/revalidation/03_original_photo
-
 - tapOn:
     label: "Xem ảnh bằng chứng"
     optional: true
@@ -53,25 +47,17 @@ appId: com.anonymous.mobile
     label: "Xác nhận biển báo vẫn còn hoạt động"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/revalidation/04_vote_still_active
-
 # 5. Action: Confirm Sign Removed
 - tapOn:
     label: "Xác nhận biển báo đã bị gỡ bỏ"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/revalidation/05_vote_removed
 
 # 6. Action: Mark as Unclear / Invalid
 - tapOn:
     label: "Đánh dấu không rõ ràng hoặc không hợp lệ"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/revalidation/06_vote_unclear
-
 # 7. Transition to Summary Metrics
 - tapOn:
     label: "Xem tổng kết đánh giá"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/revalidation/07_reval_summary

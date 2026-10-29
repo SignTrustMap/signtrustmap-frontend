@@ -22,7 +22,6 @@ appId: com.anonymous.mobile
 # Step 1: Navigate to the Work tab and Reviewer screen
 # -------------------------------------------------------------------------
 - openLink: "mobile://work"
-- takeScreenshot: __tests__/report/screenshots/reviewer/01_work_reviewer_tab
 
 # Deep-link directly to submission review queue
 - openLink: "mobile://work/submission-review"
@@ -34,16 +33,12 @@ appId: com.anonymous.mobile
 - assertVisible:
     text: ".*REVIEWING.*|.*Thẩm định.*|.*All reviews completed.*"
 
-- takeScreenshot: __tests__/report/screenshots/reviewer/02_review_card_initial
-
 # -------------------------------------------------------------------------
 # Step 3: Test Image Zoom Modal
 # -------------------------------------------------------------------------
 - tapOn:
     label: "Ảnh biển báo. Chạm để phóng to."
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/reviewer/03_review_image_zoomed
 
 # Close the zoom modal
 - tapOn:
@@ -57,8 +52,6 @@ appId: com.anonymous.mobile
     label: "Approve submission"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/reviewer/04_after_approve
-
 # -------------------------------------------------------------------------
 # Step 5: Test Undo action
 # -------------------------------------------------------------------------
@@ -66,16 +59,12 @@ appId: com.anonymous.mobile
     label: "Undo last review action"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/reviewer/05_after_undo
-
 # -------------------------------------------------------------------------
 # Step 6: Test Decline with Remedy Selection
 # -------------------------------------------------------------------------
 - tapOn:
     label: "Decline submission"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/reviewer/06_decline_remedy_sheet
 
 # Select a remedy sign or decline reason if sheet is open
 - tapOn:
@@ -87,16 +76,12 @@ appId: com.anonymous.mobile
     text: ".*Xác nhận chọn.*|.*Xác nhận từ chối.*"
     optional: true
 
-- takeScreenshot: __tests__/report/screenshots/reviewer/07_after_decline_confirmed
-
 # -------------------------------------------------------------------------
 # Step 7: Test Skip action
 # -------------------------------------------------------------------------
 - tapOn:
     label: "Skip submission (cannot identify)"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/reviewer/08_after_skip
 
 # -------------------------------------------------------------------------
 # Step 8: Transition to Submission Summary Screen
@@ -112,13 +97,9 @@ appId: com.anonymous.mobile
 - assertVisible:
     text: ".*TỔNG KẾT.*|.*PHÊ DUYỆT.*|.*TỪ CHỐI.*|.*BỎ QUA.*|.*Kiểm tra lại hồ sơ.*"
 
-- takeScreenshot: __tests__/report/screenshots/reviewer/09_submission_summary_screen
-
 # -------------------------------------------------------------------------
 # Step 9: Finish the review batch
 # -------------------------------------------------------------------------
 - tapOn:
     text: "Hoàn tất"
     optional: true
-
-- takeScreenshot: __tests__/report/screenshots/reviewer/10_review_completed

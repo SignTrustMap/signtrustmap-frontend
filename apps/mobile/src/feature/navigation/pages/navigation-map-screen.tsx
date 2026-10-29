@@ -98,6 +98,7 @@ export function NavigationMapScreen() {
     startLat,
     startLng,
     startTitle,
+    vehicleMode: paramVehicleMode,
   } = useLocalSearchParams<{
     destinationId?: string;
     destinationLat?: string;
@@ -109,6 +110,7 @@ export function NavigationMapScreen() {
     startLat?: string;
     startLng?: string;
     startTitle?: string;
+    vehicleMode?: string;
   }>();
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
@@ -210,12 +212,32 @@ export function NavigationMapScreen() {
       : (fallbackCurrentLocation ?? initialGpsOrigin);
 
   const routeStartTitle =
-    savedRouteData && !fallbackCurrentLocation
+    startTitle ||
+    (savedRouteData && !fallbackCurrentLocation
       ? savedRouteData.originName
-      : (resolvedOriginTitle ?? "Vị trí của bạn");
+      : (resolvedOriginTitle ?? "Vị trí của bạn"));
 
 
-  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>("DRIVING");
+  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>(() => {
+    if (paramVehicleMode) {
+      const mode = paramVehicleMode.toUpperCase();
+      if (mode === "CAR" || mode === "DRIVING") return "DRIVING";
+      if (mode === "CYCLING" || mode === "BICYCLE") return "CYCLING";
+      if (mode === "WALKING" || mode === "PEDESTRIAN") return "WALKING";
+      if (mode === "BIKE" || mode === "MOTORCYCLE") return "BIKE";
+    }
+    return "DRIVING";
+  });
+
+  useEffect(() => {
+    if (paramVehicleMode) {
+      const mode = paramVehicleMode.toUpperCase();
+      if (mode === "CAR" || mode === "DRIVING") setVehicleMode("DRIVING");
+      else if (mode === "CYCLING" || mode === "BICYCLE") setVehicleMode("CYCLING");
+      else if (mode === "WALKING" || mode === "PEDESTRIAN") setVehicleMode("WALKING");
+      else if (mode === "BIKE" || mode === "MOTORCYCLE") setVehicleMode("BIKE");
+    }
+  }, [paramVehicleMode]);
   const isMotorcycleMode = vehicleMode === "MOTORCYCLE" || vehicleMode === "BIKE";
   const session = useOptionalSession()?.session;
 

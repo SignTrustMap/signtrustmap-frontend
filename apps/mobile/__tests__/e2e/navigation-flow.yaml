@@ -28,8 +28,6 @@ appId: com.anonymous.mobile
 
 - waitForAnimationToEnd
 
-- takeScreenshot: __tests__/report/screenshots/navigation/01_home_map_screen
-
 # -------------------------------------------------------------------------
 # Step 2: Open Route Search Screen
 # -------------------------------------------------------------------------
@@ -41,8 +39,6 @@ appId: com.anonymous.mobile
     id: "input-route-search"
 
 - waitForAnimationToEnd
-
-- takeScreenshot: __tests__/report/screenshots/navigation/02_route_search_screen
 
 # -------------------------------------------------------------------------
 # Step 3: Enter Search Query & Wait for API results
@@ -57,8 +53,6 @@ appId: com.anonymous.mobile
     text: ".*KẾT QUẢ TÌM KIẾM.*|.*Bến Thành.*"
 
 - waitForAnimationToEnd
-
-- takeScreenshot: __tests__/report/screenshots/navigation/03_search_results
 
 # -------------------------------------------------------------------------
 # Step 4: Select Destination & Route Preview Sheet
@@ -77,8 +71,6 @@ appId: com.anonymous.mobile
 
 - waitForAnimationToEnd
 
-- takeScreenshot: __tests__/report/screenshots/navigation/04_route_preview_sheet
-
 # -------------------------------------------------------------------------
 # Step 5: Switch Vehicle Mode (Motorcycle tab)
 # -------------------------------------------------------------------------
@@ -86,8 +78,6 @@ appId: com.anonymous.mobile
     id: "vehicle-tab-bike"
 
 - waitForAnimationToEnd
-
-- takeScreenshot: __tests__/report/screenshots/navigation/05_vehicle_mode_selected
 
 # -------------------------------------------------------------------------
 # Step 6: Start Turn-by-Turn Navigation
@@ -101,8 +91,6 @@ appId: com.anonymous.mobile
 
 - waitForAnimationToEnd
 
-- takeScreenshot: __tests__/report/screenshots/navigation/06_active_navigation
-
 # -------------------------------------------------------------------------
 # Step 7: Test Floating Map Controls (Căn giữa)
 # -------------------------------------------------------------------------
@@ -110,8 +98,6 @@ appId: com.anonymous.mobile
     id: "btn-recenter-map"
 
 - waitForAnimationToEnd
-
-- takeScreenshot: __tests__/report/screenshots/navigation/07_recenter_pressed
 
 # -------------------------------------------------------------------------
 # Step 8: Stop Navigation & Return to Idle Map
@@ -124,5 +110,3 @@ appId: com.anonymous.mobile
     id: "btn-search-destination"
 
 - waitForAnimationToEnd
-
-- takeScreenshot: __tests__/report/screenshots/navigation/08_navigation_stopped

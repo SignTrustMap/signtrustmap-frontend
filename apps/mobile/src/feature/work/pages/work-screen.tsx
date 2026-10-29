@@ -479,13 +479,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                 subtitle="Xem lại các lộ trình và chuyến đi bạn đã điều hướng"
               />
 
-              <WorkActionCard
+              {/* <WorkActionCard
                 accentColor={theme.primary}
                 icon="video-outline"
                 label="Biển báo đã ghi nhận"
                 onPress={() => router.push('/work/recorded-signs')}
                 subtitle="Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn"
-              />
+              /> */}
 
               {/* Action Card: Sign Catalog */}
               <WorkActionCard
