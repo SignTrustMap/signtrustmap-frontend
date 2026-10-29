@@ -29,7 +29,16 @@
     "test:ci": "jest --watchAll=false",
     "test:coverage": "jest --coverage --watchAll=false",
     "test:integration": "jest apps/mobile/__tests__/intergration --watchAll=false",
-    "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui --watchAll=false"
+    "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui --watchAll=false",
+    "test:e2e:upload": "npm run test:e2e:upload --workspace=mobile",
+    "test:e2e:survey": "npm run test:e2e:survey --workspace=mobile",
+    "test:e2e:reviewer": "npm run test:e2e:reviewer --workspace=mobile",
+    "test:e2e:reval": "npm run test:e2e:reval --workspace=mobile",
+    "test:e2e:navigation": "npm run test:e2e:navigation --workspace=mobile",
+    "test:e2e:screens": "npm run test:e2e:screens --workspace=mobile",
+    "test:e2e:login": "npm run test:e2e:login --workspace=mobile",
+    "test:e2e": "npm run test:e2e --workspace=mobile",
+    "maestro:studio": "npm run maestro:studio --workspace=mobile"
   },
   "repository": {
     "type": "git",

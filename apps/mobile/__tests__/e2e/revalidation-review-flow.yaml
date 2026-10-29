@@ -23,7 +23,6 @@ appId: com.anonymous.mobile
 # Wait for candidate card or empty queue state
 - assertVisible:
     text: ".*Tái thẩm định.*|.*Đang tải.*|.*Không có dữ liệu.*|.*Hàng đợi trống.*"
-    timeout: 10000
 
 - takeScreenshot: __tests__/report/screenshots/revalidation/01_reval_review_card
 

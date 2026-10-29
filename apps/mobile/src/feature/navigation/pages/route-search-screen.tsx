@@ -100,6 +100,7 @@ export function RouteSearchScreen() {
           <AppInput
             ref={inputRef}
             accessibilityLabel="Tìm kiếm điểm đến"
+            testID="input-route-search"
             autoCapitalize="none"
             autoFocus
             onChangeText={setQuery}
@@ -114,6 +115,7 @@ export function RouteSearchScreen() {
             leadingIcon={
               <AppButton
                 accessibilityLabel="Quay lại"
+                testID="btn-back-search"
                 hitSlop={Spacing.one}
                 onPress={() => router.back()}
                 pressedOpacity={0.7}
@@ -213,6 +215,7 @@ export function RouteSearchScreen() {
         {!isLoading && locations.map((location) => (
           <AppButton
             accessibilityLabel={location.title}
+            testID="search-result-item"
             key={location.id}
             onPress={() => handleSelectLocation(location)}
             pressedOpacity={0.72}

@@ -153,6 +153,7 @@ export function NavigationTopControls({
             >
               <AppButton
                 accessibilityLabel="Tìm kiếm điểm đến"
+                testID="btn-search-destination"
                 onPress={onSearchPress}
                 style={styles.searchButton}
                 variant="ghost"

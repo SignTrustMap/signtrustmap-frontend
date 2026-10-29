@@ -32,7 +32,6 @@ appId: com.anonymous.mobile
 
 - assertVisible:
     text: ".*Chọn ảnh từ thư viện.*|.*Bản ghi khảo sát mới.*"
-    timeout: 10000
 
 - takeScreenshot: __tests__/report/screenshots/upload/02_new_survey_picker_screen
 
@@ -80,7 +79,6 @@ appId: com.anonymous.mobile
 # -------------------------------------------------------------------------
 - assertVisible:
     text: ".*Thời gian ghi nhận.*|.*DD/MM/YYYY.*"
-    timeout: 10000
 
 - takeScreenshot: __tests__/report/screenshots/upload/05_survey_details_initial
 
@@ -133,7 +131,6 @@ appId: com.anonymous.mobile
 
 - assertVisible:
     text: ".*Đã gửi hồ sơ khảo sát.*|.*Gửi khảo sát khác.*"
-    timeout: 8000
 
 - takeScreenshot: __tests__/report/screenshots/upload/09_survey_finish_success
 
@@ -144,6 +141,5 @@ appId: com.anonymous.mobile
 
 - assertVisible:
     text: ".*Lịch sử.*|.*khảo sát.*|.*ĐANG CHỜ.*|.*Hoàn thành.*"
-    timeout: 8000
 
 - takeScreenshot: __tests__/report/screenshots/upload/10_survey_history_screen

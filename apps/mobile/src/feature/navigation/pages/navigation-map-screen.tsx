@@ -1109,6 +1109,7 @@ export function NavigationMapScreen() {
           <Pressable
             accessibilityLabel="Căn giữa"
             accessibilityRole="button"
+            testID="btn-recenter-map"
             onPress={() => {
               const coord = userCoordinate ?? plannedRouteOrigin;
               if (!coord) return;

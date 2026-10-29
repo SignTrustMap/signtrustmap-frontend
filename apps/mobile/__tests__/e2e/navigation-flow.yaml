@@ -6,11 +6,11 @@ appId: com.anonymous.mobile
 # This test covers:
 #  1. Opening Home Map Screen (Driver mode)
 #  2. Navigating to Destination Search screen
-#  3. Typing destination query & selecting a location
+#  3. Typing destination query & waiting for API suggestions
 #  4. Route Preview bottom sheet (ETA, distance, vehicle mode selector)
-#  5. Switching vehicle mode (Car -> Bike)
-#  6. Starting turn-by-turn navigation (Maneuver banner, map guidance)
-#  7. Testing floating navigation controls (Re-center button)
+#  5. Switching vehicle mode to Motorcycle tab
+#  6. Starting turn-by-turn navigation (Maneuver banner, active map)
+#  7. Testing floating navigation controls (Căn giữa)
 #  8. Stopping navigation & returning to Home map
 # =========================================================================
 
@@ -22,9 +22,11 @@ appId: com.anonymous.mobile
 # -------------------------------------------------------------------------
 - openLink: "mobile://home"
 
+# Wait for top search bar to appear on the idle map
 - assertVisible:
-    text: ".*Bắt đầu tìm kiếm.*|.*Tìm kiếm điểm đến.*|.*SignTrustMap.*"
-    timeout: 10000
+    id: "btn-search-destination"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/01_home_map_screen
 
@@ -32,47 +34,58 @@ appId: com.anonymous.mobile
 # Step 2: Open Route Search Screen
 # -------------------------------------------------------------------------
 - tapOn:
-    label: "Tìm kiếm điểm đến"
-    optional: true
+    id: "btn-search-destination"
 
-# If search did not open by label, deep-link to search route
-- openLink: "mobile://home/search"
+# Wait for search input to be focused
+- assertVisible:
+    id: "input-route-search"
 
-- assertVisible: "Bạn muốn đi đâu?"
+- waitForAnimationToEnd
+
 - takeScreenshot: __tests__/report/screenshots/navigation/02_route_search_screen
 
 # -------------------------------------------------------------------------
-# Step 3: Enter Search Query & Select Destination
+# Step 3: Enter Search Query & Wait for API results
 # -------------------------------------------------------------------------
-- tapOn: "Bạn muốn đi đâu?"
+- tapOn:
+    id: "input-route-search"
 - inputText: "Bến Thành"
 - hideKeyboard
 
+# Wait until search suggestions load from backend API
+- assertVisible:
+    text: ".*KẾT QUẢ TÌM KIẾM.*|.*Bến Thành.*"
+
+- waitForAnimationToEnd
+
 - takeScreenshot: __tests__/report/screenshots/navigation/03_search_results
 
-# Select first suggestion or saved route if available
+# -------------------------------------------------------------------------
+# Step 4: Select Destination & Route Preview Sheet
+# -------------------------------------------------------------------------
+# Tap on the search result suggestion
 - tapOn:
-    text: ".*Bến Thành.*|.*Quận 1.*|.*TUYẾN ĐƯỜNG YÊU THÍCH.*"
+    id: "search-result-item"
     optional: true
 
-# -------------------------------------------------------------------------
-# Step 4: Route Preview Sheet (Destination & Route Options)
-# -------------------------------------------------------------------------
-# Alternatively, ensure route preview is visible with coordinates
-- openLink: "mobile://home?destinationTitle=Chợ%20Bến%20Thành&destinationLat=10.7725&destinationLng=106.6980"
+# Ensure complete route coordinates and origin are set for full route preview
+- openLink: "mobile://home?destinationTitle=Chợ%20Bến%20Thành&destinationLat=10.7725&destinationLng=106.6980&startLat=10.7769&startLng=106.7009&startTitle=Vị%20trí%20của%20bạn"
 
+# Wait until route preview sheet and vehicle mode tabs are fully rendered
 - assertVisible:
-    label: "Start route"
-    timeout: 10000
+    id: "vehicle-tab-bike"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/04_route_preview_sheet
 
 # -------------------------------------------------------------------------
-# Step 5: Switch Vehicle Mode (Bike / Car)
+# Step 5: Switch Vehicle Mode (Motorcycle tab)
 # -------------------------------------------------------------------------
 - tapOn:
-    label: "Bike route"
-    optional: true
+    id: "vehicle-tab-bike"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/05_vehicle_mode_selected
 
@@ -80,20 +93,23 @@ appId: com.anonymous.mobile
 # Step 6: Start Turn-by-Turn Navigation
 # -------------------------------------------------------------------------
 - tapOn:
-    label: "Start route"
+    id: "btn-start-navigation"
 
+# Wait for active navigation mode to engage (red "Dừng" button appears)
 - assertVisible:
-    label: "Dừng điều hướng"
-    timeout: 10000
+    id: "btn-stop-navigation"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/06_active_navigation
 
 # -------------------------------------------------------------------------
-# Step 7: Test Re-center Floating Action Button
+# Step 7: Test Floating Map Controls (Căn giữa)
 # -------------------------------------------------------------------------
 - tapOn:
-    label: "Căn giữa"
-    optional: true
+    id: "btn-recenter-map"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/07_recenter_pressed
 
@@ -101,6 +117,12 @@ appId: com.anonymous.mobile
 # Step 8: Stop Navigation & Return to Idle Map
 # -------------------------------------------------------------------------
 - tapOn:
-    label: "Dừng điều hướng"
+    id: "btn-stop-navigation"
+
+# Wait for route to close and idle search bar to return
+- assertVisible:
+    id: "btn-search-destination"
+
+- waitForAnimationToEnd
 
 - takeScreenshot: __tests__/report/screenshots/navigation/08_navigation_stopped

@@ -353,7 +353,8 @@ export function NavigationBottomSheet({
               >
                 {/* Car */}
                 <AppButton
-                  accessibilityLabel="Car route"
+                  accessibilityLabel="Tuyến đường ô tô"
+                  testID="vehicle-tab-car"
                   onPress={() => onSwitchVehicleMode("DRIVING")}
                   style={[
                     styles.vehicleTabButton,
@@ -399,7 +400,7 @@ export function NavigationBottomSheet({
 
                 {/* Motorcycle */}
                 <AppButton
-                  accessibilityLabel="Bike route"
+                  accessibilityLabel="Tuyến đường xe máy"
                   testID="vehicle-tab-bike"
                   onPress={() => onSwitchVehicleMode("MOTORCYCLE")}
                   style={[
@@ -445,7 +446,8 @@ export function NavigationBottomSheet({
 
                 {/* Bicycle */}
                 <AppButton
-                  accessibilityLabel="Bicycle route"
+                  accessibilityLabel="Tuyến đường xe đạp"
+                  testID="vehicle-tab-cycling"
                   onPress={() => onSwitchVehicleMode("CYCLING")}
                   style={[
                     styles.vehicleTabButton,
@@ -491,7 +493,8 @@ export function NavigationBottomSheet({
 
                 {/* Walking */}
                 <AppButton
-                  accessibilityLabel="Walking route"
+                  accessibilityLabel="Tuyến đường đi bộ"
+                  testID="vehicle-tab-walking"
                   onPress={() => onSwitchVehicleMode("WALKING")}
                   style={[
                     styles.vehicleTabButton,
@@ -945,6 +948,7 @@ export function NavigationBottomSheet({
                     ? "Starting navigation"
                     : "Begin navigation"
                 }
+                testID="btn-start-navigation"
                 disabled={isStartingNavigation}
                 onPress={onBeginNavigation}
                 style={styles.bottomGoButton}
@@ -962,6 +966,7 @@ export function NavigationBottomSheet({
                     ? "Lộ trình đã lưu"
                     : "Lưu lộ trình yêu thích"
                 }
+                testID="btn-bookmark-route"
                 onPress={onOpenBookmarkModal}
                 style={[
                   styles.bottomBookmarkButton,
@@ -989,6 +994,7 @@ export function NavigationBottomSheet({
             >
               <AppButton
                 accessibilityLabel="Dừng điều hướng"
+                testID="btn-stop-navigation"
                 onPress={onCloseRoute}
                 style={[
                   styles.bottomGoButton,
@@ -1035,6 +1041,7 @@ export function NavigationBottomSheet({
           <View style={styles.destinationActions}>
             <AppButton
               accessibilityLabel="Start route"
+              testID="btn-start-route-plan"
               disabled={isStartingNavigation}
               label={
                 isStartingNavigation

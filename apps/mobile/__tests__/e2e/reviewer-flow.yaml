@@ -33,7 +33,6 @@ appId: com.anonymous.mobile
 # Wait for the candidate card to load
 - assertVisible:
     text: ".*REVIEWING.*|.*Thẩm định.*|.*All reviews completed.*"
-    timeout: 10000
 
 - takeScreenshot: __tests__/report/screenshots/reviewer/02_review_card_initial
 
@@ -112,7 +111,6 @@ appId: com.anonymous.mobile
 # Verify summary metrics screen
 - assertVisible:
     text: ".*TỔNG KẾT.*|.*PHÊ DUYỆT.*|.*TỪ CHỐI.*|.*BỎ QUA.*|.*Kiểm tra lại hồ sơ.*"
-    timeout: 5000
 
 - takeScreenshot: __tests__/report/screenshots/reviewer/09_submission_summary_screen
 
