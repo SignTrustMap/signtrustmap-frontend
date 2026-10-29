@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import {
   Animated,
   type LayoutChangeEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,11 +22,13 @@ import { MissionCardItem } from '@/feature/work/components/mission-card-item';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
+  useGetDailyTasks,
   useGetMyMissions,
   useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 import type {
+  DailyTask,
   DailyTaskCompletion,
   GenericMissionItem,
   WorkMissionRole,
@@ -54,7 +57,7 @@ const MISSION_TABS: TabMeta[] = [
   },
   {
     key: 'global',
-    label: 'Toàn cầu',
+    label: 'Chung',
     icon: 'earth',
   },
 ];
@@ -70,124 +73,203 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
   const [activeTab, setActiveTab] = useState<MissionTabType>('daily');
 
   // Queries
-  const { data: completionsData, isLoading: isLoadingCompletions } = useGetMyTaskCompletions();
-  const { data: missionsData, isLoading: isLoadingMissions } = useGetMyMissions();
+  const {
+    data: completionsData,
+    isLoading: isLoadingCompletions,
+    refetch: refetchCompletions,
+    isRefetching: isRefetchingCompletions,
+  } = useGetMyTaskCompletions();
 
-  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 1;
+  const {
+    data: dailyTasksData,
+    isLoading: isLoadingDailyTasks,
+    refetch: refetchDailyTasks,
+    isRefetching: isRefetchingDailyTasks,
+  } = useGetDailyTasks();
 
-  // Filter daily completions for current role
-  const dailyRoleTasks = useMemo<DailyTaskCompletion[]>(() => {
-    const rawList = Array.isArray(completionsData) ? completionsData : [];
-    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, initialRole));
-    if (matched.length > 0) {
-      return matched;
+  const {
+    data: missionsData,
+    isLoading: isLoadingMissions,
+    refetch: refetchMissions,
+    isRefetching: isRefetchingMissions,
+  } = useGetMyMissions();
+
+  const isRefreshing =
+    isRefetchingCompletions || isRefetchingDailyTasks || isRefetchingMissions;
+
+  const handleRefresh = () => {
+    refetchCompletions();
+    refetchDailyTasks();
+    refetchMissions();
+  };
+
+  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
+
+  // Extract all daily tasks defined in BE catalog
+  const backendTasks = useMemo<DailyTask[]>(() => {
+    if (Array.isArray(dailyTasksData)) {
+      return dailyTasksData;
     }
+    if (dailyTasksData && Array.isArray((dailyTasksData as any).tasks)) {
+      return (dailyTasksData as any).tasks;
+    }
+    return [];
+  }, [dailyTasksData]);
+
+  // Extract task completions from BE
+  const backendCompletions = useMemo<DailyTaskCompletion[]>(() => {
+    if (Array.isArray(completionsData) && completionsData.length > 0) {
+      return completionsData;
+    }
+    if (dailyTasksData && Array.isArray((dailyTasksData as any).completions)) {
+      return (dailyTasksData as any).completions;
+    }
+    return [];
+  }, [completionsData, dailyTasksData]);
+
+  // Merge real BE tasks with user's completion progress for current role
+  const dailyRoleTasks = useMemo<DailyTaskCompletion[]>(() => {
+    const today = new Date().toISOString().split('T')[0];
+
+    const matchedTasks = backendTasks.filter((task) => isTaskForRole(task, initialRole));
+    const matchedCompletions = backendCompletions.filter((item) =>
+      item.dailyTask ? isTaskForRole(item.dailyTask, initialRole) : true
+    );
+
+    // 1. If BE provides the daily tasks catalog, map each task with its completion status
+    if (matchedTasks.length > 0) {
+      return matchedTasks.map((task) => {
+        const found = matchedCompletions.find((c) => c.dailyTaskId === task.id);
+        if (found) {
+          return found;
+        }
+        return {
+          id: `task-${task.id}`,
+          userId: 'me',
+          dailyTaskId: task.id,
+          completionDate: today,
+          progress: 0,
+          isCompleted: false,
+          claimed: false,
+          claimedAt: null,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+          dailyTask: task,
+        };
+      });
+    }
+
+    // 2. If completions are provided directly without task catalog
+    if (matchedCompletions.length > 0) {
+      return matchedCompletions;
+    }
+
+    // 3. Graceful fallback when BE data is offline or not yet configured
     return getFallbackMissionsForRole(initialRole);
-  }, [completionsData, initialRole]);
+  }, [backendTasks, backendCompletions, initialRole]);
 
-  // Construct weekly missions
+  // Construct weekly missions from BE
   const weeklyMissions = useMemo<GenericMissionItem[]>(() => {
+    // 1. If backend returns an array of weekly missions
+    if (Array.isArray(missionsData?.weeklyMissions) && missionsData.weeklyMissions.length > 0) {
+      return missionsData.weeklyMissions.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        progress: item.progress,
+        targetCount: item.targetCount,
+        rewardCredits: item.rewardCredits,
+        isCompleted: item.isCompleted,
+        claimed: item.claimed,
+        periodLabel: 'Hàng tuần',
+      }));
+    }
+
+    // 2. Standard OpenAPI weekly mission object from GET /daily-tasks/missions/me
     const weeklyBackend = missionsData?.weekly;
-    const completedMissions = weeklyBackend?.completedMissions ?? 0;
-    const target = weeklyBackend?.target ?? 5;
-    const isCompleted = weeklyBackend?.completed ?? completedMissions >= target;
+    if (weeklyBackend) {
+      const completedMissions = weeklyBackend.completedMissions ?? 0;
+      const target = weeklyBackend.target ?? 5;
+      const isCompleted = weeklyBackend.completed ?? completedMissions >= target;
 
-    return [
-      {
-        id: 'weekly-main-5',
-        code: 'WEEKLY_FIVE_MISSIONS',
-        title: weeklyBackend?.title ?? 'Hoàn thành 5 nhiệm vụ trong tuần',
-        description:
-          weeklyBackend?.description ??
-          'Hoàn thành 5 nhiệm vụ đóng góp hợp lệ từ Thứ Hai đến Chủ Nhật.',
-        progress: completedMissions,
-        targetCount: target,
-        rewardCredits: weeklyBackend?.bonusCredits ?? 50,
-        isCompleted,
-        activityType: 'DAILY_TASK_REWARD',
-        actionUrl: '/work',
-      },
-      {
-        id: 'weekly-revalidation-3',
-        code: 'WEEKLY_REVAL_3',
-        title: 'Tái thẩm định 3 minh chứng thực địa trong tuần',
-        description: 'Bỏ phiếu đối soát minh chứng hình ảnh do cộng đồng gửi lên.',
-        progress: Math.min(completedMissions > 1 ? 2 : 0, 3),
-        targetCount: 3,
-        rewardCredits: 35,
-        isCompleted: false,
-        activityType: 'REVALIDATION_VOTE',
-        actionUrl: '/work/submission-review',
-      },
-      {
-        id: 'weekly-nav-5',
-        code: 'WEEKLY_NAV_5',
-        title: 'Thực hiện 5 hành trình điều hướng an toàn',
-        description: 'Bật điều hướng và cập nhật tình trạng giao thông khi lái xe.',
-        progress: 2,
-        targetCount: 5,
-        rewardCredits: 40,
-        isCompleted: false,
-        activityType: 'NAVIGATION_SESSION',
-        actionUrl: '/home',
-      },
-    ];
-  }, [missionsData?.weekly]);
+      return [
+        {
+          id: 'weekly-main-mission',
+          code: 'WEEKLY_GOAL',
+          title: weeklyBackend.title || 'Hoàn thành nhiệm vụ tuần',
+          description:
+            weeklyBackend.description ||
+            `Hoàn thành ${target} nhiệm vụ đóng góp hợp lệ từ Thứ Hai đến Chủ Nhật.`,
+          progress: completedMissions,
+          targetCount: target,
+          rewardCredits: weeklyBackend.bonusCredits ?? 50,
+          isCompleted,
+          claimed: weeklyBackend.bonusGranted,
+          activityType: 'DAILY_TASK_REWARD',
+          actionUrl: '/work',
+          periodLabel: 'Hàng tuần',
+        },
+      ];
+    }
 
-  // Construct global / system missions
+    return [];
+  }, [missionsData?.weekly, missionsData?.weeklyMissions]);
+
+  // Construct global / system missions dynamically from BE
   const globalMissions = useMemo<GenericMissionItem[]>(() => {
+    const items: GenericMissionItem[] = [];
+
+    // 1. Dynamic missions from backend: missionsData.daily.missions
     const backendDailyMissions = missionsData?.daily?.missions ?? [];
-    const verify3 = backendDailyMissions.find((m) => m.code === 'VERIFY_3_SIGNS');
-    const anomaly1 = backendDailyMissions.find((m) => m.code === 'APPROVED_ANOMALY_REPORT');
+    backendDailyMissions.forEach((m, idx) => {
+      items.push({
+        id: `be-global-${m.code || idx}`,
+        code: m.code,
+        title: m.title,
+        description: m.description,
+        progress: m.progress ?? 0,
+        targetCount: m.target ?? 1,
+        rewardCredits: m.rewardCredits ?? 10,
+        isCompleted: Boolean(m.completed || (m.progress ?? 0) >= (m.target ?? 1)),
+        claimed: m.rewardGranted,
+        activityType: m.code?.includes('SIGN') || m.code?.includes('VERIFY')
+          ? 'REVIEW_VOTE'
+          : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
+            ? 'HAZARD_REPORT'
+            : 'DAILY_TASK_REWARD',
+        actionUrl: m.code?.includes('SIGN') || m.code?.includes('VERIFY')
+          ? '/work/submission-review'
+          : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
+            ? '/work/recorded-signs'
+            : '/work',
+        periodLabel: 'Chung',
+      });
+    });
+
+    // 2. Streak milestone from backend: missionsData.streak
     const streakInfo = missionsData?.streak;
+    if (streakInfo) {
+      const streakDays = streakInfo.currentDays ?? streak;
+      const streakTarget = streakInfo.requiredDays ?? 7;
 
-    const streakDays = streakInfo?.currentDays ?? streak;
-    const streakTarget = streakInfo?.requiredDays ?? 7;
-
-    return [
-      {
-        id: 'global-verify-3-signs',
-        code: 'VERIFY_3_SIGNS',
-        title: verify3?.title ?? 'Xác minh 3 biển báo giao thông hợp lệ',
+      items.push({
+        id: 'global-streak-milestone',
+        code: streakInfo.badgeCode || 'STREAK_GOAL',
+        title: streakInfo.title || 'Chuỗi đóng góp liên tiếp',
         description:
-          verify3?.description ??
-          'Tham gia xác minh 3 biển báo được consensus xác nhận trong ngày.',
-        progress: verify3?.progress ?? 0,
-        targetCount: verify3?.target ?? 3,
-        rewardCredits: verify3?.rewardCredits ?? 20,
-        isCompleted: Boolean(verify3?.completed || (verify3?.progress ?? 0) >= 3),
-        activityType: 'REVIEW_VOTE',
-        actionUrl: '/work/submission-review',
-      },
-      {
-        id: 'global-approved-anomaly',
-        code: 'APPROVED_ANOMALY_REPORT',
-        title: anomaly1?.title ?? 'Gửi báo cáo bất thường kèm bằng chứng',
-        description:
-          anomaly1?.description ??
-          'Báo cáo sự cố kèm hình ảnh/video được xác nhận qua consensus.',
-        progress: anomaly1?.progress ?? 0,
-        targetCount: anomaly1?.target ?? 1,
-        rewardCredits: anomaly1?.rewardCredits ?? 15,
-        isCompleted: Boolean(anomaly1?.completed || (anomaly1?.progress ?? 0) >= 1),
-        activityType: 'HAZARD_REPORT',
-        actionUrl: '/work/recorded-signs',
-      },
-      {
-        id: 'global-streak-7-days',
-        code: 'STREAK_7_DAYS',
-        title: streakInfo?.title ?? 'Chuỗi đóng góp 7 ngày liên tiếp',
-        description:
-          streakInfo?.description ??
-          'Đóng góp ít nhất 1 lần mỗi ngày trong 7 ngày liên tiếp để nhận huy hiệu.',
+          streakInfo.description ||
+          `Đóng góp liên tục trong ${streakTarget} ngày để nhận huy hiệu danh dự.`,
         progress: Math.min(streakDays, streakTarget),
         targetCount: streakTarget,
-        rewardCredits: streakInfo?.bonusCredits ?? 50,
-        isCompleted: Boolean(streakInfo?.badgeEarned || streakDays >= streakTarget),
+        rewardCredits: streakInfo.bonusCredits ?? 50,
+        isCompleted: Boolean(streakInfo.badgeEarned || streakDays >= streakTarget),
         activityType: 'DAILY_TASK_REWARD',
         actionUrl: '/work',
-      },
-    ];
+        periodLabel: 'Chung',
+      });
+    }
+
+    return items;
   }, [missionsData, streak]);
 
   // Tab Badge counts: number of incomplete missions
@@ -204,7 +286,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
   // Animated sliding pill indicator (identical logic to Role Switcher)
   const activeIndex = MISSION_TABS.findIndex((tab) => tab.key === activeTab);
   const [switcherWidth, setSwitcherWidth] = useState<number>(0);
-  const slideAnimation = useRef(new Animated.Value(activeIndex >= 0 ? activeIndex : 0)).current;
+  const [slideAnimation] = useState(() => new Animated.Value(activeIndex >= 0 ? activeIndex : 0));
 
   const tabWidth =
     switcherWidth > 0 && MISSION_TABS.length > 0 ? switcherWidth / MISSION_TABS.length : 0;
@@ -223,10 +305,10 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
         speed: 18,
       }).start();
     }
-  }, [activeIndex]);
+  }, [activeIndex, slideAnimation]);
 
   // Duolingo-style flame pop animation every time the screen loads
-  const flameScale = useRef(new Animated.Value(1)).current;
+  const [flameScale] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     const animation = Animated.sequence([
@@ -279,6 +361,14 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              colors={[theme.primary]}
+              onRefresh={handleRefresh}
+              refreshing={isRefreshing}
+              tintColor={theme.primary}
+            />
+          }
           showsVerticalScrollIndicator={false}
         >
           {/* Dedicated Duolingo-style Streak Card */}
@@ -349,10 +439,10 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                           ? { backgroundColor: '#F59E0B', borderColor: '#D97706' }
                           : isToday
                             ? {
-                                backgroundColor: '#FEF3C7',
-                                borderColor: '#F59E0B',
-                                borderWidth: 2,
-                              }
+                              backgroundColor: '#FEF3C7',
+                              borderColor: '#F59E0B',
+                              borderWidth: 2,
+                            }
                             : { backgroundColor: `${theme.grey}20`, borderColor: 'transparent' },
                       ]}
                     >
@@ -454,11 +544,24 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
           {/* Mission Card List */}
           <View style={styles.missionList}>
             {activeTab === 'daily' ? (
-              isLoadingCompletions && dailyRoleTasks.length === 0 ? (
+              isLoadingDailyTasks && dailyRoleTasks.length === 0 ? (
                 <View style={[styles.loadingBox, { backgroundColor: theme.backgroundElement }]}>
                   <ActivityIndicator color={theme.primary} size="small" />
                   <Text style={[styles.loadingText, { color: theme.grey }]}>
                     Đang tải nhiệm vụ hàng ngày...
+                  </Text>
+                </View>
+              ) : dailyRoleTasks.length === 0 ? (
+                <View
+                  style={[
+                    styles.emptyBox,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.grey} name="checkbox-marked-circle-outline" size={36} />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ hàng ngày</Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+                    Hiện chưa có nhiệm vụ nào cho vai trò này.
                   </Text>
                 </View>
               ) : (
@@ -478,6 +581,19 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     Đang tải nhiệm vụ tuần...
                   </Text>
                 </View>
+              ) : weeklyMissions.length === 0 ? (
+                <View
+                  style={[
+                    styles.emptyBox,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                >
+                  <MaterialCommunityIcons color={theme.grey} name="calendar-blank-outline" size={36} />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ tuần</Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+                    Nhiệm vụ tuần mới sẽ mở vào thứ Hai tuần tới.
+                  </Text>
+                </View>
               ) : (
                 weeklyMissions.map((item) => (
                   <MissionCardItem key={item.id} mission={item} role={initialRole} />
@@ -487,7 +603,20 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
               <View style={[styles.loadingBox, { backgroundColor: theme.backgroundElement }]}>
                 <ActivityIndicator color={theme.primary} size="small" />
                 <Text style={[styles.loadingText, { color: theme.grey }]}>
-                  Đang tải nhiệm vụ toàn cầu...
+                  Đang tải nhiệm vụ chung...
+                </Text>
+              </View>
+            ) : globalMissions.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyBox,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+              >
+                <MaterialCommunityIcons color={theme.grey} name="earth" size={36} />
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ chung</Text>
+                <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+                  Bạn đã hoàn thành tất cả nhiệm vụ hệ thống.
                 </Text>
               </View>
             ) : (
@@ -693,5 +822,24 @@ const styles = StyleSheet.create({
   loadingText: {
     fontFamily: Fonts.body,
     fontSize: 13,
+  },
+  emptyBox: {
+    padding: Spacing.six,
+    borderRadius: Rounded.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    marginTop: Spacing.two,
+  },
+  emptyTitle: {
+    fontFamily: Fonts.sans,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptySubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

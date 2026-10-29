@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useClaimDailyTaskReward } from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 import type {
   DailyTaskCompletion,
@@ -19,12 +20,13 @@ export interface MissionCardItemProps {
 export function MissionCardItem({ completion, mission, role = 'driver' }: MissionCardItemProps) {
   const theme = useTheme();
   const router = useRouter();
+  const claimMutation = useClaimDailyTaskReward();
 
   // Normalize data from either DailyTaskCompletion or GenericMissionItem
-  const taskName = completion?.dailyTask.name ?? mission?.title ?? 'Nhiệm vụ đóng góp';
+  const taskName = completion?.dailyTask?.name ?? mission?.title ?? 'Nhiệm vụ đóng góp';
   const progressCount = completion ? completion.progress : (mission?.progress ?? 0);
-  const targetCount = completion ? completion.dailyTask.targetCount : (mission?.targetCount ?? 1);
-  const target = targetCount > 0 ? targetCount : 1;
+  const targetCount = completion ? completion.dailyTask?.targetCount : (mission?.targetCount ?? 1);
+  const target = targetCount && targetCount > 0 ? targetCount : 1;
   const progress = Math.min(progressCount, target);
   const percentage = Math.round((progress / target) * 100);
   const isFinished = Boolean(
@@ -34,7 +36,9 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
     mission?.claimed ||
     progress >= target
   );
-  const rewardCredits = completion?.dailyTask.rewardCredits ?? mission?.rewardCredits ?? 10;
+  const isClaimed = Boolean(completion?.claimed || mission?.claimed);
+  const canClaim = Boolean(isFinished && !isClaimed && completion?.dailyTaskId);
+  const rewardCredits = completion?.dailyTask?.rewardCredits ?? mission?.rewardCredits ?? 10;
 
   const handleAction = () => {
     if (mission?.actionUrl) {
@@ -56,7 +60,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
       return;
     }
 
-    const act = (completion?.dailyTask.activityType || mission?.activityType || '').toUpperCase();
+    const act = (completion?.dailyTask?.activityType || mission?.activityType || '').toUpperCase();
     if (act.includes('SURVEY')) {
       router.push('/work/new-survey');
     } else if (act.includes('REVALIDATION_EVIDENCE') || act.includes('REVAL_MAP')) {
@@ -80,7 +84,6 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
       }
     }
   };
-
 
   return (
     <View
@@ -134,8 +137,39 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
         </View>
       </View>
 
-      {/* 3. Bottom Row: Full width button for action & status display */}
-      {isFinished ? (
+      {/* 3. Bottom Row: Claim / Completed / Action button */}
+      {canClaim ? (
+        <Pressable
+          accessibilityLabel={`Nhận ${rewardCredits} Xu thưởng cho nhiệm vụ ${taskName}`}
+          accessibilityRole="button"
+          disabled={claimMutation.isPending}
+          onPress={() => claimMutation.mutate(completion!.dailyTaskId)}
+          style={({ pressed }) => [
+            styles.claimButton,
+            {
+              backgroundColor: pressed ? '#D97706' : '#F59E0B',
+              opacity: claimMutation.isPending ? 0.7 : 1,
+            },
+          ]}
+        >
+          {claimMutation.isPending ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <MaterialCommunityIcons color="#FFFFFF" name="hand-coin" size={16} />
+              <Text style={styles.claimButtonText}>Nhận thưởng +{rewardCredits} Xu</Text>
+            </>
+          )}
+        </Pressable>
+      ) : isClaimed ? (
+        <View
+          accessibilityLabel={`Nhiệm vụ ${taskName} đã nhận thưởng`}
+          style={[styles.statusButton, { backgroundColor: '#10B98115', borderColor: '#10B98135' }]}
+        >
+          <MaterialCommunityIcons color="#10B981" name="check-circle" size={16} />
+          <Text style={[styles.statusButtonText, { color: '#10B981' }]}>Đã nhận thưởng</Text>
+        </View>
+      ) : isFinished ? (
         <View
           accessibilityLabel={`Nhiệm vụ ${taskName} đã hoàn thành`}
           style={[styles.statusButton, { backgroundColor: '#10B98115', borderColor: '#10B98135' }]}
@@ -257,5 +291,20 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     fontWeight: '700',
     fontSize: 13,
+  },
+  claimButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: Rounded.md,
+  },
+  claimButtonText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 13,
+    color: '#FFFFFF',
   },
 });

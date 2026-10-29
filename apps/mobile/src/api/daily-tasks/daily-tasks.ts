@@ -43,3 +43,21 @@ export function getMyMissionsProgress(accessToken: string, signal?: AbortSignal)
     accessToken,
   );
 }
+
+/**
+ * Claims credit rewards for an accomplished daily task.
+ */
+export function claimDailyTaskReward(
+  taskId: number | string,
+  accessToken: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<{ success: boolean; creditsAwarded?: number; message?: string }>(
+    `${API_PATHS.DAILY_TASKS}/${taskId}/claim`,
+    {
+      method: 'POST',
+      signal,
+    },
+    accessToken,
+  );
+}

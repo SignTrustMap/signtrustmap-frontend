@@ -101,26 +101,6 @@ export function ErrorFallbackView({
     }
   };
 
-  const handleCopyDetails = async () => {
-    const errorDetails = [
-      `Name: ${error?.name || 'Error'}`,
-      `Message: ${error?.message || 'Unknown error'}`,
-      `Stack:\n${error?.stack || 'No stack trace available'}`,
-      `Timestamp: ${new Date().toISOString()}`,
-    ].join('\n');
-
-    try {
-      await Clipboard.setStringAsync(errorDetails);
-      setIsCopied(true);
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-      copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2200);
-    } catch (err) {
-      console.warn('[ErrorBoundary] Failed to copy to clipboard:', err);
-    }
-  };
-
   const errorMessage = error?.message || UNHANDLED_EXCEPTION_MESSAGE;
   const errorName = error?.name || APPLICATION_ERROR_TITLE;
 
