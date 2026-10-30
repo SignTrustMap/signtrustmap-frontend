@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -19,6 +19,8 @@ import {
 import { mockCandidates, type CandidateItem, type PriorityLevel, type CandidateStatus } from '@/data'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
+import { candidatesService } from '@/api/services'
+import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 
 function PriorityTag({ priority }: { priority: PriorityLevel }) {
   const { t } = useTranslation('ops')
@@ -94,12 +96,70 @@ export default function CandidatesListPage() {
   const { t } = useTranslation('ops')
   const navigate = useNavigate()
   const { isCollapsed } = useSidebar()
-  const [candidates] = useState<CandidateItem[]>(mockCandidates)
+  const [candidates, setCandidates] = useState<CandidateItem[]>(mockCandidates)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  // Fetch live queue from backend
+  useEffect(() => {
+    let isMounted = true
+    async function loadQueue() {
+      try {
+        setIsLoading(true)
+        const res: any = await candidatesService.getQueue({ page: 1, pageSize: 50, includeOwnSubmissions: true })
+        const items = res?.items || res?.data?.items || (Array.isArray(res) ? res : [])
+        if (isMounted && Array.isArray(items) && items.length > 0) {
+          const liveItems: CandidateItem[] = items.map((item: any) => {
+            const signCode = item.predictedSignType?.signCode || 'P.102'
+            const signName = item.predictedSignType?.nameVi || item.predictedSignType?.nameEn || 'Biển báo giao thông'
+            const confidenceScore =
+              item.confidenceScore != null
+                ? Math.round((item.confidenceScore <= 1 ? item.confidenceScore * 100 : item.confidenceScore) * 10) / 10
+                : 88.5
+            const priority: PriorityLevel = confidenceScore < 70 ? 'Cao' : confidenceScore < 85 ? 'Vừa' : 'Thấp'
+            const status: CandidateStatus =
+              item.status === 'IN_CONSENSUS'
+                ? 'Đang xem xét'
+                : item.status === 'VERIFIED'
+                  ? 'Đã giải quyết'
+                  : 'Chưa xử lý'
+
+            return {
+              id: item.id,
+              name: `${signCode} - ${signName}`,
+              reportedDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'Hôm nay',
+              reason: item.status === 'IN_CONSENSUS' ? 'Đang chờ hội đồng biểu quyết cộng đồng' : 'Chờ kiểm duyệt và phê duyệt chính thức',
+              priority,
+              status,
+              signCode,
+              signName,
+              anomalyType: confidenceScore < 70 ? 'low_conf' : 'conflict',
+              location: item.locationContext?.displayLocation || item.locationContext?.nearbyRoad || 'Vị trí hiện trường ghi nhận',
+              surveyorName: item.submission?.surveyorId ? `Surveyor #${item.submission.surveyorId.slice(0, 6).toUpperCase()}` : 'Khảo sát viên ẩn danh',
+              aiConfidence: confidenceScore,
+              cropImageUrl: item.signCropUrl ? resolveImageUrl(item.signCropUrl) : undefined,
+              contextImageUrl: item.bestFrameUrl ? resolveImageUrl(item.bestFrameUrl) : undefined,
+              gpsOffset: 1.2,
+            }
+          })
+          setCandidates(liveItems)
+        }
+      } catch (err) {
+        console.warn('[CandidatesList] Failed to load live queue, retaining mock data:', err)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+
+    loadQueue()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const filteredCandidates = candidates.filter((c) => {
     const matchesSearch =
@@ -288,7 +348,14 @@ export default function CandidatesListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {paginatedCandidates.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
+                    <ArrowsClockwise size={32} className="mx-auto opacity-60 animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Đang kết nối hàng đợi kiểm duyệt...</p>
+                  </td>
+                </tr>
+              ) : paginatedCandidates.length === 0 ? (
                 <tr>
                   <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
                     <ArrowsClockwise size={32} className="mx-auto opacity-40" />
