@@ -290,7 +290,6 @@ export function MissingSignInspectionModal({
     report.status === 'Incomplete'
 
   const decisionConfig = getDecisionConfig(report.status, report.mergedIntoSignTypeId)
-  const DecisionIcon = decisionConfig.icon
 
   const handleConfirmAction = async () => {
     if (actionType === 'APPROVE') {

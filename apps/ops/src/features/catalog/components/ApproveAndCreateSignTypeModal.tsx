@@ -124,8 +124,9 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
     e.preventDefault()
     if (!signCode.trim() || !nameVi.trim()) return
 
+    const normalizedCode = signCode.trim().match(/^T\.xxx$/i) ? 'T.xxx' : signCode.trim().toUpperCase()
     const payload: ApproveAndCreateSignTypeInput = {
-      signCode: signCode.trim().toUpperCase(),
+      signCode: normalizedCode,
       nameVi: nameVi.trim(),
       nameEn: nameEn.trim() || nameVi.trim(),
       proposedCategoryId: Number(selectedCategoryId) || undefined,
@@ -223,7 +224,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
                   required
                   value={signCode}
                   onChange={(e) => setSignCode(e.target.value.toUpperCase())}
-                  placeholder="VD: P.124d, W.205b"
+                  placeholder="VD: P.124d, W.205b, T.xxx"
                   className="w-full px-3 py-2 bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#007b8b] font-mono font-bold text-gray-900 dark:text-white"
                 />
               </div>

@@ -53,6 +53,7 @@ export function determineSignCategory(signCode?: string): RouteSign['category'] 
   if (upper.startsWith('R')) return 'MANDATORY'
   if (upper.startsWith('I')) return 'INFORMATION'
   if (upper.startsWith('S')) return 'TEMPORARY'
+  if (upper.startsWith('T')) return 'OTHER'
   return 'OTHER'
 }
 

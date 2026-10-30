@@ -28,7 +28,7 @@ export type LoginResponse = {
   };
 };
 
-const backendRoleToAccountRole: Record<string, AccountRole> = {
+export const backendRoleToAccountRole: Record<string, AccountRole> = {
   DRIVER: 'driver',
   REVIEWER: 'reviewer',
   SURVEYOR: 'surveyor',
@@ -95,5 +95,29 @@ export async function updateProfile(
 
 export async function getProfile(accessToken: string): Promise<UserProfileResponse> {
   return jsonApiRequest<UserProfileResponse>('/auth/me', undefined, accessToken, undefined, 'GET');
+}
+
+export type ToggleRoleResponse = {
+  accessToken: string;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    roles: string[];
+  };
+};
+
+export async function toggleRole(
+  role: string,
+  enabled: boolean,
+  accessToken: string,
+): Promise<ToggleRoleResponse> {
+  return jsonApiRequest<ToggleRoleResponse>(
+    '/auth/me/roles',
+    { role, enabled },
+    accessToken,
+    undefined,
+    'POST',
+  );
 }
 

@@ -224,7 +224,7 @@ export default function UsersPage() {
   // Open Edit Modal
   const handleOpenModal = (user: BackendUserItem) => {
     setSelectedUser(user)
-    setSelectedRoles(Array.isArray(user.roles) ? [...user.roles.map((r) => r.toUpperCase())] : [])
+    setSelectedRoles(Array.isArray(user.roles) ? user.roles.map((r) => r.toUpperCase()) : [])
     setSelectedStatus(user.status || 'ACTIVE')
     setStatusReason('')
     setCopiedId(false)
