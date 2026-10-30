@@ -1,0 +1,611 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Linking,
+  Platform,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AppButton } from '@/components/button';
+import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
+import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
+import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import type { RecaptureReason, SurveyorRecaptureItem } from '@/types/reviewsType';
+
+const REASON_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  MISSING_TYPE_RECAPTURE_REQUESTED: { label: 'Yêu cầu chụp lại biển lạ', color: '#007b8b', bg: 'rgba(0, 123, 139, 0.12)' },
+  BLURRY: { label: 'Ảnh mờ hoặc rung tay', color: '#DC2626', bg: 'rgba(220, 38, 38, 0.1)' },
+  POOR_LIGHTING: { label: 'Ngược sáng hoặc thiếu sáng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  WRONG_ANGLE: { label: 'Góc chụp quá nghiêng', color: '#D97706', bg: 'rgba(217, 119, 6, 0.1)' },
+  OCCLUDED: { label: 'Bị vật cản che khuất', color: '#9333EA', bg: 'rgba(147, 51, 234, 0.1)' },
+  MISSING_CONTEXT: { label: 'Thiếu ảnh toàn cảnh', color: '#2563EB', bg: 'rgba(37, 99, 235, 0.1)' },
+  OTHER: { label: 'Lý do khác', color: '#4B5563', bg: 'rgba(75, 85, 99, 0.1)' },
+};
+
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)}m`;
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
+export function RecapturesScreen() {
+  const router = useRouter();
+  const theme = useTheme();
+
+  const { data, isLoading, refetch, isRefetching } = useGetMyRecaptures({ page: 1, pageSize: 50 });
+  const items = data?.items ?? [];
+
+  const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
+
+  // Cập nhật vị trí GPS định kỳ
+  useEffect(() => {
+    let isMounted = true;
+    async function updateGps() {
+      const pos = await fetchFreshGpsPosition(4000);
+      if (isMounted && pos) {
+        setCurrentPosition(pos);
+      }
+    }
+    void updateGps();
+    const interval = setInterval(updateGps, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleOpenDirections = (lat: number, lon: number) => {
+    const scheme = Platform.select({
+      ios: `maps://0,0?q=${lat},${lon}`,
+      android: `geo:0,0?q=${lat},${lon}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
+    });
+    void Linking.openURL(scheme);
+  };
+
+  const handleStartRecapture = useCallback(
+    (item: SurveyorRecaptureItem) => {
+      router.push({
+        pathname: '/work/recapture-camera',
+        params: {
+          candidateId: item.candidate_id,
+          targetLat: String(item.latitude),
+          targetLon: String(item.longitude),
+          signTitle: item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất',
+          signCode: item.sign_code || '',
+          reason: item.reason,
+          note: item.note || '',
+          oldSignCropUrl: item.sign_crop_url || '',
+        },
+      });
+    },
+    [router],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: SurveyorRecaptureItem }) => {
+      const meta =
+        (REASON_LABELS as Record<string, { label: string; color: string; bg: string }>)[item.reason] ?? {
+          label: item.reason || 'Lý do khác',
+          color: theme.primary,
+          bg: theme.backgroundSelected,
+        };
+      const imageUrl = resolveS3Url(item.sign_crop_url || item.best_frame_url);
+
+      const distanceMeters =
+        currentPosition && item.latitude && item.longitude
+          ? calculateDistanceMeters(currentPosition, [item.longitude, item.latitude])
+          : null;
+
+      const isNovelSignQuest = Boolean(
+        item.missing_type_report_id || item.reason === 'MISSING_TYPE_RECAPTURE_REQUESTED'
+      );
+
+      return (
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: isNovelSignQuest ? `${theme.primary}50` : theme.border,
+            },
+          ]}
+        >
+          {/* Card Top: Ảnh biển bên trái + Thông tin biển bên phải (Bấm để xem chi tiết / chụp lại) */}
+          <TouchableOpacity
+            accessibilityLabel={`Xem chi tiết ${item.name_vi || item.name_en || item.sign_code || 'biển báo'}`}
+            activeOpacity={0.7}
+            onPress={() => handleStartRecapture(item)}
+            style={styles.cardHeader}
+          >
+            <View style={[styles.imageWrapper, { backgroundColor: theme.neutral, borderColor: theme.border }]}>
+              {imageUrl ? (
+                <Image
+                  contentFit="cover"
+                  source={{ uri: imageUrl }}
+                  style={styles.signImage}
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.placeholderImage}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="image-off-outline" size={26} />
+                </View>
+              )}
+            </View>
+
+            <View style={styles.cardInfo}>
+              {/* Badges: Mã biển + Nhãn lý do */}
+              <View style={styles.badgeRow}>
+                {item.sign_code ? (
+                  <View
+                    style={[
+                      styles.codeBadge,
+                      {
+                        backgroundColor: theme.backgroundSelected,
+                        borderColor: `${theme.primary}40`,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.codeBadgeText, { color: theme.primary }]}>
+                      {item.sign_code}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={[styles.reasonBadge, { backgroundColor: meta.bg }]}>
+                  <Text style={[styles.reasonBadgeText, { color: meta.color }]}>{meta.label}</Text>
+                </View>
+              </View>
+
+              {/* Tên biển báo (Hiển thị tối đa 2 dòng, trọn vẹn, không bị cắt cụt) */}
+              <Text numberOfLines={2} style={[styles.signTitle, { color: theme.text }]}>
+                {item.name_vi || item.name_en || item.sign_code || 'Biển báo mới đề xuất'}
+              </Text>
+
+              {/* Toạ độ GPS & Khoảng cách gọn gàng */}
+              <View style={styles.coordsRow}>
+                {distanceMeters != null && (
+                  <>
+                    <MaterialCommunityIcons color={theme.primary} name="navigation-variant" size={12} />
+                    <Text style={[styles.distanceInlineText, { color: theme.primary }]}>
+                      Cách {formatDistance(distanceMeters)}
+                    </Text>
+                    <Text style={[styles.dotSeparator, { color: theme.border }]}>•</Text>
+                  </>
+                )}
+                <MaterialCommunityIcons color={theme.placeholder} name="map-marker-outline" size={12} />
+                <Text style={[styles.coordsText, { color: theme.grey }]}>
+                  {item.latitude.toFixed(5)}°, {item.longitude.toFixed(5)}°
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Hộp Ghi Chú / Hướng Dẫn Thẩm Định Viên (Trải rộng 100%, đọc rõ ràng, không bị che khuất) */}
+          {item.note ? (
+            <View
+              style={[
+                styles.reviewerNoteBox,
+                {
+                  backgroundColor: theme.neutral,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={theme.placeholder}
+                name="alert-circle-outline"
+                size={14}
+                style={styles.reviewerNoteIcon}
+              />
+              <Text style={[styles.reviewerNoteText, { color: theme.text }]}>
+                <Text style={[styles.reviewerNoteBold, { color: theme.textSecondary }]}>Ghi chú: </Text>
+                {item.note}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Action Buttons Row */}
+          <View style={styles.cardActions}>
+            <AppButton
+              accessibilityLabel="Chỉ đường tới biển báo"
+              onPress={() => handleOpenDirections(item.latitude, item.longitude)}
+              style={styles.directionsButton}
+              variant="surface"
+            >
+              <MaterialCommunityIcons color={theme.text} name="navigation-variant-outline" size={16} />
+              <Text style={[styles.directionsButtonText, { color: theme.text }]}>Chỉ đường</Text>
+            </AppButton>
+
+            <AppButton
+              accessibilityLabel="Bắt đầu chụp lại ảnh biển báo"
+              onPress={() => handleStartRecapture(item)}
+              style={styles.recaptureButton}
+              variant="primary"
+            >
+              <MaterialCommunityIcons color="#FFFFFF" name="camera-retake-outline" size={16} />
+              <Text style={styles.recaptureButtonText}>Chụp lại ngay</Text>
+            </AppButton>
+          </View>
+        </View>
+      );
+    },
+    [theme, currentPosition, handleStartRecapture],
+  );
+
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        {/* Top Header */}
+        <View
+          style={[
+            styles.topBar,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderBottomColor: theme.border,
+            },
+          ]}
+        >
+          <AppButton
+            accessibilityLabel="Quay lại công việc"
+            onPress={() => router.back()}
+            pressedOpacity={0.6}
+            style={styles.backButton}
+            variant="ghost"
+          >
+            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+          </AppButton>
+
+          <View style={styles.topBarTitle}>
+            <Text style={[styles.screenTitle, { color: theme.text }]}>Yêu cầu chụp lại</Text>
+            <Text style={[styles.screenSubtitle, { color: theme.grey }]}>
+              {items.length} biển báo cần bổ sung ảnh thực địa
+            </Text>
+          </View>
+
+          <AppButton
+            accessibilityLabel="Làm mới danh sách"
+            disabled={isRefetching}
+            onPress={() => void refetch()}
+            pressedOpacity={0.6}
+            style={styles.backButton}
+            variant="ghost"
+          >
+            <MaterialCommunityIcons
+              color={theme.primary}
+              name="reload"
+              size={22}
+              style={isRefetching ? styles.spinning : undefined}
+            />
+          </AppButton>
+        </View>
+
+        {/* Helpful Guideline Banner */}
+        <View
+          style={[
+            styles.banner,
+            {
+              backgroundColor: theme.backgroundElement,
+              borderColor: theme.border,
+              borderLeftColor: theme.primary,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            color={theme.primary}
+            name="map-marker-radius-outline"
+            size={20}
+            style={styles.bannerIcon}
+          />
+          <Text style={[styles.bannerText, { color: theme.text }]}>
+            Di chuyển đến vị trí biển báo trong bán kính tối đa <Text style={styles.boldText}>100 mét</Text> để chụp và nộp ảnh thay thế.
+          </Text>
+        </View>
+
+        {/* Content List */}
+        {isLoading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator color={theme.primary} size="large" />
+            <Text style={[styles.loadingText, { color: theme.grey }]}>
+              Đang tải danh sách yêu cầu...
+            </Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View style={styles.centerContainer}>
+            <MaterialCommunityIcons color="#10B981" name="check-decagram-outline" size={56} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              Không có yêu cầu chụp lại nào
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+              Tất cả các biển báo bạn khảo sát đã đạt yêu cầu hoặc chưa có yêu cầu bổ sung mới.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            contentContainerStyle={styles.listContent}
+            data={items}
+            keyExtractor={(it) => String(it.request_id)}
+            refreshControl={
+              <RefreshControl onRefresh={refetch} refreshing={isRefetching} tintColor={theme.primary} />
+            }
+            renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderBottomWidth: 1,
+    gap: Spacing.two,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    minHeight: 40,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: {
+    flex: 1,
+    gap: 2,
+  },
+  screenTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+  },
+  screenSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  spinning: {
+    transform: [{ rotate: '45deg' }],
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.four,
+    marginTop: Spacing.three,
+    marginBottom: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  bannerIcon: {
+    marginRight: Spacing.two,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    lineHeight: 18,
+  },
+  boldText: {
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  listContent: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.six,
+    gap: Spacing.three,
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  card: {
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+    alignItems: 'center',
+  },
+  imageWrapper: {
+    width: 76,
+    height: 76,
+    borderRadius: Rounded.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  signImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImage: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 3,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  codeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  codeBadgeText: {
+    fontSize: 11,
+    fontFamily: Fonts.mono,
+    fontWeight: '700',
+  },
+  reasonBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: Rounded.sm,
+  },
+  reasonBadgeText: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  signTitle: {
+    fontSize: 15,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  coordsText: {
+    fontSize: 11,
+    fontFamily: Fonts.mono,
+  },
+  distanceInlineText: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  dotSeparator: {
+    fontSize: 11,
+    marginHorizontal: 1,
+  },
+  reviewerNoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 7,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  reviewerNoteIcon: {
+    marginTop: 1,
+  },
+  reviewerNoteText: {
+    fontSize: 12,
+    fontFamily: Fonts.body,
+    lineHeight: 17,
+    flex: 1,
+  },
+  reviewerNoteBold: {
+    fontWeight: '700',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: 2,
+  },
+  directionsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 42,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Rounded.md,
+  },
+  directionsButtonText: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+  },
+  recaptureButton: {
+    flex: 1.4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 42,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Rounded.md,
+  },
+  recaptureButtonText: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.five,
+    gap: Spacing.two,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: Fonts.title,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: Spacing.two,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    fontFamily: Fonts.body,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
+  },
+});
+
+export default RecapturesScreen;

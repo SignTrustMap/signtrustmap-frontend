@@ -1,9 +1,9 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -12,13 +12,13 @@ type ReviewTab = 'catalog' | 'review';
 const tabs = [
   {
     id: 'review',
-    label: 'Review',
+    label: 'Thẩm định',
     route: '/work/submission-review',
     symbol: { android: 'fact_check', ios: 'checkmark.rectangle.stack', web: 'fact_check' },
   },
   {
     id: 'catalog',
-    label: 'Catalog',
+    label: 'Tra cứu',
     route: '/work/sign-catalog',
     symbol: { android: 'menu_book', ios: 'books.vertical', web: 'menu_book' },
   },

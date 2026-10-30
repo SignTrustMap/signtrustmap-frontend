@@ -3,7 +3,16 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-import type { CreditTransaction } from '../data/mock-credit-data';
+export type CreditTransaction = {
+  id: string;
+  title?: string;
+  name?: string;
+  amount: number;
+  date?: string;
+  timestamp?: string;
+  detail?: string;
+  type?: string;
+};
 
 export function TransactionList({ transactions }: { transactions: CreditTransaction[] }) {
   const theme = useTheme();
@@ -19,9 +28,9 @@ export function TransactionList({ transactions }: { transactions: CreditTransact
           ]}
         >
           <View style={styles.copy}>
-            <Text style={[styles.title, { color: theme.text }]}>{transaction.title}</Text>
+            <Text style={[styles.title, { color: theme.text }]}>{transaction.title ?? transaction.name}</Text>
             <Text numberOfLines={1} style={[styles.detail, { color: theme.placeholder }]}>
-              {transaction.date}{transaction.detail ? ` · ${transaction.detail}` : ''}
+              {(transaction.date ?? transaction.timestamp) ?? ''}{transaction.detail ? ` · ${transaction.detail}` : ''}
             </Text>
           </View>
           <Text style={[styles.amount, { color: transaction.amount >= 0 ? '#087A3D' : '#C62929' }]}>

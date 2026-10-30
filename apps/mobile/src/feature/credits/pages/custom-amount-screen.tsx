@@ -1,9 +1,9 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -31,20 +31,20 @@ export function CustomAmountScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: theme.background }]}
     >
-      <CreditScreenHeader onBack={() => router.back()} title="Custom Amount" />
+      <CreditScreenHeader onBack={() => router.back()} title="Số lượng tùy chỉnh" />
       <View style={styles.content}>
         <View style={styles.balanceRow}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Current balance</Text>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số điểm hiện tại</Text>
           <Text style={[styles.balanceValue, { color: theme.text }]}>
-            {walletData?.wallet?.balance ?? 0} credits
+            {walletData?.wallet?.balance ?? 0} Credits
           </Text>
         </View>
         <View style={styles.amountEntry}>
-          <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Custom amount</Text>
+          <Text style={[styles.customLabel, { color: theme.textSecondary }]}>Số lượng tùy chỉnh</Text>
           <View style={[styles.inputRow, { borderColor: theme.primary }]}>
             <Text style={[styles.currency, { color: theme.text }]}>C</Text>
             <TextInput
-              accessibilityLabel="Custom credit amount"
+              accessibilityLabel="Số lượng Credits tùy chỉnh"
               autoFocus
               keyboardType="number-pad"
               onChangeText={(value) => setAmount(value.replace(/[^0-9]/g, ''))}
@@ -70,7 +70,7 @@ export function CustomAmountScreen() {
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <AppButton
           disabled={numericAmount <= 0}
-          label={`Continue with ${numericAmount.toFixed(2)} credits`}
+          label={`Tiếp tục với ${numericAmount.toFixed(2)} Credits`}
           onPress={continueToPayment}
         />
       </SafeAreaView>

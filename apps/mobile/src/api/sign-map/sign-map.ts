@@ -39,19 +39,16 @@ export function createVerifiedSign(
     );
 }
 
-export function getSignsAlongRoute(
+export async function getSignsAlongRoute(
     request: RouteSignsRequestDto,
     signal?: AbortSignal,
 ): Promise<FindSignsAlongRouteResponse> {
-    const res = jsonApiRequest<FindSignsAlongRouteResponse>(
+    return jsonApiRequest<FindSignsAlongRouteResponse>(
         API_PATHS.SIGNS_ALONG_ROUTE,
         request,
         undefined,
         signal,
     );
-
-    console.log('getSignsAlongRoute', res);
-    return res;
 }
 
 /** Requires a Staff/Admin bearer token. */
@@ -70,6 +67,50 @@ export function updateVerifiedSign(
             signal,
         },
         accessToken,
+    );
+}
+
+/** Query verified signs near GPS location with distance and optional heading filter */
+export function getNearbySignCandidates(
+    params: {
+        latitude: number;
+        longitude: number;
+        radiusMeters?: number;
+        headingDegrees?: number;
+    },
+    signal?: AbortSignal,
+): Promise<FindSignsInBoundsResponse> {
+    const searchParams = new URLSearchParams({
+        latitude: String(params.latitude),
+        longitude: String(params.longitude),
+        ...(params.radiusMeters != null ? { radiusMeters: String(params.radiusMeters) } : {}),
+        ...(params.headingDegrees != null ? { headingDegrees: String(params.headingDegrees) } : {}),
+    });
+    return apiRequest<FindSignsInBoundsResponse>(
+        `${API_PATHS.SIGNS_NEARBY_CANDIDATES}?${searchParams}`,
+        { signal },
+    );
+}
+
+/** Submit driver or surveyor verification confirming or reporting missing a verified sign */
+export function confirmSignPresence(
+    id: string,
+    body: {
+        isPresent: boolean;
+        latitude?: number;
+        longitude?: number;
+        photoEvidenceUrl?: string;
+        note?: string;
+    },
+    accessToken: string,
+    signal?: AbortSignal,
+): Promise<{ success: boolean; message?: string }> {
+    return jsonApiRequest<{ success: boolean; message?: string }>(
+        `${API_PATHS.SIGNS}/${encodeURIComponent(id)}/confirm`,
+        body,
+        accessToken,
+        signal,
+        'POST',
     );
 }
 

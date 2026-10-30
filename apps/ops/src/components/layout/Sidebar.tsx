@@ -23,6 +23,7 @@ import {
 } from '@phosphor-icons/react'
 import { UserDropdownMenu } from './UserDropdownMenu'
 import { ProfileModal } from './ProfileModal'
+import { useNavBadges } from '@/hooks/useNavBadges'
 
 interface NavSection {
   title: string
@@ -36,6 +37,7 @@ interface NavSection {
 
 export function Sidebar() {
   const { user } = useAuth()
+  const { badges } = useNavBadges()
   const { t } = useTranslation('common')
   const location = useLocation()
   const { isCollapsed } = useSidebar()
@@ -77,7 +79,7 @@ export function Sidebar() {
           icon: <ShieldWarning size={18} weight="duotone" />,
           label: t('nav.escalations'),
           href: '/escalations',
-          badge: 5,
+          badge: badges.escalations,
         },
         {
           icon: <Users size={18} weight="duotone" />,
@@ -157,7 +159,7 @@ export function Sidebar() {
           icon: <ShieldCheck size={18} weight="duotone" />,
           label: t('nav.candidates'),
           href: '/candidates',
-          badge: 4,
+          badge: badges.candidates,
         },
         {
           icon: <MapTrifold size={18} weight="duotone" />,
@@ -168,7 +170,7 @@ export function Sidebar() {
           icon: <CheckSquare size={18} weight="duotone" />,
           label: t('nav.tasks'),
           href: '/tasks',
-          badge: 3,
+          badge: badges.tasks,
         },
         {
           icon: <ClipboardText size={18} weight="duotone" />,
@@ -189,7 +191,7 @@ export function Sidebar() {
           icon: <Question size={18} weight="duotone" />,
           label: t('nav.new_types'),
           href: '/catalog/new-types',
-          badge: 4,
+          badge: badges.newTypes,
         },
         {
           icon: <CurrencyCircleDollar size={18} weight="duotone" />,
@@ -284,7 +286,7 @@ export function Sidebar() {
             {isCollapsed ? (
               sIdx > 0 && <div className="w-8 h-px bg-gray-200 dark:bg-white/10 mx-auto my-2" />
             ) : (
-              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 font-mono select-none">
+              <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-gray-400 dark:text-gray-500 select-none">
                 {section.title}
               </p>
             )}
@@ -338,7 +340,7 @@ export function Sidebar() {
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge ? (
                     <span
-                      className={`shrink-0 min-w-[20px] h-[20px] flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${
+                      className={`shrink-0 min-w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${
                         active
                           ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-[#061115]'
                           : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'

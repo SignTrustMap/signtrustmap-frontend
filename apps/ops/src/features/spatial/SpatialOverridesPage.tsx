@@ -182,7 +182,7 @@ export default function SpatialOverridesPage() {
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-neutral-50 dark:bg-white/5 text-neutral-500 dark:text-neutral-400 font-mono uppercase border-b border-neutral-200/80 dark:border-white/10">
+            <thead className="bg-neutral-50 dark:bg-white/5 text-neutral-500 dark:text-neutral-400 font-mono border-b border-neutral-200/80 dark:border-white/10">
               <tr>
                 <th className="py-3.5 px-4 font-semibold">{t('spatial.th_id_code')}</th>
                 <th className="py-3.5 px-4 font-semibold">{t('spatial.th_coords')}</th>

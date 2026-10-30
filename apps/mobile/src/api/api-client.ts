@@ -1,5 +1,9 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import {
+    API_URL_NOT_CONFIGURED_MESSAGE,
+    formatServerConnectionErrorMessage,
+} from "@/constants/message";
 
 // ---------------------------------------------------------------------------
 // Auth-expiry emitter
@@ -69,13 +73,13 @@ export function apiBaseUrl() {
         return `http://${developmentHost}:3000/api/v1`;
     }
 
-    throw new Error("EXPO_PUBLIC_API_URL is not configured.");
+    throw new Error(API_URL_NOT_CONFIGURED_MESSAGE);
 }
 
 function errorMessage(body: ApiErrorBody | undefined, status: number) {
     if (Array.isArray(body?.message)) return body.message.join(" ");
     return (
-        body?.message ?? body?.error ?? `Request failed with status ${status}.`
+        body?.message ?? body?.error ?? `Yêu cầu thất bại với mã trạng thái ${status}.`
     );
 }
 
@@ -105,7 +109,7 @@ export async function apiRequest<T>(
             cause,
             error,
         });
-        throw new Error(`Failed to connect to backend at ${baseUrl}: ${cause}`);
+        throw new Error(formatServerConnectionErrorMessage(baseUrl, cause));
     }
 
     const text = await response.text();

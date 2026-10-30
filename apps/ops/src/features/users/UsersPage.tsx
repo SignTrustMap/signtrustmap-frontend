@@ -1,67 +1,244 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
+import PageHeader from '@/components/common/PageHeader'
+import { DataFilterBar } from '@/components/common/DataFilterBar'
 import CustomSelect from '@/components/common/CustomSelect'
 import { Pagination } from '@/components/common/Pagination'
-import { DataFilterBar } from '@/components/common/DataFilterBar'
 import { ModalPortal } from '@/components/common/ModalPortal'
-import PageHeader from '@/components/common/PageHeader'
 import {
-  Funnel,
-  ShieldCheck,
-  Prohibit,
+  ArrowsClockwise,
+  CircleNotch,
   X,
-  CheckCircle,
-  NotePencil,
-  FloppyDisk,
-  PaperPlaneTilt,
   Copy,
   Check,
 } from '@phosphor-icons/react'
-import { mockAdminUsers, type AdminUserItem } from '@/data/adminGovernanceData'
-import { mockOpsDemoAccounts } from '@/data/mockAccounts'
+import { userService, type BackendUserItem } from '@/api/services/user.service'
+
+const SYSTEM_ROLES = [
+  { code: 'ADMIN', label: 'Admin' },
+  { code: 'STAFF', label: 'Staff' },
+  { code: 'REVIEWER', label: 'Reviewer' },
+  { code: 'SURVEYOR', label: 'Surveyor' },
+  { code: 'DRIVER', label: 'Driver' },
+] as const
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Admin',
+  STAFF: 'Staff',
+  REVIEWER: 'Reviewer',
+  SURVEYOR: 'Surveyor',
+  DRIVER: 'Driver',
+}
+
+function formatRoleName(code: string): string {
+  const upper = (code || '').toUpperCase()
+  return ROLE_LABELS[upper] || code
+}
+
+function formatShortDate(dateStr?: string | null): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+function formatFullDateTime(dateStr?: string | null): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getStatusMeta(status: string) {
+  switch (status?.toUpperCase()) {
+    case 'ACTIVE':
+      return {
+        label: 'Hoạt động',
+        textColor: 'text-emerald-700 dark:text-emerald-400 font-medium',
+      }
+    case 'SUSPENDED':
+      return {
+        label: 'Tạm khóa',
+        textColor: 'text-amber-700 dark:text-amber-400 font-medium',
+      }
+    case 'BANNED':
+      return {
+        label: 'Đã cấm',
+        textColor: 'text-red-700 dark:text-red-400 font-medium',
+      }
+    default:
+      return {
+        label: status || '—',
+        textColor: 'text-gray-600 dark:text-gray-400',
+      }
+  }
+}
+
+function UserAvatar({
+  url,
+  name,
+  size = 'sm',
+  className = '',
+}: {
+  url?: string | null
+  name?: string
+  size?: 'sm' | 'md'
+  className?: string
+}) {
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [url])
+
+  const words = (name || '').trim().split(/\s+/).filter(Boolean)
+  const initials =
+    words.length >= 2
+      ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+      : (words[0]?.[0] || 'U').toUpperCase()
+
+  const dim = size === 'md' ? 'w-10 h-10 text-xs' : 'w-8 h-8 text-[11px]'
+
+  if (url && !imgError) {
+    return (
+      <img
+        src={url}
+        alt={name || ''}
+        onError={() => setImgError(true)}
+        className={`${dim} rounded-full object-cover border border-gray-200 dark:border-white/10 shrink-0 ${className}`}
+      />
+    )
+  }
+
+  return (
+    <div
+      className={`${dim} rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-700 dark:text-neutral-300 font-semibold flex items-center justify-center shrink-0 border border-neutral-200/60 dark:border-white/10 select-none font-mono ${className}`}
+    >
+      {initials}
+    </div>
+  )
+}
 
 export default function UsersPage() {
   const { t } = useTranslation(['ops', 'common'])
   const toast = useToast()
 
-  const [users, setUsers] = useState<AdminUserItem[]>(mockAdminUsers)
+  // Real API State (Zero mock data)
+  const [users, setUsers] = useState<BackendUserItem[]>([])
+  const [totalCount, setTotalCount] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Direct Editable Form state
-  const [editForm, setEditForm] = useState<AdminUserItem | null>(null)
+  // Modal State
+  const [selectedUser, setSelectedUser] = useState<BackendUserItem | null>(null)
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [selectedStatus, setSelectedStatus] = useState<'ACTIVE' | 'SUSPENDED' | 'BANNED'>('ACTIVE')
+  const [statusReason, setStatusReason] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [copiedId, setCopiedId] = useState(false)
 
-  // Send Password Reset Email state
-  const [isSendingResetEmail, setIsSendingResetEmail] = useState(false)
-  const [resetEmailSentInfo, setResetEmailSentInfo] = useState<{
-    email: string
-    sentAt: string
-    expiresInMinutes: number
-    tokenLink: string
-  } | null>(null)
-  const [hasCopiedResetLink, setHasCopiedResetLink] = useState(false)
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
-  // Open modal with user details ready for direct editing
-  function handleOpenUser(u: AdminUserItem) {
-    setSelectedUser(u)
-    setEditForm({ ...u })
-    setResetEmailSentInfo(null)
-  }
+  // Fetch users directly from real NestJS API
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await userService.getUsers({
+        page: currentPage,
+        pageSize,
+        search: debouncedSearch.trim() || undefined,
+        role: roleFilter !== 'all' ? roleFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      })
 
-  function handleCloseModal() {
-    setSelectedUser(null)
-    setEditForm(null)
-    setIsSendingResetEmail(false)
-    setResetEmailSentInfo(null)
-  }
+      if (response && Array.isArray(response.items)) {
+        setUsers(response.items)
+        setTotalCount(response.total ?? response.items.length)
+      } else {
+        setUsers([])
+        setTotalCount(0)
+      }
+    } catch (err: any) {
+      // If remote backend returns 500 for role query (pending deployment of backend fix),
+      // gracefully fetch without role param and filter locally so user experience is uninterrupted
+      if (roleFilter !== 'all') {
+        try {
+          const fallbackRes = await userService.getUsers({
+            page: 1,
+            pageSize: 100,
+            search: debouncedSearch.trim() || undefined,
+            status: statusFilter !== 'all' ? statusFilter : undefined,
+          })
+          if (fallbackRes && Array.isArray(fallbackRes.items)) {
+            const matched = fallbackRes.items.filter((u) =>
+              (u.roles || []).some((r) => r.toUpperCase() === roleFilter.toUpperCase())
+            )
+            setUsers(matched.slice((currentPage - 1) * pageSize, currentPage * pageSize))
+            setTotalCount(matched.length)
+            setIsLoading(false)
+            return
+          }
+        } catch {
+          // If fallback fails too, proceed to error toast
+        }
+      }
+
+      console.error('Failed to load users from API:', err)
+      toast.error(err?.message || 'Không thể tải danh sách người dùng từ máy chủ')
+      setUsers([])
+      setTotalCount(0)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentPage, pageSize, debouncedSearch, roleFilter, statusFilter, toast])
 
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
+    fetchUsers()
+  }, [fetchUsers])
+
+  // Open Edit Modal
+  const handleOpenModal = (user: BackendUserItem) => {
+    setSelectedUser(user)
+    setSelectedRoles(Array.isArray(user.roles) ? user.roles.map((r) => r.toUpperCase()) : [])
+    setSelectedStatus(user.status || 'ACTIVE')
+    setStatusReason('')
+    setCopiedId(false)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedUser(null)
+    setIsSubmitting(false)
+    setCopiedId(false)
+  }
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedUser) {
         handleCloseModal()
       }
@@ -70,648 +247,464 @@ export default function UsersPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedUser])
 
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.phone && u.phone.includes(searchTerm)) ||
-      (u.location && u.location.toLowerCase().includes(searchTerm.toLowerCase()))
-
-    const matchesRole = roleFilter === 'all' || u.role === roleFilter
-    const matchesStatus = statusFilter === 'all' || u.status === statusFilter
-    return matchesSearch && matchesRole && matchesStatus
-  })
-
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
-
-  function handleToggleStatus(userId: string) {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          const nextStatus = u.status === 'Active' ? 'Suspended' : 'Active'
-          if (nextStatus === 'Active') {
-            toast.success(t('users.toast_unlocked', { name: u.name }))
-          } else {
-            toast.warning(t('users.toast_locked', { name: u.name }))
-          }
-          return { ...u, status: nextStatus }
-        }
-        return u
-      })
+  // Toggle role in modal
+  const handleToggleRole = (roleCode: string) => {
+    const code = roleCode.toUpperCase()
+    setSelectedRoles((prev) =>
+      prev.includes(code) ? prev.filter((r) => r !== code) : [...prev, code]
     )
-    if (selectedUser?.id === userId) {
-      const nextStatus = selectedUser.status === 'Active' ? 'Suspended' : 'Active'
-      setSelectedUser((prev) => (prev ? { ...prev, status: nextStatus } : null))
-      setEditForm((prev) => (prev ? { ...prev, status: nextStatus } : null))
-    }
   }
 
-  // Enterprise Password Reset Email Dispatcher
-  function handleSendPasswordResetEmail() {
+  // Handle Save User Changes
+  const handleSaveUser = async () => {
     if (!selectedUser) return
-    setIsSendingResetEmail(true)
-
-    setTimeout(() => {
-      setIsSendingResetEmail(false)
-      const token = `st_sec_${Math.random().toString(36).substring(2, 12)}_${Date.now().toString(36)}`
-      const resetLink = `https://signtrustmap.com/reset-password?token=${token}&email=${encodeURIComponent(selectedUser.email)}`
-
-      setResetEmailSentInfo({
-        email: selectedUser.email,
-        sentAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        expiresInMinutes: 30,
-        tokenLink: resetLink,
-      })
-
-      toast.success(t('users.lbl_reset_pwd_desc') + ` ${selectedUser.email}`)
-    }, 600)
-  }
-
-  function handleSaveEdit(e?: React.FormEvent) {
-    if (e) e.preventDefault()
-    if (!editForm || !selectedUser) return
-
-    if (!editForm.name.trim()) {
-      toast.error(t('users.err_name_required'))
-      return
-    }
-    if (!editForm.email.trim()) {
-      toast.error(t('users.err_email_required'))
-      return
-    }
-    if ((selectedUser.id === 'USR-001' || selectedUser.id === 'USR-006') && editForm.role !== 'admin') {
-      toast.warning(t('users.toast_root_admin_warn'))
+    if (selectedRoles.length === 0) {
+      toast.warning('Người dùng phải có ít nhất 1 vai trò')
       return
     }
 
-    const updatedUser: AdminUserItem = {
-      ...editForm,
-      name: editForm.name.trim(),
-      email: editForm.email.trim(),
-      phone: editForm.phone?.trim() || '',
-      location: editForm.location?.trim() || '',
-      department: editForm.department?.trim() || '',
-      avatar: editForm.avatar?.trim() || '',
-      credits: Number(editForm.credits) || 0,
-    }
+    setIsSubmitting(true)
+    try {
+      const originalRoles = (selectedUser.roles || []).map((r) => r.toUpperCase())
+      const newRoles = selectedRoles.map((r) => r.toUpperCase())
 
-    // 1. Update list state
-    setUsers((prev) => prev.map((u) => (u.id === selectedUser.id ? updatedUser : u)))
-    setSelectedUser(updatedUser)
-    setEditForm(updatedUser)
+      // 1. Assign added roles
+      const rolesToAdd = newRoles.filter((r) => !originalRoles.includes(r))
+      for (const r of rolesToAdd) {
+        await userService.assignRole(selectedUser.id, { roleCode: r, isActive: true })
+      }
 
-    // 2. Synchronize with demo accounts in memory if it's one of the official demo users
-    const demoAcc = mockOpsDemoAccounts.find(
-      (a) => a.email.toLowerCase() === selectedUser.email.toLowerCase() || a.id === selectedUser.id
-    )
-    if (demoAcc) {
-      demoAcc.name = updatedUser.name
-      demoAcc.email = updatedUser.email
-      if (updatedUser.avatar) demoAcc.avatar = updatedUser.avatar
-    }
+      // 2. Revoke removed roles
+      const rolesToRemove = originalRoles.filter((r) => !newRoles.includes(r))
+      for (const r of rolesToRemove) {
+        await userService.assignRole(selectedUser.id, { roleCode: r, isActive: false })
+      }
 
-    handleCloseModal()
-    toast.success(t('users.toast_saved', { name: updatedUser.name }))
-  }
+      // 3. Update status if changed
+      if (selectedStatus !== selectedUser.status) {
+        await userService.updateStatus(selectedUser.id, {
+          status: selectedStatus,
+          reason: statusReason.trim() || 'Admin cập nhật trạng thái từ Ops Portal',
+        })
+      }
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return (
-          <span className="inline-flex items-center font-mono font-bold text-[11px] uppercase px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-            {t('users.role_admin')}
-          </span>
-        )
-      case 'staff':
-        return (
-          <span className="inline-flex items-center font-mono font-bold text-[11px] uppercase px-2 py-0.5 rounded-md bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] border border-[#007b8b]/30 dark:border-[#00c4de]/40">
-            {t('users.role_staff')}
-          </span>
-        )
-      case 'reviewer':
-        return (
-          <span className="inline-flex items-center font-mono font-bold text-[11px] uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-            {t('users.role_reviewer')}
-          </span>
-        )
-      case 'surveyor':
-        return (
-          <span className="inline-flex items-center font-mono font-bold text-[11px] uppercase px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-            {t('users.role_surveyor')}
-          </span>
-        )
-      case 'driver':
-      default:
-        return (
-          <span className="inline-flex items-center font-mono font-bold text-[11px] uppercase px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-            {t('users.role_driver')}
-          </span>
-        )
+      toast.success(`Cập nhật tài khoản ${selectedUser.full_name || selectedUser.email} thành công`)
+      handleCloseModal()
+      fetchUsers()
+    } catch (err: any) {
+      console.error('Failed to update user:', err)
+      toast.error(err?.message || 'Không thể cập nhật người dùng trên máy chủ')
+    } finally {
+      setIsSubmitting(false)
     }
   }
-
-  const roleOptions = [
-    { value: 'driver', label: t('users.role_driver') },
-    { value: 'surveyor', label: t('users.role_surveyor') },
-    { value: 'reviewer', label: t('users.role_reviewer') },
-    { value: 'staff', label: t('users.role_staff') },
-    { value: 'admin', label: t('users.role_admin') },
-  ]
-
-  const statusOptions = [
-    { value: 'Active', label: t('users.status_active') },
-    { value: 'Suspended', label: t('users.status_suspended') },
-  ]
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* Page Title Only - Clean & Minimalist */}
-      <PageHeader title={t('users.title')} />
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full animate-in fade-in duration-200">
+      {/* ─── PAGE HEADER ──────────────────────────────────────────────── */}
+      <PageHeader
+        title={t('users.title', 'Quản lý người dùng')}
+        actions={
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={fetchUsers}
+            className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            title="Làm mới danh sách"
+          >
+            <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+          </button>
+        }
+      />
 
-      {/* Unified Filter and Search Bar */}
+      {/* ─── DATA FILTER BAR ───────────────────────────────────────────── */}
       <DataFilterBar
         searchQuery={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder={t('users.search_placeholder')}
+        searchPlaceholder="Tìm theo tên, email, SĐT..."
       >
+        {/* Role Filter */}
         <CustomSelect
           value={roleFilter}
-          onChange={setRoleFilter}
+          onChange={(val) => {
+            setRoleFilter(val)
+            setCurrentPage(1)
+          }}
           size="sm"
-          leftIcon={<Funnel size={14} />}
           options={[
-            { value: 'all', label: t('users.role_all') },
-            ...roleOptions,
+            { value: 'all', label: 'Tất cả vai trò' },
+            { value: 'ADMIN', label: 'Admin' },
+            { value: 'STAFF', label: 'Staff' },
+            { value: 'REVIEWER', label: 'Reviewer' },
+            { value: 'SURVEYOR', label: 'Surveyor' },
+            { value: 'DRIVER', label: 'Driver' },
           ]}
+          className="w-full sm:w-44"
         />
 
+        {/* Status Filter */}
         <CustomSelect
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={(val) => {
+            setStatusFilter(val)
+            setCurrentPage(1)
+          }}
           size="sm"
           options={[
-            { value: 'all', label: t('users.status_all') },
-            ...statusOptions,
+            { value: 'all', label: 'Tất cả trạng thái' },
+            { value: 'ACTIVE', label: 'Hoạt động' },
+            { value: 'SUSPENDED', label: 'Tạm khóa' },
+            { value: 'BANNED', label: 'Đã cấm' },
           ]}
+          className="w-full sm:w-44"
         />
       </DataFilterBar>
 
-      {/* Minimalist Users Table */}
+      {/* ─── CLEAN, CONCISE USERS TABLE (Pure API Data, Zero Mock) ─────── */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-neutral-50 dark:bg-white/5 text-neutral-500 dark:text-neutral-400 font-mono uppercase border-b border-neutral-200/80 dark:border-white/10">
+            <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
               <tr>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_user_id')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_contact')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_role')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_location')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_metrics')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_credits')}</th>
-                <th className="py-3.5 px-4 font-semibold">{t('users.th_status')}</th>
-                <th className="py-3.5 px-4 font-semibold text-center">{t('users.th_actions')}</th>
+                <th className="py-3 px-3 font-semibold w-14 text-center">Hình ảnh</th>
+                <th className="py-3 px-4 font-semibold">Người dùng</th>
+                <th className="py-3 px-4 font-semibold">Mã ID</th>
+                <th className="py-3 px-4 font-semibold">Số điện thoại</th>
+                <th className="py-3 px-4 font-semibold">Vai trò</th>
+                <th className="py-3 px-4 font-semibold">Trạng thái</th>
+                <th className="py-3 px-4 font-semibold">Ngày tham gia</th>
+                <th className="py-3 px-4 font-semibold text-center">Chi tiết</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-white/5">
-              {paginatedUsers.length === 0 ? (
+            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+              {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-neutral-400 font-medium">
-                    {t('users.empty_filter')}
+                  <td colSpan={8} className="py-12 text-center text-gray-400 font-medium">
+                    <div className="inline-flex items-center gap-2 text-neutral-500">
+                      <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>Đang tải danh sách người dùng từ hệ thống...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-gray-500 dark:text-gray-400">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                        Không tìm thấy người dùng nào
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc vai trò/trạng thái.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                paginatedUsers.map((u) => (
-                  <tr
-                    key={u.id}
-                    onClick={() => handleOpenUser(u)}
-                    className="hover:bg-neutral-50/80 dark:hover:bg-white/5 transition-colors cursor-pointer group"
-                  >
-                    {/* User ID & Name (Clean text - NO AVATAR IMAGE IN TABLE) */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex flex-col">
-                        <span className="font-mono text-[11px] font-bold text-[#007b8b] dark:text-[#00c4de] group-hover:underline">
-                          {u.id}
-                        </span>
-                        <span className="font-medium text-neutral-900 dark:text-white text-xs sm:text-sm">
-                          {u.name}
-                        </span>
-                      </div>
-                    </td>
+                users.map((u) => {
+                  const statusMeta = getStatusMeta(u.status)
 
-                    {/* Email & Phone */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex flex-col text-xs font-mono">
-                        <span className="text-neutral-700 dark:text-neutral-300 font-medium">{u.email}</span>
-                        <span className="text-neutral-400 text-[11px]">{u.phone || '--'}</span>
-                      </div>
-                    </td>
+                  return (
+                    <tr
+                      key={u.id}
+                      onClick={() => handleOpenModal(u)}
+                      className="hover:bg-neutral-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer group"
+                    >
+                      {/* Cột hình ảnh kế bên cột Người dùng */}
+                      <td className="py-3 px-3 text-center w-14">
+                        <UserAvatar url={u.avatar_url} name={u.full_name} size="sm" className="mx-auto" />
+                      </td>
 
-                    {/* Role Badge */}
-                    <td className="py-3.5 px-4">
-                      {getRoleBadge(u.role)}
-                    </td>
-
-                    {/* Location / Division */}
-                    <td className="py-3.5 px-4 text-neutral-600 dark:text-neutral-300 font-medium">
-                      {u.department || u.location || t('users.nationwide')}
-                    </td>
-
-                    {/* Role Metrics / Contribution strictly matching documents */}
-                    <td className="py-3.5 px-4 font-mono">
-                      {u.role === 'reviewer' && (
-                        <div className="text-[11px]">
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {u.reliabilityScore ? `${(u.reliabilityScore * 100).toFixed(0)}%` : '--'}
-                          </span>
-                          <span className="text-neutral-400 ml-1">{t('users.reviews_count', { count: u.reviewsCount || 0 })}</span>
+                      {/* 1. Người dùng: Tên + Email */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-gray-900 dark:text-gray-100">
+                            {u.full_name || 'Chưa đặt tên'}
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+                            {u.email}
+                          </p>
                         </div>
-                      )}
-                      {u.role === 'surveyor' && (
-                        <div className="text-[11px]">
-                          <span className="font-bold text-blue-600 dark:text-blue-400">
-                            {u.reliabilityScore ? `${(u.reliabilityScore * 100).toFixed(0)}%` : '--'}
-                          </span>
-                          <span className="text-neutral-400 ml-1">{t('users.surveys_count', { count: u.surveysSubmitted || 0 })}</span>
-                        </div>
-                      )}
-                      {u.role === 'staff' && (
-                        <div className="text-[11px] text-[#007b8b] dark:text-[#00c4de] font-semibold">
-                          {t('users.moderations_count', { count: u.moderationHandled || 0 })}
-                        </div>
-                      )}
-                      {u.role === 'driver' && (
-                        <div className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
-                          {u.distanceTraveled || t('users.status_active')}
-                        </div>
-                      )}
-                      {u.role === 'admin' && (
-                        <span className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold">
-                          Platform Governance
-                        </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Credits */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-neutral-800 dark:text-neutral-200">
-                      {u.credits.toLocaleString()} pts
-                    </td>
+                      {/* 2. Mã ID: Rút gọn 8 ký tự, font-mono */}
+                      <td className="py-3.5 px-4 font-mono font-semibold text-[#007b8b] dark:text-[#00c4de]">
+                        <span className="group-hover:underline">#{u.id.slice(0, 8)}</span>
+                      </td>
 
-                    {/* Status Badge */}
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
-                          u.status === 'Active'
-                            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                            : 'bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30'
-                        }`}
-                      >
-                        {u.status === 'Active' ? t('users.status_active') : t('users.status_suspended')}
-                      </span>
-                    </td>
+                      {/* 3. Số điện thoại */}
+                      <td className="py-3.5 px-4 font-mono text-gray-700 dark:text-gray-300">
+                        {u.phone || '—'}
+                      </td>
 
-                    {/* Action Buttons */}
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {/* 4. Vai trò: Chuỗi văn bản thuần ngăn cách bằng dấu phẩy */}
+                      <td className="py-3.5 px-4 text-xs">
+                        {u.roles && u.roles.length > 0 ? (
+                          u.roles.map((r, i) => {
+                            const isAdmin = r.toUpperCase() === 'ADMIN'
+                            return (
+                              <span key={r}>
+                                {i > 0 && ', '}
+                                <span
+                                  className={
+                                    isAdmin
+                                      ? 'font-semibold text-purple-700 dark:text-purple-400'
+                                      : 'text-gray-700 dark:text-gray-300'
+                                  }
+                                >
+                                  {formatRoleName(r)}
+                                </span>
+                              </span>
+                            )
+                          })
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+
+                      {/* 5. Trạng thái: Chữ thuần có màu ngữ cảnh */}
+                      <td className="py-3.5 px-4">
+                        <span className={statusMeta.textColor}>{statusMeta.label}</span>
+                      </td>
+
+                      {/* 6. Ngày tham gia */}
+                      <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400 font-mono text-[11px] whitespace-nowrap">
+                        {formatShortDate(u.created_at)}
+                      </td>
+
+                      {/* 7. Nút xem chi tiết */}
+                      <td className="py-3.5 px-4 text-center">
                         <button
                           type="button"
-                          onClick={() => handleOpenUser(u)}
-                          className="p-1.5 text-neutral-500 hover:text-[#007b8b] dark:hover:text-[#00c4de] hover:bg-neutral-100 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                          title={t('users.edit_user_tooltip')}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenModal(u)
+                          }}
+                          className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-[#007b8b] hover:text-white dark:bg-white/10 dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
                         >
-                          <NotePencil size={16} />
+                          Chi tiết
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(u.id)}
-                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                            u.status === 'Active'
-                              ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
-                              : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                          }`}
-                          title={u.status === 'Active' ? t('users.btn_lock') : t('users.btn_unlock')}
-                        >
-                          {u.status === 'Active' ? <Prohibit size={16} /> : <ShieldCheck size={16} />}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div className="px-6 py-4 border-t border-neutral-100 dark:border-white/5">
+        {/* ─── PAGINATION (Clean backend-paginated) ────────────────────── */}
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredUsers.length}
+            totalItems={totalCount}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
               setPageSize(newSize)
               setCurrentPage(1)
             }}
-            pageSizeOptions={[5, 10, 20]}
+            pageSizeOptions={[5, 10, 20, 50]}
           />
         </div>
       </div>
 
-      {/* ─── Direct Editable User Modal ─── */}
-      {selectedUser && editForm && (
+      {/* ─── SIMPLE & CLEAN USER DETAIL & EDIT MODAL (Identical style to /escalations & catalog) ───────────────────── */}
+      {selectedUser && (
         <ModalPortal>
           <div
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto select-none"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
             onClick={handleCloseModal}
           >
             <div
-              className="bg-white dark:bg-[#0A171C] border border-neutral-200 dark:border-white/15 rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto"
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-[560px] w-full shadow-2xl animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col overflow-hidden text-xs text-gray-800 dark:text-gray-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between border-b border-neutral-100 dark:border-white/10 pb-4">
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="relative shrink-0">
-                      {selectedUser.avatar ? (
-                        <img
-                          src={selectedUser.avatar}
-                          alt={selectedUser.name}
-                          className="w-12 h-12 rounded-full object-cover border border-neutral-200 dark:border-white/20 shadow-xs"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-base text-white shadow-xs ${
-                            selectedUser.avatarBg || 'bg-[#007b8b]'
-                          }`}
-                        >
-                          {selectedUser.initials || selectedUser.name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-bold text-neutral-900 dark:text-white truncate">
-                          {selectedUser.name}
-                        </h3>
-                        <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-neutral-100 dark:bg-white/10 text-neutral-500 dark:text-neutral-400 font-bold">
-                          {selectedUser.id}
-                        </span>
-                      </div>
-                      <p className="font-mono text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
-                        {selectedUser.email}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {getRoleBadge(editForm.role)}
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold ${
-                            editForm.status === 'Active'
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
-                          }`}
-                        >
-                          {editForm.status === 'Active'
-                            ? t('users.status_active')
-                            : t('users.status_suspended')}
-                        </span>
-                        <span className="text-[11px] text-neutral-400 font-mono">
-                          • {selectedUser.joinedAt}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Close Button */}
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="text-neutral-400 hover:text-neutral-600 dark:hover:text-white p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                    title={t('users.btn_close')}
-                  >
-                    <X size={20} />
-                  </button>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                    {selectedUser.full_name || selectedUser.email}
+                  </span>
+                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                  <span className={`font-medium text-xs whitespace-nowrap ${getStatusMeta(selectedUser.status).textColor}`}>
+                    {getStatusMeta(selectedUser.status).label}
+                  </span>
                 </div>
 
-                {/* Direct Editable Form Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Họ và tên */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_name')} *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      placeholder={t('users.placeholder_name')}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
-                    />
-                  </div>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-2"
+                  title="Đóng (Esc)"
+                >
+                  <X size={18} weight="bold" />
+                </button>
+              </div>
 
-                  {/* Email */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_email')} *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                      placeholder="name@signtrustmap.com"
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
-                    />
-                  </div>
-
-                  {/* Số điện thoại */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_phone')}
-                    </label>
-                    <input
-                      type="tel"
-                      value={editForm.phone || ''}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      placeholder="0901234567"
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] font-mono"
-                    />
-                  </div>
-
-                  {/* Khu vực / Địa bàn */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_location')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.location || ''}
-                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                      placeholder={t('users.placeholder_location')}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
-                    />
-                  </div>
-
-                  {/* Vai trò (Role) - CustomSelect pure text without emojis */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_role')}
-                    </label>
-                    <CustomSelect
-                      value={editForm.role}
-                      onChange={(val) =>
-                        setEditForm({
-                          ...editForm,
-                          role: val as 'driver' | 'surveyor' | 'reviewer' | 'staff' | 'admin',
-                        })
-                      }
-                      options={roleOptions}
-                      className="w-full"
-                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-[38px]"
-                    />
-                  </div>
-
-                  {/* Trạng thái tài khoản - CustomSelect pure text without emojis */}
-                  <div className="space-y-1">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_status')}
-                    </label>
-                    <CustomSelect
-                      value={editForm.status}
-                      onChange={(val) =>
-                        setEditForm({
-                          ...editForm,
-                          status: val as 'Active' | 'Suspended',
-                        })
-                      }
-                      options={statusOptions}
-                      className="w-full"
-                      buttonClassName="w-full rounded-xl border-neutral-300 dark:border-white/15 min-h-[38px]"
-                    />
-                  </div>
-
-                  {/* Phòng ban / Phụ trách */}
-                  <div className="space-y-1 sm:col-span-2">
-                    <label className="font-semibold text-neutral-700 dark:text-neutral-300 block">
-                      {t('users.lbl_department')}
-                    </label>
-                    <input
-                      type="text"
-                      value={editForm.department || ''}
-                      onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                      placeholder={t('users.placeholder_department')}
-                      className="w-full px-3 py-2 rounded-xl border border-neutral-300 dark:border-white/15 bg-white dark:bg-white/5 text-neutral-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de]"
-                    />
+              {/* Modal Body */}
+              <div className="p-5 space-y-4 overflow-y-auto text-xs">
+                {/* 1. Profile Card */}
+                <div className="flex items-center gap-3.5 p-3.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+                  <UserAvatar url={selectedUser.avatar_url} name={selectedUser.full_name} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                      {selectedUser.full_name || 'Chưa đặt tên'}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                      {selectedUser.email}
+                    </p>
                   </div>
                 </div>
 
-                {/* Password Reset Section */}
-                <div className="p-3.5 bg-neutral-50 dark:bg-white/5 border border-neutral-200/80 dark:border-white/10 rounded-xl space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="font-bold text-neutral-900 dark:text-white text-xs">
-                        {t('users.lbl_reset_pwd')}
-                      </h4>
-                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                        {t('users.lbl_reset_pwd_desc')} {selectedUser.email}
-                      </p>
+                {/* 2. Key-Value Info Card (Full ID shown cleanly) */}
+                <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5">
+                  <div className="flex items-center justify-between py-2 px-3.5">
+                    <span className="text-gray-500 dark:text-gray-400">Mã người dùng</span>
+                    <div className="flex items-center gap-1.5 font-mono text-gray-800 dark:text-gray-200">
+                      <span className="select-all break-all">{selectedUser.id}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedUser.id)
+                          setCopiedId(true)
+                          setTimeout(() => setCopiedId(false), 2000)
+                        }}
+                        className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                        title="Sao chép UUID"
+                      >
+                        {copiedId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      disabled={isSendingResetEmail}
-                      onClick={handleSendPasswordResetEmail}
-                      className="px-3.5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black font-semibold text-xs transition-all shadow-xs disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
-                    >
-                      <PaperPlaneTilt size={13} weight="bold" className={isSendingResetEmail ? 'animate-spin' : ''} />
-                      <span>{isSendingResetEmail ? t('users.btn_sending') : t('users.btn_send_reset_link')}</span>
-                    </button>
                   </div>
 
-                  {resetEmailSentInfo && resetEmailSentInfo.email === selectedUser.email && (
-                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/30 rounded-lg space-y-2 animate-in fade-in">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300 font-medium">
-                          <CheckCircle size={14} weight="fill" className="text-emerald-500" />
-                          <span>{t('users.reset_sent_info', { time: resetEmailSentInfo.sentAt })}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={resetEmailSentInfo.tokenLink}
-                          className="flex-1 px-2.5 py-1 text-[11px] font-mono rounded-lg bg-white dark:bg-black/40 border border-emerald-500/30 text-neutral-700 dark:text-neutral-200 outline-none select-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(resetEmailSentInfo.tokenLink)
-                            setHasCopiedResetLink(true)
-                            toast.success(t('users.toast_copied'))
-                            setTimeout(() => setHasCopiedResetLink(false), 2000)
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-medium transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
-                        >
-                          {hasCopiedResetLink ? <Check size={12} weight="bold" /> : <Copy size={12} weight="bold" />}
-                          <span>{hasCopiedResetLink ? t('users.btn_copied') : t('users.btn_copy_link')}</span>
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between py-2 px-3.5">
+                    <span className="text-gray-500 dark:text-gray-400">Số điện thoại</span>
+                    <span className="font-mono text-gray-800 dark:text-gray-200">{selectedUser.phone || '—'}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2 px-3.5">
+                    <span className="text-gray-500 dark:text-gray-400">Ngày tạo</span>
+                    <span className="font-mono text-gray-800 dark:text-gray-200">{formatFullDateTime(selectedUser.created_at)}</span>
+                  </div>
+
+                  {selectedUser.updated_at && (
+                    <div className="flex items-center justify-between py-2 px-3.5">
+                      <span className="text-gray-500 dark:text-gray-400">Cập nhật lần cuối</span>
+                      <span className="font-mono text-gray-800 dark:text-gray-200">{formatFullDateTime(selectedUser.updated_at)}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Direct Editable Footer Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-white/10 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleStatus(selectedUser.id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      selectedUser.status === 'Active'
-                        ? 'bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/40'
-                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/40'
-                    }`}
-                  >
-                    {selectedUser.status === 'Active' ? (
-                      <>
-                        <Prohibit size={14} />
-                        <span>{t('users.btn_lock')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle size={14} />
-                        <span>{t('users.btn_unlock')}</span>
-                      </>
-                    )}
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCloseModal}
-                      className="px-4 py-2 rounded-xl border border-neutral-200 dark:border-white/10 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 font-medium text-xs transition-colors cursor-pointer"
-                    >
-                      {t('users.btn_close')}
-                    </button>
-
-                    <button
-                      type="submit"
-                      className="px-5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-                    >
-                      <FloppyDisk size={14} weight="bold" />
-                      <span>{t('users.btn_save')}</span>
-                    </button>
+                {/* 3. Vai trò */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-900 dark:text-white">
+                    Vai trò
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                    {SYSTEM_ROLES.map((r) => {
+                      const isSelected = selectedRoles.includes(r.code)
+                      return (
+                        <button
+                          key={r.code}
+                          type="button"
+                          onClick={() => handleToggleRole(r.code)}
+                          className={`py-2 px-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-center ${
+                            isSelected
+                              ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
+                              : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-              </form>
+
+                {/* 4. Trạng thái */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-gray-900 dark:text-white">
+                    Trạng thái
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStatus('ACTIVE')}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-center ${
+                        selectedStatus === 'ACTIVE'
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      Hoạt động
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStatus('SUSPENDED')}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-center ${
+                        selectedStatus === 'SUSPENDED'
+                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      Tạm khóa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStatus('BANNED')}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer text-center ${
+                        selectedStatus === 'BANNED'
+                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
+                      }`}
+                    >
+                      Đã cấm
+                    </button>
+                  </div>
+
+                  {selectedStatus !== selectedUser.status && (selectedStatus === 'SUSPENDED' || selectedStatus === 'BANNED') && (
+                    <div className="space-y-1 pt-1 animate-in fade-in duration-150">
+                      <label className="text-[11px] text-gray-500">
+                        Lý do thay đổi trạng thái
+                      </label>
+                      <input
+                        type="text"
+                        value={statusReason}
+                        onChange={(e) => setStatusReason(e.target.value)}
+                        placeholder="Nhập lý do..."
+                        className="w-full px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-hidden focus:ring-1 focus:ring-[#007b8b]"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/15 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleSaveUser}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <CircleNotch size={14} className="animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <span>Lưu thay đổi</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </ModalPortal>

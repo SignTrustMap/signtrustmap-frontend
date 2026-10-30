@@ -1,6 +1,8 @@
 import { getStorageItemAsync, removeStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import { SESSION_PROVIDER_REQUIRED_MESSAGE } from '@/constants/message';
+import { toggleRole, backendRoleToAccountRole } from '@/api/auth/auth';
 
 export const ACCOUNT_ROLES = ['driver', 'surveyor', 'reviewer'] as const;
 
@@ -26,6 +28,7 @@ type SessionContextValue = {
   logOut: () => Promise<void>;
   session: AppSession | null;
   setRoleEnabled: (role: OptionalAccountRole, enabled: boolean) => Promise<void>;
+  updateAccount?: (updates: Partial<Account>) => Promise<void>;
 };
 
 const AuthContext = createContext<SessionContextValue | null>(null);
@@ -34,10 +37,14 @@ export const useSession = () => {
   const value = use(AuthContext);
 
   if (!value) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error(SESSION_PROVIDER_REQUIRED_MESSAGE);
   }
 
   return value;
+};
+
+export const useOptionalSession = (): SessionContextValue | null => {
+  return use(AuthContext);
 };
 
 function normalizeRoles(roles: unknown): AccountRole[] {
@@ -130,24 +137,58 @@ export function SessionProvider({ children }: PropsWithChildren) {
   async function setRoleEnabled(role: OptionalAccountRole, enabled: boolean) {
     if (!session) return;
 
-    const nextRoles = enabled
-      ? normalizeRoles([...session.account.roles, role])
-      : session.account.roles.filter((accountRole) => accountRole !== role);
+    let updatedSession = session;
+    try {
+      const backendRole = role.toUpperCase();
+      const res = await toggleRole(backendRole, enabled, session.accessToken);
+      if (res?.accessToken) {
+        const nextRoles = res.user.roles
+          .map((r) => backendRoleToAccountRole[r.toUpperCase()])
+          .filter((r): r is AccountRole => Boolean(r));
+
+        updatedSession = {
+          ...session,
+          accessToken: res.accessToken,
+          account: {
+            ...session.account,
+            roles: normalizeRoles(nextRoles),
+          },
+        };
+      }
+    } catch {
+      // Fallback to local toggle if network unavailable
+      const nextRoles = enabled
+        ? normalizeRoles([...session.account.roles, role])
+        : session.account.roles.filter((accountRole) => accountRole !== role);
+      updatedSession = {
+        ...session,
+        account: {
+          ...session.account,
+          roles: nextRoles,
+        },
+      };
+    }
+
+    setSession(updatedSession);
+    await setStorageItemAsync('session', JSON.stringify(updatedSession));
+  }
+
+  async function updateAccount(updates: Partial<Account>) {
+    if (!session) return;
     const nextSession = {
       ...session,
       account: {
         ...session.account,
-        roles: nextRoles,
+        ...updates,
       },
     };
-
     setSession(nextSession);
     await setStorageItemAsync('session', JSON.stringify(nextSession));
   }
 
   return (
     <AuthContext.Provider
-      value={{ isInitializing, isLoading, logIn, logOut, session, setRoleEnabled }}
+      value={{ isInitializing, isLoading, logIn, logOut, session, setRoleEnabled, updateAccount }}
     >
       {children}
     </AuthContext.Provider>

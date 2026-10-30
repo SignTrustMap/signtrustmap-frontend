@@ -1,7 +1,66 @@
-import { http, type ApiResponse } from '../client'
+import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
-import type { AdminEscalationCase } from '@/data/adminGovernanceData'
 
+export interface ModerationCaseActionItem {
+  id: string
+  caseId: string
+  actionType: string
+  performedBy: string
+  note: string | null
+  performedAt: string
+}
+
+export interface ModerationCaseItem {
+  id: string
+  case_type?: string
+  caseType?: string
+  target_entity_type?: string
+  targetEntityType?: string
+  target_entity_id?: string
+  targetEntityId?: string
+  assigned_staff_id?: string | null
+  assignedStaffId?: string | null
+  status: 'PENDING' | 'IN_REVIEW' | 'RESOLVED' | 'DISMISSED' | 'ESCALATED_ADMIN' | string
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+  notes?: string
+  resolutionNote?: string | null
+  resolution_note?: string | null
+  created_at?: string
+  createdAt?: string
+  updated_at?: string
+  updatedAt?: string
+  resolved_at?: string | null
+  resolvedAt?: string | null
+  actions?: ModerationCaseActionItem[]
+  reports?: any[]
+}
+
+export interface PaginatedCasesResponse {
+  items: ModerationCaseItem[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export interface ResolveCaseInput {
+  resolutionNote: string
+  actionType?: 'RESOLVE' | 'DISMISS' | 'BAN_USER' | 'REMOVE_SIGN' | 'REQUEST_RECAPTURE' | 'MERGE_SIGN' | string
+  actionNote?: string
+  reportId?: string
+  targetSignTypeId?: number
+  mergedIntoSignTypeId?: number
+}
+
+export type BanTargetRole = 'SURVEYOR' | 'REVIEWER' | 'STAFF'
+
+export interface AdminMissingReportActionInput {
+  actionType: 'REJECT' | 'REQUEST_RECAPTURE' | 'BAN_USER'
+  reason: string
+  banTarget?: BanTargetRole
+}
+
+// Backwards compatibility types
 export interface ResolveEscalationDto {
   status: 'Resolved' | 'Rejected'
   verdictNotes: string
@@ -9,17 +68,69 @@ export interface ResolveEscalationDto {
 
 export const escalationService = {
   /**
-   * Fetch all staff escalation cases
+   * Fetch all staff moderation & escalation cases via GET /api/v1/moderation/cases
    */
-  getEscalations: async (params?: { status?: string }): Promise<ApiResponse<AdminEscalationCase[]>> => {
-    return http.get<ApiResponse<AdminEscalationCase[]>>(API_ENDPOINTS.ESCALATIONS.BASE, { params })
+  getCases: async (
+    params?: { status?: string; page?: number; pageSize?: number },
+    config?: Record<string, any>
+  ): Promise<PaginatedCasesResponse> => {
+    return http.get<PaginatedCasesResponse>(API_ENDPOINTS.MODERATION.CASES, { params, ...config })
   },
 
   /**
-   * Resolve an escalated case with verdict justification
+   * Get single moderation case detail
    */
-  resolveCase: async (caseId: string, data: ResolveEscalationDto): Promise<ApiResponse<AdminEscalationCase>> => {
-    return http.post<ApiResponse<AdminEscalationCase>>(API_ENDPOINTS.ESCALATIONS.RESOLVE(caseId), data)
+  getCaseById: async (caseId: string): Promise<ModerationCaseItem> => {
+    return http.get<ModerationCaseItem>(API_ENDPOINTS.MODERATION.CASE_DETAIL(caseId))
+  },
+
+  /**
+   * Resolve an escalated case with verdict justification via PUT /api/v1/moderation/cases/:id/resolve
+   */
+  resolveCase: async (caseId: string, data: ResolveCaseInput): Promise<any> => {
+    return http.put<any>(API_ENDPOINTS.MODERATION.RESOLVE_CASE(caseId), data)
+  },
+
+  /**
+   * Apply dedicated admin decision on escalated novel sign report (REJECT, REQUEST_RECAPTURE, BAN_USER)
+   */
+  applyAdminMissingReportAction: async (
+    reportId: string,
+    data: AdminMissingReportActionInput
+  ): Promise<any> => {
+    return http.patch(API_ENDPOINTS.MODERATION.ADMIN_ACTION(reportId), data)
+  },
+
+  /**
+   * Fetch related target entity details (Candidate, Revalidation Task, Missing Report)
+   */
+  getTargetEntity: async (targetType?: string, targetId?: string, caseType?: string): Promise<any> => {
+    if (!targetId) return null
+    const t = (targetType || '').toLowerCase()
+    const c = (caseType || '').toUpperCase()
+    try {
+      if (t === 'candidate') {
+        const res: any = await http.get(API_ENDPOINTS.MODERATION.CANDIDATE_DETAIL(targetId))
+        return res?.data?.data || res?.data || res
+      }
+      if (t.includes('reval')) {
+        const res: any = await http.get(API_ENDPOINTS.REVALIDATION.TASK_DETAIL(targetId))
+        return res?.data?.data || res?.data || res
+      }
+      if (t.includes('report') || t.includes('missing') || c === 'CATALOG_PROPOSAL') {
+        const res: any = await http.get(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(targetId))
+        return res?.data?.data || res?.data || res
+      }
+      return null
+    } catch (err) {
+      console.warn(`Could not load target entity (${targetType}:${targetId}):`, err)
+      return null
+    }
+  },
+
+  // Backward compatibility wrapper
+  getEscalations: async (params?: { status?: string }): Promise<any> => {
+    return escalationService.getCases(params)
   },
 }
 

@@ -9,9 +9,15 @@ import {
   getVideoFileSizeBytes,
   prepareVideoChunk,
   MAX_BACKEND_CHUNK_BYTES,
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
 } from './video-processor';
 import { prepareSurveyGpx } from './survey-image';
 import { createCompanionGpxDescriptor } from './video-gps';
+import {
+  UPLOAD_ABORTED_BY_USER_MESSAGE,
+  VIDEO_SIZE_EXCEEDED_MESSAGE,
+} from '@/constants/message';
+
 
 export type UploadProgressInfo = {
   currentChunk: number;
@@ -100,7 +106,11 @@ export async function executeChunkedVideoUpload(
   // Safely inspect video file size without reading entire file into memory
   // Caps chunk size at MAX_BACKEND_CHUNK_BYTES (45MB safety margin under backend's 50MB / 52428800 bytes limit)
   const totalSizeBytes = await getVideoFileSizeBytes(videoUri);
+  if (totalSizeBytes > MAX_SURVEY_VIDEO_SIZE_BYTES) {
+    throw new Error(VIDEO_SIZE_EXCEEDED_MESSAGE);
+  }
   const plan = calculateTemporalChunks(totalSizeBytes, durationSeconds, MAX_BACKEND_CHUNK_BYTES);
+
   console.log(`[ChunkUpload] Video file: "${fileName}", size=${totalSizeBytes} bytes, duration=${durationSeconds}s. Computed plan: ${plan.totalChunks} chunks of ~${plan.chunkSize} bytes.`);
 
   // 1. Initialize or resume video upload session
@@ -154,7 +164,7 @@ export async function executeChunkedVideoUpload(
   let completedCount = totalChunks - missingIndices.length;
 
   for (const chunkIndex of missingIndices) {
-    if (signal?.aborted) throw new Error('Upload aborted by user.');
+    if (signal?.aborted) throw new Error(UPLOAD_ABORTED_BY_USER_MESSAGE);
 
     const percent = Math.round((completedCount / totalChunks) * 85); // Video is 85% of total progress
     onProgress?.({

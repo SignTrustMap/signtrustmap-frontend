@@ -1,15 +1,5 @@
-import { http, type ApiResponse } from '../client'
+import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
-import type { CatalogEntry, MissingSignTypeReport } from '@/data/catalogData'
-
-export interface CreateCatalogSignDto {
-  code: string
-  name: string
-  category: 'prohibition' | 'warning' | 'mandatory' | 'information'
-  aiPrompt?: string
-  osmMapping?: string
-  guidelines?: string
-}
 
 export interface SignCategoryItem {
   id: number
@@ -40,11 +30,11 @@ export interface CatalogSignTypeItem {
   representativeImageKey?: string | null
 }
 
-export interface PageResponse<T> {
-  content: T[]
+export interface PaginatedSignTypesResponse {
+  items: CatalogSignTypeItem[]
+  total: number
   page: number
-  size: number
-  totalElements: number
+  pageSize: number
   totalPages: number
 }
 
@@ -52,8 +42,10 @@ export interface ListSignTypesParams {
   categoryId?: number
   isActive?: boolean
   search?: string
+  q?: string
   page?: number
   size?: number
+  pageSize?: number
 }
 
 export interface CreateSignTypeInput {
@@ -71,6 +63,8 @@ export interface CreateSignTypeInput {
   isActive?: boolean
 }
 
+export interface UpdateSignTypeInput extends Partial<CreateSignTypeInput> {}
+
 export interface CreateSignCategoryInput {
   code: string
   nameVi: string
@@ -80,40 +74,376 @@ export interface CreateSignCategoryInput {
   sortOrder?: number
 }
 
+export interface UpdateSignCategoryInput extends Partial<CreateSignCategoryInput> {}
+
+export interface CandidateEnriched {
+  id: string
+  predictedSignTypeId?: number
+  confidenceScore?: number
+  bestFrameUrl?: string
+  signCropUrl?: string
+  status?: string
+  latitude?: number
+  longitude?: number
+}
+
+export interface MissingTypeReportItem {
+  id: string
+  reporterId?: string
+  submittedBy?: string
+  candidateId?: string | null
+  originalCandidateId?: string | null
+  proposedCategoryId?: number | null
+  proposedName: string
+  suggestedNameVi?: string | null
+  suggestedNameEn?: string | null
+  suggestedCode?: string | null
+  description?: string | null
+  suggestedShape?: string | null
+  suggestedColorScheme?: string | null
+  cropImageUrl?: string | null
+  status: 'PENDING' | 'MERGED' | 'ESCALATED_ADMIN' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE' | 'IN_REVIEW'
+  mergedIntoSignTypeId?: number | null
+  reviewedBy?: string | null
+  staffNotes?: string | null
+  resolvedBy?: string | null
+  resolvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+  candidate?: CandidateEnriched | null
+}
+
+export interface PaginatedMissingReportsResponse {
+  items: MissingTypeReportItem[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
+export type VehicleType = 'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN'
+
+export const VEHICLE_TYPES: VehicleType[] = [
+  'CAR',
+  'MOTORCYCLE',
+  'TRUCK',
+  'BUS',
+  'BICYCLE',
+  'PEDESTRIAN',
+]
+
+export const VEHICLE_TYPE_OPTIONS: Array<{ value: VehicleType; labelVi: string; labelEn: string }> = [
+  { value: 'CAR', labelVi: 'Xe ô tô con', labelEn: 'Car' },
+  { value: 'MOTORCYCLE', labelVi: 'Xe máy / Mô tô', labelEn: 'Motorcycle' },
+  { value: 'TRUCK', labelVi: 'Xe tải', labelEn: 'Truck' },
+  { value: 'BUS', labelVi: 'Xe buýt / Khách', labelEn: 'Bus' },
+  { value: 'BICYCLE', labelVi: 'Xe đạp', labelEn: 'Bicycle' },
+  { value: 'PEDESTRIAN', labelVi: 'Người đi bộ', labelEn: 'Pedestrian' },
+]
+
+export interface ApproveAndCreateSignTypeInput {
+  proposedCategoryId?: number
+  categoryId?: number
+  signCode?: string
+  nameVi?: string
+  nameEn?: string
+  description?: string
+  suggestedShape?: string
+  shape?: string
+  suggestedColorScheme?: string
+  colorScheme?: string
+  aiLabelPrompt?: string
+  staffNotes?: string
+  representativeImageKey?: string
+  allowedVehicles?: VehicleType[]
+}
+
+export const STANDARD_SIGN_CATEGORIES: SignCategoryItem[] = [
+  { id: 1, code: 'P', nameVi: 'Biển báo cấm', nameEn: 'Prohibitory signs', sortOrder: 1 },
+  { id: 2, code: 'W', nameVi: 'Biển cảnh báo', nameEn: 'Warning signs', sortOrder: 2 },
+  { id: 3, code: 'R', nameVi: 'Biển hiệu lệnh', nameEn: 'Mandatory signs', sortOrder: 3 },
+  { id: 4, code: 'I', nameVi: 'Biển chỉ dẫn', nameEn: 'Information signs', sortOrder: 4 },
+  { id: 5, code: 'S', nameVi: 'Biển phụ', nameEn: 'Supplementary signs', sortOrder: 5 },
+]
+
+let categoriesMemoryCache: SignCategoryItem[] | null = null
+let categoriesInFlight: Promise<SignCategoryItem[]> | null = null
+
 export const catalogService = {
-  /**
-   * Fetch official traffic sign catalog entries
-   */
-  getCatalog: async (params?: { category?: string; search?: string }): Promise<ApiResponse<CatalogEntry[]>> => {
-    return http.get<ApiResponse<CatalogEntry[]>>(API_ENDPOINTS.CATALOG.BASE, { params })
+  // ── Categories ──────────────────────────────────────────────────
+  getCategories: async (force = false): Promise<SignCategoryItem[]> => {
+    if (!force && categoriesMemoryCache && categoriesMemoryCache.length > 0) {
+      return categoriesMemoryCache
+    }
+
+    if (categoriesInFlight) {
+      return categoriesInFlight
+    }
+
+    categoriesInFlight = (async () => {
+      try {
+        const res = await http.get<SignCategoryItem[]>(API_ENDPOINTS.CATALOG.CATEGORIES, {
+          timeout: 8000,
+        })
+        if (Array.isArray(res) && res.length > 0) {
+          const clean = res.filter(
+            (c) =>
+              !c.code?.toLowerCase().includes('mock') &&
+              !c.nameVi?.toLowerCase().includes('mock') &&
+              !c.nameEn?.toLowerCase().includes('mock')
+          )
+          if (clean.length > 0) {
+            categoriesMemoryCache = clean
+            return clean
+          }
+        }
+      } catch {
+        // Fall back gracefully to cache or standard QCVN 41 categories on timeout or network error
+      } finally {
+        categoriesInFlight = null
+      }
+      return categoriesMemoryCache || STANDARD_SIGN_CATEGORIES
+    })()
+
+    return categoriesInFlight
   },
 
-  /**
-   * Create and publish a new standard sign into the catalog
-   */
-  createSign: async (data: CreateCatalogSignDto): Promise<ApiResponse<CatalogEntry>> => {
-    return http.post<ApiResponse<CatalogEntry>>(API_ENDPOINTS.CATALOG.BASE, data)
+  getCategoryById: async (id: number): Promise<SignCategoryItem> => {
+    return http.get<SignCategoryItem>(API_ENDPOINTS.CATALOG.CATEGORY_DETAIL(id))
   },
 
-  /**
-   * Fetch pending missing sign reports from field submissions
-   */
-  getMissingSignReports: async (): Promise<ApiResponse<MissingSignTypeReport[]>> => {
-    return http.get<ApiResponse<MissingSignTypeReport[]>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.BASE)
+  createCategory: async (data: CreateSignCategoryInput): Promise<SignCategoryItem> => {
+    return http.post<SignCategoryItem>(API_ENDPOINTS.CATALOG.CATEGORIES, data)
   },
 
-  /**
-   * Approve a missing sign proposal to create a new catalog entry
-   */
-  approveMissingReport: async (reportId: string, data?: { catalogCode?: string }): Promise<ApiResponse<MissingSignTypeReport>> => {
-    return http.post<ApiResponse<MissingSignTypeReport>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.APPROVE(reportId), data)
+  updateCategory: async (id: number, data: UpdateSignCategoryInput): Promise<SignCategoryItem> => {
+    return http.patch<SignCategoryItem>(API_ENDPOINTS.CATALOG.CATEGORY_DETAIL(id), data)
   },
 
-  /**
-   * Merge a missing sign proposal into an existing catalog sign
-   */
-  mergeMissingReport: async (reportId: string, targetCatalogCode: string): Promise<ApiResponse<MissingSignTypeReport>> => {
-    return http.post<ApiResponse<MissingSignTypeReport>>(API_ENDPOINTS.CATALOG.MISSING_REPORTS.MERGE(reportId), { targetCatalogCode })
+  deleteCategory: async (id: number): Promise<{ deleted: boolean; id: number }> => {
+    return http.delete<{ deleted: boolean; id: number }>(API_ENDPOINTS.CATALOG.CATEGORY_DETAIL(id))
+  },
+
+  // ── Sign Types ──────────────────────────────────────────────────
+  getSignTypes: async (params?: ListSignTypesParams): Promise<PaginatedSignTypesResponse> => {
+    const q: Record<string, any> = {}
+    if (params?.categoryId) q.categoryId = params.categoryId
+    if (params?.isActive !== undefined) q.isActive = params.isActive
+    if (params?.search || params?.q) q.search = params.search || params.q
+    if (params?.page !== undefined) q.page = params.page
+    const clampedSize = params?.size || params?.pageSize ? Math.min(100, Math.max(1, (params?.size || params?.pageSize)!)) : 100
+    q.size = clampedSize
+
+    const res = await http.get<any>(API_ENDPOINTS.CATALOG.SIGN_TYPES, { params: q })
+    const items: CatalogSignTypeItem[] = res?.content || res?.items || (Array.isArray(res) ? res : [])
+    const total: number = res?.totalElements ?? res?.total ?? items.length
+    const page: number = res?.page ?? 0
+    const pageSize: number = res?.size ?? clampedSize
+    const totalPages: number = res?.totalPages ?? Math.ceil(total / Math.max(1, pageSize))
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
+  },
+
+  getAllSignTypes: async (params?: Omit<ListSignTypesParams, 'page' | 'size' | 'pageSize'>): Promise<{
+    items: CatalogSignTypeItem[]
+    total: number
+  }> => {
+    const firstPage = await catalogService.getSignTypes({ ...params, page: 0, size: 100 })
+    const all = [...(firstPage.items || [])]
+    const total = firstPage.total || all.length
+    const totalPages = firstPage.totalPages || Math.ceil(total / 100)
+
+    if (totalPages > 1) {
+      const remainingPromises = []
+      for (let p = 1; p < totalPages; p++) {
+        remainingPromises.push(
+          catalogService.getSignTypes({ ...params, page: p, size: 100 }).catch(() => ({ items: [] }))
+        )
+      }
+      const rest = await Promise.all(remainingPromises)
+      rest.forEach((batch) => {
+        if (batch.items && batch.items.length > 0) {
+          all.push(...batch.items)
+        }
+      })
+    }
+
+    return { items: all, total }
+  },
+
+  getSignTypeById: async (id: number): Promise<CatalogSignTypeItem> => {
+    return http.get<CatalogSignTypeItem>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
+  },
+
+  createSignType: async (data: CreateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.post<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPES,
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
+  },
+
+  updateSignType: async (id: number, data: UpdateSignTypeInput | FormData): Promise<CatalogSignTypeItem> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.patch<CatalogSignTypeItem>(
+      API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id),
+      data,
+      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+    )
+  },
+
+  deleteSignType: async (id: number): Promise<{ deleted: boolean; id: number }> => {
+    return http.delete<{ deleted: boolean; id: number }>(API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id))
+  },
+
+  getMissingReports: async (
+    params?: { status?: string; page?: number; pageSize?: number },
+    config?: Record<string, any>
+  ): Promise<PaginatedMissingReportsResponse> => {
+    return http.get<PaginatedMissingReportsResponse>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORTS, { params, ...config })
+  },
+
+  getMissingReportById: async (id: string): Promise<MissingTypeReportItem> => {
+    return http.get<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id))
+  },
+
+  updateMissingReport: async (
+    id: string,
+    data: {
+      actionType?: 'MERGE' | 'REJECT' | 'ESCALATE_ADMIN' | 'REQUEST_RECAPTURE'
+      status?: string
+      staffNotes?: string
+      actionNote?: string
+      mergedSignTypeId?: number
+      mergedIntoSignTypeId?: number
+      suggestedShape?: string
+      suggestedColorScheme?: string
+    }
+  ): Promise<MissingTypeReportItem> => {
+    return http.patch<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id), data)
+  },
+
+  requestCandidateRecapture: async (
+    candidateId: string,
+    data: { reason: string; note?: string }
+  ): Promise<{ success: boolean; requestId?: string; message?: string }> => {
+    return http.post(API_ENDPOINTS.MODERATION.REQUEST_RECAPTURE(candidateId), data)
+  },
+
+  getCandidateRecaptures: async (
+    candidateId: string
+  ): Promise<
+    Array<{
+      id: string
+      candidateId?: string
+      candidate_id?: string
+      reason: string
+      note?: string
+      createdAt?: string
+      created_at?: string
+    }>
+  > => {
+    return http.get(API_ENDPOINTS.MODERATION.CANDIDATE_RECAPTURES(candidateId))
+  },
+
+  approveAndCreateType: async (
+    id: string,
+    data: ApproveAndCreateSignTypeInput | FormData,
+    file?: File
+  ): Promise<{ message?: string; report?: MissingTypeReportItem; createdSignType?: CatalogSignTypeItem; signType?: CatalogSignTypeItem }> => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    if (isFormData) {
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        data,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
+    if (file) {
+      const formData = new FormData()
+      Object.entries(data).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          if (Array.isArray(val)) {
+            formData.append(key, JSON.stringify(val))
+          } else {
+            formData.append(key, String(val))
+          }
+        }
+      })
+      formData.append('file', file)
+      return http.post(
+        API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+    }
+    return http.post(
+      API_ENDPOINTS.MODERATION.APPROVE_AND_CREATE_TYPE(id),
+      data
+    )
+  },
+
+  reprocessCandidates: async (
+    signTypeId: number,
+    similarityThreshold = 0.70
+  ): Promise<{ message: string; reprocessedCount: number }> => {
+    return http.post<{ message: string; reprocessedCount: number }>(
+      API_ENDPOINTS.CATALOG.REPROCESS(signTypeId),
+      { similarityThreshold }
+    )
+  },
+
+  // ── Support Shots & Prototypes ──────────────────────────────────
+  getSupportShots: async (signTypeId: number): Promise<any[]> => {
+    return http.get<any[]>(API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId))
+  },
+
+  addSupportShot: async (signTypeId: number, data: any): Promise<any> => {
+    return http.post<any>(API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId), data)
+  },
+
+  deleteSupportShot: async (signTypeId: number, imageId: string): Promise<any> => {
+    return http.delete<any>(API_ENDPOINTS.CATALOG.SUPPORT_SHOT_DETAIL(signTypeId, imageId))
+  },
+
+  togglePinSupportShot: async (signTypeId: number, imageId: string, isPinned: boolean): Promise<any> => {
+    return http.patch<any>(API_ENDPOINTS.CATALOG.SUPPORT_SHOT_PIN(signTypeId, imageId), { isPinned })
+  },
+
+  rebuildPrototypes: async (): Promise<any> => {
+    return http.post<any>(API_ENDPOINTS.CATALOG.REBUILD_PROTOTYPES)
+  },
+
+  // ── Backward Compatibility Helpers ──────────────────────────────
+  getCatalog: async (params?: any): Promise<any> => {
+    return catalogService.getSignTypes(params)
+  },
+  createSign: async (data: any): Promise<any> => {
+    return catalogService.createSignType(data)
+  },
+  getMissingSignReports: async (): Promise<any> => {
+    return catalogService.getMissingReports()
+  },
+  approveMissingReport: async (reportId: string, data?: any): Promise<any> => {
+    return catalogService.updateMissingReport(reportId, { status: 'APPROVED', staffNotes: data?.catalogCode })
+  },
+  mergeMissingReport: async (reportId: string, targetCatalogCode: string): Promise<any> => {
+    return catalogService.updateMissingReport(reportId, { status: 'APPROVED', staffNotes: `Đã gộp vào biển ${targetCatalogCode} trong Catalog chuẩn.` })
   },
 }
 

@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Arvo:wght@400;700&display=swap');
 @import "tailwindcss";
+@source "../../../packages/ui/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -19,11 +20,13 @@
   --font-brand: 'Arvo', ui-serif, Georgia, serif;
   --font-mono: 'Geist Mono', monospace;
 
-  /* Corner Radius Scale (DESIGN.md: sm 4px, md 8px, lg 12px) */
+  /* Corner Radius Scale (4px/8px incremental system) */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
   --radius-pill: 9999px;
 }
 
@@ -36,15 +39,15 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
-  background-color: #030708;
-  color: #f3f4f6;
+  background-color: #F8F7F7;
+  color: #111827;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: #030708;
-  color: #f3f4f6;
+  background-color: #F8F7F7;
+  color: #111827;
   line-height: 1.6;
   overflow-x: clip;
 }
@@ -54,6 +57,12 @@ html.disable-transitions *,
 html.disable-transitions *::before,
 html.disable-transitions *::after {
   transition: none !important;
+}
+
+/* ─── Dark Mode Base Overrides ──────────────────────────────────── */
+html.dark, html.dark body {
+  background-color: #030708;
+  color: #f3f4f6;
 }
 
 /* ─── Light Mode Overrides (Strictly based on DESIGN.md: #F8F7F7) ─ */
@@ -279,4 +288,76 @@ html.light ::-webkit-scrollbar-thumb {
 .dark .leaflet-container a.leaflet-popup-close-button:hover {
   color: #ffffff !important;
 }
+
+/* ─── Mobile-Style Sign Callout Popup ──────────────────────────── */
+.sign-callout-leaflet-popup .leaflet-popup-content-wrapper {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.sign-callout-leaflet-popup .leaflet-popup-content {
+  margin: 0 !important;
+  line-height: normal !important;
+}
+
+.sign-callout-leaflet-popup .leaflet-popup-tip-container {
+  margin-top: -2px !important;
+}
+
+/* ─── Google Maps Minimalist Attribution Bar ────────────────────── */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(6px);
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  color: #64748b !important;
+  border-top-left-radius: 8px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  margin: 0 !important;
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(7, 19, 23, 0.75) !important;
+  color: #94a3b8 !important;
+}
+
+.leaflet-control-attribution a {
+  color: inherit !important;
+  text-decoration: none !important;
+  font-weight: 500;
+}
+
+.leaflet-control-attribution a:hover {
+  text-decoration: underline !important;
+}
+
+/* ─── Google Maps Destination Pin Marker ───────────────────────── */
+.route-dest-pin-marker,
+.survey-start-marker,
+.survey-end-marker,
+.survey-modal-marker,
+.route-start-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+@keyframes mapPinDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Leaflet Dark Mode Tiles ────────────────────────── */
+.dark-tiles {
+  filter: brightness(0.7) invert(1) contrast(2.2) hue-rotate(200deg) saturate(0.4) !important;
+}
+
+
 

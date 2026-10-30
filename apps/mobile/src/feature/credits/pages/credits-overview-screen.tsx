@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -21,7 +21,7 @@ export function CreditsOverviewScreen() {
     id: t.id,
     title: t.description || t.transactionType,
     amount: t.amount,
-    date: new Date(t.createdAt).toLocaleString(),
+    date: new Date(t.createdAt).toLocaleString('vi-VN'),
   }));
 
   return (
@@ -32,7 +32,7 @@ export function CreditsOverviewScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.balanceCard, { backgroundColor: theme.primary }]}>
-            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Current balance</Text>
+            <Text style={[styles.balanceLabel, { color: theme.onPrimary }]}>Số điểm hiện tại</Text>
             <View style={styles.balanceRow}>
               {isLoading ? (
                 <ActivityIndicator color={theme.onPrimary} size="small" />
@@ -41,21 +41,21 @@ export function CreditsOverviewScreen() {
                   {balance}
                 </Text>
               )}
-              <Text style={[styles.balanceUnit, { color: theme.onPrimary }]}>credits</Text>
+              <Text style={[styles.balanceUnit, { color: theme.onPrimary }]}>Credits</Text>
             </View>
             <View style={styles.balanceMetaRow}>
               <View>
-                <Text style={styles.metaLabel}>STATUS</Text>
-                <Text style={styles.metaValue}>Active</Text>
+                <Text style={styles.metaLabel}>TRẠNG THÁI</Text>
+                <Text style={styles.metaValue}>Đang hoạt động</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.sectionHeading}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Recent activity</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Hoạt động gần đây</Text>
             <AppButton
-              accessibilityLabel="View all credit activity"
-              label="View all"
+              accessibilityLabel="Xem tất cả hoạt động Credits"
+              label="Xem tất cả"
               onPress={() => router.push('/credits/history')}
               style={styles.viewAllButton}
               textStyle={{ color: theme.primary }}
@@ -64,7 +64,7 @@ export function CreditsOverviewScreen() {
           </View>
           <TransactionList transactions={recentTransactions} />
           <AppButton
-          label="＋  Add credits"
+            label="＋  Nạp Credits"
             onPress={() => router.push('/credits/top-up')}
             style={styles.addButton}
           />

@@ -1,0 +1,112 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Driver Navigation Workflow
+# =========================================================================
+# This test covers:
+#  1. Opening Home Map Screen (Driver mode)
+#  2. Navigating to Destination Search screen
+#  3. Typing destination query & waiting for API suggestions
+#  4. Route Preview bottom sheet (ETA, distance, vehicle mode selector)
+#  5. Switching vehicle mode to Motorcycle tab
+#  6. Starting turn-by-turn navigation (Maneuver banner, active map)
+#  7. Testing floating navigation controls (Căn giữa)
+#  8. Stopping navigation & returning to Home map
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# -------------------------------------------------------------------------
+# Step 1: Open Home Map Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://home"
+
+# Wait for top search bar to appear on the idle map
+- assertVisible:
+    id: "btn-search-destination"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 2: Open Route Search Screen
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "btn-search-destination"
+
+# Wait for search input to be focused
+- assertVisible:
+    id: "input-route-search"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 3: Enter Search Query & Wait for API results
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "input-route-search"
+- inputText: "Bến Thành"
+- hideKeyboard
+
+# Wait until search suggestions load from backend API
+- assertVisible:
+    text: ".*KẾT QUẢ TÌM KIẾM.*|.*Bến Thành.*"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 4: Select Destination & Route Preview Sheet
+# -------------------------------------------------------------------------
+# Tap on the search result suggestion
+- tapOn:
+    id: "search-result-item"
+    optional: true
+
+# Ensure complete route coordinates and origin are set for full route preview
+- openLink: "mobile://home?destinationTitle=Chợ%20Bến%20Thành&destinationLat=10.7725&destinationLng=106.6980&startLat=10.7769&startLng=106.7009&startTitle=Vị%20trí%20của%20bạn"
+
+# Wait until route preview sheet and vehicle mode tabs are fully rendered
+- assertVisible:
+    id: "vehicle-tab-bike"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 5: Switch Vehicle Mode (Motorcycle tab)
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "vehicle-tab-bike"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 6: Start Turn-by-Turn Navigation
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "btn-start-navigation"
+
+# Wait for active navigation mode to engage (red "Dừng" button appears)
+- assertVisible:
+    id: "btn-stop-navigation"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 7: Test Floating Map Controls (Căn giữa)
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "btn-recenter-map"
+
+- waitForAnimationToEnd
+
+# -------------------------------------------------------------------------
+# Step 8: Stop Navigation & Return to Idle Map
+# -------------------------------------------------------------------------
+- tapOn:
+    id: "btn-stop-navigation"
+
+# Wait for route to close and idle search bar to return
+- assertVisible:
+    id: "btn-search-destination"
+
+- waitForAnimationToEnd

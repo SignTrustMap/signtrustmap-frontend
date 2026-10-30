@@ -1,16 +1,17 @@
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   castVoteOnSignCandidate, getCandidateSignDetails, getMyReviewHistory, getReviewQueue,
-  reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats
+  reportSignCandidate, undoVoteOnCandidate, skipSign, getMyReviewerStats, reportMissingType
 } from '@/api/reviews/review';
-import { getCatalog } from '@/api/reviews/catalog';
+import { getCatalog, CATALOG_TTL_MS } from '@/api/reviews/catalog';
 import { useSession } from '@/context/session-provider';
+import { SIGN_IN_TO_REVIEW_MESSAGE } from '@/constants/message';
 import { selectReviewHistory, selectReviewQueue } from '@/api/reviews/review-workflow';
 import type {
   CandidateReportParams, CandidateSignDetailsParams, CandidateVoteParams,
   CannotIdentifySignReportParams, MyReviewHistoryParams, ReportDto, ReviewQueueParams, VoteDto,
-  ReviewerStatsResponse,
+  ReviewerStatsResponse, CreateMissingTypeReportDto,
 } from '@/types/reviewsType';
 
 export const reviewKeys = {
@@ -37,6 +38,7 @@ export function useGetMyReviewHistory(params: MyReviewHistoryParams, enabled = t
   return useQuery({
     queryKey: reviewKeys.history(session?.account.id, params),
     queryFn: session ? ({ signal }) => getMyReviewHistory(params, session.accessToken, signal) : skipToken,
+    placeholderData: keepPreviousData,
     enabled,
   });
 }
@@ -59,7 +61,7 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables: TVariables) => {
-      if (!session) throw new Error('Sign in to review submissions.');
+      if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
       return mutation(variables, session.accessToken);
     },
     onSuccess: () => {
@@ -79,6 +81,21 @@ export function useCastVoteOnSignCandidate() {
 export function useReportSignCandidate() {
   return useReviewMutation(({ params, request, signal }: { params: CandidateReportParams; request: ReportDto; signal?: AbortSignal }, token) =>
     reportSignCandidate(params, request, token, signal));
+}
+
+export function useReportMissingType() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: CreateMissingTypeReportDto) => {
+      if (!session) throw new Error('Sign in to report missing sign type.');
+      return reportMissingType(request, session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
+    },
+  });
 }
 
 export function useSkipSign() {
@@ -107,8 +124,28 @@ export function useGetCatalog(enabled = true) {
   const { session } = useSession();
   return useQuery({
     queryKey: reviewKeys.catalog(session?.account.id),
-    queryFn: session ? ({ signal }) => getCatalog(session.accessToken, signal) : skipToken,
+    queryFn: session ? ({ signal }) => getCatalog(session.accessToken, { signal }) : skipToken,
     enabled,
+    staleTime: CATALOG_TTL_MS, // 1 week TTL
+    gcTime: Infinity,          // Keep cached indefinitely in memory
+  });
+}
+
+/**
+ * Force refresh the catalog from remote API and overwrite the device local storage cache.
+ */
+export function useRefreshCatalog() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
+      return getCatalog(session.accessToken, { forceRefresh: true });
+    },
+    onSuccess: (freshData) => {
+      queryClient.setQueryData(reviewKeys.catalog(session?.account.id), freshData);
+    },
   });
 }
 

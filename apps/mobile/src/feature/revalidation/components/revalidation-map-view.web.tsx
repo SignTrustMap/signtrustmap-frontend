@@ -1,0 +1,295 @@
+import { useEffect, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+
+import type { RouteSign } from '@/api/navigation/navigation';
+import type { MapCoordinate } from '@/types/navigationType';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
+import { useTheme } from '@/hooks/use-theme';
+import { getFreshnessInfo } from './revalidation-sign-marker';
+
+export type RevalidationMapViewProps = {
+  signs?: RouteSign[];
+  selectedSignId?: string | null;
+  onSignPress?: (sign: RouteSign) => void;
+  onMapPress?: () => void;
+  onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
+  userCoordinate?: MapCoordinate;
+  focusCoordinate?: MapCoordinate;
+  focusRequestId?: number;
+  zoomLevel?: number;
+  zoomRequestId?: number;
+};
+
+const mapTileUrl =
+  process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim() ||
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+
+const openStreetMapStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: [mapTileUrl],
+      tileSize: 256,
+      attribution: 'Esri, HERE, Garmin, USGS, OpenStreetMap contributors, GIS user community',
+    },
+  },
+  layers: [
+    {
+      id: 'osm',
+      type: 'raster',
+      source: 'osm',
+    },
+  ],
+};
+
+function createWebSignMarkerElement(
+  sign: RouteSign,
+  isSelected: boolean,
+  isDimmed: boolean,
+  onClick: () => void,
+) {
+  const container = document.createElement('div');
+  container.style.position = 'relative';
+  container.style.width = '44px';
+  container.style.height = '44px';
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+  container.style.justifyContent = 'center';
+  container.style.cursor = 'pointer';
+  container.style.transition = 'transform 0.18s ease, opacity 0.18s ease';
+
+  if (isSelected) {
+    container.style.transform = 'scale(1.18)';
+    container.style.zIndex = '10';
+  } else if (isDimmed) {
+    container.style.opacity = '0.55';
+    container.style.transform = 'scale(0.92)';
+  }
+
+  // Selected Halo Ring
+  if (isSelected) {
+    const halo = document.createElement('div');
+    halo.style.position = 'absolute';
+    halo.style.width = '44px';
+    halo.style.height = '44px';
+    halo.style.borderRadius = '22px';
+    halo.style.border = '2.5px solid #0671EB';
+    halo.style.background = 'rgba(6, 113, 235, 0.16)';
+    container.appendChild(halo);
+  }
+
+  const { isStale, isModerate, isFresh } = getFreshnessInfo(sign);
+
+  const bubble = document.createElement('div');
+  bubble.style.width = '34px';
+  bubble.style.height = '34px';
+  bubble.style.borderRadius = '50%';
+  bubble.style.background = '#FFFFFF';
+  bubble.style.display = 'flex';
+  bubble.style.alignItems = 'center';
+  bubble.style.justifyContent = 'center';
+  bubble.style.boxShadow = isSelected
+    ? '0 4px 10px rgba(6, 113, 235, 0.35)'
+    : '0 2px 5px rgba(0, 0, 0, 0.15)';
+  bubble.style.border = isSelected
+    ? '2px solid #0671EB'
+    : isStale
+      ? '1.5px solid #EF4444'
+      : isModerate
+        ? '1.5px solid #F59E0B'
+        : '1.5px solid #CBD5E1';
+
+  const img = document.createElement('img');
+  img.src = sign.imageUrl || '';
+  img.alt = sign.name || sign.signCode;
+  img.style.width = '24px';
+  img.style.height = '24px';
+  img.style.objectFit = 'contain';
+  img.onerror = () => {
+    img.style.display = 'none';
+  };
+  bubble.appendChild(img);
+  container.appendChild(bubble);
+
+  // Subtle state indicator
+  if (isStale) {
+    const badge = document.createElement('div');
+    badge.style.position = 'absolute';
+    badge.style.top = '2px';
+    badge.style.right = '2px';
+    badge.style.width = '12px';
+    badge.style.height = '12px';
+    badge.style.borderRadius = '6px';
+    badge.style.border = '1.5px solid #FFFFFF';
+    badge.style.background = '#EF4444';
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    badge.style.fontSize = '8px';
+    badge.style.fontWeight = '900';
+    badge.style.color = '#FFFFFF';
+    badge.textContent = '!';
+    container.appendChild(badge);
+  } else if (isModerate) {
+    const dot = document.createElement('div');
+    dot.style.position = 'absolute';
+    dot.style.top = '3px';
+    dot.style.right = '3px';
+    dot.style.width = '9px';
+    dot.style.height = '9px';
+    dot.style.borderRadius = '4.5px';
+    dot.style.border = '1.5px solid #FFFFFF';
+    dot.style.background = '#F59E0B';
+    container.appendChild(dot);
+  } else if (isFresh) {
+    const dot = document.createElement('div');
+    dot.style.position = 'absolute';
+    dot.style.top = '3px';
+    dot.style.right = '3px';
+    dot.style.width = '9px';
+    dot.style.height = '9px';
+    dot.style.borderRadius = '4.5px';
+    dot.style.border = '1.5px solid #FFFFFF';
+    dot.style.background = '#10B981';
+    container.appendChild(dot);
+  }
+
+  container.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return container;
+}
+
+export function RevalidationMapView({
+  signs = [],
+  selectedSignId,
+  onSignPress,
+  onMapPress,
+  onBoundsChange,
+  userCoordinate,
+  focusCoordinate,
+  focusRequestId = 0,
+  zoomLevel,
+  zoomRequestId = 0,
+}: RevalidationMapViewProps) {
+  const theme = useTheme();
+  const mapRef = useRef<Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const signMarkersRef = useRef<Marker[]>([]);
+  const onMapPressRef = useRef(onMapPress);
+
+  useEffect(() => {
+    onMapPressRef.current = onMapPress;
+  }, [onMapPress]);
+
+  const initialCenter = userCoordinate ?? focusCoordinate ?? [106.6955, 10.7769];
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    const map = new Map({
+      attributionControl: { compact: true },
+      center: initialCenter,
+      container: mapContainerRef.current,
+      doubleClickZoom: true,
+      maxZoom: 19,
+      minZoom: 10,
+      pitchWithRotate: false,
+      style: openStreetMapStyle,
+      zoom: 15,
+    });
+    mapRef.current = map;
+
+    map.addControl(new NavigationControl({ showCompass: true }), 'top-right');
+
+    const handleMapClick = () => {
+      onMapPressRef.current?.();
+    };
+    map.on('click', handleMapClick);
+
+    return () => {
+      map.off('click', handleMapClick);
+      signMarkersRef.current.forEach((m) => m.remove());
+      signMarkersRef.current = [];
+      mapRef.current = null;
+      map.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onBoundsChange) return;
+
+    const reportBounds = () => {
+      const bounds = map.getBounds();
+      onBoundsChange({
+        minLat: bounds.getSouth(),
+        minLon: bounds.getWest(),
+        maxLat: bounds.getNorth(),
+        maxLon: bounds.getEast(),
+      });
+    };
+
+    map.on('load', reportBounds);
+    map.on('moveend', reportBounds);
+    if (map.loaded()) reportBounds();
+
+    return () => {
+      map.off('load', reportBounds);
+      map.off('moveend', reportBounds);
+    };
+  }, [onBoundsChange]);
+
+  // Update Sign Markers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    signMarkersRef.current.forEach((m) => m.remove());
+
+    const markers = signs.map((sign) => {
+      const isSelected = selectedSignId === sign.id;
+      const isDimmed = Boolean(selectedSignId && !isSelected);
+      const el = createWebSignMarkerElement(sign, isSelected, isDimmed, () => {
+        onSignPress?.(sign);
+      });
+      return new Marker({ element: el })
+        .setLngLat(sign.coordinate)
+        .addTo(map);
+    });
+
+    signMarkersRef.current = markers;
+
+    return () => {
+      markers.forEach((m) => m.remove());
+      signMarkersRef.current = [];
+    };
+  }, [signs, selectedSignId, onSignPress]);
+
+  // Focus Coordinate FlyTo
+  useEffect(() => {
+    if (!focusCoordinate || !mapRef.current) return;
+    mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: zoomLevel ?? 16.5 });
+  }, [focusCoordinate, focusRequestId, zoomLevel]);
+
+  // Zoom Level change
+  useEffect(() => {
+    if (zoomLevel === undefined || !mapRef.current) return;
+    mapRef.current.easeTo({ zoom: zoomLevel, duration: 600 });
+  }, [zoomLevel, zoomRequestId]);
+
+  return <View ref={mapContainerRef as any} style={styles.map} />;
+}
+
+const styles = StyleSheet.create({
+  map: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+});

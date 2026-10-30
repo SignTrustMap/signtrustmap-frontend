@@ -1,18 +1,25 @@
-import type { MyReviewHistoryResponse, ReviewCandidate, ReviewQueueResponse } from '@/types/reviewsType';
+import type { MyReviewHistoryResponse, RemedySignDto, ReviewCandidate, ReviewQueueResponse } from '@/types/reviewsType';
+
+export type RemedySign = RemedySignDto;
 
 export type ReviewSubmission = {
   captured: string;
   id: string;
   image: any;
   location: string;
+  predictedSignTypeId?: number;
+  remedySigns?: RemedySign[];
   surveyorId: string;
   title: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type ReviewDecision = {
   action: 'approved' | 'declined' | 'reported';
   declineNote?: string;
   declineReason?: string;
+  suggestedSignTypeId?: number | string;
 };
 
 export type ReviewHistoryItem = {
@@ -22,16 +29,19 @@ export type ReviewHistoryItem = {
 
 const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') || process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') || 'https://s3.signmap.site';
 
+const KNOWN_BUCKETS = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs', 'stm-raw-images'];
+
 export function resolveS3Url(url?: string | null): string {
   if (!url) return '';
+  if (url.startsWith('file://') || url.startsWith('content://')) return url;
   if (url.startsWith('https://cdn.signmap.site/')) {
     const rawPath = url.slice('https://cdn.signmap.site/'.length).replace(/^\/+/, '');
-    const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => rawPath.startsWith(b + '/'));
+    const hasBucket = KNOWN_BUCKETS.some((b) => rawPath.startsWith(b + '/'));
     return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${rawPath}`;
   }
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   const clean = url.replace(/^\/+/, '');
-  const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => clean.startsWith(b + '/'));
+  const hasBucket = KNOWN_BUCKETS.some((b) => clean.startsWith(b + '/'));
   return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${clean}`;
 }
 
@@ -54,13 +64,21 @@ function toSubmission(candidate: ReviewCandidate): ReviewSubmission {
   const cropUrl = resolveS3Url(candidate.signCropUrl);
   const frameUrl = resolveS3Url(candidate.bestFrameUrl);
   const imageSource = cropUrl ? { uri: cropUrl } : (frameUrl ? { uri: frameUrl } : undefined);
+  const lat = candidate.locationContext?.coordinates?.latitude ?? candidate.latitude ?? candidate.submission?.latitude ?? null;
+  const lon = candidate.locationContext?.coordinates?.longitude ?? candidate.longitude ?? candidate.submission?.longitude ?? null;
+  const locationText = candidate.locationContext?.displayLocation || candidate.locationContext?.nearbyRoad || '';
+
   return {
     captured: formatCaptured(candidate.submission?.createdAt ?? candidate.createdAt),
     id: candidate.id,
     image: imageSource,
-    location: 'Estimated GPS coordinates available',
+    location: locationText,
+    predictedSignTypeId: type?.id,
+    remedySigns: candidate.remedySigns,
     surveyorId: candidate.submission?.surveyorId ?? candidate.submissionId,
     title: type?.nameVi ? `${type.nameVi} (${type.signCode})` : (type?.nameEn || type?.signCode || 'Unidentified sign'),
+    latitude: lat,
+    longitude: lon,
   };
 }
 

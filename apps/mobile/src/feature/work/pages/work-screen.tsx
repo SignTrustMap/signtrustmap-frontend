@@ -1,16 +1,35 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { AppButton } from '@/components/button';
+import { Badge } from '@/components/badge';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
-import { useGetReviewQueue } from '@/feature/review/hooks/use-review';
-import { useGetMyPendingSubmissions, useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
+import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
+import {
+  useGetMyPendingSubmissions,
+  useGetMySubmissions,
+  useGetMySurveyStats,
+} from '@/feature/upload/hooks/use-survey-submission';
+import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
+import {
+  useGetFirstRevalidationSign,
+  useGetRevalidationEvidenceQueue,
+} from '@/feature/revalidation/hooks/use-revalidation';
+import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
 import { WorkActionCard } from '@/feature/work/components/work-action-card';
+import { OfflineMapModal } from '@/components/offline-map-modal';
+import {
+  getFallbackMissionsForRole,
+  isTaskForRole,
+  useGetMyMissions,
+  useGetMyTaskCompletions,
+} from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -26,19 +45,19 @@ const roleMeta: Record<
   }
 > = {
   driver: {
-    description: 'Verify traffic signs and report road conditions along your assigned route.',
+    description: 'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
     icon: 'car-outline',
-    label: 'Driver',
+    label: 'Tài xế',
   },
   surveyor: {
-    description: 'Capture road sign condition and GPS telemetry data from the field.',
+    description: 'Thu thập tình trạng biển báo giao thông và dữ liệu đo đạc GPS thực địa.',
     icon: 'camera-outline',
-    label: 'Surveyor',
+    label: 'Khảo sát',
   },
   reviewer: {
-    description: 'Check submitted sign records and cast consensus votes before they enter the trusted map.',
+    description: 'Kiểm tra hồ sơ biển báo được gửi lên và bỏ phiếu đồng thuận trước khi đưa vào bản đồ tin cậy.',
     icon: 'shield-check-outline',
-    label: 'Reviewer',
+    label: 'Thẩm định',
   },
 };
 
@@ -56,6 +75,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const [activeRole, setActiveRole] = useState<AccountRole>(currentRole);
   const [prevCurrentRole, setPrevCurrentRole] = useState<CurrentRole>(currentRole);
+  const [isOfflineMapModalOpen, setIsOfflineMapModalOpen] = useState(false);
 
   if (prevCurrentRole !== currentRole) {
     setPrevCurrentRole(currentRole);
@@ -64,17 +84,91 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
   const selectedRole = availableRoles.includes(activeRole) ? activeRole : 'driver';
 
-  // Live queries for surveyor and reviewer counts
-  const { data: pendingData } = useGetMyPendingSubmissions(Boolean(session));
-  const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, Boolean(session));
+  const isDriverActive = Boolean(session && selectedRole === 'driver');
+  const isSurveyorActive = Boolean(session && selectedRole === 'surveyor');
+  const isReviewerActive = Boolean(session && selectedRole === 'reviewer');
 
+  // Live queries for driver, surveyor and reviewer counts run only for their active section
+  const { data: driverSessions } = useGetNavigationSessions({ page: 1, pageSize: 1 }, isDriverActive);
+  const { data: reviewerStats } = useGetMyReviewerStats(isReviewerActive);
+  const { data: pendingData } = useGetMyPendingSubmissions(isSurveyorActive);
+  const { data: reviewQueue } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewerActive);
+  const { data: revalEvidenceQueue } = useGetRevalidationEvidenceQueue(
+    { page: 1, pageSize: 1 },
+    isReviewerActive,
+  );
+  const { data: surveyStats } = useGetMySurveyStats(isSurveyorActive);
+  const { data: firstRevalSign } = useGetFirstRevalidationSign(undefined, isSurveyorActive);
+  const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyorActive);
+
+  const driverSessionsTotal = driverSessions?.total ?? 0;
   const draftCount = pendingData?.countsByStatus?.DRAFT ?? 0;
   const pendingSurveyCount = pendingData?.pending ?? 0;
+  const recapturesCount = recapturesData?.total ?? 0;
   const reviewQueueTotal = reviewQueue?.total ?? 0;
+  const revalEvidenceCount = revalEvidenceQueue?.total ?? 0;
+  const revalidationTaskCount = surveyStats?.revalidationAvailable ?? 0;
+
+  // Missions queries for action card badge and streak indicator
+  const { data: completionsData } = useGetMyTaskCompletions();
+  const { data: missionsData } = useGetMyMissions();
+  const streak = missionsData?.dailyStreak ?? missionsData?.streak?.currentDays ?? 0;
+
+  const incompleteMissionsCount = useMemo(() => {
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, selectedRole));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole(selectedRole);
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, selectedRole]);
+
+  const activeIndex = availableRoles.indexOf(selectedRole);
+  const [switcherWidth, setSwitcherWidth] = useState<number>(0);
+  const slideAnimation = useRef(new Animated.Value(activeIndex >= 0 ? activeIndex : 0)).current;
+
+  const tabWidth = switcherWidth > 0 && availableRoles.length > 0
+    ? switcherWidth / availableRoles.length
+    : 0;
+  const translateX = slideAnimation.interpolate({
+    inputRange: availableRoles.map((_, i) => i),
+    outputRange: availableRoles.map((_, i) => i * tabWidth),
+  });
+
+  const handleOpenRevalidationMap = async () => {
+    let targetSign = firstRevalSign;
+    if (!targetSign) {
+      try {
+        targetSign = await fetchFirstRevalidationSign();
+      } catch {
+        targetSign = null;
+      }
+    }
+
+    if (targetSign) {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          selectedSignId: targetSign.id,
+          snapLon: String(targetSign.coordinate[0]),
+          snapLat: String(targetSign.coordinate[1]),
+          snapRequestId: String(Date.now()),
+          signJson: JSON.stringify(targetSign),
+        },
+      });
+    } else {
+      router.push({
+        pathname: '/work/revalidation-map',
+        params: {
+          autoSelectFirst: 'true',
+          snapRequestId: String(Date.now()),
+        },
+      });
+    }
+  };
 
   const { data: mySubmissionsData } = useGetMySubmissions(
     { page: '1', pageSize: '10' },
-    Boolean(session && selectedRole === 'surveyor'),
+    isSurveyorActive,
   );
 
   const pendingSubmissionsList = useMemo(() => {
@@ -82,6 +176,21 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
       (item) => !['COMPLETED', 'DRAFT'].includes(item.status),
     );
   }, [mySubmissionsData?.items]);
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      Animated.spring(slideAnimation, {
+        toValue: activeIndex,
+        useNativeDriver: true,
+        bounciness: 4,
+        speed: 18,
+      }).start();
+    }
+  }, [activeIndex]);
+
+  const onSwitcherLayout = (e: LayoutChangeEvent) => {
+    setSwitcherWidth(e.nativeEvent.layout.width);
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -92,76 +201,90 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           showsVerticalScrollIndicator={false}
         >
           {/* Clean Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Work</Text>
-            <Text style={[styles.subtitle, { color: theme.grey }]}>
-              Choose a role to view its assigned jobs and tasks.
-            </Text>
+          <View style={styles.headerRow}>
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
+            </View>
+            <Pressable
+              accessibilityLabel="Bản đồ ngoại tuyến"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setIsOfflineMapModalOpen(true)}
+              style={[
+                styles.headerOfflineBtn,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
+            </Pressable>
           </View>
 
           {/* Role Switcher Tabs */}
           <View
-            accessibilityLabel="Work role"
+            accessibilityLabel="Vai trò công việc"
             accessibilityRole="tablist"
-            style={[styles.roleSwitcher, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+            onLayout={onSwitcherLayout}
+            style={[
+              styles.roleSwitcher,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
           >
+            {/* The Sliding Pill Indicator */}
+            {tabWidth > 0 ? (
+              <Animated.View
+                style={[
+                  styles.slidingIndicator,
+                  {
+                    width: tabWidth,
+                    transform: [{ translateX }],
+                    backgroundColor: theme.primary,
+                  },
+                ]}
+              />
+            ) : null}
+
             {availableRoles.map((role) => {
               const isActive = selectedRole === role;
               const meta = roleMeta[role];
               const badgeCount =
                 role === 'surveyor'
-                  ? draftCount + pendingSurveyCount
+                  ? draftCount + pendingSurveyCount + recapturesCount
                   : role === 'reviewer'
                     ? reviewQueueTotal
                     : undefined;
 
               return (
-                <AppButton
+                <Pressable
+                  accessibilityLabel={`Vai trò ${meta.label}`}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                   key={role}
                   onPress={() => setActiveRole(role)}
-                  pressedOpacity={0.8}
-                  style={[
+                  style={({ pressed }) => [
                     styles.roleTab,
-                    isActive && [styles.roleTabActive, { borderBottomColor: theme.primary }],
+                    { opacity: pressed ? 0.8 : 1 },
                   ]}
-                  variant="ghost"
                 >
                   <MaterialCommunityIcons
-                    color={isActive ? theme.primary : theme.grey}
+                    color={isActive ? "#FFFFFF" : theme.grey}
                     name={meta.icon}
                     size={20}
                   />
                   <Text
                     style={[
                       styles.roleTabText,
-                      { color: isActive ? theme.primary : theme.text },
+                      { color: isActive ? "#FFFFFF" : theme.text },
                     ]}
                   >
                     {meta.label}
                   </Text>
 
-                  {badgeCount !== undefined && badgeCount > 0 ? (
-                    <View
-                      style={[
-                        styles.tabBadge,
-                        {
-                          backgroundColor: isActive ? theme.primary : `${theme.grey}25`,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.tabBadgeText,
-                          { color: isActive ? theme.onPrimary : theme.text },
-                        ]}
-                      >
-                        {badgeCount}
-                      </Text>
-                    </View>
-                  ) : null}
-                </AppButton>
+                  <Badge
+                    count={badgeCount}
+                    maxCount={9}
+                    size="sm"
+                  />
+                </Pressable>
               );
             })}
           </View>
@@ -169,37 +292,54 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Role Summary */}
           <View style={styles.roleSummary}>
             <Text style={[styles.roleTitle, { color: theme.text }]}>
-              {roleMeta[selectedRole].label} Jobs
+              Vai trò: {roleMeta[selectedRole].label}
             </Text>
-            <Text style={[styles.roleDescription, { color: theme.grey }]}>
+            <Text style={[styles.roleDescription, { color: theme.text }]}>
               {roleMeta[selectedRole].description}
             </Text>
+          </View>
+
+          {/* Mission Feature Action Card */}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleWithIcon}>
+              <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionList}>
+            <WorkActionCard
+              accentColor={theme.primary}
+              count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
+              icon="trophy-outline"
+              label="Nhiệm vụ & Thử thách"
+              onPress={() =>
+                router.push({
+                  pathname: '/work/missions',
+                  params: { role: selectedRole },
+                })
+              }
+              subtitle="Nhiệm vụ hàng ngày, hàng tuần & toàn hệ thống để nhận Xu thưởng"
+            />
+          </View>
+
+          {/* Section Title: Role-Specific Features / Actions */}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleWithIcon}>
+              <MaterialCommunityIcons color={theme.primary} name="view-grid-outline" size={22} />
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Chức năng</Text>
+            </View>
           </View>
 
           {/* Role-Specific Work Actions */}
           {selectedRole === 'surveyor' ? (
             <View style={styles.actionList}>
-
-              <WorkActionCard
-                accentColor="#F59E0B"
-                count={draftCount}
-                icon="file-document-edit-outline"
-                label="Draft Submissions"
-                onPress={() => router.push('/work/new-survey')}
-                subtitle={
-                  draftCount > 0
-                    ? `${draftCount} recorded drafts on device ready to upload`
-                    : 'No pending local recordings'
-                }
-                urgent={draftCount > 0}
-              />
-
               {/* Standout Action: Pending Submissions */}
               <WorkActionCard
-                accentColor="#0671eb"
+                accentColor={theme.primary}
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
-                label="Pending Submissions"
+                label="Lịch sử khảo sát"
                 onPress={() => {
                   if (pendingSubmissionsList.length === 1) {
                     router.push({
@@ -213,89 +353,54 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                     });
                   }
                 }}
-                subtitle={
-                  pendingSurveyCount > 0
-                    ? `${pendingSurveyCount} ${pendingSurveyCount === 1 ? 'submission' : 'submissions'} awaiting AI processing and detection`
-                    : 'All submitted survey recordings processed'
-                }
+                subtitle={'Lịch sử ghi nhận biển báo đã nộp, duyệt, từ chối'}
               />
-
-              {/* Quick-Access to In-Flight Pending Submissions */}
-              {pendingSubmissionsList.length > 0 ? (
-                <View style={styles.pendingPreviewSection}>
-                  <Text style={[styles.pendingPreviewTitle, { color: theme.textSecondary }]}>
-                    Active Processing ({pendingSubmissionsList.length})
-                  </Text>
-                  {pendingSubmissionsList.slice(0, 3).map((item) => {
-                    const isVideo = item.submissionType === 'VIDEO_GPX';
-                    return (
-                      <Pressable
-                        accessibilityLabel={`View pending submission ${item.id}`}
-                        accessibilityRole="button"
-                        key={item.id}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/work/survey-submission-details',
-                            params: { id: item.id },
-                          })
-                        }
-                        style={[
-                          styles.pendingPreviewCard,
-                          {
-                            backgroundColor: theme.backgroundElement,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.pendingPreviewIconBox,
-                            { backgroundColor: isVideo ? 'rgba(239, 68, 68, 0.12)' : 'rgba(37, 99, 235, 0.12)' },
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            color={isVideo ? '#EF4444' : '#2563EB'}
-                            name={isVideo ? 'video-outline' : 'camera-outline'}
-                            size={20}
-                          />
-                        </View>
-                        <View style={styles.pendingPreviewText}>
-                          <View style={styles.pendingPreviewTop}>
-                            <Text numberOfLines={1} style={[styles.pendingPreviewName, { color: theme.text }]}>
-                              {isVideo ? 'Video survey' : 'Image survey'}
-                            </Text>
-                            <View style={styles.pendingPreviewStatusBadge}>
-                              <Text style={styles.pendingPreviewStatusText}>
-                                {item.status}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={[styles.pendingPreviewSub, { color: theme.placeholder }]}>
-                            #{item.id.slice(0, 8)} · {item.totalCandidatesExtracted} signs detected
-                          </Text>
-                        </View>
-                        <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-
               {/* Standout Action: Revalidation Map */}
               <WorkActionCard
-                accentColor="#10B981"
-                count={2}
+                accentColor={theme.primary}
+                count={revalidationTaskCount}
                 icon="map-search-outline"
-                label="Revalidation Map"
-                onPress={() => router.replace('/home')}
-                subtitle="View the map to verify reported sign discrepancies"
+                label="Tái xác nhận biển báo"
+                onPress={handleOpenRevalidationMap}
+                subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
+              />
+              {/* Standout Action: Recaptures Requested */}
+              <WorkActionCard
+                accentColor="#F59E0B"
+                count={recapturesCount}
+                icon="camera-retake-outline"
+                label="Yêu cầu chụp lại ảnh"
+                onPress={() => router.push('/work/recaptures')}
+                subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
+              />
+              {/* Standout Action: Offline Maps */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="map-marker-down"
+                label="Bản đồ ngoại tuyến"
+                onPress={() => setIsOfflineMapModalOpen(true)}
+                subtitle="Tải bản đồ vector PMTiles để khảo sát khi không có sóng di động"
+              />
+
+              {/* Action Card: Sign Catalog */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="database-search-outline"
+                label="Tra cứu biển báo giao thông"
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'surveyor' },
+                  })
+                }
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
               />
             </View>
           ) : selectedRole === 'reviewer' ? (
             <View style={styles.actionList}>
               {/* Standout Hero Action for Reviewer: Pending Reviews */}
               <AppButton
-                accessibilityLabel="Review pending submissions"
+                accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
                 onPress={() => router.push('/work/submission-review')}
                 pressedOpacity={0.9}
                 style={styles.heroActionCard}
@@ -307,58 +412,95 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   </View>
                   <View style={styles.heroText}>
                     <View style={styles.heroTitleRow}>
-                      <Text style={styles.heroTitle}>Pending Reviews</Text>
+                      <Text style={styles.heroTitle}>Thẩm định chờ duyệt</Text>
                       {reviewQueueTotal > 0 ? (
                         <View style={styles.heroBadge}>
-                          <Text style={styles.heroBadgeText}>{reviewQueueTotal} NEW</Text>
+                          <Text style={styles.heroBadgeText}>{reviewQueueTotal} MỚI</Text>
                         </View>
                       ) : null}
                     </View>
                     <Text style={styles.heroSubtitle}>
                       {reviewQueueTotal > 0
-                        ? `${reviewQueueTotal} candidate signs waiting for your verification vote`
-                        : 'Review submitted sign records before they enter the trusted map'}
+                        ? `${reviewQueueTotal} biển báo cần bạn xác minh`
+                        : 'Không có biển báo cần xác minh'}
                     </Text>
                   </View>
                 </View>
                 <MaterialCommunityIcons color={theme.onPrimary} name="chevron-right" size={24} />
               </AppButton>
 
+              {/* Action Card: Pending Revalidation Evidence */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                count={revalEvidenceCount}
+                icon="clipboard-check-outline"
+                label="Tái thẩm định"
+                onPress={() => router.push('/work/revalidation-review')}
+                subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
+              />
+
+              {/* Action Card: Reviewer Stats */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                count={reviewerStats?.totalReviews}
+                icon="chart-timeline-variant-shimmer"
+                label="Thống kê của bạn"
+                onPress={() => router.push('/work/reviewer-stats')}
+                subtitle={
+                  reviewerStats
+                    ? `Độ tin cậy: ${Math.round((reviewerStats.reliabilityScore ?? 0) * 100)}% · Tỷ lệ chính xác: ${Math.round((reviewerStats.accuracyRate ?? 0) * 100)}%`
+                    : 'Xem độ tin cậy, tỷ lệ chính xác và lịch sử thẩm định của bạn'
+                }
+              />
+
               {/* Secondary Standout Action: Sign Catalog */}
               <WorkActionCard
-                accentColor="#8B5CF6"
+                accentColor={theme.primary}
                 icon="database-search-outline"
-                label="Traffic Sign Catalog"
-                onPress={() => router.push('/work/sign-catalog')}
-                subtitle="Browse official Vietnamese standard sign codes and classifications"
+                label="Tra cứu biển báo giao thông"
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'reviewer' },
+                  })
+                }
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
               />
             </View>
           ) : (
-            <AppButton
-              accessibilityLabel="View signs recorded during livestream"
-              onPress={() => router.push('/work/recorded-signs')}
-              pressedOpacity={0.88}
-              style={[
-                styles.recordedSignsButton,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              variant="ghost"
-            >
-              <View style={styles.recordedSignsLeft}>
-                <View style={[styles.recordedSignsIcon, { backgroundColor: '#EF444418' }]}>
-                  <MaterialCommunityIcons color="#EF4444" name="video-outline" size={24} />
-                </View>
-                <View style={styles.recordedSignsCopy}>
-                  <Text style={[styles.recordedSignsLabel, { color: theme.text }]}>
-                    Recorded Signs
-                  </Text>
-                  <Text style={[styles.recordedSignsSubtitle, { color: theme.grey }]}>
-                    Review signs captured from your livestream session
-                  </Text>
-                </View>
-              </View>
-              <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
-            </AppButton>
+            <View style={styles.actionList}>
+              {/* Standout Action: Driver Navigation History */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                count={driverSessionsTotal}
+                icon="map-clock-outline"
+                label="Lịch sử di chuyển"
+                onPress={() => router.push('/work/navigation-history')}
+                subtitle="Xem lại các lộ trình và chuyến đi bạn đã điều hướng"
+              />
+
+              {/* <WorkActionCard
+                accentColor={theme.primary}
+                icon="video-outline"
+                label="Biển báo đã ghi nhận"
+                onPress={() => router.push('/work/recorded-signs')}
+                subtitle="Xem lại các biển báo được ghi nhận từ phiên phát trực tiếp của bạn"
+              /> */}
+
+              {/* Action Card: Sign Catalog */}
+              <WorkActionCard
+                accentColor={theme.primary}
+                icon="database-search-outline"
+                label="Tra cứu biển báo giao thông"
+                onPress={() =>
+                  router.push({
+                    pathname: '/work/sign-catalog',
+                    params: { role: 'driver' },
+                  })
+                }
+                subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
+              />
+            </View>
           )}
         </ScrollView >
 
@@ -366,7 +508,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
         {
           selectedRole === 'surveyor' ? (
             <AppButton
-              accessibilityLabel="Create new survey record"
+              accessibilityLabel="Tạo bản ghi khảo sát mới"
               onPress={() => router.push('/work/new-survey')}
               pressedOpacity={0.75}
               style={styles.floatingAction}
@@ -375,6 +517,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             </AppButton>
           ) : null
         }
+
+        <OfflineMapModal
+          accessToken={session?.accessToken}
+          onClose={() => setIsOfflineMapModalOpen(false)}
+          visible={isOfflineMapModalOpen}
+        />
       </SafeAreaView >
     </View >
   );
@@ -399,6 +547,19 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.half,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerOfflineBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontFamily: Fonts.title,
     fontSize: 28,
@@ -412,10 +573,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   roleSwitcher: {
+    position: 'relative',
     flexDirection: 'row',
-    borderRadius: Rounded.lg,
+    alignItems: 'center',
+    borderRadius: Rounded.round,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  slidingIndicator: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: Rounded.round,
+    zIndex: 0,
   },
   roleTab: {
     flex: 1,
@@ -423,23 +594,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: Spacing.one,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  roleTabActive: {
-    backgroundColor: 'rgba(6, 113, 235, 0.05)',
+    borderRadius: Rounded.round,
+    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   roleTabText: {
     fontFamily: Fonts.body,
     fontSize: 14,
     fontWeight: '700',
-  },
-  tabBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
   },
   tabBadgeText: {
     fontFamily: Fonts.body,
@@ -460,6 +624,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.two,
+  },
+  sectionTitleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  streakEmoji: {
+    fontSize: 12,
+  },
+  streakText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 12,
+    color: '#B45309',
   },
   actionList: {
     gap: Spacing.three,

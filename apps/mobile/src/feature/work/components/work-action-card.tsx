@@ -1,9 +1,10 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Badge } from '@/components/badge';
 import { useTheme } from '@/hooks/use-theme';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -88,18 +89,15 @@ export function WorkActionCard({
         </View>
       </Pressable>
 
-      {count !== undefined && count !== null ? (
-        <View
-          style={[
-            styles.topRightBadge,
-            {
-              backgroundColor: primaryAccent,
-              borderColor: theme.background,
-            },
-          ]}
-        >
-          <Text style={[styles.topRightBadgeText, { color: theme.onPrimary }]}>{count}</Text>
-        </View>
+      {count !== undefined && count !== null && count > 0 ? (
+        <Badge
+          borderColor={theme.background}
+          borderWidth={2}
+          count={count}
+          maxCount={9}
+          size="lg"
+          style={styles.topRightBadge}
+        />
       ) : null}
     </View>
   );
@@ -125,20 +123,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
     zIndex: 10,
     elevation: 5,
-  },
-  topRightBadgeText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 15,
   },
   contentRow: {
     flexDirection: 'row',

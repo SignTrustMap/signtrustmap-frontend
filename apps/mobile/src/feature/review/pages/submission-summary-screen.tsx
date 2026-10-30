@@ -1,9 +1,10 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import {
   type CompletedReview,
@@ -19,27 +20,33 @@ const actionDetails: Record<
 > = {
   approved: {
     color: Colors.primary,
-    label: 'Approved',
-    summary: 'Ready for the trusted sign map.',
+    label: 'Phê duyệt',
+    summary: 'Sẵn sàng đưa vào bản đồ biển báo tin cậy.',
     symbol: '✓',
   },
   declined: {
     color: Colors.danger,
-    label: 'Declined',
-    summary: 'Declined during quality review.',
+    label: 'Từ chối',
+    summary: 'Từ chối trong quá trình kiểm tra chất lượng.',
     symbol: '×',
   },
   reported: {
     color: Colors.placeholder,
-    label: 'Reported',
-    summary: 'Reported to system staff.',
+    label: 'Báo cáo',
+    summary: 'Đã báo cáo cho ban quản trị hệ thống.',
     symbol: '!',
   },
   skipped: {
     color: Colors.grey,
-    label: 'Skipped',
-    summary: 'Cannot identify sign.',
+    label: 'Bỏ qua',
+    summary: 'Không thể nhận diện biển báo.',
     symbol: '↷',
+  },
+  reported_new_sign: {
+    color: Colors.warning,
+    label: 'New Sign Type',
+    summary: 'Reported new sign type for catalog review.',
+    symbol: '★',
   },
 };
 
@@ -65,15 +72,30 @@ function SummaryMetric({ action, count }: { action: ReviewActionType; count: num
   );
 }
 
-function ReviewedSignRow({ review }: { review: CompletedReview }) {
+function ReviewedSignRow({
+  onPress,
+  review,
+}: {
+  onPress?: () => void;
+  review: CompletedReview;
+}) {
   const theme = useTheme();
   const details = actionDetails[review.action];
 
   return (
-    <View
-      style={[
+    <Pressable
+      accessibilityHint="Chạm để thẩm định lại biển báo này"
+      accessibilityLabel={`Biển báo ${review.submission.title}, trạng thái ${details.label}. Chạm để sửa lại lựa chọn.`}
+      accessibilityRole="button"
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [
         styles.signRow,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+          opacity: pressed ? 0.85 : 1,
+        },
       ]}
     >
       <Image
@@ -96,35 +118,60 @@ function ReviewedSignRow({ review }: { review: CompletedReview }) {
       <View style={[styles.statusBadge, { backgroundColor: `${details.color}18` }]}>
         <Text style={[styles.statusLabel, { color: details.color }]}>{details.label}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 export function SubmissionSummaryScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const params = useLocalSearchParams<{ resumeIndex?: string }>();
+  const resumeIndex = params?.resumeIndex;
   const { beginSubmissionCheck, resetReviewWorkflow, reviewHistory } = useReviewWorkflow();
   const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const counts = reviewHistory.reduce<Record<ReviewActionType, number>>(
-    (result, review) => ({ ...result, [review.action]: result[review.action] + 1 }),
-    { approved: 0, declined: 0, reported: 0, skipped: 0 },
+    (result, review) => ({ ...result, [review.action]: (result[review.action] || 0) + 1 }),
+    { approved: 0, declined: 0, reported: 0, skipped: 0, reported_new_sign: 0 },
   );
+
+  const handleBackToReview = () => {
+    if (resumeIndex !== undefined && resumeIndex !== '') {
+      router.replace({
+        pathname: '/work/submission-review',
+        params: { resumeIndex: String(resumeIndex) },
+      });
+    } else {
+      router.replace('/work/submission-review');
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <View style={styles.content}>
+          <View style={styles.topBar}>
+            <Pressable
+              accessibilityLabel="Quay lại thẩm định"
+              hitSlop={Spacing.one}
+              onPress={handleBackToReview}
+              style={styles.backButton}
+              testID="summary-back-button"
+            >
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+            </Pressable>
+          </View>
+
           <View style={styles.heading}>
-            <Text style={[styles.title, { color: theme.text }]}>Submission Summary</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Tổng kết thẩm định</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Today • {reviewHistory.length} signs reviewed
+              Hôm nay • Đã thẩm định {reviewHistory.length} biển báo
             </Text>
           </View>
 
           <View style={styles.metrics}>
             <SummaryMetric action="approved" count={counts.approved} />
             <SummaryMetric action="declined" count={counts.declined} />
-            <SummaryMetric action="reported" count={counts.reported} />
+            <SummaryMetric action="reported" count={counts.reported + counts.reported_new_sign} />
             <SummaryMetric action="skipped" count={counts.skipped} />
           </View>
 
@@ -133,24 +180,35 @@ export function SubmissionSummaryScreen() {
             showsVerticalScrollIndicator={false}
             style={styles.reviewList}
           >
-            {reviewHistory.map((review) => (
-              <ReviewedSignRow key={review.submission.id} review={review} />
+            {reviewHistory.map((review, index) => (
+              <ReviewedSignRow
+                key={review.submission.id}
+                onPress={() => {
+                  beginSubmissionCheck(index);
+                  router.replace('/work/submission-review');
+                }}
+                review={review}
+              />
             ))}
           </ScrollView>
 
           <View style={styles.footerActions}>
             <AppButton
-              label="Check submission"
+              disabled={reviewHistory.length === 0}
+              label="Kiểm tra lại hồ sơ"
               onPress={() => {
                 beginSubmissionCheck();
                 router.replace('/work/submission-review');
               }}
-              style={[styles.checkButton, { borderColor: theme.primary }]}
-              textStyle={{ color: theme.primary }}
+              style={[
+                styles.checkButton,
+                { borderColor: reviewHistory.length > 0 ? theme.primary : theme.border },
+              ]}
+              textStyle={{ color: reviewHistory.length > 0 ? theme.primary : theme.placeholder }}
               variant="surface"
             />
             <AppButton
-              label="Submit"
+              label="Hoàn tất"
               onPress={() => {
                 const reviewedCount = reviewHistory.length;
                 resetReviewWorkflow();
@@ -158,8 +216,11 @@ export function SubmissionSummaryScreen() {
                 // home screen and nav bar show fresh data after submission.
                 invalidateWalletAndStats();
                 router.replace({
-                  pathname: '/work/submission-finish',
-                  params: { count: String(reviewedCount) },
+                  pathname: '/work/submission-complete',
+                  params: {
+                    type: 'review_submission',
+                    count: String(reviewedCount),
+                  },
                 });
               }}
               style={styles.submitButton}
@@ -181,8 +242,20 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.two,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: -Spacing.one,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heading: { gap: 2 },
   title: { fontFamily: Fonts.body, fontSize: 24, fontWeight: 900, lineHeight: 31 },

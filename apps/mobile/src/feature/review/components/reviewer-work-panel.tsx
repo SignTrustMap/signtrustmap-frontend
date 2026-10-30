@@ -12,7 +12,7 @@ export function ReviewerWorkPanel() {
 
   return (
     <WorkActionCard
-      label="Pending Reviews"
+      label="Thẩm định chờ xử lý"
       onPress={() => router.push('/work/submission-review')}
       symbol={{ android: 'fact_check', ios: 'checkmark.rectangle.stack', web: 'fact_check' }}
     />

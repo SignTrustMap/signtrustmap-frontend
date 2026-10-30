@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState, type ComponentProps } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -20,16 +20,16 @@ type AppTab = {
 };
 
 const tabs: AppTab[] = [
-  { fallbackLabel: 'H', label: 'Home', route: '/home', symbol: { android: 'home', web: 'home' } },
+  { fallbackLabel: 'C', label: 'Trang chủ', route: '/home', symbol: { android: 'home', web: 'home' } },
   {
-    fallbackLabel: 'T',
-    label: 'Work',
+    fallbackLabel: 'V',
+    label: 'Công việc',
     route: '/work',
     symbol: { android: 'task', web: 'task' },
   },
   {
-    fallbackLabel: 'P',
-    label: 'Profile',
+    fallbackLabel: 'N',
+    label: 'Cá nhân',
     route: '/profile',
     symbol: { android: 'person', web: 'person' },
   },

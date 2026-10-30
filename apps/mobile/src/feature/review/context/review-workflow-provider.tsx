@@ -1,9 +1,11 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useSegments } from 'expo-router';
 import {
   useGetReviewQueue,
   useGetReviewHistory,
   useCastVoteOnSignCandidate,
   useReportSignCandidate,
+  useReportMissingType,
   useSkipSign,
   useUndoVoteOnCandidate,
 } from '@/feature/review/hooks/use-review';
@@ -12,25 +14,39 @@ import {
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
+import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
+import {
+  REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
+  UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
+} from '@/constants/message';
 
-export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped';
+export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped' | 'reported_new_sign';
 
 export type CompletedReview = {
   action: ReviewActionType;
   submission: ReviewSubmission;
 };
 
-type ReviewWorkflowContextValue = {
-  beginSubmissionCheck: () => void;
+export type ReviewWorkflowContextValue = {
+  beginSubmissionCheck: (targetSubmissionIndex?: number) => void;
   checkedReviewIndex: number;
   checkingSubmission: boolean;
   isCheckingSubmission: boolean;
-  completeCurrentReview: (actionOrDecision: ReviewActionType | ReviewDecision, details?: { declineReason?: string; declineNote?: string }) => Promise<boolean>;
+  completeCurrentReview: (
+    actionOrDecision: ReviewActionType | ReviewDecision,
+    details?: {
+      declineReason?: string;
+      declineNote?: string;
+      suggestedSignTypeId?: number | string;
+      newSignReport?: CreateMissingTypeReportDto;
+    }
+  ) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
   goToNextCheckedReview: () => void;
   goToPreviousCheckedReview: () => void;
   isLoading: boolean;
+  jumpToSubmissionIndex?: (index: number) => void;
   pendingSubmissions: ReviewSubmission[];
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
@@ -46,7 +62,7 @@ type ReviewWorkflowContextValue = {
   undoLastReview: () => Promise<boolean>;
 };
 
-const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
+export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
 
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
@@ -58,21 +74,27 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const { mutateAsync: castVote } = useCastVoteOnSignCandidate();
   const { mutateAsync: reportCandidate } = useReportSignCandidate();
+  const { mutateAsync: reportMissingTypeMutation } = useReportMissingType();
   const { mutateAsync: skipSign } = useSkipSign();
   const { mutateAsync: undoVote } = useUndoVoteOnCandidate();
 
   const [pendingSubmissions, setPendingSubmissions] = useState<ReviewSubmission[]>([]);
+  const [initialQueueSubmissions, setInitialQueueSubmissions] = useState<ReviewSubmission[]>([]);
   const [reviewHistory, setReviewHistory] = useState<CompletedReview[]>([]);
   const [isCheckingSubmission, setIsCheckingSubmission] = useState(false);
   const [checkedReviewIndex, setCheckedReviewIndex] = useState(0);
   const [isRecheckingSubmission, setIsRecheckingSubmission] = useState(false);
   const [recheckingReviewIndex, setRecheckingReviewIndex] = useState<number>();
   const [recheckingPreviousAction, setRecheckingPreviousAction] = useState<ReviewActionType>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
   const hasLoadedRef = useRef(false);
+
+  const segments = useSegments();
+  const rawSegments = segments as string[];
+  const isReviewActive = rawSegments.includes('submission-review') || rawSegments.includes('submission-summary');
 
   const refetchWorkflow = useCallback(async () => {
     const [queueResult, historyResult] = await Promise.all([
@@ -93,9 +115,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       const data = await refetchWorkflow();
       if (!data?.queue) return;
       setPendingSubmissions(data.queue.submissions);
+      setInitialQueueSubmissions(data.queue.submissions);
       setTotalSubmissions(data.queue.total);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+      setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
     } finally {
       setIsLoading(false);
     }
@@ -106,21 +129,25 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       hasLoadedRef.current = false;
       return;
     }
-    // Only load initial queue once per login/account session, preventing background
-    // cache invalidations from wiping out ongoing reviewer swiping progress
+    // Only load initial queue when actively on a review screen, preventing background
+    // cache invalidations and calls when browsing other work tabs or app sections
+    if (!isReviewActive) return;
+
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
 
+    setIsLoading(true);
     let active = true;
     refetchWorkflow()
       .then((data) => {
         if (!active || !data?.queue) return;
         setPendingSubmissions(data.queue.submissions);
+        setInitialQueueSubmissions(data.queue.submissions);
         setTotalSubmissions(data.queue.total);
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unable to load review submissions.');
+        if (active) setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -128,13 +155,49 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [accessToken, accountId, refetchWorkflow]);
+  }, [accessToken, accountId, isReviewActive, refetchWorkflow]);
 
-  const beginSubmissionCheck = () => {
-    setPendingSubmissions((pending) => [
-      ...reviewHistory.map((item) => item.submission),
-      ...pending,
-    ]);
+  const jumpToSubmissionIndex = useCallback(
+    (targetIndex: number) => {
+      if (initialQueueSubmissions.length === 0) return;
+      const clampedIndex = Math.max(0, Math.min(targetIndex, initialQueueSubmissions.length));
+      if (clampedIndex >= initialQueueSubmissions.length) {
+        setPendingSubmissions([]);
+        return;
+      }
+      if (
+        reviewHistory.length === clampedIndex &&
+        pendingSubmissions[0]?.id === initialQueueSubmissions[clampedIndex]?.id
+      ) {
+        return;
+      }
+      setPendingSubmissions(initialQueueSubmissions.slice(clampedIndex));
+      setTotalSubmissions(initialQueueSubmissions.length);
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(false);
+      setRecheckingReviewIndex(undefined);
+      setRecheckingPreviousAction(undefined);
+    },
+    [initialQueueSubmissions, reviewHistory.length, pendingSubmissions],
+  );
+
+  const beginSubmissionCheck = (targetSubmissionIndex?: number) => {
+    if (targetSubmissionIndex !== undefined && reviewHistory[targetSubmissionIndex]) {
+      const target = reviewHistory[targetSubmissionIndex];
+      setPendingSubmissions([target.submission]);
+      setTotalSubmissions(1);
+      setIsRecheckingSubmission(true);
+      setRecheckingReviewIndex(targetSubmissionIndex);
+      setRecheckingPreviousAction(target.action);
+      setReviewHistory((history) => history.filter((_, i) => i !== targetSubmissionIndex));
+      setCheckedReviewIndex(0);
+      setIsCheckingSubmission(false);
+      return;
+    }
+
+    const votedSubmissions = reviewHistory.map((item) => item.submission);
+    setPendingSubmissions(votedSubmissions);
+    setTotalSubmissions(votedSubmissions.length);
     setReviewHistory([]);
     setCheckedReviewIndex(0);
     setIsCheckingSubmission(false);
@@ -156,6 +219,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingPreviousAction(undefined);
     setReviewHistory([]);
     setSessionReviewCount(0);
+    setInitialQueueSubmissions([]);
     hasLoadedRef.current = false;
     await refresh();
   };
@@ -170,7 +234,12 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const completeCurrentReview = async (
     actionOrDecision: ReviewActionType | ReviewDecision,
-    details?: { declineReason?: string; declineNote?: string }
+    details?: {
+      declineReason?: string;
+      declineNote?: string;
+      suggestedSignTypeId?: number | string;
+      newSignReport?: CreateMissingTypeReportDto;
+    }
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
@@ -179,6 +248,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const action: ReviewActionType = typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
     const reason = details?.declineReason || (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
     const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
+    const suggestedSignTypeId = (details as any)?.suggestedSignTypeId ?? (typeof actionOrDecision === 'object' ? (actionOrDecision as any).suggestedSignTypeId : undefined);
 
     // 1. Immediately update UI state optimistically so review cards advance with zero lag
     setReviewHistory((history) => {
@@ -204,7 +274,14 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     // 2. Dispatch backend network call in background without blocking state progression
     const params = { candidateId: submission.id };
     try {
-      if (action === 'reported') {
+      if (action === 'reported_new_sign') {
+        if (details?.newSignReport) {
+          await reportMissingTypeMutation({
+            ...details.newSignReport,
+            candidateId: submission.id,
+          });
+        }
+      } else if (action === 'reported') {
         await reportCandidate({
           params,
           request: {
@@ -220,6 +297,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           params,
           request: {
             vote: action === 'approved' ? 1 : -1,
+            ...(suggestedSignTypeId != null ? { suggestedSignTypeId: Number(suggestedSignTypeId) } : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
           },
@@ -252,6 +330,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const reviewCheckedSubmissionAgain = async (): Promise<boolean> => {
+    if (reviewHistory[checkedReviewIndex]) {
+      beginSubmissionCheck(checkedReviewIndex);
+      return true;
+    }
     return false;
   };
 
@@ -272,6 +354,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         goToNextCheckedReview,
         goToPreviousCheckedReview,
         isLoading,
+        jumpToSubmissionIndex,
         pendingSubmissions,
         refresh,
         recheckingPreviousAction,
@@ -294,6 +377,6 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
 export function useReviewWorkflow() {
   const context = useContext(ReviewWorkflowContext);
-  if (!context) throw new Error('useReviewWorkflow must be used within ReviewWorkflowProvider');
+  if (!context) throw new Error(REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE);
   return context;
 }

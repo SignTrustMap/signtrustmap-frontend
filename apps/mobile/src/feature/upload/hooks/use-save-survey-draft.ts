@@ -1,6 +1,11 @@
 import { useRef } from 'react';
 
 import { useSession } from '@/context/session-provider';
+import {
+  GPX_UPLOAD_SESSION_UNAVAILABLE_MESSAGE,
+  SIGN_IN_TO_SAVE_DRAFT_MESSAGE,
+  UPLOAD_SESSION_UNAVAILABLE_MESSAGE,
+} from '@/constants/message';
 import { useCompleteSurveyUpload, useCreateSurveySubmission, useInitializeSurveyUpload, useUploadSurveyChunk } from './use-survey-submission';
 import { prepareSurveyGpx, prepareSurveyImage, type SurveyImage } from '../utils/survey-image';
 import { readSubmissionId } from '../utils/submission-response';
@@ -29,6 +34,24 @@ export async function readDraftImage(accountId: string, submissionId: string): P
   } catch { return undefined; }
 }
 
+export async function updateDraftCoordinates(
+  accountId: string,
+  submissionId: string,
+  coords: { latitude?: number; longitude?: number },
+) {
+  const existing = await readDraftImage(accountId, submissionId);
+  if (existing) {
+    const updated: DraftImage = {
+      ...existing,
+      startLat: coords.latitude ?? existing.startLat,
+      startLon: coords.longitude ?? existing.startLon,
+    };
+    await setStorageItemAsync(draftKey(accountId, submissionId), JSON.stringify(updated));
+    return updated;
+  }
+  return undefined;
+}
+
 /** Saves media on a draft only. Final submission belongs to the details screen. */
 export function useSaveSurveyDraft() {
   const { session } = useSession();
@@ -44,31 +67,52 @@ export function useSaveSurveyDraft() {
     submissionId?: string,
     gpx?: { name?: string; uri: string },
   ) => {
-    if (!session) throw new Error('Sign in to save a draft.');
-    if (submissionId && attempt.current?.submissionId !== submissionId) {
-      attempt.current = await readDraftImage(session.account.id, submissionId) ?? {
+    if (!session) throw new Error(SIGN_IN_TO_SAVE_DRAFT_MESSAGE);
+    let draft: DraftImage;
+    let preparedImage: Awaited<ReturnType<typeof prepareSurveyImage>> | undefined;
+
+    const effectiveLat = image.startLat ?? (typeof request.latitude === 'number' ? request.latitude : undefined);
+    const effectiveLon = image.startLon ?? (typeof request.longitude === 'number' ? request.longitude : undefined);
+
+    if (submissionId) {
+      const existing = (attempt.current?.submissionId === submissionId && (!image.uri || attempt.current.uri === image.uri) ? attempt.current : undefined)
+        ?? await readDraftImage(session.account.id, submissionId);
+      const isNewMedia = Boolean(existing && image.uri && existing.uri && image.uri !== existing.uri);
+      draft = existing ? {
+        ...existing,
         ...image,
+        startLat: isNewMedia ? effectiveLat : (effectiveLat ?? existing.startLat),
+        startLon: isNewMedia ? effectiveLon : (effectiveLon ?? existing.startLon),
+      } : {
+        ...image,
+        startLat: effectiveLat,
+        startLon: effectiveLon,
         submissionId,
         gpxName: gpx?.name,
         gpxUri: gpx?.uri,
       };
-    }
-    if (!attempt.current || attempt.current.uri !== image.uri) {
+    } else {
       if (image.type !== 'video') {
         // Read the file before creating a record so unreadable images do not create empty drafts.
-        await prepareSurveyImage(image);
+        preparedImage = await prepareSurveyImage(image);
       }
-      attempt.current = {
+      const newSubmissionId = readSubmissionId(await create.mutateAsync({ request }));
+      draft = {
         ...image,
-        submissionId: submissionId ?? readSubmissionId(await create.mutateAsync({ request })),
+        startLat: effectiveLat,
+        startLon: effectiveLon,
+        submissionId: newSubmissionId,
         gpxName: gpx?.name,
         gpxUri: gpx?.uri,
       };
-    } else if (gpx?.uri && !attempt.current.gpxUri) {
-      attempt.current.gpxUri = gpx.uri;
-      attempt.current.gpxName = gpx.name;
     }
-    const draft = attempt.current;
+
+    if (gpx?.uri && !draft.gpxUri) {
+      draft.gpxUri = gpx.uri;
+      draft.gpxName = gpx.name;
+    }
+
+    attempt.current = draft;
     const persist = () => setStorageItemAsync(draftKey(session.account.id, draft.submissionId), JSON.stringify(draft));
     await persist();
 
@@ -76,7 +120,7 @@ export function useSaveSurveyDraft() {
     // For single images, complete the direct single-chunk upload here.
     if (image.type !== 'video' && !draft.uploadCompleted) {
       if (!draft.chunkUploaded) {
-        const prepared = await prepareSurveyImage(image);
+        const prepared = preparedImage ?? await prepareSurveyImage(image);
         if (!draft.sessionId) {
           const result = await initialize.mutateAsync({
             submissionId: draft.submissionId, request: {
@@ -90,7 +134,7 @@ export function useSaveSurveyDraft() {
         draft.chunkUploaded = true;
         await persist();
       }
-      if (!draft.sessionId) throw new Error('Upload session is unavailable. Please retry.');
+      if (!draft.sessionId) throw new Error(UPLOAD_SESSION_UNAVAILABLE_MESSAGE);
       await complete.mutateAsync({ sessionId: draft.sessionId });
       draft.uploadCompleted = true;
       await persist();
@@ -113,7 +157,7 @@ export function useSaveSurveyDraft() {
         draft.gpxChunkUploaded = true;
         await persist();
       }
-      if (!draft.gpxSessionId) throw new Error('GPX upload session is unavailable. Please retry.');
+      if (!draft.gpxSessionId) throw new Error(GPX_UPLOAD_SESSION_UNAVAILABLE_MESSAGE);
       await complete.mutateAsync({ sessionId: draft.gpxSessionId });
       draft.gpxUploadCompleted = true;
       await persist();

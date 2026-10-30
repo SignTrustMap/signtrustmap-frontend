@@ -17,7 +17,7 @@ export default function PlaceholderPage({
   return (
     <div className="p-6 flex items-center justify-center min-h-64">
       <div className="text-center">
-        <div className="w-12 h-12 rounded-[12px] bg-[#d3f7ff] flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-xl bg-[#d3f7ff] flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🚧</span>
         </div>
         <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1" style={{ fontFamily: 'Public Sans, sans-serif' }}>

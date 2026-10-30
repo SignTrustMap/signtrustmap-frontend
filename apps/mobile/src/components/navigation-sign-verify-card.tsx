@@ -11,6 +11,7 @@ import { Image } from 'expo-image';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { RouteSign } from '@/api/navigation/navigation';
+import { ImageInspectionModal } from './image-inspection-modal';
 
 export type SignVerifyResult = 'present' | 'absent';
 
@@ -43,6 +44,7 @@ export function NavigationSignVerifyCard({
   const [lastSignId, setLastSignId] = useState(sign?.id);
   const [visible, setVisible] = useState(Boolean(sign));
   const [responded, setResponded] = useState(false);
+  const [inspectPhoto, setInspectPhoto] = useState<string | null>(null);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (sign?.id !== lastSignId) {
@@ -113,7 +115,7 @@ export function NavigationSignVerifyCard({
 
   if (!visible) return null;
 
-  const signTitle = sign?.name || sign?.signCode || 'Traffic Sign';
+  const signTitle = sign?.name || sign?.signCode || 'Biển báo giao thông';
 
   return (
     <Animated.View
@@ -134,7 +136,7 @@ export function NavigationSignVerifyCard({
       >
         {/* Dismiss × */}
         <Pressable
-          accessibilityLabel="Dismiss sign verification"
+          accessibilityLabel="Bỏ qua xác minh biển báo"
           accessibilityRole="button"
           hitSlop={12}
           onPress={() => hideCard(true)}
@@ -145,19 +147,34 @@ export function NavigationSignVerifyCard({
 
         {/* Sign image + info */}
         <View style={styles.signRow}>
-          <View style={[styles.signImageWrap, { backgroundColor: theme.backgroundSelected }]}>
-            {sign?.imageUrl ? (
+          <Pressable
+            accessibilityLabel="Tap to view full verification photo"
+            onPress={() => setInspectPhoto(sign?.actualCropUrl || sign?.imageUrl || null)}
+            style={[styles.signImageWrap, { backgroundColor: theme.backgroundSelected }]}
+          >
+            {sign?.actualCropUrl ? (
+              <Image
+                contentFit="cover"
+                source={{ uri: sign.actualCropUrl }}
+                style={styles.signImage}
+              />
+            ) : sign?.imageUrl ? (
               <Image
                 contentFit="contain"
                 source={{ uri: sign.imageUrl }}
                 style={styles.signImage}
               />
             ) : null}
-          </View>
+          </Pressable>
           <View style={styles.signInfo}>
             <Text style={[styles.promptLabel, { color: theme.placeholder }]}>
-              SIGN AHEAD · {distanceMeters}M
+              BIỂN BÁO PHÍA TRƯỚC · {distanceMeters}M
             </Text>
+            {sign?.actualCropUrl ? (
+              <Text style={{ fontSize: 9, color: '#0671EB', fontWeight: '700', marginBottom: 2 }}>
+                ẢNH XÁC THỰC
+              </Text>
+            ) : null}
             <Text numberOfLines={2} style={[styles.signName, { color: theme.text }]}>
               {signTitle}
             </Text>
@@ -166,13 +183,13 @@ export function NavigationSignVerifyCard({
 
         {/* Confirm question */}
         <Text style={[styles.question, { color: theme.textSecondary }]}>
-          Is this sign on the street?
+          Biển báo này có trên đường không?
         </Text>
 
         {/* Action buttons */}
         <View style={styles.actions}>
           <TouchableOpacity
-            accessibilityLabel="Yes, the sign is on the street"
+            accessibilityLabel="Có, biển báo vẫn có trên đường"
             accessibilityRole="button"
             activeOpacity={0.78}
             disabled={responded}
@@ -184,11 +201,11 @@ export function NavigationSignVerifyCard({
             ]}
           >
             <Text style={styles.actionBtnIcon}>✅</Text>
-            <Text style={[styles.actionBtnLabel, styles.actionBtnLabelYes]}>Yes</Text>
+            <Text style={[styles.actionBtnLabel, styles.actionBtnLabelYes]}>Có</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            accessibilityLabel="No, the sign is not on the street"
+            accessibilityLabel="Không, không thấy biển báo"
             accessibilityRole="button"
             activeOpacity={0.78}
             disabled={responded}
@@ -200,10 +217,17 @@ export function NavigationSignVerifyCard({
             ]}
           >
             <Text style={styles.actionBtnIcon}>❌</Text>
-            <Text style={[styles.actionBtnLabel, { color: theme.danger }]}>No</Text>
+            <Text style={[styles.actionBtnLabel, { color: theme.danger }]}>Không</Text>
           </TouchableOpacity>
         </View>
       </View>
+      <ImageInspectionModal
+        visible={Boolean(inspectPhoto)}
+        onClose={() => setInspectPhoto(null)}
+        imageUrl={inspectPhoto}
+        title={signTitle}
+        subtitle={sign?.roadName || sign?.displayAddress || undefined}
+      />
     </Animated.View>
   );
 }

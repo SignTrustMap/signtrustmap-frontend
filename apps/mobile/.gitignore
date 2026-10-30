@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+#capture images and test logs
+/__tests__/report/*/

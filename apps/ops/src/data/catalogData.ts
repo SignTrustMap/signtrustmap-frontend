@@ -5,6 +5,8 @@ export type CatalogCategory =
   | 'guide'
   | 'speed_limit'
   | 'additional'
+  | 'temporary'
+  | string
 
 export interface CatalogEntry {
   id: string
@@ -12,8 +14,9 @@ export interface CatalogEntry {
   name: string
   nameVi: string
   nameEn: string
+  categoryId?: number
   category: CatalogCategory
-  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond'
+  shape: 'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond' | string
   color: 'Red-White' | 'Yellow-Black' | 'Blue-White' | 'Green-White' | 'Black-White' | string
   description: string
   descriptionVi: string
@@ -25,6 +28,9 @@ export interface CatalogEntry {
   standardRef?: string
   status: 'Active' | 'Deprecated' | 'Draft'
   version: string
+  imageUrl?: string
+  representativeImageKey?: string
+  allowedVehicles?: Array<'CAR' | 'MOTORCYCLE' | 'TRUCK' | 'BUS' | 'BICYCLE' | 'PEDESTRIAN'>
 }
 
 export interface MissingSignTypeReport {
@@ -32,7 +38,10 @@ export interface MissingSignTypeReport {
   tempLabel: string
   category: string
   sampleImageUrl: string
+  bestFrameUrl?: string
+  cropImageUrl?: string
   reportedBy: string
+  reporterId?: string
   reportedAt: string
   lat: number
   lng: number
@@ -42,12 +51,34 @@ export interface MissingSignTypeReport {
   priority?: 'Cao' | 'Vừa' | 'Thấp'
   reporterNote: string
   similarCatalogEntries: string[]
-  status: 'Open' | 'Approved' | 'Rejected' | 'Merged'
+  status: 'Open' | 'Approved' | 'Rejected' | 'Merged' | 'Escalated' | 'Incomplete'
+  rawStatus?: 'PENDING' | 'MERGED' | 'ESCALATED_ADMIN' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE' | 'IN_REVIEW'
+  candidateId?: string | null
+  proposedCategoryId?: number | null
+  suggestedShape?: string | null
+  suggestedColorScheme?: string | null
+  mergedIntoSignTypeId?: number | null
+  staffNotes?: string | null
+  reviewedBy?: string | null
+  createdAt?: string
+  updatedAt?: string
+  resolvedAt?: string | null
+  recaptureRequest?: {
+    reason: string
+    note: string
+    createdAt?: string
+  } | null
 }
 
+export const candidateRecaptureCache = new Map<
+  string,
+  { reason: string; note: string; createdAt?: string }
+>()
+
 export interface AvailableSignOption {
+  id?: number
   code: string
-  nameKey: string
+  nameKey?: string
   codeTitle: string
 }
 

@@ -76,7 +76,7 @@ export function SurveyScanModal({ imageUri, isVideo, onComplete, onCancel }: Sur
             ]}
           >
             <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={[styles.loadingText, { color: theme.text }]}>Loading...</Text>
+            <Text style={[styles.loadingText, { color: theme.text }]}>Đang tải...</Text>
           </View>
         </SafeAreaView>
       </Modal>
@@ -111,7 +111,7 @@ export function SurveyScanModal({ imageUri, isVideo, onComplete, onCancel }: Sur
         ]}>
           <View style={styles.preview}>
             <Image
-              accessibilityLabel="Selected survey image"
+              accessibilityLabel="Ảnh khảo sát đã chọn"
               contentFit="contain"
               source={{ uri: imageUri }}
               style={StyleSheet.absoluteFill}
@@ -148,7 +148,7 @@ export function SurveyScanModal({ imageUri, isVideo, onComplete, onCancel }: Sur
             ) : null}
           </View>
           <View
-            accessibilityLabel="Scanning image"
+            accessibilityLabel="Đang quét ảnh"
             accessibilityRole="progressbar"
             accessibilityValue={{ min: 0, max: 100, now: percentage }}
             style={[

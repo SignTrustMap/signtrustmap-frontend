@@ -131,7 +131,12 @@ dist-ssr/
 .claude/
 CLAUDE.md
 AGENTS.md
+.agents/
 
 # Temporary docs, project reports, and working notes
 *.docx
 /documents
+sample/
+
+#screenshots
+screenshots/

@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useSidebar } from '@/context/SidebarContext'
+import { useToast } from '@/context/ToastContext'
 import { SearchBar } from '@/components/common/SearchBar'
 import { ModalPortal } from '@/components/common/ModalPortal'
+import PageHeader from '@/components/common/PageHeader'
 import {
   CaretRight,
   WarningOctagon,
@@ -23,10 +25,13 @@ import {
   ArrowsOut,
   Compass,
   TrafficSignal,
+  CircleNotch,
 } from '@phosphor-icons/react'
-import { mockCandidateDetail, availableCatalogSigns } from '@/data'
+import { mockCandidateDetail, availableCatalogSigns, mockCandidates, type CandidateDetailData } from '@/data'
 import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
+import { candidatesService } from '@/api/services'
+import { adaptCandidateDetailResponse } from './candidateAdapter'
 
 type StatusKey = 'reviewing' | 'rejected' | 'resurvey' | 'approved' | 'escalated'
 type RejectReasonKey = 'reason_blur' | 'reason_not_sign' | 'reason_gps_offset' | 'reason_spoofing' | 'reason_duplicate'
@@ -45,8 +50,14 @@ interface NoticeState {
 export default function CandidateDetailPage() {
   const { t } = useTranslation('ops')
   const { isCollapsed } = useSidebar()
+  const toast = useToast()
   const { id } = useParams<{ id: string }>()
-  const candidate = mockCandidateDetail
+
+  const [candidate, setCandidate] = useState<CandidateDetailData>(mockCandidateDetail)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [isLiveBackend, setIsLiveBackend] = useState<boolean>(false)
+
   const reportId = t('candidate_detail.case_prefix', { id: id || candidate.id })
 
   const [currentStatusKey, setCurrentStatusKey] = useState<StatusKey>('reviewing')
@@ -64,6 +75,60 @@ export default function CandidateDetailPage() {
   const [escalateNote, setEscalateNote] = useState('')
   const [catalogSearch, setCatalogSearch] = useState('')
 
+  // Load candidate details dynamically
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadData() {
+      if (!id) {
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      const cleanId = id.replace(/^#/, '')
+
+      try {
+        const res = await candidatesService.getCandidateDetail(cleanId)
+        if (isMounted && res) {
+          const adapted = adaptCandidateDetailResponse(res, mockCandidateDetail)
+          setCandidate(adapted)
+          setSelectedLabel(adapted.predictedLabel)
+          setIsLiveBackend(true)
+        }
+      } catch (err) {
+        if (isMounted) {
+          // Fallback to matched mock candidate if exists
+          const matched = mockCandidates.find(
+            (c) => c.id.replace('#', '').toLowerCase() === cleanId.toLowerCase()
+          )
+          if (matched) {
+            setCandidate((prev) => ({
+              ...prev,
+              id: matched.id.replace('#', ''),
+              predictedLabel: `${matched.signCode || 'P.102'} - ${matched.signName || 'Biển báo'}`,
+              cropImageUrl: matched.cropImageUrl || prev.cropImageUrl,
+              contextImageUrl: matched.contextImageUrl || prev.contextImageUrl,
+              yoloConfidence: matched.aiConfidence || prev.yoloConfidence,
+              lat: matched.gpsOffset ? prev.lat + matched.gpsOffset / 1000 : prev.lat,
+            }))
+            setSelectedLabel(`${matched.signCode || 'P.102'} - ${matched.signName || 'Biển báo'}`)
+          }
+          setIsLiveBackend(false)
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadData()
+    return () => {
+      isMounted = false
+    }
+  }, [id])
+
   // Resolve current sign entry for reference display
   const currentCode = (selectedLabel.split(' - ')[0] || 'P.102').trim()
   const referenceSignEntry =
@@ -76,30 +141,93 @@ export default function CandidateDetailPage() {
       s.codeTitle.toLowerCase().includes(catalogSearch.toLowerCase())
   )
 
-  function handleAction(action: 'reject' | 'resurvey' | 'approve' | 'correct' | 'escalate') {
-    if (action === 'reject') {
-      setCurrentStatusKey('rejected')
-      setActionNotice({
-        key: 'notice_rejected',
-        params: { reason: t(`candidate_detail.${rejectReasonKey}`) },
-      })
-      setIsRejectModalOpen(false)
-    } else if (action === 'resurvey') {
-      setCurrentStatusKey('resurvey')
-      setActionNotice({ key: 'notice_resurvey' })
-    } else if (action === 'approve') {
-      setCurrentStatusKey('approved')
-      setActionNotice({ key: 'notice_approved' })
-    } else if (action === 'correct') {
-      setActionNotice({
-        key: 'notice_corrected',
-        params: { label: selectedLabel },
-      })
-      setIsCorrectModalOpen(false)
-    } else if (action === 'escalate') {
-      setCurrentStatusKey('escalated')
-      setActionNotice({ key: 'notice_escalated' })
-      setIsEscalateModalOpen(false)
+  async function handleAction(action: 'reject' | 'resurvey' | 'approve' | 'correct' | 'escalate') {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+
+    try {
+      if (action === 'reject') {
+        try {
+          await candidatesService.vote(candidate.id, {
+            vote: -1,
+            declineReason: rejectReasonKey,
+            declineNote: rejectNote || undefined,
+          })
+          toast.success(t('candidate_detail.notice_rejected', { reason: t(`candidate_detail.${rejectReasonKey}`) }))
+        } catch (apiErr) {
+          console.warn('[Candidates] Backend vote error, recording local verdict:', apiErr)
+          toast.info(t('candidate_detail.notice_rejected', { reason: t(`candidate_detail.${rejectReasonKey}`) }))
+        }
+        setCurrentStatusKey('rejected')
+        setActionNotice({
+          key: 'notice_rejected',
+          params: { reason: t(`candidate_detail.${rejectReasonKey}`) },
+        })
+        setIsRejectModalOpen(false)
+      } else if (action === 'resurvey') {
+        try {
+          await candidatesService.requestRecapture(candidate.id, {
+            reason: 'MODERATION_RECAPTURE_REQUESTED',
+            note: 'Yêu cầu khảo sát lại hình ảnh hiện trường rõ nét hơn',
+          })
+          toast.success(t('candidate_detail.notice_resurvey'))
+        } catch (apiErr) {
+          console.warn('[Candidates] Backend recapture request error, falling back to local state:', apiErr)
+          toast.info(t('candidate_detail.notice_resurvey'))
+        }
+        setCurrentStatusKey('resurvey')
+        setActionNotice({ key: 'notice_resurvey' })
+      } else if (action === 'approve') {
+        try {
+          await candidatesService.vote(candidate.id, { vote: 1 })
+          toast.success(t('candidate_detail.notice_approved'))
+        } catch (voteErr) {
+          try {
+            await candidatesService.testReview(candidate.id, { vote: 1 })
+            toast.success(t('candidate_detail.notice_approved'))
+          } catch (testErr) {
+            console.warn('[Candidates] Backend approval error, recording local verdict:', testErr)
+            toast.info(t('candidate_detail.notice_approved'))
+          }
+        }
+        setCurrentStatusKey('approved')
+        setActionNotice({ key: 'notice_approved' })
+      } else if (action === 'correct') {
+        try {
+          const selectedCode = (selectedLabel.split(' - ')[0] || '').trim()
+          const matchedEntry = mockCatalogData.find((s) => s.code.toLowerCase() === selectedCode.toLowerCase())
+          const signTypeId = matchedEntry ? parseInt(matchedEntry.id, 10) || undefined : undefined
+
+          await candidatesService.vote(candidate.id, {
+            vote: 1,
+            suggestedSignTypeId: signTypeId,
+          })
+          toast.success(t('candidate_detail.notice_corrected', { label: selectedLabel }))
+        } catch (apiErr) {
+          console.warn('[Candidates] Backend label update error, recording local verdict:', apiErr)
+          toast.info(t('candidate_detail.notice_corrected', { label: selectedLabel }))
+        }
+        setActionNotice({
+          key: 'notice_corrected',
+          params: { label: selectedLabel },
+        })
+        setIsCorrectModalOpen(false)
+      } else if (action === 'escalate') {
+        try {
+          await candidatesService.reportOrEscalate(candidate.id, {
+            reason: escalateNote || 'Chuyển tiếp lên Quản trị viên xử lý pháp lý và tranh chấp.',
+          })
+          toast.success(t('candidate_detail.notice_escalated'))
+        } catch (apiErr) {
+          console.warn('[Candidates] Backend escalation error, recording local verdict:', apiErr)
+          toast.info(t('candidate_detail.notice_escalated'))
+        }
+        setCurrentStatusKey('escalated')
+        setActionNotice({ key: 'notice_escalated' })
+        setIsEscalateModalOpen(false)
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -160,22 +288,31 @@ export default function CandidateDetailPage() {
         <span className="text-gray-900 dark:text-white font-bold font-mono">{reportId}</span>
       </nav>
 
-      {/* Page Title & Status (Action buttons moved exclusively to Sticky Bottom Bar) */}
-      <div className="border-b border-[#E8E4E3] dark:border-white/10 pb-5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
-                {t('candidate_detail.title')}
-              </h1>
-              <span className="font-mono text-xs px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-bold border border-gray-200/80 dark:border-white/15 shadow-2xs">
-                {reportId}
-              </span>
-            </div>
+      {/* Page Title & Status (Standardized via PageHeader) */}
+      <PageHeader
+        title={
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{t('candidate_detail.title')}</span>
+            <span className="font-mono text-xs px-3 py-1 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 font-bold border border-gray-200/80 dark:border-white/15 shadow-2xs">
+              {reportId}
+            </span>
           </div>
-
-          {/* Status Badges Group */}
+        }
+        actions={
           <div className="flex flex-wrap items-center gap-2.5">
+            {isLiveBackend ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live API
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400 border border-gray-200 dark:border-white/10"
+                title="Chế độ dữ liệu mẫu / dự phòng ngoại tuyến"
+              >
+                Local Cache
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-[#fee2e2] text-[#b91c1c] dark:bg-red-500/15 dark:text-red-400 dark:border dark:border-red-500/30 uppercase tracking-wider shadow-2xs">
               <WarningOctagon size={15} weight="fill" /> {t('candidate_detail.priority_high')}
             </span>
@@ -184,8 +321,9 @@ export default function CandidateDetailPage() {
               <span>{t(`candidate_detail.status_${currentStatusKey}`)}</span>
             </span>
           </div>
-        </div>
-      </div>
+        }
+        bordered
+      />
 
       {actionNotice && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-300 text-xs sm:text-sm flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
@@ -201,8 +339,20 @@ export default function CandidateDetailPage() {
         </div>
       )}
 
-      {/* ─── Evidence Tri-View: Crop AI vs Reference Catalog vs Context Dashcam ─── */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+      {isLoading ? (
+        <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-16 text-center space-y-4 shadow-xs">
+          <CircleNotch size={36} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-gray-900 dark:text-white">
+              {t('common.loading', 'Đang kết nối hệ thống và tải hồ sơ kiểm duyệt...')}
+            </p>
+            <p className="text-xs text-gray-400 font-mono">Case ID: {reportId}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ─── Evidence Tri-View: Crop AI vs Reference Catalog vs Context Dashcam ─── */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <FileImage size={20} className="text-[#007b8b] dark:text-[#00c4de]" />
@@ -472,6 +622,8 @@ export default function CandidateDetailPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* ─── COMPACT STICKY BOTTOM ACTION BAR FOR STAFF (Centered in main content frame) ─── */}
       <div
@@ -485,8 +637,9 @@ export default function CandidateDetailPage() {
 
         <button
           type="button"
+          disabled={isSubmitting || isLoading}
           onClick={() => setIsCorrectModalOpen(true)}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50/80 dark:bg-cyan-500/15 text-cyan-800 dark:text-[#00c4de] hover:bg-cyan-100 dark:hover:bg-cyan-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-cyan-200 dark:border-cyan-500/30 bg-cyan-50/80 dark:bg-cyan-500/15 text-cyan-800 dark:text-[#00c4de] hover:bg-cyan-100 dark:hover:bg-cyan-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Hotkey: C"
         >
           <Tag size={14} weight="bold" />
@@ -496,8 +649,9 @@ export default function CandidateDetailPage() {
 
         <button
           type="button"
+          disabled={isSubmitting || isLoading}
           onClick={() => setIsRejectModalOpen(true)}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Hotkey: R"
         >
           <Prohibit size={14} weight="bold" />
@@ -507,8 +661,9 @@ export default function CandidateDetailPage() {
 
         <button
           type="button"
+          disabled={isSubmitting || isLoading}
           onClick={() => handleAction('resurvey')}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-amber-200 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-amber-200 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Hotkey: S"
         >
           <ArrowsClockwise size={14} weight="bold" />
@@ -518,8 +673,9 @@ export default function CandidateDetailPage() {
 
         <button
           type="button"
+          disabled={isSubmitting || isLoading}
           onClick={() => setIsEscalateModalOpen(true)}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-purple-200 dark:border-purple-500/30 bg-purple-50/80 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-purple-200 dark:border-purple-500/30 bg-purple-50/80 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/25 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Hotkey: E"
         >
           <RocketLaunch size={14} weight="bold" />
@@ -529,11 +685,16 @@ export default function CandidateDetailPage() {
 
         <button
           type="button"
+          disabled={isSubmitting || isLoading}
           onClick={() => handleAction('approve')}
-          className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+          className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer active:scale-95 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           title="Hotkey: A"
         >
-          <CheckCircle size={15} weight="bold" />
+          {isSubmitting ? (
+            <CircleNotch size={15} weight="bold" className="animate-spin" />
+          ) : (
+            <CheckCircle size={15} weight="bold" />
+          )}
           <span>{t('candidate_detail.btn_approve_short')}</span>
           <kbd className="px-1 py-0.2 text-[9px] font-mono font-bold bg-white/20 rounded border border-white/30 text-white">A</kbd>
         </button>

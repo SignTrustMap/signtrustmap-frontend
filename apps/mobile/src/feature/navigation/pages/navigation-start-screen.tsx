@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,8 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AntDesign from '@expo/vector-icons/AntDesign';
 
-import { AppButton } from "@/components/ui/button";
-import { AppToast } from "@/components/ui/toast";
+import { AppButton } from "@/components/button";
+import { AppToast } from "@/components/toast";
+import { SearchSuggestionSkeleton } from "@/components/skeleton";
 import { Fonts, Rounded, Spacing } from "@/constants/theme";
 import { useSession } from "@/context/session-provider";
 import {
@@ -21,9 +21,9 @@ import {
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useTheme } from "@/hooks/use-theme";
-import { SAME_LOCATION_MESSAGE } from "@/constants/message";
+import { GPS_UNAVAILABLE_MESSAGE, SAME_LOCATION_MESSAGE } from "@/constants/message";
 import { areSameLocation } from "../utils/location";
-import { fetchFreshGpsPosition, GPS_UNAVAILABLE_MESSAGE } from "../utils/gps";
+import { fetchFreshGpsPosition } from "../utils/gps";
 
 export function NavigationStartScreen() {
   const router = useRouter();
@@ -51,7 +51,7 @@ export function NavigationStartScreen() {
         ] as MapCoordinate,
         id: destinationId || "destination",
         subtitle: destinationSubtitle ?? "",
-        title: destinationTitle ?? "Destination",
+        title: destinationTitle ?? "Điểm đến",
       };
     }
     return undefined;
@@ -122,7 +122,7 @@ export function NavigationStartScreen() {
         ...destinationParams,
         startLat: String(coordinate[1]),
         startLng: String(coordinate[0]),
-        startTitle: "Current Location",
+        startTitle: "Vị trí hiện tại",
       },
     });
   };
@@ -174,7 +174,7 @@ export function NavigationStartScreen() {
     >
       <View style={styles.routeSelector}>
         <AppButton
-          accessibilityLabel="Go back"
+          accessibilityLabel="Quay lại"
           hitSlop={Spacing.one}
           onPress={handleBack}
           pressedOpacity={0.7}
@@ -189,13 +189,13 @@ export function NavigationStartScreen() {
           }]}>
             <AntDesign name="pushpin" size={17} color={theme.text} />
             <TextInput
-              accessibilityLabel="Search starting point"
+              accessibilityLabel="Tìm điểm xuất phát"
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
               clearButtonMode="while-editing"
               onChangeText={setQuery}
-              placeholder="Your starting point..."
+              placeholder="Chọn điểm xuất phát..."
               placeholderTextColor={theme.placeholder}
               returnKeyType="search"
               style={[styles.searchPrompt, { color: theme.text }]}
@@ -223,7 +223,7 @@ export function NavigationStartScreen() {
           ) : null}
         </View>
         <AppButton
-          accessibilityLabel="Swap starting point and destination"
+          accessibilityLabel="Đổi chiều điểm đi và đến"
           disabled={!destination}
           onPress={handleSwapRoutePoints}
           style={styles.backButton}
@@ -241,7 +241,7 @@ export function NavigationStartScreen() {
       >
         {!isSearching ? (
           <AppButton
-            accessibilityLabel="Use current location"
+            accessibilityLabel="Sử dụng vị trí hiện tại"
             onPress={handleSelectCurrentLocation}
             pressedOpacity={0.72}
             style={[styles.currentLocationRow, { borderColor: theme.border }]}
@@ -257,7 +257,7 @@ export function NavigationStartScreen() {
             </View>
             <View style={styles.locationCopy}>
               <Text style={[styles.locationTitle, { color: theme.text }]}>
-                Current Location
+                Vị trí hiện tại
               </Text>
               <Text
                 style={[
@@ -265,7 +265,7 @@ export function NavigationStartScreen() {
                   { color: theme.textSecondary },
                 ]}
               >
-                Using GPS accuracy
+                Sử dụng độ chính xác GPS
               </Text>
             </View>
             <AntDesign name="arrow-right" size={18} color={theme.primary} />
@@ -274,12 +274,16 @@ export function NavigationStartScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionLabel, { color: theme.primary }]}>
-            {isSearching ? "Search results" : "Recents"}
+            {isSearching ? "Kết quả tìm kiếm" : "Gần đây"}
           </Text>
         </View>
 
         {isLoading ? (
-          <ActivityIndicator color={theme.primary} style={styles.loading} />
+          <SearchSuggestionSkeleton
+            circleSize={38}
+            count={5}
+            itemStyle={[styles.locationRow, { borderColor: theme.border }]}
+          />
         ) : null}
         {!isLoading && error ? (
           <Text
@@ -292,8 +296,8 @@ export function NavigationStartScreen() {
         {!isLoading && !error && startLocations.length === 0 ? (
           <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
             {isSearching
-              ? "No starting points found."
-              : "No saved or recent starting points."}
+              ? "Không tìm thấy điểm xuất phát phù hợp."
+              : "Chưa có điểm xuất phát đã lưu hoặc gần đây."}
           </Text>
         ) : null}
         {!isLoading &&

@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -24,7 +24,7 @@ export function CreditScreenHeader({ onBack, rightContent, title }: CreditScreen
         <View style={styles.side}>
           {onBack ? (
             <AppButton
-              accessibilityLabel="Go back"
+              accessibilityLabel="Quay lại"
               onPress={onBack}
               style={styles.backButton}
               variant="ghost"

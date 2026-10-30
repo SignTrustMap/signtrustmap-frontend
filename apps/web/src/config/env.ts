@@ -1,6 +1,14 @@
-// apps/web/src/config/env.ts
-// Single source of truth for all environment variables & endpoints.
+/**
+ * Centralized environment configuration and runtime endpoint validation for Community Portal.
+ * Single Source of Truth for environment variables per RULE.md Section 10.
+ */
 
+/**
+ * Format domain string to full URL with protocol based on current execution mode.
+ * @param domainOrUrl Hostname or URL string
+ * @param isDev True when running in Vite development mode
+ * @returns Fully-qualified HTTP/HTTPS URL
+ */
 function formatUrl(domainOrUrl: string, isDev: boolean): string {
   if (!domainOrUrl) return ''
   if (domainOrUrl.startsWith('http://') || domainOrUrl.startsWith('https://')) {
@@ -9,6 +17,11 @@ function formatUrl(domainOrUrl: string, isDev: boolean): string {
   return isDev ? `http://${domainOrUrl}` : `https://${domainOrUrl}`
 }
 
+/**
+ * Validate required environment keys at startup.
+ * @param variables Dictionary of parsed environment values
+ * @param requiredKeys Keys that must be defined for application stability
+ */
 function validateEnv(variables: Record<string, string | undefined>, requiredKeys: string[]): void {
   const missing = requiredKeys.filter((key) => !variables[key])
   if (missing.length > 0) {
@@ -22,15 +35,14 @@ function validateEnv(variables: Record<string, string | undefined>, requiredKeys
 export const env = {
   opsDomain:    import.meta.env.VITE_OPS_DOMAIN || '',
   publicDomain: import.meta.env.VITE_PUBLIC_DOMAIN || '',
-  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || '',
+  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || 'https://api.signmap.site',
   mapTileUrl:   import.meta.env.VITE_MAP_TILE_URL || '',
-  aiApiUrl:     import.meta.env.VITE_AI_API_URL || '',
+  aiApiUrl:     import.meta.env.VITE_AI_API_URL || 'https://ai.signmap.site',
   isDev:        import.meta.env.DEV,
   isProd:       import.meta.env.PROD,
   mode:         import.meta.env.MODE,
 } as const
 
-// Runtime validation on startup
 validateEnv(
   {
     VITE_OPS_DOMAIN: env.opsDomain,

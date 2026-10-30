@@ -1,15 +1,18 @@
-import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Map, Marker, NavigationControl, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import {
+  type InstalledOfflineMapPack,
   type MapCoordinate,
   type PreviousLocation,
 } from '@/types/navigationType';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
+import { offlineMapService } from '@/services/offline-map-service';
 
 
 type NavigationMapViewProps = {
@@ -21,10 +24,14 @@ type NavigationMapViewProps = {
   routeCoordinates?: MapCoordinate[];
   routeStart?: MapCoordinate;
   routeSigns?: RouteSign[];
+  signs?: RouteSign[];
   showCurrentLocation?: boolean;
   isNavigatingFeature?: boolean;
   userCoordinate?: MapCoordinate;
   hasLiveLocation?: boolean;
+  isCustomStart?: boolean;
+  onSignSelect?: (sign: RouteSign | null) => void;
+  vehicleMode?: string;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -50,6 +57,14 @@ const openStreetMapStyle: StyleSpecification = {
 };
 
 function createSignMarkerElement(sign: RouteSign) {
+  const container = document.createElement('div');
+  container.style.position = 'relative';
+  container.style.width = '36px';
+  container.style.height = '36px';
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+  container.style.justifyContent = 'center';
+
   const marker = document.createElement('img');
   marker.src = sign.imageUrl || '';
   marker.alt = sign.name || sign.signCode;
@@ -60,8 +75,38 @@ function createSignMarkerElement(sign: RouteSign) {
   marker.onerror = () => {
     marker.style.display = 'none';
   };
+  container.appendChild(marker);
 
-  return marker;
+  const rawScore =
+    typeof sign.freshnessScore === 'number' && !Number.isNaN(sign.freshnessScore)
+      ? sign.freshnessScore
+      : undefined;
+  const scorePercent =
+    rawScore !== undefined
+      ? rawScore <= 1
+        ? Math.round(rawScore * 100)
+        : Math.round(rawScore)
+      : 55;
+  const color =
+    sign.status?.toUpperCase() === 'RETIRED' || scorePercent < 50
+      ? '#EF4444'
+      : scorePercent >= 80
+        ? '#10B981'
+        : '#EAB308';
+
+  const dot = document.createElement('div');
+  dot.style.position = 'absolute';
+  dot.style.bottom = '-1px';
+  dot.style.right = '-1px';
+  dot.style.width = '10px';
+  dot.style.height = '10px';
+  dot.style.borderRadius = '5px';
+  dot.style.border = '1.5px solid #FFFFFF';
+  dot.style.background = color;
+  dot.style.boxShadow = '0 1px 2px rgba(0,0,0,0.3)';
+  container.appendChild(dot);
+
+  return container;
 }
 
 function createDriverMarkerElement(color: string) {
@@ -130,8 +175,10 @@ export function NavigationMapView({
   routeCoordinates,
   routeStart,
   routeSigns = [],
+  vehicleMode = 'DRIVING',
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const [activeOfflinePack, setActiveOfflinePack] = useState<InstalledOfflineMapPack | null>(null);
   const destinationMarkerRef = useRef<Marker | null>(null);
   const currentLocationMarkerRef = useRef<Marker | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -176,6 +223,15 @@ export function NavigationMapView({
   }, []);
 
   useEffect(() => {
+    void offlineMapService.getActiveOfflinePack().then(setActiveOfflinePack);
+    const unsub = offlineMapService.subscribeToMetadata((meta) => {
+      const active = meta.activePackId ? meta.installedPacks[meta.activePackId] || null : null;
+      setActiveOfflinePack(active);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map || !onBoundsChange) return;
 
@@ -201,7 +257,20 @@ export function NavigationMapView({
     const map = mapRef.current;
     if (!map) return;
 
-    const markers = routeSigns.map((sign) => (
+    const dedup: Record<string, RouteSign> = {};
+    for (const sign of routeSigns) {
+      if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
+      const key = `${sign.coordinate[0].toFixed(5)},${sign.coordinate[1].toFixed(5)}_${sign.signCode || sign.name || ''}`;
+      const existing = dedup[key];
+      if (!existing || (sign.freshnessScore ?? 0) > (existing.freshnessScore ?? 0)) {
+        dedup[key] = sign;
+      }
+    }
+    const sorted = Object.values(dedup).sort(
+      (a: RouteSign, b: RouteSign) => (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0),
+    );
+
+    const markers = sorted.map((sign) => (
       new Marker({ element: createSignMarkerElement(sign) })
         .setLngLat(sign.coordinate)
         .addTo(map)
@@ -235,15 +304,13 @@ export function NavigationMapView({
     destinationMarkerRef.current = null;
     startMarkerRef.current = null;
 
-    if (map.getLayer('selected-route-line')) {
-      map.removeLayer('selected-route-line');
-    }
-
-    if (map.getSource('selected-route-source')) {
-      map.removeSource('selected-route-source');
-    }
-
     if (!destination) {
+      if (map.getLayer('selected-route-line')) {
+        map.removeLayer('selected-route-line');
+      }
+      if (map.getSource('selected-route-source')) {
+        map.removeSource('selected-route-source');
+      }
       if (focusCoordinate) {
         map.flyTo({
           center: focusCoordinate,
@@ -262,43 +329,100 @@ export function NavigationMapView({
       .addTo(map);
 
     const renderRoute = () => {
-      if (!routeStart || !routeCoordinates?.length) return;
+      if (!routeStart || !routeCoordinates?.length) {
+        if (map.getLayer('selected-route-line')) {
+          map.removeLayer('selected-route-line');
+        }
+        if (map.getSource('selected-route-source')) {
+          map.removeSource('selected-route-source');
+        }
+        return;
+      }
 
-      map.addSource('selected-route-source', {
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: routeCoordinates,
+      const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
+      const isBicycle = vehicleMode === 'CYCLING';
+      const isWalking = vehicleMode === 'WALKING';
+      const routeLineColor = isWalking ? '#10B981' : isBicycle ? '#F59E0B' : isMotorcycle ? '#0D9488' : theme.primary;
+
+      const geoJsonData = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: routeCoordinates,
+        },
+      };
+
+      const existingSource = map.getSource('selected-route-source') as any;
+      if (existingSource && typeof existingSource.setData === 'function') {
+        existingSource.setData(geoJsonData);
+        if (map.getLayer('selected-route-line')) {
+          map.setPaintProperty('selected-route-line', 'line-color', routeLineColor);
+        }
+      } else {
+        if (map.getLayer('selected-route-line')) {
+          map.removeLayer('selected-route-line');
+        }
+        if (map.getSource('selected-route-source')) {
+          map.removeSource('selected-route-source');
+        }
+
+        map.addSource('selected-route-source', {
+          data: geoJsonData,
+          type: 'geojson',
+        });
+        map.addLayer({
+          id: 'selected-route-line',
+          source: 'selected-route-source',
+          type: 'line',
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
           },
-        },
-        type: 'geojson',
-      });
-      map.addLayer({
-        id: 'selected-route-line',
-        source: 'selected-route-source',
-        type: 'line',
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
-        paint: {
-          'line-color': theme.primary,
-          'line-width': 5,
-        },
-      });
+          paint: {
+            'line-color': routeLineColor,
+            'line-width': 5,
+          },
+        });
+      }
 
-      startMarkerRef.current = new Marker({
-        element: createStartMarkerElement(),
-      })
-        .setLngLat(routeStart)
-        .addTo(map);
+      if (!startMarkerRef.current) {
+        startMarkerRef.current = new Marker({
+          element: createStartMarkerElement(),
+        })
+          .setLngLat(routeStart)
+          .addTo(map);
+      } else {
+        startMarkerRef.current.setLngLat(routeStart);
+      }
 
-      map.fitBounds([routeStart, destination.coordinate], {
-        duration: 900,
-        padding: { bottom: 160, left: 44, right: 44, top: 100 },
-      });
+      if (routeCoordinates && routeCoordinates.length > 1) {
+        let minLon = routeCoordinates[0][0];
+        let minLat = routeCoordinates[0][1];
+        let maxLon = routeCoordinates[0][0];
+        let maxLat = routeCoordinates[0][1];
+        for (const [lon, lat] of routeCoordinates) {
+          if (lon < minLon) minLon = lon;
+          if (lat < minLat) minLat = lat;
+          if (lon > maxLon) maxLon = lon;
+          if (lat > maxLat) maxLat = lat;
+        }
+        map.fitBounds(
+          [
+            [minLon, minLat],
+            [maxLon, maxLat],
+          ],
+          {
+            duration: 900,
+            padding: { bottom: 160, left: 44, right: 44, top: 100 },
+          },
+        );
+      } else {
+        map.fitBounds([routeStart, destination.coordinate], {
+          duration: 900,
+          padding: { bottom: 160, left: 44, right: 44, top: 100 },
+        });
+      }
     };
 
     if (routeStart) {
@@ -315,11 +439,19 @@ export function NavigationMapView({
       duration: 900,
       zoom: 14,
     });
-  }, [destination, focusCoordinate, routeCoordinates, routeStart, theme.primary]);
+  }, [destination, focusCoordinate, focusRequestId, routeCoordinates, routeStart, theme.primary, vehicleMode]);
 
   return (
     <View style={styles.container}>
       <div ref={mapContainerRef} style={styles.webMap} />
+      {activeOfflinePack ? (
+        <View style={styles.offlineIndicatorBadge}>
+          <MaterialCommunityIcons color="#059669" name="map-check" size={14} />
+          <Text style={styles.offlineIndicatorText} numberOfLines={1}>
+            Offline: {activeOfflinePack.name}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -327,6 +459,33 @@ export function NavigationMapView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
+  },
+  offlineIndicatorBadge: {
+    position: 'absolute',
+    top: 56,
+    right: 16,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#10B98150',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 3,
+    maxWidth: 220,
+  },
+  offlineIndicatorText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
   },
   webMap: {
     height: '100%',

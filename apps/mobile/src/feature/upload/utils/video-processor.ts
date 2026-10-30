@@ -1,12 +1,18 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import type { UploadChunkRequest } from '@/types/surveySubmissionType';
+import { UNABLE_TO_DETERMINE_VIDEO_SIZE_MESSAGE } from '@/constants/message';
 
 export const BACKEND_MAX_CHUNK_BYTES = 52428800; // 50 MB absolute backend limit (52,428,800 bytes)
 export const MAX_BACKEND_CHUNK_BYTES = 45 * 1024 * 1024; // 45 MB safety margin under backend's 50MB limit
 export const DEFAULT_1MIN_CHUNK_BYTES = 10 * 1024 * 1024; // 10 MB estimated for 1 min of 640p/720p
 export const MAX_CHUNK_BYTES = MAX_BACKEND_CHUNK_BYTES;
 export const MAX_NETWORK_CHUNK_BYTES = MAX_BACKEND_CHUNK_BYTES;
+
+export const MAX_SURVEY_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max allowed video
+export const MAX_SURVEY_IMAGE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max allowed single image
+export const MAX_SURVEY_GPX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB max allowed companion GPX
+
 
 export type ChunkPlan = {
   totalChunks: number;
@@ -99,7 +105,7 @@ export async function getVideoFileSizeBytes(videoUri: string): Promise<number> {
     return blob.size;
   }
 
-  throw new Error('Unable to determine video file size.');
+  throw new Error(UNABLE_TO_DETERMINE_VIDEO_SIZE_MESSAGE);
 }
 
 /**

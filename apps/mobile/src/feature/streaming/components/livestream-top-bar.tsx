@@ -28,7 +28,7 @@ export function LivestreamTopBar({
       <SafeAreaView edges={["top"]} style={styles.bar}>
         {/* Close */}
         <Pressable
-          accessibilityLabel="Close Livestream"
+          accessibilityLabel="Đóng phát trực tiếp"
           accessibilityRole="button"
           onPress={onClose}
           style={({ pressed }) => [

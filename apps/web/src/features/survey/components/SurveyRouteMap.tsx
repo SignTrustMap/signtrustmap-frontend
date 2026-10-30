@@ -41,13 +41,13 @@ export function SurveyRouteMap({
       scrollWheelZoom: false,
     })
 
-    const tileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+    const tileUrl =
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
 
     L.tileLayer(tileUrl, {
       maxZoom: 19,
-      subdomains: 'abcd',
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS',
+      className: isDark ? 'dark-tiles' : '',
     }).addTo(map)
 
     const layerGroup = L.layerGroup().addTo(map)
@@ -98,10 +98,19 @@ export function SurveyRouteMap({
       L.marker(startPoint, { icon: startIcon, title: t('survey.start_of_trip') }).addTo(layerGroup)
 
       const endIcon = L.divIcon({
-        className: 'route-end-marker',
-        html: `<div style="background:#ef4444;width:14px;height:14px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 10px rgba(239,68,68,0.7);"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        className: 'route-dest-pin-marker',
+        html: `
+          <div style="width: 32px; height: 42px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 3px 5px rgba(0,0,0,0.38)); overflow: visible;">
+              <ellipse cx="16" cy="41" rx="7" ry="2.5" fill="rgba(0,0,0,0.25)"/>
+              <path d="M16 0C7.163 0 0 7.163 0 16c0 11.4 14.2 24.3 15.3 25.4.38.36 1.02.36 1.4 0C17.8 40.3 32 27.4 32 16 32 7.163 24.837 0 16 0z" fill="#EA4335"/>
+              <path d="M16 1C7.716 1 1 7.716 1 16c0 10.8 13.5 23.2 14.7 24.3.17.16.43.16.6 0C17.5 39.2 31 26.8 31 16 31 7.716 24.284 1 16 1z" stroke="#B31412" stroke-width="1.2" fill="none"/>
+              <circle cx="16" cy="15.5" r="5.5" fill="#7A0000"/>
+            </svg>
+          </div>
+        `,
+        iconSize: [32, 42],
+        iconAnchor: [16, 42],
       })
       L.marker(endPoint, { icon: endIcon, title: t('survey.end_of_trip') }).addTo(layerGroup)
     }

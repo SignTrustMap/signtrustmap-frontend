@@ -2,8 +2,7 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import type { MapCoordinate } from '@/types/navigationType';
 import { getMapLibre } from '@/services/maplibre';
 
-export const GPS_UNAVAILABLE_MESSAGE =
-  'Unable to get your current location. Please make sure Location/GPS is enabled and try again.';
+export { GPS_UNAVAILABLE_MESSAGE } from '@/constants/message';
 
 /**
  * Ensures location permission is granted on Android and other platforms.

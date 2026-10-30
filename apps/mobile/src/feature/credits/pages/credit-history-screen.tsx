@@ -1,13 +1,41 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
 import { TransactionList } from '../components/transaction-list';
-import { creditHistoryGroups } from '../data/mock-credit-data';
+
+const creditHistoryGroups = [
+  {
+    label: 'Tháng 8 năm 2026',
+    transactions: [
+      {
+        id: '1',
+        type: 'transaction',
+        name: 'Gia hạn gói Pro',
+        amount: -129000,
+        timestamp: '01 Th08 2026, 10:30',
+      },
+      {
+        id: '2',
+        type: 'transaction',
+        name: 'Nâng cấp lên gói Pro',
+        amount: -129000,
+        timestamp: '15 Th07 2026, 14:20',
+      },
+      {
+        id: '3',
+        type: 'transaction',
+        name: 'Nạp tiền lần 1',
+        amount: -100000,
+        timestamp: '01 Th07 2026, 09:00',
+      },
+    ],
+  },
+];
 
 export function CreditHistoryScreen() {
   const router = useRouter();
@@ -15,11 +43,11 @@ export function CreditHistoryScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
-      <CreditScreenHeader onBack={() => router.back()} title="Credit History" />
+      <CreditScreenHeader onBack={() => router.back()} title="Lịch sử Credits" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.dateFields}>
-          <DateField label="From date" value="01 Aug 2026" />
-          <DateField label="To date" value="17 Aug 2026" />
+          <DateField label="Từ ngày" value="01 Th08 2026" />
+          <DateField label="Đến ngày" value="17 Th08 2026" />
         </View>
         {creditHistoryGroups.map((group) => (
           <View key={group.label} style={styles.group}>

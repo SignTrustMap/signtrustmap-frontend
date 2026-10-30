@@ -1,43 +1,62 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { SidebarProvider } from '@/context/SidebarContext'
 import { AppShell } from '@/components/layout/AppShell'
-import {
-  AuthProvider,
-  AuthGuard,
-  AdminGuard,
-  StaffGuard,
-  LoginPage,
-  ForgotPasswordPage,
-  ResetPasswordPage,
-  NotAllowedPage,
-  NotFound404Page,
-  DashboardPage,
-  UsersPage,
-  RolesPage,
-  CatalogPage,
-  MissingSignsPage,
-  SpatialOverridesPage,
-  AdminEscalationsPage,
-  CreditRulesPage,
-  CreditsApprovalPage,
-  AiopsPage,
-  SpatialDataExportPage,
-  SystemSettingsPage,
-  AuditLogsPage,
-  CandidatesListPage,
-  CandidateDetailPage,
-  MapPage,
-  TasksPage,
-  ReportsPage,
-} from '@/features'
+import { AuthProvider } from '@/features/auth/AuthContext'
+import NotAllowedPage from '@/features/auth/NotAllowedPage'
+import { AuthGuard, AdminGuard, StaffGuard } from '@/features/auth/Guards'
+import { ErrorBoundary } from '@shared/ui'
+
+// Lazy-loaded pages for bundle splitting
+const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
+const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
+const NotFound404Page = lazy(() => import('@/features/auth/NotFound404Page'))
+const UnexpectedError500Page = lazy(() => import('@/features/auth/UnexpectedError500Page'))
+
+const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'))
+const UsersPage = lazy(() => import('@/features/users/UsersPage'))
+const RolesPage = lazy(() => import('@/features/roles/RolesPage'))
+const CatalogPage = lazy(() => import('@/features/catalog/CatalogPage'))
+const MissingSignsPage = lazy(() => import('@/features/catalog/MissingSignsPage'))
+const SpatialOverridesPage = lazy(() => import('@/features/spatial/SpatialOverridesPage'))
+const AdminEscalationsPage = lazy(() => import('@/features/escalations/AdminEscalationsPage'))
+const CreditRulesPage = lazy(() => import('@/features/economy/CreditRulesPage'))
+const CreditsApprovalPage = lazy(() => import('@/features/credits/CreditsApprovalPage'))
+const AiopsPage = lazy(() => import('@/features/aiops/AiopsPage'))
+const SpatialDataExportPage = lazy(() => import('@/features/exports/SpatialDataExportPage'))
+const SystemSettingsPage = lazy(() => import('@/features/settings/SystemSettingsPage'))
+const AuditLogsPage = lazy(() => import('@/features/audit/AuditLogsPage'))
+const CandidatesListPage = lazy(() => import('@/features/candidates/CandidatesListPage'))
+const CandidateDetailPage = lazy(() => import('@/features/candidates/CandidateDetailPage'))
+const MapPage = lazy(() => import('@/features/map/MapPage'))
+const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
+const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
+
+function PageLoadingFallback() {
+  const { t } = useTranslation('common')
+  return (
+    <div className="flex items-center justify-center min-h-[50vh] w-full">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[#00c4de]/20 border-t-[#00c4de] animate-spin" />
+        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tracking-wider">
+          {t('common.loading_page', 'Đang tải trang...')}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function ProtectedLayout() {
   return (
     <AuthGuard>
       <AppShell>
-        <Routes>
+        <ErrorBoundary variant="full-page">
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Routes>
           {/* ─── Shared Overview Dashboard ─────────────────────────── */}
           <Route path="/" element={<DashboardPage />} />
 
@@ -208,8 +227,11 @@ function ProtectedLayout() {
           {/* Error Routes & Catch-all (Rendered within AppShell right viewport, keeping left sidebar intact) */}
           <Route path="/403" element={<NotAllowedPage />} />
           <Route path="/404" element={<NotFound404Page />} />
+          <Route path="/500" element={<UnexpectedError500Page />} />
           <Route path="*" element={<NotFound404Page />} />
         </Routes>
+        </Suspense>
+        </ErrorBoundary>
       </AppShell>
     </AuthGuard>
   )
@@ -222,12 +244,16 @@ export default function App() {
         <ToastProvider>
           <AuthProvider>
             <SidebarProvider>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/*" element={<ProtectedLayout />} />
-              </Routes>
+              <ErrorBoundary variant="full-page">
+                <Suspense fallback={<PageLoadingFallback />}>
+                  <Routes>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
+                    <Route path="/*" element={<ProtectedLayout />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
             </SidebarProvider>
           </AuthProvider>
         </ToastProvider>
@@ -235,3 +261,4 @@ export default function App() {
     </BrowserRouter>
   )
 }
+

@@ -1,13 +1,13 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton } from '@/components/ui/button';
+import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
-import { useGetCatalog } from '@/feature/review/hooks/use-review';
+import { useGetCatalog, useRefreshCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import {
   type CatalogSign,
@@ -30,11 +30,11 @@ function categoryColor(code: string) {
   return { background: '#F0E7FE', text: '#6938B8' };
 }
 
-function normalizeEnglishSearch(value: string) {
+function normalizeSearch(value: string) {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('en-US')
+    .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ');
 }
@@ -59,7 +59,7 @@ function SignCard({ sign }: { sign: CatalogSign }) {
       <View style={[styles.imageShell, { backgroundColor: theme.neutral }]}>
         {hasValidUrl ? (
           <Image
-            accessibilityLabel={`${sign.nameEn || sign.nameVi} example`}
+            accessibilityLabel={`${sign.nameVi || sign.nameEn} ví dụ`}
             contentFit="contain"
             onError={() => setImageError(true)}
             source={{ uri: sign.representativeImageKey! }}
@@ -70,11 +70,11 @@ function SignCard({ sign }: { sign: CatalogSign }) {
       <View style={styles.cardCopy}>
         <View style={[styles.categoryBadge, { backgroundColor: colors.background }]}>
           <Text style={[styles.categoryBadgeLabel, { color: colors.text }]}>
-            {sign.category.nameEn.toUpperCase()}
+            {((sign.category as any).nameVi || sign.category.nameEn).toUpperCase()}
           </Text>
         </View>
         <Text numberOfLines={1} style={[styles.signName, { color: theme.text }]}>
-          {sign.nameEn || sign.nameVi}
+          {sign.nameVi || sign.nameEn}
         </Text>
         <Text numberOfLines={3} style={[styles.signDescription, { color: theme.textSecondary }]}>
           {sign.description || sign.signCode}
@@ -87,21 +87,31 @@ function SignCard({ sign }: { sign: CatalogSign }) {
 export function SignCatalogScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { role } = useLocalSearchParams<{ role?: string }>();
 
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
   const { data: catalog, isPending: isLoading, error: catalogError } = useGetCatalog();
+  const { mutateAsync: refreshCatalog, isPending: isRefreshing } = useRefreshCatalog();
   const categories = catalog?.categories ?? [];
   const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
   const error = catalogError?.message;
 
+  const handleRefresh = async () => {
+    try {
+      await refreshCatalog();
+    } catch {
+      // Handled by query client state
+    }
+  };
+
   const filteredSigns = useMemo(() => {
-    const query = normalizeEnglishSearch(search);
+    const query = normalizeSearch(search);
 
     return catalogSigns.filter((sign) => {
       const matchesCategory = activeCategory === 'all' || sign.categoryId === activeCategory;
-      const searchableText = normalizeEnglishSearch(
-        `${sign.nameEn} ${sign.nameVi} ${sign.signCode} ${sign.category.nameEn} ${sign.description ?? ''}`,
+      const searchableText = normalizeSearch(
+        `${sign.nameVi ?? ''} ${sign.nameEn ?? ''} ${sign.signCode ?? ''} ${(sign.category as any).nameVi ?? ''} ${sign.category.nameEn ?? ''} ${sign.description ?? ''}`,
       );
 
       return matchesCategory && (!query || searchableText.includes(query));
@@ -118,9 +128,9 @@ export function SignCatalogScreen() {
           ]}
         >
           <AppButton
-            accessibilityLabel="Back to reviewer work"
+            accessibilityLabel='Quay lại'
             hitSlop={Spacing.one}
-            onPress={() => router.replace('/work/submission-review')}
+            onPress={() => router.back()}
             style={styles.backButton}
             variant="ghost"
           >
@@ -130,11 +140,22 @@ export function SignCatalogScreen() {
               tintColor={theme.text}
             />
           </AppButton>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Sign Catalog</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Tra cứu biển báo</Text>
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          refreshControl={
+            <RefreshControl
+              colors={[theme.primary]}
+              onRefresh={handleRefresh}
+              refreshing={isRefreshing}
+              tintColor={theme.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        >
           <View
             style={[
               styles.searchShell,
@@ -147,11 +168,11 @@ export function SignCatalogScreen() {
               tintColor={theme.placeholder}
             />
             <TextInput
-              accessibilityLabel="Search signs"
+              accessibilityLabel="Tìm kiếm biển báo"
               autoCapitalize="none"
               autoCorrect={false}
               onChangeText={setSearch}
-              placeholder="Search signs..."
+              placeholder="Tìm kiếm biển báo..."
               placeholderTextColor={theme.placeholder}
               returnKeyType="search"
               style={[styles.searchInput, { color: theme.text }]}
@@ -164,7 +185,13 @@ export function SignCatalogScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
           >
-            {[{ id: 'all' as const, nameEn: 'All Signs' }, ...categories].map((category) => {
+            {[
+              { id: 'all' as const, label: 'Tất cả biển báo' },
+              ...categories.map((c) => ({
+                id: c.id,
+                label: (c as any).nameVi || c.nameEn,
+              })),
+            ].map((category) => {
               const selected = activeCategory === category.id;
 
               return (
@@ -187,7 +214,7 @@ export function SignCatalogScreen() {
                       { color: selected ? theme.onPrimary : theme.text },
                     ]}
                   >
-                    {category.nameEn}
+                    {category.label}
                   </Text>
                 </Pressable>
               );
@@ -198,7 +225,7 @@ export function SignCatalogScreen() {
             <ActivityIndicator color={theme.primary} size="large" style={styles.loading} />
           ) : error ? (
             <View style={styles.emptyState}>
-              <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>Catalog unavailable</Text>
+              <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>Không thể tải danh mục</Text>
               <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>{error}</Text>
             </View>
           ) : filteredSigns.length > 0 ? (
@@ -209,15 +236,15 @@ export function SignCatalogScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No signs found</Text>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>Không tìm thấy biển báo</Text>
               <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
-                Try another English name, description, or category.
+                Thử tìm theo tên, mô tả hoặc danh mục khác.
               </Text>
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
-      <ReviewBottomTabs activeTab="catalog" />
+      {!role || role === 'reviewer' ? <ReviewBottomTabs activeTab="catalog" /> : null}
     </View>
   );
 }

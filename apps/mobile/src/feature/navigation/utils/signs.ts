@@ -43,12 +43,23 @@ export function resolveImageUrl(signCropUrl: string): string {
 export function toRouteSign(sign: VerifiedMapSign): RouteSign {
   const signCode = sign.signType?.signCode ?? '';
   const nameEn = sign.signType?.nameEn ?? '';
+  const nameVi = sign.signType?.nameVi ?? '';
   return {
     coordinate: [sign.longitude, sign.latitude],
     id: sign.id,
     imageUrl: resolveRepresentativeSignUrl(nameEn, signCode),
     actualCropUrl: resolveImageUrl(sign.signCropUrl),
-    name: nameEn || signCode || 'Traffic Sign',
+    frameUrl: resolveImageUrl(sign.frameUrl || sign.bestFrameUrl || ''),
+    name: nameVi || nameEn || signCode || 'Traffic Sign',
+    nameVi: nameVi || undefined,
+    nameEn: nameEn || undefined,
     signCode: signCode,
+    freshnessScore: sign.freshnessScore ?? (sign as unknown as { freshness_score?: number }).freshness_score,
+    status: sign.status,
+    roadName: sign.roadName,
+    displayAddress: sign.displayAddress,
+    lastVerifiedAt: sign.lastVerifiedAt,
+    createdAt: sign.createdAt ? String(sign.createdAt) : undefined,
+    allowedVehicles: (sign.signType as unknown as { allowedVehicles?: RouteSign['allowedVehicles'] })?.allowedVehicles,
   };
 }

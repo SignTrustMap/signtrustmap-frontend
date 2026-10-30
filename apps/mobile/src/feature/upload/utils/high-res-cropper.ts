@@ -1,4 +1,8 @@
 import { Platform } from 'react-native';
+import {
+  VIDEO_ELEMENT_LOAD_FAILED_MESSAGE,
+  VIDEO_FRAME_TIMEOUT_MESSAGE,
+} from '@/constants/message';
 
 export type SignCandidateBox = {
   id: string;
@@ -79,7 +83,7 @@ export async function cropWebVideoFrame(
 
     const timeout = setTimeout(() => {
       video.src = '';
-      reject(new Error('Video frame extraction timed out.'));
+      reject(new Error(VIDEO_FRAME_TIMEOUT_MESSAGE));
     }, 8000);
 
     video.onloadedmetadata = () => {
@@ -128,7 +132,7 @@ export async function cropWebVideoFrame(
 
     video.onerror = () => {
       clearTimeout(timeout);
-      reject(new Error('Failed to load video element for frame cropping.'));
+      reject(new Error(VIDEO_ELEMENT_LOAD_FAILED_MESSAGE));
     };
 
     video.src = videoUri;

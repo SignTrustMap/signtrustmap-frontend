@@ -1,5 +1,5 @@
 import { API_PATHS } from '@/api/api';
-import { apiRequest } from '@/api/api-client';
+import { apiRequest, apiBaseUrl } from '@/api/api-client';
 
 export type ResolvedLocation = {
   latitude: number;
@@ -26,7 +26,7 @@ async function reverseGeocodeViaNominatim(
   signal?: AbortSignal,
 ): Promise<ResolvedLocation | null> {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`;
+    const url = `${apiBaseUrl()}/spatial/resolve?lat=${latitude}&lon=${longitude}`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'SignTrustMap-Mobile/1.0 (contact@signmap.site)',
@@ -37,14 +37,21 @@ async function reverseGeocodeViaNominatim(
     if (!res.ok) return null;
     const data = await res.json();
     const addr = data.address || {};
-    const roadName = addr.road || addr.street || addr.neighbourhood || addr.suburb || null;
-    const displayAddress = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    const roadName = data.roadName ?? (addr.road || addr.street || addr.neighbourhood || addr.suburb || null);
+    const displayAddress = data.displayAddress || data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
     return {
-      latitude,
-      longitude,
+      latitude: data.latitude ?? latitude,
+      longitude: data.longitude ?? longitude,
       roadName,
       displayAddress,
-      source: 'NOMINATIM_CLIENT',
+      communeCode: data.communeCode,
+      communeName: data.communeName,
+      communeType: data.communeType,
+      provinceCode: data.provinceCode,
+      provinceName: data.provinceName,
+      provinceType: data.provinceType,
+      boundaryVersion: data.boundaryVersion,
+      source: data.source || 'FALLBACK_GEOCODER',
     };
   } catch (err) {
     if (signal?.aborted) throw err;
@@ -101,4 +108,40 @@ export async function resolveLocation(
     console.warn('[Spatial] Backend spatial resolve failed, trying client fallback:', err);
     return reverseGeocodeViaNominatim(latitude, longitude, signal);
   }
+}
+
+/**
+ * Formats a human-readable, concise title from a ResolvedLocation.
+ * Prioritizes roadName, then the most specific leading part of displayAddress,
+ * then commune + province.
+ */
+export function formatResolvedLocationTitle(
+  resolved: ResolvedLocation | null | undefined,
+): string | null {
+  if (!resolved) return null;
+  if (resolved.roadName && resolved.roadName.trim()) {
+    return resolved.roadName.trim();
+  }
+  if (resolved.displayAddress && resolved.displayAddress.trim()) {
+    const raw = resolved.displayAddress.trim();
+    const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+    const candidate = parts[0];
+    if (
+      candidate &&
+      candidate !== 'Không xác định' &&
+      candidate !== 'Việt Nam' &&
+      !/^\d+(\.\d+)?$/.test(candidate)
+    ) {
+      return candidate;
+    }
+    if (raw !== 'Không xác định, Việt Nam' && raw !== 'Việt Nam') {
+      return raw;
+    }
+  }
+  if (resolved.communeName && resolved.communeName.trim()) {
+    return resolved.provinceName && resolved.provinceName.trim()
+      ? `${resolved.communeName.trim()}, ${resolved.provinceName.trim()}`
+      : resolved.communeName.trim();
+  }
+  return null;
 }
