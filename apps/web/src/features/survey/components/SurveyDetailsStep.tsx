@@ -353,16 +353,43 @@ export function SurveyDetailsStep({
             <Clock size={15} />
             <span>{t('survey.lbl_captured_at')}</span>
           </label>
-          <input
-            type="datetime-local"
-            value={capturedAt ? capturedAt.slice(0, 16) : ''}
-            onChange={(e) => onCapturedAtChange(new Date(e.target.value).toISOString())}
-            className={`w-full px-3.5 py-2.5 text-xs sm:text-sm font-medium rounded-xl border outline-none transition-all ${
-              isDark
-                ? 'bg-black/50 border-white/15 text-white focus:border-[#00c4de]'
-                : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-[#007b8b]'
-            }`}
-          />
+          {(() => {
+            const capturedTime = capturedAt ? new Date(capturedAt).getTime() : NaN;
+            const now = Date.now();
+            const isFuture = Number.isFinite(capturedTime) && capturedTime > now + 5 * 60 * 1000;
+            const isTooOld = Number.isFinite(capturedTime) && capturedTime < now - 30 * 86400 * 1000;
+            const captureError = isFuture
+              ? 'Thời gian ghi nhận không thể ở tương lai.'
+              : isTooOld
+              ? 'Thời gian ghi nhận không được quá 30 ngày so với hiện tại.'
+              : null;
+            const minDate = new Date(now - 30 * 86400 * 1000).toISOString().slice(0, 16);
+            const maxDate = new Date(now + 5 * 60 * 1000).toISOString().slice(0, 16);
+
+            return (
+              <>
+                <input
+                  type="datetime-local"
+                  min={minDate}
+                  max={maxDate}
+                  value={capturedAt ? capturedAt.slice(0, 16) : ''}
+                  onChange={(e) => onCapturedAtChange(new Date(e.target.value).toISOString())}
+                  className={`w-full px-3.5 py-2.5 text-xs sm:text-sm font-medium rounded-xl border outline-none transition-all ${
+                    captureError
+                      ? 'border-red-500 focus:border-red-500'
+                      : isDark
+                      ? 'bg-black/50 border-white/15 text-white focus:border-[#00c4de]'
+                      : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-[#007b8b]'
+                  }`}
+                />
+                {captureError ? (
+                  <p className="mt-1 text-xs text-red-500 font-medium">
+                    {captureError}
+                  </p>
+                ) : null}
+              </>
+            );
+          })()}
         </div>
 
         {/* Note / Additional Details */}

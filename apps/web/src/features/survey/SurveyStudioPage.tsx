@@ -321,6 +321,27 @@ export default function SurveyStudioPage() {
       return
     }
 
+    const captureTimestamp = capturedAt ? new Date(capturedAt).getTime() : NaN
+    if (!Number.isFinite(captureTimestamp)) {
+      setError('Thời gian ghi nhận không hợp lệ.')
+      toast.warning('Thời gian ghi nhận không hợp lệ.')
+      setCurrentStep('details')
+      return
+    }
+    const now = Date.now()
+    if (captureTimestamp > now + 5 * 60 * 1000) {
+      setError('Thời gian ghi nhận không thể ở tương lai.')
+      toast.warning('Thời gian ghi nhận không thể ở tương lai.')
+      setCurrentStep('details')
+      return
+    }
+    if (captureTimestamp < now - 30 * 86400 * 1000) {
+      setError('Thời gian ghi nhận không được quá 30 ngày so với hiện tại.')
+      toast.warning('Thời gian ghi nhận không được quá 30 ngày so với hiện tại.')
+      setCurrentStep('details')
+      return
+    }
+
     setIsUploading(true)
     setIsPaused(false)
     isPausedRef.current = false

@@ -1,6 +1,6 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,15 +12,144 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { formatResolvedLocationTitle, resolveLocation } from '@/api/spatial/spatial';
 import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { useSession } from '@/context/session-provider';
 import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
+import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkRoute } from '@/hooks/use-work-route';
 import type { NavigationSessionItem } from '@/types/navigationType';
 
-type FilterTab = 'all' | 'completed' | 'active';
+const locationTitleCache = new Map<string, { title: string; subtitle?: string }>();
+
+/**
+ * Robustly extracts { latitude, longitude } from various backend formats:
+ * - GeoJSON Point: { type: 'Point', coordinates: [longitude, latitude] }
+ * - Array: [longitude, latitude]
+ * - Object: { latitude, longitude } or { lat, lon }
+ * - Flat fields: originLatitude, originLongitude
+ */
+export function extractCoordinate(
+  point?: any,
+  flatLat?: any,
+  flatLon?: any,
+): { latitude: number; longitude: number } | null {
+  if (point) {
+    // GeoJSON Point: { type: 'Point', coordinates: [lon, lat] }
+    if (Array.isArray(point.coordinates) && point.coordinates.length >= 2) {
+      const lon = Number(point.coordinates[0]);
+      const lat = Number(point.coordinates[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+    // Simple coordinate array: [lon, lat]
+    if (Array.isArray(point) && point.length >= 2) {
+      const lon = Number(point[0]);
+      const lat = Number(point[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return { latitude: lat, longitude: lon };
+      }
+    }
+    // Object with lat/lon properties
+    const lat = Number(point.latitude ?? point.lat);
+    const lon = Number(point.longitude ?? point.lon ?? point.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return { latitude: lat, longitude: lon };
+    }
+  }
+
+  const lat = Number(flatLat);
+  const lon = Number(flatLon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    return { latitude: lat, longitude: lon };
+  }
+
+  return null;
+}
+
+function isGenericPlaceholder(name?: string | null): boolean {
+  if (!name) return true;
+  const trimmed = name.trim().toLowerCase();
+  return (
+    trimmed === 'điểm xuất phát' ||
+    trimmed === 'điểm đến' ||
+    trimmed === 'vị trí của bạn' ||
+    trimmed === 'điểm di chuyển' ||
+    trimmed === 'điểm đến đã lưu' ||
+    trimmed === 'unknown' ||
+    trimmed === 'vị trí không xác định'
+  );
+}
+
+function useResolvedAddress(
+  coord: { latitude: number; longitude: number } | null,
+  initialName?: string | null,
+  accessToken?: string,
+  fallbackLabel = '',
+): { title: string; subtitle?: string } {
+  const coordKey = coord ? `${coord.latitude.toFixed(5)},${coord.longitude.toFixed(5)}` : null;
+
+  const [address, setAddress] = useState<{ title: string; subtitle?: string }>(() => {
+    if (initialName && !isGenericPlaceholder(initialName)) {
+      return { title: initialName };
+    }
+    if (coordKey && locationTitleCache.has(coordKey)) {
+      return locationTitleCache.get(coordKey)!;
+    }
+    return { title: '' };
+  });
+
+  useEffect(() => {
+    if (initialName && !isGenericPlaceholder(initialName)) {
+      setAddress({ title: initialName });
+      return;
+    }
+    if (!coord || !coordKey) return;
+
+    if (locationTitleCache.has(coordKey)) {
+      setAddress(locationTitleCache.get(coordKey)!);
+      return;
+    }
+
+    let isMounted = true;
+    void (async () => {
+      try {
+        const result = await resolveLocation(coord.latitude, coord.longitude, accessToken);
+        const resolvedTitle = formatResolvedLocationTitle(result);
+
+        if (resolvedTitle && isMounted) {
+          // Extract secondary address part if available
+          let subtitle: string | undefined;
+          if (result?.displayAddress) {
+            const parts = result.displayAddress.split(',').map((p) => p.trim()).filter(Boolean);
+            if (parts.length > 1) {
+              subtitle = parts.slice(1).join(', ');
+            }
+          }
+
+          const resolved = { title: resolvedTitle, subtitle };
+          locationTitleCache.set(coordKey, resolved);
+          setAddress(resolved);
+        }
+      } catch {
+        // Fallback silently if offline or geocode fails
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [coord, coordKey, initialName, accessToken]);
+
+  if (address.title) return address;
+  if (initialName && !isGenericPlaceholder(initialName)) return { title: initialName };
+  if (coord) return { title: `${coord.latitude.toFixed(4)}°, ${coord.longitude.toFixed(4)}` };
+  return { title: fallbackLabel };
+}
 
 const vehicleTypeLabels: Record<string, { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }> = {
   CAR: { label: 'Ô tô', icon: 'car' },
@@ -47,13 +176,6 @@ function formatTimestamp(value?: string) {
   });
 }
 
-function formatCoords(coords?: { latitude: number; longitude: number } | null, lat?: number, lon?: number) {
-  const actualLat = coords?.latitude ?? lat;
-  const actualLon = coords?.longitude ?? lon;
-  if (actualLat == null || actualLon == null) return null;
-  return `${actualLat.toFixed(4)}°, ${actualLon.toFixed(4)}°`;
-}
-
 function formatDistance(meters?: number) {
   if (!meters || meters <= 0) return null;
   if (meters >= 1000) {
@@ -73,14 +195,155 @@ function formatDuration(seconds?: number) {
   return `${mins} phút`;
 }
 
+interface NavigationSessionCardProps {
+  item: NavigationSessionItem;
+  accessToken?: string;
+  onNavigate: (
+    item: NavigationSessionItem,
+    originTitle: string,
+    destTitle: string,
+    origCoord: { latitude: number; longitude: number } | null,
+    destCoord: { latitude: number; longitude: number } | null,
+  ) => void;
+}
+
+function NavigationSessionCard({ item, accessToken, onNavigate }: NavigationSessionCardProps) {
+  const theme = useTheme();
+
+  const origCoord = extractCoordinate(item.origin, item.originLatitude, item.originLongitude);
+  const destCoord = extractCoordinate(item.destination, item.destinationLatitude, item.destinationLongitude);
+
+  const originAddr = useResolvedAddress(origCoord, item.originName, accessToken, 'Vị trí của bạn');
+  const destAddr = useResolvedAddress(destCoord, item.destinationName, accessToken, 'Điểm đến');
+
+  // Default to Motorcycle in driver mode if vehicle mode is not specified by backend
+  const vehicleMeta =
+    vehicleTypeLabels[item.vehicleType?.toUpperCase() ?? ''] ||
+    vehicleTypeLabels[item.vehicleMode?.toUpperCase() ?? ''] || {
+      label: 'Xe máy',
+      icon: 'motorbike',
+    };
+
+  // Compute distance from coordinates if backend doesn't provide distanceMeters
+  const calculatedDistance =
+    item.distanceMeters && item.distanceMeters > 0
+      ? item.distanceMeters
+      : origCoord && destCoord
+        ? calculateDistanceMeters(
+            [origCoord.longitude, origCoord.latitude],
+            [destCoord.longitude, destCoord.latitude],
+          )
+        : undefined;
+
+  const distanceStr = formatDistance(calculatedDistance);
+  const durationStr = formatDuration(item.durationSeconds);
+
+  return (
+    <Pressable
+      accessibilityLabel={`Lộ trình từ ${originAddr.title} đến ${destAddr.title}. Nhấn để mở lộ trình`}
+      accessibilityRole="button"
+      onPress={() => onNavigate(item, originAddr.title, destAddr.title, origCoord, destCoord)}
+      style={({ pressed }) => [
+        styles.tripCard,
+        {
+          backgroundColor: theme.backgroundElement,
+          borderColor: theme.border,
+          opacity: pressed ? 0.88 : 1,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
+      ]}
+    >
+      {/* Card Header: Vehicle Mode & Distance */}
+      <View style={styles.cardHeader}>
+        <View style={[styles.vehiclePill, { backgroundColor: `${theme.primary}12` }]}>
+          <MaterialCommunityIcons color={theme.primary} name={vehicleMeta.icon} size={16} />
+          <Text style={[styles.vehicleText, { color: theme.primary }]}>{vehicleMeta.label}</Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          {distanceStr ? (
+            <View style={[styles.distancePill, { backgroundColor: theme.background }]}>
+              <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={14} />
+              <Text style={[styles.distancePillText, { color: theme.text }]}>{distanceStr}</Text>
+            </View>
+          ) : null}
+
+          {item.creditsDeducted ? (
+            <View style={[styles.creditsBadge, { backgroundColor: '#EF444412' }]}>
+              <Text style={styles.creditsText}>-{item.creditsDeducted} credits</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Route Details with Visual Pin Indicators */}
+      <View style={styles.routeContainer}>
+        <View style={styles.routePinColumn}>
+          <View style={[styles.startDot, { borderColor: theme.primary }]} />
+          <View style={[styles.routeDottedLine, { borderColor: theme.border }]} />
+          <View style={styles.endPin}>
+            <MaterialCommunityIcons color="#EF4444" name="map-marker" size={17} />
+          </View>
+        </View>
+
+        <View style={styles.routeTextColumn}>
+          <View style={styles.locationBlock}>
+            <Text style={[styles.locationLabel, { color: theme.grey }]}>Xuất phát</Text>
+            <Text numberOfLines={1} style={[styles.locationName, { color: theme.text }]}>
+              {originAddr.title}
+            </Text>
+            {originAddr.subtitle ? (
+              <Text numberOfLines={1} style={[styles.locationSubText, { color: theme.grey }]}>
+                {originAddr.subtitle}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.locationBlock}>
+            <Text style={[styles.locationLabel, { color: theme.grey }]}>Điểm đến</Text>
+            <Text numberOfLines={1} style={[styles.locationName, { color: theme.text }]}>
+              {destAddr.title}
+            </Text>
+            {destAddr.subtitle ? (
+              <Text numberOfLines={1} style={[styles.locationSubText, { color: theme.grey }]}>
+                {destAddr.subtitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      {/* Card Footer: Timestamp & Re-navigate CTA */}
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+        <View style={styles.timeMeta}>
+          <MaterialCommunityIcons color={theme.grey} name="clock-outline" size={14} />
+          <Text style={[styles.timeText, { color: theme.grey }]}>
+            {formatTimestamp(item.createdAt || item.startedAt)}
+          </Text>
+          {durationStr ? (
+            <Text style={[styles.metricText, { color: theme.textSecondary }]}>
+              · {durationStr}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={[styles.reNavigateBtn, { backgroundColor: theme.backgroundSelected }]}>
+          <MaterialCommunityIcons color={theme.primary} name="navigation-variant-outline" size={14} />
+          <Text style={[styles.reNavigateText, { color: theme.primary }]}>Đi lại</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 export function NavigationHistoryScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { session } = useSession();
   const driverWorkRoute = useWorkRoute('/work', { currentRole: 'driver' });
 
   useBackButton(driverWorkRoute);
 
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [page, setPage] = useState(1);
   const listRef = useRef<FlatList<NavigationSessionItem>>(null);
 
@@ -90,174 +353,47 @@ export function NavigationHistoryScreen() {
   });
 
   const allItems = data?.items ?? [];
-
-  const filteredItems = useMemo(() => {
-    if (activeTab === 'completed') {
-      return allItems.filter(
-        (item) => item.status?.toUpperCase() === 'COMPLETED' || item.status?.toUpperCase() === 'ENDED',
-      );
-    }
-    if (activeTab === 'active') {
-      return allItems.filter((item) => item.status?.toUpperCase() === 'ACTIVE');
-    }
-    return allItems;
-  }, [allItems, activeTab]);
-
   const totalTrips = data?.total ?? allItems.length;
-  const completedCount = allItems.filter(
-    (item) => item.status?.toUpperCase() === 'COMPLETED' || item.status?.toUpperCase() === 'ENDED',
-  ).length;
-
   const totalPages = data?.totalPages ?? 1;
 
-  const handleReNavigate = (session: NavigationSessionItem) => {
-    const destLat = session.destination?.latitude ?? session.destinationLatitude;
-    const destLon = session.destination?.longitude ?? session.destinationLongitude;
-    if (destLat != null && destLon != null) {
-      router.push({
-        pathname: '/(authenticated)/(tabs)/home',
-        params: {
-          destLat: String(destLat),
-          destLon: String(destLon),
-          destName: session.destinationName ?? 'Điểm đến đã lưu',
-        },
-      });
-    } else {
+  const handleReNavigate = (
+    item: NavigationSessionItem,
+    resolvedOriginTitle: string,
+    resolvedDestTitle: string,
+    origCoord: { latitude: number; longitude: number } | null,
+    destCoord: { latitude: number; longitude: number } | null,
+  ) => {
+    if (!destCoord) {
       router.push('/(authenticated)/(tabs)/home');
+      return;
     }
-  };
 
-  const renderSessionItem = ({ item }: { item: NavigationSessionItem }) => {
-    const isCompleted =
-      item.status?.toUpperCase() === 'COMPLETED' || item.status?.toUpperCase() === 'ENDED';
-    const isActive = item.status?.toUpperCase() === 'ACTIVE';
+    const rawMode = (item.vehicleMode || item.vehicleType || 'MOTORCYCLE').toUpperCase();
+    const vehicleMode =
+      rawMode === 'CAR' || rawMode === 'DRIVING'
+        ? 'DRIVING'
+        : rawMode === 'CYCLING' || rawMode === 'BICYCLE'
+          ? 'CYCLING'
+          : rawMode === 'WALKING' || rawMode === 'PEDESTRIAN'
+            ? 'WALKING'
+            : 'BIKE';
 
-    const vehicleMeta =
-      vehicleTypeLabels[item.vehicleType?.toUpperCase() ?? ''] ||
-      vehicleTypeLabels[item.vehicleMode?.toUpperCase() ?? ''] || {
-        label: 'Di chuyển',
-        icon: 'navigation',
-      };
-
-    const originText =
-      item.originName ||
-      formatCoords(item.origin, item.originLatitude, item.originLongitude) ||
-      'Điểm xuất phát';
-
-    const destText =
-      item.destinationName ||
-      formatCoords(item.destination, item.destinationLatitude, item.destinationLongitude) ||
-      'Điểm đến';
-
-    const distanceStr = formatDistance(item.distanceMeters);
-    const durationStr = formatDuration(item.durationSeconds);
-
-    return (
-      <View
-        style={[
-          styles.tripCard,
-          {
-            backgroundColor: theme.backgroundElement,
-            borderColor: theme.border,
-          },
-        ]}
-      >
-        {/* Card Header */}
-        <View style={styles.cardHeader}>
-          <View style={styles.vehiclePill}>
-            <MaterialCommunityIcons color={theme.primary} name={vehicleMeta.icon} size={16} />
-            <Text style={[styles.vehicleText, { color: theme.primary }]}>{vehicleMeta.label}</Text>
-          </View>
-
-          <View style={styles.headerRight}>
-            <View
-              style={[
-                styles.statusBadge,
-                {
-                  backgroundColor: isCompleted
-                    ? 'rgba(16, 185, 129, 0.12)'
-                    : isActive
-                      ? 'rgba(6, 113, 235, 0.12)'
-                      : 'rgba(148, 163, 184, 0.15)',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusText,
-                  {
-                    color: isCompleted ? '#10B981' : isActive ? theme.primary : theme.grey,
-                  },
-                ]}
-              >
-                {isCompleted ? 'Hoàn tất' : isActive ? 'Đang chạy' : item.status || 'Kết thúc'}
-              </Text>
-            </View>
-
-            {item.creditsDeducted ? (
-              <View style={[styles.creditsBadge, { backgroundColor: '#EF444412' }]}>
-                <Text style={styles.creditsText}>-{item.creditsDeducted} credits</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Route Details with Visual Pin Indicators */}
-        <View style={styles.routeContainer}>
-          <View style={styles.routePinColumn}>
-            <View style={styles.startDot} />
-            <View style={[styles.routeDottedLine, { borderColor: theme.border }]} />
-            <View style={styles.endPin}>
-              <MaterialCommunityIcons color="#EF4444" name="map-marker" size={16} />
-            </View>
-          </View>
-
-          <View style={styles.routeTextColumn}>
-            <View style={styles.locationBlock}>
-              <Text style={[styles.locationLabel, { color: theme.grey }]}>Xuất phát</Text>
-              <Text numberOfLines={1} style={[styles.locationName, { color: theme.text }]}>
-                {originText}
-              </Text>
-            </View>
-
-            <View style={styles.locationBlock}>
-              <Text style={[styles.locationLabel, { color: theme.grey }]}>Điểm đến</Text>
-              <Text numberOfLines={1} style={[styles.locationName, { color: theme.text }]}>
-                {destText}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Card Footer */}
-        <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
-          <View style={styles.timeMeta}>
-            <MaterialCommunityIcons color={theme.grey} name="clock-outline" size={14} />
-            <Text style={[styles.timeText, { color: theme.grey }]}>
-              {formatTimestamp(item.createdAt || item.startedAt)}
-            </Text>
-            {distanceStr || durationStr ? (
-              <Text style={[styles.metricText, { color: theme.textSecondary }]}>
-                · {[distanceStr, durationStr].filter(Boolean).join(' · ')}
-              </Text>
-            ) : null}
-          </View>
-
-          <Pressable
-            accessibilityLabel="Điều hướng lại lộ trình này"
-            accessibilityRole="button"
-            onPress={() => handleReNavigate(item)}
-            style={({ pressed }) => [
-              styles.reNavigateBtn,
-              { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.75 : 1 },
-            ]}
-          >
-            <MaterialCommunityIcons color={theme.primary} name="navigation-variant-outline" size={14} />
-            <Text style={[styles.reNavigateText, { color: theme.primary }]}>Đi lại</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
+    router.push({
+      pathname: '/(authenticated)/(tabs)/home',
+      params: {
+        destinationLat: String(destCoord.latitude),
+        destinationLng: String(destCoord.longitude),
+        destinationTitle: resolvedDestTitle || item.destinationName || 'Điểm đến',
+        ...(origCoord
+          ? {
+              startLat: String(origCoord.latitude),
+              startLng: String(origCoord.longitude),
+              startTitle: resolvedOriginTitle || item.originName || 'Vị trí của bạn',
+            }
+          : {}),
+        vehicleMode,
+      },
+    });
   };
 
   return (
@@ -300,69 +436,10 @@ export function NavigationHistoryScreen() {
           </AppButton>
         </View>
 
-        {/* Quick Stats Summary Banner */}
-        <View style={styles.statsRow}>
-          <View style={[styles.statBox, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <View style={[styles.statIconBox, { backgroundColor: '#0671eb15' }]}>
-              <MaterialCommunityIcons color={theme.primary} name="map-marker-path" size={20} />
-            </View>
-            <Text style={[styles.statNumber, { color: theme.text }]}>{totalTrips}</Text>
-            <Text style={[styles.statLabel, { color: theme.grey }]}>Tổng chuyến</Text>
-          </View>
-
-          <View style={[styles.statBox, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <View style={[styles.statIconBox, { backgroundColor: '#10B98115' }]}>
-              <MaterialCommunityIcons color="#10B981" name="check-all" size={20} />
-            </View>
-            <Text style={[styles.statNumber, { color: '#10B981' }]}>{completedCount}</Text>
-            <Text style={[styles.statLabel, { color: theme.grey }]}>Đã hoàn tất</Text>
-          </View>
-
-          <View style={[styles.statBox, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <View style={[styles.statIconBox, { backgroundColor: '#8B5CF615' }]}>
-              <MaterialCommunityIcons color="#8B5CF6" name="compass-outline" size={20} />
-            </View>
-            <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>5 tín chỉ</Text>
-            <Text style={[styles.statLabel, { color: theme.grey }]}>Phí / phiên</Text>
-          </View>
-        </View>
-
-        {/* Filter Bar */}
-        <View
-          accessibilityLabel="Bộ lọc chuyến đi"
-          accessibilityRole="tablist"
-          style={[styles.filterBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-        >
-          {(['all', 'completed', 'active'] as FilterTab[]).map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[
-                  styles.filterTab,
-                  isActive && [styles.filterTabActive, { backgroundColor: theme.primary }],
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterTabText,
-                    { color: isActive ? '#FFFFFF' : theme.textSecondary },
-                  ]}
-                >
-                  {tab === 'all' ? 'Tất cả' : tab === 'completed' ? 'Hoàn tất' : 'Đang chạy'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
         {/* Main List */}
         <FlatList
           contentContainerStyle={styles.listContent}
-          data={filteredItems}
+          data={allItems}
           keyExtractor={(item, index) => item.id || String(index)}
           onRefresh={() => {
             void refetch();
@@ -372,7 +449,13 @@ export function NavigationHistoryScreen() {
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={theme.primary} />
           }
           refreshing={isRefetching}
-          renderItem={renderSessionItem}
+          renderItem={({ item }) => (
+            <NavigationSessionCard
+              accessToken={session?.accessToken}
+              item={item}
+              onNavigate={handleReNavigate}
+            />
+          )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               {isLoading ? (
@@ -484,73 +567,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    marginBottom: Spacing.three,
-  },
-  statBox: {
-    flex: 1,
-    padding: Spacing.two,
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  statIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  statNumber: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  filterBar: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.four,
-    marginBottom: Spacing.three,
-    padding: 4,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Rounded.sm,
-  },
-  filterTabActive: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  filterTabText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '700',
-  },
   listContent: {
     flexGrow: 1,
     paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.six,
     gap: Spacing.three,
   },
@@ -577,7 +597,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
     paddingVertical: 3,
     borderRadius: Rounded.sm,
-    backgroundColor: '#0671eb12',
   },
   vehicleText: {
     fontFamily: Fonts.body,
@@ -589,14 +608,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
   },
-  statusBadge: {
+  distancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Rounded.round,
   },
-  statusText: {
+  distancePillText: {
     fontFamily: Fonts.body,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   creditsBadge: {
@@ -619,17 +641,18 @@ const styles = StyleSheet.create({
   routePinColumn: {
     alignItems: 'center',
     width: 20,
-    paddingTop: 4,
+    paddingTop: 6,
   },
   startDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10B981',
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
   },
   routeDottedLine: {
     width: 1,
-    height: 32,
+    height: 28,
     borderLeftWidth: 2,
     borderStyle: 'dashed',
     marginVertical: 2,
@@ -639,7 +662,7 @@ const styles = StyleSheet.create({
   },
   routeTextColumn: {
     flex: 1,
-    gap: 12,
+    gap: 8,
   },
   locationBlock: {
     gap: 1,
@@ -651,8 +674,15 @@ const styles = StyleSheet.create({
   },
   locationName: {
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
+    lineHeight: 20,
+  },
+  locationSubText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 16,
   },
   cardFooter: {
     flexDirection: 'row',

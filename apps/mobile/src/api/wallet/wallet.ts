@@ -31,6 +31,51 @@ export type TopUpPackage = {
   isActive: boolean;
 };
 
+export const DEFAULT_TOP_UP_PACKAGES: TopUpPackage[] = [
+  { id: 1, packageName: 'Gói Khởi đầu', priceVnd: '50000.00', creditAmount: 500, isActive: true },
+  { id: 2, packageName: 'Gói Tiêu chuẩn', priceVnd: '100000.00', creditAmount: 1000, isActive: true },
+  { id: 3, packageName: 'Gói Chuyên nghiệp', priceVnd: '200000.00', creditAmount: 2000, isActive: true },
+  { id: 4, packageName: 'Gói Doanh nghiệp', priceVnd: '500000.00', creditAmount: 5000, isActive: true },
+];
+
+export function formatVnd(value: number | string | undefined | null): string {
+  if (value === undefined || value === null) return '0 ₫';
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return '0 ₫';
+  return `${Math.round(num).toLocaleString('vi-VN')} ₫`;
+}
+
+export type PaymentGatewayOption = {
+  id: 'MOMO' | 'VIETQR' | 'MOCK';
+  name: string;
+  detail: string;
+  iconSymbol: string;
+  badge?: string;
+};
+
+export const AVAILABLE_PAYMENT_GATEWAYS: PaymentGatewayOption[] = [
+  {
+    id: 'MOMO',
+    name: 'Ví điện tử MoMo',
+    detail: 'Thanh toán trực tiếp qua MoMo hoặc quét mã MoMo QR',
+    iconSymbol: '▰',
+    badge: 'Khuyên dùng',
+  },
+  {
+    id: 'VIETQR',
+    name: 'Chuyển khoản VietQR',
+    detail: 'Quét mã VietQR chuyển khoản nhanh 24/7 liên ngân hàng',
+    iconSymbol: '▦',
+  },
+  {
+    id: 'MOCK',
+    name: 'Thanh toán Sandbox (Thử nghiệm)',
+    detail: 'Tạo đơn nạp & cộng Credits trực tiếp vào ví để kiểm thử',
+    iconSymbol: '⚡',
+    badge: 'Sandbox',
+  },
+];
+
 export type PaymentMethod = {
   id: string;
   userId: string;
@@ -55,6 +100,13 @@ export type TopUpOrderResponse = {
     status: string;
     createdAt: string;
   };
+  payUrl?: string;
+  deeplink?: string;
+  qrCodeUrl?: string;
+  orderId?: string;
+  requestId?: string;
+  amount?: number;
+  resultCode?: number;
   message: string;
 };
 
@@ -68,22 +120,45 @@ export function getWallet(accessToken: string, signal?: AbortSignal) {
   );
 }
 
-export function getTopUpPackages(accessToken?: string, signal?: AbortSignal) {
-  return apiRequest<TopUpPackage[]>(
-    `${API_PATHS.WALLET}/top-up/packages`,
-    { signal },
-    accessToken,
-  );
+export async function getTopUpPackages(accessToken?: string, signal?: AbortSignal): Promise<TopUpPackage[]> {
+  try {
+    const data = await apiRequest<TopUpPackage[]>(
+      `${API_PATHS.WALLET}/top-up/packages`,
+      { signal },
+      accessToken,
+    );
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch (err) {
+    console.warn('[WalletAPI] Failed to fetch /wallet/top-up/packages:', err);
+  }
+
+  try {
+    const fallbackData = await apiRequest<TopUpPackage[]>(
+      '/payments/packages',
+      { signal },
+      accessToken,
+    );
+    if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+      return fallbackData;
+    }
+  } catch (err) {
+    console.warn('[WalletAPI] Failed to fetch /payments/packages fallback:', err);
+  }
+
+  return DEFAULT_TOP_UP_PACKAGES;
 }
 
 export function postTopUp(
   packageId: number,
   accessToken: string,
+  gateway = 'MOMO',
   signal?: AbortSignal,
 ) {
   return jsonApiRequest<TopUpOrderResponse>(
     `${API_PATHS.WALLET}/top-up`,
-    { packageId },
+    { packageId, gateway },
     accessToken,
     signal,
   );
@@ -92,11 +167,12 @@ export function postTopUp(
 export function postTopUpCustom(
   amount: number,
   accessToken: string,
+  gateway = 'MOMO',
   signal?: AbortSignal,
 ) {
   return jsonApiRequest<TopUpOrderResponse>(
     `${API_PATHS.WALLET}/top-up/custom`,
-    { amount },
+    { amount, gateway },
     accessToken,
     signal,
   );

@@ -6,10 +6,19 @@ import type { UploadChunkRequest } from '@/types/surveySubmissionType';
 import {
   GPX_EMPTY_MESSAGE,
   GPX_READ_FAILED_MESSAGE,
+  GPX_SIZE_EXCEEDED_MESSAGE,
+  IMAGE_SIZE_EXCEEDED_MESSAGE,
+  VIDEO_SIZE_EXCEEDED_MESSAGE,
   MEDIA_EMPTY_MESSAGE,
   MEDIA_READ_FAILED_MESSAGE,
   MEDIA_READ_FAILED_OR_EMPTY_MESSAGE,
 } from '@/constants/message';
+import {
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
+  MAX_SURVEY_IMAGE_SIZE_BYTES,
+  MAX_SURVEY_GPX_SIZE_BYTES,
+} from './video-processor';
+
 
 export type SurveyImage = {
   fileName?: string;
@@ -49,10 +58,22 @@ export async function prepareSurveyImage(image: SurveyImage) {
     || `survey-${isVideo ? 'video' : 'sign'}-${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`;
   const mimeType = imageMimeType(fileName, image.mimeType);
 
-  if (Platform.OS !== 'web' && (image.uri.startsWith('file://') || image.uri.startsWith('/'))) {
-    const info = await FileSystem.getInfoAsync(image.uri);
-    if (!info.exists || !info.size) {
-      throw new Error(MEDIA_READ_FAILED_OR_EMPTY_MESSAGE);
+  if (
+    Platform.OS !== 'web' &&
+    (image.uri.startsWith('file://') || image.uri.startsWith('/') || image.uri.startsWith('content://'))
+  ) {
+    let size = 0;
+    try {
+      const info = await FileSystem.getInfoAsync(image.uri);
+      if (info.exists && typeof info.size === 'number' && info.size > 0) {
+        size = info.size;
+      }
+    } catch (e) {
+      console.warn('[SurveyImage] getInfoAsync error:', e);
+    }
+    const sizeLimit = isVideo ? MAX_SURVEY_VIDEO_SIZE_BYTES : MAX_SURVEY_IMAGE_SIZE_BYTES;
+    if (size > sizeLimit) {
+      throw new Error(isVideo ? VIDEO_SIZE_EXCEEDED_MESSAGE : IMAGE_SIZE_EXCEEDED_MESSAGE);
     }
     const chunk: UploadChunkRequest = {
       chunkIndex: 0,
@@ -63,7 +84,7 @@ export async function prepareSurveyImage(image: SurveyImage) {
         type: mimeType,
       },
     };
-    return { fileName, sizeBytes: info.size, chunk };
+    return { fileName, sizeBytes: size || 1024, chunk };
   }
 
   const response = await fetch(image.uri);
@@ -74,6 +95,10 @@ export async function prepareSurveyImage(image: SurveyImage) {
     type: response.headers.get('content-type') ?? mimeType,
   });
   if (blob.size < 1) throw new Error(MEDIA_EMPTY_MESSAGE);
+  const blobLimit = isVideo ? MAX_SURVEY_VIDEO_SIZE_BYTES : MAX_SURVEY_IMAGE_SIZE_BYTES;
+  if (blob.size > blobLimit) {
+    throw new Error(isVideo ? VIDEO_SIZE_EXCEEDED_MESSAGE : IMAGE_SIZE_EXCEEDED_MESSAGE);
+  }
 
   const chunk: UploadChunkRequest = {
     chunkIndex: 0,
@@ -96,7 +121,10 @@ export async function prepareSurveyGpx(gpx: SurveyGpx) {
     const commaIdx = gpx.uri.indexOf(',');
     const raw = commaIdx >= 0 ? gpx.uri.slice(commaIdx + 1) : gpx.uri;
     xmlContent = decodeURIComponent(raw);
-  } else if (Platform.OS !== 'web' && (gpx.uri.startsWith('file://') || gpx.uri.startsWith('/'))) {
+  } else if (
+    Platform.OS !== 'web' &&
+    (gpx.uri.startsWith('file://') || gpx.uri.startsWith('/') || gpx.uri.startsWith('content://'))
+  ) {
     xmlContent = await FileSystem.readAsStringAsync(gpx.uri, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -114,6 +142,10 @@ export async function prepareSurveyGpx(gpx: SurveyGpx) {
 
   const encodedBytes = new TextEncoder().encode(xmlContent);
   const sizeBytes = encodedBytes.length;
+  if (sizeBytes > MAX_SURVEY_GPX_SIZE_BYTES) {
+    throw new Error(GPX_SIZE_EXCEEDED_MESSAGE);
+  }
+
 
   if (Platform.OS === 'web') {
     const blob = new Blob([xmlContent], { type: 'application/gpx+xml' });

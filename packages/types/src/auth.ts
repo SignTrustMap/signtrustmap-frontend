@@ -152,6 +152,77 @@ export interface UserProfileResponse {
 }
 
 /**
+ * Payload sent to backend when requesting password recovery OTP.
+ * Corresponds to NestJS ForgotPasswordDto.
+ */
+export interface ForgotPasswordPayload {
+  email: string
+}
+
+/**
+ * Response returned from POST /api/v1/auth/forgot-password.
+ */
+export interface ForgotPasswordResponse {
+  sent: boolean
+  message?: string
+  otp?: string
+  expiresAt?: string | Date
+}
+
+/**
+ * Payload sent to backend when verifying OTP code.
+ * Corresponds to NestJS VerifyOtpDto.
+ */
+export interface VerifyOtpPayload {
+  email: string
+  otp: string
+}
+
+/**
+ * Response returned from POST /api/v1/auth/verify-otp.
+ */
+export interface VerifyOtpResponse {
+  valid: boolean
+  email: string
+}
+
+/**
+ * Payload sent to backend when resending OTP code.
+ * Corresponds to NestJS ResendOtpDto.
+ */
+export interface ResendOtpPayload {
+  email: string
+}
+
+/**
+ * Response returned from POST /api/v1/auth/resend-otp.
+ */
+export interface ResendOtpResponse {
+  sent: boolean
+  message?: string
+  otp?: string
+  expiresAt?: string | Date
+}
+
+/**
+ * Payload sent to backend when resetting password with validated OTP.
+ * Corresponds to NestJS ResetPasswordDto.
+ */
+export interface ResetPasswordPayload {
+  email: string
+  otp: string
+  newPassword: string
+}
+
+/**
+ * Response returned from POST /api/v1/auth/reset-password.
+ */
+export interface ResetPasswordResponse {
+  reset: boolean
+  message?: string
+}
+
+/**
  * Standard error response structure returned by NestJS.
  */
 export interface ApiErrorResponse {

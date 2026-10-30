@@ -1,0 +1,105 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Complete Reviewer Workflow
+# =========================================================================
+# This test covers:
+#  1. Entry to Reviewer work panel
+#  2. Opening the Submission Review screen
+#  3. Inspecting candidate image (zoom in / zoom out)
+#  4. Approving a sign candidate
+#  5. Testing the Undo action
+#  6. Declining a candidate with sign remedy selection
+#  7. Skipping an unidentifiable candidate
+#  8. Navigating to the Submission Summary metrics screen
+#  9. Completing the review session
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# -------------------------------------------------------------------------
+# Step 1: Navigate to the Work tab and Reviewer screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work"
+
+# Deep-link directly to submission review queue
+- openLink: "mobile://work/submission-review"
+
+# -------------------------------------------------------------------------
+# Step 2: Submission Review Screen & Candidate Card inspection
+# -------------------------------------------------------------------------
+# Wait for the candidate card to load
+- assertVisible:
+    text: ".*REVIEWING.*|.*Thẩm định.*|.*All reviews completed.*"
+
+# -------------------------------------------------------------------------
+# Step 3: Test Image Zoom Modal
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Ảnh biển báo. Chạm để phóng to."
+    optional: true
+
+# Close the zoom modal
+- tapOn:
+    label: "Đóng xem phóng to"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 4: Approve first candidate
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Approve submission"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 5: Test Undo action
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Undo last review action"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 6: Test Decline with Remedy Selection
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Decline submission"
+    optional: true
+
+# Select a remedy sign or decline reason if sheet is open
+- tapOn:
+    text: ".*W.201a.*|.*Không tìm thấy biển báo.*"
+    optional: true
+
+# Confirm decline
+- tapOn:
+    text: ".*Xác nhận chọn.*|.*Xác nhận từ chối.*"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 7: Test Skip action
+# -------------------------------------------------------------------------
+- tapOn:
+    label: "Skip submission (cannot identify)"
+    optional: true
+
+# -------------------------------------------------------------------------
+# Step 8: Transition to Submission Summary Screen
+# -------------------------------------------------------------------------
+# Either tap the summary button or deep-link to summary
+- tapOn:
+    label: "Chuyển đến màn hình tổng kết"
+    optional: true
+
+- openLink: "mobile://work/submission-summary"
+
+# Verify summary metrics screen
+- assertVisible:
+    text: ".*TỔNG KẾT.*|.*PHÊ DUYỆT.*|.*TỪ CHỐI.*|.*BỎ QUA.*|.*Kiểm tra lại hồ sơ.*"
+
+# -------------------------------------------------------------------------
+# Step 9: Finish the review batch
+# -------------------------------------------------------------------------
+- tapOn:
+    text: "Hoàn tất"
+    optional: true

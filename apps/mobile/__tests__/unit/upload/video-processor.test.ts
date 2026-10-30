@@ -3,7 +3,11 @@ import {
   sliceVideoChunk,
   prepareVideoChunk,
   MAX_BACKEND_CHUNK_BYTES,
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
+  MAX_SURVEY_IMAGE_SIZE_BYTES,
+  MAX_SURVEY_GPX_SIZE_BYTES,
 } from '@/feature/upload/utils/video-processor';
+
 
 describe('video-processor utility', () => {
   describe('calculateTemporalChunks', () => {
@@ -92,4 +96,21 @@ describe('video-processor utility', () => {
       }
     });
   });
+
+  describe('survey media size limits', () => {
+    it('defines maximum video size matching OpenAPI contract (2 GB / 2147483648 bytes)', () => {
+      expect(MAX_SURVEY_VIDEO_SIZE_BYTES).toBe(2 * 1024 * 1024 * 1024);
+      expect(MAX_SURVEY_VIDEO_SIZE_BYTES).toBe(2147483648);
+    });
+
+    it('defines maximum image size (25 MB) safe within backend chunk limit', () => {
+      expect(MAX_SURVEY_IMAGE_SIZE_BYTES).toBe(25 * 1024 * 1024);
+      expect(MAX_SURVEY_IMAGE_SIZE_BYTES).toBeLessThan(MAX_BACKEND_CHUNK_BYTES);
+    });
+
+    it('defines maximum companion GPX size (10 MB)', () => {
+      expect(MAX_SURVEY_GPX_SIZE_BYTES).toBe(10 * 1024 * 1024);
+    });
+  });
 });
+

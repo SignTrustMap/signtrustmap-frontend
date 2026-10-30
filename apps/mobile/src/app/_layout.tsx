@@ -93,6 +93,7 @@ function RootNavigation() {
         <Stack.Protected guard={!hasValidSession}>
           <Stack.Screen name="(public)/login" />
           <Stack.Screen name="(public)/register" />
+          <Stack.Screen name="(public)/forgot-password" />
         </Stack.Protected>
         <Stack.Protected guard={hasValidSession}>
           <Stack.Screen name="(authenticated)" />

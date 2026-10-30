@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -250,13 +250,11 @@ export function InspectRevalidateScreen() {
   const isWithinProximity =
     distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
 
-  // Validation rules: Note is required when sign is reported REMOVED
+  // Validation rules: Location and media are required
   const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
-  const isNoteValid = evidenceType !== 'REMOVED' || customNote.trim().length > 0;
   const isSubmitDisabled =
     !selectedMedia ||
     !isLocationValid ||
-    !isNoteValid ||
     isSubmitting ||
     isOpeningGallery;
 
@@ -270,8 +268,6 @@ export function InspectRevalidateScreen() {
     submitButtonLabel = 'Cần vị trí (Đóng dấu GPS thiết bị)';
   } else if (isWithinProximity === false) {
     submitButtonLabel = `Vị trí quá xa (${distanceFromTarget}m > 50m)`;
-  } else if (!isNoteValid) {
-    submitButtonLabel = 'Cần nhập ghi chú khi chọn "Đã gỡ bỏ"';
   }
 
   /**
@@ -552,8 +548,15 @@ export function InspectRevalidateScreen() {
 
       setSubmitSuccess(true);
       setTimeout(() => {
-        handleNavigateBack();
-      }, 1400);
+        router.replace({
+          pathname: '/work/submission-complete',
+          params: {
+            type: 'upload_revalidation',
+            taskId: targetTaskId,
+            signCode,
+          },
+        });
+      }, 1000);
     } catch (err) {
       console.error('[InspectRevalidate] Submission failed:', err);
       setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
@@ -1044,11 +1047,7 @@ export function InspectRevalidateScreen() {
             {/* Labeled input for additional notes */}
             <View style={styles.inputLabelRow}>
               <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú chi tiết</Text>
-              {evidenceType === 'REMOVED' ? (
-                <Text style={styles.requiredTag}>* Bắt buộc khi chọn &quot;Đã gỡ bỏ&quot;</Text>
-              ) : (
-                <Text style={[styles.optionalTag, { color: theme.grey }]}>Không bắt buộc</Text>
-              )}
+              <Text style={[styles.optionalTag, { color: theme.grey }]}>Không bắt buộc</Text>
             </View>
 
             <TextInput
@@ -1073,21 +1072,12 @@ export function InspectRevalidateScreen() {
                 styles.notesInput,
                 {
                   backgroundColor: theme.backgroundElement,
-                  borderColor:
-                    evidenceType === 'REMOVED' && !customNote.trim()
-                      ? '#EF4444'
-                      : theme.border,
+                  borderColor: theme.border,
                   color: theme.text,
                 },
               ]}
               value={customNote}
             />
-
-            {evidenceType === 'REMOVED' && !customNote.trim() ? (
-              <Text style={styles.noteRequiredError}>
-                Vui lòng nhập giải thích lý do biển báo đã bị gỡ bỏ hoặc không còn.
-              </Text>
-            ) : null}
 
             {submitError ? (
               <Text accessibilityRole="alert" style={styles.errorAlertText}>
@@ -1475,12 +1465,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     minHeight: 70,
     textAlignVertical: 'top',
-  },
-  noteRequiredError: {
-    color: '#DC2626',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
   },
   // Alerts & Messages
   errorAlertText: {

@@ -60,6 +60,10 @@ export const LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE =
 export const SESSION_EXPIRED_MESSAGE = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại và thử lại.';
 export const ENTER_MEDIA_DATETIME_MESSAGE =
   'Nhập ngày giờ ghi lại phương tiện, bao gồm cả múi giờ.';
+export const CAPTURE_TIME_FUTURE_MESSAGE =
+  'Thời gian ghi nhận không thể ở tương lai.';
+export const CAPTURE_TIME_TOO_OLD_MESSAGE =
+  'Thời gian ghi nhận không được quá 30 ngày so với hiện tại.';
 export const USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE =
   'Vui lòng sử dụng tệp có dữ liệu GPS hoặc chọn vị trí hiện tại của bạn.';
 export const DRAFT_NO_VIDEO_MESSAGE = 'Bản nháp này không có video hợp lệ. Vui lòng chọn lại tệp.';
@@ -86,6 +90,31 @@ export const CANNOT_OPEN_PHOTO_LIBRARY_MESSAGE = 'Không thể mở thư viện 
 export const SELECT_VALID_GPX_FILE_MESSAGE = 'Vui lòng chọn tệp GPX hợp lệ (.gpx).';
 export const CANNOT_OPEN_DOCUMENT_PICKER_MESSAGE = 'Không thể mở trình chọn tệp. Vui lòng thử lại.';
 export const CANNOT_SAVE_DRAFT_MESSAGE = 'Không thể lưu bản nháp. Vui lòng thử lại.';
+export const VIDEO_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng video vượt quá giới hạn tối đa 2GB. Vui lòng chọn tệp nhỏ hơn.';
+export const IMAGE_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng ảnh vượt quá giới hạn tối đa 25MB. Vui lòng chọn tệp nhỏ hơn.';
+export const GPX_SIZE_EXCEEDED_MESSAGE =
+  'Dung lượng tệp GPX vượt quá giới hạn tối đa 10MB. Vui lòng chọn tệp nhỏ hơn.';
+export const MAX_UPLOAD_FILES_EXCEEDED_MESSAGE = 'Chỉ được chọn tối đa 3 tệp (ảnh hoặc video).';
+export const GPX_NO_VALID_COORDINATES_MESSAGE = 'Tệp GPX không chứa toạ độ hợp lệ.';
+export const VIDEO_NO_GPS_DATA_MESSAGE =
+  'Video không có dữ liệu GPS. Vui lòng tải lên tệp GPX hành trình để tiếp tục.';
+export const MISSING_GPS_FOR_SUBMISSION_MESSAGE = 'Vui lòng bổ sung toạ độ GPS trước khi nộp.';
+export const formatBatchMissingGpsMessage = (count: number) =>
+  `Vui lòng bổ sung toạ độ GPS cho toàn bộ ${count} ảnh trước khi nộp.`;
+export const UNABLE_TO_SUBMIT_SURVEY_MESSAGE = 'Không thể gửi bản ghi khảo sát. Vui lòng thử lại.';
+export const NO_GPS_PRESS_ZOOM_MESSAGE = 'Chưa có tọa độ GPS. Nhấn nút phóng to để chọn vị trí.';
+export const formatLoadedCoordinatesFromGpxMessage = (name: string) =>
+  `Lấy tọa độ từ file: ${name}`;
+export const formatBatchItemMissingGpsMessage = (current: number, total: number) =>
+  `Ảnh hiện tại (${current}/${total}) chưa có toạ độ GPS. Vui lòng lấy vị trí hoặc phóng to bản đồ để chọn.`;
+export const formatBatchRemainingMissingGpsMessage = (remainingCount: number, indices: string) =>
+  `Còn ${remainingCount} ảnh chưa có toạ độ GPS (ảnh ${indices}). Vui lòng chọn ảnh để thiết lập vị trí trước khi gửi.`;
+export const SINGLE_ITEM_MISSING_GPS_WARNING =
+  'Chưa có toạ độ GPS. Vui lòng lấy vị trí hiện tại hoặc phóng to bản đồ để chọn vị trí.';
+export const NOTE_TOO_LONG_MESSAGE = 'Ghi chú không được quá 1000 ký tự.';
+export const INVALID_DATE_FORMAT_MESSAGE = 'Định dạng ngày không hợp lệ.';
 
 // ============================================================================
 // Review & Revalidation Error Messages

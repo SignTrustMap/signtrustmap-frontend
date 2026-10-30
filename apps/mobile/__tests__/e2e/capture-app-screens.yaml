@@ -1,0 +1,62 @@
+appId: com.anonymous.mobile
+---
+# =========================================================================
+# Maestro E2E: Capture App Screens
+# Navigates to Missions, Profile, Catalog, and Credits screens and captures
+# full-resolution screenshots into __tests__/report/screenshots/screens/
+# =========================================================================
+
+- launchApp:
+    clearState: false
+
+# -------------------------------------------------------------------------
+# 1. Missions Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work/missions"
+
+# Wait for missions title to render
+- assertVisible:
+    text: ".*Nhiệm vụ & Thử thách.*|.*Hàng ngày.*"
+
+- waitForAnimationToEnd
+
+- takeScreenshot: __tests__/report/screenshots/screens/01_missions_screen
+
+# -------------------------------------------------------------------------
+# 2. Profile Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://profile"
+
+# Wait for profile screen content to render
+- assertVisible:
+    text: ".*Bộ lọc biển báo.*|.*Bản đồ ngoại tuyến.*|.*Tài xế.*"
+
+- waitForAnimationToEnd
+
+- takeScreenshot: __tests__/report/screenshots/screens/02_profile_screen
+
+# -------------------------------------------------------------------------
+# 3. Traffic Sign Catalog Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://work/sign-catalog"
+
+# Wait for sign catalog header to render
+- assertVisible:
+    text: ".*Tra cứu biển báo.*"
+
+- waitForAnimationToEnd
+
+- takeScreenshot: __tests__/report/screenshots/screens/03_catalog_screen
+
+# -------------------------------------------------------------------------
+# 4. Credits / Wallet Screen
+# -------------------------------------------------------------------------
+- openLink: "mobile://credits"
+
+# Wait for wallet balance card to render
+- assertVisible:
+    text: ".*Số điểm hiện tại.*|.*Hoạt động gần đây.*"
+
+- waitForAnimationToEnd
+
+- takeScreenshot: __tests__/report/screenshots/screens/04_credits_screen

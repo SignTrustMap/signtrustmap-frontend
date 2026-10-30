@@ -137,3 +137,6 @@ AGENTS.md
 *.docx
 /documents
 sample/
+
+#screenshots
+screenshots/

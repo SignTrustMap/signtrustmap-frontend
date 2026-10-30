@@ -1,28 +1,52 @@
-﻿import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, Controller, type FieldErrors } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  parseFlexibleCapturedDate,
+  validateCapturedDate,
+  surveyRecordFormSchema,
+  type SurveyRecordFormData,
+} from '@/feature/upload/schemas/survey-record.schema';
+
+export { parseFlexibleCapturedDate, validateCapturedDate };
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { formatDate } from '@/utils/format-date';
 import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
+  CAPTURE_TIME_FUTURE_MESSAGE,
+  CAPTURE_TIME_TOO_OLD_MESSAGE,
   DRAFT_NO_UPLOADED_MEDIA_MESSAGE,
   DRAFT_NO_VIDEO_MESSAGE,
   ENABLE_LOCATION_SERVICE_MESSAGE,
   ENTER_MEDIA_DATETIME_MESSAGE,
+  formatBatchItemMissingGpsMessage,
+  formatBatchMissingGpsMessage,
+  formatBatchRemainingMissingGpsMessage,
+  formatLoadedCoordinatesFromGpxMessage,
   LIVE_GPS_UNAVAILABLE_MESSAGE,
   LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE,
   LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE,
   LOCATION_NOT_AVAILABLE_IN_BROWSER_MESSAGE,
+  MISSING_GPS_FOR_SUBMISSION_MESSAGE,
+  NO_GPS_PRESS_ZOOM_MESSAGE,
+  SELECT_VALID_GPX_FILE_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
+  SINGLE_ITEM_MISSING_GPS_WARNING,
   UNABLE_TO_GET_LOCATION_FOR_END_POINT_MESSAGE,
   UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE,
+  UNABLE_TO_SUBMIT_SURVEY_MESSAGE,
   USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE,
+  VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
@@ -36,17 +60,37 @@ import {
   useSubmitSurveySubmission,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
-import { readDraftImage, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
+import { readDraftImage, updateDraftCoordinates, useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { readSubmittedStatus } from '@/feature/upload/utils/submission-response';
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/surveySubmissionType';
 import { useTheme } from '@/hooks/use-theme';
+import { LocationPickerModal } from '@/feature/upload/components/location-picker-modal';
 import { AppInput } from '@/components/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
 import { executeChunkedVideoUpload, type UploadProgressInfo } from '@/feature/upload/utils/chunk-upload-manager';
 import { registerZeroCopyDraft, startSmartPollingSync } from '@/feature/upload/utils/crop-sync-manager';
+import {
+  MAX_SURVEY_VIDEO_SIZE_BYTES,
+  getVideoFileSizeBytes,
+} from '@/feature/upload/utils/video-processor';
+
 
 import { getMapLibre } from '@/services/maplibre';
+
+export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoordinate {
+  if (!coord) return false;
+  const [lon, lat] = coord;
+  return (
+    typeof lon === 'number' &&
+    typeof lat === 'number' &&
+    Number.isFinite(lon) &&
+    Number.isFinite(lat) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lon) <= 180 &&
+    !(lat === 0 && lon === 0)
+  );
+}
 
 async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
   if (Platform.OS === 'web') {
@@ -91,12 +135,24 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
   return [position.coords.longitude, position.coords.latitude];
 }
 
+// validation functions are imported from survey-record.schema
+
 export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session } = useSession();
-  const { submissionId, gpxUri, gpxName, startLat, startLon, duration, assetId } = useLocalSearchParams<{
+  const {
+    submissionId,
+    batchSubmissionIds,
+    gpxUri,
+    gpxName,
+    startLat,
+    startLon,
+    duration,
+    assetId,
+  } = useLocalSearchParams<{
     submissionId?: string;
+    batchSubmissionIds?: string;
     gpxUri?: string;
     gpxName?: string;
     startLat?: string;
@@ -104,7 +160,71 @@ export function SurveyRecordDetailsScreen() {
     duration?: string;
     assetId?: string;
   }>();
-  const draftQuery = useGetSurveySubmissionStatus(submissionId);
+
+  const [activeSubmissionId, setActiveSubmissionId] = useState<string | undefined>(submissionId);
+
+  useEffect(() => {
+    if (submissionId && !activeSubmissionId) {
+      setActiveSubmissionId(submissionId);
+    }
+  }, [submissionId, activeSubmissionId]);
+
+  const currentDraftId = activeSubmissionId ?? submissionId;
+
+  const batchIds = useMemo(() => {
+    if (batchSubmissionIds) {
+      const ids = batchSubmissionIds.split(',').map((s) => s.trim()).filter(Boolean);
+      if (ids.length > 0) return ids;
+    }
+    return submissionId ? [submissionId] : [];
+  }, [batchSubmissionIds, submissionId]);
+
+  const currentBatchIndex = useMemo(() => {
+    if (!currentDraftId) return 0;
+    const idx = batchIds.indexOf(currentDraftId);
+    return idx >= 0 ? idx : 0;
+  }, [currentDraftId, batchIds]);
+
+  const [batchDrafts, setBatchDrafts] = useState<{ id: string; uri?: string; fileName?: string }[]>([]);
+  const [batchCoords, setBatchCoords] = useState<Record<string, MapCoordinate | undefined>>({});
+
+  useEffect(() => {
+    if (!session || batchIds.length <= 1) return;
+    let active = true;
+    Promise.all(
+      batchIds.map(async (id) => {
+        const local = await readDraftImage(session.account.id, id);
+        const hasLocalGps =
+          typeof local?.startLon === 'number' &&
+          typeof local?.startLat === 'number' &&
+          isValidCoordinate([local.startLon, local.startLat]);
+        return {
+          id,
+          uri: local?.uri,
+          fileName: local?.fileName,
+          coord: hasLocalGps ? ([local.startLon!, local.startLat!] as MapCoordinate) : undefined,
+        };
+      }),
+    ).then((drafts) => {
+      if (active) {
+        setBatchDrafts(drafts);
+        setBatchCoords((prev) => {
+          const next = { ...prev };
+          drafts.forEach((d) => {
+            if (d.coord && !next[d.id]) {
+              next[d.id] = d.coord;
+            }
+          });
+          return next;
+        });
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [batchIds, session]);
+
+  const draftQuery = useGetSurveySubmissionStatus(currentDraftId);
   const saveDraft = useSaveSurveyDraft();
   const [imageUri, setImageUri] = useState<string>();
   const [imageName, setImageName] = useState<string>();
@@ -112,22 +232,22 @@ export function SurveyRecordDetailsScreen() {
   const [savedGpxUri, setSavedGpxUri] = useState<string>();
   const [savedGpxName, setSavedGpxName] = useState<string>();
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-  const latitude = draftQuery.data?.submission.latitude;
-  const longitude = draftQuery.data?.submission.longitude;
+  const isSubmissionMatchingCurrent = draftQuery.data?.submission?.id === currentDraftId;
+  const currentSubmission = isSubmissionMatchingCurrent ? draftQuery.data?.submission : undefined;
+  const latitude = currentSubmission?.latitude;
+  const longitude = currentSubmission?.longitude;
   const parsedLatitude = latitude != null ? Number(latitude) : Number.NaN;
   const parsedLongitude = longitude != null ? Number(longitude) : Number.NaN;
   const imageCoordinate: MapCoordinate | undefined =
-    Number.isFinite(parsedLatitude) &&
-      Number.isFinite(parsedLongitude) &&
-      Math.abs(parsedLatitude) <= 90 &&
-      Math.abs(parsedLongitude) <= 180
+    isValidCoordinate([parsedLongitude, parsedLatitude])
       ? [parsedLongitude, parsedLatitude]
       : undefined;
 
-  const parsedStartLat = startLat ? Number(startLat) : parsedLatitude;
-  const parsedStartLon = startLon ? Number(startLon) : parsedLongitude;
+  const isInitialDraft = currentDraftId === submissionId;
+  const parsedStartLat = isInitialDraft && startLat ? Number(startLat) : parsedLatitude;
+  const parsedStartLon = isInitialDraft && startLon ? Number(startLon) : parsedLongitude;
   const initialStartCoord: MapCoordinate | undefined =
-    Number.isFinite(parsedStartLat) && Number.isFinite(parsedStartLon)
+    isValidCoordinate([parsedStartLon, parsedStartLat])
       ? [parsedStartLon, parsedStartLat]
       : imageCoordinate;
 
@@ -142,11 +262,61 @@ export function SurveyRecordDetailsScreen() {
   const [isLocatingEnd, setIsLocatingEnd] = useState(false);
   const [isGpxAccordionOpen, setIsGpxAccordionOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | undefined>(undefined);
+  const [gpxCoordinates, setGpxCoordinates] = useState<MapCoordinate[]>([]);
 
   const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate | undefined>(
     initialStartCoord,
   );
   const effectiveStartCoord = startCoordinate ?? selectedCoordinate ?? imageCoordinate;
+
+  useEffect(() => {
+    if (!currentDraftId) return;
+    // CRITICAL: Do NOT sync or save coordinates if the draft hasn't been hydrated for currentDraftId yet!
+    // Stale state from the previous batch item must never leak to this draft.
+    if (hydratedId.current !== currentDraftId) return;
+
+    if (isValidCoordinate(effectiveStartCoord)) {
+      const coordToSave = effectiveStartCoord;
+      setBatchCoords((prev) => {
+        if (
+          prev[currentDraftId]?.[0] === coordToSave[0] &&
+          prev[currentDraftId]?.[1] === coordToSave[1]
+        ) {
+          return prev;
+        }
+        return { ...prev, [currentDraftId]: coordToSave };
+      });
+      if (session) {
+        void updateDraftCoordinates(session.account.id, currentDraftId, {
+          latitude: coordToSave[1],
+          longitude: coordToSave[0],
+        });
+      }
+    } else {
+      setBatchCoords((prev) => {
+        if (prev[currentDraftId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[currentDraftId];
+        return next;
+      });
+    }
+  }, [currentDraftId, effectiveStartCoord, session]);
+
+  const currentItemHasGps = isValidCoordinate(effectiveStartCoord);
+
+  const missingGpsBatchIndices = useMemo(() => {
+    const missing: number[] = [];
+    batchIds.forEach((id, index) => {
+      const coord = id === currentDraftId ? effectiveStartCoord : batchCoords[id];
+      if (!isValidCoordinate(coord)) {
+        missing.push(index);
+      }
+    });
+    return missing;
+  }, [batchIds, currentDraftId, effectiveStartCoord, batchCoords]);
+
+  const allMediaSatisfyConditions = batchIds.length > 0 && missingGpsBatchIndices.length === 0;
+
   const displayCoordinate = effectiveStartCoord;
   const startLocationQuery = useReverseGeocode(
     effectiveStartCoord ? { latitude: effectiveStartCoord[1], longitude: effectiveStartCoord[0] } : null,
@@ -155,8 +325,32 @@ export function SurveyRecordDetailsScreen() {
   const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
     imageCoordinate ? 'IMAGE_EXIF' : undefined,
   );
-  const [capturedAt, setCapturedAt] = useState('');
-  const [note, setNote] = useState('');
+  const {
+    control,
+    handleSubmit: handleFormSubmit,
+    setValue,
+    watch,
+    getValues,
+    reset: resetForm,
+    formState: { errors: formErrors, isValid: isFormValid, isDirty: isFormDirty },
+  } = useForm<SurveyRecordFormData>({
+    resolver: zodResolver(surveyRecordFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      capturedAt: '',
+      note: '',
+    },
+  });
+
+  const capturedAt = watch('capturedAt');
+  const note = watch('note');
+
+  const setCapturedAt = (val: string) => {
+    setValue('capturedAt', val, { shouldValidate: true, shouldDirty: true });
+  };
+  const setNote = (val: string) => {
+    setValue('note', val, { shouldValidate: true, shouldDirty: true });
+  };
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModified, setIsModified] = useState(false);
@@ -172,16 +366,109 @@ export function SurveyRecordDetailsScreen() {
     latitude?: number;
     gpxUri?: string;
   }>();
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
-    imageCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.',
+    imageCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE,
   );
 
-  const remoteGpx = draftQuery.data?.mediaFiles?.find((f) => f.media_type === 'GPX');
+  const handleLocationConfirm = (coord: MapCoordinate) => {
+    setSelectedCoordinate(coord);
+    setStartCoordinate(coord);
+    setCoordinateSource('MANUAL');
+    setIsModified(true);
+    setLocationMessage(undefined);
+    setSubmitError(undefined);
+    setFocusRequestId((prev) => prev + 1);
+    setIsLocationPickerOpen(false);
+    if (currentDraftId && session) {
+      void updateDraftCoordinates(session.account.id, currentDraftId, {
+        latitude: coord[1],
+        longitude: coord[0],
+      });
+    }
+  };
+
+  const handleSelectBatchIndex = async (newIndex: number) => {
+    if (newIndex < 0 || newIndex >= batchIds.length || isSubmitting) return;
+    const targetId = batchIds[newIndex];
+    if (targetId === currentDraftId) return;
+
+    // Auto-save changes on current draft before switching
+    if (currentDraftId && session && (isModified || isFormDirty)) {
+      try {
+        const effectiveStart = startCoordinate ?? selectedCoordinate;
+        const currentVals = getValues();
+        const dateValidation = validateCapturedDate(currentVals.capturedAt);
+        const formattedCapturedAt = dateValidation.isValid && dateValidation.timestamp
+          ? new Date(dateValidation.timestamp).toISOString()
+          : undefined;
+
+        await updateSubmission({
+          submissionId: currentDraftId,
+          request: {
+            note: currentVals.note.trim(),
+            capturedAt: formattedCapturedAt,
+            ...(effectiveStart
+              ? {
+                latitude: effectiveStart[1],
+                longitude: effectiveStart[0],
+                coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
+              }
+              : {}),
+          },
+        });
+        if (effectiveStart) {
+          void updateDraftCoordinates(session.account.id, currentDraftId, {
+            latitude: effectiveStart[1],
+            longitude: effectiveStart[0],
+          });
+        }
+      } catch (err) {
+        console.warn('[Surveyor] Auto-saving changes before batch switch failed:', err);
+      }
+    }
+
+    hydratedId.current = undefined;
+    setIsDraftLoaded(false);
+    setIsModified(false);
+    setSubmitError(undefined);
+    setLocationMessage(undefined);
+
+    // Pre-populate with target draft's known coordinates (if any) or clear stale values
+    const targetCoord = batchCoords[targetId];
+    setStartCoordinate(targetCoord);
+    setSelectedCoordinate(targetCoord);
+    setEndCoordinate(targetCoord ? estimateEndPoint(targetCoord, durationSec) : undefined);
+    setCoordinateSource(targetCoord ? 'IMAGE_EXIF' : undefined);
+    resetForm({ capturedAt: '', note: '' });
+
+    setActiveSubmissionId(targetId);
+  };
+
+  const remoteGpx = draftQuery.data?.mediaFiles?.find(
+    (f: any) => (f.mediaType || f.media_type) === 'GPX',
+  );
+  const remoteGpxUrl = remoteGpx ? (remoteGpx.fileUrl || remoteGpx.file_url) : undefined;
   const activeGpxUri = gpxUri || savedGpxUri;
   const activeGpxName = gpxName || savedGpxName;
   const displayGpxName = activeGpxName
     || (activeGpxUri ? activeGpxUri.split('/').pop()?.split('?')[0] : undefined)
-    || (remoteGpx ? (remoteGpx.file_url?.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
+    || (remoteGpxUrl ? (remoteGpxUrl.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
+
+  const handleOpenRouteMap = () => {
+    router.push({
+      pathname: '/work/new-survey/route-map',
+      params: {
+        gpxUri: activeGpxUri,
+        startLat: effectiveStartCoord ? String(effectiveStartCoord[1]) : undefined,
+        startLon: effectiveStartCoord ? String(effectiveStartCoord[0]) : undefined,
+        endLat: endCoordinate ? String(endCoordinate[1]) : undefined,
+        endLon: endCoordinate ? String(endCoordinate[0]) : undefined,
+        title: savedGpxName ?? gpxName ?? 'Lộ trình khảo sát',
+        duration: String(durationSec),
+      },
+    });
+  };
 
   const isDirty = isModified
     || (Boolean(initialBaseline) && (
@@ -196,6 +483,29 @@ export function SurveyRecordDetailsScreen() {
     submissionStatus === 'DRAFT' ||
     submissionStatus === 'PENDING_CORRECTION' ||
     submissionStatus === 'FAILED';
+
+  const captureDateValidation = useMemo(
+    () => validateCapturedDate(capturedAt),
+    [capturedAt],
+  );
+
+  const captureDateError =
+    formErrors.capturedAt?.message ??
+    (!captureDateValidation.isValid && capturedAt.trim().length > 0
+      ? captureDateValidation.error
+      : undefined);
+
+  const canSubmit = Boolean(
+    isDraftLoaded &&
+    isEditable &&
+    !isSubmitting &&
+    !isLocating &&
+    !isLocatingEnd &&
+    currentItemHasGps &&
+    allMediaSatisfyConditions &&
+    captureDateValidation.isValid &&
+    isFormValid,
+  );
 
   // GPX fields are only relevant for video-based (VIDEO_GPX) submissions.
   // For plain image submissions we hide the GPX section entirely.
@@ -225,7 +535,7 @@ export function SurveyRecordDetailsScreen() {
         const file = result.assets[0];
         const name = file.name ?? '';
         if (!name.toLowerCase().endsWith('.gpx')) {
-          setSubmitError('Vui lòng chọn một tệp GPX hợp lệ (.gpx).');
+          setSubmitError(SELECT_VALID_GPX_FILE_MESSAGE);
           return;
         }
         setSavedGpxUri(file.uri);
@@ -234,6 +544,9 @@ export function SurveyRecordDetailsScreen() {
         setSubmitError(undefined);
 
         const gpxData = await extractGpxGpsData(file.uri);
+        if (gpxData?.coordinates?.length) {
+          setGpxCoordinates(gpxData.coordinates);
+        }
         if (gpxData?.firstPoint) {
           const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
           setSelectedCoordinate(coord);
@@ -244,15 +557,15 @@ export function SurveyRecordDetailsScreen() {
             setEndCoordinate(estimateEndPoint(coord, durationSec));
           }
           setCoordinateSource('GPX_FILE');
-          setLocationMessage(`Coordinates loaded from ${name}`);
+          setLocationMessage(formatLoadedCoordinatesFromGpxMessage(name));
           setFocusRequestId((r) => r + 1);
           if (gpxData.startTime && !capturedAt) {
-            setCapturedAt(gpxData.startTime);
+            setCapturedAt(formatDate(gpxData.startTime));
           }
         }
       }
     } catch (err) {
-      console.warn('[Surveyor] Unable to pick GPX in details screen:', err);
+      console.warn('[Surveyor] Không thể lấy tọa đồ ở màn hình khảo sát:', err);
     }
   };
 
@@ -260,6 +573,9 @@ export function SurveyRecordDetailsScreen() {
     if (!gpxUri) return;
     let active = true;
     void extractGpxGpsData(gpxUri).then((gpxData) => {
+      if (active && gpxData?.coordinates?.length) {
+        setGpxCoordinates(gpxData.coordinates);
+      }
       if (active && gpxData?.firstPoint) {
         const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
         setSelectedCoordinate(coord);
@@ -270,10 +586,10 @@ export function SurveyRecordDetailsScreen() {
           setEndCoordinate(estimateEndPoint(coord, durationSec));
         }
         setCoordinateSource('GPX_FILE');
-        setLocationMessage(gpxName ? `Coordinates loaded from ${gpxName}` : undefined);
+        setLocationMessage(gpxName ? formatLoadedCoordinatesFromGpxMessage(gpxName) : undefined);
         setFocusRequestId((r) => r + 1);
         if (gpxData.startTime) {
-          setCapturedAt((prev) => prev || gpxData.startTime || '');
+          setCapturedAt(formatDate(gpxData.startTime));
         }
       }
     });
@@ -282,33 +598,52 @@ export function SurveyRecordDetailsScreen() {
 
   useEffect(() => {
     const draft = draftQuery.data?.submission;
-    if (!draft || !session || hydratedId.current === draft.id) return;
+    if (!draft || !session || draft.id !== currentDraftId || hydratedId.current === draft.id) return;
     let active = true;
     void readDraftImage(session.account.id, draft.id).then(async (local) => {
       if (!active) return;
       setIsDraftLoaded(false);
-      setCapturedAt(draft.capturedAt ?? '');
-      setNote(draft.note ?? '');
-      const hasCoordinate = draft.latitude != null && draft.longitude != null;
+      const formattedCapturedTime = draft.capturedAt
+        ? formatDate(draft.capturedAt)
+        : formatDate(new Date());
+      resetForm({
+        capturedAt: formattedCapturedTime,
+        note: draft.note ?? '',
+      });
+      const lat = draft.latitude ?? local?.startLat;
+      const lon = draft.longitude ?? local?.startLon;
+      const hasCoordinate = lat != null && lon != null && isValidCoordinate([lon, lat]);
       if (hasCoordinate) {
-        const coord: MapCoordinate = [draft.longitude!, draft.latitude!];
+        const coord: MapCoordinate = [lon!, lat!];
         setSelectedCoordinate(coord);
-        setStartCoordinate((prev: MapCoordinate | undefined) => prev ?? coord);
-        setEndCoordinate((prev: MapCoordinate | undefined) => prev ?? estimateEndPoint(coord, durationSec));
+        setStartCoordinate(coord);
+        setEndCoordinate(estimateEndPoint(coord, durationSec));
+      } else {
+        setSelectedCoordinate(undefined);
+        setStartCoordinate(undefined);
+        setEndCoordinate(undefined);
       }
-      setCoordinateSource(hasCoordinate ? draft.coordinateSource : undefined);
-      setLocationMessage(hasCoordinate ? undefined : 'Location metadata is unavailable. Use current location before submitting.');
-      const remote = draftQuery.data?.mediaFiles?.find((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO')?.file_url;
-      setImageUri(local?.uri ?? (remote && /^https?:\/\//i.test(remote) ? remote : undefined));
+      setCoordinateSource(hasCoordinate ? (draft.coordinateSource ?? 'IMAGE_EXIF') : undefined);
+      setLocationMessage(hasCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE);
+      const remoteItem = draftQuery.data?.mediaFiles?.find((file: any) => {
+        const type = (file.mediaType || file.media_type || '').toUpperCase();
+        return type === 'IMAGE' || type === 'VIDEO';
+      });
+      const remoteKey = remoteItem ? (remoteItem.fileUrl || remoteItem.file_url) : undefined;
+      const remoteResolved = remoteKey ? resolveS3Url(remoteKey) : undefined;
+      setImageUri(local?.uri ?? remoteResolved);
       setImageName(local?.fileName);
       setImageMimeType(local?.mimeType);
       if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
       if (local?.gpxName) setSavedGpxName(local.gpxName);
 
-      const activeGpx = gpxUri || local?.gpxUri;
+      const activeGpx = (draft.id === submissionId ? gpxUri : undefined) || local?.gpxUri;
       if (activeGpx) {
         try {
           const gpxData = await extractGpxGpsData(activeGpx);
+          if (active && gpxData?.coordinates?.length) {
+            setGpxCoordinates(gpxData.coordinates);
+          }
           if (gpxData?.firstPoint && active) {
             const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
             setSelectedCoordinate(coord);
@@ -322,7 +657,7 @@ export function SurveyRecordDetailsScreen() {
             setLocationMessage(undefined);
             setFocusRequestId((r) => r + 1);
             if (gpxData.startTime && !draft.capturedAt) {
-              setCapturedAt(gpxData.startTime);
+              setCapturedAt(formatDate(gpxData.startTime));
             }
           }
         } catch (err) {
@@ -333,10 +668,10 @@ export function SurveyRecordDetailsScreen() {
       hydratedId.current = draft.id;
       setInitialBaseline({
         note: draft.note ?? '',
-        capturedAt: draft.capturedAt ?? '',
+        capturedAt: formattedCapturedTime,
         longitude: hasCoordinate ? draft.longitude! : undefined,
         latitude: hasCoordinate ? draft.latitude! : undefined,
-        gpxUri: local?.gpxUri ?? gpxUri,
+        gpxUri: local?.gpxUri ?? (draft.id === submissionId ? gpxUri : undefined),
       });
       setIsDraftLoaded(true);
       setIsModified(false);
@@ -347,7 +682,7 @@ export function SurveyRecordDetailsScreen() {
       }
     });
     return () => { active = false; };
-  }, [draftQuery.data, durationSec, gpxUri, session]);
+  }, [draftQuery.data, durationSec, gpxUri, session, currentDraftId, submissionId]);
 
   const handleUseCurrentLocation = async () => {
     if (isLocating || submissionInProgress.current) return;
@@ -392,9 +727,9 @@ export function SurveyRecordDetailsScreen() {
     }
   };
 
-  const handleSubmit = async () => {
+  const onValidSubmit = async (formData: SurveyRecordFormData) => {
     if (submissionInProgress.current || isLocating || isLocatingEnd) return;
-    if (!submissionId || !isDraftLoaded || !isEditable) {
+    if (!currentDraftId || !isDraftLoaded || !isEditable) {
       setSubmitError(LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE);
       return;
     }
@@ -402,15 +737,25 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError(SESSION_EXPIRED_MESSAGE);
       return;
     }
-    const captureTimestamp = Date.parse(capturedAt.trim());
-    if (!Number.isFinite(captureTimestamp)) {
-      setSubmitError(ENTER_MEDIA_DATETIME_MESSAGE);
+    const dateValidation = validateCapturedDate(formData.capturedAt);
+    if (!dateValidation.isValid) {
+      setSubmitError(dateValidation.error ?? ENTER_MEDIA_DATETIME_MESSAGE);
+      return;
+    }
+    const captureTimestamp = dateValidation.timestamp!;
+
+    const effectiveStart = startCoordinate ?? selectedCoordinate;
+    if (!effectiveStart || !isValidCoordinate(effectiveStart)) {
+      setSubmitError(USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE);
       return;
     }
 
-    const effectiveStart = startCoordinate ?? selectedCoordinate;
-    if (!effectiveStart) {
-      setSubmitError(USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE);
+    if (!allMediaSatisfyConditions) {
+      setSubmitError(
+        batchIds.length > 1
+          ? formatBatchMissingGpsMessage(batchIds.length)
+          : MISSING_GPS_FOR_SUBMISSION_MESSAGE,
+      );
       return;
     }
 
@@ -424,7 +769,7 @@ export function SurveyRecordDetailsScreen() {
       const formattedCapturedAt = new Date(captureTimestamp).toISOString();
 
       console.log('[Surveyor] handleSubmit started:', {
-        submissionId,
+        submissionId: currentDraftId,
         isVideoDraft,
         imageUri,
         durationSec,
@@ -438,12 +783,18 @@ export function SurveyRecordDetailsScreen() {
           throw new Error(DRAFT_NO_VIDEO_MESSAGE);
         }
 
+        const videoSize = await getVideoFileSizeBytes(imageUri).catch(() => 0);
+        if (videoSize > MAX_SURVEY_VIDEO_SIZE_BYTES) {
+          throw new Error(VIDEO_SIZE_EXCEEDED_MESSAGE);
+        }
+
         const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
+
 
         console.log('[Surveyor] Starting executeChunkedVideoUpload...');
         // 1. Chunked video upload (1-minute temporal chunks down-res 640p + companion GPX)
         await executeChunkedVideoUpload({
-          submissionId,
+          submissionId: currentDraftId,
           videoUri: imageUri,
           videoFileName: imageName,
           durationSeconds: durationSec,
@@ -461,15 +812,15 @@ export function SurveyRecordDetailsScreen() {
         console.log('[Surveyor] executeChunkedVideoUpload finished.');
 
         // 2. Register zero-copy draft for high-res 4K RoI cropping
-        await registerZeroCopyDraft(submissionId, imageUri, assetId);
+        await registerZeroCopyDraft(currentDraftId, imageUri, assetId);
 
         // 3. Start Layer 1 Foreground Smart Polling
-        startSmartPollingSync(submissionId, imageUri, session.accessToken);
+        startSmartPollingSync(currentDraftId, imageUri, session.accessToken);
 
         // 4. Update submission metadata with GPX_FILE and coordinates
         console.log('[Surveyor] Updating submission metadata with GPX_FILE coordinates...');
         await updateSubmission({
-          submissionId,
+          submissionId: currentDraftId,
           request: {
             capturedAt: formattedCapturedAt,
             coordinateSource: 'GPX_FILE',
@@ -490,39 +841,69 @@ export function SurveyRecordDetailsScreen() {
           note: note.trim(),
         };
         const { submissionType: _submissionType, ...updates } = request;
-        await updateSubmission({ submissionId, request: updates });
+        await updateSubmission({ submissionId: currentDraftId, request: updates });
 
-        const mediaFiles = draftQuery.data?.mediaFiles ?? [];
-        const sessions = draftQuery.data?.sessions ?? [];
-        const hasMainMedia = mediaFiles.some((file) => file.media_type === 'IMAGE')
-          || sessions.some((upload) => upload.media_type === 'IMAGE' && upload.status === 'COMPLETED');
+        const mediaFiles = (draftQuery.data?.mediaFiles ?? []) as any[];
+        const sessions = (draftQuery.data?.sessions ?? []) as any[];
+        const hasMainMedia = mediaFiles.some((file) => {
+          const type = (file.mediaType || file.media_type || '').toUpperCase();
+          return type === 'IMAGE';
+        })
+          || sessions.some((upload) => {
+            const type = (upload.mediaType || upload.media_type || '').toUpperCase();
+            return type === 'IMAGE' && upload.status === 'COMPLETED';
+          });
 
         if (!hasMainMedia) {
           if (!imageUri) throw new Error(DRAFT_NO_UPLOADED_MEDIA_MESSAGE);
           await saveDraft(
             { uri: imageUri, fileName: imageName, mimeType: imageMimeType, type: 'image' },
             request,
-            submissionId,
+            currentDraftId,
           );
+        }
+
+        // If batch has other items, ensure their coordinates are updated on backend
+        if (batchIds.length > 1) {
+          for (const otherId of batchIds) {
+            if (otherId === currentDraftId) continue;
+            const otherCoord = batchCoords[otherId];
+            if (otherCoord) {
+              await updateSubmission({
+                submissionId: otherId,
+                request: {
+                  latitude: otherCoord[1],
+                  longitude: otherCoord[0],
+                  coordinateSource: 'IMAGE_EXIF',
+                },
+              });
+            }
+          }
         }
       }
 
-      // 5. Submit to finalize
-      console.log('[Surveyor] Finalizing submission via submitSubmission...');
-      const submitted = await submitSubmission({ submissionId });
-      const submissionStatus = readSubmittedStatus(submitted);
-      console.log('[Surveyor] Submission finalized:', { submissionId, submissionStatus });
+      // 5. Submit to finalize all drafts in batch
+      console.log('[Surveyor] Finalizing submission(s) via submitSubmission...');
+      let lastStatus = 'QUEUED';
+      for (const id of batchIds) {
+        const submitted = await submitSubmission({ submissionId: id });
+        lastStatus = readSubmittedStatus(submitted) ?? lastStatus;
+      }
+      console.log('[Surveyor] Submissions finalized:', { batchCount: batchIds.length, lastStatus });
+
       router.replace({
-        pathname: '/work/survey-finish',
+        pathname: '/work/submission-complete',
         params: {
-          submissionId,
-          submissionStatus,
+          type: 'upload_submission',
+          submissionId: currentDraftId,
+          batchSubmissionIds: batchIds.join(','),
+          submissionStatus: lastStatus,
         },
       });
     } catch (error) {
       console.error('[Surveyor] handleSubmit ERROR:', error);
       setSubmitError(
-        error instanceof Error ? error.message : 'Không thể gửi bản ghi khảo sát. Vui lòng thử lại.',
+        error instanceof Error ? error.message : UNABLE_TO_SUBMIT_SURVEY_MESSAGE,
       );
       setIsModified(true);
     } finally {
@@ -531,6 +912,16 @@ export function SurveyRecordDetailsScreen() {
       setUploadProgress(undefined);
     }
   };
+
+  const onInvalidSubmit = (errors: FieldErrors<SurveyRecordFormData>) => {
+    if (errors.capturedAt?.message) {
+      setSubmitError(errors.capturedAt.message);
+    } else if (errors.note?.message) {
+      setSubmitError(errors.note.message);
+    }
+  };
+
+  const handleSubmit = handleFormSubmit(onValidSubmit, onInvalidSubmit);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -561,6 +952,142 @@ export function SurveyRecordDetailsScreen() {
 
           {draftQuery.isPending ? <Text style={{ color: theme.text }}>Đang tải bản nháp...</Text> : null}
           {draftQuery.isError ? <AppButton label="Thử lại tải bản nháp" onPress={() => { void draftQuery.refetch(); }} /> : null}
+
+          {batchIds.length > 1 ? (
+            <View
+              style={[
+                styles.batchCard,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.batchHeaderRow}>
+                <View style={styles.batchTitleWrap}>
+                  <MaterialCommunityIcons name="image-multiple" size={18} color={theme.primary} />
+                  <Text style={[styles.batchTitle, { color: theme.text }]}>
+                    Bộ ảnh ({currentBatchIndex + 1}/{batchIds.length})
+                  </Text>
+                </View>
+                <View style={styles.batchNavButtons}>
+                  <Pressable
+                    accessibilityLabel="Ảnh trước"
+                    disabled={currentBatchIndex <= 0 || isSubmitting}
+                    onPress={() => void handleSelectBatchIndex(currentBatchIndex - 1)}
+                    style={[
+                      styles.batchNavBtn,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                        opacity: currentBatchIndex <= 0 || isSubmitting ? 0.4 : 1,
+                      },
+                    ]}
+                  >
+                    <SymbolView
+                      fallback={<Text style={{ color: theme.text, fontSize: 14 }}>{'<'}</Text>}
+                      name={{ android: 'chevron_left', ios: 'chevron.left', web: 'chevron_left' }}
+                      size={16}
+                      tintColor={theme.text}
+                    />
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Ảnh kế tiếp"
+                    disabled={currentBatchIndex >= batchIds.length - 1 || isSubmitting}
+                    onPress={() => void handleSelectBatchIndex(currentBatchIndex + 1)}
+                    style={[
+                      styles.batchNavBtn,
+                      {
+                        backgroundColor: theme.background,
+                        borderColor: theme.border,
+                        opacity: currentBatchIndex >= batchIds.length - 1 || isSubmitting ? 0.4 : 1,
+                      },
+                    ]}
+                  >
+                    <SymbolView
+                      fallback={<Text style={{ color: theme.text, fontSize: 14 }}>{'>'}</Text>}
+                      name={{ android: 'chevron_right', ios: 'chevron.right', web: 'chevron_right' }}
+                      size={16}
+                      tintColor={theme.text}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.batchThumbnailScroll}
+              >
+                {batchIds.map((id, index) => {
+                  const isSelected = index === currentBatchIndex;
+                  const itemDraft = batchDrafts.find((d) => d.id === id);
+                  const thumbUri = itemDraft?.uri || (isSelected ? imageUri : undefined);
+                  const itemCoord = id === currentDraftId ? effectiveStartCoord : batchCoords[id];
+                  const hasGps = isValidCoordinate(itemCoord);
+
+                  return (
+                    <Pressable
+                      key={id}
+                      accessibilityLabel={`Chọn ảnh ${index + 1}`}
+                      disabled={isSubmitting}
+                      onPress={() => void handleSelectBatchIndex(index)}
+                      style={[
+                        styles.batchThumbWrap,
+                        {
+                          borderColor: isSelected ? theme.primary : theme.border,
+                          borderWidth: isSelected ? 2 : 1,
+                          backgroundColor: theme.background,
+                        },
+                      ]}
+                    >
+                      {thumbUri ? (
+                        <Image
+                          contentFit="cover"
+                          source={{ uri: thumbUri }}
+                          style={styles.batchThumbImage}
+                        />
+                      ) : (
+                        <View style={styles.batchThumbPlaceholder}>
+                          <MaterialCommunityIcons
+                            name="image"
+                            size={18}
+                            color={isSelected ? theme.primary : theme.placeholder}
+                          />
+                        </View>
+                      )}
+                      {/* GPS status chip on top right of thumbnail */}
+                      <View
+                        style={[
+                          styles.batchThumbGpsStatus,
+                          {
+                            backgroundColor: hasGps ? '#10B981' : '#F59E0B',
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={hasGps ? 'check' : 'alert'}
+                          size={10}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <View
+                        style={[
+                          styles.batchThumbBadge,
+                          {
+                            backgroundColor: isSelected ? theme.primary : 'rgba(0,0,0,0.6)',
+                          },
+                        ]}
+                      >
+                        <Text style={styles.batchThumbBadgeText}>{index + 1}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <View
             accessibilityLabel={imageUri ? 'Phương tiện khảo sát đã chọn' : 'Chưa chọn phương tiện khảo sát'}
             style={[
@@ -601,22 +1128,31 @@ export function SurveyRecordDetailsScreen() {
             )}
           </View>
 
-          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file) => file.media_type === 'IMAGE' || file.media_type === 'VIDEO') && !imageUri ? (
-            <AppButton label="Chọn phương tiện bản nháp" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: submissionId } })} />
+          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file: any) => {
+            const type = (file.mediaType || file.media_type || '').toUpperCase();
+            return type === 'IMAGE' || type === 'VIDEO';
+          }) && !imageUri ? (
+            <AppButton label="Chọn phương tiện bản nháp" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: currentDraftId } })} />
           ) : null}
           <View style={styles.section}>
-            <AppInput
-              label="Thời gian ghi nhận"
-              accessibilityLabel="Thời gian ghi nhận phương tiện kèm múi giờ"
-              placeholder="YYYY-MM-DDTHH:mm:ss+07:00"
-              value={capturedAt}
-              onChangeText={(text) => {
-                setCapturedAt(text);
-                setIsModified(true);
-                setSubmitError(undefined);
-              }}
-              autoCapitalize="none"
-              editable={!isSubmitting}
+            <Controller
+              control={control}
+              name="capturedAt"
+              render={({ field: { onChange, value } }) => (
+                <AppInput
+                  label="Thời gian ghi nhận (dd/mm/yyyy)"
+                  accessibilityLabel="Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm"
+                  placeholder="DD/MM/YYYY"
+                  value={value}
+                  onChangeText={(text) => {
+                    onChange(text);
+                    setSubmitError(undefined);
+                  }}
+                  autoCapitalize="none"
+                  editable={!isSubmitting}
+                  error={captureDateError}
+                />
+              )}
             />
           </View>
 
@@ -687,22 +1223,7 @@ export function SurveyRecordDetailsScreen() {
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
                     Điểm kết thúc (D)
                   </Text>
-                  <AppButton
-                    accessibilityLabel="Sử dụng vị trí hiện tại cho điểm kết thúc"
-                    disabled={isLocatingEnd || isSubmitting}
-                    onPress={handleUseCurrentLocationForEnd}
-                    variant="ghost"
-                    style={styles.locationSmallButton}
-                  >
-                    <SymbolView
-                      name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                      size={14}
-                      tintColor={theme.primary}
-                    />
-                    <Text style={[styles.locationSmallButtonText, { color: theme.primary }]}>
-                      {isLocatingEnd ? 'Đang định vị...' : 'Lấy vị trí'}
-                    </Text>
-                  </AppButton>
+
                 </View>
                 <AppInput
                   label="Vị trí kết thúc (vĩ độ, kinh độ)"
@@ -878,6 +1399,7 @@ export function SurveyRecordDetailsScreen() {
                     focusCoordinate={effectiveStartCoord}
                     focusRequestId={focusRequestId}
                     routeStart={!isImageSubmission ? effectiveStartCoord : undefined}
+                    isCustomStart={!isImageSubmission}
                     destination={
                       !isImageSubmission && endCoordinate
                         ? {
@@ -891,15 +1413,31 @@ export function SurveyRecordDetailsScreen() {
                     }
                     routeCoordinates={
                       !isImageSubmission && effectiveStartCoord && endCoordinate
-                        ? [effectiveStartCoord, endCoordinate]
+                        ? (gpxCoordinates.length > 0 ? gpxCoordinates : [effectiveStartCoord, endCoordinate])
                         : undefined
                     }
                     showCurrentLocation
                     isNavigatingFeature
                   />
+                  {!isImageSubmission ? (
+                    <Pressable
+                      accessibilityLabel="Mở toàn màn hình xem lộ trình"
+                      onPress={handleOpenRouteMap}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : null}
                 </View>
               ) : (
-                <View style={styles.mapEmptyState}>
+                <Pressable
+                  onPress={() => {
+                    if (!isImageSubmission && (activeGpxUri || effectiveStartCoord)) {
+                      handleOpenRouteMap();
+                    } else {
+                      setIsLocationPickerOpen(true);
+                    }
+                  }}
+                  style={styles.mapEmptyState}
+                >
                   <SymbolView
                     fallback={
                       <Text style={[styles.pinFallback, { color: theme.placeholder }]}>PIN</Text>
@@ -909,12 +1447,19 @@ export function SurveyRecordDetailsScreen() {
                     tintColor={theme.placeholder}
                   />
                   <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
-                    Không tìm thấy tọa độ GPS trong tệp này
+                    Chưa có tọa độ GPS. Nhấn nút phóng to để chọn vị trí.
                   </Text>
-                </View>
+                </Pressable>
               )}
               <AppButton
                 accessibilityLabel="Phóng to bản đồ xem trước"
+                onPress={() => {
+                  if (!isImageSubmission && (activeGpxUri || effectiveStartCoord)) {
+                    handleOpenRouteMap();
+                  } else {
+                    setIsLocationPickerOpen(true);
+                  }
+                }}
                 style={[
                   styles.mapZoomButton,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -924,13 +1469,6 @@ export function SurveyRecordDetailsScreen() {
                 <AntDesign name="expand" size={20} color={theme.primary} />
               </AppButton>
             </View>
-            {effectiveStartCoord ? (
-              <Text style={[styles.coordinateText, { color: theme.textSecondary }]}>
-                {!isImageSubmission && endCoordinate
-                  ? `S: ${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)} → D: ${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
-                  : `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`}
-              </Text>
-            ) : null}
             {locationMessage ? (
               <Text
                 accessibilityRole="alert"
@@ -942,49 +1480,77 @@ export function SurveyRecordDetailsScreen() {
           </View>
 
           <View style={styles.section}>
-            <AppInput
-              label={'Ghi chú'}
-              value={note}
-              onChangeText={(text) => {
-                setNote(text);
-                setIsModified(true);
-                setSubmitError(undefined);
-              }}
-              maxLength={2000}
-              editable={!isSubmitting}
-              accessibilityLabel="Ghi chú khảo sát"
-              multiline
-              placeholder="Nhập thông tin chi tiết bổ sung..."
-              placeholderTextColor={theme.placeholder}
-              style={[
-                styles.noteInput,
-                {
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                  color: theme.text,
-                },
-              ]}
-              textAlignVertical="top"
+            <Controller
+              control={control}
+              name="note"
+              render={({ field: { onChange, value } }) => (
+                <AppInput
+                  label={'Ghi chú'}
+                  value={value}
+                  onChangeText={(text) => {
+                    onChange(text);
+                    setSubmitError(undefined);
+                  }}
+                  maxLength={2000}
+                  editable={!isSubmitting}
+                  accessibilityLabel="Ghi chú khảo sát"
+                  multiline
+                  placeholder="Nhập thông tin chi tiết bổ sung..."
+                  placeholderTextColor={theme.placeholder}
+                  style={[
+                    styles.noteInput,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
+                  ]}
+                  textAlignVertical="top"
+                  error={formErrors.note?.message}
+                />
+              )}
             />
           </View>
 
+          {/* Warning banner when media lacks GPS */}
+          {!allMediaSatisfyConditions ? (
+            <View
+              style={[
+                styles.gpsWarningCard,
+                {
+                  backgroundColor: '#FEF3C7',
+                  borderColor: '#F59E0B',
+                },
+              ]}
+            >
+              <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#D97706" />
+              <Text style={[styles.gpsWarningText, { color: '#92400E' }]}>
+                {batchIds.length > 1
+                  ? missingGpsBatchIndices.includes(currentBatchIndex)
+                    ? formatBatchItemMissingGpsMessage(currentBatchIndex + 1, batchIds.length)
+                    : formatBatchRemainingMissingGpsMessage(
+                        missingGpsBatchIndices.length,
+                        missingGpsBatchIndices.map((i) => i + 1).join(', '),
+                      )
+                  : SINGLE_ITEM_MISSING_GPS_WARNING}
+              </Text>
+            </View>
+          ) : null}
           <AppButton
-            accessibilityLabel="Gửi khảo sát khác"
-            disabled={isSubmitting}
-            label="Gửi khảo sát khác"
-            onPress={() => router.push('/work/new-survey')}
-            style={[
-              styles.secondarySubmitButton,
-              { borderColor: theme.border, backgroundColor: theme.backgroundElement },
-            ]}
-            variant="surface"
-          />
-
-          <AppButton
-            disabled={isSubmitting || isLocating || isLocatingEnd || !isDraftLoaded || !isEditable}
-            label={isSubmitting ? 'Đang gửi...' : 'Gửi hồ sơ'}
+            disabled={!canSubmit}
+            label={
+              isSubmitting
+                ? 'Đang gửi...'
+                : batchIds.length > 1
+                  ? !allMediaSatisfyConditions
+                    ? `Chưa đủ toạ độ GPS (${batchIds.length - missingGpsBatchIndices.length}/${batchIds.length})`
+                    : `Gửi tất cả hồ sơ (${batchIds.length} ảnh)`
+                  : !currentItemHasGps
+                    ? 'Chưa có toạ độ GPS'
+                    : 'Gửi hồ sơ'
+            }
             onPress={handleSubmit}
-            style={styles.submitButton}
+            style={[styles.submitButton, !canSubmit ? { opacity: 0.55 } : null]}
           />
           {submitError ? (
             <Text accessibilityRole="alert" style={styles.submitError}>
@@ -1026,6 +1592,14 @@ export function SurveyRecordDetailsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Full-Screen Location Picker Modal */}
+      <LocationPickerModal
+        initialCoordinate={effectiveStartCoord}
+        onClose={() => setIsLocationPickerOpen(false)}
+        onConfirm={handleLocationConfirm}
+        visible={isLocationPickerOpen}
+      />
     </View>
   );
 }
@@ -1348,5 +1922,113 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
+  },
+  batchCard: {
+    borderWidth: 1,
+    borderRadius: Rounded.lg,
+    padding: Spacing.two,
+    marginBottom: Spacing.three,
+    gap: Spacing.two,
+  },
+  batchHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  batchTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  batchTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  batchNavButtons: {
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  batchNavBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: Rounded.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchThumbnailScroll: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingVertical: 2,
+  },
+  batchThumbWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: Rounded.md,
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  batchThumbPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  batchThumbBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  batchThumbBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  batchThumbGpsStatus: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  gpsWarningCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderRadius: Rounded.md,
+    padding: Spacing.two,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  gpsWarningText: {
+    flex: 1,
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  captureTimeErrorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 2,
+    fontWeight: '500',
   },
 });

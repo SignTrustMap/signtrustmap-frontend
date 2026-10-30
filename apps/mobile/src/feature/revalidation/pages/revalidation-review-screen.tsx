@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,6 +37,7 @@ import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
+import { useRevalidationWorkflow } from '../context/revalidation-workflow-provider';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
 
@@ -399,18 +400,20 @@ export function RevalidationReviewScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
-  const { data: queueResponse, isLoading } = useGetRevalidationEvidenceQueue({ page: 1, pageSize: 30 });
-  const voteMutation = useVoteOnRevalidationEvidence();
-
-  const queryClient = useQueryClient();
-  const invalidateWalletAndStats = useInvalidateWalletAndStats();
-
-  // Local state for queue manipulation and review progress
-  const [items, setItems] = useState<RevalidationQueueEvidenceItem[]>([]);
-  const [history, setHistory] = useState<
-    Array<{ item: RevalidationQueueEvidenceItem; action: RevalidationReviewAction; note?: string }>
-  >([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const workflow = useRevalidationWorkflow();
+  const {
+    queueItems: items,
+    reviewHistory: history,
+    currentItem,
+    nextItem,
+    totalCount,
+    reviewPosition,
+    progressPercent,
+    counts,
+    handleVote: workflowVote,
+    finishReviews: workflowFinish,
+    isLoading,
+  } = workflow;
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -422,40 +425,19 @@ export function RevalidationReviewScreen() {
   const [isCatalogBrowserOpen, setIsCatalogBrowserOpen] = useState(false);
   const [toast, setToast] = useState<{ id: number; message: string; tone: 'default' | 'success' }>();
 
-  // Synchronize incoming queue items
+  // If reviews completed, automatically navigate to Recheck voted evidence screen
   useEffect(() => {
-    if (queueResponse?.items && items.length === 0 && history.length === 0) {
-      setItems(queueResponse.items);
-      setTotalCount(queueResponse.total || queueResponse.items.length);
+    if (!currentItem && history.length > 0 && !isLoading) {
+      router.replace('/work/revalidation-summary');
     }
-  }, [queueResponse, items.length, history.length]);
-
-  const currentItem = items[0];
-  const nextItem = items[1];
-
-  const reviewPosition = Math.min(history.length + (currentItem ? 1 : 0), Math.max(totalCount, 1));
-  const progressPercent = Math.min(100, (reviewPosition / Math.max(totalCount, 1)) * 100);
-
-  const counts = useMemo(() => {
-    return history.reduce<Record<RevalidationReviewAction, number>>(
-      (res, rev) => ({ ...res, [rev.action]: (res[rev.action] || 0) + 1 }),
-      { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
-    );
-  }, [history]);
+  }, [currentItem, history.length, isLoading, router]);
 
   // ---------------------------------------------------------------------------
-  // Action Handler: immediately calls vote API upon swipe or action confirmation
+  // Action Handler: calls workflow vote API upon swipe or action confirmation
   // ---------------------------------------------------------------------------
   const handleVote = useCallback(
-    (action: RevalidationReviewAction, note?: string, suggestedSignTypeId?: number) => {
+    async (action: RevalidationReviewAction, note?: string, suggestedSignTypeId?: number) => {
       if (!currentItem) return;
-
-      const itemToVote = currentItem;
-
-      // 1. Optimistically advance queue and store in history for summary metrics
-      setItems((prev) => prev.slice(1));
-      setHistory((prev) => [...prev, { item: itemToVote, action, note }]);
-      setViewMode('evidence');
 
       const messages: Record<RevalidationReviewAction, string> = {
         STILL_ACTIVE: 'Đã xác nhận: Biển báo vẫn hoạt động',
@@ -464,59 +446,27 @@ export function RevalidationReviewScreen() {
         UNCLEAR: 'Đã đánh dấu: Minh chứng không rõ ràng / Không hợp lệ',
       };
 
-      setToast((cur) => ({
-        id: (cur?.id ?? 0) + 1,
+      setToast({
+        id: Date.now(),
         message: messages[action],
         tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
-      }));
+      });
 
-      // 2. Immediately dispatch vote API call for this evidence
-      const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
-        STILL_ACTIVE: 'STILL_ACTIVE',
-        REMOVED: 'REMOVED',
-        CHANGED: 'CHANGED',
-        UNCLEAR: 'UNCLEAR',
-      };
+      const completesQueue = await workflowVote(action, note, suggestedSignTypeId);
+      setViewMode('evidence');
 
-      voteMutation.mutate(
-        {
-          evidenceId: itemToVote.evidenceId,
-          dto: {
-            decision: decisionMap[action],
-            note: note || undefined,
-            suggestedSignTypeId: Number.isFinite(suggestedSignTypeId) ? suggestedSignTypeId : undefined,
-          },
-        },
-        {
-          onSuccess: () => {
-            invalidateWalletAndStats();
-          },
-          onError: (err: any) => {
-            console.error('[RevalidationReview] Vote API failed for evidence:', itemToVote.evidenceId, err);
-            setToast({
-              id: Date.now(),
-              message: err?.message || CANNOT_RECORD_VOTE_MESSAGE,
-              tone: 'default',
-            });
-          },
-        },
-      );
+      if (completesQueue) {
+        router.replace('/work/revalidation-summary');
+      }
     },
-    [currentItem, invalidateWalletAndStats, voteMutation],
+    [currentItem, router, workflowVote],
   );
 
   const handleFinishReviews = () => {
-    const reviewedCount = history.length;
-    void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
-    void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
-    void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
-    invalidateWalletAndStats();
-
-    setHistory([]);
-    setItems([]);
+    const reviewedCount = workflowFinish();
     router.replace({
-      pathname: '/work/submission-finish',
-      params: { count: String(reviewedCount) },
+      pathname: '/work/submission-complete',
+      params: { type: 'review_revalidation', count: String(reviewedCount) },
     });
   };
 
@@ -708,7 +658,14 @@ export function RevalidationReviewScreen() {
                 </View>
               </View>
 
-              <View style={styles.topBarSpacer} />
+              <Pressable
+                accessibilityLabel="Xem tổng kết đánh giá"
+                hitSlop={Spacing.one}
+                onPress={() => router.replace('/work/revalidation-summary')}
+                style={styles.summaryTopButton}
+              >
+                <MaterialCommunityIcons color={theme.text} name="format-list-checks" size={22} />
+              </Pressable>
             </View>
             <View style={styles.progressCounterRow}>
               <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
@@ -1373,6 +1330,13 @@ const styles = StyleSheet.create({
   topBarSpacer: {
     width: 36,
     height: 36,
+  },
+  summaryTopButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Rounded.md,
   },
   progressTrackWrapper: {
     flex: 1,

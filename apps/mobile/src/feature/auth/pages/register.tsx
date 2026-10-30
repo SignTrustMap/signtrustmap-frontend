@@ -286,24 +286,6 @@ export default function RegisterScreen() {
                     </Text>
                   ) : null}
                 </View>
-
-                {/* Remember Me */}
-                <View style={styles.optionsRow}>
-                  <Pressable
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: rememberMe }}
-                    hitSlop={6}
-                    onPress={() => setRememberMe((prev) => !prev)}
-                    style={styles.rememberMeContainer}
-                  >
-                    <Ionicons
-                      color={rememberMe ? theme.primary : '#CBD5E1'}
-                      name={rememberMe ? 'checkbox' : 'square-outline'}
-                      size={20}
-                    />
-                    <Text style={styles.rememberMeText}>Ghi nhớ đăng nhập</Text>
-                  </Pressable>
-                </View>
               </View>
 
               {/* Global Error Banner */}

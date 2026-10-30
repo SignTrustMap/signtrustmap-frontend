@@ -9,6 +9,11 @@ export const DEFAULT_1MIN_CHUNK_BYTES = 10 * 1024 * 1024; // 10 MB estimated for
 export const MAX_CHUNK_BYTES = MAX_BACKEND_CHUNK_BYTES;
 export const MAX_NETWORK_CHUNK_BYTES = MAX_BACKEND_CHUNK_BYTES;
 
+export const MAX_SURVEY_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max allowed video
+export const MAX_SURVEY_IMAGE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB max allowed single image
+export const MAX_SURVEY_GPX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB max allowed companion GPX
+
+
 export type ChunkPlan = {
   totalChunks: number;
   chunkSize: number;

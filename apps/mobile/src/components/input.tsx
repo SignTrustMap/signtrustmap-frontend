@@ -143,7 +143,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 });

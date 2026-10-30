@@ -9,6 +9,16 @@ export type CoordinateSource = 'IMAGE_EXIF' | 'DEVICE_GPS' | 'MANUAL' | 'GPX_FIL
 
 export type SurveyMediaType = 'VIDEO' | 'GPX' | 'IMAGE'
 
+/** Maximum allowed video size for survey uploads: 2 GB (2,147,483,648 bytes) as per OpenAPI contract */
+export const MAX_SURVEY_VIDEO_SIZE_BYTES = 2 * 1024 * 1024 * 1024
+
+/** Maximum allowed single image size: 25 MB (26,214,400 bytes, safe single chunk under 50MB backend limit) */
+export const MAX_SURVEY_IMAGE_SIZE_BYTES = 25 * 1024 * 1024
+
+/** Maximum allowed companion GPX telemetry file size: 10 MB (10,485,760 bytes) */
+export const MAX_SURVEY_GPX_SIZE_BYTES = 10 * 1024 * 1024
+
+
 export type UploadStatus =
   | 'INITIATED'
   | 'UPLOADING'

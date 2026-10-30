@@ -2,6 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 import { useMemo } from 'react';
 
 import {
+  claimDailyTaskReward,
   getDailyTasks,
   getMyMissionsProgress,
   getMyTaskCompletions,
@@ -72,6 +73,25 @@ export function useGetMyMissions(enabled = true) {
       : skipToken,
     enabled: Boolean(session && enabled),
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Hook to claim reward credits for an accomplished daily task
+ */
+export function useClaimDailyTaskReward() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (taskId: number | string) => {
+      if (!session) throw new Error('Chưa đăng nhập');
+      return claimDailyTaskReward(taskId, session.accessToken);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet'] });
+    },
   });
 }
 

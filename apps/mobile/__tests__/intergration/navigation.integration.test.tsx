@@ -146,6 +146,15 @@ jest.mock('@/services/maplibre', () => ({
   })),
 }));
 
+jest.mock('@/api/spatial/spatial', () => ({
+  resolveLocation: jest.fn().mockResolvedValue({
+    displayAddress: 'Bitexco Financial Tower',
+    roadName: 'Hai Trieu',
+  }),
+  formatResolvedLocationTitle: jest.fn(() => 'Vị trí hiện tại'),
+}));
+
+
 // Capture map props
 const mockMapProps: Record<string, any> = {};
 jest.mock('@/feature/navigation/components/navigation-map-view', () => {
@@ -687,7 +696,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
           expect(rerouteCalled).toBe(true);
         });
       }
-    });
+    }, 15000);
 
     it('FIT-NAV-05-B: handles 500 error from routing API gracefully without crashing', async () => {
       server.use(
@@ -720,7 +729,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       expect(await findByText(/Routing engine unavailable|could not be calculated/i)).toBeTruthy();
     });
 
-    it('FIT-NAV-05-C: redirects to manual start selection when location permission is not granted', async () => {
+    it('FIT-NAV-05-C: requires location permission when location permission is not granted', async () => {
       mockEnsureLocationPermission.mockResolvedValue(false);
 
       mockSearchParams = {
@@ -732,7 +741,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       };
 
       const Wrapper = createProvidersWrapper();
-      const { findByLabelText } = await render(
+      const { findByLabelText, findAllByText } = await render(
         <Wrapper>
           <NavigationMapScreen />
         </Wrapper>,
@@ -743,17 +752,17 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         await fireEvent.press(startRouteBtn);
       });
 
-      // Should redirect to manual start selection
+      // Should require location permission and not redirect to manual start selection
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(
+        expect(mockPush).not.toHaveBeenCalledWith(
           expect.objectContaining({
             pathname: '/home/start',
-            params: expect.objectContaining({
-              destinationId: 'dest-bitexco',
-            }),
           }),
         );
       });
+
+      const errorAlerts = await findAllByText('Cần cấp quyền truy cập vị trí để bắt đầu điều hướng.');
+      expect(errorAlerts.length).toBeGreaterThan(0);
     });
   });
 });

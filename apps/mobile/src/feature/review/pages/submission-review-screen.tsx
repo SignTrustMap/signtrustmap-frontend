@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
@@ -527,10 +527,13 @@ function ReviewBottomSheet({
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ resumeIndex?: string }>();
+  const resumeIndexParam = params?.resumeIndex;
   const theme = useTheme();
   const {
     completeCurrentReview,
     isLoading,
+    jumpToSubmissionIndex,
     pendingSubmissions,
     recheckingPreviousAction,
     recheckingSubmission,
@@ -538,6 +541,22 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     totalSubmissions,
     undoLastReview,
   } = useReviewWorkflow();
+
+  useEffect(() => {
+    if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
+      const idx = parseInt(resumeIndexParam, 10);
+      if (!isNaN(idx)) {
+        jumpToSubmissionIndex?.(idx);
+      }
+    }
+  }, [resumeIndexParam, jumpToSubmissionIndex]);
+
+  const handleSkipToSummary = useCallback(() => {
+    router.replace({
+      pathname: '/work/submission-summary',
+      params: { resumeIndex: String(reviewHistory.length) },
+    });
+  }, [reviewHistory.length, router]);
 
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
@@ -1120,6 +1139,26 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               </Text>
             </View>
 
+            {/* Action button right below the name, to the right edge of the screen */}
+            <View style={styles.skipToSummaryRow}>
+              <AppButton
+                accessibilityHint="Bỏ qua các biển báo còn lại và chuyển đến màn hình tổng kết"
+                accessibilityLabel="Chuyển đến màn hình tổng kết"
+                disabled={reviewHistory.length === 0}
+                label="Tổng kết"
+                onPress={handleSkipToSummary}
+                style={[
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: reviewHistory.length > 0 ? theme.primary : theme.border,
+                  },
+                ]}
+                testID="skip-to-summary-button"
+                textStyle={styles.summaryShortcutButtonText}
+                variant={reviewHistory.length > 0 ? 'primary' : 'surface'}
+              />
+            </View>
+
             {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
             <View style={styles.actionsFooter}>
               <View style={styles.diamondContainer}>
@@ -1418,6 +1457,28 @@ const styles = StyleSheet.create({
   topBarSpacer: {
     width: 36,
     height: 36,
+  },
+  skipToSummaryRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: -2,
+    marginBottom: 4,
+  },
+  summaryShortcutButton: {
+    minHeight: 32,
+    height: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  summaryShortcutButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
   },
   progressTrackWrapper: {
     flex: 1,

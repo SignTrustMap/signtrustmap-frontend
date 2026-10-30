@@ -1,11 +1,11 @@
-﻿import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -31,8 +31,10 @@ import {
   useGetMySubmissions,
   useSubmitSurveySubmission,
 } from '@/feature/upload/hooks/use-survey-submission';
-import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 import { useTheme } from '@/hooks/use-theme';
+import { useSession } from '@/context/session-provider';
+import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
+import { readDraftImage } from '@/feature/upload/hooks/use-save-survey-draft';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
 import type { MapCoordinate } from '@/types/navigationType';
@@ -40,6 +42,7 @@ import type {
   SubmissionStatus,
   SubmissionType,
   SurveySubmission,
+  SurveyMediaType,
 } from '@/types/surveySubmissionType';
 
 
@@ -145,20 +148,103 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
       : null,
   );
 
-  const mediaFiles = statusData?.mediaFiles || [];
+  const { session } = useSession();
+  const [localDraftUri, setLocalDraftUri] = useState<string>();
 
-  // Determine media items
-  const imageFiles = mediaFiles.filter((m) => m.media_type === 'IMAGE');
-  const videoFiles = mediaFiles.filter((m) => m.media_type === 'VIDEO');
-  const gpxFiles = mediaFiles.filter((m) => m.media_type === 'GPX');
+  useEffect(() => {
+    if (!submissionId || !session?.account?.id) return;
+    let active = true;
+    void readDraftImage(session.account.id, submissionId).then((draft) => {
+      if (active && draft?.uri) {
+        setLocalDraftUri(draft.uri);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [submissionId, session?.account?.id]);
+
+  // Determine media items with robust normalization for both camelCase and snake_case backend responses
+  const normalizedMediaFiles = useMemo(() => {
+    const list: {
+      id?: string;
+      mediaType: SurveyMediaType;
+      fileUrl: string;
+      fileName: string;
+      fileSizeBytes?: string | number | null;
+    }[] = [];
+
+    // 1. From statusData.mediaFiles
+    if (Array.isArray(statusData?.mediaFiles)) {
+      for (const m of statusData.mediaFiles as any[]) {
+        const rawType = (m.mediaType || m.media_type || '').toUpperCase();
+        const rawUrl = m.fileUrl || m.file_url || m.storageKey || m.url || '';
+        if (rawType && rawUrl) {
+          list.push({
+            id: m.id,
+            mediaType: rawType as SurveyMediaType,
+            fileUrl: rawUrl,
+            fileName:
+              m.originalFilename ||
+              m.original_filename ||
+              rawUrl.split('/').pop()?.split('?')[0] ||
+              `Tệp ${rawType}`,
+            fileSizeBytes: m.fileSizeBytes ?? m.file_size_bytes,
+          });
+        }
+      }
+    }
+
+    // 2. Fallback to statusData.sessions if mediaFiles is missing any entries
+    if (Array.isArray(statusData?.sessions)) {
+      for (const s of statusData.sessions as any[]) {
+        const rawType = (s.mediaType || s.media_type || '').toUpperCase();
+        const rawUrl = s.storageKey || s.storage_key || s.fileUrl || s.file_url || s.url || '';
+        if (rawType && rawUrl && !list.some((existing) => existing.mediaType === rawType)) {
+          list.push({
+            id: s.id,
+            mediaType: rawType as SurveyMediaType,
+            fileUrl: rawUrl,
+            fileName:
+              s.originalFilename ||
+              s.original_filename ||
+              rawUrl.split('/').pop()?.split('?')[0] ||
+              `Tệp ${rawType}`,
+            fileSizeBytes: s.totalSizeBytes ?? s.total_size_bytes,
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [statusData]);
+
+  const imageFiles = normalizedMediaFiles.filter((m) => m.mediaType === 'IMAGE');
+  const videoFiles = normalizedMediaFiles.filter((m) => m.mediaType === 'VIDEO');
+  const gpxFiles = normalizedMediaFiles.filter((m) => m.mediaType === 'GPX');
 
   const primaryVideo = videoFiles[0];
   const primaryImage = imageFiles[0];
 
-  const primaryVideoUrl = primaryVideo?.file_url ? resolveS3Url(primaryVideo.file_url) : undefined;
-  const primaryImageUrl = primaryImage?.file_url ? resolveS3Url(primaryImage.file_url) : undefined;
+  const primaryVideoUrl = primaryVideo?.fileUrl
+    ? resolveS3Url(primaryVideo.fileUrl)
+    : (submission?.submissionType === 'VIDEO_GPX' && localDraftUri ? localDraftUri : undefined);
+
+  const primaryImageUrl = primaryImage?.fileUrl
+    ? resolveS3Url(primaryImage.fileUrl)
+    : (submission?.submissionType !== 'VIDEO_GPX' && localDraftUri ? localDraftUri : undefined);
 
   const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
+
+  // If video submission has detected candidate frames, use bestFrameUrl as video thumbnail preview
+  const candidateFrameUrl = useMemo(() => {
+    if (!Array.isArray(statusData?.candidates) || statusData.candidates.length === 0) return undefined;
+    for (const c of statusData.candidates as any[]) {
+      const frame = c.bestFrameUrl || c.best_frame_url || c.signCropUrl || c.sign_crop_url;
+      if (frame) return resolveS3Url(frame);
+    }
+    return undefined;
+  }, [statusData?.candidates]);
 
   const hasCoordinates =
     submission?.latitude != null &&
@@ -489,9 +575,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <Pressable
                   accessibilityLabel="Phóng to ảnh khảo sát"
                   accessibilityRole="button"
+                  disabled={!primaryImageUrl}
                   onPress={() => setIsImageZoomed(true)}
                   style={styles.imagePressable}
                 >
+                  <View style={styles.imagePlaceholder}>
+                    <ActivityIndicator color={theme.primary} size="small" />
+                  </View>
                   {primaryImageUrl ? (
                     <Image
                       accessibilityLabel="Ảnh khảo sát gửi lên"
@@ -500,11 +590,20 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       style={styles.mediaImage}
                       transition={150}
                     />
+                  ) : (
+                    <View style={styles.emptyMediaBox}>
+                      <MaterialCommunityIcons color={theme.placeholder} name="image-outline" size={40} />
+                      <Text style={[styles.emptyMediaText, { color: theme.placeholder }]}>
+                        {isStatusLoading ? 'Đang tải thông tin ảnh...' : 'Không có ảnh khảo sát'}
+                      </Text>
+                    </View>
+                  )}
+                  {primaryImageUrl ? (
+                    <View style={styles.zoomButton}>
+                      <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
+                      <Text style={styles.zoomButtonText}>Nhấn để phóng to</Text>
+                    </View>
                   ) : null}
-                  <View style={styles.zoomButton}>
-                    <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
-                    <Text style={styles.zoomButtonText}>Nhấn để phóng to</Text>
-                  </View>
                 </Pressable>
               </View>
             ) : (
@@ -519,22 +618,41 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ]}
               >
                 <View style={styles.videoThumbnailArea}>
+                  {candidateFrameUrl ? (
+                    <Image
+                      accessibilityLabel="Khung hình trích xuất từ video"
+                      contentFit="cover"
+                      source={{ uri: candidateFrameUrl }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : null}
+                  <View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      candidateFrameUrl
+                        ? { backgroundColor: 'rgba(15, 23, 42, 0.55)' }
+                        : undefined,
+                    ]}
+                  />
                   <MaterialCommunityIcons color="#FFFFFF" name="video" size={48} />
                   <Text style={styles.videoPromptText}>Bản ghi video khảo sát</Text>
-                  {primaryVideo?.file_url ? (
+                  {primaryVideo?.fileName ? (
                     <Text numberOfLines={1} style={styles.videoFilename}>
-                      {primaryVideo.file_url.split('/').pop()}
+                      {primaryVideo.fileName}
                     </Text>
                   ) : null}
 
                   <Pressable
                     accessibilityLabel="Phát video khảo sát"
                     accessibilityRole="button"
+                    disabled={!primaryVideoUrl}
                     onPress={() => handleOpenVideo(primaryVideoUrl)}
-                    style={styles.playButton}
+                    style={[styles.playButton, !primaryVideoUrl && { opacity: 0.6 }]}
                   >
                     <MaterialCommunityIcons color="#FFFFFF" name="play" size={26} />
-                    <Text style={styles.playButtonText}>Phát video</Text>
+                    <Text style={styles.playButtonText}>
+                      {primaryVideoUrl ? 'Phát video' : 'Video đang chuẩn bị'}
+                    </Text>
                   </Pressable>
                 </View>
 
@@ -542,7 +660,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View style={[styles.gpxRow, { borderTopColor: theme.border }]}>
                     <MaterialCommunityIcons color={theme.primary} name="crosshairs-gps" size={18} />
                     <Text style={[styles.gpxText, { color: theme.text }]}>
-                      Nhật ký lộ trình GPX: {gpxFiles[0].file_url.split('/').pop() || 'Nhật ký tuyến'}
+                      Nhật ký lộ trình GPX: {gpxFiles[0].fileName || 'Nhật ký tuyến'}
                     </Text>
                   </View>
                 ) : null}
@@ -550,13 +668,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             )}
 
             {/* Extra Media Carousel Tabs if multiple files exist */}
-            {mediaFiles.length > 1 ? (
+            {normalizedMediaFiles.length > 1 ? (
               <View style={styles.mediaListGroup}>
                 <Text style={[styles.groupLabel, { color: theme.placeholder }]}>Các tệp phương tiện đính kèm</Text>
-                {mediaFiles.map((file, idx) => {
-                  const isVideo = file.media_type === 'VIDEO';
-                  const isImage = file.media_type === 'IMAGE';
-                  const url = resolveS3Url(file.file_url);
+                {normalizedMediaFiles.map((file, idx) => {
+                  const isVideo = file.mediaType === 'VIDEO';
+                  const isImage = file.mediaType === 'IMAGE';
+                  const url = resolveS3Url(file.fileUrl);
 
                   return (
                     <Pressable
@@ -583,10 +701,10 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       />
                       <View style={styles.mediaFileText}>
                         <Text numberOfLines={1} style={[styles.mediaFileName, { color: theme.text }]}>
-                          {file.file_url.split('/').pop() || `Tệp ${file.media_type}`}
+                          {file.fileName || `Tệp ${file.mediaType}`}
                         </Text>
                         <Text style={[styles.mediaFileType, { color: theme.placeholder }]}>
-                          {file.media_type} · Nhấn để xem
+                          {file.mediaType} · Nhấn để xem
                         </Text>
                       </View>
                       <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
@@ -801,6 +919,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     <NavigationMapView
                       focusCoordinate={startCoord}
                       routeStart={isVideoSubmission ? startCoord : undefined}
+                      isCustomStart={isVideoSubmission}
                       destination={
                         isVideoSubmission && endCoord
                           ? {
@@ -819,7 +938,53 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       }
                       showCurrentLocation={false}
                     />
+                    {isVideoSubmission ? (
+                      <Pressable
+                        accessibilityLabel="Mở toàn màn hình xem lộ trình"
+                        onPress={() => {
+                          const gpx = normalizedMediaFiles.find((m) => m.mediaType === 'GPX')?.fileUrl;
+                          router.push({
+                            pathname: '/work/new-survey/route-map',
+                            params: {
+                              gpxUri: gpx ? resolveS3Url(gpx) : undefined,
+                              startLat: startCoord ? String(startCoord[1]) : undefined,
+                              startLon: startCoord ? String(startCoord[0]) : undefined,
+                              endLat: endCoord ? String(endCoord[1]) : undefined,
+                              endLon: endCoord ? String(endCoord[0]) : undefined,
+                              title: 'Lộ trình khảo sát đã gửi',
+                            },
+                          });
+                        }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    ) : null}
                   </View>
+                  {isVideoSubmission ? (
+                    <AppButton
+                      accessibilityLabel="Phóng to bản đồ xem trước"
+                      onPress={() => {
+                        const gpx = normalizedMediaFiles.find((m) => m.mediaType === 'GPX')?.fileUrl;
+                        router.push({
+                          pathname: '/work/new-survey/route-map',
+                          params: {
+                            gpxUri: gpx ? resolveS3Url(gpx) : undefined,
+                            startLat: startCoord ? String(startCoord[1]) : undefined,
+                            startLon: startCoord ? String(startCoord[0]) : undefined,
+                            endLat: endCoord ? String(endCoord[1]) : undefined,
+                            endLon: endCoord ? String(endCoord[0]) : undefined,
+                            title: 'Lộ trình khảo sát đã gửi',
+                          },
+                        });
+                      }}
+                      style={[
+                        styles.mapZoomButton,
+                        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      ]}
+                      variant="ghost"
+                    >
+                      <AntDesign name="expand" size={18} color={theme.primary} />
+                    </AppButton>
+                  ) : null}
                 </View>
                 <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
                   {isVideoSubmission && endCoord
@@ -1406,6 +1571,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  imagePlaceholder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(100, 116, 139, 0.08)',
+  },
+  emptyMediaBox: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.two,
+  },
+  emptyMediaText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    textAlign: 'center',
+  },
   zoomButton: {
     position: 'absolute',
     bottom: 12,
@@ -1686,5 +1874,18 @@ const styles = StyleSheet.create({
   candidateMeta: {
     fontFamily: Fonts.body,
     fontSize: 11,
+  },
+  mapZoomButton: {
+    position: 'absolute',
+    top: Spacing.two,
+    right: Spacing.two,
+    width: 36,
+    height: 36,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 3,
   },
 });

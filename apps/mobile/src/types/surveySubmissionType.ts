@@ -152,8 +152,29 @@ export type SurveyorStatsResponse = {
   dailyTasks: Record<string, unknown>[];
 };
 
+export type SubmissionMediaItem = {
+  id?: string;
+  media_type?: SurveyMediaType;
+  mediaType?: SurveyMediaType;
+  file_url?: string;
+  fileUrl?: string;
+  storageKey?: string;
+  storage_key?: string;
+  originalFilename?: string;
+  original_filename?: string;
+  uploadSessionId?: string;
+  upload_session_id?: string;
+  fileSizeBytes?: string | number | null;
+  file_size_bytes?: string | number | null;
+  durationSeconds?: number | null;
+  duration_seconds?: number | null;
+  checksum?: string | null;
+  uploadedAt?: string;
+  uploaded_at?: string;
+};
+
 export type SubmissionStatusResponse = {
-  mediaFiles?: { id: string; media_type: SurveyMediaType; file_url: string }[];
+  mediaFiles?: SubmissionMediaItem[];
   submission: SurveySubmission;
   totalCandidates: number;
   /** Raw SQL rows use snake_case keys and have no declared response DTOs. */

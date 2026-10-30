@@ -3,6 +3,23 @@ import type { MapCoordinate } from '@/types/navigationType';
 const EARTH_RADIUS_METERS = 6_371_000;
 
 /**
+ * Validates that coordinate is [longitude, latitude] with valid ranges and non-zero sentinel.
+ */
+export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoordinate {
+  if (!coord) return false;
+  const [lon, lat] = coord;
+  return (
+    typeof lon === 'number' &&
+    typeof lat === 'number' &&
+    Number.isFinite(lon) &&
+    Number.isFinite(lat) &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lon) <= 180 &&
+    !(lon === 0 && lat === 0)
+  );
+}
+
+/**
  * Calculates the great-circle distance between two [longitude, latitude] coordinates in meters
  * using the Haversine formula.
  */

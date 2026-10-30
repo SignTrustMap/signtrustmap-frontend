@@ -1,5 +1,5 @@
-﻿import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -87,6 +87,7 @@ function SignCard({ sign }: { sign: CatalogSign }) {
 export function SignCatalogScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { role } = useLocalSearchParams<{ role?: string }>();
 
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
@@ -127,7 +128,7 @@ export function SignCatalogScreen() {
           ]}
         >
           <AppButton
-            accessibilityLabel="Quay lại công việc thẩm định"
+            accessibilityLabel='Quay lại'
             hitSlop={Spacing.one}
             onPress={() => router.back()}
             style={styles.backButton}
@@ -243,7 +244,7 @@ export function SignCatalogScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
-      <ReviewBottomTabs activeTab="catalog" />
+      {!role || role === 'reviewer' ? <ReviewBottomTabs activeTab="catalog" /> : null}
     </View>
   );
 }
