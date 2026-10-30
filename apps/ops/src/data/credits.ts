@@ -2,14 +2,17 @@ export type ContributorRole = 'surveyor' | 'reviewer' | 'contributor' | 'driver'
 
 export interface CreditApprovalItem {
   id: string
+  userId?: string
+  walletId?: string
+  isWalletFrozen?: boolean
   user: {
     name: string
     email: string
     avatarBg: string
     role: ContributorRole
   }
-  activityType: 'Khảo sát thực địa' | 'Kiểm duyệt cộng đồng' | 'Tái xác thực biển báo' | 'Nhiệm vụ hàng ngày'
-  activityKey: 'survey' | 'review' | 'revalidation' | 'daily'
+  activityType: 'Khảo sát thực địa' | 'Kiểm duyệt cộng đồng' | 'Tái xác thực biển báo' | 'Nhiệm vụ hàng ngày' | string
+  activityKey: 'survey' | 'review' | 'revalidation' | 'daily' | string
   amount: number
   riskLevel: 'Thấp' | 'Nghi vấn' | 'Cảnh báo gian lận'
   evidenceSummary: string
@@ -40,7 +43,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskLevel: 'Thấp',
     riskScore: 8,
     evidenceSummary: 'Video hành trình 3.2km kèm file GPX hợp lệ (14 biển báo phát hiện)',
-    evidenceUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1082-evidence.jpg',
     deviceModel: 'Dashcam 70mai A810 4K',
     gpsDistance: 2.1,
     payoutMethod: 'Ví MoMo (0912.***.678)',
@@ -62,7 +65,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskScore: 92,
     riskReason: 'Tốc độ biểu quyết trung bình 0.4s/biển, tỷ lệ Approve 100% không qua kiểm tra ảnh.',
     evidenceSummary: 'Tỷ lệ đồng thuận bất thường (Bỏ phiếu quá nhanh < 1s/biển báo)',
-    evidenceUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1083-evidence.jpg',
     deviceModel: 'Web Browser / Chrome 124 (Emulated Script)',
     payoutMethod: 'Ví ZaloPay (0983.***.233)',
     createdAt: 'Hôm nay, 09:40 SA',
@@ -82,7 +85,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskLevel: 'Thấp',
     riskScore: 5,
     evidenceSummary: 'Ảnh chụp biển P.102 mới thay thế tại góc đường Pasteur - Lê Lợi Quận 1',
-    evidenceUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1084-evidence.jpg',
     deviceModel: 'iPhone 15 Pro Max',
     gpsDistance: 1.4,
     payoutMethod: 'Tài khoản Vietcombank (***8921)',
@@ -103,7 +106,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskLevel: 'Thấp',
     riskScore: 12,
     evidenceSummary: 'Thu thập chuỗi hình ảnh liên tục 8.5km dọc tuyến Vành Đai 3 Hà Nội',
-    evidenceUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1085-evidence.jpg',
     deviceModel: 'Samsung Galaxy S24 Ultra',
     gpsDistance: 3.5,
     payoutMethod: 'Ví Grab Driver Wallet',
@@ -127,7 +130,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskScore: 68,
     riskReason: 'Độ lệch tọa độ GPS EXIF trên ảnh cách xa vị trí tim đường 120m.',
     evidenceSummary: 'Hình ảnh trích xuất từ camera có tọa độ GPS bị gián đoạn giữa hầm ngầm Thủ Thiêm',
-    evidenceUrl: 'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1086-evidence.jpg',
     deviceModel: 'Xiaomi Redmi Note 13',
     gpsDistance: 120.4,
     payoutMethod: 'Ví Viettel Money (0935.***.112)',
@@ -148,7 +151,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskLevel: 'Thấp',
     riskScore: 6,
     evidenceSummary: 'Hoàn thành 30 lượt biểu quyết kiểm duyệt độ chính xác nhãn biển báo P.103a',
-    evidenceUrl: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1087-evidence.jpg',
     deviceModel: 'iPad Pro 11 M2',
     payoutMethod: 'Tài khoản MB Bank (***6688)',
     createdAt: '22/10/2026, 18:05 CH',
@@ -171,7 +174,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskScore: 98,
     riskReason: 'Sử dụng hình ảnh trùng lặp tải từ Internet, chữ ký số máy ảnh không khớp EXIF thực tế.',
     evidenceSummary: 'Ảnh gửi lên trùng lặp 100% với ảnh đã có trên Google Maps Street View 2023',
-    evidenceUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1088-evidence.jpg',
     deviceModel: 'Giả lập NoxPlayer / Android 9',
     payoutMethod: 'Tài khoản Techcombank (***4412)',
     createdAt: '21/10/2026, 08:30 SA',
@@ -193,7 +196,7 @@ export const mockCreditApprovals: CreditApprovalItem[] = [
     riskLevel: 'Thấp',
     riskScore: 10,
     evidenceSummary: 'Khảo sát 4.6km tuyến Quốc lộ 1A Đà Nẵng, phát hiện biển W.207a bị cây che',
-    evidenceUrl: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=600&auto=format&fit=crop&q=80',
+    evidenceUrl: '/images/evidence/crd-1089-evidence.jpg',
     deviceModel: 'GoPro Hero 11 Black',
     gpsDistance: 1.8,
     payoutMethod: 'Ví bePay Wallet',
