@@ -395,13 +395,15 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
 
               <View style={styles.streakTextCol}>
                 <View style={styles.streakHeaderRow}>
-                  <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
-                    Chuỗi {streak} ngày
-                  </Text>
-                  <View style={[styles.streakBadgePill, { backgroundColor: '#F59E0B18' }]}>
-                    <MaterialCommunityIcons color="#D97706" name="shield-star" size={13} />
-                    <Text style={styles.streakBadgePillText}>Mục tiêu 7 ngày</Text>
-                  </View>
+                  {streak === 0 ? (
+                    <>  <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
+                      Bắt đầu chuỗi ngày đóng góp của bạn ngay!
+                    </Text></>
+                  ) : (
+                    <>  <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
+                      Chuỗi {streak} ngày
+                    </Text></>
+                  )}
                 </View>
                 <Text style={[styles.streakSubText, { color: theme.grey }]}>
                   {streak >= 7

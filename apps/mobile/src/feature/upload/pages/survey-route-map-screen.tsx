@@ -174,12 +174,15 @@ export function SurveyRouteMapScreen() {
         <View style={StyleSheet.absoluteFill}>
           <NavigationMapView
             destination={destinationParam}
+            focusCoordinate={startCoord}
             focusRequestId={focusRequestId}
-            isCustomStart
+            isCustomStart={Boolean(endCoord || effectiveRouteCoordinates.length > 0)}
             isNavigatingFeature
+            locationPin={!endCoord && startCoord ? startCoord : undefined}
             routeCoordinates={effectiveRouteCoordinates.length > 0 ? effectiveRouteCoordinates : undefined}
-            routeStart={startCoord}
+            routeStart={endCoord || effectiveRouteCoordinates.length > 0 ? startCoord : undefined}
             showCurrentLocation={false}
+            showFocusPin={!endCoord && Boolean(startCoord)}
           />
         </View>
       ) : (

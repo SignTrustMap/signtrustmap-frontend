@@ -49,14 +49,14 @@ export function Sidebar() {
     user?.initials ||
     (user?.name
       ? user.name
-          .split(' ')
-          .map((n) => n[0])
-          .join('')
-          .slice(-2)
-          .toUpperCase()
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(-2)
+        .toUpperCase()
       : isAdmin
-      ? 'PĐ'
-      : 'NV')
+        ? 'PĐ'
+        : 'NV')
 
   const displayName = user?.name || (isAdmin ? 'Phan Tài Đức' : 'Nguyễn Long Vũ')
 
@@ -172,11 +172,6 @@ export function Sidebar() {
           href: '/tasks',
           badge: badges.tasks,
         },
-        {
-          icon: <ClipboardText size={18} weight="duotone" />,
-          label: t('nav.incident_reports'),
-          href: '/reports',
-        },
       ],
     },
     {
@@ -219,23 +214,20 @@ export function Sidebar() {
   }
 
   const linkClass = (isActive: boolean) =>
-    `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-[13px] transition-all duration-150 select-none ${
-      isActive
-        ? 'bg-[#007b8b]/10 text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-xs'
-        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5 font-medium'
+    `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-[13px] transition-all duration-150 select-none ${isActive
+      ? 'bg-[#007b8b]/10 text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-xs'
+      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-white/5 font-medium'
     }`
 
   return (
     <aside
-      className={`flex flex-col shrink-0 border-r border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] h-full shadow-xs transition-all duration-300 ease-in-out z-20 ${
-        isCollapsed ? 'w-[68px]' : 'w-64'
-      }`}
+      className={`flex flex-col shrink-0 border-r border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] h-full shadow-xs transition-all duration-300 ease-in-out z-20 ${isCollapsed ? 'w-[68px]' : 'w-64'
+        }`}
     >
       {/* ─── Brand Header ────────────────────────────────────────── */}
       <div
-        className={`flex items-center h-16 border-b border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] shrink-0 transition-all ${
-          isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
-        }`}
+        className={`flex items-center h-16 border-b border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#071317] shrink-0 transition-all ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+          }`}
       >
         {isCollapsed ? (
           <div
@@ -267,11 +259,10 @@ export function Sidebar() {
             </div>
 
             <span
-              className={`shrink-0 text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider ${
-                isAdmin
-                  ? 'bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] border-[#007b8b]/30 dark:border-[#00c4de]/40'
-                  : 'bg-[#007b8b]/10 text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] border-[#007b8b]/20 dark:border-[#00c4de]/30'
-              }`}
+              className={`shrink-0 text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider ${isAdmin
+                ? 'bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] border-[#007b8b]/30 dark:border-[#00c4de]/40'
+                : 'bg-[#007b8b]/10 text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de] border-[#007b8b]/20 dark:border-[#00c4de]/30'
+                }`}
             >
               {isAdmin ? t('nav.role_admin') : t('nav.role_staff')}
             </span>
@@ -300,11 +291,10 @@ export function Sidebar() {
                     key={item.href}
                     to={item.href}
                     title={item.label + (item.badge ? ` (${item.badge})` : '')}
-                    className={`group relative w-10 h-10 mx-auto flex items-center justify-center rounded-xl transition-all select-none ${
-                      active
-                        ? 'bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] font-bold shadow-xs'
-                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                    className={`group relative w-10 h-10 mx-auto flex items-center justify-center rounded-xl transition-all select-none ${active
+                      ? 'bg-[#007b8b]/15 text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de] font-bold shadow-xs'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white'
+                      }`}
                   >
                     <span className="transition-transform group-hover:scale-110">
                       {item.icon}
@@ -329,22 +319,20 @@ export function Sidebar() {
                     <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#007b8b] dark:bg-[#00c4de]" />
                   )}
                   <span
-                    className={`shrink-0 transition-transform duration-150 group-hover:scale-110 ${
-                      active
-                        ? 'text-[#007b8b] dark:text-[#00c4de]'
-                        : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-200'
-                    }`}
+                    className={`shrink-0 transition-transform duration-150 group-hover:scale-110 ${active
+                      ? 'text-[#007b8b] dark:text-[#00c4de]'
+                      : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-200'
+                      }`}
                   >
                     {item.icon}
                   </span>
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge ? (
                     <span
-                      className={`shrink-0 min-w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${
-                        active
-                          ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-[#061115]'
-                          : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'
-                      }`}
+                      className={`shrink-0 min-w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-mono font-extrabold px-1.5 transition-colors ${active
+                        ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-[#061115]'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                        }`}
                     >
                       {item.badge}
                     </span>
@@ -358,9 +346,8 @@ export function Sidebar() {
 
       {/* ─── Bottom User Profile Trigger & Dropdown ───────────────── */}
       <div
-        className={`p-2.5 border-t border-[#E8E4E3] dark:border-white/10 relative bg-white dark:bg-[#071317] shrink-0 ${
-          isCollapsed ? 'flex justify-center' : ''
-        }`}
+        className={`p-2.5 border-t border-[#E8E4E3] dark:border-white/10 relative bg-white dark:bg-[#071317] shrink-0 ${isCollapsed ? 'flex justify-center' : ''
+          }`}
       >
         {/* Dropdown Menu (pops up above the card) */}
         <UserDropdownMenu
@@ -389,9 +376,8 @@ export function Sidebar() {
               />
             ) : (
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-xs ${
-                  isAdmin ? 'bg-gradient-to-br from-[#007b8b] to-[#005a66]' : 'bg-[#007b8b]'
-                }`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-xs ${isAdmin ? 'bg-gradient-to-br from-[#007b8b] to-[#005a66]' : 'bg-[#007b8b]'
+                  }`}
               >
                 {userInitials}
               </div>
@@ -404,11 +390,10 @@ export function Sidebar() {
             onClick={() => setIsUserMenuOpen((prev) => !prev)}
             aria-expanded={isUserMenuOpen}
             aria-haspopup="menu"
-            className={`w-full p-2 rounded-xl border transition-all flex items-center gap-2.5 text-left cursor-pointer group select-none ${
-              isUserMenuOpen
-                ? 'bg-[#eef2f5] dark:bg-[#11232a] border-[#007b8b]/30 dark:border-[#00c4de]/40 ring-2 ring-[#007b8b]/10 dark:ring-[#00c4de]/20'
-                : 'bg-gray-50 hover:bg-gray-100 dark:bg-white/5 dark:hover:bg-white/10 border-gray-200/70 dark:border-white/10'
-            }`}
+            className={`w-full p-2 rounded-xl border transition-all flex items-center gap-2.5 text-left cursor-pointer group select-none ${isUserMenuOpen
+              ? 'bg-[#eef2f5] dark:bg-[#11232a] border-[#007b8b]/30 dark:border-[#00c4de]/40 ring-2 ring-[#007b8b]/10 dark:ring-[#00c4de]/20'
+              : 'bg-gray-50 hover:bg-gray-100 dark:bg-white/5 dark:hover:bg-white/10 border-gray-200/70 dark:border-white/10'
+              }`}
           >
             <div className="relative shrink-0">
               {user?.avatar ? (
@@ -422,9 +407,8 @@ export function Sidebar() {
                 />
               ) : (
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-xs group-hover:scale-105 transition-transform ${
-                    isAdmin ? 'bg-gradient-to-br from-[#007b8b] to-[#005a66]' : 'bg-[#007b8b]'
-                  }`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shadow-xs group-hover:scale-105 transition-transform ${isAdmin ? 'bg-gradient-to-br from-[#007b8b] to-[#005a66]' : 'bg-[#007b8b]'
+                    }`}
                 >
                   {userInitials}
                 </div>
@@ -443,9 +427,8 @@ export function Sidebar() {
             <CaretUp
               size={14}
               weight="bold"
-              className={`text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0 transition-transform duration-200 ${
-                isUserMenuOpen ? 'rotate-180 text-[#007b8b] dark:text-[#00c4de]' : ''
-              }`}
+              className={`text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-[#007b8b] dark:text-[#00c4de]' : ''
+                }`}
             />
           </button>
         )}

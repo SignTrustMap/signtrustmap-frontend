@@ -711,22 +711,6 @@ export function SurveyRecordDetailsScreen() {
       setIsLocating(false);
     }
   };
-
-  const handleUseCurrentLocationForEnd = async () => {
-    if (isLocatingEnd || submissionInProgress.current) return;
-    setIsLocatingEnd(true);
-    try {
-      const coord = await getCurrentSurveyCoordinate();
-      setEndCoordinate(coord);
-      setIsModified(true);
-      setSubmitError(undefined);
-    } catch (err) {
-      setLocationMessage(err instanceof Error ? err.message : UNABLE_TO_GET_LOCATION_FOR_END_POINT_MESSAGE);
-    } finally {
-      setIsLocatingEnd(false);
-    }
-  };
-
   const onValidSubmit = async (formData: SurveyRecordFormData) => {
     if (submissionInProgress.current || isLocating || isLocatingEnd) return;
     if (!currentDraftId || !isDraftLoaded || !isEditable) {
@@ -1140,7 +1124,7 @@ export function SurveyRecordDetailsScreen() {
               name="capturedAt"
               render={({ field: { onChange, value } }) => (
                 <AppInput
-                  label="Thời gian ghi nhận (dd/mm/yyyy)"
+                  label="Thời gian ghi nhận (ngày/tháng/năm)"
                   accessibilityLabel="Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm"
                   placeholder="DD/MM/YYYY"
                   value={value}
@@ -1336,43 +1320,14 @@ export function SurveyRecordDetailsScreen() {
                 containerStyle={styles.imageLocationInput}
               />
               {effectiveStartCoord ? (
-                <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                  <View style={styles.addressResolvedHeader}>
-                    <MaterialCommunityIcons name="map-marker-radius" size={16} color={theme.primary} />
-                    <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                      {startLocationQuery.isLoading ? 'Đang tra cứu vị trí thực tế...' : 'Địa chỉ'}
-                    </Text>
-                    {startLocationQuery.isLoading ? (
-                      <ActivityIndicator size="small" color={theme.primary} style={{ marginLeft: 6 }} />
-                    ) : null}
-                  </View>
-                  <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                    {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
-                  </Text>
-                  {startLocationQuery.data?.roadName ? (
-                    <Text style={[styles.addressRoadText, { color: theme.primary }]}>
-                      🛣️ {startLocationQuery.data.roadName}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-              <AppButton
-                accessibilityLabel={
-                  isLocating ? 'Đang lấy vị trí hiện tại' : 'Lấy vị trí hiện tại cho khảo sát này'
-                }
-                disabled={isLocating || isSubmitting}
-                onPress={handleUseCurrentLocation}
-                style={styles.locationButton}
-              >
-                <SymbolView
-                  name={{ android: 'my_location', ios: 'location.fill', web: 'my_location' }}
-                  size={16}
-                  tintColor={theme.onPrimary}
+                <AppInput
+                  label="Địa chỉ thực tế"
+                  editable={false}
+                  value={startLocationQuery.data?.displayAddress || ''}
+                  leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
+                  containerStyle={styles.imageLocationInput}
                 />
-                <Text style={[styles.locationButtonText, { color: theme.onPrimary }]}>
-                  {isLocating ? 'Đang lấy vị trí...' : 'Lấy vị trí hiện tại'}
-                </Text>
-              </AppButton>
+              ) : null}
             </View>
           )}
 
@@ -1398,6 +1353,8 @@ export function SurveyRecordDetailsScreen() {
                   <NavigationMapView
                     focusCoordinate={effectiveStartCoord}
                     focusRequestId={focusRequestId}
+                    locationPin={isImageSubmission ? effectiveStartCoord : undefined}
+                    showFocusPin={isImageSubmission}
                     routeStart={!isImageSubmission ? effectiveStartCoord : undefined}
                     isCustomStart={!isImageSubmission}
                     destination={
@@ -1420,7 +1377,7 @@ export function SurveyRecordDetailsScreen() {
                     isNavigatingFeature
                   />
                   {!isImageSubmission ? (
-                    <Pressable
+                    <AppButton
                       accessibilityLabel="Mở toàn màn hình xem lộ trình"
                       onPress={handleOpenRouteMap}
                       style={StyleSheet.absoluteFill}
@@ -1428,7 +1385,8 @@ export function SurveyRecordDetailsScreen() {
                   ) : null}
                 </View>
               ) : (
-                <Pressable
+                <AppButton
+                  variant='ghost'
                   onPress={() => {
                     if (!isImageSubmission && (activeGpxUri || effectiveStartCoord)) {
                       handleOpenRouteMap();
@@ -1449,7 +1407,7 @@ export function SurveyRecordDetailsScreen() {
                   <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
                     Chưa có tọa độ GPS. Nhấn nút phóng to để chọn vị trí.
                   </Text>
-                </Pressable>
+                </AppButton>
               )}
               <AppButton
                 accessibilityLabel="Phóng to bản đồ xem trước"
@@ -1529,9 +1487,9 @@ export function SurveyRecordDetailsScreen() {
                   ? missingGpsBatchIndices.includes(currentBatchIndex)
                     ? formatBatchItemMissingGpsMessage(currentBatchIndex + 1, batchIds.length)
                     : formatBatchRemainingMissingGpsMessage(
-                        missingGpsBatchIndices.length,
-                        missingGpsBatchIndices.map((i) => i + 1).join(', '),
-                      )
+                      missingGpsBatchIndices.length,
+                      missingGpsBatchIndices.map((i) => i + 1).join(', '),
+                    )
                   : SINGLE_ITEM_MISSING_GPS_WARNING}
               </Text>
             </View>

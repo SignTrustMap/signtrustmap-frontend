@@ -32,6 +32,9 @@ type NavigationMapViewProps = {
   isCustomStart?: boolean;
   onSignSelect?: (sign: RouteSign | null) => void;
   vehicleMode?: string;
+  locationPin?: MapCoordinate;
+  locationPinColor?: string;
+  showFocusPin?: boolean;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -131,22 +134,10 @@ function createDriverMarkerElement(color: string) {
   return halo;
 }
 
-function createDestinationMarkerElement() {
-  const marker = document.createElement('div');
-  marker.style.width = '28px';
-  marker.style.height = '28px';
-  marker.style.border = '2px solid #FFFFFF';
-  marker.style.borderRadius = '14px';
-  marker.style.background = '#148594';
-  marker.style.color = '#FFFFFF';
-  marker.style.display = 'flex';
-  marker.style.alignItems = 'center';
-  marker.style.justifyContent = 'center';
-  marker.style.fontSize = '12px';
-  marker.style.fontWeight = '900';
-  marker.textContent = 'D';
+export { MapLocationPin, type MapLocationPinProps } from './map-location-pin';
 
-  return marker;
+function createDestinationMarkerElement() {
+  return createLocationPinElement('#EF4444');
 }
 
 function createStartMarkerElement() {
@@ -167,6 +158,24 @@ function createStartMarkerElement() {
   return marker;
 }
 
+function createLocationPinElement(color = '#EF4444') {
+  const container = document.createElement('div');
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.alignItems = 'center';
+  container.style.justifyContent = 'center';
+  container.style.width = '32px';
+  container.style.height = '42px';
+
+  container.innerHTML = `
+    <svg width="32" height="38" viewBox="0 0 24 24" fill="${color}" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+    </svg>
+    <div style="width: 8px; height: 3px; background: rgba(0,0,0,0.25); border-radius: 50%; margin-top: -2px;"></div>
+  `;
+  return container;
+}
+
 export function NavigationMapView({
   onBoundsChange,
   destination,
@@ -176,17 +185,22 @@ export function NavigationMapView({
   routeStart,
   routeSigns = [],
   vehicleMode = 'DRIVING',
+  locationPin,
+  locationPinColor,
+  showFocusPin = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const effectiveLocationPin = locationPin ?? (showFocusPin ? focusCoordinate : undefined);
   const [activeOfflinePack, setActiveOfflinePack] = useState<InstalledOfflineMapPack | null>(null);
   const destinationMarkerRef = useRef<Marker | null>(null);
   const currentLocationMarkerRef = useRef<Marker | null>(null);
+  const locationPinMarkerRef = useRef<Marker | null>(null);
   const mapRef = useRef<Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const startMarkerRef = useRef<Marker | null>(null);
   const stopSignMarkersRef = useRef<Marker[]>([]);
 
-  const initialCenterRef = useRef(destination?.coordinate ?? focusCoordinate ?? routeStart);
+  const initialCenterRef = useRef(destination?.coordinate ?? focusCoordinate ?? effectiveLocationPin ?? routeStart);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -212,11 +226,13 @@ export function NavigationMapView({
       destinationMarkerRef.current?.remove();
       currentLocationMarkerRef.current?.remove();
       startMarkerRef.current?.remove();
+      locationPinMarkerRef.current?.remove();
       stopSignMarkersRef.current.forEach((marker) => marker.remove());
       stopSignMarkersRef.current = [];
       destinationMarkerRef.current = null;
       currentLocationMarkerRef.current = null;
       startMarkerRef.current = null;
+      locationPinMarkerRef.current = null;
       mapRef.current = null;
       map.remove();
     };
@@ -294,6 +310,28 @@ export function NavigationMapView({
     }
     mapRef.current.flyTo({ center: focusCoordinate, duration: 700, zoom: 16 });
   }, [focusCoordinate, focusRequestId, theme.primary]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!effectiveLocationPin) {
+      locationPinMarkerRef.current?.remove();
+      locationPinMarkerRef.current = null;
+      return;
+    }
+
+    if (!locationPinMarkerRef.current) {
+      locationPinMarkerRef.current = new Marker({
+        anchor: 'bottom',
+        element: createLocationPinElement(locationPinColor || '#EF4444'),
+      })
+        .setLngLat(effectiveLocationPin)
+        .addTo(map);
+    } else {
+      locationPinMarkerRef.current.setLngLat(effectiveLocationPin);
+    }
+  }, [effectiveLocationPin, locationPinColor]);
 
   useEffect(() => {
     if (!mapRef.current) return;

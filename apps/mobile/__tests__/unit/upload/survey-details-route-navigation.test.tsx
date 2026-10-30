@@ -138,14 +138,21 @@ jest.mock('@/feature/upload/hooks/use-reverse-geocode', () => ({
   }),
 }));
 
+let lastMapProps: any = {};
 jest.mock('@/feature/navigation/components/navigation-map-view', () => ({
   NavigationMapView: (props: any) => {
+    lastMapProps = props;
     const { View, Text } = require('react-native');
     return (
       <View testID="mock-preview-map">
         <Text testID="map-preview-has-route">
           {props.routeCoordinates ? 'has-route' : 'no-route'}
         </Text>
+        {props.locationPin ? (
+          <Text testID="map-preview-location-pin">
+            {`${props.locationPin[0]},${props.locationPin[1]}`}
+          </Text>
+        ) : null}
       </View>
     );
   },
@@ -156,6 +163,7 @@ import { SurveyRecordDetailsScreen } from '@/feature/upload/pages/survey-record-
 describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Image', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    lastMapProps = {};
     mockLocationPickerVisible = false;
     mockSearchParams = {};
   });
@@ -208,9 +216,10 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
 
     // Verify LocationPickerModal was NOT opened
     expect(mockLocationPickerVisible).toBe(false);
+    expect(lastMapProps.locationPin).toBeUndefined();
   });
 
-  it('opens LocationPickerModal when clicking zoom button for a single image submission', async () => {
+  it('opens LocationPickerModal when clicking zoom button for a single image submission and passes locationPin to map', async () => {
     mockSearchParams = {
       submissionId: 'sub-image-456',
     };
@@ -243,6 +252,9 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
 
     await waitFor(() => {
       expect(getByLabelText('Phóng to bản đồ xem trước')).toBeTruthy();
+      expect(lastMapProps.locationPin).toEqual([106.7009, 10.7769]);
+      expect(lastMapProps.showFocusPin).toBe(true);
+      expect(getByTestId('map-preview-location-pin')).toHaveTextContent('106.7009,10.7769');
     });
 
     const zoomBtn = getByLabelText('Phóng to bản đồ xem trước');

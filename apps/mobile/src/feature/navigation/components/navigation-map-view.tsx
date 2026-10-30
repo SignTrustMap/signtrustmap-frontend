@@ -30,11 +30,14 @@ import {
   MAP_BUILD_REQUIRED_DESCRIPTION,
   MAP_BUILD_REQUIRED_TITLE,
 } from '@/constants/message';
-import { calculateDistanceMeters, getRouteForwardBearing } from '../utils/geo';
+import { calculateDistanceMeters, getRouteForwardBearing, isValidCoordinate } from '../utils/geo';
 import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
 import { formatDate } from '@/utils/format-date';
 import { formatFreshnessScore } from '@/utils/freshness';
+import { MapLocationPin, type MapLocationPinProps } from './map-location-pin';
+
+export { MapLocationPin, type MapLocationPinProps };
 
 type NavigationMapViewProps = {
   onBoundsChange?: (bounds: FindSignsInBoundsParams) => void;
@@ -53,6 +56,9 @@ type NavigationMapViewProps = {
   isCustomStart?: boolean;
   onSignSelect?: (sign: RouteSign | null) => void;
   vehicleMode?: VehicleMode["id"] | string;
+  locationPin?: MapCoordinate;
+  locationPinColor?: string;
+  showFocusPin?: boolean;
 };
 
 const mapTileUrl = process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim()
@@ -453,14 +459,18 @@ export function NavigationMapView({
   routeSigns = [],
   signs,
   showCurrentLocation = true,
-  isNavigatingFeature = false,
   userCoordinate,
   hasLiveLocation = false,
   isCustomStart = false,
   onSignSelect,
   vehicleMode = 'DRIVING',
+  locationPin,
+  locationPinColor,
+  showFocusPin = false,
 }: NavigationMapViewProps) {
   const theme = useTheme();
+  const effectiveLocationPin = locationPin ?? (showFocusPin ? focusCoordinate : undefined);
+  const hasValidLocationPin = isValidCoordinate(effectiveLocationPin);
   const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
   const isBicycle = vehicleMode === 'CYCLING';
   const isWalking = vehicleMode === 'WALKING';
@@ -814,6 +824,16 @@ export function NavigationMapView({
             minZoom={11}
             zoom={16}
           />
+        ) : hasValidLocationPin ? (
+          <Camera
+            center={effectiveLocationPin}
+            duration={700}
+            easing="fly"
+            key={`location-pin-${focusRequestId}-${effectiveLocationPin[0]}-${effectiveLocationPin[1]}`}
+            maxZoom={19}
+            minZoom={11}
+            zoom={16}
+          />
         ) : routeBounds ? (
           <Camera
             bounds={routeBounds}
@@ -941,9 +961,16 @@ export function NavigationMapView({
 
         {destination ? (
           <Marker anchor="bottom" id="destination-location" lngLat={destination.coordinate}>
-            <View style={styles.destinationMarker}>
-              <Text style={styles.destinationMarkerText}>D</Text>
-            </View>
+            <MapLocationPin color="#EF4444" testID="map-destination-pin" />
+          </Marker>
+        ) : null}
+
+        {hasValidLocationPin && (!destination || destination.coordinate[0] !== effectiveLocationPin[0] || destination.coordinate[1] !== effectiveLocationPin[1]) ? (
+          <Marker anchor="bottom" id="location-pin" lngLat={effectiveLocationPin}>
+            <MapLocationPin
+              color={locationPinColor || '#EF4444'}
+              testID="map-location-pin"
+            />
           </Marker>
         ) : null}
       </Map>
@@ -1217,6 +1244,22 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     fontWeight: 900,
+  },
+  locationPinWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationPinIcon: {
+    textShadowColor: 'rgba(0, 0, 0, 0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  locationPinShadow: {
+    width: 10,
+    height: 4,
+    borderRadius: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    marginTop: -3,
   },
   calloutActualCrop: {
     width: 32,

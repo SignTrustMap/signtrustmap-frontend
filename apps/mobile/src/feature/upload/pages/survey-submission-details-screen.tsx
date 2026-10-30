@@ -918,6 +918,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View style={StyleSheet.absoluteFill}>
                     <NavigationMapView
                       focusCoordinate={startCoord}
+                      locationPin={!isVideoSubmission && startCoord ? startCoord : undefined}
+                      showFocusPin={!isVideoSubmission}
                       routeStart={isVideoSubmission ? startCoord : undefined}
                       isCustomStart={isVideoSubmission}
                       destination={
@@ -938,7 +940,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       }
                       showCurrentLocation={false}
                     />
-                    {isVideoSubmission ? (
+                    {isVideoSubmission || startCoord ? (
                       <Pressable
                         accessibilityLabel="Mở toàn màn hình xem lộ trình"
                         onPress={() => {
@@ -951,7 +953,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                               startLon: startCoord ? String(startCoord[0]) : undefined,
                               endLat: endCoord ? String(endCoord[1]) : undefined,
                               endLon: endCoord ? String(endCoord[0]) : undefined,
-                              title: 'Lộ trình khảo sát đã gửi',
+                              title: isVideoSubmission ? 'Lộ trình khảo sát đã gửi' : 'Vị trí khảo sát đã gửi',
                             },
                           });
                         }}
@@ -959,7 +961,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       />
                     ) : null}
                   </View>
-                  {isVideoSubmission ? (
+                  {isVideoSubmission || startCoord ? (
                     <AppButton
                       accessibilityLabel="Phóng to bản đồ xem trước"
                       onPress={() => {
@@ -972,7 +974,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                             startLon: startCoord ? String(startCoord[0]) : undefined,
                             endLat: endCoord ? String(endCoord[1]) : undefined,
                             endLon: endCoord ? String(endCoord[0]) : undefined,
-                            title: 'Lộ trình khảo sát đã gửi',
+                            title: isVideoSubmission ? 'Lộ trình khảo sát đã gửi' : 'Vị trí khảo sát đã gửi',
                           },
                         });
                       }}
