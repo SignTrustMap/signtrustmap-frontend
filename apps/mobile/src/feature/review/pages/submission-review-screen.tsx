@@ -581,7 +581,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const displayedReviewAction = recheckingPreviousAction;
   const submission = pendingSubmissions[0];
   const nextSubmission = pendingSubmissions[1];
-  const session = typeof useOptionalSession === 'function' ? useOptionalSession()?.session : undefined;
+  const optionalSession = useOptionalSession();
+  const session = optionalSession?.session;
   const [resolvedAddress, setResolvedAddress] = useState<string>();
 
   useEffect(() => {

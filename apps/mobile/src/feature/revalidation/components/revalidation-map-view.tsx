@@ -90,6 +90,15 @@ export function RevalidationMapView({
 
   const mapLibre = loadMapLibre();
 
+  useEffect(() => {
+    if (zoomLevel === undefined || !cameraRef.current) return;
+    cameraRef.current.setStop({
+      zoom: zoomLevel,
+      duration: 600,
+      easing: 'ease',
+    });
+  }, [zoomLevel, zoomRequestId]);
+
   if (!mapLibre) {
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
@@ -104,15 +113,6 @@ export function RevalidationMapView({
   }
 
   const { Camera, Map, Marker } = mapLibre;
-
-  useEffect(() => {
-    if (zoomLevel === undefined || !cameraRef.current) return;
-    cameraRef.current.setStop({
-      zoom: zoomLevel,
-      duration: 600,
-      easing: 'ease',
-    });
-  }, [zoomLevel, zoomRequestId]);
 
   return (
     <Map
