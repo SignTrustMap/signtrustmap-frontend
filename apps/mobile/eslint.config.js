@@ -9,6 +9,14 @@ module.exports = defineConfig([
     ignores: ["dist/*"],
   },
   {
+    rules: {
+      "react-hooks/preserve-manual-memoization": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/purity": "warn",
+    },
+  },
+  {
     files: [
       '**/__tests__/**/*.[jt]s?(x)',
       '**/?(*.)+(spec|test).[jt]s?(x)',

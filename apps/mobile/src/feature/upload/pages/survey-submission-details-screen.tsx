@@ -808,32 +808,6 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Mã khảo sát viên</Text>
-                  <View style={styles.metaValueContainer}>
-                    <Text
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      selectable
-                      style={[styles.metaValueMono, { color: theme.text }]}
-                    >
-                      {submission.surveyorId}
-                    </Text>
-                    <Pressable
-                      accessibilityLabel="Sao chép mã khảo sát viên"
-                      hitSlop={Spacing.half}
-                      onPress={() => handleCopyText(submission.surveyorId, 'surveyor')}
-                      style={styles.copyButton}
-                    >
-                      <MaterialCommunityIcons
-                        color={copiedTarget === 'surveyor' ? '#16A34A' : theme.placeholder}
-                        name={copiedTarget === 'surveyor' ? 'check' : 'content-copy'}
-                        size={16}
-                      />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View style={styles.metaRow}>
                   <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Thời gian ghi nhận</Text>
                   <View style={styles.metaValueContainer}>
                     <Text

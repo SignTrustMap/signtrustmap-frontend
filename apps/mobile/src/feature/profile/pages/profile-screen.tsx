@@ -148,7 +148,7 @@ export function ProfileScreen() {
   const handleLogOut = () => {
     Alert.alert(
       'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?',
+      'Bạn có muốn đăng xuất không?',
       [
         { text: 'Hủy', style: 'cancel' },
         {

@@ -31,70 +31,161 @@ import {
   type MissingRejectReasonKey,
 } from './components'
 
-function mapBackendReportToMissingSign(r: MissingTypeReportItem): MissingSignTypeReport {
+function mapBackendReportToMissingSign(r: MissingTypeReportItem | any): MissingSignTypeReport {
   let status: MissingSignTypeReport['status'] = 'Open'
-  if (r.status === 'APPROVED') status = 'Approved'
-  else if (r.status === 'REJECTED') status = 'Rejected'
-  else if (r.status === 'MERGED') status = 'Merged'
-  else if (r.status === 'ESCALATED_ADMIN') status = 'Escalated'
-  else if (r.status === 'INCOMPLETE') status = 'Incomplete'
-  else if (r.status === 'IN_REVIEW') status = 'Escalated'
+  const rawStatus = String(r.status || r.rawStatus || 'PENDING').toUpperCase()
+  if (rawStatus === 'APPROVED' || rawStatus === 'RESOLVED') status = 'Approved'
+  else if (rawStatus === 'REJECTED' || rawStatus === 'DISMISSED') status = 'Rejected'
+  else if (rawStatus === 'MERGED') status = 'Merged'
+  else if (rawStatus === 'ESCALATED_ADMIN' || rawStatus === 'ESCALATED' || rawStatus === 'IN_REVIEW') status = 'Escalated'
+  else if (rawStatus === 'INCOMPLETE' || rawStatus === 'NEEDS_INFO' || rawStatus === 'REQUEST_RECAPTURE') status = 'Incomplete'
+  else status = 'Open'
 
   const candidate = r.candidate
-  const rawCrop = candidate?.signCropUrl || r.cropImageUrl || null
-  const sampleImageUrl =
-    resolveImageUrl(rawCrop) ||
-    'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?w=500&auto=format&fit=crop&q=80'
-  const bestFrameUrl = resolveImageUrl(candidate?.bestFrameUrl) || undefined
+  const rawCrop =
+    candidate?.signCropUrl ||
+    candidate?.sign_crop_url ||
+    r.cropImageUrl ||
+    r.crop_image_url ||
+    r.signCropUrl ||
+    r.sign_crop_url ||
+    r.sampleImageUrl ||
+    r.sample_image_url ||
+    null
+
+  const sampleImageUrl = resolveImageUrl(rawCrop) || ''
+  const bestFrameUrl =
+    resolveImageUrl(candidate?.bestFrameUrl || candidate?.best_frame_url || r.bestFrameUrl || r.best_frame_url) ||
+    undefined
   const cropImageUrl = resolveImageUrl(rawCrop) || undefined
 
+  const lat =
+    candidate?.latitude ??
+    candidate?.lat ??
+    r.latitude ??
+    r.lat ??
+    10.7769
+  const lng =
+    candidate?.longitude ??
+    candidate?.lng ??
+    r.longitude ??
+    r.lng ??
+    106.7009
+
+  const proposedCatId =
+    r.proposedCategoryId ??
+    r.proposed_category_id ??
+    r.categoryId ??
+    r.category_id ??
+    null
+
+  const category = proposedCatId
+    ? `cat_${proposedCatId}`
+    : r.category
+      ? String(r.category)
+      : 'prohibitory'
+
+  const reporterId = r.reporterId || r.reporter_id || r.userId || r.user_id || undefined
+  const reportedBy =
+    r.reportedBy ||
+    r.reported_by ||
+    r.submittedBy ||
+    r.submitted_by ||
+    r.user?.name ||
+    r.userName ||
+    (reporterId ? `Reviewer #${reporterId.slice(0, 8)}` : 'Reviewer')
+
+  const createdAt = r.createdAt || r.created_at || '2026-10-01'
+
+  const aiConf =
+    typeof candidate?.confidenceScore === 'number'
+      ? candidate.confidenceScore
+      : typeof candidate?.confidence_score === 'number'
+        ? candidate.confidence_score
+        : typeof r.aiConfidence === 'number'
+          ? r.aiConfidence
+          : typeof r.confidenceScore === 'number'
+            ? r.confidenceScore
+            : typeof r.confidence === 'number'
+              ? r.confidence
+              : undefined
+
+  const roadAddress =
+    r.roadAddress ||
+    r.road_address ||
+    r.address ||
+    r.location ||
+    candidate?.location ||
+    candidate?.displayLocation ||
+    (lat != null && lng != null ? `${Number(lat).toFixed(5)}°, ${Number(lng).toFixed(5)}°` : 'TP. Hồ Chí Minh, Việt Nam')
+
   return {
-    id: r.id,
-    tempLabel: r.proposedName || r.suggestedNameVi || r.suggestedCode || 'Biển báo mới đề xuất',
-    category: r.proposedCategoryId ? `cat_${r.proposedCategoryId}` : 'prohibitory',
-    reportedBy: r.reporterId ? `Reviewer #${r.reporterId.slice(0, 8)}` : (r.submittedBy || 'Reviewer'),
-    reporterId: r.reporterId,
-    reportedAt: r.createdAt || '2026-10-01',
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-    resolvedAt: r.resolvedAt,
-    reviewedBy: r.reviewedBy,
-    lat: candidate?.latitude ?? 10.7769,
-    lng: candidate?.longitude ?? 106.7009,
-    roadAddress: candidate
-      ? `${candidate.latitude?.toFixed(5) ?? 10.7769}°, ${candidate.longitude?.toFixed(5) ?? 106.7009}°`
-      : 'TP. Hồ Chí Minh, Việt Nam',
-    aiConfidence: typeof candidate?.confidenceScore === 'number' ? candidate.confidenceScore : undefined,
+    id: String(r.id),
+    tempLabel:
+      r.proposedName ||
+      r.proposed_name ||
+      r.suggestedNameVi ||
+      r.suggested_name_vi ||
+      r.suggestedCode ||
+      r.suggested_code ||
+      r.tempLabel ||
+      'Biển báo mới đề xuất',
+    category,
+    reportedBy,
+    reporterId,
+    reportedAt: createdAt,
+    createdAt,
+    updatedAt: r.updatedAt || r.updated_at,
+    resolvedAt: r.resolvedAt || r.resolved_at,
+    reviewedBy: r.reviewedBy || r.reviewed_by,
+    lat: Number(lat),
+    lng: Number(lng),
+    roadAddress,
+    aiConfidence: aiConf != null ? (aiConf <= 1 ? Math.round(aiConf * 1000) / 10 : aiConf) : undefined,
     status,
-    rawStatus: r.status,
+    rawStatus: rawStatus as any,
     sampleImageUrl,
     bestFrameUrl,
     cropImageUrl,
-    reporterNote: r.description || 'Báo cáo biển báo chưa có trong danh mục chuẩn QCVN 41:2019',
-    similarCatalogEntries: ['P.102', 'P.103a'],
-    clipPrompt: r.suggestedNameEn || r.proposedName || 'A road traffic sign on street',
-    candidateId: r.candidateId,
-    proposedCategoryId: r.proposedCategoryId ?? (r as any).proposed_category_id ?? (r as any).categoryId ?? null,
+    reporterNote:
+      r.description ||
+      r.reporterNote ||
+      r.reporter_note ||
+      r.note ||
+      'Báo cáo biển báo chưa có trong danh mục chuẩn QCVN 41:2019',
+    similarCatalogEntries: Array.isArray(r.similarCatalogEntries)
+      ? r.similarCatalogEntries
+      : Array.isArray(r.similar_catalog_entries)
+        ? r.similar_catalog_entries
+        : ['P.102', 'P.103a'],
+    clipPrompt:
+      r.suggestedNameEn ||
+      r.suggested_name_en ||
+      r.proposedName ||
+      r.proposed_name ||
+      'A road traffic sign on street',
+    candidateId: r.candidateId || r.candidate_id || (candidate?.id ? String(candidate.id) : null),
+    proposedCategoryId: proposedCatId,
     suggestedShape:
       r.suggestedShape ||
-      (r as any).suggested_shape ||
-      (r as any).shape ||
-      (candidate as any)?.shape ||
-      (candidate as any)?.predictedSignType?.shape ||
+      r.suggested_shape ||
+      r.shape ||
+      candidate?.shape ||
+      candidate?.predictedSignType?.shape ||
       null,
     suggestedColorScheme:
       r.suggestedColorScheme ||
-      (r as any).suggested_color_scheme ||
-      (r as any).colorScheme ||
-      (r as any).color_scheme ||
-      (r as any).color ||
-      (candidate as any)?.colorScheme ||
-      (candidate as any)?.color_scheme ||
-      (candidate as any)?.predictedSignType?.colorScheme ||
-      (candidate as any)?.predictedSignType?.color ||
+      r.suggested_color_scheme ||
+      r.colorScheme ||
+      r.color_scheme ||
+      r.color ||
+      candidate?.colorScheme ||
+      candidate?.color_scheme ||
+      candidate?.predictedSignType?.colorScheme ||
+      candidate?.predictedSignType?.color ||
       null,
-    mergedIntoSignTypeId: r.mergedIntoSignTypeId,
-    staffNotes: r.staffNotes,
+    mergedIntoSignTypeId: r.mergedIntoSignTypeId || r.merged_into_sign_type_id || null,
+    staffNotes: r.staffNotes || r.staff_notes || null,
   }
 }
 
@@ -202,7 +293,9 @@ export default function MissingSignsPage() {
         catalogService.getMissingReports({ page: 1, pageSize: 100 }).catch(() => null),
       ])
 
-      if (response && Array.isArray(response.items)) {
+      const hasLiveItems = response && Array.isArray(response.items) && response.items.length > 0
+
+      if (hasLiveItems) {
         const mapped = response.items.map(mapBackendReportToMissingSign)
         setReports(mapped)
         setTotalCount(response.total ?? mapped.length)
@@ -250,17 +343,36 @@ export default function MissingSignsPage() {
         setKpiCounts({
           total: summaryRes.total ?? items.length,
           pending: items.filter((i) => i.status === 'PENDING').length,
-          escalated: items.filter((i) => i.status === 'ESCALATED_ADMIN').length,
+          escalated: items.filter((i) => i.status === 'ESCALATED_ADMIN' || i.status === 'IN_REVIEW').length,
           approved: items.filter((i) => i.status === 'APPROVED').length,
           merged: items.filter((i) => i.status === 'MERGED').length,
           incomplete: items.filter((i) => i.status === 'INCOMPLETE').length,
           rejected: items.filter((i) => i.status === 'REJECTED').length,
         })
+      } else {
+        setKpiCounts({
+          total: 0,
+          pending: 0,
+          escalated: 0,
+          approved: 0,
+          merged: 0,
+          incomplete: 0,
+          rejected: 0,
+        })
       }
     } catch (err: any) {
-      console.error('Failed to fetch real missing sign reports from API:', err)
+      console.warn('Live missing sign reports fetch failed:', err)
       setReports([])
       setTotalCount(0)
+      setKpiCounts({
+        total: 0,
+        pending: 0,
+        escalated: 0,
+        approved: 0,
+        merged: 0,
+        incomplete: 0,
+        rejected: 0,
+      })
     } finally {
       setIsLoading(false)
       window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
@@ -631,6 +743,18 @@ export default function MissingSignsPage() {
               }
             }
             setSelectedReport(rep)
+
+            if (rep.id) {
+              catalogService
+                .getMissingReportById(rep.id)
+                .then((fresh) => {
+                  if (fresh) {
+                    const freshMapped = mapBackendReportToMissingSign(fresh)
+                    setSelectedReport((cur) => (cur?.id === rep.id ? { ...cur, ...freshMapped } : cur))
+                  }
+                })
+                .catch(() => {})
+            }
           }}
         />
       )}
