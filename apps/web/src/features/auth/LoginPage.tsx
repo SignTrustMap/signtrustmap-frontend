@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/context/AuthContext'
+import { authService } from '@/api/services/auth.service'
 import { env } from '@/config/env'
 import { mockDemoAccounts, type DemoUserAccount } from '@/data'
 
@@ -55,6 +56,50 @@ export default function Login() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Handle Google OAuth callback redirect with ?token=...
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const token = params.get('token')
+    if (token) {
+      setIsLoading(true)
+      localStorage.setItem('stm_access_token', token)
+      authService
+        .getMe()
+        .then((profile) => {
+          const rawRoles = profile.roles || []
+          let role: 'driver' | 'surveyor' | 'reviewer' | 'staff' | 'admin' = 'driver'
+          const upper = rawRoles.map((r: string) => r.toUpperCase())
+          if (upper.includes('ADMIN')) role = 'admin'
+          else if (upper.includes('STAFF')) role = 'staff'
+          else if (upper.includes('REVIEWER')) role = 'reviewer'
+          else if (upper.includes('SURVEYOR')) role = 'surveyor'
+
+          const userObj = {
+            id: profile.id,
+            email: profile.email,
+            name: profile.fullName || profile.email.split('@')[0],
+            phone: profile.phone || undefined,
+            role,
+            label: role.charAt(0).toUpperCase() + role.slice(1),
+            icon: role === 'surveyor' ? '📹' : role === 'reviewer' ? '⚖️' : '🚗',
+            avatar: profile.avatarUrl || undefined,
+            credits: profile.walletBalance ?? 0,
+            trustScore: 90,
+            joinDate: new Date().toLocaleDateString('vi-VN'),
+          }
+          localStorage.setItem('stm_web_user', JSON.stringify(userObj))
+          toast.success(t('auth.login.success', { defaultValue: 'Đăng nhập thành công' }))
+          window.location.replace('/')
+        })
+        .catch((err) => {
+          localStorage.removeItem('stm_access_token')
+          localStorage.removeItem('stm_web_user')
+          toast.error(err?.message || 'Google authentication failed')
+          setIsLoading(false)
+        })
+    }
+  }, [location.search, t, toast])
 
   const leftAccounts = mockDemoAccounts.slice(0, 3)
   const rightAccounts = mockDemoAccounts.slice(3)
