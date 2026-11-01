@@ -2,9 +2,10 @@ name: Frontend CI
 
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [preview, main]
   push:
-    branches: [develop, main]
+    branches: [preview, main]
+  workflow_dispatch:
 
 concurrency:
   group: frontend-ci-${{ github.ref }}
@@ -12,15 +13,24 @@ concurrency:
 
 jobs:
   check:
+    name: Lint, Build, Typecheck & Unit Tests
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
-      - run: npm run ci
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, Build & Typecheck (Web, Ops, Mobile)
+        run: npm run ci
+
+      - name: Run Frontend Unit Tests
+        run: npm run test:unit:ci
