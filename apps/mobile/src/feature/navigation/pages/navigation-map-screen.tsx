@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Camera } from "expo-camera";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SymbolView } from "expo-symbols";
@@ -23,6 +23,7 @@ import {
   useGetSavedRouteSigns,
 } from "@/feature/saved-routes/hooks/use-saved-routes";
 import { NavigationMapView } from "../components/navigation-map-view";
+import { NavigationCompleteModal } from "../components/navigation-complete-modal";
 import {
   getNavigationRoute,
   type NavigationStep,
@@ -125,7 +126,20 @@ export function NavigationMapScreen() {
 
   const { data: savedRouteData } = useGetSavedRoute(activeSavedRouteId);
   const { data: savedRouteSignsData } = useGetSavedRouteSigns(activeSavedRouteId);
-  const { data: walletData } = useGetWallet();
+  const { data: walletData, refetch: refetchWallet } = useGetWallet({
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchWallet?.();
+    }, [refetchWallet]),
+  );
+
+  const [isCompleteModalVisible, setIsCompleteModalVisible] = useState(false);
+  const [lastNavigatedDestinationTitle, setLastNavigatedDestinationTitle] = useState<string | undefined>();
   const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
   const selectedDestination = useMemo(() => {
@@ -985,9 +999,22 @@ export function NavigationMapScreen() {
   };
 
   const handleCloseRoute = () => {
+    if (isNavigating) {
+      setLastNavigatedDestinationTitle(selectedDestination?.title);
+      setNavigationSession(undefined);
+      setActiveSavedRouteId(undefined);
+      resetReroute();
+      setIsCompleteModalVisible(true);
+      return;
+    }
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
+    router.replace("/home");
+  };
+
+  const handleDismissCompleteModal = () => {
+    setIsCompleteModalVisible(false);
     router.replace("/home");
   };
 
@@ -1430,6 +1457,12 @@ export function NavigationMapScreen() {
           onDismiss={handleDismissToast}
         />
       ) : null}
+
+      <NavigationCompleteModal
+        destinationTitle={lastNavigatedDestinationTitle ?? selectedDestination?.title}
+        onDismiss={handleDismissCompleteModal}
+        visible={isCompleteModalVisible}
+      />
     </View>
   );
 }

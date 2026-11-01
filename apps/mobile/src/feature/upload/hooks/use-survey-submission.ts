@@ -2,7 +2,6 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   completeSurveyUpload,
-  getLatestSurveyDraft,
   createSurveySubmission,
   updateSurveySubmission,
   submitSurveySubmission,
@@ -43,15 +42,6 @@ export const surveySubmissionKeys = {
     [...surveySubmissionKeys.all(accountId), 'session', sessionId] as const,
 };
 
-export function useGetLatestSurveyDraft(enabled = true) {
-  const { session } = useSession();
-  return useQuery({
-    queryKey: [...surveySubmissionKeys.all(session?.account.id), 'latest-draft'],
-    queryFn: session ? ({ signal }) => getLatestSurveyDraft(session.accessToken, signal) : skipToken,
-    enabled,
-    refetchOnMount: 'always',
-  });
-}
 
 export type InitializeSurveyUploadVariables = {
   submissionId: string;

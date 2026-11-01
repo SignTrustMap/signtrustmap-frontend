@@ -8,15 +8,23 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 // 1. Mock expo-router
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-jest.mock('expo-router', () => ({
-  useRouter: jest.fn(() => ({
-    push: mockPush,
-    replace: mockReplace,
-    canGoBack: () => true,
-    back: jest.fn(),
-  })),
-  useLocalSearchParams: jest.fn(),
-}));
+jest.mock('expo-router', () => {
+  const React = require('react');
+  return {
+    useRouter: jest.fn(() => ({
+      push: mockPush,
+      replace: mockReplace,
+      canGoBack: () => true,
+      back: jest.fn(),
+    })),
+    useLocalSearchParams: jest.fn(),
+    useFocusEffect: (cb: any) => {
+      React.useEffect(() => {
+        return cb();
+      }, [cb]);
+    },
+  };
+});
 
 // 2. Mock vector icons and expo UI modules
 jest.mock('@expo/vector-icons/AntDesign', () => 'AntDesign');
@@ -80,7 +88,7 @@ jest.mock('@/context/navigation-active-provider', () => ({
 }));
 
 jest.mock('@/feature/credits/hooks/use-wallet', () => ({
-  useGetWallet: jest.fn(() => ({ data: undefined })),
+  useGetWallet: jest.fn(() => ({ data: undefined, refetch: jest.fn() })),
 }));
 
 jest.mock('@/feature/notifications/hooks/use-notifications', () => ({

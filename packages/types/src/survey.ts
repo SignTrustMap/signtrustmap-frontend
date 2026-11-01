@@ -5,7 +5,7 @@
 
 export type SubmissionType = 'VIDEO_GPX' | 'SINGLE_IMAGE' | 'LIVE_TRIP'
 
-export type CoordinateSource = 'IMAGE_EXIF' | 'DEVICE_GPS' | 'MANUAL' | 'GPX_FILE' | 'LIVE_STREAM'
+export type CoordinateSource = 'FILE GPX' | 'GPS' | 'ẢNH'
 
 export type SurveyMediaType = 'VIDEO' | 'GPX' | 'IMAGE'
 

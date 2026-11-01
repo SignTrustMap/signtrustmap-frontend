@@ -1,9 +1,11 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -20,6 +22,7 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { getProfile, updateProfile } from '@/api/auth/auth';
+import { AvatarCropModal } from '../components/avatar-crop-modal';
 
 function getInitials(displayName?: string) {
   if (!displayName) return 'ST';
@@ -39,6 +42,10 @@ export function EditProfileScreen() {
 
   const [fullName, setFullName] = useState(session?.account.displayName ?? '');
   const [phone, setPhone] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(session?.account.avatarUrl ?? null);
+  const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
+  const [selectedPickerUri, setSelectedPickerUri] = useState<string | null>(null);
+  const [isCropModalVisible, setIsCropModalVisible] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -50,6 +57,7 @@ export function EditProfileScreen() {
           if (isMounted) {
             if (profile.fullName) setFullName(profile.fullName);
             if (profile.phone) setPhone(profile.phone);
+            if (profile.avatarUrl !== undefined) setAvatarUrl(profile.avatarUrl ?? null);
           }
         })
         .catch(() => {
@@ -66,6 +74,43 @@ export function EditProfileScreen() {
     };
   }, [session?.accessToken]);
 
+  const handlePickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Quyền truy cập thư viện',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để cập nhật ảnh đại diện.',
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        setSelectedPickerUri(result.assets[0].uri);
+        setIsCropModalVisible(true);
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh: ' + (err.message || ''));
+    }
+  };
+
+  const handleCropConfirm = (croppedUri: string) => {
+    setTempAvatarUri(croppedUri);
+    setIsCropModalVisible(false);
+    setSelectedPickerUri(null);
+  };
+
+  const handleCropCancel = () => {
+    setIsCropModalVisible(false);
+    setSelectedPickerUri(null);
+  };
+
   const handleSave = async () => {
     if (!fullName.trim()) {
       Alert.alert('Thông báo', 'Họ và tên không được để trống.');
@@ -79,16 +124,22 @@ export function EditProfileScreen() {
 
     setIsSaving(true);
     try {
+      const finalAvatar = tempAvatarUri !== null ? tempAvatarUri : (avatarUrl ?? undefined);
       const updated = await updateProfile(
         {
           fullName: fullName.trim(),
           phone: phone.trim() ? phone.trim() : undefined,
+          avatarUrl: finalAvatar,
         },
         session.accessToken,
       );
 
       const newDisplayName = updated.fullName || fullName.trim();
-      await updateAccount?.({ displayName: newDisplayName });
+      const newAvatarUrl = updated.avatarUrl !== undefined ? updated.avatarUrl : finalAvatar;
+      await updateAccount?.({
+        displayName: newDisplayName,
+        avatarUrl: newAvatarUrl,
+      });
 
       Alert.alert('Thành công', 'Thông tin tài khoản đã được cập nhật.', [
         {
@@ -134,18 +185,43 @@ export function EditProfileScreen() {
           >
             {/* Avatar Section */}
             <View style={styles.avatarSection}>
-              <View
-                style={[
-                  styles.avatar,
-                  { backgroundColor: theme.secondary, borderColor: theme.primary },
-                ]}
+              <Pressable
+                accessibilityHint="Chạm để chọn và điều chỉnh ảnh đại diện mới"
+                accessibilityLabel="Thay đổi ảnh đại diện"
+                accessibilityRole="button"
+                disabled={isSaving}
+                onPress={handlePickAvatar}
+                style={styles.avatarWrapper}
               >
-                <Text style={[styles.avatarText, { color: theme.primary }]}>
-                  {getInitials(fullName || session?.account.displayName)}
-                </Text>
-              </View>
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: theme.secondary, borderColor: theme.primary },
+                  ]}
+                >
+                  {tempAvatarUri || avatarUrl ? (
+                    <Image
+                      resizeMode="cover"
+                      source={{ uri: tempAvatarUri || avatarUrl! }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={[styles.avatarText, { color: theme.primary }]}>
+                      {getInitials(fullName || session?.account.displayName)}
+                    </Text>
+                  )}
+                </View>
+
+                {/* White plus icon in black circular background at bottom right of avatar */}
+                <View style={styles.plusBadge}>
+                  <MaterialCommunityIcons color="#FFFFFF" name="plus" size={16} />
+                </View>
+              </Pressable>
+
               <Text style={[styles.avatarHint, { color: theme.grey }]}>
-                Ảnh đại diện dựa trên tên tài khoản
+                {tempAvatarUri
+                  ? 'Ảnh mới (chưa lưu, nhấn Lưu thay đổi bên dưới)'
+                  : 'Chạm vào ảnh để thay đổi ảnh đại diện'}
               </Text>
             </View>
 
@@ -287,6 +363,13 @@ export function EditProfileScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <AvatarCropModal
+          imageUri={selectedPickerUri}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+          visible={isCropModalVisible}
+        />
       </SafeAreaView>
     </View>
   );
@@ -337,6 +420,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.four,
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: Spacing.two,
+    alignSelf: 'center',
+  },
   avatar: {
     width: 90,
     height: 90,
@@ -344,7 +432,29 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.two,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  plusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
   },
   avatarText: {
     fontFamily: Fonts.title,

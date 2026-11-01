@@ -81,7 +81,19 @@ jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
     refetch: jest.fn(),
   }),
   useSaveSurveyDraft: () => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  }),
+  useCreateSurveySubmission: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  }),
+  useInitializeSurveyUpload: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ sessionId: 'session-123' }),
+  }),
+  useUploadSurveyChunk: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
+  }),
+  useCompleteSurveyUpload: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
   }),
   useUpdateSurveySubmission: () => ({
     mutateAsync: jest.fn(),

@@ -49,7 +49,6 @@ import type {
 const submissionTypeLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Khảo sát hình ảnh',
   VIDEO_GPX: 'Khảo sát Video & GPX',
-  LIVE_TRIP: 'Ghi nhận chuyến đi trực tiếp',
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
@@ -113,7 +112,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
   const router = useRouter();
   const theme = useTheme();
 
-  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | undefined>();
   const [copiedTarget, setCopiedTarget] = useState<'submission' | 'surveyor' | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isRetryModalVisible, setIsRetryModalVisible] = useState(false);
@@ -576,7 +575,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   accessibilityLabel="Phóng to ảnh khảo sát"
                   accessibilityRole="button"
                   disabled={!primaryImageUrl}
-                  onPress={() => setIsImageZoomed(true)}
+                  onPress={() => setZoomedImageUrl(primaryImageUrl)}
                   style={styles.imagePressable}
                 >
                   <View style={styles.imagePlaceholder}>
@@ -683,7 +682,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                         if (isVideo) {
                           void handleOpenVideo(url);
                         } else if (isImage) {
-                          setIsImageZoomed(true);
+                          setZoomedImageUrl(url);
                         }
                       }}
                       style={[
@@ -877,7 +876,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 <View style={styles.cardHeader}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={20} />
                   <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    {isVideoSubmission ? 'Xem trước lộ trình khảo sát (S → D)' : 'Xem trước vị trí'}
+                    Vị trí
                   </Text>
                 </View>
                 <View
@@ -936,8 +935,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     ) : null}
                   </View>
                   {isVideoSubmission || startCoord ? (
-                    <AppButton
+                    <Pressable
                       accessibilityLabel="Phóng to bản đồ xem trước"
+                      accessibilityRole="button"
                       onPress={() => {
                         const gpx = normalizedMediaFiles.find((m) => m.mediaType === 'GPX')?.fileUrl;
                         router.push({
@@ -952,21 +952,19 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           },
                         });
                       }}
-                      style={[
+                      style={({ pressed }) => [
                         styles.mapZoomButton,
-                        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                        {
+                          backgroundColor: theme.backgroundElement,
+                          borderColor: theme.border,
+                          opacity: pressed ? 0.8 : 1,
+                        },
                       ]}
-                      variant="ghost"
                     >
-                      <AntDesign name="expand" size={18} color={theme.primary} />
-                    </AppButton>
+                      <MaterialCommunityIcons color={theme.primary} name="fullscreen" size={20} />
+                    </Pressable>
                   ) : null}
                 </View>
-                <Text style={[styles.mapCoordinateSubtext, { color: theme.textSecondary }]}>
-                  {isVideoSubmission && endCoord
-                    ? `Bắt đầu (S): ${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)} → Kết thúc (D): ${endCoord[1].toFixed(6)}, ${endCoord[0].toFixed(6)}`
-                    : `${startCoord[1].toFixed(6)}, ${startCoord[0].toFixed(6)}`}
-                </Text>
               </View>
             ) : null}
 
@@ -990,14 +988,83 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 <View style={styles.candidateList}>
                   {statusData.candidates.map((cand: any, idx: number) => {
-                    const candidateImg = cand.crop_url || cand.image_url || cand.imageUrl;
-                    const signLabel = cand.sign_type || cand.label || cand.type || `Biển #${idx + 1}`;
-                    const confidence = typeof cand.confidence === 'number' ? Math.round(cand.confidence * 100) : null;
-                    const resolvedImg = candidateImg ? resolveS3Url(candidateImg) : undefined;
+                    const rawCrop =
+                      cand.signCropUrl ||
+                      cand.sign_crop_url ||
+                      cand.cropUrl ||
+                      cand.crop_url ||
+                      cand.bestFrameUrl ||
+                      cand.best_frame_url ||
+                      cand.imageUrl ||
+                      cand.image_url;
+                    const resolvedImg = rawCrop ? resolveS3Url(rawCrop) : undefined;
+
+                    const signType =
+                      cand.predictedSignType ||
+                      cand.predicted_sign_type ||
+                      cand.signType ||
+                      cand.sign_type;
+                    const signCode =
+                      signType?.signCode ||
+                      signType?.sign_code ||
+                      cand.signCode ||
+                      cand.sign_code ||
+                      cand.code;
+                    const signName =
+                      signType?.nameVi ||
+                      signType?.name_vi ||
+                      cand.nameVi ||
+                      cand.name_vi ||
+                      signType?.nameEn ||
+                      signType?.name_en ||
+                      cand.signName ||
+                      cand.name ||
+                      cand.label ||
+                      (signCode ? `Biển ${signCode}` : `Biển #${idx + 1}`);
+
+                    const rawScore =
+                      cand.confidence ??
+                      cand.confidenceScore ??
+                      cand.confidence_score ??
+                      cand.score;
+                    const confidence =
+                      typeof rawScore === 'number'
+                        ? Math.round(rawScore <= 1 ? rawScore * 100 : rawScore)
+                        : null;
+
+                    const timestampSec =
+                      cand.timestampSec ??
+                      cand.timestamp_sec ??
+                      (typeof cand.timestamp_ms === 'number'
+                        ? Math.round(cand.timestamp_ms / 1000)
+                        : null) ??
+                      cand.cropFrameSec;
+
+                    const rawStatus = String(cand.status || cand.reviewStatus || '').toUpperCase();
+                    const statusLabel =
+                      rawStatus === 'APPROVED'
+                        ? 'Đã duyệt'
+                        : rawStatus === 'REJECTED'
+                          ? 'Từ chối'
+                          : rawStatus === 'PENDING'
+                            ? 'Chờ duyệt'
+                            : undefined;
+                    const statusColor =
+                      rawStatus === 'APPROVED'
+                        ? '#16A34A'
+                        : rawStatus === 'REJECTED'
+                          ? '#EF4444'
+                          : '#F59E0B';
 
                     return (
-                      <View
+                      <Pressable
                         key={cand.id || idx}
+                        accessibilityLabel={`Biển báo ${signName}`}
+                        accessibilityRole="button"
+                        disabled={!resolvedImg}
+                        onPress={() => {
+                          if (resolvedImg) setZoomedImageUrl(resolvedImg);
+                        }}
                         style={[
                           styles.candidateCard,
                           {
@@ -1007,29 +1074,81 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                         ]}
                       >
                         {resolvedImg ? (
-                          <Image
-                            contentFit="cover"
-                            source={{ uri: resolvedImg }}
-                            style={styles.candidateThumbnail}
-                          />
-                        ) : null}
-                        <View style={styles.candidateInfo}>
-                          <Text style={[styles.candidateTitle, { color: theme.text }]} numberOfLines={1}>
-                            {signLabel}
-                          </Text>
-                          {confidence != null ? (
-                            <View style={styles.confidenceBadge}>
-                              <MaterialCommunityIcons name="check-circle" size={12} color="#16A34A" />
-                              <Text style={styles.confidenceText}>Độ tin cậy: {confidence}%</Text>
+                          <View style={styles.candidateThumbnailWrap}>
+                            <Image
+                              contentFit="cover"
+                              source={{ uri: resolvedImg }}
+                              style={styles.candidateThumbnail}
+                              transition={150}
+                            />
+                            <View style={styles.candidateZoomBadge}>
+                              <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={11} />
                             </View>
-                          ) : null}
-                          {cand.timestamp_ms != null ? (
+                          </View>
+                        ) : (
+                          <View
+                            style={[
+                              styles.candidateThumbnailPlaceholder,
+                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                            ]}
+                          >
+                            <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={24} />
+                          </View>
+                        )}
+                        <View style={styles.candidateInfo}>
+                          <View style={styles.candidateTitleRow}>
+                            {signCode ? (
+                              <View
+                                style={[
+                                  styles.signCodeBadge,
+                                  {
+                                    backgroundColor: `${theme.primary}18`,
+                                    borderColor: `${theme.primary}40`,
+                                  },
+                                ]}
+                              >
+                                <Text style={[styles.signCodeText, { color: theme.primary }]}>
+                                  {signCode}
+                                </Text>
+                              </View>
+                            ) : null}
+                            <Text
+                              numberOfLines={2}
+                              style={[styles.candidateTitle, { color: theme.text }]}
+                            >
+                              {signName}
+                            </Text>
+                          </View>
+
+                          <View style={styles.candidateMetaRow}>
+                            {confidence != null ? (
+                              <View style={styles.confidenceBadge}>
+                                <MaterialCommunityIcons color="#16A34A" name="check-circle" size={13} />
+                                <Text style={styles.confidenceText}>Độ tin cậy: {confidence}%</Text>
+                              </View>
+                            ) : null}
+
+                            {statusLabel ? (
+                              <View
+                                style={[
+                                  styles.candidateStatusBadge,
+                                  { backgroundColor: `${statusColor}18` },
+                                ]}
+                              >
+                                <Text style={[styles.candidateStatusText, { color: statusColor }]}>
+                                  {statusLabel}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+
+                          {timestampSec != null ? (
                             <Text style={[styles.candidateMeta, { color: theme.placeholder }]}>
-                              Thời điểm trong video: {Math.round(cand.timestamp_ms / 1000)}s
+                              Thời điểm: {Math.floor(timestampSec / 60)}:{String(timestampSec % 60).padStart(2, '0')} ({timestampSec}s)
                             </Text>
                           ) : null}
                         </View>
-                      </View>
+                      </Pressable>
                     );
                   })}
                 </View>
@@ -1041,25 +1160,25 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
         {/* Full-Screen Image Zoom Modal */}
         <Modal
           animationType="fade"
-          onRequestClose={() => setIsImageZoomed(false)}
+          onRequestClose={() => setZoomedImageUrl(undefined)}
           transparent
-          visible={isImageZoomed}
+          visible={Boolean(zoomedImageUrl)}
         >
           <View style={styles.zoomBackdrop}>
             <SafeAreaView style={styles.zoomSafeArea}>
               <Pressable
                 accessibilityLabel="Đóng xem phóng to"
                 accessibilityRole="button"
-                onPress={() => setIsImageZoomed(false)}
+                onPress={() => setZoomedImageUrl(undefined)}
                 style={styles.zoomCloseBtn}
               >
                 <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
               </Pressable>
 
-              {primaryImageUrl ? (
+              {zoomedImageUrl ? (
                 <Image
                   contentFit="contain"
-                  source={{ uri: primaryImageUrl }}
+                  source={{ uri: zoomedImageUrl }}
                   style={styles.zoomedImage}
                 />
               ) : null}
@@ -1817,24 +1936,71 @@ const styles = StyleSheet.create({
   candidateCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.two,
+    gap: 12,
+    padding: 12,
     borderRadius: Rounded.md,
     borderWidth: 1,
   },
-  candidateThumbnail: {
-    width: 56,
-    height: 56,
+  candidateThumbnailWrap: {
+    position: 'relative',
+    width: 60,
+    height: 60,
     borderRadius: Rounded.sm,
+    overflow: 'hidden',
+  },
+  candidateThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: Rounded.sm,
+  },
+  candidateZoomBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 8,
+    padding: 2,
+  },
+  candidateThumbnailPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   candidateInfo: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+  },
+  candidateTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  signCodeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  signCodeText: {
+    fontFamily: Fonts.mono,
+    fontSize: 11,
+    fontWeight: '700',
   },
   candidateTitle: {
     fontFamily: Fonts.body,
     fontSize: 14,
     fontWeight: '700',
+    flex: 1,
+  },
+  candidateMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   confidenceBadge: {
     flexDirection: 'row',
@@ -1847,21 +2013,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#16A34A',
   },
-  candidateMeta: {
+  candidateStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Rounded.sm,
+  },
+  candidateStatusText: {
     fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  candidateMeta: {
+    fontFamily: Fonts.mono,
     fontSize: 11,
   },
   mapZoomButton: {
     position: 'absolute',
-    top: Spacing.two,
+    bottom: Spacing.two,
     right: Spacing.two,
     width: 36,
     height: 36,
-    borderRadius: Rounded.round,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
-    elevation: 3,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
 });

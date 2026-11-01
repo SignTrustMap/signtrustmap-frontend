@@ -161,11 +161,13 @@ export function useSubmitRevalidationEvidence() {
       taskIdOrSignId,
       data,
       mediaFile,
+      accessToken,
     }: {
       taskIdOrSignId: string;
       data: SubmitRevalidationEvidenceDto;
       mediaFile?: { uri: string; fileName?: string; mimeType?: string };
-    }) => submitRevalidationEvidence(taskIdOrSignId, data, mediaFile),
+      accessToken?: string;
+    }) => submitRevalidationEvidence(taskIdOrSignId, data, mediaFile, accessToken),
     onSuccess: (_, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['task-evidences', variables.taskIdOrSignId] });
       void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
@@ -176,6 +178,8 @@ export function useSubmitRevalidationEvidence() {
     },
   });
 }
+
+export const useSubmitRevalidation = useSubmitRevalidationEvidence;
 
 export function useVoteOnRevalidationEvidence() {
   const queryClient = useQueryClient();

@@ -14,13 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppButton } from '@/components/button';
 import {
-  CANNOT_SAVE_DRAFT_MESSAGE,
   VIDEO_NO_GPS_DATA_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AndroidGalleryModal } from '@/feature/upload/components/android-gallery-modal';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
-import { useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { useSurveyMediaPicker } from '@/feature/upload/hooks/use-survey-media-picker';
 import {
   isValidGpsCoordinates,
@@ -34,8 +32,6 @@ export type { SelectedGpxFile, SelectedSurveyMedia };
 export function NewSurveyRecordScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { draftId } = useLocalSearchParams<{ draftId?: string }>();
-  const saveDraft = useSaveSurveyDraft();
 
   const picker = useSurveyMediaPicker();
   const {
@@ -64,12 +60,9 @@ export function NewSurveyRecordScreen() {
   } = picker;
 
   const isFocused = useRef(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const scanInProgress = useRef(false);
   const scanFinished = useRef(false);
-  const savedDraftId = useRef<string | undefined>(undefined);
-  const savedBatchIds = useRef<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,20 +73,23 @@ export function NewSurveyRecordScreen() {
     }, []),
   );
 
-  const openSavedDraft = () => {
-    if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
+  const openDetails = () => {
+    if (!isFocused.current) return;
     setIsScanning(false);
-    setIsSaving(false);
     const initialAsset = selectedAssets[0];
     const initialGps = initialAsset?.gps ?? null;
     router.replace({
       pathname: '/work/new-survey/details',
       params: {
-        submissionId: savedDraftId.current,
-        ...(savedBatchIds.current.length > 1 ? { batchSubmissionIds: savedBatchIds.current.join(',') } : {}),
+        imageUri: initialAsset?.uri,
+        imageName: initialAsset?.fileName ?? undefined,
+        imageMimeType: initialAsset?.mimeType,
+        imageType: initialAsset?.type,
         ...(initialGps ? {
           startLat: String(initialGps.latitude),
           startLon: String(initialGps.longitude),
+          latitude: String(initialGps.latitude),
+          longitude: String(initialGps.longitude),
         } : {}),
         ...(initialAsset?.duration ? {
           duration: String(Math.round(initialAsset.duration)),
@@ -106,10 +102,9 @@ export function NewSurveyRecordScreen() {
     });
   };
 
-  const handleSubmitRecord = async () => {
+  const handleSubmitRecord = () => {
     if (selectedAssets.length === 0 || isOpeningGallery || scanInProgress.current) return;
 
-    // Check if any video asset lacks GPX/GPS data before moving to details screen
     for (const asset of selectedAssets) {
       if (asset.type === 'video') {
         const hasAssetGps = isValidGpsCoordinates(asset.gps);
@@ -122,70 +117,14 @@ export function NewSurveyRecordScreen() {
 
     scanInProgress.current = true;
     scanFinished.current = false;
-    savedDraftId.current = undefined;
-    savedBatchIds.current = [];
     setPickerError(undefined);
-    setIsSaving(true);
     setIsScanning(true);
-
-    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
-    // Call saveDraft for all selected assets concurrently while scan modal is active
-    const saveTasks = selectedAssets.map(async (asset, i) => {
-      const isVideo = asset.type === 'video';
-      const parsedCaptureTime = asset.capturedAt ? Date.parse(asset.capturedAt) : NaN;
-      const isCaptureValid =
-        !Number.isNaN(parsedCaptureTime) &&
-        Date.now() - parsedCaptureTime >= 0 &&
-        Date.now() - parsedCaptureTime < THIRTY_DAYS_MS;
-      const safeCapturedAt = isCaptureValid ? asset.capturedAt! : new Date().toISOString();
-
-      return saveDraft(
-        {
-          fileName: asset.fileName ?? undefined,
-          mimeType: asset.mimeType,
-          type: asset.type,
-          uri: asset.uri,
-          startLat: asset.gps?.latitude,
-          startLon: asset.gps?.longitude,
-        },
-        {
-          submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-          capturedAt: safeCapturedAt,
-          coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
-          ...(asset.gps ?? {}),
-        },
-        draftId && i === 0 ? draftId : undefined,
-        selectedGpxFile,
-      );
-    });
-
-    Promise.all(saveTasks)
-      .then((savedIds) => {
-        if (savedIds.length > 0) {
-          savedDraftId.current = savedIds[0];
-          savedBatchIds.current = savedIds;
-          if (scanFinished.current) {
-            openSavedDraft();
-          }
-        }
-      })
-      .catch((error) => {
-        console.warn('[Surveyor] Unable to save survey draft:', error);
-        setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
-        setIsScanning(false);
-        setIsSaving(false);
-      })
-      .finally(() => {
-        scanInProgress.current = false;
-      });
   };
 
   const handleScanComplete = () => {
+    scanInProgress.current = false;
     scanFinished.current = true;
-    if (savedDraftId.current) {
-      openSavedDraft();
-    }
+    openDetails();
   };
 
   const selectedAssetIds = selectedAssets
@@ -199,13 +138,8 @@ export function NewSurveyRecordScreen() {
           imageUri={selectedAsset.uri}
           isVideo={selectedAsset.type === 'video'}
           onCancel={() => {
-            scanFinished.current = true;
-            if (savedDraftId.current) {
-              openSavedDraft();
-            } else {
-              setIsScanning(false);
-              setIsSaving(false);
-            }
+            scanInProgress.current = false;
+            setIsScanning(false);
           }}
           onComplete={handleScanComplete}
         />
@@ -446,7 +380,7 @@ export function NewSurveyRecordScreen() {
                     </Text>
                     <AppButton
                       accessibilityLabel="Tải lên tệp GPX hành trình"
-                      disabled={isScanning || isSaving}
+                      disabled={isScanning}
                       onPress={pickGpx}
                       pressedOpacity={0.78}
                       style={[
@@ -579,7 +513,7 @@ export function NewSurveyRecordScreen() {
                     <>
                       <AppButton
                         accessibilityLabel="Tải lên tệp GPX"
-                        disabled={isScanning || isSaving}
+                        disabled={isScanning}
                         onPress={pickGpx}
                         pressedOpacity={0.78}
                         style={[
@@ -620,17 +554,14 @@ export function NewSurveyRecordScreen() {
               selectedAssets.length === 0 ||
               isOpeningGallery ||
               isScanning ||
-              isSaving ||
               isAnyVideoMissingGpx
             }
             label={
-              isSaving
-                ? 'Đang lưu bản nháp...'
-                : isAnyVideoMissingGpx
-                  ? 'Cần tải lên tệp GPX cho video để tiếp tục'
-                  : selectedAssets.length > 1
-                    ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
-                    : 'Tiếp tục ghi nhận'
+              isAnyVideoMissingGpx
+                ? 'Cần tải lên tệp GPX cho video để tiếp tục'
+                : selectedAssets.length > 1
+                  ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
+                  : 'Tiếp tục ghi nhận'
             }
             onPress={handleSubmitRecord}
             style={styles.submitButton}

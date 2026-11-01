@@ -175,25 +175,23 @@ function RevalidationReviewSkeleton() {
 type RevalidationBottomSheetProps = {
   type?: SheetType;
   onClose: () => void;
-  onConfirm: (note: string, suggestedSignTypeId?: number) => void;
+  onConfirm: (note: string) => void;
 };
 
 function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBottomSheetProps) {
   const theme = useTheme();
   const [note, setNote] = useState('');
-  const [selectedSign, setSelectedSign] = useState<CatalogSign | undefined>();
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const title =
     type === 'changed'
-      ? 'Đổi loại biển báo'
+      ? 'Biển báo đã thay đổi'
       : type === 'removed'
         ? 'Xác nhận biển đã gỡ bỏ'
         : 'Đánh dấu không rõ / Không hợp lệ';
 
   const helperText =
     type === 'changed'
-      ? 'Chọn loại biển báo thực tế quan sát được và giải thích điểm khác biệt:'
+      ? 'Nhập giải thích hoặc ghi chú về sự thay đổi của biển báo thực tế (tùy chọn):'
       : type === 'removed'
         ? 'Xác nhận rằng biển báo giao thông không còn hiện diện tại vị trí này:'
         : 'Nêu rõ lý do minh chứng không rõ ràng (ví dụ: mờ, bị che khuất, chói sáng ban đêm, sai vị trí):';
@@ -204,14 +202,12 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
   const canConfirm = true;
 
   const handleConfirm = () => {
-    onConfirm(note, selectedSign?.id);
+    onConfirm(note);
     setNote('');
-    setSelectedSign(undefined);
   };
 
   const handleClose = () => {
     setNote('');
-    setSelectedSign(undefined);
     onClose();
   };
 
@@ -254,99 +250,6 @@ function RevalidationBottomSheet({ type, onClose, onConfirm }: RevalidationBotto
               style={styles.sheetBodyScroll}
             >
               <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>{helperText}</Text>
-              {type === 'changed' ? (
-                <View style={styles.reasonInputGroup}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>
-                    Biển báo thay thế thực tế (tùy chọn)
-                  </Text>
-
-                  {selectedSign ? (
-                    <View
-                      style={[
-                        styles.selectedSignCard,
-                        {
-                          backgroundColor: theme.background,
-                          borderColor: theme.primary,
-                        },
-                      ]}
-                    >
-                      <View style={[styles.selectedSignImageWrapper, { backgroundColor: theme.neutral }]}>
-                        {selectedSign.representativeImageKey ? (
-                          <Image
-                            contentFit="contain"
-                            source={{ uri: resolveS3Url(selectedSign.representativeImageKey) }}
-                            style={styles.selectedSignImage}
-                          />
-                        ) : (
-                          <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={26} />
-                        )}
-                      </View>
-                      <View style={styles.selectedSignInfo}>
-                        <View style={styles.selectedSignBadgeRow}>
-                          <View style={[styles.selectedSignCodeBadge, { backgroundColor: theme.primary }]}>
-                            <Text style={styles.selectedSignCodeText}>{selectedSign.signCode}</Text>
-                          </View>
-                          <Text numberOfLines={1} style={[styles.selectedSignCategoryText, { color: theme.textSecondary }]}>
-                            {(selectedSign.category as any)?.nameVi || selectedSign.category?.nameEn}
-                          </Text>
-                        </View>
-                        <Text numberOfLines={2} style={[styles.selectedSignNameText, { color: theme.text }]}>
-                          {selectedSign.nameVi || selectedSign.nameEn}
-                        </Text>
-                      </View>
-                      <View style={styles.selectedSignActions}>
-                        <Pressable
-                          accessibilityLabel="Đổi biển báo khác"
-                          hitSlop={8}
-                          onPress={() => setIsPickerOpen(true)}
-                          style={[styles.changeSignBtn, { backgroundColor: theme.backgroundSelected }]}
-                        >
-                          <MaterialCommunityIcons color={theme.primary} name="pencil-outline" size={18} />
-                        </Pressable>
-                        <Pressable
-                          accessibilityLabel="Bỏ chọn biển báo"
-                          hitSlop={8}
-                          onPress={() => setSelectedSign(undefined)}
-                          style={[styles.changeSignBtn, { backgroundColor: theme.neutral }]}
-                        >
-                          <MaterialCommunityIcons color={theme.textSecondary} name="close" size={18} />
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <Pressable
-                      accessibilityLabel="Mở danh mục chọn biển báo"
-                      accessibilityRole="button"
-                      onPress={() => setIsPickerOpen(true)}
-                      style={[
-                        styles.signPickerTrigger,
-                        {
-                          backgroundColor: theme.background,
-                          borderColor: theme.border,
-                        },
-                      ]}
-                    >
-                      <View style={styles.signPickerTriggerLeft}>
-                        <MaterialCommunityIcons color={theme.primary} name="magnify" size={20} />
-                        <Text style={[styles.signPickerTriggerText, { color: theme.placeholder }]}>
-                          Chọn biển báo từ danh mục (nếu có)...
-                        </Text>
-                      </View>
-                      <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
-                    </Pressable>
-                  )}
-
-                  {/* Sign Picker Modal */}
-                  <RevalidationSignPickerModal
-                    onClose={() => setIsPickerOpen(false)}
-                    onSelectSign={(sign) => {
-                      setSelectedSign(sign);
-                    }}
-                    selectedSignId={selectedSign?.id}
-                    visible={isPickerOpen}
-                  />
-                </View>
-              ) : null}
               <View style={styles.reasonInputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
                   Ghi chú của thẩm định viên (tùy chọn)
@@ -763,7 +666,7 @@ export function RevalidationReviewScreen() {
                 {/* Floating Top-Left Tab: Switch between Evidence and Baseline Original Sign */}
                 <View style={styles.imageSourceToggleContainer}>
                   <Pressable
-                    accessibilityLabel="Xem ảnh bằng chứng"
+                    accessibilityLabel="Xem ảnh mới"
                     accessibilityRole="tab"
                     onPress={() => setViewMode('evidence')}
                     style={[
@@ -778,7 +681,7 @@ export function RevalidationReviewScreen() {
                         viewMode === 'evidence' && styles.imageSourcePillTextActive,
                       ]}
                     >
-                      Ảnh bằng chứng
+                      Ảnh mới
                     </Text>
                   </Pressable>
 
@@ -798,7 +701,7 @@ export function RevalidationReviewScreen() {
                         viewMode === 'baseline' && styles.imageSourcePillTextActive,
                       ]}
                     >
-                      Ảnh gốc
+                      Ảnh cũ
                     </Text>
                   </Pressable>
                 </View>
@@ -1120,8 +1023,8 @@ export function RevalidationReviewScreen() {
       {/* Decision Note Bottom Sheet */}
       <RevalidationBottomSheet
         onClose={() => setActiveSheet(undefined)}
-        onConfirm={(note, suggestedSignTypeId) => {
-          if (activeSheet === 'changed') handleVote('CHANGED', note, suggestedSignTypeId);
+        onConfirm={(note) => {
+          if (activeSheet === 'changed') handleVote('CHANGED', note);
           else if (activeSheet === 'removed') handleVote('REMOVED', note);
           else if (activeSheet === 'unclear') handleVote('UNCLEAR', note);
           setActiveSheet(undefined);

@@ -1,4 +1,4 @@
-﻿import AntDesign from '@expo/vector-icons/AntDesign';
+import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
@@ -14,7 +14,6 @@ import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types
 const submissionLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Khảo sát hình ảnh',
   VIDEO_GPX: 'Khảo sát Video',
-  LIVE_TRIP: 'Chuyến đi trực tiếp',
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
