@@ -27,7 +27,9 @@ export type ReviewHistoryItem = {
   submission: ReviewSubmission;
 };
 
-const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') || process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') || 'https://s3.signmap.site';
+import { env } from '@/config/env';
+
+const S3_BASE = env.storageUrl;
 
 const KNOWN_BUCKETS = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs', 'stm-raw-images'];
 
