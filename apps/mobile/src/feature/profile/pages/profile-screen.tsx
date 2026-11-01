@@ -148,7 +148,7 @@ export function ProfileScreen() {
   const handleLogOut = () => {
     Alert.alert(
       'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?',
+      'Bạn có muốn đăng xuất không?',
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -204,9 +204,17 @@ export function ProfileScreen() {
                   { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
                 ]}
               >
-                <Text style={[styles.avatarText, { color: theme.primary }]}>
-                  {getInitials(displayName)}
-                </Text>
+                {session?.account.avatarUrl ? (
+                  <Image
+                    resizeMode="cover"
+                    source={{ uri: session.account.avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Text style={[styles.avatarText, { color: theme.primary }]}>
+                    {getInitials(displayName)}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.userDetails}>
@@ -616,11 +624,16 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontFamily: Fonts.title,

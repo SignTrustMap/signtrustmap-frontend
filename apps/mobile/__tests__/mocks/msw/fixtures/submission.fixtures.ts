@@ -13,7 +13,7 @@ export const mockCreatedSubmission = {
   status: 'DRAFT' as const,
   submissionType: 'SINGLE_IMAGE' as const,
   capturedAt: '2026-10-01T08:00:00Z',
-  coordinateSource: 'IMAGE_EXIF' as const,
+  coordinateSource: 'Ảnh' as const,
   latitude: 10.7769,
   longitude: 106.7009,
 };
@@ -63,7 +63,7 @@ export const mockSubmissionStatusResponse: SubmissionStatusResponse = {
     submissionType: 'SINGLE_IMAGE',
     status: 'DRAFT',
     capturedAt: '2026-10-01T08:00:00Z',
-    coordinateSource: 'IMAGE_EXIF',
+    coordinateSource: 'Ảnh',
     latitude: 10.7769,
     longitude: 106.7009,
     note: 'Sample draft note',

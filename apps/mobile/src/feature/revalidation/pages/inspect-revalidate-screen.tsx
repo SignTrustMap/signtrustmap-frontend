@@ -42,7 +42,8 @@ import { useSession } from '@/context/session-provider';
 import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
-import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
+import { resolveS3Url } from '@/api/revalidation/revalidation';
+import { useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
 
@@ -222,6 +223,7 @@ export function InspectRevalidateScreen() {
   const [customNote, setCustomNote] = useState('');
 
   // Submission state
+  const { mutateAsync: submitRevalidation } = useSubmitRevalidation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
@@ -522,29 +524,24 @@ export function InspectRevalidateScreen() {
     }
 
     try {
-      await submitRevalidationEvidence(
-        targetTaskId,
-        {
+      await submitRevalidation({
+        taskIdOrSignId: targetTaskId,
+        data: {
           latitude: lat,
           longitude: lon,
           capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
         },
-        selectedMedia
+        mediaFile: selectedMedia
           ? {
             uri: selectedMedia.uri,
             fileName: selectedMedia.fileName || 'evidence.jpg',
             mimeType: selectedMedia.mimeType,
           }
           : undefined,
-        session?.accessToken,
-      );
-
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
-      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+        accessToken: session?.accessToken,
+      });
 
       setSubmitSuccess(true);
       setTimeout(() => {

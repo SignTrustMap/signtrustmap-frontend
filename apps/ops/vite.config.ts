@@ -27,6 +27,44 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    proxy: {
+      // 1. Core Backend API Gateway route (/api/v1/*)
+      '/api/v1': {
+        target: process.env.VITE_GATEWAY_TARGET || process.env.VITE_BACKEND_TARGET || 'https://api.signmap.site',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['x-proxied-by'] = 'vite-dev-gateway-proxy'
+          })
+        },
+      },
+      // 2. Jetson Orin Edge AI Gateway route (/ai/*)
+      '/ai': {
+        target: process.env.VITE_AI_TARGET || 'https://ai.signmap.site',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/ai/, ''),
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['x-proxied-by'] = 'vite-dev-gateway-proxy'
+          })
+        },
+      },
+      // 3. Object Storage / Media Gateway route (/storage/*)
+      '/storage': {
+        target: process.env.VITE_STORAGE_TARGET || 'https://s3.signmap.site',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/storage/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['x-proxied-by'] = 'vite-dev-gateway-proxy'
+          })
+        },
+      },
+    },
     warmup: {
       clientFiles: [
         './src/main.tsx',

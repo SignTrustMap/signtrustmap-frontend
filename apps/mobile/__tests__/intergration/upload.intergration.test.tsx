@@ -311,7 +311,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
           {
             submissionType: 'SINGLE_IMAGE',
             capturedAt: '2026-10-01T08:00:00Z',
-            coordinateSource: 'IMAGE_EXIF',
+            coordinateSource: 'Ảnh',
             latitude: 10.7769,
             longitude: 106.7009,
           },
@@ -324,7 +324,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       // 2. Verify POST /submissions payload contract
       expect(createdSubmissionPayload).toMatchObject({
         submissionType: 'SINGLE_IMAGE',
-        coordinateSource: 'IMAGE_EXIF',
+        coordinateSource: 'Ảnh',
         latitude: 10.7769,
         longitude: 106.7009,
       });
@@ -363,7 +363,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
               id: 'sub-video-001',
               submissionId: 'sub-video-001',
               submissionType: 'VIDEO_GPX',
-              coordinateSource: 'GPX_FILE',
+              coordinateSource: 'File GPX',
             },
             { status: 201 },
           );
@@ -386,7 +386,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
           {
             submissionType: 'VIDEO_GPX',
             capturedAt: '2026-10-01T08:00:00Z',
-            coordinateSource: 'GPX_FILE',
+            coordinateSource: 'File GPX',
             latitude: 10.7769,
             longitude: 106.7009,
           },
@@ -709,7 +709,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
             {
               submissionType: 'SINGLE_IMAGE',
               capturedAt: '2026-10-01T08:00:00Z',
-              coordinateSource: 'IMAGE_EXIF',
+              coordinateSource: 'Ảnh',
               latitude: 10.7769,
               longitude: 106.7009,
             },

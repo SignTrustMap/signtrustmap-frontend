@@ -35,9 +35,11 @@ function validateEnv(variables: Record<string, string | undefined>, requiredKeys
 export const env = {
   opsDomain:    import.meta.env.VITE_OPS_DOMAIN || '',
   publicDomain: import.meta.env.VITE_PUBLIC_DOMAIN || '',
-  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || 'https://api.signmap.site',
+  gatewayUrl:   import.meta.env.VITE_GATEWAY_URL || (import.meta.env.DEV ? '' : 'https://api.signmap.site'),
+  apiBaseUrl:   import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '' : 'https://api.signmap.site'),
   mapTileUrl:   import.meta.env.VITE_MAP_TILE_URL || '',
-  aiApiUrl:     import.meta.env.VITE_AI_API_URL || 'https://ai.signmap.site',
+  aiApiUrl:     import.meta.env.VITE_AI_API_URL || (import.meta.env.DEV ? '/ai' : 'https://ai.signmap.site'),
+  storageUrl:   import.meta.env.VITE_STORAGE_URL || import.meta.env.VITE_S3_URL || (import.meta.env.DEV ? '/storage' : 'https://s3.signmap.site'),
   isDev:        import.meta.env.DEV,
   isProd:       import.meta.env.PROD,
   mode:         import.meta.env.MODE,
@@ -47,9 +49,9 @@ validateEnv(
   {
     VITE_OPS_DOMAIN: env.opsDomain,
     VITE_PUBLIC_DOMAIN: env.publicDomain,
-    VITE_API_BASE_URL: env.apiBaseUrl,
+    VITE_API_BASE_URL: env.apiBaseUrl || 'default',
   },
-  ['VITE_OPS_DOMAIN', 'VITE_PUBLIC_DOMAIN', 'VITE_API_BASE_URL']
+  ['VITE_OPS_DOMAIN', 'VITE_PUBLIC_DOMAIN']
 )
 
 export const opsPortalUrl = formatUrl(env.opsDomain, env.isDev)

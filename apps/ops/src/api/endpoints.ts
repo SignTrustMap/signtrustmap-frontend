@@ -125,8 +125,11 @@ export const API_ENDPOINTS = {
     WALLET_FREEZE: (id: string) => `/api/v1/admin/wallets/${id}/freeze`,
     TOPUP_PACKAGES: '/api/v1/payments/packages',
     CREDITS_APPROVAL: {
-      BASE: '/api/v1/admin/wallets',
-      DECISION: (id: string) => `/api/v1/admin/wallets/${id}/adjust`,
+      BASE: '/api/v1/admin/rewards/approvals',
+      DETAIL: (id: string) => `/api/v1/admin/rewards/approvals/${id}`,
+      DECIDE: (id: string) => `/api/v1/admin/rewards/approvals/${id}/decide`,
+      FREEZE_WALLET: (walletId: string) => `/api/v1/admin/wallets/${walletId}/freeze`,
+      ADJUST_WALLET: (walletId: string) => `/api/v1/admin/wallets/${walletId}/adjust`,
     },
   },
 
@@ -157,10 +160,14 @@ export const API_ENDPOINTS = {
     TASK_DETAIL: (id: string) => `/api/v1/revalidation/tasks/${id}`,
     TASK_MAP: '/api/v1/revalidation/tasks/map',
     TASK_EVIDENCES: (id: string) => `/api/v1/revalidation/tasks/${id}/evidences`,
+    SIGN_EVIDENCES: (id: string) => `/api/v1/revalidation/signs/${id}/evidences`,
+    TASK_SUBMIT_EVIDENCE: (id: string) => `/api/v1/revalidation/tasks/${id}/evidence`,
     TASK_FINALIZE: (taskId: string) => `/api/v1/revalidation/tasks/${taskId}/finalize`,
+    TASK_EARLY_CLASSIFY: (taskId: string) => `/api/v1/revalidation/tasks/${taskId}/early-classify`,
     EVIDENCE_VOTE: (evidenceId: string) => `/api/v1/revalidation/evidence/${evidenceId}/vote`,
     EVIDENCE_QUEUE: '/api/v1/revalidation/evidence/queue',
     EVIDENCE_DECISIONS: (evidenceId: string) => `/api/v1/revalidation/evidence/${evidenceId}/decisions`,
+    EVIDENCE_REQUEST_RECAPTURE: (evidenceId: string) => `/api/v1/revalidation/evidence/${evidenceId}/request-recapture`,
   },
 
   // ── Contributor Leaderboard ───────────────────────────────────────

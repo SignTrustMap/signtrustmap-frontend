@@ -26,9 +26,9 @@ export type RevalidationMapViewProps = {
   zoomRequestId?: number;
 };
 
-const mapTileUrl =
-  process.env.EXPO_PUBLIC_MAP_TILE_URL?.trim() ||
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+import { env } from '@/config/env';
+
+const mapTileUrl = env.mapTileUrl;
 
 const openStreetMapStyle: StyleSpecification = {
   version: 8,

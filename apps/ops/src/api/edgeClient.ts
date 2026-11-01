@@ -3,7 +3,7 @@ import { AIOPS_BASE_URL } from './endpoints'
 
 /**
  * Specialized Axios Client singleton for Jetson Orin Edge Node APIs (AIOps).
- * Automatically injects required proxy bypass headers and manages timeouts.
+ * Routes through the unified Nginx API Gateway with centralized timeouts and CORS policies.
  */
 export const edgeApiClient: AxiosInstance = axios.create({
   baseURL: AIOPS_BASE_URL,

@@ -16,7 +16,7 @@ import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MapCoordinate } from '@/types/navigationType';
-import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
+import { NavigationMapView, MapLocationPin } from '@/feature/navigation/components/navigation-map-view';
 import { usePlaceSuggestions } from '@/feature/navigation/hooks/use-places';
 import type { ApiPlace } from '@/api/navigation/places';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
@@ -203,10 +203,7 @@ export function LocationPickerModal({
 
         {/* Center Crosshair Pin */}
         <View pointerEvents="none" style={styles.centerPinWrapper}>
-          <View style={styles.centerPin}>
-            <MaterialCommunityIcons name="map-marker" size={46} color="#0671eb" />
-            <View style={styles.pinShadow} />
-          </View>
+          <MapLocationPin color="#EF4444" size={46} style={styles.centerPin} testID="center-crosshair-pin" />
         </View>
 
         {/* Top Header & Search Area */}

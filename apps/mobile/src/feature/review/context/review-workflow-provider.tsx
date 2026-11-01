@@ -276,9 +276,19 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     try {
       if (action === 'reported_new_sign') {
         if (details?.newSignReport) {
+          const proposedName =
+            details.newSignReport.proposedName?.trim() ||
+            submission.title ||
+            'Biển mới đề xuất';
           await reportMissingTypeMutation({
             ...details.newSignReport,
             candidateId: submission.id,
+            proposedName,
+            description:
+              details.newSignReport.description ||
+              details.declineNote ||
+              details.declineReason ||
+              'Báo cáo biển chưa có trong danh mục chuẩn QCVN 41:2019',
           });
         }
       } else if (action === 'reported') {

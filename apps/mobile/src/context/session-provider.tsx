@@ -14,6 +14,7 @@ export type Account = {
   email: string;
   id: string;
   roles: AccountRole[];
+  avatarUrl?: string | null;
 };
 
 export type AppSession = {
@@ -76,6 +77,7 @@ function parseStoredSession(value: string | null): AppSession | null {
         email: parsed.account.email ?? 'demo@example.com',
         id: parsed.account.id,
         roles: normalizeRoles(parsed.account.roles),
+        avatarUrl: parsed.account.avatarUrl ?? null,
       },
     };
   } catch {
@@ -89,6 +91,7 @@ function parseStoredSession(value: string | null): AppSession | null {
         email: 'demo@example.com',
         id: 'demo-account',
         roles: [...ACCOUNT_ROLES],
+        avatarUrl: null,
       },
     };
   }

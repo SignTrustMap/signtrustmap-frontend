@@ -143,9 +143,11 @@ function parseReleaseData(data: any): ReleaseInfo {
   };
 }
 
+import { env } from '@/config/env';
+
 export async function checkAppUpdate(): Promise<UpdateCheckResult> {
   const currentVersion = Constants.expoConfig?.version ?? '1.0.0';
-  const currentCommit = process.env.EXPO_PUBLIC_APP_COMMIT_SHA ?? '';
+  const currentCommit = env.appCommitSha;
 
   try {
     const latestRelease = await fetchLatestRelease();

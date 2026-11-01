@@ -1,7 +1,8 @@
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { VerifiedMapSign } from '@/types/signMapType';
+import { env } from '@/config/env';
 
-const S3_BASE = process.env.EXPO_PUBLIC_S3_URL?.replace(/\/$/, '') ?? process.env.EXPO_PUBLIC_CDN_URL?.replace(/\/$/, '') ?? 'https://s3.signmap.site';
+const S3_BASE = env.storageUrl;
 
 export const TARGET_SIGN_IMAGE_URL =
   `${S3_BASE}/stm-sign-crops/uploads/eaa2eac3-be4f-4a51-a822-6a8757978d58/f0f86c63-e05b-4baa-bae8-ae81e01a4e7d/a8a881f2-c218-4394-8b8d-7de40de1388f/uk-20mph-speed-limit-sign.jpg`;

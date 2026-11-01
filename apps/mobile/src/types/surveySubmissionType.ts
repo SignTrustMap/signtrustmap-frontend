@@ -1,8 +1,8 @@
 // Request DTOs match the supplied OpenAPI document. Response bodies are not
 // declared there; new responses remain unknown and existing read shapes below
 // retain the last documented local backend contract. Dates are JSON strings.
-export type SubmissionType = 'VIDEO_GPX' | 'SINGLE_IMAGE' | 'LIVE_TRIP';
-export type CoordinateSource = 'IMAGE_EXIF' | 'DEVICE_GPS' | 'MANUAL' | 'GPX_FILE' | 'LIVE_STREAM';
+export type SubmissionType = 'VIDEO_GPX' | 'SINGLE_IMAGE';
+export type CoordinateSource = 'Ảnh' | 'GPS' | 'File GPX';
 
 export type CreateSubmissionDto = {
   submissionType: SubmissionType;

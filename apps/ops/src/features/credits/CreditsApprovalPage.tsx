@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import { useSidebar } from '@/context/SidebarContext'
@@ -21,8 +21,13 @@ import {
   Funnel,
   ShieldCheck,
   CurrencyCircleDollar,
+  ArrowsClockwise,
+  Spinner,
+  Lock,
+  Warning,
 } from '@phosphor-icons/react'
-import { mockCreditApprovals, type CreditApprovalItem } from '@/data'
+import { type CreditApprovalItem } from '@/data/credits'
+import { economyService } from '@/api/services/economy.service'
 
 const roleBadgeStyles: Record<string, string> = {
   surveyor: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-400 dark:border-sky-500/30',
@@ -82,10 +87,12 @@ function StatusBadge({ status }: { status: CreditApprovalItem['status'] }) {
 
 export default function CreditsApprovalPage() {
   const { t } = useTranslation('ops')
-  const { success, warning } = useToast()
+  const { success, warning, error: toastError } = useToast()
   const { isCollapsed } = useSidebar()
 
-  const [items, setItems] = useState<CreditApprovalItem[]>(mockCreditApprovals)
+  const [items, setItems] = useState<CreditApprovalItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<'all' | 'Pending' | 'Fraud' | 'Approved' | 'Rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<string>('all')
@@ -94,15 +101,48 @@ export default function CreditsApprovalPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  // Decision & Wallet Controls
+  const [decisionNote, setDecisionNote] = useState('')
+  const [isFreezeModalOpen, setIsFreezeModalOpen] = useState(false)
+  const [itemToFreeze, setItemToFreeze] = useState<CreditApprovalItem | null>(null)
+  const [freezeReason, setFreezeReason] = useState('')
+
+  // ── Fetch data from backend with fallback ───────────────────────────
+  const fetchCreditsData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const res = await economyService.getCreditApprovals({
+        status: activeTab,
+        role: selectedRole !== 'all' ? selectedRole : undefined,
+        risk: selectedRisk !== 'all' ? selectedRisk : undefined,
+        search: searchQuery.trim() || undefined,
+      })
+      setItems(res.items || [])
+    } catch (err: any) {
+      console.error('Failed to load credit approvals:', err)
+      toastError(err?.message || 'Không thể tải danh sách xét duyệt điểm thưởng')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [activeTab, selectedRole, selectedRisk, searchQuery, toastError])
+
+  useEffect(() => {
+    fetchCreditsData()
+  }, [fetchCreditsData])
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && selectedItem) {
-        setSelectedItem(null)
+      if (e.key === 'Escape') {
+        if (isFreezeModalOpen) {
+          setIsFreezeModalOpen(false)
+        } else if (selectedItem) {
+          setSelectedItem(null)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItem])
+  }, [selectedItem, isFreezeModalOpen])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -133,7 +173,7 @@ export default function CreditsApprovalPage() {
     { value: 'Cảnh báo gian lận', label: t('credits.risk_fraud') },
   ]
 
-  // Main Filtering
+  // Main Filtering (Local client-side filtering on loaded list)
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const q = searchQuery.toLowerCase().trim()
@@ -162,42 +202,102 @@ export default function CreditsApprovalPage() {
     return filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   }, [filteredItems, currentPage, pageSize])
 
-  // Handlers
-  function handleDecision(id: string, decision: 'Approved' | 'Rejected') {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: decision,
-              reviewedBy: 'Staff Trực ban',
-              reviewedAt: 'Vừa xong',
-            }
-          : item
+  // ── Handlers ────────────────────────────────────────────────────────
+  async function handleDecision(id: string, decision: 'Approved' | 'Rejected') {
+    setIsSubmitting(true)
+    try {
+      await economyService.decideCreditApproval(id, {
+        decision,
+        reason: decisionNote.trim() || undefined,
+      })
+
+      const nowStr = 'Vừa xong'
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: decision,
+                reviewedBy: 'Staff Trực ban',
+                reviewedAt: nowStr,
+              }
+            : item
+        )
       )
-    )
-    if (selectedItem?.id === id) {
-      setSelectedItem((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: decision,
-              reviewedBy: 'Staff Trực ban',
-              reviewedAt: 'Vừa xong',
-            }
-          : null
-      )
+
+      if (selectedItem?.id === id) {
+        setSelectedItem((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: decision,
+                reviewedBy: 'Staff Trực ban',
+                reviewedAt: nowStr,
+              }
+            : null
+        )
+      }
+
+      setDecisionNote('')
+
+      if (decision === 'Approved') {
+        success(t('credits.toast_approved', { id }))
+      } else {
+        warning(t('credits.toast_rejected', { id }))
+      }
+    } catch (err: any) {
+      console.error('Decision error:', err)
+      toastError(err?.message || 'Lỗi xử lý quyết định điểm thưởng')
+    } finally {
+      setIsSubmitting(false)
     }
-    if (decision === 'Approved') {
-      success(t('credits.toast_approved', { id }))
-    } else {
-      warning(t('credits.toast_rejected', { id }))
+  }
+
+  function handleOpenFreeze(item: CreditApprovalItem) {
+    setItemToFreeze(item)
+    setFreezeReason(
+      item.riskReason ||
+        'Hệ thống phát hiện hành vi gian lận dữ liệu đóng góp hoặc bất thường tần suất gửi'
+    )
+    setIsFreezeModalOpen(true)
+  }
+
+  async function handleConfirmFreeze() {
+    if (!itemToFreeze) return
+    setIsSubmitting(true)
+    const targetWalletId = itemToFreeze.walletId || itemToFreeze.userId || itemToFreeze.id
+    try {
+      await economyService.freezeWallet(targetWalletId, {
+        freeze: true,
+        reason: freezeReason.trim() || 'Tạm khóa bảo vệ hệ thống do vi phạm đóng góp',
+      })
+
+      success(`Đã tạm khóa ví người dùng ${itemToFreeze.user.name} thành công.`)
+
+      // Mark frozen locally
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === itemToFreeze.id ? { ...i, isWalletFrozen: true } : i
+        )
+      )
+
+      if (selectedItem?.id === itemToFreeze.id) {
+        setSelectedItem((prev) => (prev ? { ...prev, isWalletFrozen: true } : null))
+      }
+
+      setIsFreezeModalOpen(false)
+      setItemToFreeze(null)
+    } catch (err: any) {
+      console.error('Freeze wallet error:', err)
+      toastError(err?.message || 'Không thể khóa ví người dùng')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   function handleExport() {
     const headers = [
-      `${t('credits.th_id')},${t('credits.th_user')},Role,${t('credits.th_activity')},${t('credits.th_amount')},${t('credits.th_risk')},${t('credits.th_status')},${t('credits.th_created_at')}`
+      `${t('credits.th_id')},${t('credits.th_user')},Role,${t('credits.th_activity')},${t('credits.th_amount')},${t('credits.th_risk')},${t('credits.th_status')},${t('credits.th_created_at')}`,
     ]
     const rows = filteredItems.map(
       (i) =>
@@ -220,14 +320,30 @@ export default function CreditsApprovalPage() {
       <PageHeader
         title={t('credits.title')}
         actions={
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
-          >
-            <DownloadSimple size={16} weight="bold" />
-            <span>{t('credits.btn_export')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={fetchCreditsData}
+              disabled={isLoading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Tải lại dữ liệu"
+            >
+              <ArrowsClockwise
+                size={16}
+                className={isLoading ? 'animate-spin text-[#007b8b] dark:text-[#00c4de]' : ''}
+              />
+              <span className="hidden sm:inline">Làm mới</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <DownloadSimple size={16} weight="bold" />
+              <span>{t('credits.btn_export')}</span>
+            </button>
+          </div>
         }
       />
 
@@ -398,7 +514,34 @@ export default function CreditsApprovalPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {paginatedItems.length === 0 ? (
+              {isLoading ? (
+                // Skeleton loading rows
+                Array.from({ length: 5 }).map((_, idx) => (
+                  <tr key={`skeleton-${idx}`} className="animate-pulse">
+                    <td className="py-3 px-3"><div className="h-5 w-16 bg-gray-200 dark:bg-white/10 rounded" /></td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-white/10 shrink-0" />
+                        <div className="space-y-1">
+                          <div className="h-3 w-24 bg-gray-200 dark:bg-white/10 rounded" />
+                          <div className="h-2 w-32 bg-gray-100 dark:bg-white/5 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3"><div className="h-4 w-28 bg-gray-200 dark:bg-white/10 rounded" /></td>
+                    <td className="py-3 px-2.5 text-center"><div className="h-4 w-12 bg-gray-200 dark:bg-white/10 rounded mx-auto" /></td>
+                    <td className="py-3 px-2.5 text-center"><div className="h-4 w-16 bg-gray-200 dark:bg-white/10 rounded mx-auto" /></td>
+                    <td className="py-3 px-2.5 text-center"><div className="h-4 w-16 bg-gray-200 dark:bg-white/10 rounded mx-auto" /></td>
+                    {isCollapsed && (
+                      <>
+                        <td className="py-3 px-3 hidden md:table-cell"><div className="h-3 w-20 bg-gray-200 dark:bg-white/10 rounded" /></td>
+                        <td className="py-3 px-3 hidden lg:table-cell"><div className="h-3 w-24 bg-gray-200 dark:bg-white/10 rounded" /></td>
+                      </>
+                    )}
+                    <td className="py-3 px-3 text-right"><div className="h-6 w-16 bg-gray-200 dark:bg-white/10 rounded ml-auto" /></td>
+                  </tr>
+                ))
+              ) : paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
                     <Coins size={32} className="mx-auto opacity-40" />
@@ -440,6 +583,11 @@ export default function CreditsApprovalPage() {
                             >
                               {t(`credits.role_${item.user.role}`)}
                             </span>
+                            {item.isWalletFrozen && (
+                              <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 border border-red-200 dark:border-red-500/30">
+                                Đã khóa ví
+                              </span>
+                            )}
                           </div>
                           <span className="text-[10px] text-gray-400 font-mono truncate block">
                             {item.user.email}
@@ -544,227 +692,342 @@ export default function CreditsApprovalPage() {
             className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={() => setSelectedItem(null)}
           >
-          <div
-            className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#007b8b]/10 dark:bg-[#00c4de]/20 flex items-center justify-center text-[#007b8b] dark:text-[#00c4de] shrink-0">
-                  <CurrencyCircleDollar size={22} weight="bold" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
-                      {selectedItem.id}
-                    </span>
-                    <StatusBadge status={selectedItem.status} />
-                    <RiskBadge riskLevel={selectedItem.riskLevel} />
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-1">
-                    {t('credits.modal_title')}
-                  </h3>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedItem(null)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X size={18} weight="bold" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
-              {/* Contributor Profile Card */}
-              <div className="p-4 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 flex items-center justify-between gap-3">
+            <div
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 shrink-0">
                 <div className="flex items-center gap-3">
-                  <span
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${selectedItem.user.avatarBg}`}
-                  >
-                    {selectedItem.user.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-[#007b8b]/10 dark:bg-[#00c4de]/20 flex items-center justify-center text-[#007b8b] dark:text-[#00c4de] shrink-0">
+                    <CurrencyCircleDollar size={22} weight="bold" />
+                  </div>
+                  <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">
-                        {selectedItem.user.name}
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-white/10">
+                        {selectedItem.id}
                       </span>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
-                          roleBadgeStyles[selectedItem.user.role] || 'bg-gray-100 text-gray-700 border-gray-200'
-                        }`}
-                      >
-                        {t(`credits.role_${selectedItem.user.role}`)}
-                      </span>
+                      <StatusBadge status={selectedItem.status} />
+                      <RiskBadge riskLevel={selectedItem.riskLevel} />
                     </div>
-                    <p className="text-gray-500 dark:text-gray-400 font-mono text-xs">
-                      {selectedItem.user.email}
-                    </p>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-1">
+                      {t('credits.modal_title')}
+                    </h3>
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <span className="text-[10px] font-mono text-gray-400 block uppercase font-bold">
-                    {t('credits.lbl_amount')}
-                  </span>
-                  <span className="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
-                    +{selectedItem.amount} Credits
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(null)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={18} weight="bold" />
+                </button>
               </div>
 
-              {/* Grid 2 Columns: Telemetry & Fraud Risk */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Activity & Payout */}
-                <div className="p-3.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block">
-                    {t('credits.lbl_activity')}
-                  </span>
-                  <p className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
-                    {t(`credits.activity_${selectedItem.activityKey}`)}
-                  </p>
-                  {selectedItem.payoutMethod && (
-                    <div className="pt-1 border-t border-gray-200/60 dark:border-white/5">
-                      <span className="text-[10px] text-gray-400 block font-mono">{t('credits.lbl_payout_method')}</span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300 text-xs">
-                        {selectedItem.payoutMethod}
-                      </span>
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs sm:text-sm">
+                {/* Contributor Profile Card */}
+                <div className="p-4 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${selectedItem.user.avatarBg}`}
+                    >
+                      {selectedItem.user.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-900 dark:text-white text-sm">
+                          {selectedItem.user.name}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border ${
+                            roleBadgeStyles[selectedItem.user.role] || 'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          {t(`credits.role_${selectedItem.user.role}`)}
+                        </span>
+                        {selectedItem.isWalletFrozen && (
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 border border-red-200 dark:border-red-500/30">
+                            Ví đang bị khóa
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                        {selectedItem.user.email}
+                      </p>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] font-mono text-gray-400 block uppercase font-bold">
+                      {t('credits.lbl_amount')}
+                    </span>
+                    <span className="text-xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
+                      +{selectedItem.amount} Credits
+                    </span>
+                  </div>
                 </div>
 
-                {/* Telemetry & Device */}
-                <div className="p-3.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
-                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block">
-                    {t('credits.lbl_telemetry_details')}
-                  </span>
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
-                      <DeviceMobile size={14} className="text-gray-400" />
-                      <span>{selectedItem.deviceModel || 'Thiết bị di động'}</span>
-                    </div>
-                    {selectedItem.gpsDistance !== undefined && (
-                      <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[11px]">
-                        <MapPin size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
-                        <span>{t('credits.lbl_gps_offset_meters', { dist: selectedItem.gpsDistance })}</span>
+                {/* Grid 2 Columns: Telemetry & Fraud Risk */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Activity & Payout */}
+                  <div className="p-3.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
+                    <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block">
+                      {t('credits.lbl_activity')}
+                    </span>
+                    <p className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
+                      {t(`credits.activity_${selectedItem.activityKey}`)}
+                    </p>
+                    {selectedItem.payoutMethod && (
+                      <div className="pt-1 border-t border-gray-200/60 dark:border-white/5">
+                        <span className="text-[10px] text-gray-400 block font-mono">{t('credits.lbl_payout_method')}</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300 text-xs">
+                          {selectedItem.payoutMethod}
+                        </span>
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
 
-              {/* Fraud Warning / Risk Analysis Callout */}
-              {selectedItem.riskLevel === 'Cảnh báo gian lận' ? (
-                <div className="p-4 bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-500/30 rounded-xl flex items-start gap-3 text-red-700 dark:text-red-400">
-                  <ShieldWarning size={20} className="shrink-0 mt-0.5 text-red-600" weight="fill" />
-                  <div className="space-y-1">
-                    <p className="font-bold text-xs">{t('credits.lbl_risk_analysis')}</p>
-                    <p className="text-xs leading-relaxed">
-                      {selectedItem.riskReason || t('credits.risk_fraud_desc')}
-                    </p>
-                    {selectedItem.riskScore && (
-                      <p className="font-mono font-bold text-[11px] text-red-800 dark:text-red-300 pt-0.5">
-                        {t('credits.lbl_anomaly_index', { score: selectedItem.riskScore })}
+                  {/* Telemetry & Device */}
+                  <div className="p-3.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
+                    <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider block">
+                      {t('credits.lbl_telemetry_details')}
+                    </span>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
+                        <DeviceMobile size={14} className="text-gray-400" />
+                        <span>{selectedItem.deviceModel || 'Thiết bị di động'}</span>
+                      </div>
+                      {selectedItem.gpsDistance !== undefined && (
+                        <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[11px]">
+                          <MapPin size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
+                          <span>{t('credits.lbl_gps_offset_meters', { dist: selectedItem.gpsDistance })}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fraud Warning / Risk Analysis Callout */}
+                {selectedItem.riskLevel === 'Cảnh báo gian lận' ? (
+                  <div className="p-4 bg-red-50/80 dark:bg-red-950/30 border border-red-200 dark:border-red-500/30 rounded-xl flex items-start gap-3 text-red-700 dark:text-red-400">
+                    <ShieldWarning size={20} className="shrink-0 mt-0.5 text-red-600" weight="fill" />
+                    <div className="space-y-1 flex-1">
+                      <p className="font-bold text-xs">{t('credits.lbl_risk_analysis')}</p>
+                      <p className="text-xs leading-relaxed">
+                        {selectedItem.riskReason || t('credits.risk_fraud_desc')}
                       </p>
-                    )}
+                      {selectedItem.riskScore && (
+                        <p className="font-mono font-bold text-[11px] text-red-800 dark:text-red-300 pt-0.5">
+                          {t('credits.lbl_anomaly_index', { score: selectedItem.riskScore })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ) : selectedItem.riskLevel === 'Nghi vấn' ? (
-                <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 rounded-xl flex items-start gap-3 text-amber-800 dark:text-amber-300">
-                  <ShieldWarning size={18} className="shrink-0 mt-0.5 text-amber-600" weight="fill" />
-                  <div className="space-y-0.5">
-                    <p className="font-bold text-xs">{t('credits.lbl_risk_analysis')}</p>
-                    <p className="text-xs leading-relaxed">
-                      {selectedItem.riskReason || 'Tọa độ GPS có sự gián đoạn nhẹ. Cần rà soát ảnh chụp hiện trường.'}
-                    </p>
+                ) : selectedItem.riskLevel === 'Nghi vấn' ? (
+                  <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30 rounded-xl flex items-start gap-3 text-amber-800 dark:text-amber-300">
+                    <ShieldWarning size={18} className="shrink-0 mt-0.5 text-amber-600" weight="fill" />
+                    <div className="space-y-0.5 flex-1">
+                      <p className="font-bold text-xs">{t('credits.lbl_risk_analysis')}</p>
+                      <p className="text-xs leading-relaxed">
+                        {selectedItem.riskReason || 'Tọa độ GPS có sự gián đoạn nhẹ. Cần rà soát ảnh chụp hiện trường.'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {/* Evidence Photo Preview (if available) */}
-              {selectedItem.evidenceUrl && (
-                <div>
-                  <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-2">
-                    {t('credits.lbl_evidence_photo')}
-                  </span>
-                  <div className="relative aspect-16/9 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-black/40">
-                    <img
-                      src={selectedItem.evidenceUrl}
-                      alt="Audit Evidence"
-                      className="w-full h-full object-cover"
+                {/* Evidence Photo Preview (if available) */}
+                {selectedItem.evidenceUrl && (
+                  <div>
+                    <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-2">
+                      {t('credits.lbl_evidence_photo')}
+                    </span>
+                    <div className="relative aspect-16/9 rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-black/40">
+                      <img
+                        src={selectedItem.evidenceUrl}
+                        alt="Audit Evidence"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Evidence Description */}
+                <div className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 font-mono text-[10px] uppercase font-bold">
+                    <FileText size={14} />
+                    <span>{t('credits.lbl_evidence')}</span>
+                  </div>
+                  <p className="text-gray-800 dark:text-gray-200 leading-relaxed font-sans text-xs bg-white dark:bg-black/20 p-3 rounded-lg border border-gray-100 dark:border-white/5">
+                    {selectedItem.evidenceSummary}
+                  </p>
+                </div>
+
+                {/* Decision Note Input (when pending) */}
+                {selectedItem.status === 'Pending' && (
+                  <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-white/10">
+                    <label className="text-[11px] font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
+                      Ghi chú quyết định / Căn cứ thẩm định:
+                    </label>
+                    <input
+                      type="text"
+                      value={decisionNote}
+                      onChange={(e) => setDecisionNote(e.target.value)}
+                      placeholder="Nhập lý do duyệt hoặc lý do từ chối giao dịch..."
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#007b8b]"
                     />
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Evidence Description */}
-              <div className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 font-mono text-[10px] uppercase font-bold">
-                  <FileText size={14} />
-                  <span>{t('credits.lbl_evidence')}</span>
+                {/* Audit Metadata */}
+                <div className="flex items-center justify-between text-xs text-gray-400 font-mono pt-2 border-t border-gray-100 dark:border-white/10">
+                  <span>{t('credits.lbl_time')}: {selectedItem.createdAt}</span>
+                  {selectedItem.reviewedBy && (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      {t('credits.lbl_reviewed_by')} {selectedItem.reviewedBy} ({selectedItem.reviewedAt})
+                    </span>
+                  )}
                 </div>
-                <p className="text-gray-800 dark:text-gray-200 leading-relaxed font-sans text-xs bg-white dark:bg-black/20 p-3 rounded-lg border border-gray-100 dark:border-white/5">
-                  {selectedItem.evidenceSummary}
-                </p>
               </div>
 
-              {/* Audit Metadata */}
-              <div className="flex items-center justify-between text-xs text-gray-400 font-mono pt-2 border-t border-gray-100 dark:border-white/10">
-                <span>{t('credits.lbl_time')}: {selectedItem.createdAt}</span>
-                {selectedItem.reviewedBy && (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                    {t('credits.lbl_reviewed_by')} {selectedItem.reviewedBy} ({selectedItem.reviewedAt})
+              {/* Modal Footer */}
+              <div className="p-4 sm:p-5 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItem(null)}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    {t('credits.btn_close')}
+                  </button>
+
+                  {/* Freeze Wallet Action for High-Risk Accounts */}
+                  {selectedItem.riskLevel === 'Cảnh báo gian lận' && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenFreeze(selectedItem)}
+                      disabled={isSubmitting || selectedItem.isWalletFrozen}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        selectedItem.isWalletFrozen
+                          ? 'bg-gray-100 text-gray-400 dark:bg-white/5 cursor-not-allowed'
+                          : 'bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 cursor-pointer active:scale-95'
+                      }`}
+                    >
+                      <Lock size={14} weight="bold" />
+                      <span>{selectedItem.isWalletFrozen ? 'Ví đã bị khóa' : 'Khóa ví contributor'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {selectedItem.status === 'Pending' ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleDecision(selectedItem.id, 'Rejected')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900/60 text-red-700 dark:text-red-400 font-bold rounded-xl transition-all active:scale-95 cursor-pointer text-xs disabled:opacity-50"
+                    >
+                      {isSubmitting && <Spinner size={14} className="animate-spin" />}
+                      <span>{t('credits.btn_reject')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleDecision(selectedItem.id, 'Approved')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white font-bold rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer text-xs disabled:opacity-50"
+                    >
+                      {isSubmitting && <Spinner size={14} className="animate-spin" />}
+                      <span>{t('credits.btn_approve')}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold ${
+                      selectedItem.status === 'Approved'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border dark:border-emerald-500/30'
+                        : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border dark:border-red-500/30'
+                    }`}
+                  >
+                    {selectedItem.status === 'Approved'
+                      ? t('credits.tag_approved')
+                      : t('credits.tag_rejected')}
                   </span>
                 )}
               </div>
             </div>
+          </div>
+        </ModalPortal>
+      )}
 
-            {/* Modal Footer */}
-            <div className="p-4 sm:p-5 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setSelectedItem(null)}
-                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                {t('credits.btn_close')}
-              </button>
-
-              {selectedItem.status === 'Pending' ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleDecision(selectedItem.id, 'Rejected')}
-                    className="px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900/60 text-red-700 dark:text-red-400 font-bold rounded-xl transition-all active:scale-95 cursor-pointer text-xs"
-                  >
-                    {t('credits.btn_reject')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDecision(selectedItem.id, 'Approved')}
-                    className="px-4 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white font-bold rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer text-xs"
-                  >
-                    {t('credits.btn_approve')}
-                  </button>
+      {/* ─── WALLET FREEZE CONFIRMATION MODAL ───────────────────────── */}
+      {isFreezeModalOpen && itemToFreeze && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={() => setIsFreezeModalOpen(false)}
+          >
+            <div
+              className="bg-white dark:bg-[#0A171C] border border-red-200 dark:border-red-500/30 rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-4 animate-in zoom-in-95 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center shrink-0">
+                  <Warning size={24} weight="bold" />
                 </div>
-              ) : (
-                <span
-                  className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold ${
-                    selectedItem.status === 'Approved'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border dark:border-emerald-500/30'
-                      : 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border dark:border-red-500/30'
-                  }`}
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 dark:text-white">
+                    Xác nhận khóa ví Contributor
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Ngăn chặn rút điểm và nhận thưởng tự động
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-red-50/70 dark:bg-red-950/20 border border-red-200/60 dark:border-red-500/20 text-xs space-y-1 text-red-800 dark:text-red-300">
+                <p>
+                  <strong>Người dùng:</strong> {itemToFreeze.user.name} ({itemToFreeze.user.email})
+                </p>
+                <p>
+                  <strong>Mã claim thưởng:</strong> {itemToFreeze.id}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Lý do khóa tài khoản (Ghi vào Audit Trail):
+                </label>
+                <textarea
+                  rows={3}
+                  value={freezeReason}
+                  onChange={(e) => setFreezeReason(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-gray-200 dark:border-white/15 bg-gray-50/50 dark:bg-white/5 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/10">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setIsFreezeModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer"
                 >
-                  {selectedItem.status === 'Approved'
-                    ? t('credits.tag_approved')
-                    : t('credits.tag_rejected')}
-                </span>
-              )}
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleConfirmFreeze}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting && <Spinner size={14} className="animate-spin" />}
+                  <span>Xác nhận khóa ví</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         </ModalPortal>
       )}
     </div>
