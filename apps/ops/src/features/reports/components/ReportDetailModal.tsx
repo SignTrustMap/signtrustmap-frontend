@@ -10,7 +10,6 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react'
 import type { SignReportItem, ReportStatus } from '@/data'
-import { mockCatalogData } from '@/data/catalogData'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 import { IssueTypeBadge, PriorityBadge, ReportStatusBadge } from './ReportsBadges'
@@ -32,9 +31,7 @@ export function ReportDetailModal({
 
   if (!report) return null
 
-  const catalogEntry = mockCatalogData.find(
-    (c) => c.code.toLowerCase() === report.signCode.toLowerCase()
-  ) || {
+  const catalogEntry = {
     code: report.signCode,
     nameVi: report.signName,
     shape: 'Circle',

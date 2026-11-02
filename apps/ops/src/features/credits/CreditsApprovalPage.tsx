@@ -26,7 +26,7 @@ import {
   Lock,
   Warning,
 } from '@phosphor-icons/react'
-import { type CreditApprovalItem } from '@/data/credits'
+import { type CreditApprovalItem } from '@/api/services/economy.service'
 import { economyService } from '@/api/services/economy.service'
 
 const roleBadgeStyles: Record<string, string> = {

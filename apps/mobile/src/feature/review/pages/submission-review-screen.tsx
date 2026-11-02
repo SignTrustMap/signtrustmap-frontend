@@ -135,7 +135,6 @@ type ReviewBottomSheetProps = {
   onClose: () => void;
   onConfirm: () => void;
   onOpenCatalog?: () => void;
-  onOpenNewSignType?: () => void;
   onOpenReport?: () => void;
   onSelectRemedySign?: (sign?: RemedySign) => void;
   remedySigns?: RemedySign[];
@@ -155,7 +154,6 @@ function ReviewBottomSheet({
   onClose,
   onConfirm,
   onOpenCatalog,
-  onOpenNewSignType,
   onOpenReport,
   onSelectRemedySign,
   remedySigns = [],
@@ -347,16 +345,6 @@ function ReviewBottomSheet({
                     onPress={onOpenCatalog}
                     style={[styles.catalogPickerTriggerButton, { borderColor: theme.border }]}
                     textStyle={{ color: theme.text, fontSize: 13, fontWeight: '600' }}
-                    variant="surface"
-                  />
-
-                  {/* 1b. Propose new uncataloged sign type */}
-                  <AppButton
-                    accessibilityLabel="Đề xuất loại biển báo mới"
-                    label="Biển lạ chưa có trong danh mục? Đề xuất biển mới..."
-                    onPress={onOpenNewSignType}
-                    style={[styles.catalogPickerTriggerButton, { borderColor: theme.primary, marginTop: 8 }]}
-                    textStyle={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}
                     variant="surface"
                   />
 
@@ -1400,10 +1388,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         onClose={closeSheet}
         onConfirm={activeSheet === 'decline' ? confirmDecline : confirmReport}
         onOpenCatalog={() => setIsCatalogPickerVisible(true)}
-        onOpenNewSignType={() => {
-          closeSheet();
-          setIsNewSignTypeModalOpen(true);
-        }}
         onOpenReport={() => {
           setSelectedRemedySign(undefined);
           setDeclineReason(undefined);

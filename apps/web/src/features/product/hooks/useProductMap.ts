@@ -22,6 +22,8 @@ const OSM_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 interface UseProductMapProps {
   isDark: boolean
   t: TFunction<'product'>
+  initialSigns?: RouteSign[]
+  scrollWheelZoom?: boolean
 }
 
 /**
@@ -29,7 +31,12 @@ interface UseProductMapProps {
  * real-time device geolocation tracking (pulsing driver marker),
  * Esri/OSM tile switching, and vehicle navigation state.
  */
-export function useProductMap({ isDark, t }: UseProductMapProps) {
+export function useProductMap({
+  isDark,
+  t,
+  initialSigns,
+  scrollWheelZoom = true,
+}: UseProductMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersLayerRef = useRef<L.LayerGroup | null>(null)
@@ -46,7 +53,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
   // Map state — default to 'esri' matching mobile app
   const [tileMode, setTileMode] = useState<'osm' | 'esri'>('esri')
   const [isLoadingGis, setIsLoadingGis] = useState(false)
-  const [mapSigns, setMapSigns] = useState<RouteSign[]>([])
+  const [mapSigns, setMapSigns] = useState<RouteSign[]>(initialSigns ?? [])
 
   // Live GPS user location state
   const [userCoordinate, setUserCoordinate] = useState<[latitude: number, longitude: number] | null>(null)
@@ -159,6 +166,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
       center: initialCenter,
       zoom: initialZoom,
       zoomControl: false,
+      scrollWheelZoom,
     })
 
     // Esri World Street Map is the default tile layer (identical to mobile)
@@ -208,6 +216,7 @@ export function useProductMap({ isDark, t }: UseProductMapProps) {
 
     const timer = setTimeout(() => {
       map.invalidateSize()
+      setViewportRevision((v) => v + 1)
     }, 250)
 
     return () => {

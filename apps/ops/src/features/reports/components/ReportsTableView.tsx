@@ -7,7 +7,6 @@ import {
   Eye,
 } from '@phosphor-icons/react'
 import type { SignReportItem } from '@/data'
-import { mockCatalogData } from '@/data/catalogData'
 import { Pagination } from '@/components/common/Pagination'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 import { IssueTypeBadge, PriorityBadge, ReportStatusBadge } from './ReportsBadges'
@@ -71,9 +70,7 @@ export function ReportsTableView({
               </tr>
             ) : (
               paginatedReports.map((report) => {
-                const catalogEntry = mockCatalogData.find(
-                  (c) => c.code.toLowerCase() === report.signCode.toLowerCase()
-                ) || {
+                const catalogEntry = {
                   code: report.signCode,
                   nameVi: report.signName,
                   shape: 'Circle',

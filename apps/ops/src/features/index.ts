@@ -32,7 +32,7 @@ export { default as AuditLogsPage } from './audit/AuditLogsPage'
 
 // Staff Operations
 export { default as CandidatesListPage } from './candidates/CandidatesListPage'
-export { default as CandidateDetailPage } from './candidates/CandidateDetailPage'
+export * from './candidates/components/CandidateInspectionModal';
 export { default as MapPage } from './map/MapPage'
 export { default as TasksPage } from './tasks/TasksPage'
 export { default as StaffDirectoryPage } from './staff/StaffDirectoryPage'

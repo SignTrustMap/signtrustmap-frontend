@@ -26,8 +26,8 @@ import {
   Cpu,
   CheckCircle,
 } from '@phosphor-icons/react'
-import { mockRevalidationTasks, type RevalidationTask } from '@/data'
-import { mockCatalogData } from '@/data/catalogData'
+import type { RevalidationTask } from '@/data'
+import { catalogService, type CatalogSignTypeItem } from '@/api/services/catalog.service'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
 import {
   revalidationService,
@@ -146,6 +146,15 @@ export default function TasksPage() {
   const [newTaskBounty, setNewTaskBounty] = useState(50)
   const [newSignId, setNewSignId] = useState('')
   const [isCreatingTask, setIsCreatingTask] = useState(false)
+  const [catalogSigns, setCatalogSigns] = useState<CatalogSignTypeItem[]>([])
+
+  useEffect(() => {
+    catalogService.getAllSignTypes().then((res) => {
+      if (res && Array.isArray(res.items)) {
+        setCatalogSigns(res.items)
+      }
+    }).catch(() => {})
+  }, [])
 
   // Fetch tasks from live NestJS backend (/api/v1/revalidation/tasks)
   const fetchTasks = useCallback(async () => {
@@ -181,14 +190,13 @@ export default function TasksPage() {
         setTasks([])
         setTotalCount(response.total ?? 0)
       } else {
-        // Fallback to mock data if response payload unexpected
-        setTasks(mockRevalidationTasks)
-        setTotalCount(mockRevalidationTasks.length)
+        setTasks([])
+        setTotalCount(0)
       }
     } catch (err) {
-      console.warn('Live revalidation tasks fetch failed, fallback to mock data:', err)
-      setTasks(mockRevalidationTasks)
-      setTotalCount(mockRevalidationTasks.length)
+      console.warn('Live revalidation tasks fetch failed:', err)
+      setTasks([])
+      setTotalCount(0)
     } finally {
       setIsLoading(false)
     }
@@ -342,7 +350,7 @@ export default function TasksPage() {
         await revalidationService.finalizeTask(taskId)
         success(t('tasks.toast_confirmed', { taskId: taskId.slice(0, 8), reward: selectedTask?.rewardCredits || 20 }))
       } else if (decision === 'changed') {
-        const catEntry = mockCatalogData.find((c) => c.code.toLowerCase() === selectedChangeCode.toLowerCase())
+        const catEntry = catalogSigns.find((c) => c.signCode.toLowerCase() === selectedChangeCode.toLowerCase())
         if (evidenceId) {
           try {
             await revalidationService.voteEvidence(evidenceId, {
@@ -412,7 +420,7 @@ export default function TasksPage() {
     if (!newTaskLocation.trim()) return
 
     setIsCreatingTask(true)
-    const catalogEntry = mockCatalogData.find((c) => c.code.toLowerCase() === newTaskCode.toLowerCase())
+    const catalogEntry = catalogSigns.find((c) => c.signCode.toLowerCase() === newTaskCode.toLowerCase())
 
     try {
       if (newSignId.trim()) {
@@ -468,15 +476,22 @@ export default function TasksPage() {
   // Catalog entry for selected task
   const selectedCatalogEntry = useMemo(() => {
     if (!selectedTask) return null
-    return (
-      mockCatalogData.find((c) => c.code.toLowerCase() === selectedTask.signCode.toLowerCase()) || {
-        code: selectedTask.signCode,
-        shape: 'Circle' as const,
-        color: 'Red-White' as const,
-        nameVi: selectedTask.signName,
+    const found = catalogSigns.find((c) => c.signCode.toLowerCase() === selectedTask.signCode.toLowerCase())
+    if (found) {
+      return {
+        code: found.signCode,
+        nameVi: found.nameVi,
+        shape: (found.shape as any) || 'Circle',
+        color: (found.category as any) || 'Red-White',
       }
-    )
-  }, [selectedTask])
+    }
+    return {
+      code: selectedTask.signCode,
+      shape: 'Circle' as const,
+      color: 'Red-White' as const,
+      nameVi: selectedTask.signName,
+    }
+  }, [selectedTask, catalogSigns])
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 w-full max-w-[1680px] mx-auto space-y-6">
@@ -652,9 +667,7 @@ export default function TasksPage() {
                 </tr>
               ) : (
                 filteredTasks.map((task) => {
-                  const catalogEntry = mockCatalogData.find(
-                    (c) => c.code.toLowerCase() === task.signCode.toLowerCase()
-                  )
+                  const catalogEntry = { code: task.signCode, nameVi: task.signName }
 
                   return (
                     <tr
@@ -1145,10 +1158,7 @@ export default function TasksPage() {
                     onChange={(val) => setSelectedChangeCode(val)}
                     className="w-full"
                     buttonClassName="w-full"
-                    options={mockCatalogData.slice(0, 15).map((cat) => ({
-                      value: cat.code,
-                      label: `${cat.code} - ${cat.nameVi}`,
-                    }))}
+                    options={catalogSigns.map((cat) => ({ value: cat.signCode, label: `${cat.signCode} - ${cat.nameVi || cat.nameEn || "Biển báo"}` }))}
                   />
                 </div>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 italic">
@@ -1206,10 +1216,7 @@ export default function TasksPage() {
                     onChange={(val) => setNewTaskCode(val)}
                     className="w-full"
                     buttonClassName="w-full"
-                    options={mockCatalogData.slice(0, 12).map((cat) => ({
-                      value: cat.code,
-                      label: `${cat.code} - ${cat.nameVi}`,
-                    }))}
+                    options={catalogSigns.map((cat) => ({ value: cat.signCode, label: `${cat.signCode} - ${cat.nameVi || cat.nameEn || "Biển báo"}` }))}
                   />
                 </div>
 

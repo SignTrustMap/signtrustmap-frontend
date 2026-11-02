@@ -31,7 +31,6 @@ const SpatialDataExportPage = lazy(() => import('@/features/exports/SpatialDataE
 const SystemSettingsPage = lazy(() => import('@/features/settings/SystemSettingsPage'))
 const AuditLogsPage = lazy(() => import('@/features/audit/AuditLogsPage'))
 const CandidatesListPage = lazy(() => import('@/features/candidates/CandidatesListPage'))
-const CandidateDetailPage = lazy(() => import('@/features/candidates/CandidateDetailPage'))
 const MapPage = lazy(() => import('@/features/map/MapPage'))
 const TasksPage = lazy(() => import('@/features/tasks/TasksPage'))
 const ReportsPage = lazy(() => import('@/features/reports/ReportsPage'))
@@ -187,14 +186,7 @@ function ProtectedLayout() {
               </StaffGuard>
             }
           />
-          <Route
-            path="/candidates/:id"
-            element={
-              <StaffGuard>
-                <CandidateDetailPage />
-              </StaffGuard>
-            }
-          />
+          <Route path="/candidates/:id" element={<Navigate to="/candidates" replace />} />
           <Route
             path="/map"
             element={<MapPage />}
