@@ -102,10 +102,11 @@ describe('RecheckEvidenceScreen', () => {
   it('renders recheck evidence screen with metrics, review rows, and back button', async () => {
     const mockWorkflowValue: RevalidationWorkflowContextValue = {
       beginEvidenceCheck: jest.fn(),
-      counts: { STILL_ACTIVE: 1, REMOVED: 1, CHANGED: 0, UNCLEAR: 0 },
+      counts: { STILL_ACTIVE: 1, REMOVED: 1, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
       currentItem: undefined,
       finishReviews: jest.fn().mockReturnValue(2),
       handleVote: jest.fn().mockResolvedValue(true),
+      handleSkip: jest.fn(),
       isCheckingEvidence: false,
       isLoading: false,
       nextItem: undefined,
@@ -142,10 +143,11 @@ describe('RecheckEvidenceScreen', () => {
     const mockBeginCheck = jest.fn();
     const mockWorkflowValue: RevalidationWorkflowContextValue = {
       beginEvidenceCheck: mockBeginCheck,
-      counts: { STILL_ACTIVE: 1, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+      counts: { STILL_ACTIVE: 1, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
       currentItem: undefined,
       finishReviews: jest.fn().mockReturnValue(1),
       handleVote: jest.fn().mockResolvedValue(true),
+      handleSkip: jest.fn(),
       isCheckingEvidence: false,
       isLoading: false,
       nextItem: undefined,
@@ -176,10 +178,11 @@ describe('RecheckEvidenceScreen', () => {
     const mockBeginCheck = jest.fn();
     const mockWorkflowValue: RevalidationWorkflowContextValue = {
       beginEvidenceCheck: mockBeginCheck,
-      counts: { STILL_ACTIVE: 1, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+      counts: { STILL_ACTIVE: 1, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
       currentItem: undefined,
       finishReviews: jest.fn().mockReturnValue(1),
       handleVote: jest.fn().mockResolvedValue(true),
+      handleSkip: jest.fn(),
       isCheckingEvidence: false,
       isLoading: false,
       nextItem: undefined,
@@ -210,10 +213,11 @@ describe('RecheckEvidenceScreen', () => {
     const mockFinish = jest.fn().mockReturnValue(3);
     const mockWorkflowValue: RevalidationWorkflowContextValue = {
       beginEvidenceCheck: jest.fn(),
-      counts: { STILL_ACTIVE: 3, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+      counts: { STILL_ACTIVE: 3, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
       currentItem: undefined,
       finishReviews: mockFinish,
       handleVote: jest.fn().mockResolvedValue(true),
+      handleSkip: jest.fn(),
       isCheckingEvidence: false,
       isLoading: false,
       nextItem: undefined,

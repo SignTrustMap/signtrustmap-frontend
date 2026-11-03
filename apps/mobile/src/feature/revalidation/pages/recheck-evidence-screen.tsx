@@ -42,6 +42,12 @@ const revalActionDetails: Record<
     summary: 'Không thể nhận diện biển báo / hình ảnh mờ.',
     symbol: '?',
   },
+  INVALID: {
+    color: Colors.danger,
+    label: 'Không hợp lệ',
+    summary: 'Minh chứng sai lệch hoặc không chính xác.',
+    symbol: '!',
+  },
 };
 
 function RevalMetric({

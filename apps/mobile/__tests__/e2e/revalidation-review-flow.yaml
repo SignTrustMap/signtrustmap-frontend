@@ -42,19 +42,23 @@ appId: com.anonymous.mobile
     label: "Xem ảnh bằng chứng"
     optional: true
 
-# 4. Action: Confirm Sign is Still Active
+# 4. Action: Agree with Surveyor
 - tapOn:
-    label: "Xác nhận biển báo vẫn còn hoạt động"
+    label: "Đồng ý với kết luận của điều tra viên"
     optional: true
 
-# 5. Action: Confirm Sign Removed
+# 5. Action: Decline Surveyor Conclusion
 - tapOn:
-    label: "Xác nhận biển báo đã bị gỡ bỏ"
+    label: "Từ chối kết luận của điều tra viên"
     optional: true
 
-# 6. Action: Mark as Unclear / Invalid
+# 6. Action: Skip / Report Evidence
 - tapOn:
-    label: "Đánh dấu không rõ ràng hoặc không hợp lệ"
+    label: "Bỏ qua minh chứng này"
+    optional: true
+
+- tapOn:
+    label: "Báo cáo minh chứng này"
     optional: true
 
 # 7. Transition to Summary Metrics
