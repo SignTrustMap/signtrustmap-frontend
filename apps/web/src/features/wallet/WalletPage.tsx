@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   CircleNotch,
-  ArrowClockwise,
   Fire,
   ArrowRight,
   Wallet,
@@ -32,15 +31,10 @@ import { PaymentCheckoutModal } from './components/PaymentCheckoutModal'
 type TransactionFilter = 'ALL' | 'IN' | 'OUT'
 
 export default function WalletPage() {
-  const { user } = useAuth()
+  const { claimDailyBonus } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
-
-  // ─── Real Wallet Data from NestJS Backend ────────────────────────────────
-  const [balance, setBalance] = useState<number>(user?.credits || 0)
-  const [isFrozen, setIsFrozen] = useState<boolean>(false)
-  const [isLoadingWallet, setIsLoadingWallet] = useState(true)
 
   // ─── Top-up Packages & Custom Amount State ───────────────────────────────
   const [packages, setPackages] = useState<TopUpPackage[]>(DEFAULT_TOP_UP_PACKAGES)
@@ -85,23 +79,7 @@ export default function WalletPage() {
     ? customCredits * 100
     : Math.round(Number(selectedPackage?.priceVnd || 0))
 
-  // ─── 1. Fetch Wallet Balance from Backend ──────────────────────────────────
-  const fetchWallet = useCallback(async () => {
-    try {
-      setIsLoadingWallet(true)
-      const res = await walletService.getWallet()
-      if (res?.wallet) {
-        setBalance(res.wallet.balance)
-        setIsFrozen(res.wallet.isFrozen ?? false)
-      }
-    } catch (err) {
-      console.warn('[WalletPage] Failed to fetch live wallet:', err)
-    } finally {
-      setIsLoadingWallet(false)
-    }
-  }, [])
-
-  // ─── 2. Fetch Packages from Backend ───────────────────────────────────────
+  // ─── 1. Fetch Packages from Backend ───────────────────────────────────────
   const fetchPackages = useCallback(async () => {
     try {
       setIsLoadingPackages(true)
@@ -121,7 +99,7 @@ export default function WalletPage() {
     }
   }, [selectedPkgId])
 
-  // ─── 3. Fetch Transactions from Backend ───────────────────────────────────
+  // ─── 2. Fetch Transactions from Backend ───────────────────────────────────
   const fetchTransactions = useCallback(async (page: number, size: number) => {
     try {
       setIsLoadingTx(true)
@@ -137,7 +115,7 @@ export default function WalletPage() {
     }
   }, [])
 
-  // ─── 4. Fetch Daily Tasks & Missions from Backend ─────────────────────────
+  // ─── 3. Fetch Daily Tasks & Missions from Backend ─────────────────────────
   const fetchDailyTasks = useCallback(async () => {
     try {
       const [tasks, missionData] = await Promise.all([
@@ -153,10 +131,9 @@ export default function WalletPage() {
   }, [])
 
   useEffect(() => {
-    fetchWallet()
     fetchPackages()
     fetchDailyTasks()
-  }, [fetchWallet, fetchPackages, fetchDailyTasks])
+  }, [fetchPackages, fetchDailyTasks])
 
   useEffect(() => {
     fetchTransactions(currentPage, pageSize)
@@ -169,9 +146,8 @@ export default function WalletPage() {
     try {
       await dailyTasksService.claim(task.id)
       const reward = task.rewardCredits || 10
-      setBalance((prev) => prev + reward)
+      claimDailyBonus(reward)
       toast.success(`+${reward} Credits cho nhiệm vụ ${task.name}`)
-      await fetchWallet()
       await fetchDailyTasks()
       await fetchTransactions(currentPage, pageSize)
     } catch (err: any) {
@@ -182,8 +158,8 @@ export default function WalletPage() {
   }
 
   // ─── Payment Success Callback from Modal ──────────────────────────────────
-  const handlePaymentSuccess = async () => {
-    await fetchWallet()
+  const handlePaymentSuccess = async (creditedCredits: number) => {
+    claimDailyBonus(creditedCredits)
     await fetchTransactions(currentPage, pageSize)
   }
 
@@ -225,71 +201,12 @@ export default function WalletPage() {
       }`}
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* ─── Header & Quick Balance Bar ─────────────────────────────── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <PageHeader
-            title={t('wallet.title')}
-            subtitle={t('wallet.subtitle')}
-            badge={t('wallet.economy_badge')}
-          />
-
-          {/* User Quick Balance Bar */}
-          <div
-            className={`flex items-center gap-3 p-3 sm:px-4 rounded-2xl border shadow-xs shrink-0 ${
-              isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
-            }`}
-          >
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                  Số dư ví
-                </span>
-                <button
-                  type="button"
-                  onClick={fetchWallet}
-                  disabled={isLoadingWallet}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                  title="Làm mới số dư"
-                >
-                  <ArrowClockwise
-                    size={12}
-                    className={
-                      isLoadingWallet
-                        ? isDark
-                          ? 'animate-spin text-[#00c4de]'
-                          : 'animate-spin text-[#007b8b]'
-                        : ''
-                    }
-                  />
-                </button>
-              </div>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-xl font-black text-amber-500 tracking-tight">
-                  {isLoadingWallet ? '—' : balance.toLocaleString('vi-VN')}
-                </span>
-                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Credits</span>
-                <span className="text-[11px] text-gray-400 ml-1">
-                  ≈ {(balance * 100).toLocaleString('vi-VN')} đ
-                </span>
-                {isFrozen && (
-                  <span className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.2 rounded ml-1.5">
-                    Đóng băng
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {currentStreak > 0 && (
-              <>
-                <div className="h-8 w-px bg-gray-200 dark:bg-white/10 mx-1" />
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                  <Fire size={14} weight="fill" className="text-amber-500" />
-                  <span>{currentStreak} ngày đóng góp</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        {/* ─── Page Header ───────────────────────────────────────────── */}
+        <PageHeader
+          title={t('wallet.title')}
+          subtitle={t('wallet.subtitle')}
+          badge={t('wallet.economy_badge')}
+        />
 
         {/* ─── Main Content Layout ────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -420,11 +337,19 @@ export default function WalletPage() {
                     Nhiệm vụ đóng góp hằng ngày
                   </h3>
                 </div>
-                <span className="text-xs text-gray-500 font-medium">
-                  {dailyTasks.length > 0
-                    ? `${dailyTasks.filter((t) => t.isCompleted).length}/${dailyTasks.length} hoàn thành`
-                    : 'Đóng góp nhận Credits'}
-                </span>
+                <div className="flex items-center gap-2.5">
+                  {currentStreak > 0 && (
+                    <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <Fire size={13} weight="fill" className="text-amber-500" />
+                      <span>{currentStreak} ngày</span>
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-500 font-medium">
+                    {dailyTasks.length > 0
+                      ? `${dailyTasks.filter((t) => t.isCompleted).length}/${dailyTasks.length} hoàn thành`
+                      : 'Đóng góp nhận Credits'}
+                  </span>
+                </div>
               </div>
 
               {dailyTasks.length > 0 ? (
