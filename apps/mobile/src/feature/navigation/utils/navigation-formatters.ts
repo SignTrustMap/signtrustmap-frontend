@@ -10,9 +10,9 @@ export function getManeuverSymbol(step: NavigationStep): string {
     return "↻";
 
   const instruction = step.instruction.toLowerCase();
-  if (instruction.includes("left")) return "↖";
-  if (instruction.includes("right")) return "↗";
-  if (instruction.includes("u-turn")) return "↶";
+  if (instruction.includes("left") || instruction.includes("trái")) return "↖";
+  if (instruction.includes("right") || instruction.includes("phải")) return "↗";
+  if (instruction.includes("u-turn") || instruction.includes("quay đầu")) return "↶";
 
   return "↑";
 }
