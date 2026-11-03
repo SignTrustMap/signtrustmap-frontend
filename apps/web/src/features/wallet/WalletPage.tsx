@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Sparkle,
   ArrowUpRight,
@@ -35,48 +36,64 @@ import { Modal } from '@/components/common/Modal'
 import { Pagination } from '@/components/common/Pagination'
 import { PageHeader } from '@/components/common/PageHeader'
 
+type TopUpMode = 'packages' | 'custom'
+type TransactionFilter = 'ALL' | 'IN' | 'OUT'
+
 export default function WalletPage() {
   const { user, claimDailyBonus } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
 
-  // Real Wallet Data from NestJS backend
+  // ─── Real Wallet Data from NestJS Backend ────────────────────────────────
   const [balance, setBalance] = useState<number>(user?.credits || 0)
   const [isFrozen, setIsFrozen] = useState<boolean>(false)
   const [isLoadingWallet, setIsLoadingWallet] = useState(true)
 
-  // Top-up packages state
+  // ─── Top-up Packages & Custom Amount State ───────────────────────────────
   const [packages, setPackages] = useState<TopUpPackage[]>(DEFAULT_TOP_UP_PACKAGES)
-  const [isLoadingPackages, setIsLoadingPackages] = useState(true)
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false)
+  const [topUpMode, setTopUpMode] = useState<TopUpMode>('packages')
+  const [customAmount, setCustomAmount] = useState<number>(500)
+  const [selectedGateway, setSelectedGateway] = useState<PaymentGatewayOption['id']>('VIETQR')
 
-  // Transactions pagination state
+  // ─── Transactions State & Filters ─────────────────────────────────────────
   const [transactions, setTransactions] = useState<WalletTransaction[]>([])
   const [totalTransactions, setTotalTransactions] = useState<number>(0)
+  const [isLoadingTx, setIsLoadingTx] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(5)
-  const [isLoadingTx, setIsLoadingTx] = useState(true)
+  const [pageSize, setPageSize] = useState(10)
+  const [txFilter, setTxFilter] = useState<TransactionFilter>('ALL')
 
-  // Daily Tasks & Missions state
+  // ─── Daily Tasks & Missions State ─────────────────────────────────────────
   const [dailyTasks, setDailyTasks] = useState<DailyTaskItem[]>([])
   const [missions, setMissions] = useState<MissionsOverviewResponse | null>(null)
   const [isClaimingDaily, setIsClaimingDaily] = useState(false)
+  const [claimingTaskId, setClaimingTaskId] = useState<number | null>(null)
 
-  // Today's date string for idempotency & persistence
+  // Today's date string for idempotency & local persistence
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const dailyStorageKey = useMemo(() => `stm_daily_claimed_${user?.id || 'guest'}_${todayStr}`, [user?.id, todayStr])
+  const dailyStorageKey = useMemo(
+    () => `stm_daily_claimed_${user?.id || 'guest'}_${todayStr}`,
+    [user?.id, todayStr]
+  )
   const [claimedToday, setClaimedToday] = useState<boolean>(() => {
     return localStorage.getItem(dailyStorageKey) === 'true'
   })
 
-  // Top-up payment flow modal
+  // ─── Payment Modal Flow ───────────────────────────────────────────────────
   const [selectedPkg, setSelectedPkg] = useState<TopUpPackage | null>(null)
-  const [selectedGateway, setSelectedGateway] = useState<PaymentGatewayOption['id']>('VIETQR')
+  const [isCustomOrder, setIsCustomOrder] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [isCreatingOrder, setIsCreatingOrder] = useState(false)
   const [activeOrder, setActiveOrder] = useState<TopUpOrderResponse | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
+
+  // Helper to remove any English parentheses from package name
+  const cleanPackageName = (name: string): string => {
+    return name.replace(/\s*\([^)]*\)/g, '').trim()
+  }
 
   // ─── 1. Fetch Wallet Balance from Backend ──────────────────────────────────
   const fetchWallet = useCallback(async () => {
@@ -131,6 +148,10 @@ export default function WalletPage() {
         dailyTasksService.getTasks(),
         dailyTasksService.getMissions(),
       ])
+      console.log('=== [Nhiệm vụ đóng góp hôm nay] ===')
+      console.log('Danh sách nhiệm vụ từ API /api/v1/daily-tasks:', tasks)
+      console.log('Tổng quan tiến độ nhiệm vụ và chuỗi streak:', missionData)
+
       setDailyTasks(tasks)
       setMissions(missionData)
 
@@ -172,7 +193,6 @@ export default function WalletPage() {
     setIsClaimingDaily(true)
 
     try {
-      // 1. If backend has a daily task, claim through /api/v1/daily-tasks/:id/claim
       const loginTask = dailyTasks.find(
         (t) =>
           (t.taskCode.toUpperCase().includes('LOGIN') ||
@@ -188,14 +208,12 @@ export default function WalletPage() {
         }
       }
 
-      // 2. Award bonus to user credits and local state
       claimDailyBonus(bonus)
       setBalance((prev) => prev + bonus)
       setClaimedToday(true)
       localStorage.setItem(dailyStorageKey, 'true')
       toast.success(`+${bonus} Credits: ${t('wallet.tx_daily_reward')}`)
 
-      // 3. Prepend immediate local transaction record
       setTransactions((prev) => [
         {
           id: `TXN-${Date.now().toString().slice(-6)}`,
@@ -208,7 +226,6 @@ export default function WalletPage() {
       ])
       setTotalTransactions((prev) => prev + 1)
 
-      // 4. Re-fetch wallet and daily tasks in background
       await fetchWallet()
       await fetchDailyTasks()
     } finally {
@@ -216,20 +233,68 @@ export default function WalletPage() {
     }
   }
 
+  // ─── Claim Contributor Daily Task Reward ──────────────────────────────────
+  const handleClaimTaskReward = async (task: DailyTaskItem) => {
+    if (!task.isClaimable || task.isClaimed || claimingTaskId !== null) return
+    setClaimingTaskId(task.id)
+    try {
+      await dailyTasksService.claim(task.id)
+      const reward = task.rewardCredits || 10
+      claimDailyBonus(reward)
+      setBalance((prev) => prev + reward)
+      toast.success(`+${reward} Credits cho nhiệm vụ ${task.name}`)
+      await fetchWallet()
+      await fetchDailyTasks()
+      await fetchTransactions(currentPage, pageSize)
+    } catch (err: any) {
+      toast.error(err.message || 'Chưa thể nhận thưởng nhiệm vụ lúc này')
+    } finally {
+      setClaimingTaskId(null)
+    }
+  }
+
+  // ─── Open Payment Modal ───────────────────────────────────────────────────
+  const handleOpenPackageOrder = (pkg: TopUpPackage) => {
+    setSelectedPkg(pkg)
+    setIsCustomOrder(false)
+    setActiveOrder(null)
+    setShowPaymentModal(true)
+  }
+
+  const handleOpenCustomOrder = () => {
+    if (customAmount <= 0) {
+      toast.error('Vui lòng nhập số lượng Credits hợp lệ')
+      return
+    }
+    setSelectedPkg(null)
+    setIsCustomOrder(true)
+    setActiveOrder(null)
+    setShowPaymentModal(true)
+  }
+
   // ─── Create Top-up Order with Backend ─────────────────────────────────────
   const handleCreateOrder = async () => {
-    if (!selectedPkg) return
     try {
       setIsCreatingOrder(true)
-      const idempotencyKey = `stm_web_${selectedPkg.id}_${Date.now()}`
-      const res = await walletService.topUp(selectedPkg.id, selectedGateway, idempotencyKey)
+      let res: TopUpOrderResponse
+      const idempotencyKey = `stm_web_${Date.now()}`
+
+      if (isCustomOrder) {
+        res = await walletService.topUpCustom(customAmount, selectedGateway, idempotencyKey)
+      } else if (selectedPkg) {
+        res = await walletService.topUp(selectedPkg.id, selectedGateway, idempotencyKey)
+      } else {
+        return
+      }
+
       setActiveOrder(res)
 
       // In Sandbox mode, payment is instantly credited
       if (selectedGateway === 'MOCK' || res.paymentOrder?.status === 'COMPLETED') {
         setPaymentSuccess(true)
-        toast.success(`Nạp thành công +${selectedPkg.creditAmount} Credits!`)
-        claimDailyBonus(selectedPkg.creditAmount + (selectedPkg.bonusCredits || 0))
+        const credited = isCustomOrder ? customAmount : selectedPkg?.creditAmount || 0
+        toast.success(`Nạp thành công +${credited} Credits`)
+        claimDailyBonus(credited)
         await fetchWallet()
         await fetchTransactions(currentPage, pageSize)
         setTimeout(() => {
@@ -237,7 +302,7 @@ export default function WalletPage() {
           setShowPaymentModal(false)
           setSelectedPkg(null)
           setActiveOrder(null)
-        }, 2200)
+        }, 2000)
       }
     } catch (err: any) {
       toast.error(err.message || 'Không thể tạo đơn nạp tiền. Vui lòng thử lại.')
@@ -269,7 +334,7 @@ export default function WalletPage() {
     setTimeout(() => setCopiedField(null), 2000)
   }
 
-  // High-contrast role badge styles matching ProfilePage
+  // Role badge styles matching ProfilePage
   const getRoleBadge = (role?: string) => {
     const r = (role || '').trim().toLowerCase()
     switch (r) {
@@ -336,6 +401,16 @@ export default function WalletPage() {
     }
   }
 
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    if (txFilter === 'IN') return transactions.filter((t) => Number(t.amount) > 0)
+    if (txFilter === 'OUT') return transactions.filter((t) => Number(t.amount) < 0)
+    return transactions
+  }, [transactions, txFilter])
+
+  // Calculated current streak from missions response
+  const currentStreak = missions?.streak?.currentDays || 0
+
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-8 sm:py-12 transition-colors ${
@@ -347,14 +422,15 @@ export default function WalletPage() {
         <PageHeader
           title={t('wallet.title')}
           subtitle={t('wallet.subtitle')}
+          badge={t('wallet.economy_badge')}
           bordered
         />
 
-        {/* ─── Balance & Earn Overview (2 Columns) ────────────────────── */}
+        {/* ─── Balance & Missions Row (2 Columns) ────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          {/* Main Balance Card (8 cols) */}
+          {/* Main Balance Card (7 cols) */}
           <div
-            className={`lg:col-span-8 rounded-2xl border p-6 sm:p-8 flex flex-col justify-between shadow-xs ${
+            className={`lg:col-span-7 rounded-2xl border p-6 sm:p-7 flex flex-col justify-between shadow-xs ${
               isDark
                 ? 'bg-[#071317] border-white/10 shadow-lg shadow-black/40'
                 : 'bg-white border-[#E8E4E3]'
@@ -387,9 +463,17 @@ export default function WalletPage() {
                     </span>
                     <span className="text-base font-bold text-gray-700 dark:text-gray-300">Credits</span>
                   </div>
-                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1.5 block font-medium">
+                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 block font-medium">
                     {t('wallet.convert_value', { amount: (balance * 100).toLocaleString('vi-VN') })}
                   </span>
+
+                  {/* Daily Streak Indicator */}
+                  {currentStreak > 0 && (
+                    <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                      <Fire size={14} weight="fill" className="text-amber-500" />
+                      <span>Chuỗi {currentStreak} ngày tham gia liên tục</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Daily Check-in Button */}
@@ -416,14 +500,14 @@ export default function WalletPage() {
             </div>
 
             {/* Bottom Account Status Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-white/10 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-5 border-t border-gray-200 dark:border-white/10 text-xs">
               <div>
                 <span className="text-gray-600 dark:text-gray-400 block mb-1 font-medium">
                   {t('wallet.tier_label')}
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800">
                   <ShieldCheck size={14} weight="fill" className="text-emerald-600 dark:text-emerald-400" />
-                  <span>{isFrozen ? 'Tài khoản bị đóng băng' : `Đang hoạt động (${user?.trustScore || 100}%)`}</span>
+                  <span>{isFrozen ? 'Tài khoản đóng băng' : `Độ tin cậy: ${user?.trustScore || 100}%`}</span>
                 </span>
               </div>
 
@@ -440,76 +524,160 @@ export default function WalletPage() {
                 <span className="text-gray-600 dark:text-gray-400 block mb-1 font-medium">
                   {t('wallet.privilege_label')}
                 </span>
-                <span className="font-bold text-gray-800 dark:text-gray-200 block truncate">
-                  {t('wallet.privilege_val')}
+                <span className="font-bold text-gray-800 dark:text-gray-200 block">
+                  Dẫn đường & Xuất dữ liệu
                 </span>
               </div>
             </div>
           </div>
 
-          {/* How to Earn Side Card (4 cols) */}
+          {/* Daily Missions & Contributor Challenges Card (5 cols) */}
           <div
-            className={`lg:col-span-4 rounded-2xl border p-6 flex flex-col justify-between shadow-xs ${
+            className={`lg:col-span-5 rounded-2xl border p-6 flex flex-col justify-between shadow-xs ${
               isDark
                 ? 'bg-[#071317] border-white/10 shadow-lg shadow-black/40'
                 : 'bg-white border-[#E8E4E3]'
             }`}
           >
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3.5">
                 <h3 className="font-extrabold text-base text-gray-900 dark:text-white flex items-center gap-2">
                   <Sparkle size={18} weight="fill" className="text-amber-500" />
-                  <span>{t('wallet.how_to_earn_title')}</span>
+                  <span>Nhiệm vụ đóng góp hôm nay</span>
                 </h3>
-
-                {/* Streak Counter if available */}
-                {missions?.streak && missions.streak.currentDays > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
-                    <Fire size={13} weight="fill" />
-                    <span>{missions.streak.currentDays} ngày</span>
-                  </span>
-                )}
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                  {dailyTasks.length > 0 ? `${dailyTasks.filter((t) => t.isCompleted).length}/${dailyTasks.length} hoàn thành` : 'Điểm danh hằng ngày'}
+                </span>
               </div>
 
-              <div className="space-y-3 text-xs leading-relaxed">
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <span className="font-bold text-amber-700 dark:text-amber-300 block mb-0.5">
-                    +20 Credits
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {t('wallet.earn_survey_sub')}
-                  </span>
-                </div>
+              {/* Render dynamic tasks from backend /daily-tasks */}
+              {dailyTasks.length > 0 ? (
+                <div className="space-y-2.5 text-xs">
+                  {dailyTasks.slice(0, 3).map((task) => {
+                    const isTaskDone = task.isCompleted || task.isClaimed
+                    const canClaim = task.isClaimable && !task.isClaimed
+                    const progressPercent = Math.min(
+                      100,
+                      Math.round((task.progress / (task.targetCount || 1)) * 100)
+                    )
 
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <span className="font-bold text-emerald-700 dark:text-emerald-300 block mb-0.5">
-                    +5 Credits
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {t('wallet.earn_review_sub')}
-                  </span>
-                </div>
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-gray-900 dark:text-white truncate">
+                            {task.name}
+                          </span>
+                          <span className="font-extrabold text-amber-600 dark:text-amber-400 shrink-0">
+                            +{task.rewardCredits} Credits
+                          </span>
+                        </div>
 
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between gap-2">
-                  <div>
-                    <span className="font-bold text-cyan-700 dark:text-cyan-300 block mb-0.5">
-                      +25 Credits
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-300">
-                      {t('wallet.earn_daily_sub')}
+                        {/* Progress Bar */}
+                        <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              isTaskDone ? 'bg-emerald-500' : 'bg-[#00c4de]'
+                            }`}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-0.5">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            Tiến độ: {task.progress}/{task.targetCount}
+                          </span>
+
+                          {canClaim ? (
+                            <button
+                              type="button"
+                              disabled={claimingTaskId === task.id}
+                              onClick={() => handleClaimTaskReward(task)}
+                              className="px-2.5 py-0.5 rounded-md font-bold text-[11px] bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer"
+                            >
+                              {claimingTaskId === task.id ? 'Đang nhận...' : 'Nhận thưởng'}
+                            </button>
+                          ) : task.isClaimed ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                              ✓ Đã nhận
+                            </span>
+                          ) : isTaskDone ? (
+                            <span className="text-cyan-600 dark:text-cyan-400 font-bold">
+                              Đã hoàn thành
+                            </span>
+                          ) : (
+                            <Link
+                              to={task.activityType === 'SURVEY' ? '/studio' : '/reviews/candidates'}
+                              className="text-[#007b8b] dark:text-[#00c4de] hover:underline font-semibold"
+                            >
+                              Thực hiện ➔
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                /* Fallback standard reward rules */
+                <div className="space-y-2.5 text-xs leading-relaxed">
+                  <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-amber-700 dark:text-amber-300 block mb-0.5">
+                        +20 Credits
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-300">
+                        {t('wallet.earn_survey_sub')}
+                      </span>
+                    </div>
+                    <Link
+                      to="/studio"
+                      className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#007b8b]/10 text-[#007b8b] dark:text-[#00c4de] shrink-0"
+                    >
+                      Khảo sát ➔
+                    </Link>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-300 block mb-0.5">
+                        +5 Credits
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-300">
+                        {t('wallet.earn_review_sub')}
+                      </span>
+                    </div>
+                    <Link
+                      to="/reviews/candidates"
+                      className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 shrink-0"
+                    >
+                      Duyệt biển ➔
+                    </Link>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-cyan-700 dark:text-cyan-300 block mb-0.5">
+                        +25 Credits
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-300">
+                        {t('wallet.earn_daily_sub')}
+                      </span>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                        claimedToday
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                          : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                      }`}
+                    >
+                      {claimedToday ? 'Đã nhận' : 'Chưa nhận'}
                     </span>
                   </div>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
-                      claimedToday
-                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                        : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                    }`}
-                  >
-                    {claimedToday ? '✓ Đã nhận' : 'Chưa nhận'}
-                  </span>
                 </div>
-              </div>
+              )}
             </div>
 
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-4 pt-3 border-t border-gray-200 dark:border-white/10">
@@ -518,96 +686,244 @@ export default function WalletPage() {
           </div>
         </div>
 
-        {/* ─── Top-up Packages Section ─────────────────────────────────── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        {/* ─── Top-up Section (Packages + Custom Amount) ─────────────────── */}
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-                {t('wallet.packages_title')}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                  {t('wallet.packages_title')}
+                </h2>
+                {isLoadingPackages && (
+                  <CircleNotch size={18} className="animate-spin text-[#00c4de]" />
+                )}
+              </div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
                 {t('wallet.packages_subtitle')}
               </p>
             </div>
-            {isLoadingPackages && (
-              <CircleNotch size={20} className="animate-spin text-[#00c4de]" />
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className={`rounded-2xl p-5 sm:p-6 border transition-all relative flex flex-col justify-between shadow-xs ${
-                  pkg.isPopular
-                    ? isDark
-                      ? 'bg-[#071317] border-2 border-[#00c4de] shadow-lg shadow-[#00c4de]/10'
-                      : 'bg-white border-2 border-[#007b8b] shadow-md'
-                    : isDark
-                    ? 'bg-[#071317] border-white/10 hover:border-white/20'
-                    : 'bg-white border-[#E8E4E3] hover:border-gray-400'
+            {/* Mode Switcher Tabs */}
+            <div className="inline-flex p-1 rounded-xl bg-gray-200/80 dark:bg-white/10 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setTopUpMode('packages')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  topUpMode === 'packages'
+                    ? 'bg-white dark:bg-[#071317] text-gray-900 dark:text-white shadow-xs'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                {pkg.isPopular && (
-                  <span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    isDark ? 'bg-[#00c4de] text-black shadow-md' : 'bg-[#007b8b] text-white shadow-sm'
-                  }`}>
-                    {t('wallet.popular_badge')}
+                Gói ưu đãi
+              </button>
+              <button
+                type="button"
+                onClick={() => setTopUpMode('custom')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  topUpMode === 'custom'
+                    ? 'bg-white dark:bg-[#071317] text-gray-900 dark:text-white shadow-xs'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Nạp tùy chỉnh
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Payment Gateway Selector */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <span className="text-gray-500 dark:text-gray-400 font-medium shrink-0">
+              Phương thức thanh toán:
+            </span>
+            {AVAILABLE_PAYMENT_GATEWAYS.map((gw) => (
+              <button
+                key={gw.id}
+                type="button"
+                onClick={() => setSelectedGateway(gw.id)}
+                className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border ${
+                  selectedGateway === gw.id
+                    ? isDark
+                      ? 'bg-[#00c4de]/15 text-[#00c4de] border-[#00c4de]'
+                      : 'bg-teal-50 text-[#007b8b] border-[#007b8b]'
+                    : isDark
+                    ? 'bg-white/5 text-gray-400 border-white/10 hover:border-white/20'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <span>{gw.iconSymbol}</span>
+                <span>{gw.name}</span>
+                {gw.badge && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                    {gw.badge}
                   </span>
                 )}
+              </button>
+            ))}
+          </div>
 
-                <div>
-                  <h3 className="font-extrabold text-lg text-gray-900 dark:text-white">
-                    {pkg.packageName}
-                  </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
-                    Mở khóa tính năng dẫn đường & lưu trữ dữ liệu
-                  </p>
+          {/* View Mode 1: Standard Packages Grid */}
+          {topUpMode === 'packages' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className={`rounded-2xl p-5 sm:p-6 border transition-all relative flex flex-col justify-between shadow-xs ${
+                    pkg.isPopular
+                      ? isDark
+                        ? 'bg-[#071317] border-2 border-[#00c4de] shadow-lg shadow-[#00c4de]/10'
+                        : 'bg-white border-2 border-[#007b8b] shadow-md'
+                      : isDark
+                      ? 'bg-[#071317] border-white/10 hover:border-white/20'
+                      : 'bg-white border-[#E8E4E3] hover:border-gray-400'
+                  }`}
+                >
+                  {pkg.isPopular && (
+                    <span
+                      className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        isDark ? 'bg-[#00c4de] text-black shadow-md' : 'bg-[#007b8b] text-white shadow-sm'
+                      }`}
+                    >
+                      {t('wallet.popular_badge')}
+                    </span>
+                  )}
 
-                  <div className="mt-4 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-                        {pkg.creditAmount}
-                      </span>
-                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Credits</span>
+                  <div>
+                    <h3 className="font-extrabold text-lg text-gray-900 dark:text-white">
+                      {cleanPackageName(pkg.packageName)}
+                    </h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                      Mở khóa tính năng dẫn đường và lưu trữ dữ liệu
+                    </p>
+
+                    <div className="mt-4 flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
+                          {pkg.creditAmount}
+                        </span>
+                        <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Credits</span>
+                      </div>
+                      {(pkg.bonusCredits || 0) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800">
+                          {t('wallet.bonus_badge', { amount: pkg.bonusCredits })}
+                        </span>
+                      )}
                     </div>
-                    {(pkg.bonusCredits || 0) > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800">
-                        {t('wallet.bonus_badge', { amount: pkg.bonusCredits })}
-                      </span>
-                    )}
+
+                    <span className="text-sm font-mono font-extrabold text-gray-900 dark:text-white block mt-2">
+                      {Math.round(Number(pkg.priceVnd)).toLocaleString('vi-VN')} VND
+                    </span>
                   </div>
 
-                  <span className="text-sm font-mono font-extrabold text-gray-900 dark:text-white block mt-2">
-                    {Math.round(Number(pkg.priceVnd)).toLocaleString('vi-VN')} VND
+                  <div className="pt-5 mt-5 border-t border-gray-200 dark:border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPackageOrder(pkg)}
+                      className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+                        pkg.isPopular
+                          ? isDark
+                            ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-md'
+                            : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-sm'
+                          : isDark
+                          ? 'bg-white/10 hover:bg-white/15 text-white border border-white/15'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200'
+                      }`}
+                    >
+                      {t('wallet.btn_select_pay')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* View Mode 2: Custom Amount Top-up Form */
+            <div
+              className={`rounded-2xl border p-6 sm:p-8 max-w-xl mx-auto shadow-xs ${
+                isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+              }`}
+            >
+              <div className="text-center space-y-1 mb-6">
+                <h3 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                  Nhập số lượng Credits tùy chỉnh
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Tỷ lệ quy đổi tiêu chuẩn: 100 VND cho mỗi Credit
+                </p>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex flex-wrap gap-2 justify-center mb-6">
+                {[100, 250, 500, 1000, 2500, 5000].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setCustomAmount(val)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                      customAmount === val
+                        ? isDark
+                          ? 'bg-[#00c4de] text-black border-[#00c4de]'
+                          : 'bg-[#007b8b] text-white border-[#007b8b]'
+                        : isDark
+                        ? 'bg-white/5 border-white/10 text-gray-300 hover:border-white/20'
+                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    +{val.toLocaleString('vi-VN')}
+                  </button>
+                ))}
+              </div>
+
+              {/* Number Input Field */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                    Số Credits muốn nạp
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={50}
+                      max={50000}
+                      step={50}
+                      value={customAmount || ''}
+                      onChange={(e) => setCustomAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      className={`w-full px-4 py-3 rounded-xl font-bold text-lg border transition-colors outline-none ${
+                        isDark
+                          ? 'bg-black/30 border-white/15 text-white focus:border-[#00c4de]'
+                          : 'bg-gray-50 border-gray-300 text-gray-900 focus:border-[#007b8b]'
+                      }`}
+                      placeholder="Nhập số Credits..."
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
+                      Credits
+                    </span>
+                  </div>
+                </div>
+
+                {/* Live VND Conversion Calculation */}
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 flex items-center justify-between">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                    Tổng số tiền thanh toán:
+                  </span>
+                  <span className="text-lg font-mono font-black text-amber-600 dark:text-amber-400">
+                    {(customAmount * 100).toLocaleString('vi-VN')} VND
                   </span>
                 </div>
 
-                <div className="pt-5 mt-5 border-t border-gray-200 dark:border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPkg(pkg)
-                      setSelectedGateway('VIETQR')
-                      setActiveOrder(null)
-                      setShowPaymentModal(true)
-                    }}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-                      pkg.isPopular
-                        ? isDark
-                          ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-md'
-                          : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-sm'
-                        : isDark
-                        ? 'bg-white/10 hover:bg-white/15 text-white border border-white/15'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200'
-                    }`}
-                  >
-                    {t('wallet.btn_select_pay')}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={customAmount <= 0}
+                  onClick={handleOpenCustomOrder}
+                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer ${
+                    isDark
+                      ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
+                      : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                  }`}
+                >
+                  Tiến hành thanh toán {customAmount.toLocaleString('vi-VN')} Credits
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ─── Transaction History Section ────────────────────────────── */}
@@ -616,13 +932,52 @@ export default function WalletPage() {
             isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
           }`}
         >
-          <div className="p-5 sm:p-6 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">
-              {t('wallet.history_title')}
-            </h2>
-            <span className="text-xs font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-full border border-gray-200 dark:border-white/10">
-              {t('wallet.history_count', { count: totalTransactions })}
-            </span>
+          <div className="p-5 sm:p-6 border-b border-gray-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">
+                {t('wallet.history_title')}
+              </h2>
+              <span className="text-xs font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-0.5 rounded-full border border-gray-200 dark:border-white/10">
+                {t('wallet.history_count', { count: totalTransactions })}
+              </span>
+            </div>
+
+            {/* Transaction Filter Tabs */}
+            <div className="inline-flex p-0.5 rounded-lg bg-gray-100 dark:bg-white/10 self-start sm:self-auto text-xs">
+              <button
+                type="button"
+                onClick={() => setTxFilter('ALL')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'ALL'
+                    ? 'bg-white dark:bg-[#071317] text-gray-900 dark:text-white shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => setTxFilter('IN')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'IN'
+                    ? 'bg-white dark:bg-[#071317] text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Cộng điểm
+              </button>
+              <button
+                type="button"
+                onClick={() => setTxFilter('OUT')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'OUT'
+                    ? 'bg-white dark:bg-[#071317] text-rose-600 dark:text-rose-400 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Khấu trừ
+              </button>
+            </div>
           </div>
 
           <div className="divide-y divide-gray-100 dark:divide-white/5">
@@ -631,12 +986,12 @@ export default function WalletPage() {
                 <CircleNotch size={28} className="animate-spin mx-auto mb-2 text-[#00c4de]" />
                 <p className="text-xs">Đang tải lịch sử giao dịch...</p>
               </div>
-            ) : transactions.length === 0 ? (
+            ) : filteredTransactions.length === 0 ? (
               <div className="p-12 text-center text-gray-500 text-sm">
                 Chưa có giao dịch nào được ghi nhận.
               </div>
             ) : (
-              transactions.map((tx) => {
+              filteredTransactions.map((tx) => {
                 const isPositive = Number(tx.amount) > 0
                 return (
                   <div
@@ -694,7 +1049,7 @@ export default function WalletPage() {
             )}
           </div>
 
-          {/* ─── Shared Pagination ──────────────────────────────────── */}
+          {/* Shared Pagination */}
           {totalTransactions > pageSize && (
             <div className="p-4 sm:px-6">
               <Pagination
@@ -713,267 +1068,273 @@ export default function WalletPage() {
           )}
         </div>
 
-        {/* ─── Real Payment / Top-Up Modal ────────────────────────────── */}
-        {selectedPkg && (
-          <Modal
-            isOpen={showPaymentModal}
-            onClose={() => {
-              setShowPaymentModal(false)
-              setActiveOrder(null)
-            }}
-            maxWidth="max-w-lg"
+        {/* ─── Real Payment Modal (Unified for Packages and Custom Amount) ─ */}
+        <Modal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false)
+            setActiveOrder(null)
+          }}
+          maxWidth="max-w-lg"
+        >
+          <div
+            className={`w-full rounded-2xl border shadow-2xl p-6 sm:p-8 text-center transition-all ${
+              isDark ? 'bg-[#071317] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'
+            }`}
           >
-            <div
-              className={`w-full rounded-2xl border shadow-2xl p-6 sm:p-8 text-center transition-all ${
-                isDark ? 'bg-[#071317] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'
-              }`}
-            >
-              {paymentSuccess ? (
-                <div className="py-6 space-y-3">
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 mx-auto flex items-center justify-center animate-bounce">
-                    <CheckCircle size={36} weight="fill" />
-                  </div>
-                  <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    {t('wallet.payment_success_title')}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('wallet.payment_success_desc')}
-                  </p>
+            {paymentSuccess ? (
+              <div className="py-6 space-y-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 mx-auto flex items-center justify-center animate-bounce">
+                  <CheckCircle size={36} weight="fill" />
                 </div>
-              ) : !activeOrder ? (
-                /* Step 1: Gateway Selection & Order Confirmation */
-                <div className="space-y-4 text-left">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center">
-                    Xác nhận gói nạp Credits
-                  </h3>
+                <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
+                  {t('wallet.payment_success_title')}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {t('wallet.payment_success_desc')}
+                </p>
+              </div>
+            ) : !activeOrder ? (
+              /* Step 1: Order Confirmation & Gateway Choice */
+              <div className="space-y-4 text-left">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center">
+                  Xác nhận đơn nạp Credits
+                </h3>
 
-                  <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">{t('wallet.modal_package_lbl')}</span>
-                      <span className="font-extrabold text-gray-900 dark:text-[#00c4de]">
-                        {selectedPkg.packageName}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">{t('wallet.modal_credits_received')}</span>
-                      <span className="font-black text-amber-600 dark:text-amber-400">
-                        {selectedPkg.creditAmount + (selectedPkg.bonusCredits || 0)} Credits
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm border-t border-gray-200 dark:border-white/10 pt-2">
-                      <span className="text-gray-500 dark:text-gray-400">{t('wallet.modal_amount_lbl')}</span>
-                      <span className="font-mono font-extrabold text-base text-gray-900 dark:text-white">
-                        {Math.round(Number(selectedPkg.priceVnd)).toLocaleString('vi-VN')} VND
-                      </span>
-                    </div>
+                <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">Hình thức nạp:</span>
+                    <span className="font-extrabold text-gray-900 dark:text-[#00c4de]">
+                      {isCustomOrder ? 'Nạp số lượng tùy chỉnh' : cleanPackageName(selectedPkg?.packageName || '')}
+                    </span>
                   </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500 dark:text-gray-400">Credits nhận:</span>
+                    <span className="font-black text-amber-600 dark:text-amber-400">
+                      {isCustomOrder
+                        ? `${customAmount} Credits`
+                        : `${(selectedPkg?.creditAmount || 0) + (selectedPkg?.bonusCredits || 0)} Credits`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-t border-gray-200 dark:border-white/10 pt-2">
+                    <span className="text-gray-500 dark:text-gray-400">Số tiền thanh toán:</span>
+                    <span className="font-mono font-extrabold text-base text-gray-900 dark:text-white">
+                      {isCustomOrder
+                        ? `${(customAmount * 100).toLocaleString('vi-VN')} VND`
+                        : `${Math.round(Number(selectedPkg?.priceVnd || 0)).toLocaleString('vi-VN')} VND`}
+                    </span>
+                  </div>
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 block mb-2">
-                      Chọn phương thức thanh toán
-                    </label>
-                    <div className="space-y-2.5">
-                      {AVAILABLE_PAYMENT_GATEWAYS.map((gw) => (
-                        <button
-                          key={gw.id}
-                          type="button"
-                          onClick={() => setSelectedGateway(gw.id)}
-                          className={`w-full p-3.5 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-400 block mb-2">
+                    Phương thức thanh toán
+                  </label>
+                  <div className="space-y-2">
+                    {AVAILABLE_PAYMENT_GATEWAYS.map((gw) => (
+                      <button
+                        key={gw.id}
+                        type="button"
+                        onClick={() => setSelectedGateway(gw.id)}
+                        className={`w-full p-3 rounded-xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                          selectedGateway === gw.id
+                            ? isDark
+                              ? 'bg-[#00c4de]/10 border-[#00c4de] text-white'
+                              : 'bg-teal-50 border-[#007b8b] text-gray-900'
+                            : isDark
+                            ? 'bg-white/5 border-white/10 text-gray-300 hover:border-white/20'
+                            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-base">{gw.iconSymbol}</span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm">{gw.name}</span>
+                              {gw.badge && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                                  {gw.badge}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                              {gw.detail}
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                             selectedGateway === gw.id
-                              ? isDark
-                                ? 'bg-[#00c4de]/10 border-[#00c4de] text-white shadow-xs'
-                                : 'bg-teal-50 border-[#007b8b] text-gray-900 shadow-xs'
-                              : isDark
-                              ? 'bg-white/5 border-white/10 text-gray-300 hover:border-white/20'
-                              : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                              ? 'border-[#007b8b] dark:border-[#00c4de] bg-[#007b8b] dark:bg-[#00c4de]'
+                              : 'border-gray-400'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-lg">{gw.iconSymbol}</span>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm">{gw.name}</span>
-                                {gw.badge && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                    {gw.badge}
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 block mt-0.5">
-                                {gw.detail}
-                              </span>
-                            </div>
-                          </div>
-                          <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                              selectedGateway === gw.id
-                                ? 'border-[#007b8b] dark:border-[#00c4de] bg-[#007b8b] dark:bg-[#00c4de]'
-                                : 'border-gray-400'
-                            }`}
-                          >
-                            {selectedGateway === gw.id && <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-black" />}
-                          </div>
+                          {selectedGateway === gw.id && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-black" />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(false)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-colors cursor-pointer ${
+                      isDark
+                        ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                        : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    {t('wallet.btn_cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCreatingOrder}
+                    onClick={handleCreateOrder}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer ${
+                      isDark
+                        ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
+                        : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                    }`}
+                  >
+                    {isCreatingOrder && <CircleNotch size={16} className="animate-spin" />}
+                    <span>Xác nhận nạp</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Step 2: Payment Execution (VietQR or MoMo) */
+              <div className="space-y-4">
+                <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">
+                  {selectedGateway === 'VIETQR' ? t('wallet.qr_modal_title') : 'Cổng thanh toán MoMo'}
+                </h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {selectedGateway === 'VIETQR'
+                    ? t('wallet.qr_scan_desc')
+                    : 'Quét mã MoMo hoặc chuyển hướng sang ứng dụng MoMo để hoàn tất thanh toán'}
+                </p>
+
+                {/* QR Code Canvas */}
+                <div className="w-56 h-56 mx-auto p-3 rounded-2xl bg-white shadow-md flex items-center justify-center border border-gray-200">
+                  {activeOrder.qrCodeUrl ? (
+                    <img
+                      src={activeOrder.qrCodeUrl}
+                      alt="Payment Code"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <CircleNotch size={32} className="animate-spin text-gray-400" />
+                  )}
+                </div>
+
+                {/* VietQR Bank Info Details */}
+                {activeOrder.bankInfo && (
+                  <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 text-xs text-left space-y-2 font-mono">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">{t('wallet.qr_bank')}:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        {activeOrder.bankInfo.bankId}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">{t('wallet.qr_account_number')}:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-base text-gray-900 dark:text-[#00c4de]">
+                          {activeOrder.bankInfo.accountNo}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(activeOrder.bankInfo!.accountNo, 'acc')}
+                          className="p-1 rounded-md bg-gray-200 dark:bg-white/10 hover:bg-gray-300 transition-colors cursor-pointer"
+                          title="Sao chép số tài khoản"
+                        >
+                          {copiedField === 'acc' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                         </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentModal(false)}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-colors cursor-pointer ${
-                        isDark
-                          ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                          : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-800'
-                      }`}
-                    >
-                      {t('wallet.btn_cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isCreatingOrder}
-                      onClick={handleCreateOrder}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer ${
-                        isDark
-                          ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                          : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
-                      }`}
-                    >
-                      {isCreatingOrder && <CircleNotch size={16} className="animate-spin" />}
-                      <span>Tiến hành nạp</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Step 2: Payment Processing Screen (VietQR / MoMo) */
-                <div className="space-y-4">
-                  <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white">
-                    {selectedGateway === 'VIETQR' ? t('wallet.qr_modal_title') : 'Thanh toán qua MoMo'}
-                  </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {t('wallet.qr_scan_desc')}
-                  </p>
-
-                  {/* QR Code Canvas */}
-                  <div className="w-60 h-60 mx-auto p-3 rounded-2xl bg-white shadow-md flex items-center justify-center border border-gray-200">
-                    {activeOrder.qrCodeUrl ? (
-                      <img
-                        src={activeOrder.qrCodeUrl}
-                        alt="VietQR Payment Code"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <CircleNotch size={32} className="animate-spin text-gray-400" />
-                    )}
-                  </div>
-
-                  {/* VietQR Bank Info Details */}
-                  {activeOrder.bankInfo && (
-                    <div className="mt-3 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/5 text-xs text-left space-y-2 font-mono">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500">{t('wallet.qr_bank')}:</span>
-                        <span className="font-bold text-gray-900 dark:text-white">
-                          {activeOrder.bankInfo.bankId} (Ngân hàng Quân Đội)
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500">{t('wallet.qr_account_number')}:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-base text-gray-900 dark:text-[#00c4de]">
-                            {activeOrder.bankInfo.accountNo}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(activeOrder.bankInfo!.accountNo, 'acc')}
-                            className="p-1 rounded-md bg-gray-200 dark:bg-white/10 hover:bg-gray-300 transition-colors cursor-pointer"
-                            title="Sao chép số tài khoản"
-                          >
-                            {copiedField === 'acc' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500">{t('wallet.qr_account_owner')}:</span>
-                        <span className="font-bold text-gray-900 dark:text-white">
-                          {activeOrder.bankInfo.accountName}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-500">{t('wallet.modal_amount_lbl')}</span>
-                        <span className="font-bold text-amber-600 dark:text-amber-400">
-                          {activeOrder.bankInfo.amount.toLocaleString('vi-VN')} VND
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center border-t border-gray-200 dark:border-white/10 pt-2">
-                        <span className="text-gray-500">{t('wallet.qr_content')}:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-gray-900 dark:text-amber-300">
-                            {activeOrder.bankInfo.transferContent}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(activeOrder.bankInfo!.transferContent, 'content')}
-                            className="p-1 rounded-md bg-gray-200 dark:bg-white/10 hover:bg-gray-300 transition-colors cursor-pointer"
-                            title="Sao chép nội dung chuyển khoản"
-                          >
-                            {copiedField === 'content' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                          </button>
-                        </div>
                       </div>
                     </div>
-                  )}
 
-                  {/* MoMo Pay Direct Link Button */}
-                  {selectedGateway === 'MOMO' && activeOrder.payUrl && (
-                    <a
-                      href={activeOrder.payUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-[#a50064] hover:bg-[#860051] text-white flex items-center justify-center gap-2 shadow-md transition-all"
-                    >
-                      <span>Mở ứng dụng / Cổng thanh toán MoMo</span>
-                      <ArrowSquareOut size={16} />
-                    </a>
-                  )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">{t('wallet.qr_account_owner')}:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        {activeOrder.bankInfo.accountName}
+                      </span>
+                    </div>
 
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center">
-                    Vui lòng giữ nguyên nội dung chuyển khoản để hệ thống tự động cộng Credits trong vòng 1-2 phút.
-                  </p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500">{t('wallet.modal_amount_lbl')}</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">
+                        {activeOrder.bankInfo.amount.toLocaleString('vi-VN')} VND
+                      </span>
+                    </div>
 
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveOrder(null)}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-colors cursor-pointer ${
-                        isDark
-                          ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                          : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-800'
-                      }`}
-                    >
-                      Quay lại
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmPaid}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm cursor-pointer ${
-                        isDark
-                          ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                          : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
-                      }`}
-                    >
-                      {t('wallet.btn_confirm_paid')}
-                    </button>
+                    <div className="flex justify-between items-center border-t border-gray-200 dark:border-white/10 pt-2">
+                      <span className="text-gray-500">{t('wallet.qr_content')}:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-gray-900 dark:text-amber-300">
+                          {activeOrder.bankInfo.transferContent}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(activeOrder.bankInfo!.transferContent, 'content')}
+                          className="p-1 rounded-md bg-gray-200 dark:bg-white/10 hover:bg-gray-300 transition-colors cursor-pointer"
+                          title="Sao chép nội dung chuyển khoản"
+                        >
+                          {copiedField === 'content' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                )}
+
+                {/* MoMo Direct Link Button */}
+                {selectedGateway === 'MOMO' && activeOrder.payUrl && (
+                  <a
+                    href={activeOrder.payUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-[#a50064] hover:bg-[#860051] text-white flex items-center justify-center gap-2 shadow-md transition-all"
+                  >
+                    <span>Mở cổng thanh toán MoMo</span>
+                    <ArrowSquareOut size={16} />
+                  </a>
+                )}
+
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center">
+                  Vui lòng giữ nguyên nội dung chuyển khoản để hệ thống tự động cộng Credits.
+                </p>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveOrder(null)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-colors cursor-pointer ${
+                      isDark
+                        ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
+                        : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmPaid}
+                    className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm cursor-pointer ${
+                      isDark
+                        ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
+                        : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                    }`}
+                  >
+                    {t('wallet.btn_confirm_paid')}
+                  </button>
                 </div>
-              )}
-            </div>
-          </Modal>
-        )}
+              </div>
+            )}
+          </div>
+        </Modal>
       </div>
     </div>
   )
