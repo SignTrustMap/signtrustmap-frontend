@@ -4,7 +4,6 @@ import {
   Sparkle,
   ArrowUpRight,
   ArrowDownLeft,
-  Gift,
   CircleNotch,
   ArrowClockwise,
   Fire,
@@ -33,7 +32,7 @@ import { PaymentCheckoutModal } from './components/PaymentCheckoutModal'
 type TransactionFilter = 'ALL' | 'IN' | 'OUT'
 
 export default function WalletPage() {
-  const { user, claimDailyBonus } = useAuth()
+  const { user } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
@@ -61,21 +60,10 @@ export default function WalletPage() {
   const [pageSize, setPageSize] = useState(10)
   const [txFilter, setTxFilter] = useState<TransactionFilter>('ALL')
 
-  // ─── Daily Tasks & Missions State ─────────────────────────────────────────
+  // ─── Daily Contributor Tasks & Missions State ─────────────────────────────
   const [dailyTasks, setDailyTasks] = useState<DailyTaskItem[]>([])
   const [missions, setMissions] = useState<MissionsOverviewResponse | null>(null)
-  const [isClaimingDaily, setIsClaimingDaily] = useState(false)
   const [claimingTaskId, setClaimingTaskId] = useState<number | null>(null)
-
-  // Today's date string for local idempotency
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const dailyStorageKey = useMemo(
-    () => `stm_daily_claimed_${user?.id || 'guest'}_${todayStr}`,
-    [user?.id, todayStr]
-  )
-  const [claimedToday, setClaimedToday] = useState<boolean>(() => {
-    return localStorage.getItem(dailyStorageKey) === 'true'
-  })
 
   // Clean package name helper (removes any English parentheses)
   const cleanPackageName = (name: string): string => {
@@ -157,31 +145,12 @@ export default function WalletPage() {
         dailyTasksService.getMissions(),
       ])
 
-      console.log('=== [Nhiệm vụ đóng góp hôm nay] ===')
-      console.log('API /api/v1/daily-tasks trả về:', tasks)
-      console.log('Tổng quan tiến độ nhiệm vụ và chuỗi streak:', missionData)
-
       setDailyTasks(tasks)
       setMissions(missionData)
-
-      const loginTask = tasks.find(
-        (t) =>
-          t.taskCode.toUpperCase().includes('LOGIN') ||
-          t.taskCode.toUpperCase().includes('CLAIM') ||
-          t.activityType === 'LOGIN'
-      )
-      if (loginTask?.isClaimed) {
-        setClaimedToday(true)
-        localStorage.setItem(dailyStorageKey, 'true')
-      } else {
-        const stored = localStorage.getItem(dailyStorageKey) === 'true'
-        setClaimedToday(stored)
-      }
-    } catch {
-      const stored = localStorage.getItem(dailyStorageKey) === 'true'
-      setClaimedToday(stored)
+    } catch (err) {
+      console.warn('[WalletPage] Failed to fetch daily tasks:', err)
     }
-  }, [dailyStorageKey])
+  }, [])
 
   useEffect(() => {
     fetchWallet()
@@ -193,53 +162,6 @@ export default function WalletPage() {
     fetchTransactions(currentPage, pageSize)
   }, [fetchTransactions, currentPage, pageSize])
 
-  // ─── Daily Check-in Bonus Action ──────────────────────────────────────────
-  const handleClaimDaily = async () => {
-    if (claimedToday || isClaimingDaily) return
-    const bonus = 25
-    setIsClaimingDaily(true)
-
-    try {
-      const loginTask = dailyTasks.find(
-        (t) =>
-          (t.taskCode.toUpperCase().includes('LOGIN') ||
-            t.taskCode.toUpperCase().includes('CLAIM') ||
-            t.activityType === 'LOGIN') &&
-          !t.isClaimed
-      )
-      if (loginTask) {
-        try {
-          await dailyTasksService.claim(loginTask.id)
-        } catch (err: any) {
-          console.warn('[Wallet] Backend claim task notice:', err?.message)
-        }
-      }
-
-      claimDailyBonus(bonus)
-      setBalance((prev) => prev + bonus)
-      setClaimedToday(true)
-      localStorage.setItem(dailyStorageKey, 'true')
-      toast.success(`+${bonus} Credits: ${t('wallet.tx_daily_reward')}`)
-
-      setTransactions((prev) => [
-        {
-          id: `TXN-${Date.now().toString().slice(-6)}`,
-          transactionType: 'DAILY_CLAIM',
-          description: t('wallet.tx_daily_reward'),
-          amount: bonus,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ])
-      setTotalTransactions((prev) => prev + 1)
-
-      await fetchWallet()
-      await fetchDailyTasks()
-    } finally {
-      setIsClaimingDaily(false)
-    }
-  }
-
   // ─── Claim Contributor Daily Task Reward ──────────────────────────────────
   const handleClaimTaskReward = async (task: DailyTaskItem) => {
     if (!task.isClaimable || task.isClaimed || claimingTaskId !== null) return
@@ -247,7 +169,6 @@ export default function WalletPage() {
     try {
       await dailyTasksService.claim(task.id)
       const reward = task.rewardCredits || 10
-      claimDailyBonus(reward)
       setBalance((prev) => prev + reward)
       toast.success(`+${reward} Credits cho nhiệm vụ ${task.name}`)
       await fetchWallet()
@@ -261,8 +182,7 @@ export default function WalletPage() {
   }
 
   // ─── Payment Success Callback from Modal ──────────────────────────────────
-  const handlePaymentSuccess = async (creditedCredits: number) => {
-    claimDailyBonus(creditedCredits)
+  const handlePaymentSuccess = async () => {
     await fetchWallet()
     await fetchTransactions(currentPage, pageSize)
   }
@@ -280,7 +200,7 @@ export default function WalletPage() {
         return 'Thưởng duyệt biển báo đồng thuận'
       case 'DAILY_CLAIM':
       case 'DAILY_REWARD':
-        return 'Thưởng điểm danh hàng ngày'
+        return 'Thưởng nhiệm vụ đóng góp'
       case 'NAVIGATION_FEE':
         return 'Phí điều hướng thông minh'
       case 'ADMIN_ADJUSTMENT':
@@ -359,37 +279,15 @@ export default function WalletPage() {
               </div>
             </div>
 
-            <div className="h-8 w-px bg-gray-200 dark:bg-white/10 mx-1" />
-
-            {/* Streak & Checkin */}
-            <div className="flex items-center gap-2">
-              {currentStreak > 0 && (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            {currentStreak > 0 && (
+              <>
+                <div className="h-8 w-px bg-gray-200 dark:bg-white/10 mx-1" />
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                   <Fire size={14} weight="fill" className="text-amber-500" />
-                  <span>{currentStreak} ngày</span>
+                  <span>{currentStreak} ngày đóng góp</span>
                 </div>
-              )}
-
-              <button
-                type="button"
-                disabled={claimedToday || isClaimingDaily}
-                onClick={handleClaimDaily}
-                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                  claimedToday
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 cursor-not-allowed'
-                    : isDark
-                    ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black active:scale-95'
-                    : 'bg-[#007b8b] hover:bg-[#00606d] text-white active:scale-95'
-                }`}
-              >
-                {isClaimingDaily ? (
-                  <CircleNotch size={14} className="animate-spin" />
-                ) : (
-                  <Gift size={14} weight={claimedToday ? 'fill' : 'bold'} />
-                )}
-                <span>{claimedToday ? 'Đã nhận +25' : 'Điểm danh +25'}</span>
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -422,7 +320,7 @@ export default function WalletPage() {
                 )}
               </div>
 
-              {/* Preset Packages Grid (No Popular Badge per User Request) */}
+              {/* Preset Packages Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {packages.map((pkg) => {
                   const isSelected = !isCustomMode && selectedPkgId === pkg.id
@@ -603,7 +501,7 @@ export default function WalletPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center">
                     <div>
-                      <span className="font-bold text-amber-600 block">+20 Credits</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400 block">+20 Credits</span>
                       <span className="text-gray-500 text-[11px]">Khảo sát video Dashcam</span>
                     </div>
                     <Link to="/studio" className="text-[#007b8b] dark:text-[#00c4de] font-bold">
@@ -612,7 +510,7 @@ export default function WalletPage() {
                   </div>
                   <div className="p-2.5 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center">
                     <div>
-                      <span className="font-bold text-emerald-600 block">+5 Credits</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 block">+5 Credits</span>
                       <span className="text-gray-500 text-[11px]">Duyệt biển báo AI phát hiện</span>
                     </div>
                     <Link
@@ -758,7 +656,7 @@ export default function WalletPage() {
             </div>
           </div>
 
-          <div className="divide-y divide-gray-100 dark:divide-white/10">
+          <div className="divide-y divide-gray-100 dark:divide-white/5">
             {isLoadingTx ? (
               <div className="p-10 text-center text-gray-400">
                 <CircleNotch
