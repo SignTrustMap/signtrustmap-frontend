@@ -78,7 +78,7 @@ export interface TopUpOrderResponse {
 
 export const DEFAULT_TOP_UP_PACKAGES: TopUpPackage[] = [
   { id: 1, packageName: 'Gói Khởi đầu', priceVnd: '50000.00', creditAmount: 500, isActive: true, bonusCredits: 0 },
-  { id: 2, packageName: 'Gói Tiêu chuẩn', priceVnd: '100000.00', creditAmount: 1000, isActive: true, isPopular: true, bonusCredits: 50 },
+  { id: 2, packageName: 'Gói Tiêu chuẩn', priceVnd: '100000.00', creditAmount: 1000, isActive: true, bonusCredits: 50 },
   { id: 3, packageName: 'Gói Chuyên nghiệp', priceVnd: '200000.00', creditAmount: 2000, isActive: true, bonusCredits: 150 },
   { id: 4, packageName: 'Gói Doanh nghiệp', priceVnd: '500000.00', creditAmount: 5000, isActive: true, bonusCredits: 500 },
 ]
@@ -99,7 +99,7 @@ export const AVAILABLE_PAYMENT_GATEWAYS: PaymentGatewayOption[] = [
   },
   {
     id: 'MOCK',
-    name: 'Thanh toán Sandbox (Thử nghiệm)',
+    name: 'Thanh toán Sandbox Thử nghiệm',
     detail: 'Tạo đơn nạp & cộng Credits trực tiếp vào ví để kiểm thử',
     iconSymbol: '⚡',
     badge: 'Sandbox',
@@ -134,9 +134,8 @@ export const walletService = {
     try {
       const data = await http.get<TopUpPackage[]>(API_ENDPOINTS.WALLET.PACKAGES)
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((pkg, idx) => ({
+        return data.map((pkg) => ({
           ...pkg,
-          isPopular: pkg.id === 2 || idx === 1,
           bonusCredits: pkg.creditAmount >= 5000 ? 500 : pkg.creditAmount >= 2000 ? 150 : pkg.creditAmount >= 1000 ? 50 : 0,
         }))
       }
@@ -144,9 +143,8 @@ export const walletService = {
       try {
         const fallback = await http.get<TopUpPackage[]>('/api/v1/payments/packages')
         if (Array.isArray(fallback) && fallback.length > 0) {
-          return fallback.map((pkg, idx) => ({
+          return fallback.map((pkg) => ({
             ...pkg,
-            isPopular: pkg.id === 2 || idx === 1,
             bonusCredits: pkg.creditAmount >= 5000 ? 500 : pkg.creditAmount >= 2000 ? 150 : pkg.creditAmount >= 1000 ? 50 : 0,
           }))
         }
