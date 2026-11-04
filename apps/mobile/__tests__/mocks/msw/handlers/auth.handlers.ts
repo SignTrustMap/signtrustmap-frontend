@@ -14,6 +14,7 @@ import {
 // ---------------------------------------------------------------------------
 const LOGIN_PATH = '*/api/v1/auth/login';
 const REGISTER_PATH = '*/api/v1/auth/register';
+const GOOGLE_PATH = '*/api/v1/auth/google';
 
 // ---------------------------------------------------------------------------
 // 1. Default Authentication Handlers (Standard Project API Behavior)
@@ -103,6 +104,27 @@ export const authHandlers = [
 
     // Default 401 Unauthorized for bad credentials or missing fields
     return HttpResponse.json(mockAuthErrorResponses.unauthorized, { status: 401 });
+  }),
+
+  // -------------------------------------------------------------------------
+  // POST /auth/google
+  // -------------------------------------------------------------------------
+  http.post(GOOGLE_PATH, async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { token?: string };
+    const token = body.token?.trim() ?? '';
+
+    if (!token || token === 'invalid-google-token') {
+      return HttpResponse.json(
+        { error: 'Unauthorized', message: 'Invalid or expired Google token' },
+        { status: 401 }
+      );
+    }
+
+    if (token === 'network-error-google-token') {
+      return HttpResponse.error();
+    }
+
+    return HttpResponse.json(mockLoginResponses.google, { status: 200 });
   }),
 
   // -------------------------------------------------------------------------

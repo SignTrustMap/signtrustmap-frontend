@@ -68,6 +68,16 @@ export const mapTileUrl =
 // 5. Build & Release metadata
 export const appCommitSha = process.env.EXPO_PUBLIC_APP_COMMIT_SHA?.trim() || '';
 
+// 6. Google OAuth2 Configuration
+export const googleConfig = {
+  webClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ||
+    '',
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || '',
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || '',
+};
+
 export const env = {
   gatewayUrl,
   apiBaseUrl,
@@ -76,4 +86,5 @@ export const env = {
   cdnUrl: storageUrl,
   mapTileUrl,
   appCommitSha,
+  googleConfig,
 } as const;
