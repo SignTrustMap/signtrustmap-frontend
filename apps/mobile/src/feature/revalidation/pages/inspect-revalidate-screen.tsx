@@ -122,28 +122,28 @@ export const REVALIDATION_STATUS_OPTIONS: Array<{
   activeColor: string;
   description: string;
 }> = [
-  {
-    id: 'STILL_ACTIVE',
-    label: 'Vẫn hoạt động',
-    icon: 'check-circle-outline',
-    activeColor: '#16A34A',
-    description: 'Biển báo vẫn tồn tại và hoạt động bình thường trên thực địa.',
-  },
-  {
-    id: 'REMOVED',
-    label: 'Đã gỡ bỏ',
-    icon: 'close-circle-outline',
-    activeColor: '#DC2626',
-    description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn trên thực địa.',
-  },
-  {
-    id: 'CHANGED',
-    label: 'Đã thay đổi',
-    icon: 'swap-horizontal',
-    activeColor: '#D97706',
-    description: 'Biển báo đã được thay thế bằng một loại biển báo khác.',
-  },
-];
+    {
+      id: 'STILL_ACTIVE',
+      label: 'Vẫn hoạt động',
+      icon: 'check-circle-outline',
+      activeColor: '#16A34A',
+      description: 'Biển báo vẫn tồn tại và hoạt động bình thường trên thực địa.',
+    },
+    {
+      id: 'REMOVED',
+      label: 'Đã gỡ bỏ',
+      icon: 'close-circle-outline',
+      activeColor: '#DC2626',
+      description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn trên thực địa.',
+    },
+    {
+      id: 'CHANGED',
+      label: 'Đã thay đổi',
+      icon: 'swap-horizontal',
+      activeColor: '#D97706',
+      description: 'Biển báo đã được thay thế bằng một loại biển báo khác.',
+    },
+  ];
 
 /**
  * Resolves color styling and icon for freshness score:
@@ -928,7 +928,7 @@ export function InspectRevalidateScreen() {
                   </Text>
                   <Text style={[styles.gpsCardSubtitle, { color: theme.textSecondary }]}>
                     {isWithinProximity === true
-                      ? 'Nằm trong bán kính hợp lệ (< 50m). Đạt chuẩn PostGIS.'
+                      ? 'Nằm trong bán kính hợp lệ (< 50m).s'
                       : isWithinProximity === false
                         ? `Bằng chứng cách xa ${distanceFromTarget}m. Tối đa cho phép 50m.`
                         : 'Chụp ảnh tại hiện trường hoặc nhấn bên dưới để đóng dấu GPS thiết bị.'}

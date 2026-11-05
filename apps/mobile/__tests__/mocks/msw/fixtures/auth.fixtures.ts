@@ -53,6 +53,14 @@ export const mockUsers = {
     backendRoles: ['DRIVER'],
     accountRoles: ['driver'] as const,
   },
+  google: {
+    id: 'user-google-1',
+    email: 'google.user@stm.dev',
+    fullName: 'Google User',
+    password: '',
+    backendRoles: ['DRIVER', 'SURVEYOR'],
+    accountRoles: ['driver', 'surveyor'] as const,
+  },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -190,6 +198,16 @@ export const mockLoginResponses = {
       email: mockUsers.driver.email,
       fullName: mockUsers.driver.fullName,
       roles: [...mockUsers.driver.backendRoles],
+    },
+  } satisfies LoginResponse,
+
+  google: {
+    accessToken: 'mock-jwt-token-google-user',
+    user: {
+      id: mockUsers.google.id,
+      email: mockUsers.google.email,
+      fullName: mockUsers.google.fullName,
+      roles: [...mockUsers.google.backendRoles],
     },
   } satisfies LoginResponse,
 } as const;

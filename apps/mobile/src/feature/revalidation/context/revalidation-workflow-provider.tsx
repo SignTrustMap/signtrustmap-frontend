@@ -21,13 +21,14 @@ import type {
   RevalidationQueueEvidenceItem,
 } from '@/types/revalidationType';
 
-export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR';
+export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
 
 export type CompletedRevalidationReview = {
   action: RevalidationReviewAction;
   item: RevalidationQueueEvidenceItem;
   note?: string;
   suggestedSignTypeId?: number;
+  userVerdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT';
 };
 
 export type RevalidationWorkflowContextValue = {
@@ -39,7 +40,9 @@ export type RevalidationWorkflowContextValue = {
     action: RevalidationReviewAction,
     note?: string,
     suggestedSignTypeId?: number,
+    userVerdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
   ) => Promise<boolean>;
+  handleSkip: () => boolean;
   isCheckingEvidence: boolean;
   isLoading: boolean;
   nextItem?: RevalidationQueueEvidenceItem;
@@ -101,7 +104,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const counts = useMemo(() => {
     return reviewHistory.reduce<Record<RevalidationReviewAction, number>>(
       (res, rev) => ({ ...res, [rev.action]: (res[rev.action] || 0) + 1 }),
-      { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+      { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
     );
   }, [reviewHistory]);
 
@@ -110,6 +113,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       action: RevalidationReviewAction,
       note?: string,
       suggestedSignTypeId?: number,
+      userVerdict: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT' = 'AGREE',
     ): Promise<boolean> => {
       if (!currentItem) return false;
 
@@ -120,7 +124,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       setQueueItems((prev) => prev.slice(1));
       setReviewHistory((prev) => [
         ...prev,
-        { item: itemToVote, action, note, suggestedSignTypeId },
+        { item: itemToVote, action, note, suggestedSignTypeId, userVerdict },
       ]);
 
       // 2. Dispatch vote API
@@ -129,13 +133,14 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
         REMOVED: 'REMOVED',
         CHANGED: 'CHANGED',
         UNCLEAR: 'UNCLEAR',
+        INVALID: 'INVALID',
       };
 
       try {
         await voteMutation.mutateAsync({
           evidenceId: itemToVote.evidenceId,
           dto: {
-            decision: decisionMap[action],
+            decision: decisionMap[action] || action,
             note: note?.trim() || undefined,
             suggestedSignTypeId:
               action === 'CHANGED' && suggestedSignTypeId ? suggestedSignTypeId : undefined,
@@ -149,6 +154,25 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     },
     [currentItem, queueItems.length, voteMutation],
   );
+
+  const handleSkip = useCallback((): boolean => {
+    if (!currentItem) return false;
+    const itemToSkip = currentItem;
+    const completesQueue = queueItems.length <= 1;
+
+    setQueueItems((prev) => prev.slice(1));
+    setReviewHistory((prev) => [
+      ...prev,
+      {
+        item: itemToSkip,
+        action: 'UNCLEAR',
+        note: 'Bỏ qua minh chứng (chưa xác định)',
+        userVerdict: 'SKIP',
+      },
+    ]);
+
+    return completesQueue;
+  }, [currentItem, queueItems.length]);
 
   const beginEvidenceCheck = useCallback(
     (targetIndex?: number) => {
@@ -213,6 +237,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       currentItem,
       finishReviews,
       handleVote,
+      handleSkip,
       isCheckingEvidence,
       isLoading,
       nextItem,
@@ -231,6 +256,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       currentItem,
       finishReviews,
       handleVote,
+      handleSkip,
       isCheckingEvidence,
       isLoading,
       nextItem,
@@ -254,10 +280,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
 const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   beginEvidenceCheck: () => {},
-  counts: { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0 },
+  counts: { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
   currentItem: undefined,
   finishReviews: () => 0,
   handleVote: async () => false,
+  handleSkip: () => false,
   isCheckingEvidence: false,
   isLoading: false,
   nextItem: undefined,

@@ -29,7 +29,7 @@
         "foregroundImage": "./assets/images/app-logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "package": "com.signtrustmap.app"
     },
     "web": {
       "output": "static",

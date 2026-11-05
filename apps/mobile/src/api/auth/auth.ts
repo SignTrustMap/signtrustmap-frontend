@@ -7,6 +7,10 @@ export type LoginRequest = {
   password: string;
 };
 
+export type GoogleLoginRequest = {
+  token: string;
+};
+
 export type RegisterRequest = {
   email: string;
   password: string;
@@ -52,8 +56,26 @@ export async function login(request: LoginRequest): Promise<AppSession> {
       roles,
     },
   };
-  console.log(res.accessToken);
   return res;
+}
+
+export async function loginWithGoogle(idToken: string): Promise<AppSession> {
+  const response = await jsonApiRequest<LoginResponse>(API_PATHS.AUTH_GOOGLE, {
+    token: idToken.trim(),
+  });
+  const roles = response.user.roles
+    .map((role) => backendRoleToAccountRole[role.toUpperCase()])
+    .filter((role): role is AccountRole => Boolean(role));
+
+  return {
+    accessToken: response.accessToken,
+    account: {
+      displayName: response.user.fullName,
+      email: response.user.email,
+      id: response.user.id,
+      roles,
+    },
+  };
 }
 
 export async function register(request: RegisterRequest): Promise<RegisterResponse> {

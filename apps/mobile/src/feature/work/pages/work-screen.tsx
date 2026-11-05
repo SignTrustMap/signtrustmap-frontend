@@ -13,7 +13,6 @@ import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks
 import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
 import {
   useGetMyPendingSubmissions,
-  useGetMySubmissions,
   useGetMySurveyStats,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
@@ -166,16 +165,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
     }
   };
 
-  const { data: mySubmissionsData } = useGetMySubmissions(
-    { page: '1', pageSize: '10' },
-    isSurveyorActive,
-  );
-
-  const pendingSubmissionsList = useMemo(() => {
-    return (mySubmissionsData?.items ?? []).filter(
-      (item) => !['COMPLETED', 'DRAFT'].includes(item.status),
-    );
-  }, [mySubmissionsData?.items]);
 
   useEffect(() => {
     if (activeIndex >= 0) {
@@ -334,25 +323,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Role-Specific Work Actions */}
           {selectedRole === 'surveyor' ? (
             <View style={styles.actionList}>
-              {/* Standout Action: Pending Submissions */}
+              {/* Standout Action: Survey History */}
               <WorkActionCard
                 accentColor={theme.primary}
                 count={pendingSurveyCount}
                 icon="cloud-upload-outline"
                 label="Lịch sử khảo sát"
-                onPress={() => {
-                  if (pendingSubmissionsList.length === 1) {
-                    router.push({
-                      pathname: '/work/survey-submission-details',
-                      params: { id: pendingSubmissionsList[0].id },
-                    });
-                  } else {
-                    router.push({
-                      pathname: '/work/survey-history',
-                      params: { filter: 'pending' },
-                    });
-                  }
-                }}
+                onPress={() => router.push('/work/survey-history')}
                 subtitle={'Lịch sử ghi nhận biển báo đã nộp, duyệt, từ chối'}
               />
               {/* Standout Action: Revalidation Map */}

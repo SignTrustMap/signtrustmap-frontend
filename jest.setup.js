@@ -11,7 +11,61 @@ if (globalThis.__NATIVE_GLOBALS__) {
   }
 }
 
+// Default test env for Google OAuth
+process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 'mock-google-client-id';
+process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'mock-google-client-id';
+
 // Global mocks to prevent background async network leaks during Jest unit tests
+jest.mock('@react-native-google-signin/google-signin', () => {
+  const mockUser = {
+    idToken: 'mock-google-id-token',
+    serverAuthCode: 'mock-code',
+    scopes: ['openid', 'profile', 'email'],
+    user: {
+      email: 'mock-google@example.com',
+      id: 'mock-google-id',
+      givenName: 'Google',
+      familyName: 'User',
+      photo: null,
+      name: 'Google User',
+    },
+  };
+
+  return {
+    GoogleSignin: {
+      configure: jest.fn(),
+      hasPlayServices: jest.fn().mockResolvedValue(true),
+      signIn: jest.fn().mockResolvedValue({
+        type: 'success',
+        data: mockUser,
+      }),
+      signInSilently: jest.fn().mockResolvedValue({
+        type: 'success',
+        data: mockUser,
+      }),
+      signOut: jest.fn().mockResolvedValue(null),
+      revokeAccess: jest.fn().mockResolvedValue(null),
+      hasPreviousSignIn: jest.fn().mockReturnValue(false),
+      getCurrentUser: jest.fn().mockReturnValue(mockUser),
+      clearCachedAccessToken: jest.fn().mockResolvedValue(null),
+      getTokens: jest.fn().mockResolvedValue({
+        idToken: 'mock-google-id-token',
+        accessToken: 'mock-access-token',
+      }),
+    },
+    statusCodes: {
+      SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+      IN_PROGRESS: 'IN_PROGRESS',
+      PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+      SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+    },
+    isErrorWithCode: (error) => Boolean(error && typeof error === 'object' && 'code' in error),
+    isCancelledResponse: (response) => response?.type === 'cancelled',
+    isSuccessResponse: (response) => response?.type === 'success',
+    isNoSavedCredentialFoundResponse: (response) => response?.type === 'noSavedCredentialFound',
+  };
+});
+
 jest.mock('@/hooks/use-offline-maps', () => ({
   useOfflineMaps: () => ({
     availablePacks: [],
