@@ -34,7 +34,7 @@ $BitexcoLon = "106.704676"
 
 Write-Host "[Simulation] Preparing mock location providers on emulator..." -ForegroundColor Cyan
 adb shell appops set 2000 android:mock_location allow
-adb shell appops set com.anonymous.mobile android:mock_location allow
+adb shell appops set com.signtrustmap.app android:mock_location allow
 adb shell cmd location providers add-test-provider gps
 adb shell cmd location providers set-test-provider-enabled gps true
 adb shell cmd location providers add-test-provider fused

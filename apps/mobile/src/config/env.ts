@@ -69,13 +69,18 @@ export const mapTileUrl =
 export const appCommitSha = process.env.EXPO_PUBLIC_APP_COMMIT_SHA?.trim() || '';
 
 // 6. Google OAuth2 Configuration
+const fallbackClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() || '';
+
 export const googleConfig = {
   webClientId:
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ||
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ||
-    '',
-  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || '',
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || '',
+    fallbackClientId,
+  androidClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() ||
+    fallbackClientId,
+  iosClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() ||
+    fallbackClientId,
 };
 
 export const env = {

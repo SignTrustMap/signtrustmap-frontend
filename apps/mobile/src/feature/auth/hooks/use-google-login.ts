@@ -1,21 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { loginWithGoogle } from '@/api/auth/auth';
 import { useSession, type AppSession } from '@/context/session-provider';
 import { googleConfig } from '@/config/env';
-
-// Complete incoming OAuth redirect loops if running in a popup/browser session
-WebBrowser.maybeCompleteAuthSession();
-
-// Google OpenID Connect discovery endpoints
-const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
 
 export class GoogleAuthCancelledError extends Error {
   constructor(message = 'Đăng nhập Google đã bị hủy.') {
@@ -24,10 +12,35 @@ export class GoogleAuthCancelledError extends Error {
   }
 }
 
+let cachedGoogleSignin: typeof import('@react-native-google-signin/google-signin') | null | undefined;
+
+function getGoogleSigninModule() {
+  if (cachedGoogleSignin !== undefined) {
+    return cachedGoogleSignin;
+  }
+  try {
+    cachedGoogleSignin = require('@react-native-google-signin/google-signin');
+  } catch {
+    cachedGoogleSignin = null;
+  }
+  return cachedGoogleSignin;
+}
+
 export function useGoogleLogin() {
   const { logIn } = useSession();
   const queryClient = useQueryClient();
   const [isPrompting, setIsPrompting] = useState(false);
+
+  useEffect(() => {
+    const mod = getGoogleSigninModule();
+    if (mod && googleConfig.webClientId) {
+      mod.GoogleSignin.configure({
+        webClientId: googleConfig.webClientId,
+        offlineAccess: false,
+        scopes: ['profile', 'email'],
+      });
+    }
+  }, []);
 
   const mutation = useMutation({
     mutationKey: ['auth', 'google-login'],
@@ -44,77 +57,83 @@ export function useGoogleLogin() {
   });
 
   const signIn = useCallback(async (): Promise<AppSession | null> => {
-    // 1. Resolve client ID based on current platform
-    const clientId = Platform.select({
-      android: googleConfig.androidClientId || googleConfig.webClientId,
-      ios: googleConfig.iosClientId || googleConfig.webClientId,
-      default: googleConfig.webClientId,
-    });
-
-    if (!clientId) {
+    const webClientId = googleConfig.webClientId;
+    if (!webClientId) {
       throw new Error(
         'Chưa cấu hình Google Client ID. Vui lòng thêm EXPO_PUBLIC_GOOGLE_CLIENT_ID vào file .env.'
       );
     }
 
-    // 2. Configure redirect URI for custom scheme
-    const redirectUri = AuthSession.makeRedirectUri({
-      scheme: 'mobile',
-      path: 'oauthredirect',
-    });
+    const mod = getGoogleSigninModule();
+    if (!mod) {
+      throw new Error(
+        'Thư viện Google Sign-in chưa được biên dịch vào native binary. Bạn đang mở ứng dụng bằng Expo Go hoặc chưa build lại APK. Vui lòng chạy "npx expo run:android" để cài đặt và mở bản build native.'
+      );
+    }
 
-    // 3. Create Google Auth Request
-    const request = new AuthSession.AuthRequest({
-      clientId,
-      scopes: ['openid', 'profile', 'email'],
-      responseType: AuthSession.ResponseType.IdToken,
-      redirectUri,
-      extraParams: {
-        nonce: Math.random().toString(36).substring(2, 15),
-      },
-    });
+    const { GoogleSignin, isCancelledResponse, isSuccessResponse, isErrorWithCode, statusCodes } = mod;
 
     setIsPrompting(true);
-    let result: AuthSession.AuthSessionResult;
     try {
-      result = await request.promptAsync(GOOGLE_DISCOVERY);
+      GoogleSignin.configure({
+        webClientId,
+        offlineAccess: false,
+        scopes: ['profile', 'email'],
+      });
+
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      }
+
+      const response = await GoogleSignin.signIn();
+
+      if (isCancelledResponse(response)) {
+        throw new GoogleAuthCancelledError();
+      }
+
+      let idToken: string | null | undefined;
+      if (isSuccessResponse(response)) {
+        idToken = response.data.idToken;
+      }
+
+      if (!idToken) {
+        const tokens = await GoogleSignin.getTokens();
+        idToken = tokens.idToken;
+      }
+
+      if (!idToken) {
+        throw new Error('Không nhận được mã xác thực (ID token) từ Google.');
+      }
+
+      return await mutation.mutateAsync(idToken);
+    } catch (error: any) {
+      if (error instanceof GoogleAuthCancelledError) {
+        throw error;
+      }
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+          throw new GoogleAuthCancelledError();
+        }
+        if (error.code === statusCodes.IN_PROGRESS) {
+          throw new Error('Quá trình đăng nhập Google đang được tiến hành.');
+        }
+        if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          throw new Error('Google Play Services không khả dụng hoặc phiên bản đã quá cũ.');
+        }
+        if (
+          error.code === '10' ||
+          (typeof error.message === 'string' && error.message.includes('DEVELOPER_ERROR'))
+        ) {
+          throw new Error(
+            'Lỗi cấu hình Google Sign-in (DEVELOPER_ERROR). Vui lòng đảm bảo SHA-1 và Package Name (com.signtrustmap.app) khớp trên Google Cloud Console, và webClientId là Web Application Client ID.'
+          );
+        }
+      }
+      throw error;
     } finally {
       setIsPrompting(false);
     }
-
-    if (result.type === 'cancel' || result.type === 'dismiss') {
-      throw new GoogleAuthCancelledError();
-    }
-
-    if (result.type !== 'success') {
-      const errDetail = (result as any).error?.message || result.type;
-      throw new Error(`Đăng nhập Google không thành công (${errDetail}).`);
-    }
-
-    // Extract ID Token from params
-    let idToken: string | undefined = result.params?.id_token;
-
-    // Fallback: If code is returned instead of id_token, perform code exchange
-    if (!idToken && result.params?.code) {
-      const tokenResult = await AuthSession.exchangeCodeAsync(
-        {
-          clientId,
-          code: result.params.code,
-          redirectUri,
-          extraParams: request.codeVerifier ? { code_verifier: request.codeVerifier } : undefined,
-        },
-        GOOGLE_DISCOVERY
-      );
-      idToken = tokenResult.idToken;
-    }
-
-    if (!idToken) {
-      throw new Error('Không nhận được mã xác thực (ID token) từ Google.');
-    }
-
-    // 4. Send ID token to backend for verification and session initialization
-    return await mutation.mutateAsync(idToken);
-  }, [logIn, mutation, queryClient]);
+  }, [logIn, mutation]);
 
   return {
     signIn,
@@ -123,4 +142,3 @@ export function useGoogleLogin() {
     reset: mutation.reset,
   };
 }
-

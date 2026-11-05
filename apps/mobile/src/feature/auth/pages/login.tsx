@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useLogin } from '@/feature/auth/hooks/use-login';
 import { useTheme } from '@/hooks/use-theme';
+import { GoogleAuthCancelledError, useGoogleLogin } from '../hooks/use-google-login';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -31,6 +32,7 @@ export default function LoginScreen() {
   const loginMutation = useLogin();
   const router = useRouter();
   const theme = useTheme();
+  const googleLogin = useGoogleLogin();
   const insets = useSafeAreaInsets();
 
   const [email, setEmail] = useState('');
@@ -46,8 +48,8 @@ export default function LoginScreen() {
     setShowDevLogin((prev) => !prev);
   };
 
-  const isSubmitting = loginMutation.isPending;
-  const displayedLoginError = loginError ?? loginMutation.error?.message;
+  const isSubmitting = loginMutation.isPending || googleLogin.isPending;
+  const displayedLoginError = loginError ?? googleLogin.error?.message ?? loginMutation.error?.message;
 
   const handleLogIn = async () => {
     if (isSubmitting) return;
@@ -71,8 +73,22 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleLogIn = () => {
-    setLoginError('Đăng nhập Google hiện chưa khả dụng trên ứng dụng di động.');
+  const handleGoogleLogIn = async () => {
+    if (isSubmitting) return;
+  
+      setLoginError(undefined);
+      googleLogin.reset();
+      try {
+        const session = await googleLogin.signIn();
+        if (session) {
+          router.replace('/');
+        }
+      } catch (error: any) {
+        if (error instanceof GoogleAuthCancelledError) {
+          return;
+        }
+        setLoginError(error?.message || 'Đăng nhập Google thất bại. Vui lòng thử lại.');
+      }
   };
 
   const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
@@ -303,9 +319,11 @@ export default function LoginScreen() {
               <Pressable
                 accessibilityLabel="Đăng nhập với Google"
                 accessibilityRole="button"
+                disabled={isSubmitting}
                 onPress={handleGoogleLogIn}
                 style={({ pressed }) => [
                   styles.socialButton,
+                  isSubmitting && { opacity: 0.6 },
                   pressed && { opacity: 0.8 },
                 ]}
               >
