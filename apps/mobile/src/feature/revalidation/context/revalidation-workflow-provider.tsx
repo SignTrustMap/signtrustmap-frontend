@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSegments } from 'expo-router';
 
 import { useSession } from '@/context/session-provider';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
@@ -65,11 +66,21 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const invalidateWalletAndStats = useInvalidateWalletAndStats();
   const { session } = useSession();
 
+  const segments = useSegments();
+  const rawSegments = (segments ?? []) as string[];
+  const isRevalReviewActive =
+    rawSegments.includes('revalidation-review') ||
+    rawSegments.includes('revalidation-summary') ||
+    rawSegments.includes('inspect-revalidate');
+
+  const isReviewer = Boolean(session?.account?.roles?.includes('reviewer'));
+  const isQueryEnabled = Boolean(session?.accessToken && isReviewer && isRevalReviewActive);
+
   const {
     data: queueResponse,
     isLoading,
     refetch,
-  } = useGetRevalidationEvidenceQueue({ pageSize: 50 }, Boolean(session?.accessToken));
+  } = useGetRevalidationEvidenceQueue({ pageSize: 50 }, isQueryEnabled);
 
   const voteMutation = useVoteOnRevalidationEvidence();
 
@@ -82,12 +93,17 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
   // Sync with incoming queue response initially
   useEffect(() => {
+    if (!isQueryEnabled) {
+      hasInitializedRef.current = false;
+      return;
+    }
+
     if (queueResponse?.items && !hasInitializedRef.current && reviewHistory.length === 0) {
       setQueueItems(queueResponse.items);
       setTotalCount(queueResponse.total || queueResponse.items.length);
       hasInitializedRef.current = true;
     }
-  }, [queueResponse, reviewHistory.length]);
+  }, [isQueryEnabled, queueResponse, reviewHistory.length]);
 
   const currentItem = queueItems[0];
   const nextItem = queueItems[1];

@@ -291,4 +291,17 @@ export const navigationHandlers = [
   http.delete('*/api/v1/saved-routes/:id', ({ params }) => {
     return HttpResponse.json({ success: true, id: params.id || 'mock-saved-route-1' }, { status: 200 });
   }),
+
+  // 17. POST /navigation/sessions/initiate
+  http.post('*/api/v1/navigation/sessions/initiate', async () => {
+    return HttpResponse.json(
+      {
+        sessionId: 'mock-session-123',
+        status: 'ACTIVE',
+        creditsDeducted: 5,
+        remainingCredits: 95,
+      },
+      { status: 201 },
+    );
+  }),
 ];

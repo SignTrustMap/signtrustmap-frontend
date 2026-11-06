@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { formatBytes, offlineMapService } from '../offline-map-service';
+import { formatBytes, offlineMapService } from '../../../src/services/offline-map-service';
 
 jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: 'file:///data/user/0/com.signtrustmap/files/',

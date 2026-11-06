@@ -25,10 +25,7 @@ import { CANNOT_RECORD_VOTE_MESSAGE } from '@/constants/message';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/utils/format-date';
-import type {
-  RevalDecision,
-  RevalidationQueueEvidenceItem,
-} from '@/types/revalidationType';
+import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
 import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
@@ -43,7 +40,12 @@ import {
 } from '../components/revalidation-decision-badge';
 import { useRevalidationWorkflow } from '../context/revalidation-workflow-provider';
 
-export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
+export type RevalidationReviewAction =
+  | 'STILL_ACTIVE'
+  | 'REMOVED'
+  | 'CHANGED'
+  | 'UNCLEAR'
+  | 'INVALID';
 
 type SheetType = 'decline' | 'report';
 
@@ -83,7 +85,13 @@ const revalSummaryActionDetails: Record<
   },
 };
 
-function RevalSummaryMetric({ action, count }: { action: RevalidationReviewAction; count: number }) {
+function RevalSummaryMetric({
+  action,
+  count,
+}: {
+  action: RevalidationReviewAction;
+  count: number;
+}) {
   const theme = useTheme();
   const details = revalSummaryActionDetails[action];
 
@@ -95,7 +103,9 @@ function RevalSummaryMetric({ action, count }: { action: RevalidationReviewActio
       ]}
     >
       <View style={[styles.summaryMetricSymbol, { borderColor: details.color }]}>
-        <Text style={[styles.summaryMetricSymbolLabel, { color: details.color }]}>{details.symbol}</Text>
+        <Text style={[styles.summaryMetricSymbolLabel, { color: details.color }]}>
+          {details.symbol}
+        </Text>
       </View>
       <Text style={[styles.summaryMetricCount, { color: theme.text }]}>{count}</Text>
       <Text style={[styles.summaryMetricLabel, { color: details.color }]}>
@@ -149,11 +159,14 @@ function RevalReviewedSignRow({
             record.item.verifiedSign.signCode ||
             'Traffic Sign'}
         </Text>
-        <Text numberOfLines={1} style={[styles.summarySignLocation, { color: theme.textSecondary }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.summarySignLocation, { color: theme.textSecondary }]}
+        >
           {record.item.verifiedSign.signCode}
           {record.item.evidence.distanceMeters != null
-            ? ` • Cách vị trí gốc ${record.item.evidence.distanceMeters}m`
-            : ' • Đã xác minh vị trí'}
+            ? ` Khoảng cách so với vị trí gốc: ${record.item.evidence.distanceMeters}m`
+            : ' Đã xác minh vị trí'}
         </Text>
         <Text numberOfLines={1} style={[styles.summarySignSummary, { color: theme.placeholder }]}>
           {record.note ? `Ghi chú: ${record.note}` : details.summary}
@@ -247,9 +260,7 @@ function RevalidationBottomSheet({
   const [note, setNote] = useState('');
 
   const title =
-    type === 'decline'
-      ? 'Từ chối kết luận của điều tra viên'
-      : 'Báo cáo sự cố minh chứng';
+    type === 'decline' ? 'Từ chối kết luận của điều tra viên' : 'Báo cáo sự cố minh chứng';
 
   const helperText =
     type === 'decline'
@@ -263,7 +274,9 @@ function RevalidationBottomSheet({
       onConfirmDecline(
         selectedDeclineAction,
         note.trim() || undefined,
-        selectedDeclineAction === 'CHANGED' && selectedCatalogSign ? selectedCatalogSign.id : undefined,
+        selectedDeclineAction === 'CHANGED' && selectedCatalogSign
+          ? selectedCatalogSign.id
+          : undefined,
       );
     } else if (type === 'report') {
       onConfirmReport(selectedReportReason, note.trim() || undefined);
@@ -286,9 +299,15 @@ function RevalidationBottomSheet({
       visible={Boolean(type)}
     >
       <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel="Đóng tùy chọn thẩm định" onPress={handleClose} style={styles.backdrop} />
+        <Pressable
+          accessibilityLabel="Đóng tùy chọn thẩm định"
+          onPress={handleClose}
+          style={styles.backdrop}
+        />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          behavior={
+            Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined
+          }
           enabled={Platform.OS !== 'web'}
           pointerEvents="box-none"
           style={styles.sheetPositioner}
@@ -332,15 +351,25 @@ function RevalidationBottomSheet({
                           style={[
                             styles.reasonOption,
                             {
-                              backgroundColor: isSelected ? theme.backgroundSelected : theme.surface,
+                              backgroundColor: isSelected
+                                ? theme.backgroundSelected
+                                : theme.surface,
                               borderColor: isSelected ? choice.color : theme.border,
                             },
                           ]}
                         >
-                          <MaterialCommunityIcons color={choice.color} name={choice.icon} size={22} />
+                          <MaterialCommunityIcons
+                            color={choice.color}
+                            name={choice.icon}
+                            size={22}
+                          />
                           <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={[styles.reasonLabel, { color: theme.text }]}>{choice.label}</Text>
-                            <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 1 }}>
+                            <Text style={[styles.reasonLabel, { color: theme.text }]}>
+                              {choice.label}
+                            </Text>
+                            <Text
+                              style={{ fontSize: 11, color: theme.textSecondary, marginTop: 1 }}
+                            >
                               {choice.desc}
                             </Text>
                           </View>
@@ -434,7 +463,12 @@ function RevalidationBottomSheet({
                         ]}
                       >
                         <MaterialCommunityIcons color="#EA580C" name="flag-outline" size={20} />
-                        <Text style={[styles.reasonLabel, { flex: 1, marginLeft: 10, color: theme.text }]}>
+                        <Text
+                          style={[
+                            styles.reasonLabel,
+                            { flex: 1, marginLeft: 10, color: theme.text },
+                          ]}
+                        >
                           {reason}
                         </Text>
                         <View
@@ -488,10 +522,7 @@ function RevalidationBottomSheet({
               <AppButton
                 label={type === 'decline' ? 'Xác nhận từ chối' : 'Gửi báo cáo'}
                 onPress={handleConfirm}
-                style={[
-                  styles.sheetFooterButton,
-                  { backgroundColor: confirmColor },
-                ]}
+                style={[styles.sheetFooterButton, { backgroundColor: confirmColor }]}
               />
             </View>
           </SafeAreaView>
@@ -531,7 +562,11 @@ export function RevalidationReviewScreen() {
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [isCatalogBrowserOpen, setIsCatalogBrowserOpen] = useState(false);
   const [selectedCatalogSign, setSelectedCatalogSign] = useState<CatalogSign | null>(null);
-  const [toast, setToast] = useState<{ id: number; message: string; tone: 'default' | 'success' }>();
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    tone: 'default' | 'success';
+  }>();
 
   // If reviews completed, automatically navigate to Recheck voted evidence screen
   useEffect(() => {
@@ -583,11 +618,7 @@ export function RevalidationReviewScreen() {
     // Follow surveyor's concluded evidenceType directly
     const rawVerdict = currentItem.evidence.evidenceType;
     const decision: RevalidationReviewAction =
-      rawVerdict === 'REMOVED'
-        ? 'REMOVED'
-        : rawVerdict === 'CHANGED'
-          ? 'CHANGED'
-          : 'STILL_ACTIVE';
+      rawVerdict === 'REMOVED' ? 'REMOVED' : rawVerdict === 'CHANGED' ? 'CHANGED' : 'STILL_ACTIVE';
 
     setToast({
       id: Date.now(),
@@ -870,14 +901,17 @@ export function RevalidationReviewScreen() {
                 >
                   <Image
                     contentFit="cover"
-                    source={{ uri: resolveS3Url(nextItem.evidence.mediaUrl || nextItem.verifiedSign.signCropUrl) }}
+                    source={{
+                      uri: resolveS3Url(
+                        nextItem.evidence.mediaUrl || nextItem.verifiedSign.signCropUrl,
+                      ),
+                    }}
                     style={styles.cardImage}
                     transition={180}
                   />
                   <View style={styles.peekDimOverlay} />
                 </View>
               ) : null}
-
 
               {/* Active Main Card with 4-Way Swipe */}
               <Animated.View
@@ -927,10 +961,12 @@ export function RevalidationReviewScreen() {
                     onPress={() => setViewMode('evidence')}
                     style={[
                       styles.imageSourcePill,
-                      viewMode === 'evidence' && [styles.imageSourcePillActive, { backgroundColor: theme.primary }],
+                      viewMode === 'evidence' && [
+                        styles.imageSourcePillActive,
+                        { backgroundColor: theme.primary },
+                      ],
                     ]}
                   >
-
                     <Text
                       style={[
                         styles.imageSourcePillText,
@@ -947,10 +983,12 @@ export function RevalidationReviewScreen() {
                     onPress={() => setViewMode('baseline')}
                     style={[
                       styles.imageSourcePill,
-                      viewMode === 'baseline' && [styles.imageSourcePillActive, { backgroundColor: theme.primary }],
+                      viewMode === 'baseline' && [
+                        styles.imageSourcePillActive,
+                        { backgroundColor: theme.primary },
+                      ],
                     ]}
                   >
-
                     <Text
                       style={[
                         styles.imageSourcePillText,
@@ -983,7 +1021,9 @@ export function RevalidationReviewScreen() {
                 {/* LEFT COLUMN: NEW EVIDENCE (ON-SITE SUBMISSION)               */}
                 {/* ----------------------------------------------------------- */}
                 <View style={styles.comparisonColumn}>
-                  <Text style={[styles.columnLabel, { color: theme.textSecondary, marginBottom: 4 }]}>
+                  <Text
+                    style={[styles.columnLabel, { color: theme.textSecondary, marginBottom: 4 }]}
+                  >
                     MINH CHỨNG MỚI
                   </Text>
 
@@ -999,14 +1039,20 @@ export function RevalidationReviewScreen() {
                   {/* Distance & Timestamp Telemetry */}
                   <View style={styles.columnTelemetryList}>
                     <View style={styles.telemetryItem}>
-                      <Text numberOfLines={1} style={[styles.telemetryText, { color: theme.placeholder }]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.telemetryText, { color: theme.placeholder }]}
+                      >
                         {currentItem.evidence.distanceMeters != null
                           ? `Cách vị trí cũ ${currentItem.evidence.distanceMeters}m`
                           : 'Đã xác minh vị trí'}
                       </Text>
                     </View>
                     <View style={styles.telemetryItem}>
-                      <Text numberOfLines={1} style={[styles.telemetryText, { color: theme.placeholder }]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.telemetryText, { color: theme.placeholder }]}
+                      >
                         Thời gian chụp: {formatDate(currentItem.evidence.submittedAt)}
                       </Text>
                     </View>
@@ -1028,18 +1074,22 @@ export function RevalidationReviewScreen() {
                     </Text>
                   </View>
 
-
-
                   {/* Baseline Sign Name */}
                   <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.verifiedSign.nameVi || currentItem.verifiedSign.nameEn || currentItem.verifiedSign.signCode || 'Biển báo giao thông'}
+                    {currentItem.verifiedSign.nameVi ||
+                      currentItem.verifiedSign.nameEn ||
+                      currentItem.verifiedSign.signCode ||
+                      'Biển báo giao thông'}
                   </Text>
 
                   {/* Thumbnail & Freshness Score Row */}
                   <View style={styles.baselineMetaRow}>
                     <View style={styles.baselineScoreContainer}>
                       {currentItem.verifiedSign.lastVerifiedAt ? (
-                        <Text numberOfLines={1} style={[styles.baselineLastVerified, { color: theme.placeholder }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.baselineLastVerified, { color: theme.placeholder }]}
+                        >
                           Lần cuối xác minh {formatDate(currentItem.verifiedSign.lastVerifiedAt)}
                         </Text>
                       ) : null}
@@ -1130,7 +1180,9 @@ export function RevalidationReviewScreen() {
           /* Revalidation Summary Screen (mirrors reviewer flow) */
           <View style={styles.summaryContent}>
             <View style={styles.summaryHeading}>
-              <Text style={[styles.summaryTitle, { color: theme.text }]}>Tổng kết tái thẩm định</Text>
+              <Text style={[styles.summaryTitle, { color: theme.text }]}>
+                Tổng kết tái thẩm định
+              </Text>
               <Text style={[styles.summarySubtitle, { color: theme.textSecondary }]}>
                 Hôm nay • Đã đánh giá {history.length} biển báo
               </Text>
@@ -1173,7 +1225,9 @@ export function RevalidationReviewScreen() {
             <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
-            <Text style={[styles.completeTitle, { color: theme.text }]}>Đã đánh giá tất cả minh chứng</Text>
+            <Text style={[styles.completeTitle, { color: theme.text }]}>
+              Đã đánh giá tất cả minh chứng
+            </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
               Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.
             </Text>
@@ -1239,10 +1293,7 @@ export function RevalidationReviewScreen() {
               accessibilityLabel="Đóng xem phóng to"
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={() => setIsImageZoomed(false)}
-              style={[
-                styles.zoomCloseBtn,
-                { top: Math.max(insets.top, 16) + 12 },
-              ]}
+              style={[styles.zoomCloseBtn, { top: Math.max(insets.top, 16) + 12 }]}
             >
               <MaterialCommunityIcons color="#FFFFFF" name="close" size={26} />
             </Pressable>
@@ -1281,11 +1332,15 @@ export function RevalidationReviewScreen() {
           >
             {/* Header */}
             <View style={styles.helpDialogHeader}>
-              <View style={[styles.helpHeaderIconContainer, { backgroundColor: `${theme.primary}15` }]}>
+              <View
+                style={[styles.helpHeaderIconContainer, { backgroundColor: `${theme.primary}15` }]}
+              >
                 <MaterialCommunityIcons color={theme.primary} name="gesture-swipe" size={24} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.helpDialogTitle, { color: theme.text }]}>Hướng dẫn quẹt thẻ</Text>
+                <Text style={[styles.helpDialogTitle, { color: theme.text }]}>
+                  Hướng dẫn quẹt thẻ
+                </Text>
                 <Text style={[styles.helpDialogSubtitle, { color: theme.textSecondary }]}>
                   Thao tác nhanh trên ảnh minh chứng
                 </Text>
@@ -1303,12 +1358,19 @@ export function RevalidationReviewScreen() {
             {/* Directions List */}
             <View style={styles.helpGuideList}>
               {/* Right: Agree */}
-              <View style={[styles.helpGuideItem, { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' }]}>
+              <View
+                style={[
+                  styles.helpGuideItem,
+                  { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+                ]}
+              >
                 <View style={[styles.helpItemIconBadge, { backgroundColor: '#16A34A' }]}>
                   <MaterialCommunityIcons color="#FFFFFF" name="arrow-right-bold" size={16} />
                 </View>
                 <View style={styles.helpItemContent}>
-                  <Text style={[styles.helpItemTitle, { color: '#16A34A' }]}>Quẹt sang PHẢI: Đồng ý</Text>
+                  <Text style={[styles.helpItemTitle, { color: '#16A34A' }]}>
+                    Quẹt sang PHẢI: Đồng ý
+                  </Text>
                   <Text style={[styles.helpItemDesc, { color: theme.textSecondary }]}>
                     Xác nhận đồng ý với kết luận thực địa của điều tra viên.
                   </Text>
@@ -1316,12 +1378,19 @@ export function RevalidationReviewScreen() {
               </View>
 
               {/* Left: Decline */}
-              <View style={[styles.helpGuideItem, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}>
+              <View
+                style={[
+                  styles.helpGuideItem,
+                  { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' },
+                ]}
+              >
                 <View style={[styles.helpItemIconBadge, { backgroundColor: '#DC2626' }]}>
                   <MaterialCommunityIcons color="#FFFFFF" name="arrow-left-bold" size={16} />
                 </View>
                 <View style={styles.helpItemContent}>
-                  <Text style={[styles.helpItemTitle, { color: '#DC2626' }]}>Quẹt sang TRÁI: Từ chối</Text>
+                  <Text style={[styles.helpItemTitle, { color: '#DC2626' }]}>
+                    Quẹt sang TRÁI: Từ chối
+                  </Text>
                   <Text style={[styles.helpItemDesc, { color: theme.textSecondary }]}>
                     Không đồng ý với kết luận, đưa ra tình trạng quan sát thực tế.
                   </Text>
@@ -1329,12 +1398,19 @@ export function RevalidationReviewScreen() {
               </View>
 
               {/* Up: Skip */}
-              <View style={[styles.helpGuideItem, { backgroundColor: '#F8FAFC', borderColor: '#CBD5E1' }]}>
+              <View
+                style={[
+                  styles.helpGuideItem,
+                  { backgroundColor: '#F8FAFC', borderColor: '#CBD5E1' },
+                ]}
+              >
                 <View style={[styles.helpItemIconBadge, { backgroundColor: '#64748B' }]}>
                   <MaterialCommunityIcons color="#FFFFFF" name="arrow-up-bold" size={16} />
                 </View>
                 <View style={styles.helpItemContent}>
-                  <Text style={[styles.helpItemTitle, { color: '#475569' }]}>Quẹt LÊN TRÊN: Bỏ qua</Text>
+                  <Text style={[styles.helpItemTitle, { color: '#475569' }]}>
+                    Quẹt LÊN TRÊN: Bỏ qua
+                  </Text>
                   <Text style={[styles.helpItemDesc, { color: theme.textSecondary }]}>
                     Chưa chắc chắn hoặc hình ảnh khó xác định, chuyển thẻ tiếp theo.
                   </Text>
@@ -1342,12 +1418,19 @@ export function RevalidationReviewScreen() {
               </View>
 
               {/* Down: Report */}
-              <View style={[styles.helpGuideItem, { backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }]}>
+              <View
+                style={[
+                  styles.helpGuideItem,
+                  { backgroundColor: '#FFF7ED', borderColor: '#FDBA74' },
+                ]}
+              >
                 <View style={[styles.helpItemIconBadge, { backgroundColor: '#EA580C' }]}>
                   <MaterialCommunityIcons color="#FFFFFF" name="arrow-down-bold" size={16} />
                 </View>
                 <View style={styles.helpItemContent}>
-                  <Text style={[styles.helpItemTitle, { color: '#EA580C' }]}>Quẹt XUỐNG DƯỚI: Báo cáo</Text>
+                  <Text style={[styles.helpItemTitle, { color: '#EA580C' }]}>
+                    Quẹt XUỐNG DƯỚI: Báo cáo
+                  </Text>
                   <Text style={[styles.helpItemDesc, { color: theme.textSecondary }]}>
                     Báo cáo ảnh mờ, chói sáng, sai vị trí hoặc vi phạm quy tắc.
                   </Text>
@@ -1356,7 +1439,11 @@ export function RevalidationReviewScreen() {
             </View>
 
             <View style={styles.helpTipBox}>
-              <MaterialCommunityIcons color={theme.placeholder} name="information-outline" size={14} />
+              <MaterialCommunityIcons
+                color={theme.placeholder}
+                name="information-outline"
+                size={14}
+              />
               <Text style={[styles.helpTipText, { color: theme.textSecondary }]}>
                 Bạn cũng có thể bấm trực tiếp vào 4 nút hành động ở dưới để đưa ra quyết định.
               </Text>
@@ -1937,9 +2024,19 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 10,
   },
-  summaryMetricSymbolLabel: { fontFamily: Fonts.body, fontSize: 13, fontWeight: '900', lineHeight: 15 },
+  summaryMetricSymbolLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 15,
+  },
   summaryMetricCount: { fontFamily: Fonts.body, fontSize: 23, fontWeight: '900', lineHeight: 28 },
-  summaryMetricLabel: { fontFamily: Fonts.body, fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  summaryMetricLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
   summaryReviewList: { flex: 1 },
   summaryReviewListContent: { gap: Spacing.one },
   summarySignRow: {
@@ -1956,7 +2053,12 @@ const styles = StyleSheet.create({
   summarySignName: { fontFamily: Fonts.body, fontSize: 15, fontWeight: '800', lineHeight: 20 },
   summarySignLocation: { fontFamily: Fonts.body, fontSize: 11, fontWeight: '500', lineHeight: 15 },
   summarySignSummary: { fontFamily: Fonts.body, fontSize: 10, fontWeight: '500', lineHeight: 14 },
-  summaryStatusBadge: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  summaryStatusBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   summaryStatusLabel: { fontFamily: Fonts.body, fontSize: 9, fontWeight: '800' },
   summaryFooterActions: { gap: Spacing.one, marginTop: 'auto' },
   summaryCheckButton: { minHeight: 48, borderWidth: 1 },

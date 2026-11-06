@@ -57,6 +57,9 @@ jest.mock('react-native-safe-area-context', () => {
 // 4. Mock navigation hooks & wallet
 jest.mock('@/feature/navigation/hooks/use-navigation', () => ({
   useGetNavigationRoute: jest.fn(),
+  useInitiateNavigationSession: jest.fn(() => ({
+    mutateAsync: jest.fn().mockResolvedValue({ sessionId: 'mock-session-1' }),
+  })),
 }));
 
 jest.mock('@/feature/navigation/hooks/use-signs', () => ({
@@ -218,7 +221,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
   it('user clicks "Start route" when GPS permission is denied: requires location permission and does not redirect to start selection', async () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(false);
 
-    const { getByLabelText, findByText } = await render(<NavigationMapScreen />);
+    const { getByLabelText, findAllByText } = await render(<NavigationMapScreen />);
 
     const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
@@ -229,9 +232,8 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       );
     });
 
-    expect(
-      await findByText('Cần cấp quyền truy cập vị trí để bắt đầu điều hướng.'),
-    ).toBeTruthy();
+    const matches = await findAllByText('Cần cấp quyền truy cập vị trí để bắt đầu điều hướng.');
+    expect(matches.length).toBeGreaterThan(0);
 
     // Route API was never called with any origin
     expect(useGetNavigationRoute).not.toHaveBeenCalledWith(
@@ -245,7 +247,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
     (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
     (fetchFreshGpsPosition as jest.Mock).mockResolvedValue(null);
 
-    const { getByLabelText, findByText } = await render(<NavigationMapScreen />);
+    const { getByLabelText, findAllByText } = await render(<NavigationMapScreen />);
 
     const startRouteButton = getByLabelText('Start route');
     fireEvent.press(startRouteButton);
@@ -256,9 +258,10 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       );
     });
 
-    expect(
-      await findByText('Không thể lấy vị trí hiện tại của bạn. Vui lòng bật Vị trí/GPS và thử lại.'),
-    ).toBeTruthy();
+    const matches = await findAllByText(
+      'Không thể lấy vị trí hiện tại của bạn. Vui lòng bật Vị trí/GPS và thử lại.',
+    );
+    expect(matches.length).toBeGreaterThan(0);
   });
 
   describe('Vehicle mode switching', () => {
@@ -322,7 +325,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(getByText('(1.2 km)')).toBeTruthy();
 
       // 2. Switch vehicle mode to Bike
-      const bikeTab = getByLabelText('Bike route');
+      const bikeTab = getByLabelText(/Bike route|Tuyến đường xe máy/i);
       fireEvent.press(bikeTab);
 
       // 3. Route API called with BIKE mode, map coordinates and estimated time update
@@ -340,7 +343,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(getByText('(1.0 km)')).toBeTruthy();
 
       // 4. Switch back to Car mode
-      const carTab = getByLabelText('Car route');
+      const carTab = getByLabelText(/Car route|Tuyến đường ô tô/i);
       fireEvent.press(carTab);
 
       await waitFor(() => {
@@ -392,7 +395,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(getByText('(1.2 km)')).toBeTruthy();
 
       // Switch vehicle mode to Bike
-      const bikeTab = getByLabelText('Bike route');
+      const bikeTab = getByLabelText(/Bike route|Tuyến đường xe máy/i);
       fireEvent.press(bikeTab);
 
       await waitFor(() => {

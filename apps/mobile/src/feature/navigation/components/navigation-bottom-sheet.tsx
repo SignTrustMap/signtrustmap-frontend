@@ -69,6 +69,7 @@ export interface NavigationBottomSheetProps {
   onSelectPreset: (id: string | null) => void;
   visibleSigns: RouteSign[];
   isStartingNavigation: boolean;
+  isStartDisabled?: boolean;
   isRouteBookmarked: boolean;
   onBeginNavigation: () => void;
   onOpenBookmarkModal: () => void;
@@ -116,6 +117,7 @@ export function NavigationBottomSheet({
   onSelectPreset,
   visibleSigns,
   isStartingNavigation,
+  isStartDisabled = false,
   isRouteBookmarked,
   onBeginNavigation,
   onOpenBookmarkModal,
@@ -944,12 +946,14 @@ export function NavigationBottomSheet({
             >
               <AppButton
                 accessibilityLabel={
-                  isStartingNavigation
-                    ? "Starting navigation"
-                    : "Begin navigation"
+                  isStartDisabled
+                    ? "Không đủ credits để bắt đầu điều hướng"
+                    : isStartingNavigation
+                      ? "Starting navigation"
+                      : "Begin navigation"
                 }
                 testID="btn-start-navigation"
-                disabled={isStartingNavigation}
+                disabled={isStartingNavigation || isStartDisabled}
                 onPress={onBeginNavigation}
                 style={styles.bottomGoButton}
               >
