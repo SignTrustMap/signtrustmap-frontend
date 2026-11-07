@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, cleanup } from '@testing-library/react-native';
 import { View } from 'react-native';
 
 // ---------------------------------------------------------------------------
@@ -23,15 +23,23 @@ jest.mock('expo-router', () => ({
 // ---------------------------------------------------------------------------
 // 2. UI & Theme Mocks
 // ---------------------------------------------------------------------------
-jest.mock('react-native-safe-area-context', () => ({
-  SafeAreaView: ({ children, ...props }: any) => React.createElement(View, props, children),
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    SafeAreaView: ({ children, ...props }: any) => React.createElement(View, props, children),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  };
+});
 
-jest.mock('@expo/vector-icons', () => ({
-  MaterialCommunityIcons: (props: any) =>
-    React.createElement(View, { testID: `icon-${props.name}`, ...props }),
-}));
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    MaterialCommunityIcons: (props: any) =>
+      React.createElement(View, { testID: `icon-${props.name}`, ...props }),
+  };
+});
 
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
@@ -50,10 +58,14 @@ jest.mock('@/hooks/use-theme', () => ({
   }),
 }));
 
-jest.mock('@/components/offline-map-modal', () => ({
-  OfflineMapModal: ({ visible, onClose }: any) =>
-    visible ? React.createElement(View, { testID: 'offline-map-modal' }) : null,
-}));
+jest.mock('@/components/offline-map-modal', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    OfflineMapModal: ({ isOpen, visible, onClose }: any) =>
+      (isOpen ?? visible) ? React.createElement(View, { testID: 'offline-map-modal' }) : null,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // 3. GPS Utility Mock
@@ -184,27 +196,32 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   // =========================================================================
   // SUITE 1: DriverWork Component
   // =========================================================================
   describe('1. DriverWork Component', () => {
-    it('renders navigation history and sign catalog action cards with session total', () => {
-      const { getByText } = render(<DriverWork />);
+    it('renders navigation history and sign catalog action cards with session total', async () => {
+      const { getByText, getByLabelText } = await render(<DriverWork />);
 
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
-      expect(getByText('12')).toBeTruthy();
+      expect(getByText('9+')).toBeTruthy();
+      expect(getByLabelText('Lịch sử di chuyển, 12 items')).toBeTruthy();
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
     });
 
-    it('navigates to /work/navigation-history when pressing history card', () => {
-      const { getByText } = render(<DriverWork />);
+    it('navigates to /work/navigation-history when pressing history card', async () => {
+      const { getByText } = await render(<DriverWork />);
 
       fireEvent.press(getByText('Lịch sử di chuyển'));
       expect(mockPush).toHaveBeenCalledWith('/work/navigation-history');
     });
 
-    it('navigates to /work/sign-catalog with role driver when pressing catalog card', () => {
-      const { getByText } = render(<DriverWork />);
+    it('navigates to /work/sign-catalog with role driver when pressing catalog card', async () => {
+      const { getByText } = await render(<DriverWork />);
 
       fireEvent.press(getByText('Tra cứu biển báo giao thông'));
       expect(mockPush).toHaveBeenCalledWith({
@@ -213,15 +230,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       });
     });
 
-    it('uses fallback prop driverSessionsTotal when provided', () => {
-      const { getByText } = render(<DriverWork driverSessionsTotal={99} />);
+    it('uses fallback prop driverSessionsTotal when provided', async () => {
+      const { getByText, getByLabelText } = await render(<DriverWork driverSessionsTotal={99} />);
 
-      expect(getByText('99')).toBeTruthy();
+      expect(getByText('9+')).toBeTruthy();
+      expect(getByLabelText('Lịch sử di chuyển, 99 items')).toBeTruthy();
     });
 
-    it('guards queries with isDriver check', () => {
+    it('guards queries with isDriver check', async () => {
       mockSessionUser = { id: 'surveyor-only', roles: ['surveyor'] };
-      render(<DriverWork />);
+      await render(<DriverWork />);
 
       expect(mockUseGetNavigationSessions).toHaveBeenCalledWith(
         { page: 1, pageSize: 1 },
@@ -230,12 +248,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   // =========================================================================
   // SUITE 2: ReviewerWork Component
   // =========================================================================
   describe('2. ReviewerWork Component', () => {
-    it('renders hero review queue card with badge and reviewer stats', () => {
-      const { getByText, getByLabelText } = render(<ReviewerWork />);
+    it('renders hero review queue card with badge and reviewer stats', async () => {
+      const { getByText, getByLabelText } = await render(<ReviewerWork />);
 
       expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
       expect(getByText('7 MỚI')).toBeTruthy();
@@ -249,14 +271,22 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(mockPush).toHaveBeenCalledWith('/work/submission-review');
     });
 
-    it('navigates to revalidation-review, reviewer-stats, and sign-catalog', () => {
-      const { getByText } = render(<ReviewerWork />);
+    it('navigates to revalidation-review when pressing revalidation evidence card', async () => {
+      const { getByText } = await render(<ReviewerWork />);
 
       fireEvent.press(getByText('Minh chứng tái thẩm định chờ duyệt'));
       expect(mockPush).toHaveBeenCalledWith('/work/revalidation-review');
+    });
+
+    it('navigates to reviewer-stats when pressing stats card', async () => {
+      const { getByText } = await render(<ReviewerWork />);
 
       fireEvent.press(getByText('Thống kê của bạn'));
       expect(mockPush).toHaveBeenCalledWith('/work/reviewer-stats');
+    });
+
+    it('navigates to sign-catalog with role reviewer when pressing catalog card', async () => {
+      const { getByText } = await render(<ReviewerWork />);
 
       fireEvent.press(getByText('Tra cứu biển báo giao thông'));
       expect(mockPush).toHaveBeenCalledWith({
@@ -265,9 +295,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       });
     });
 
-    it('guards reviewer queries with isReviewer check', () => {
+    it('guards reviewer queries with isReviewer check', async () => {
       mockSessionUser = { id: 'driver-only', roles: ['driver'] };
-      render(<ReviewerWork />);
+      await render(<ReviewerWork />);
 
       expect(mockUseGetMyReviewerStats).toHaveBeenCalledWith(false);
       expect(mockUseGetReviewQueue).toHaveBeenCalledWith({ page: '1', pageSize: '20' }, false);
@@ -278,12 +308,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   // =========================================================================
   // SUITE 3: SurveyorWork Component
   // =========================================================================
   describe('3. SurveyorWork Component', () => {
-    it('renders surveyor action cards with pending and recaptures count', () => {
-      const { getByText } = render(<SurveyorWork />);
+    it('renders surveyor action cards with pending and recaptures count', async () => {
+      const { getByText } = await render(<SurveyorWork />);
 
       expect(getByText('Lịch sử khảo sát')).toBeTruthy();
       expect(getByText('5')).toBeTruthy();
@@ -294,9 +328,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
     });
 
-    it('renders offline map card when onOpenOfflineMap callback is provided', () => {
+    it('renders offline map card when onOpenOfflineMap callback is provided', async () => {
       const mockOnOpenOfflineMap = jest.fn();
-      const { getByText } = render(<SurveyorWork onOpenOfflineMap={mockOnOpenOfflineMap} />);
+      const { getByText } = await render(<SurveyorWork onOpenOfflineMap={mockOnOpenOfflineMap} />);
 
       const offlineCard = getByText('Bản đồ ngoại tuyến');
       expect(offlineCard).toBeTruthy();
@@ -308,7 +342,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('acquires real user coordinates via fetchFreshGpsPosition and passes to useGetFirstRevalidationSign', async () => {
       mockFetchFreshGpsPosition.mockResolvedValue([106.6900, 10.7800]);
 
-      render(<SurveyorWork />);
+      await render(<SurveyorWork />);
 
       await waitFor(() => {
         expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
@@ -321,7 +355,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
 
     it('navigates to revalidation-map with snap coordinates when revalidation card is pressed', async () => {
-      const { getByText } = render(<SurveyorWork />);
+      const { getByText } = await render(<SurveyorWork />);
 
       fireEvent.press(getByText('Tái xác nhận biển báo'));
 
@@ -336,17 +370,17 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       });
     });
 
-    it('SurveyorFab renders floating plus button and navigates to /work/new-survey', () => {
-      const { getByLabelText } = render(<SurveyorFab />);
+    it('SurveyorFab renders floating plus button and navigates to /work/new-survey', async () => {
+      const { getByLabelText } = await render(<SurveyorFab />);
 
       const fab = getByLabelText('Tạo bản ghi khảo sát mới');
       fireEvent.press(fab);
       expect(mockPush).toHaveBeenCalledWith('/work/new-survey');
     });
 
-    it('guards surveyor queries with isSurveyor check', () => {
+    it('guards surveyor queries with isSurveyor check', async () => {
       mockSessionUser = { id: 'driver-only', roles: ['driver'] };
-      render(<SurveyorWork />);
+      await render(<SurveyorWork />);
 
       expect(mockUseGetMyPendingSubmissions).toHaveBeenCalledWith(false);
       expect(mockUseGetMySurveyStats).toHaveBeenCalledWith(false);
@@ -355,12 +389,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   // =========================================================================
-  // SUITE 4: WorkScreen Integration & Role Switcher
+  // SUITE 4: WorkScreen Integration & Role Switching
   // =========================================================================
   describe('4. WorkScreen Integration & Role Switching', () => {
-    it('mounts DriverWork by default when driver is the initial role', () => {
-      const { getByText, queryByText } = render(<WorkScreen currentRole="driver" />);
+    it('mounts DriverWork by default when driver is the initial role', async () => {
+      const { getByText, queryByText } = await render(<WorkScreen currentRole="driver" />);
 
       expect(getByText('Vai trò: Tài xế')).toBeTruthy();
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
@@ -368,40 +406,50 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(queryByText('Tái xác nhận biển báo')).toBeNull();
     });
 
-    it('switches to SurveyorWork and renders SurveyorFab when surveyor tab is selected', () => {
-      const { getByText, getByLabelText } = render(<WorkScreen currentRole="driver" />);
+    it('switches to SurveyorWork and renders SurveyorFab when surveyor tab is selected', async () => {
+      const { getByText, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
 
-      fireEvent.press(getByText('Khảo sát'));
+      fireEvent.press(getByLabelText('Vai trò Khảo sát'));
 
-      expect(getByText('Vai trò: Khảo sát')).toBeTruthy();
-      expect(getByText('Lịch sử khảo sát')).toBeTruthy();
-      expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
+      await waitFor(() => {
+        expect(getByText('Vai trò: Khảo sát')).toBeTruthy();
+        expect(getByText('Lịch sử khảo sát')).toBeTruthy();
+        expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
+      });
     });
 
-    it('switches to ReviewerWork when reviewer tab is selected', () => {
-      const { getByText } = render(<WorkScreen currentRole="driver" />);
+    it('switches to ReviewerWork when reviewer tab is selected', async () => {
+      const { getByText, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
 
-      fireEvent.press(getByText('Thẩm định'));
+      fireEvent.press(getByLabelText('Vai trò Thẩm định'));
 
-      expect(getByText('Vai trò: Thẩm định')).toBeTruthy();
-      expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
-      expect(getByText('7 MỚI')).toBeTruthy();
+      await waitFor(() => {
+        expect(getByText('Vai trò: Thẩm định')).toBeTruthy();
+        expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
+        expect(getByText('7 MỚI')).toBeTruthy();
+      });
     });
 
-    it('handles single-role user without crashing (slider 2-point outputRange)', () => {
+    it('handles single-role user without crashing (slider 2-point outputRange)', async () => {
       mockSessionUser = { id: 'single-role-user', roles: ['driver'] };
 
-      const { getByText } = render(<WorkScreen currentRole="driver" />);
+      const { getByText } = await render(<WorkScreen currentRole="driver" />);
       expect(getByText('Vai trò: Tài xế')).toBeTruthy();
     });
 
-    it('opens offline map modal when pressing offline map header button', () => {
-      const { getByLabelText, getByTestId } = render(<WorkScreen currentRole="driver" />);
+    it('opens offline map modal when pressing offline map header button', async () => {
+      const { getByLabelText, getByTestId } = await render(<WorkScreen currentRole="driver" />);
 
       const offlineBtn = getByLabelText('Bản đồ ngoại tuyến');
       fireEvent.press(offlineBtn);
 
-      expect(getByTestId('offline-map-modal')).toBeTruthy();
+      await waitFor(() => {
+        expect(getByTestId('offline-map-modal')).toBeTruthy();
+      });
     });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 });
