@@ -15,6 +15,7 @@ export type Account = {
   id: string;
   roles: AccountRole[];
   avatarUrl?: string | null;
+  address?: string | null;
 };
 
 export type AppSession = {
@@ -123,6 +124,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       account: {
         ...nextSession.account,
         roles: normalizeRoles(nextSession.account.roles),
+        avatarUrl: nextSession.account.avatarUrl ?? null,
       },
     };
 

@@ -1,15 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -26,6 +17,7 @@ import {
 } from '@/context/session-provider';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { useTheme } from '@/hooks/use-theme';
+import { getProfile } from '@/api/auth/auth';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -70,8 +62,39 @@ function PrimaryToWhiteGradient() {
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { logOut, session, setRoleEnabled } = useSession();
+  const { logOut, session, setRoleEnabled, updateAccount } = useSession();
+  console.log('ProfileScreen session:', session);
   const theme = useTheme();
+
+  useEffect(() => {
+    let isMounted = true;
+    if (session?.accessToken) {
+      getProfile(session.accessToken)
+        .then((profile) => {
+          if (!isMounted || !profile) return;
+          const hasDifferentAvatar =
+            profile.avatarUrl !== undefined &&
+            profile.avatarUrl !== null &&
+            profile.avatarUrl !== session.account.avatarUrl;
+          const hasDifferentName =
+            profile.fullName && profile.fullName !== session.account.displayName;
+          const hasDifferentAddress =
+            profile.address !== undefined && profile.address !== session.account.address;
+
+          if (hasDifferentAvatar || hasDifferentName || hasDifferentAddress) {
+            void updateAccount?.({
+              ...(hasDifferentAvatar ? { avatarUrl: profile.avatarUrl } : {}),
+              ...(hasDifferentName ? { displayName: profile.fullName } : {}),
+              ...(hasDifferentAddress ? { address: profile.address } : {}),
+            });
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.accessToken]);
   const { scrollTo, t } = useLocalSearchParams<{ scrollTo?: string; t?: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
   const signFilterRef = useRef<View>(null);
@@ -99,7 +122,7 @@ export function ProfileScreen() {
               });
             }
           },
-          () => { }
+          () => {},
         );
       }
     }, 200);
@@ -146,20 +169,16 @@ export function ProfileScreen() {
   };
 
   const handleLogOut = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có muốn đăng xuất không?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: () => {
-            void logOut();
-          },
+    Alert.alert('Đăng xuất', 'Bạn có muốn đăng xuất không?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: () => {
+          void logOut();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -199,10 +218,7 @@ export function ProfileScreen() {
             <View style={styles.profileInfoRow}>
               <View
                 accessibilityLabel={`Ảnh đại diện của ${displayName}`}
-                style={[
-                  styles.avatar,
-                  { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-                ]}
+                style={[styles.avatar, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }]}
               >
                 {session?.account.avatarUrl ? (
                   <Image
@@ -218,18 +234,10 @@ export function ProfileScreen() {
               </View>
 
               <View style={styles.userDetails}>
-                <Text
-                  ellipsizeMode="tail"
-                  numberOfLines={1}
-                  style={styles.name}
-                >
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.name}>
                   {displayName}
                 </Text>
-                <Text
-                  ellipsizeMode="tail"
-                  numberOfLines={1}
-                  style={styles.email}
-                >
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.email}>
                   {email || 'Chưa cập nhật email'}
                 </Text>
               </View>
@@ -297,17 +305,25 @@ export function ProfileScreen() {
             ]}
           >
             <Pressable
-              accessibilityLabel={isRoleSectionOpen ? 'Thu gọn vai trò tài khoản' : 'Mở rộng vai trò tài khoản'}
+              accessibilityLabel={
+                isRoleSectionOpen ? 'Thu gọn vai trò tài khoản' : 'Mở rộng vai trò tài khoản'
+              }
               accessibilityRole="button"
               onPress={() => setIsRoleSectionOpen((prev) => !prev)}
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
                 <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
-                  <MaterialCommunityIcons color={theme.primary} name="account-switch-outline" size={20} />
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="account-switch-outline"
+                    size={20}
+                  />
                 </View>
                 <View style={styles.headerTitles}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Vai trò tài khoản</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Vai trò tài khoản
+                  </Text>
                   <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
                     {activeRolesCount} vai trò đang kích hoạt
                   </Text>
@@ -344,14 +360,18 @@ export function ProfileScreen() {
                             {roleLabels[role]}
                           </Text>
                           <Text style={[styles.rowDescription, { color: theme.placeholder }]}>
-                            {role === 'driver' ? 'Quyền điều hướng bản đồ' : `Công cụ ${roleLabels[role]}`}
+                            {role === 'driver'
+                              ? 'Quyền điều hướng bản đồ'
+                              : `Công cụ ${roleLabels[role]}`}
                           </Text>
                         </View>
                         <View
                           style={[
                             styles.statusPill,
                             {
-                              backgroundColor: isEnabled ? theme.backgroundSelected : theme.background,
+                              backgroundColor: isEnabled
+                                ? theme.backgroundSelected
+                                : theme.background,
                               borderColor: isEnabled ? theme.primary : theme.border,
                             },
                           ]}
@@ -405,7 +425,9 @@ export function ProfileScreen() {
             ]}
           >
             <Pressable
-              accessibilityLabel={isFilterSectionOpen ? 'Thu gọn bộ lọc biển báo' : 'Mở rộng bộ lọc biển báo'}
+              accessibilityLabel={
+                isFilterSectionOpen ? 'Thu gọn bộ lọc biển báo' : 'Mở rộng bộ lọc biển báo'
+              }
               accessibilityRole="button"
               onPress={() => setIsFilterSectionOpen((prev) => !prev)}
               style={styles.collapsibleHeader}
@@ -453,17 +475,15 @@ export function ProfileScreen() {
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
                 </View>
                 <View style={styles.headerTitles}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Bản đồ ngoại tuyến
+                  </Text>
                   <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
                     Tải và quản lý gói dữ liệu PMTiles ngoại tuyến
                   </Text>
                 </View>
               </View>
-              <MaterialCommunityIcons
-                color={theme.placeholder}
-                name="chevron-right"
-                size={22}
-              />
+              <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={22} />
             </Pressable>
           </View>
         </View>
@@ -506,11 +526,11 @@ export function ProfileScreen() {
             >
               <MaterialCommunityIcons color={theme.primary} name="cellphone-arrow-down" size={18} />
               <View style={styles.dropdownItemTextGroup}>
-                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>Cập nhật ứng dụng</Text>
+                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>
+                  Cập nhật ứng dụng
+                </Text>
                 <Text style={[styles.dropdownItemSublabel, { color: theme.placeholder }]}>
-                  {status === 'checking'
-                    ? 'Đang kiểm tra...'
-                    : `Phiên bản ${currentVersion}`}
+                  {status === 'checking' ? 'Đang kiểm tra...' : `Phiên bản ${currentVersion}`}
                 </Text>
               </View>
             </Pressable>
@@ -531,7 +551,9 @@ export function ProfileScreen() {
             >
               <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={18} />
               <View style={styles.dropdownItemTextGroup}>
-                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>
+                  Bản đồ ngoại tuyến
+                </Text>
                 <Text style={[styles.dropdownItemSublabel, { color: theme.placeholder }]}>
                   Quản lý gói PMTiles
                 </Text>

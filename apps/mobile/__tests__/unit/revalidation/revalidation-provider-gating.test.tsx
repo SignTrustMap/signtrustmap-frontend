@@ -44,36 +44,34 @@ jest.mock('@/context/session-provider', () => ({
 // ---------------------------------------------------------------------------
 // 4. Revalidation Query Hook Mock
 // ---------------------------------------------------------------------------
-const mockUseGetRevalidationEvidenceQueue = jest.fn();
-const mockUseVoteOnRevalidationEvidence = jest.fn();
-
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
-  useGetRevalidationEvidenceQueue: (...args: any[]) => mockUseGetRevalidationEvidenceQueue(...args),
-  useVoteOnRevalidationEvidence: () => ({
-    mutateAsync: mockUseVoteOnRevalidationEvidence,
-  }),
+  useGetRevalidationEvidenceQueue: jest.fn(),
+  useVoteOnRevalidationEvidence: jest.fn(() => ({
+    mutateAsync: jest.fn(),
+  })),
 }));
 
+import { useGetRevalidationEvidenceQueue } from '@/feature/revalidation/hooks/use-revalidation';
 import { RevalidationWorkflowProvider } from '@/feature/revalidation/context/revalidation-workflow-provider';
 
 describe('RevalidationWorkflowProvider Query Gating & 403 Prevention', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseGetRevalidationEvidenceQueue.mockReturnValue({
+    (useGetRevalidationEvidenceQueue as jest.Mock).mockReturnValue({
       data: null,
       isLoading: false,
       refetch: jest.fn(),
     });
   });
 
-  it('disables revalidation evidence queue query when browsing work dashboard (not on reval review screen)', () => {
+  it('disables revalidation evidence queue query when browsing work dashboard (not on reval review screen)', async () => {
     mockSegments = ['(authenticated)', '(tabs)', 'work'];
     mockSessionData = {
       accessToken: 'valid-token',
       account: { id: 'rev-1', roles: ['reviewer'] },
     };
 
-    render(
+    await render(
       <RevalidationWorkflowProvider>
         <View>
           <Text>Work Screen Child</Text>
@@ -81,20 +79,20 @@ describe('RevalidationWorkflowProvider Query Gating & 403 Prevention', () => {
       </RevalidationWorkflowProvider>,
     );
 
-    expect(mockUseGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
+    expect(useGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
       { pageSize: 50 },
       false, // isQueryEnabled must be FALSE on work dashboard
     );
   });
 
-  it('disables revalidation evidence queue query for non-reviewer accounts (preventing 403 Forbidden)', () => {
+  it('disables revalidation evidence queue query for non-reviewer accounts (preventing 403 Forbidden)', async () => {
     mockSegments = ['(authenticated)', '(tabs)', 'work', 'revalidation-review'];
     mockSessionData = {
       accessToken: 'driver-token',
       account: { id: 'driver-1', roles: ['driver'] }, // NOT a reviewer
     };
 
-    render(
+    await render(
       <RevalidationWorkflowProvider>
         <View>
           <Text>Review Screen Child</Text>
@@ -102,20 +100,20 @@ describe('RevalidationWorkflowProvider Query Gating & 403 Prevention', () => {
       </RevalidationWorkflowProvider>,
     );
 
-    expect(mockUseGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
+    expect(useGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
       { pageSize: 50 },
       false, // isQueryEnabled must be FALSE for driver/surveyor accounts
     );
   });
 
-  it('enables revalidation evidence queue query when user is reviewer AND on revalidation review screen', () => {
+  it('enables revalidation evidence queue query when user is reviewer AND on revalidation review screen', async () => {
     mockSegments = ['(authenticated)', '(tabs)', 'work', 'revalidation-review'];
     mockSessionData = {
       accessToken: 'reviewer-token',
       account: { id: 'rev-1', roles: ['reviewer'] },
     };
 
-    render(
+    await render(
       <RevalidationWorkflowProvider>
         <View>
           <Text>Review Screen Child</Text>
@@ -123,7 +121,7 @@ describe('RevalidationWorkflowProvider Query Gating & 403 Prevention', () => {
       </RevalidationWorkflowProvider>,
     );
 
-    expect(mockUseGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
+    expect(useGetRevalidationEvidenceQueue).toHaveBeenCalledWith(
       { pageSize: 50 },
       true, // isQueryEnabled must be TRUE
     );

@@ -1,3 +1,6 @@
+jest.unmock('@/services/offline-map-service');
+jest.unmock('../../../src/services/offline-map-service');
+
 import * as FileSystem from 'expo-file-system/legacy';
 import { formatBytes, offlineMapService } from '../../../src/services/offline-map-service';
 

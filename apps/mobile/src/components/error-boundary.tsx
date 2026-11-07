@@ -101,6 +101,26 @@ export function ErrorFallbackView({
     }
   };
 
+  const handleCopyDetails = async () => {
+    const errorDetails = [
+      `Name: ${error?.name || 'Error'}`,
+      `Message: ${error?.message || 'Unknown error'}`,
+      `Stack:\n${error?.stack || 'No stack trace available'}`,
+      `Timestamp: ${new Date().toISOString()}`,
+    ].join('\n');
+
+    try {
+      await Clipboard.setStringAsync(errorDetails);
+      setIsCopied(true);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2200);
+    } catch (err) {
+      console.warn('[ErrorBoundary] Failed to copy to clipboard:', err);
+    }
+  };
+
   const errorMessage = error?.message || UNHANDLED_EXCEPTION_MESSAGE;
   const errorName = error?.name || APPLICATION_ERROR_TITLE;
 
@@ -169,6 +189,60 @@ export function ErrorFallbackView({
               <Text style={[styles.secondaryButtonText, { color: theme.text }]}>Quay về trang chủ</Text>
             </Pressable>
           </View>
+
+          {/* Technical Details Accordion */}
+          {error ? (
+            <View style={[styles.detailsCard, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+              <Pressable
+                accessibilityLabel={showDetails ? 'Ẩn chi tiết kỹ thuật' : 'Xem chi tiết kỹ thuật'}
+                accessibilityRole="button"
+                onPress={() => setShowDetails((prev) => !prev)}
+                style={styles.detailsToggleRow}
+              >
+                <View style={styles.detailsToggleLeft}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="code-tags" size={18} />
+                  <Text style={[styles.detailsToggleText, { color: theme.text }]}>Chi tiết kỹ thuật</Text>
+                  <View style={styles.errorNameBadge}>
+                    <Text numberOfLines={1} style={styles.errorNameBadgeText}>{errorName}</Text>
+                  </View>
+                </View>
+                <MaterialCommunityIcons
+                  color={theme.placeholder}
+                  name={showDetails ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                />
+              </Pressable>
+
+              {showDetails ? (
+                <View style={styles.detailsBody}>
+                  <View style={styles.codeBox}>
+                    <Text style={styles.codeMessage}>{errorMessage}</Text>
+                    {error?.stack ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <Text style={styles.codeStack}>{error.stack}</Text>
+                      </ScrollView>
+                    ) : null}
+                  </View>
+
+                  <Pressable
+                    accessibilityLabel="Sao chép chi tiết lỗi"
+                    accessibilityRole="button"
+                    onPress={handleCopyDetails}
+                    style={styles.copyButton}
+                  >
+                    <MaterialCommunityIcons
+                      color={isCopied ? '#10B981' : '#64748B'}
+                      name={isCopied ? 'check' : 'content-copy'}
+                      size={15}
+                    />
+                    <Text style={[styles.copyButtonText, isCopied && { color: '#10B981' }]}>
+                      {isCopied ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép chi tiết'}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>

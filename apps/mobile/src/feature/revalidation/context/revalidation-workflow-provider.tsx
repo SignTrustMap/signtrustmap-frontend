@@ -16,7 +16,7 @@ import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet'
 import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
-} from '../hooks/use-revalidation';
+} from '@/feature/revalidation/hooks/use-revalidation';
 import type {
   RevalDecision,
   RevalidationQueueEvidenceItem,

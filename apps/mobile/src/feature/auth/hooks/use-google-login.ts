@@ -47,8 +47,11 @@ export function useGoogleLogin() {
     retry: false,
     gcTime: 0,
     networkMode: 'always',
-    mutationFn: async (idToken: string) => {
+    mutationFn: async ({ idToken, photoUrl }: { idToken: string; photoUrl?: string | null }) => {
       const session = await loginWithGoogle(idToken);
+      if (photoUrl && !session.account.avatarUrl) {
+        session.account.avatarUrl = photoUrl;
+      }
       await queryClient.cancelQueries();
       queryClient.removeQueries();
       await logIn(session);
@@ -92,8 +95,10 @@ export function useGoogleLogin() {
       }
 
       let idToken: string | null | undefined;
+      let photoUrl: string | null | undefined;
       if (isSuccessResponse(response)) {
         idToken = response.data.idToken;
+        photoUrl = response.data.user?.photo;
       }
 
       if (!idToken) {
@@ -105,7 +110,7 @@ export function useGoogleLogin() {
         throw new Error('Không nhận được mã xác thực (ID token) từ Google.');
       }
 
-      return await mutation.mutateAsync(idToken);
+      return await mutation.mutateAsync({ idToken, photoUrl });
     } catch (error: any) {
       if (error instanceof GoogleAuthCancelledError) {
         throw error;

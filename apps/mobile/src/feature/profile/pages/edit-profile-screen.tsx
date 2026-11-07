@@ -12,7 +12,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { getProfile, updateProfile } from '@/api/auth/auth';
 import { AvatarCropModal } from '../components/avatar-crop-modal';
+import { AppInput } from '@/components/input';
 
 function getInitials(displayName?: string) {
   if (!displayName) return 'ST';
@@ -39,9 +39,10 @@ export function EditProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { session, updateAccount } = useSession();
-
+  console.log('EditProfileScreen session:', session);
   const [fullName, setFullName] = useState(session?.account.displayName ?? '');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState(session?.account.address ?? '');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(session?.account.avatarUrl ?? null);
   const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
   const [selectedPickerUri, setSelectedPickerUri] = useState<string | null>(null);
@@ -57,7 +58,16 @@ export function EditProfileScreen() {
           if (isMounted) {
             if (profile.fullName) setFullName(profile.fullName);
             if (profile.phone) setPhone(profile.phone);
-            if (profile.avatarUrl !== undefined) setAvatarUrl(profile.avatarUrl ?? null);
+            if (profile.address) setAddress(profile.address);
+            if (profile.avatarUrl !== undefined) {
+              setAvatarUrl(profile.avatarUrl ?? null);
+              if (profile.avatarUrl && profile.avatarUrl !== session.account.avatarUrl) {
+                void updateAccount?.({
+                  avatarUrl: profile.avatarUrl,
+                  ...(profile.address ? { address: profile.address } : {}),
+                });
+              }
+            }
           }
         })
         .catch(() => {
@@ -129,6 +139,7 @@ export function EditProfileScreen() {
         {
           fullName: fullName.trim(),
           phone: phone.trim() ? phone.trim() : undefined,
+          address: address.trim() ? address.trim() : undefined,
           avatarUrl: finalAvatar,
         },
         session.accessToken,
@@ -136,9 +147,16 @@ export function EditProfileScreen() {
 
       const newDisplayName = updated.fullName || fullName.trim();
       const newAvatarUrl = updated.avatarUrl !== undefined ? updated.avatarUrl : finalAvatar;
+      const newAddress =
+        updated.address !== undefined
+          ? updated.address
+          : address.trim()
+            ? address.trim()
+            : undefined;
       await updateAccount?.({
         displayName: newDisplayName,
         avatarUrl: newAvatarUrl,
+        address: newAddress,
       });
 
       Alert.alert('Thành công', 'Thông tin tài khoản đã được cập nhật.', [
@@ -244,94 +262,101 @@ export function EditProfileScreen() {
               {/* Full Name Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="account-outline" size={20} />
                   <Text style={[styles.fieldLabel, { color: theme.text }]}>Họ và tên</Text>
                   <Text style={[styles.requiredBadge, { color: theme.danger }]}>*</Text>
                 </View>
-                <View
-                  style={[
+                <AppInput
+                  accessibilityLabel="Họ và tên"
+                  autoComplete="name"
+                  autoCapitalize="words"
+                  containerStyle={[
                     styles.inputContainer,
-                    { borderColor: theme.border, backgroundColor: theme.background },
+                    { borderColor: '#666', backgroundColor: theme.surface },
                   ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.grey}
-                    name="account-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    autoCapitalize="words"
-                    editable={!isSaving}
-                    maxLength={100}
-                    onChangeText={setFullName}
-                    placeholder="Nhập họ và tên của bạn"
-                    placeholderTextColor={theme.placeholder}
-                    style={[styles.input, { color: theme.text }]}
-                    value={fullName}
-                  />
-                </View>
+                  editable={!isSaving}
+                  maxLength={100}
+                  onChangeText={setFullName}
+                  placeholder="Nhập họ và tên của bạn"
+                  placeholderTextColor={theme.placeholder}
+                  value={fullName}
+                />
               </View>
 
               {/* Phone Field */}
               <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: theme.text }]}>Số điện thoại</Text>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    { borderColor: theme.border, backgroundColor: theme.background },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.grey}
-                    name="phone-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    editable={!isSaving}
-                    keyboardType="phone-pad"
-                    maxLength={20}
-                    onChangeText={setPhone}
-                    placeholder="Nhập số điện thoại liên hệ"
-                    placeholderTextColor={theme.placeholder}
-                    style={[styles.input, { color: theme.text }]}
-                    value={phone}
-                  />
+                <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="phone-outline" size={20} />
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Số điện thoại</Text>
                 </View>
+                <AppInput
+                  accessibilityLabel="Số điện thoại"
+                  containerStyle={[
+                    styles.inputContainer,
+                    { borderColor: '#666', backgroundColor: theme.surface },
+                  ]}
+                  editable={!isSaving}
+                  keyboardType="phone-pad"
+                  maxLength={20}
+                  onChangeText={setPhone}
+                  placeholder="Nhập số điện thoại liên hệ"
+                  placeholderTextColor={theme.placeholder}
+                  type="phone"
+                  value={phone}
+                />
+              </View>
+
+              {/* Address Field */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="map-marker-outline" size={20} />
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Địa chỉ</Text>
+                </View>
+                <AppInput
+                  accessibilityLabel="Địa chỉ"
+                  autoCapitalize="sentences"
+                  containerStyle={[
+                    styles.inputContainer,
+                    { borderColor: '#666', backgroundColor: theme.surface },
+                  ]}
+                  editable={!isSaving}
+                  maxLength={200}
+                  onChangeText={setAddress}
+                  placeholder="Nhập địa chỉ của bạn"
+                  placeholderTextColor={theme.placeholder}
+                  value={address}
+                />
               </View>
 
               {/* Email (Read-only) Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="email-outline" size={20} />
                   <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
                   <Text style={[styles.lockedBadge, { color: theme.grey }]}>
                     (Không thể thay đổi)
                   </Text>
                 </View>
-                <View
-                  style={[
+                <AppInput
+                  accessibilityLabel="Email"
+                  containerStyle={[
                     styles.inputContainer,
                     styles.disabledInputContainer,
                     { borderColor: theme.border, backgroundColor: theme.background },
                   ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.placeholder}
-                    name="email-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    editable={false}
-                    style={[styles.input, { color: theme.placeholder }]}
-                    value={email}
-                  />
-                  <MaterialCommunityIcons
-                    color={theme.placeholder}
-                    name="lock-outline"
-                    size={16}
-                  />
-                </View>
+                  editable={false}
+                  keyboardType="email-address"
+                  style={{ color: theme.placeholder }}
+                  trailingIcon={
+                    <MaterialCommunityIcons
+                      color={theme.placeholder}
+                      name="lock-outline"
+                      size={16}
+                    />
+                  }
+                  type="email"
+                  value={email}
+                />
               </View>
             </View>
 
@@ -353,7 +378,11 @@ export function EditProfileScreen() {
                   <ActivityIndicator color={theme.onPrimary} size="small" />
                 ) : (
                   <View style={styles.saveButtonContent}>
-                    <MaterialCommunityIcons color={theme.onPrimary} name="content-save-outline" size={20} />
+                    <MaterialCommunityIcons
+                      color={theme.onPrimary}
+                      name="content-save-outline"
+                      size={20}
+                    />
                     <Text style={[styles.saveButtonText, { color: theme.onPrimary }]}>
                       Lưu thay đổi
                     </Text>
@@ -514,7 +543,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: Rounded.md,
+    borderRadius: Rounded.lg,
     paddingHorizontal: Spacing.three,
     minHeight: 46,
   },
