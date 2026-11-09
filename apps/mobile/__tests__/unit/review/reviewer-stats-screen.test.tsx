@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
 import { ReviewerStatsScreen } from '@/feature/review/pages/reviewer-stats-screen';
 import {
@@ -269,5 +269,36 @@ describe('ReviewerStatsScreen Unit Test Suite', () => {
 
     expect(queryByText('Cấm đi ngược chiều')).toBeNull();
     expect(getByText('Đường cong nguy hiểm')).toBeTruthy();
+  });
+
+  it('renders date filter and sort controls for sign history and supports sorting', async () => {
+    (useGetMyReviewerStats as jest.Mock).mockReturnValue({
+      data: sampleStats,
+      isLoading: false,
+      isFetching: false,
+      refetch: mockRefetchStats,
+    });
+    (useGetMyReviewHistory as jest.Mock).mockReturnValue({
+      data: sampleHistory,
+      isLoading: false,
+      isFetching: false,
+      refetch: mockRefetchHistory,
+    });
+
+    const { getByText, getByLabelText } = await render(<ReviewerStatsScreen />);
+
+    // Date filter header and controls in history section
+    expect(getByText('Lọc theo ngày biểu quyết')).toBeTruthy();
+    expect(getByLabelText('Chọn Từ ngày')).toBeTruthy();
+    expect(getByLabelText('Chọn Đến ngày')).toBeTruthy();
+
+    // Toggle sort order
+    expect(getByText('Mới nhất')).toBeTruthy();
+    const sortBtn = getByLabelText('Sắp xếp ngày: Mới nhất');
+    fireEvent.press(sortBtn);
+
+    await waitFor(() => {
+      expect(getByText('Cũ nhất')).toBeTruthy();
+    });
   });
 });

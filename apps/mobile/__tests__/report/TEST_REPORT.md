@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-09 04:02:51 UTC  
+> **Generated:** 2026-11-09 07:35:40 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 5.97s  
+> **Execution Duration:** 12.43s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,8 +11,8 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 10 | 10 | 0 | 0 | 100.0% |
-| **Tests** | 99 | 99 | 0 | 0 | 100.0% |
+| **Test Suites** | 8 | 8 | 0 | 0 | 100.0% |
+| **Tests** | 81 | 81 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
@@ -269,14 +269,12 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 20 / 20 | 2.83s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 0.17s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 0.73s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 7 / 7 | 0.41s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/recheck-evidence-screen.test.tsx` | 4 / 4 | 0.46s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 7 / 7 | 0.37s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 7 / 7 | 0.29s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 0.23s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 35 / 35 | 0.14s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 3 / 3 | 0.10s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-api.test.ts` | 12 / 12 | 1.02s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-workflow-api.test.ts` | 8 / 8 | 1.05s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/catalog-api.test.ts` | 12 / 12 | 1.09s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/use-recapture-and-instruction.test.tsx` | 5 / 5 | 2.52s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-submission-address.test.tsx` | 3 / 3 | 2.64s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-skip-summary-flow.test.tsx` | 8 / 8 | 2.80s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/reviewer-stats-screen.test.tsx` | 8 / 8 | 4.01s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-flow.test.tsx` | 25 / 25 | 10.95s | ✅ Pass |
 

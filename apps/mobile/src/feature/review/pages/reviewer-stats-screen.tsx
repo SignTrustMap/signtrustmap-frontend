@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/button';
+import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { ListSkeleton, Skeleton } from '@/components/skeleton';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMyReviewHistory, useGetMyReviewerStats } from '@/feature/review/hooks/use-review';
@@ -62,7 +63,6 @@ export function ReviewerStatsScreen() {
     error: statsError,
   } = useGetMyReviewerStats();
 
-  console.log('Reviewer Stats:', stats);
 
   const {
     data: historyData,
@@ -88,6 +88,21 @@ export function ReviewerStatsScreen() {
   const approvedCount = stats?.approved ?? 0;
   const rejectedCount = stats?.rejected ?? 0;
   const streak = stats?.currentStreak ?? 0;
+
+  // Reputation tier calculation
+  let tierLabel = 'Thẩm định viên tập sự';
+  let tierColor = '#0284C7';
+
+  if (reliabilityPercent >= 90) {
+    tierLabel = 'Thẩm định viên cao cấp';
+    tierColor = '#10B981';
+  } else if (reliabilityPercent >= 75) {
+    tierLabel = 'Thẩm định viên tin cậy';
+    tierColor = theme.primary;
+  } else if (reliabilityPercent < 50 && totalReviews > 10) {
+    tierLabel = 'Cần cải thiện độ chính xác';
+    tierColor = '#EF4444';
+  }
 
   const rawHistoryItems = historyData?.items ?? [];
   const filteredHistoryItems = rawHistoryItems.filter((item) => {
@@ -233,7 +248,7 @@ export function ReviewerStatsScreen() {
                   </View>
 
                   <View style={styles.heroScoreInfo}>
-                    <Text style={styles.heroScoreHeading}>Điểm tín nhiệm</Text>
+                    <Text style={styles.heroScoreHeading}>{tierLabel}</Text>
                     <Text style={styles.heroScoreDesc}>
                       Dựa trên sự đồng thuận của cộng đồng SignTrustMap với các phiếu thẩm định biển
                       báo của bạn.
@@ -416,116 +431,154 @@ export function ReviewerStatsScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <View
-                    style={[styles.historyList, isHistoryFetching && styles.historyListFetching]}
+                  <DateFilterSortList
+                    items={filteredHistoryItems}
+                    getDate={(item) => (item as any).reviewedAt || (item as any).createdAt}
+                    headerTitle="Lọc theo ngày biểu quyết"
+                    startDateLabel="Từ ngày"
+                    endDateLabel="Đến ngày"
+                    showPresets
+                    showSortToggle
+                    showCountBadge
+                    controlsCardStyle={{ marginBottom: Spacing.two }}
                   >
-                    {filteredHistoryItems.map((item, index) => {
-                      const isApproved = item.vote > 0;
-                      const candidate = item.candidate;
-                      const signName =
-                        candidate?.predictedSignType?.nameVi ||
-                        candidate?.predictedSignType?.nameEn ||
-                        candidate?.predictedSignType?.signCode ||
-                        'Biển báo ứng viên';
-                      const signCode = candidate?.predictedSignType?.signCode;
-                      const cropUrl = resolveS3Url(
-                        candidate?.signCropUrl || candidate?.bestFrameUrl,
-                      );
+                    {({ items: dateFilteredItems, totalCount }) => {
+                      if (dateFilteredItems.length === 0) {
+                        return (
+                          <View
+                            style={[
+                              styles.emptyHistoryBox,
+                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.grey}
+                              name="file-document-outline"
+                              size={32}
+                            />
+                            <Text style={[styles.emptyHistoryText, { color: theme.grey }]}>
+                              {totalCount === 0
+                                ? 'Bạn chưa thực hiện lượt thẩm định nào.'
+                                : 'Không có bản ghi phù hợp với bộ lọc ngày.'}
+                            </Text>
+                          </View>
+                        );
+                      }
 
                       return (
                         <View
-                          key={item.candidateId || String(index)}
-                          style={[
-                            styles.historyCard,
-                            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                          ]}
+                          style={[styles.historyList, isHistoryFetching && styles.historyListFetching]}
                         >
-                          {/* Image Thumbnail or fallback */}
-                          <View
-                            style={[
-                              styles.historyThumbWrap,
-                              { backgroundColor: `${theme.grey}15` },
-                            ]}
-                          >
-                            {cropUrl ? (
-                              <Image
-                                contentFit="cover"
-                                source={{ uri: cropUrl }}
-                                style={styles.historyThumb}
-                                transition={200}
-                              />
-                            ) : (
-                              <MaterialCommunityIcons
-                                color={theme.primary}
-                                name="sign-direction"
-                                size={22}
-                              />
-                            )}
-                          </View>
+                          {dateFilteredItems.map((item, index) => {
+                            const isApproved = item.vote > 0;
+                            const candidate = item.candidate;
+                            const signName =
+                              candidate?.predictedSignType?.nameVi ||
+                              candidate?.predictedSignType?.nameEn ||
+                              candidate?.predictedSignType?.signCode ||
+                              'Biển báo ứng viên';
+                            const signCode = candidate?.predictedSignType?.signCode;
+                            const cropUrl = resolveS3Url(
+                              candidate?.signCropUrl || candidate?.bestFrameUrl,
+                            );
 
-                          {/* Info */}
-                          <View style={styles.historyBody}>
-                            <View style={styles.historyTopRow}>
-                              <Text
-                                numberOfLines={1}
-                                style={[styles.historySignName, { color: theme.text }]}
-                              >
-                                {signName}
-                              </Text>
-
+                            return (
                               <View
+                                key={item.candidateId || String(index)}
                                 style={[
-                                  styles.historyVoteBadge,
-                                  {
-                                    backgroundColor: isApproved
-                                      ? 'rgba(16, 185, 129, 0.12)'
-                                      : 'rgba(239, 68, 68, 0.12)',
-                                  },
+                                  styles.historyCard,
+                                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                                 ]}
                               >
-                                <MaterialCommunityIcons
-                                  color={isApproved ? '#10B981' : '#EF4444'}
-                                  name={isApproved ? 'check-circle' : 'close-circle'}
-                                  size={13}
-                                />
-                                <Text
+                                {/* Image Thumbnail or fallback */}
+                                <View
                                   style={[
-                                    styles.historyVoteText,
-                                    { color: isApproved ? '#10B981' : '#EF4444' },
+                                    styles.historyThumbWrap,
+                                    { backgroundColor: `${theme.grey}15` },
                                   ]}
                                 >
-                                  {isApproved ? 'Đồng ý' : 'Từ chối'}
-                                </Text>
+                                  {cropUrl ? (
+                                    <Image
+                                      contentFit="cover"
+                                      source={{ uri: cropUrl }}
+                                      style={styles.historyThumb}
+                                      transition={200}
+                                    />
+                                  ) : (
+                                    <MaterialCommunityIcons
+                                      color={theme.primary}
+                                      name="sign-direction"
+                                      size={22}
+                                    />
+                                  )}
+                                </View>
+
+                                {/* Info */}
+                                <View style={styles.historyBody}>
+                                  <View style={styles.historyTopRow}>
+                                    <Text
+                                      numberOfLines={1}
+                                      style={[styles.historySignName, { color: theme.text }]}
+                                    >
+                                      {signName}
+                                    </Text>
+
+                                    <View
+                                      style={[
+                                        styles.historyVoteBadge,
+                                        {
+                                          backgroundColor: isApproved
+                                            ? 'rgba(16, 185, 129, 0.12)'
+                                            : 'rgba(239, 68, 68, 0.12)',
+                                        },
+                                      ]}
+                                    >
+                                      <MaterialCommunityIcons
+                                        color={isApproved ? '#10B981' : '#EF4444'}
+                                        name={isApproved ? 'check-circle' : 'close-circle'}
+                                        size={13}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.historyVoteText,
+                                          { color: isApproved ? '#10B981' : '#EF4444' },
+                                        ]}
+                                      >
+                                        {isApproved ? 'Đồng ý' : 'Từ chối'}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  {signCode ? (
+                                    <Text style={[styles.historySignCode, { color: theme.grey }]}>
+                                      Mã hiệu: {signCode}
+                                    </Text>
+                                  ) : null}
+
+                                  {item.declineReason ? (
+                                    <Text numberOfLines={1} style={styles.historyDeclineReason}>
+                                      Lý do: {item.declineReason}
+                                    </Text>
+                                  ) : null}
+
+                                  <View style={styles.historyFooter}>
+                                    <MaterialCommunityIcons
+                                      color={theme.grey}
+                                      name="clock-outline"
+                                      size={12}
+                                    />
+                                    <Text style={[styles.historyDateText, { color: theme.grey }]}>
+                                      {formatReviewDate(item.reviewedAt || (item as any).createdAt)}
+                                    </Text>
+                                  </View>
+                                </View>
                               </View>
-                            </View>
-
-                            {signCode ? (
-                              <Text style={[styles.historySignCode, { color: theme.grey }]}>
-                                Mã hiệu: {signCode}
-                              </Text>
-                            ) : null}
-
-                            {item.declineReason ? (
-                              <Text numberOfLines={1} style={styles.historyDeclineReason}>
-                                Lý do: {item.declineReason}
-                              </Text>
-                            ) : null}
-
-                            <View style={styles.historyFooter}>
-                              <MaterialCommunityIcons
-                                color={theme.grey}
-                                name="clock-outline"
-                                size={12}
-                              />
-                              <Text style={[styles.historyDateText, { color: theme.grey }]}>
-                                {formatReviewDate(item.reviewedAt)}
-                              </Text>
-                            </View>
-                          </View>
+                            );
+                          })}
                         </View>
                       );
-                    })}
-                  </View>
+                    }}
+                  </DateFilterSortList>
                 )}
 
                 {/* Pagination */}
