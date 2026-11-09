@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut, Phone, CircleNotch, WarningCircle } from '@phosphor-icons/react'
+import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from 'react'
+import { X, User, Envelope, ShieldCheck, Coins, Key, SignOut, Phone, CircleNotch, WarningCircle, Camera } from '@phosphor-icons/react'
 import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
@@ -27,6 +27,47 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [activeTab, setActiveTab] = useState<'info' | 'security'>('info')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [isAvatarDirty, setIsAvatarDirty] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
+    }
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
+    setNameError(null)
+    setPhoneError(null)
+  }, [user, isOpen])
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('profile.avatar_type_error', { defaultValue: 'Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WebP...)' }))
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('profile.avatar_size_error', { defaultValue: 'Kích thước ảnh không được vượt quá 5MB' }))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      setAvatarPreview(dataUrl)
+      setIsAvatarDirty(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
 
   const handlePhoneChange = (val: string) => {
     setPhone(val)
@@ -63,15 +104,20 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
       setPhoneError(null)
     }
 
-    if (hasError) return
+    if (!isDirty || isSaving || hasError) return
 
     setIsSaving(true)
     try {
       const normalizedPhone = trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined
-      await updateProfile({
+      const payload: Parameters<typeof updateProfile>[0] = {
         name: cleanName,
         phone: normalizedPhone,
-      })
+      }
+      if (isAvatarDirty && avatarPreview) {
+        payload.avatar = avatarPreview
+      }
+      await updateProfile(payload)
+      setIsAvatarDirty(false)
       setPhoneError(null)
       toast.success(t('profile.save_success'))
     } catch (err: any) {
@@ -79,6 +125,23 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const isDirty = Boolean(
+    user && (
+      name.trim() !== (user.name || '').trim() ||
+      (phone.trim() || '') !== (user.phone || '').trim() ||
+      isAvatarDirty
+    )
+  )
+
+  const handleCancel = () => {
+    setName(user.name || '')
+    setPhone(user.phone || '')
+    setPhoneError(null)
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -148,13 +211,50 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
         {/* User Summary Card */}
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/50'}`}>
           <div className="flex items-center gap-4">
-            <div className="relative">
+            <div
+              className="relative group cursor-pointer shrink-0"
+              onClick={handleAvatarClick}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleAvatarClick()
+                }
+              }}
+            >
               <Avatar size="lg" className="border-2 border-[#00c4de]">
-                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarImage src={avatarPreview || user.avatar} alt={user.name} />
                 <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
               </Avatar>
-              <span className="absolute -bottom-1 -right-1 text-sm">{user.icon}</span>
+              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                <Camera size={14} weight="bold" />
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleAvatarClick()
+                }}
+                className={`absolute -bottom-1 -right-1 p-1 rounded-full border shadow-sm transition-colors cursor-pointer ${
+                  isDark
+                    ? "bg-[#00c4de] hover:bg-[#38dbf1] text-black border-[#061417]"
+                    : "bg-[#007b8b] hover:bg-[#00606d] text-white border-white"
+                }`}
+                title={t("profile.change_avatar", { defaultValue: "Đổi ảnh đại diện" })}
+                aria-label={t("profile.change_avatar", { defaultValue: "Đổi ảnh đại diện" })}
+              >
+                <Camera size={12} weight="bold" />
+              </button>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarFileChange}
+            />
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -318,12 +418,29 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
+                  type="button"
+                  disabled={!isDirty || isSaving}
+                  onClick={handleCancel}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl border transition-all ${
+                    !isDirty || isSaving
+                      ? 'opacity-40 cursor-not-allowed pointer-events-none border-gray-200 dark:border-white/10 text-gray-400'
+                      : isDark
+                      ? 'border-white/15 bg-white/5 hover:bg-white/10 text-gray-300 cursor-pointer'
+                      : 'border-gray-300 bg-white hover:bg-gray-100 text-gray-700 cursor-pointer'
+                  }`}
+                >
+                  {t('profile.btn_cancel', { defaultValue: 'Hủy thay đổi' })}
+                </button>
+
+                <button
                   type="submit"
-                  disabled={isSaving}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                      : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
+                  disabled={!isDirty || isSaving || !!phoneError}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 ${
+                    !isDirty || isSaving || !!phoneError
+                      ? 'opacity-40 cursor-not-allowed pointer-events-none bg-gray-300 dark:bg-white/10 text-gray-500 dark:text-gray-400'
+                      : isDark
+                      ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black cursor-pointer active:scale-95'
+                      : 'bg-[#007b8b] hover:bg-[#00606d] text-white cursor-pointer active:scale-95'
                   }`}
                 >
                   {isSaving ? (

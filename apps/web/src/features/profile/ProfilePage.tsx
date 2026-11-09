@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   User,
@@ -18,6 +18,7 @@ import {
   Lock,
   CircleNotch,
   WarningCircle,
+  Camera,
 } from '@phosphor-icons/react'
 import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { useAuth } from '@/context/AuthContext'
@@ -52,6 +53,47 @@ export default function ProfilePage() {
   const [showNewPw, setShowNewPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [isAvatarDirty, setIsAvatarDirty] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
+    }
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
+    setNameError(null)
+    setPhoneError(null)
+  }, [user])
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('profile.avatar_type_error', { defaultValue: 'Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WebP...)' }))
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('profile.avatar_size_error', { defaultValue: 'Kích thước ảnh không được vượt quá 5MB' }))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      setAvatarPreview(dataUrl)
+      setIsAvatarDirty(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
 
   const handlePhoneChange = (val: string) => {
     setPhone(val)
@@ -78,8 +120,18 @@ export default function ProfilePage() {
     setTimeout(() => setCopiedEmail(false), 2000)
   }
 
+  const isDirty = Boolean(
+    user && (
+      name.trim() !== (user.name || '').trim() ||
+      (phone.trim() || '') !== (user.phone || '').trim() ||
+      isAvatarDirty
+    )
+  )
+
   const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault()
+    if (!isDirty || isSaving) return
+
     let hasError = false
     const cleanName = name.trim()
     if (!cleanName) {
@@ -102,10 +154,15 @@ export default function ProfilePage() {
     setIsSaving(true)
     try {
       const normalizedPhone = trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined
-      await updateProfile({
+      const payload: Parameters<typeof updateProfile>[0] = {
         name: cleanName,
         phone: normalizedPhone,
-      })
+      }
+      if (isAvatarDirty && avatarPreview) {
+        payload.avatar = avatarPreview
+      }
+      await updateProfile(payload)
+      setIsAvatarDirty(false)
       setPhoneError(null)
       toast.success(t('profile.save_success'))
     } catch (err: any) {
@@ -113,6 +170,17 @@ export default function ProfilePage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleCancel = () => {
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
+    }
+    setPhoneError(null)
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -197,10 +265,50 @@ export default function ProfilePage() {
             }`}
           >
             <div className="flex flex-col items-center text-center space-y-3">
-              <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-              </Avatar>
+              <div
+                className="relative group cursor-pointer shrink-0"
+                onClick={handleAvatarClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleAvatarClick()
+                  }
+                }}
+              >
+                <Avatar size="2xl" className="border-4 border-[#00c4de] shadow-md">
+                  <AvatarImage src={avatarPreview || user.avatar} alt={user.name} />
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                  <Camera size={26} weight="bold" />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAvatarClick()
+                  }}
+                  className={`absolute bottom-0 right-0 p-2 rounded-full border-2 shadow-md transition-colors cursor-pointer ${
+                    isDark
+                      ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black border-[#071317]'
+                      : 'bg-[#007b8b] hover:bg-[#00606d] text-white border-white'
+                  }`}
+                  title={t('profile.change_avatar', { defaultValue: 'Đổi ảnh đại diện' })}
+                  aria-label={t('profile.change_avatar', { defaultValue: 'Đổi ảnh đại diện' })}
+                >
+                  <Camera size={16} weight="bold" />
+                </button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
 
               <div className="space-y-1 w-full">
                 <h2 className="text-xl font-extrabold text-gray-900 dark:text-white break-words">
@@ -444,14 +552,31 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200 dark:border-white/10 flex justify-end">
+                <div className="pt-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={!isDirty || isSaving}
+                    onClick={handleCancel}
+                    className={`py-2.5 px-5 rounded-xl font-bold text-sm border transition-all ${
+                      !isDirty || isSaving
+                        ? 'opacity-40 cursor-not-allowed pointer-events-none border-gray-200 dark:border-white/10 text-gray-400'
+                        : isDark
+                        ? 'border-white/15 bg-white/5 hover:bg-white/10 text-gray-300 cursor-pointer'
+                        : 'border-gray-300 bg-white hover:bg-gray-100 text-gray-700 cursor-pointer'
+                    }`}
+                  >
+                    {t('profile.btn_cancel', { defaultValue: 'Hủy thay đổi' })}
+                  </button>
+
                   <button
                     type="submit"
-                    disabled={isSaving}
-                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isDark
-                        ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/20'
-                        : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20'
+                    disabled={!isDirty || isSaving || !!phoneError}
+                    className={`py-2.5 px-6 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 ${
+                      !isDirty || isSaving || !!phoneError
+                        ? 'opacity-40 cursor-not-allowed pointer-events-none bg-gray-300 dark:bg-white/10 text-gray-500 dark:text-gray-400 border border-transparent shadow-none'
+                        : isDark
+                        ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-[#00c4de]/20 cursor-pointer'
+                        : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-[#007b8b]/20 cursor-pointer'
                     }`}
                   >
                     {isSaving ? (

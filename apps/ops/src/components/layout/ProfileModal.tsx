@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react'
 import {
   User,
   Envelope,
@@ -11,6 +11,7 @@ import {
   X,
   CircleNotch,
   WarningCircle,
+  Camera,
 } from '@phosphor-icons/react'
 import { isValidVietnamPhone, normalizeVietnamPhone } from '@shared/types'
 import { Avatar, AvatarImage, AvatarFallback, getInitials } from '@shared/ui'
@@ -49,15 +50,47 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [showNewPw, setShowNewPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [isAvatarDirty, setIsAvatarDirty] = useState(false)
 
   useEffect(() => {
     if (user) {
       setName(user.name || '')
       setPhone(user.phone || '')
     }
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
     setNameError(null)
     setPhoneError(null)
   }, [user, isOpen])
+
+  const handleAvatarFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('profile.avatar_type_error', { defaultValue: 'Vui lòng chọn file hình ảnh hợp lệ (PNG, JPG, WebP...)' }))
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('profile.avatar_size_error', { defaultValue: 'Kích thước ảnh không được vượt quá 5MB' }))
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      setAvatarPreview(dataUrl)
+      setIsAvatarDirty(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
 
   useEffect(() => {
     if (!isOpen) return
@@ -123,14 +156,19 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setPhoneError(null)
     }
 
-    if (hasError) return
+    if (!isDirty || isSaving || hasError) return
 
     setIsSaving(true)
     try {
-      await updateProfile({
+      const payload: Parameters<typeof updateProfile>[0] = {
         fullName: trimmedName,
         phone: trimmedPhone ? normalizeVietnamPhone(trimmedPhone) : undefined,
-      })
+      }
+      if (isAvatarDirty && avatarPreview) {
+        payload.avatarUrl = avatarPreview
+      }
+      await updateProfile(payload)
+      setIsAvatarDirty(false)
       toast.success(t('profile.save_success', { defaultValue: 'Đã lưu thông tin tài khoản thành công!' }))
     } catch (err) {
       console.error('Failed to update ops profile:', err)
@@ -138,6 +176,26 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const isDirty = Boolean(
+    user && (
+      name.trim() !== (user.name || '').trim() ||
+      (phone.trim() || '') !== (user.phone || '').trim() ||
+      isAvatarDirty
+    )
+  )
+
+  const handleCancel = () => {
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
+    }
+    setAvatarPreview(null)
+    setIsAvatarDirty(false)
+    setNameError(null)
+    setPhoneError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleChangePassword = (e: FormEvent) => {
@@ -197,12 +255,50 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         <div className={`p-6 border-b ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-gray-100 bg-gray-50/70'}`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="shrink-0">
+              <div
+                className="shrink-0 relative group cursor-pointer"
+                onClick={handleAvatarClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleAvatarClick()
+                  }
+                }}
+              >
                 <Avatar size="xl" className="border-2 border-[#00c4de] shadow-md">
-                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarImage src={avatarPreview || user.avatar} alt={user.name} />
                   <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                  <Camera size={18} weight="bold" />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAvatarClick()
+                  }}
+                  className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 shadow-md transition-colors cursor-pointer ${
+                    isDark
+                      ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black border-[#071317]'
+                      : 'bg-[#007b8b] hover:bg-[#00606d] text-white border-white'
+                  }`}
+                  title={t('profile.change_avatar', { defaultValue: 'Đổi ảnh đại diện' })}
+                  aria-label={t('profile.change_avatar', { defaultValue: 'Đổi ảnh đại diện' })}
+                >
+                  <Camera size={13} weight="bold" />
+                </button>
               </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
 
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
@@ -501,6 +597,23 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             : 'border-gray-100 bg-gray-50/70'
         }`}>
           <div className="flex items-center gap-2.5">
+            {activeTab === 'info' && (
+              <button
+                type="button"
+                disabled={!isDirty || isSaving}
+                onClick={handleCancel}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-colors ${
+                  !isDirty || isSaving
+                    ? 'opacity-40 cursor-not-allowed pointer-events-none border-gray-200 dark:border-white/10 text-gray-400'
+                    : isDark
+                    ? 'border-white/15 text-gray-300 hover:bg-white/10 cursor-pointer'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 cursor-pointer'
+                }`}
+              >
+                {t('profile.btn_cancel', { defaultValue: 'Hủy thay đổi' })}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onClose}
@@ -517,8 +630,12 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <button
                 type="submit"
                 form="profile-form"
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold text-white dark:text-black bg-[#007b8b] hover:bg-[#00606d] dark:bg-[#00c4de] dark:hover:bg-[#38dbf1] shadow-sm shadow-[#007b8b]/20 dark:shadow-[#00c4de]/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!isDirty || isSaving || !!nameError || !!phoneError}
+                className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  !isDirty || isSaving || !!nameError || !!phoneError
+                    ? 'opacity-40 cursor-not-allowed pointer-events-none bg-gray-300 dark:bg-white/10 text-gray-500 dark:text-gray-400 border border-transparent shadow-none'
+                    : 'text-white dark:text-black bg-[#007b8b] hover:bg-[#00606d] dark:bg-[#00c4de] dark:hover:bg-[#38dbf1] shadow-sm shadow-[#007b8b]/20 dark:shadow-[#00c4de]/20 cursor-pointer'
+                }`}
               >
                 {isSaving && <CircleNotch size={14} className="animate-spin" />}
                 <span>

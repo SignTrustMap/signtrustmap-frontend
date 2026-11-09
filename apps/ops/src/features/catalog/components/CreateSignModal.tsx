@@ -39,6 +39,10 @@ function getPrefixForCatalogCategory(cat: CatalogCategory): string {
  * Modal dialog enabling Administrators to publish a new traffic sign specification
  * into the QCVN 41:2019 reference catalog with AI CLIP vector prompt and OSM tagging rules.
  */
+const DEFAULT_ALLOWED_VEHICLES: VehicleType[] = VEHICLE_TYPE_OPTIONS.map((v) => v.value).filter(
+  (v) => v !== 'PEDESTRIAN'
+)
+
 export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   isOpen,
   onClose,
@@ -61,7 +65,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   const [newDescriptionEn, setNewDescriptionEn] = useState('')
   const [newAiPrompt, setNewAiPrompt] = useState('')
   const [newOsmMapping, setNewOsmMapping] = useState('')
-  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>([])
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>(DEFAULT_ALLOWED_VEHICLES)
 
   // Representative Image state (Mandatory)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -85,7 +89,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
     setNewCategory('prohibitory')
     setNewShape('Circle')
     setNewColor('')
-    setAllowedVehicles([])
+    setAllowedVehicles(DEFAULT_ALLOWED_VEHICLES)
     setImageFile(null)
     setImageUrl('')
     setImagePreview('')

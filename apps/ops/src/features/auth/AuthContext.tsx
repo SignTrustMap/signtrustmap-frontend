@@ -11,6 +11,7 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const OPS_USER_STORAGE_KEY = 'stm_ops_user'
+const AVATAR_STORAGE_KEY_PREFIX = 'stm_avatar_'
 
 function computeInitials(name?: string, email?: string): string {
   if (name && name.trim()) {
@@ -35,6 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('stm_access_token')
       if (stored && token) {
         const parsed = JSON.parse(stored) as User
+        if (parsed && parsed.id) {
+          const cachedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + parsed.id)
+          if (cachedAvatar) {
+            parsed.avatar = cachedAvatar
+          }
+        }
         return {
           user: parsed,
           isLoading: false,
@@ -70,13 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(`FORBIDDEN_COMMUNITY_ROLE:${primaryRole}`)
       }
 
+      const cachedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + res.user.id)
       const authenticatedUser: User = {
         id: res.user.id,
         name: res.user.fullName || res.user.email.split('@')[0],
         email: res.user.email,
         phone: (res.user as any).phone || undefined,
         role: primaryRole,
-        avatar: (res.user as any).avatarUrl || undefined,
+        avatar: cachedAvatar || (res.user as any).avatarUrl || undefined,
         initials: computeInitials(res.user.fullName, res.user.email),
       }
 
@@ -109,14 +117,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = useCallback(async (data: UpdateProfilePayload) => {
     try {
-      const updated = await authService.updateMe(data)
+      if (data.avatarUrl) {
+        const currentId = state.user?.id || (localStorage.getItem(OPS_USER_STORAGE_KEY) ? JSON.parse(localStorage.getItem(OPS_USER_STORAGE_KEY)!).id : undefined)
+        if (currentId) {
+          try {
+            localStorage.setItem(AVATAR_STORAGE_KEY_PREFIX + currentId, data.avatarUrl)
+          } catch (e) {
+            console.warn('Failed to cache ops avatar in localStorage', e)
+          }
+        }
+      }
+
+      const safeAvatarUrl =
+        data.avatarUrl && data.avatarUrl.length <= 500 && !data.avatarUrl.startsWith('data:')
+          ? data.avatarUrl
+          : undefined
+
+      const backendPayload: UpdateProfilePayload = {
+        fullName: data.fullName,
+        phone: data.phone,
+        ...(safeAvatarUrl !== undefined ? { avatarUrl: safeAvatarUrl } : {}),
+      }
+
+      const updated = await authService.updateMe(backendPayload)
       setState((prev) => {
         if (!prev.user) return prev
+        const cachedAvatar = prev.user.id ? localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + prev.user.id) : null
         const newUser: User = {
           ...prev.user,
           name: updated.fullName || prev.user.name,
           phone: updated.phone || undefined,
-          avatar: updated.avatarUrl || prev.user.avatar,
+          avatar: data.avatarUrl || cachedAvatar || updated.avatarUrl || prev.user.avatar,
         }
         localStorage.setItem(OPS_USER_STORAGE_KEY, JSON.stringify(newUser))
         return { ...prev, user: newUser }
@@ -125,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to update ops profile:', err)
       throw err
     }
-  }, [])
+  }, [state.user?.id])
 
   useEffect(() => {
     async function restoreSession() {
@@ -144,13 +175,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return
         }
 
+        const cachedAvatar = profile.id ? localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + profile.id) : null
         const syncedUser: User = {
           id: profile.id,
           name: profile.fullName || profile.email.split('@')[0],
           email: profile.email,
           phone: profile.phone || undefined,
           role: primaryRole,
-          avatar: profile.avatarUrl || undefined,
+          avatar: cachedAvatar || profile.avatarUrl || undefined,
           initials: computeInitials(profile.fullName, profile.email),
         }
 

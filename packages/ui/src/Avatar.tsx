@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useState,
   useEffect,
   type HTMLAttributes,
@@ -11,6 +13,15 @@ export interface AvatarProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode
 }
 
+type ImageLoadingStatus = 'idle' | 'loading' | 'loaded' | 'error'
+
+interface AvatarContextValue {
+  status: ImageLoadingStatus
+  setStatus: (status: ImageLoadingStatus) => void
+}
+
+const AvatarContext = createContext<AvatarContextValue | null>(null)
+
 /**
  * Size mapping dictionary conforming to SignTrustMap Design System
  */
@@ -20,7 +31,7 @@ const sizeClasses: Record<NonNullable<AvatarProps['size']>, string> = {
   md: 'w-10 h-10 text-sm',
   lg: 'w-12 h-12 text-base',
   xl: 'w-16 h-16 text-xl',
-  '2xl': 'w-24 h-24 sm:w-28 sm:h-28 text-2xl sm:text-3xl',
+  '2xl': 'w-28 h-28 text-2xl',
 }
 
 /**
@@ -32,13 +43,17 @@ export function Avatar({
   children,
   ...props
 }: AvatarProps) {
+  const [status, setStatus] = useState<ImageLoadingStatus>('idle')
+
   return (
-    <div
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none aspect-square ${sizeClasses[size]} ${className}`}
-      {...props}
-    >
-      {children}
-    </div>
+    <AvatarContext.Provider value={{ status, setStatus }}>
+      <div
+        className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold select-none aspect-square ${sizeClasses[size]} ${className}`}
+        {...props}
+      >
+        {children}
+      </div>
+    </AvatarContext.Provider>
   )
 }
 
@@ -55,15 +70,32 @@ export function AvatarImage({
   className = '',
   onError,
   onLoad,
+  onStatusChange,
   ...props
 }: AvatarImageProps) {
-  const [hasError, setHasError] = useState(!src)
+  const context = useContext(AvatarContext)
 
   useEffect(() => {
-    setHasError(!src)
+    if (!src) {
+      context?.setStatus('error')
+      onStatusChange?.('error')
+      return
+    }
+
+    // Check if the image has already finished loading (cached)
+    const img = new Image()
+    img.src = src
+    if (img.complete && img.naturalWidth > 0) {
+      context?.setStatus('loaded')
+      onStatusChange?.('loaded')
+      return
+    }
+
+    context?.setStatus('loading')
+    onStatusChange?.('loading')
   }, [src])
 
-  if (hasError || !src) {
+  if (!src || context?.status === 'error') {
     return null
   }
 
@@ -72,14 +104,16 @@ export function AvatarImage({
       src={src}
       alt={alt}
       onError={(e) => {
-        setHasError(true)
+        context?.setStatus('error')
+        onStatusChange?.('error')
         onError?.(e)
       }}
       onLoad={(e) => {
-        setHasError(false)
+        context?.setStatus('loaded')
+        onStatusChange?.('loaded')
         onLoad?.(e)
       }}
-      className={`h-full w-full object-cover object-center ${className}`}
+      className={`absolute inset-0 h-full w-full object-cover object-center ${className}`}
       {...props}
     />
   )
@@ -97,6 +131,13 @@ export function AvatarFallback({
   children,
   ...props
 }: AvatarFallbackProps) {
+  const context = useContext(AvatarContext)
+
+  // When image loads successfully, do not render fallback to prevent overlapping/side-by-side flex issues
+  if (context && context.status === 'loaded') {
+    return null
+  }
+
   return (
     <div
       className={`flex h-full w-full items-center justify-center rounded-full bg-linear-to-tr from-[#007b8b]/20 to-[#00c4de]/25 text-[#007b8b] dark:text-[#00c4de] dark:bg-[#00c4de]/15 font-mono uppercase tracking-wider ${className}`}

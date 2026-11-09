@@ -481,7 +481,16 @@ export default function AdminEscalationsPage() {
         lng = Number(cand.longitude ?? cand.lng ?? raw.lng)
       }
       signName = raw.proposedName || raw.tempLabel || cand?.predictedSignType?.nameVi || cand?.predictedSignType?.nameEn
-      description = raw.description || raw.reporterNote || null
+      description =
+        raw.description ||
+        raw.reporterNote ||
+        raw.reporter_note ||
+        raw.note ||
+        raw.regulationNotes ||
+        raw.fieldNotes ||
+        raw.submission?.note ||
+        cand?.submission?.note ||
+        null
       rawStaffNote = raw.staffNotes || null
       reporterId = raw.reporterId || raw.reportedBy || null
       reviewedBy = raw.reviewedBy || selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
@@ -503,6 +512,16 @@ export default function AdminEscalationsPage() {
         lng = Number(cand.longitude)
       }
       locationAddress = raw.locationContext?.displayLocation || null
+      description =
+        raw.description ||
+        raw.reporterNote ||
+        raw.reporter_note ||
+        raw.note ||
+        raw.regulationNotes ||
+        raw.fieldNotes ||
+        raw.submission?.note ||
+        cand?.submission?.note ||
+        null
     } else if (isRevalidation) {
       const ev = raw.evidences?.[0]
       cropUrl = resolveImageUrl(ev?.media_url || ev?.mediaUrl)
