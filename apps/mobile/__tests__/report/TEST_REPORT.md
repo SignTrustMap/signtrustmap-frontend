@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-09 03:34:27 UTC  
+> **Generated:** 2026-11-09 04:02:51 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 3.47s  
+> **Execution Duration:** 5.97s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,8 +11,8 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 5 | 5 | 0 | 0 | 100.0% |
-| **Tests** | 34 | 34 | 0 | 0 | 100.0% |
+| **Test Suites** | 10 | 10 | 0 | 0 | 100.0% |
+| **Tests** | 99 | 99 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
@@ -269,9 +269,14 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/profile/edit-profile-avatar.test.tsx` | 7 / 7 | 2.13s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/profile-flow.test.tsx` | 11 / 11 | 0.54s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/sign-filter-manager.test.tsx` | 6 / 6 | 0.34s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/profile-routes.test.tsx` | 2 / 2 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/offline-map-service.test.ts` | 8 / 8 | 0.09s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 20 / 20 | 2.83s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 0.17s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 0.73s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 7 / 7 | 0.41s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/recheck-evidence-screen.test.tsx` | 4 / 4 | 0.46s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 7 / 7 | 0.37s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 7 / 7 | 0.29s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 0.23s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 35 / 35 | 0.14s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 3 / 3 | 0.10s | ✅ Pass |
 

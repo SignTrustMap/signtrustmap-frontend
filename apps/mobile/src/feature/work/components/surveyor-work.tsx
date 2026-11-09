@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { AppButton } from '@/components/button';
 import { Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
@@ -44,7 +43,9 @@ export function SurveyorWork({
 
   const isSurveyor = Boolean(session?.account?.roles?.includes('surveyor'));
 
-  const [deviceCoordinate, setDeviceCoordinate] = useState<MapCoordinate | undefined>(propUserCoordinate);
+  const [deviceCoordinate, setDeviceCoordinate] = useState<MapCoordinate | undefined>(
+    propUserCoordinate,
+  );
   const [gpsAttempted, setGpsAttempted] = useState(Boolean(propUserCoordinate));
 
   useEffect(() => {
@@ -85,9 +86,10 @@ export function SurveyorWork({
     Boolean(isSurveyor && (effectiveCoordinate || gpsAttempted)),
   );
 
-  const pendingSurveyCount = propPendingSurveyCount ?? (pendingData?.pending ?? 0);
-  const revalidationTaskCount = propRevalidationTaskCount ?? (surveyStats?.revalidationAvailable ?? 0);
-  const recapturesCount = propRecapturesCount ?? (recapturesData?.total ?? 0);
+  const pendingSurveyCount = propPendingSurveyCount ?? pendingData?.pending ?? 0;
+  const revalidationTaskCount =
+    propRevalidationTaskCount ?? surveyStats?.revalidationAvailable ?? 0;
+  const recapturesCount = propRecapturesCount ?? recapturesData?.total ?? 0;
   const firstRevalSign = propFirstRevalSign !== undefined ? propFirstRevalSign : firstRevalSignData;
 
   const handleOpenRevalidationMap = async () => {
@@ -194,14 +196,27 @@ export function SurveyorFab() {
   const theme = useTheme();
 
   return (
-    <AppButton
+    <Pressable
       accessibilityLabel="Tạo bản ghi khảo sát mới"
+      accessibilityRole="button"
+      hitSlop={8}
       onPress={() => router.push('/work/new-survey')}
-      pressedOpacity={0.75}
-      style={styles.floatingAction}
+      style={({ pressed }) => [
+        styles.floatingAction,
+        {
+          backgroundColor: theme.primary,
+          opacity: pressed ? 0.85 : 1,
+          transform: [{ scale: pressed ? 0.95 : 1 }],
+        },
+      ]}
     >
-      <MaterialCommunityIcons color={theme.onPrimary} name="plus" size={28} />
-    </AppButton>
+      <MaterialCommunityIcons
+        color={theme.onPrimary}
+        name="plus"
+        size={30}
+        style={styles.fabIcon}
+      />
+    </Pressable>
   );
 }
 
@@ -218,10 +233,16 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  fabIcon: {
+    textAlign: 'center',
+    alignSelf: 'center',
+    lineHeight: 30,
   },
 });

@@ -73,27 +73,30 @@ function PrimaryToWhiteGradient() {
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { logOut, session, setRoleEnabled, updateAccount } = useSession();
+  const { logOut, session, setRoleEnabled } = useSession();
   const theme = useTheme();
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const fetchProfile = useCallback(async () => {
     if (!session?.accessToken) return;
     try {
       const data = await getProfile(session.accessToken);
-      if (data) {
+      if (data && isMountedRef.current) {
         setProfile(data);
-        void updateAccount?.({
-          displayName: data.fullName,
-          avatarUrl: data.avatarUrl ?? null,
-          address: data.address ?? undefined,
-        });
       }
     } catch {
       // ignore
     }
-  }, [session?.accessToken, updateAccount]);
+  }, [session?.accessToken]);
 
   useScreenFocusEffect(
     useCallback(() => {
@@ -191,8 +194,13 @@ export function ProfileScreen() {
       {
         text: 'Đăng xuất',
         style: 'destructive',
-        onPress: () => {
-          void logOut();
+        onPress: async () => {
+          setIsMenuOpen(false);
+          try {
+            await logOut();
+          } finally {
+            router.replace('/(public)/login');
+          }
         },
       },
     ]);

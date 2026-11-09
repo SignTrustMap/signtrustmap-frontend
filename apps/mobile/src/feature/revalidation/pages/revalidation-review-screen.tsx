@@ -1000,7 +1000,7 @@ export function RevalidationReviewScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
-              <Text style={{ marginTop: Spacing.two, color: theme.placeholder }}>
+              <Text style={[styles.zoomHintText, { color: theme.placeholder }]}>
                 Nhấn để phóng to nếu chưa nhìn rõ biển báo
               </Text>
             </View>
@@ -1038,6 +1038,16 @@ export function RevalidationReviewScreen() {
 
                   {/* Distance & Timestamp Telemetry */}
                   <View style={styles.columnTelemetryList}>
+                    {currentItem.evidence.distanceMeters != null ? (
+                      <View style={styles.telemetryItem}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.telemetryText, { color: theme.placeholder }]}
+                        >
+                          Cách vị trí cũ {Math.round(currentItem.evidence.distanceMeters)}m
+                        </Text>
+                      </View>
+                    ) : null}
                     <View style={styles.telemetryItem}>
                       <Text
                         numberOfLines={1}
@@ -1474,8 +1484,8 @@ const styles = StyleSheet.create({
   },
   progressSection: {
     paddingHorizontal: Spacing.two,
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingTop: Spacing.one,
+    paddingBottom: Spacing.one,
   },
   progressTopRow: {
     flexDirection: 'row',
@@ -1515,7 +1525,8 @@ const styles = StyleSheet.create({
   },
   progressCounterRow: {
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: Spacing.one,
+    marginBottom: Spacing.two,
   },
   progressCounterText: {
     fontFamily: Fonts.body,
@@ -1527,14 +1538,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.one,
+    paddingBottom: Spacing.two,
   },
   cardArea: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: Spacing.one,
+    marginVertical: Spacing.two,
     position: 'relative',
+  },
+  zoomHintText: {
+    marginTop: Spacing.two,
+    marginBottom: Spacing.one,
+    fontSize: 11,
+    textAlign: 'center',
   },
   mainCard: {
     width: '88%',
@@ -1688,9 +1705,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginVertical: 4,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    marginVertical: Spacing.two,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -1701,7 +1718,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: Spacing.two,
   },
   comparisonColumn: {
     flex: 1,
@@ -1753,10 +1770,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: Spacing.one,
     borderRadius: 8,
     borderWidth: 1.2,
-    marginBottom: 10,
+    marginBottom: Spacing.two,
     alignSelf: 'stretch',
     overflow: 'hidden',
   },

@@ -184,7 +184,7 @@ describe('RevalidationReviewScreen', () => {
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
     expect(getByText('Cách vị trí cũ 12m')).toBeTruthy();
     expect(getByText('+10 Credits thưởng')).toBeTruthy();
-    expect(getByText('KẾT LUẬN: BÁO CÁO VẪN CÒN')).toBeTruthy();
+    expect(getByText('Biển báo vẫn còn hoạt động')).toBeTruthy();
   });
 
   it('triggers handleAgree when pressing Agree button', async () => {

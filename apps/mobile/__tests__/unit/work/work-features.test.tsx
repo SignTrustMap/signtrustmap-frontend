@@ -114,6 +114,7 @@ import { WorkMissionsSection } from '@/feature/work/components/work-missions-sec
 import { RecordedSignsScreen } from '@/feature/work/pages/recorded-signs-screen';
 import { RecapturesScreen } from '@/feature/work/pages/recaptures-screen';
 import { RecaptureCameraScreen } from '@/feature/work/pages/recapture-camera-screen';
+import { SurveyorFab } from '@/feature/work/components/surveyor-work';
 
 describe('Work Feature Components and Pages', () => {
   beforeEach(() => {
@@ -248,6 +249,19 @@ describe('Work Feature Components and Pages', () => {
         fireEvent.press(backBtn);
       });
       expect(mockBack).toHaveBeenCalled();
+    });
+  });
+
+  describe('SurveyorFab', () => {
+    it('renders centered plus button and navigates to /work/new-survey on press', async () => {
+      const { getByLabelText } = await render(<SurveyorFab />);
+      const fabBtn = getByLabelText('Tạo bản ghi khảo sát mới');
+      expect(fabBtn).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(fabBtn);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/work/new-survey');
     });
   });
 });
