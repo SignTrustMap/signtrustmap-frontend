@@ -1,6 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -16,6 +25,7 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
+import { TransactionList } from '../components/transaction-list';
 import {
   useGetWallet,
   useGetTopUpPackages,
@@ -57,6 +67,19 @@ export function TopUpScreen() {
 
   const isConfirming = isConfirmingPkg || isConfirmingCustom;
   const balance = walletData?.wallet?.balance ?? 0;
+
+  // 3 closest (most recent) credit consumptions
+  const recentConsumptionTransactions = useMemo(() => {
+    const all = walletData?.recentTransactions ?? [];
+    const consumptions = all.filter((t) => t.amount < 0);
+    const items = (consumptions.length > 0 ? consumptions : all).slice(0, 3);
+    return items.map((t) => ({
+      id: t.id,
+      title: t.description || t.transactionType,
+      amount: t.amount,
+      date: new Date(t.createdAt).toLocaleString('vi-VN'),
+    }));
+  }, [walletData?.recentTransactions]);
 
   // Resolved list of packages (uses BE data or standard defaults if DB has no rows)
   const displayPackages = useMemo(() => {
@@ -143,10 +166,42 @@ export function TopUpScreen() {
         {/* Current balance */}
         <View style={[styles.balancePanel, { backgroundColor: theme.backgroundSelected }]}>
           <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số điểm hiện tại</Text>
-          <Text style={[styles.balanceValue, { color: theme.text }]}>
-            {balance} <Text style={styles.balanceUnit}>Credits</Text>
-          </Text>
+          <View style={styles.balanceRow}>
+            <Text style={[styles.balanceValue, { color: theme.text }]}>
+              {balance}
+            </Text>
+            <Text style={[styles.balanceUnit, { color: theme.textSecondary }]}>Credits</Text>
+          </View>
         </View>
+
+        {/* Credit consumption history section */}
+        <View style={styles.historyHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Lịch sử tiêu dùng</Text>
+          <Pressable
+            accessibilityLabel="Xem tất cả hoạt động Credits"
+            accessibilityRole="button"
+            hitSlop={Spacing.one}
+            onPress={() => router.push('/credits/history')}
+            style={styles.viewAllPressable}
+          >
+            <Text style={[styles.viewAllText, { color: theme.primary }]}>Xem tất cả</Text>
+          </Pressable>
+        </View>
+
+        {recentConsumptionTransactions.length > 0 ? (
+          <TransactionList transactions={recentConsumptionTransactions} />
+        ) : (
+          <View
+            style={[
+              styles.emptyHistoryCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.emptyHistoryText, { color: theme.textSecondary }]}>
+              Chưa có lịch sử tiêu dùng
+            </Text>
+          </View>
+        )}
 
         {/* Package selection header */}
         <View style={styles.sectionHeaderRow}>
@@ -403,9 +458,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.one,
   },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
   balanceLabel: { fontFamily: Fonts.body, fontSize: 13, fontWeight: 700 },
   balanceValue: { fontFamily: Fonts.body, fontSize: 30, fontWeight: 900 },
   balanceUnit: { fontSize: 16, fontWeight: 700 },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.two,
+    marginBottom: Spacing.one,
+  },
+  viewAllPressable: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllText: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyHistoryCard: {
+    borderWidth: 1,
+    borderRadius: Rounded.lg,
+    padding: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHistoryText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',

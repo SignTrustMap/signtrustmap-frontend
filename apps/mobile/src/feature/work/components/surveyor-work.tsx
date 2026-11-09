@@ -45,21 +45,29 @@ export function SurveyorWork({
   const isSurveyor = Boolean(session?.account?.roles?.includes('surveyor'));
 
   const [deviceCoordinate, setDeviceCoordinate] = useState<MapCoordinate | undefined>(propUserCoordinate);
+  const [gpsAttempted, setGpsAttempted] = useState(Boolean(propUserCoordinate));
 
   useEffect(() => {
     if (propUserCoordinate) {
       setDeviceCoordinate(propUserCoordinate);
+      setGpsAttempted(true);
       return;
     }
 
     if (!isSurveyor) return;
 
     let isMounted = true;
-    void fetchFreshGpsPosition(3500).then((pos) => {
-      if (isMounted && pos) {
-        setDeviceCoordinate(pos);
-      }
-    });
+    void fetchFreshGpsPosition(3500)
+      .then((pos) => {
+        if (isMounted && pos) {
+          setDeviceCoordinate(pos);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setGpsAttempted(true);
+        }
+      });
 
     return () => {
       isMounted = false;
@@ -72,7 +80,10 @@ export function SurveyorWork({
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyor);
   const { data: surveyStats } = useGetMySurveyStats(isSurveyor);
   const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyor);
-  const { data: firstRevalSignData } = useGetFirstRevalidationSign(effectiveCoordinate, isSurveyor);
+  const { data: firstRevalSignData } = useGetFirstRevalidationSign(
+    effectiveCoordinate,
+    Boolean(isSurveyor && (effectiveCoordinate || gpsAttempted)),
+  );
 
   const pendingSurveyCount = propPendingSurveyCount ?? (pendingData?.pending ?? 0);
   const revalidationTaskCount = propRevalidationTaskCount ?? (surveyStats?.revalidationAvailable ?? 0);

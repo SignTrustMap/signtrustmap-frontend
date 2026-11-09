@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   LayoutAnimation,
@@ -23,6 +23,7 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
 import { formatFreshnessScore } from '@/utils/freshness';
+import { REVALIDATION_STATUS_LABELS } from '@/constants/revalidation';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { ImageInspectionModal } from '@/components/image-inspection-modal';
@@ -181,7 +182,7 @@ export function RevalidationSignDetailsCard({
     };
   } else {
     statusConfig = {
-      label: 'Cần tái thẩm định',
+      label: REVALIDATION_STATUS_LABELS.NEEDS_REVALIDATION,
       bg: '#FFF1F2',
       border: '#FDA4AF',
       text: '#BE123C',
@@ -258,7 +259,6 @@ export function RevalidationSignDetailsCard({
             </Text>
 
             <View style={styles.compactMetaRow}>
-              <View style={[styles.freshnessMiniDot, { backgroundColor: freshnessColor }]} />
               <Text style={[styles.compactFreshnessText, { color: theme.grey }]}>
                 Độ mới:{' '}
                 <Text style={{ color: freshnessColor, fontWeight: '700' }}>
@@ -385,11 +385,17 @@ export function RevalidationSignDetailsCard({
                 <Text style={[styles.evidenceBoxLabel, { color: theme.text }]}>BIỂN BÁO CHUẨN</Text>
                 <View style={styles.evidenceImageFrame}>
                   {sign.imageUrl ? (
-                    <Image
-                      contentFit="contain"
-                      source={{ uri: sign.imageUrl }}
-                      style={styles.standardImg}
-                    />
+                    <Pressable
+                      accessibilityLabel="Inspect official standard sign"
+                      accessibilityRole="button"
+                      onPress={() => setInspectPhotoUrl(sign.imageUrl || null)}
+                    >
+                      <Image
+                        contentFit="contain"
+                        source={{ uri: sign.imageUrl }}
+                        style={styles.standardImg}
+                      />
+                    </Pressable>
                   ) : (
                     <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={20} />
                   )}
@@ -481,17 +487,6 @@ export function RevalidationSignDetailsCard({
                       : 'Hãy là khảo sát viên đầu tiên kiểm tra vị trí này để nhận thưởng'}
                 </Text>
               </View>
-            </View>
-            <View style={{ marginTop: Spacing.two }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: theme.placeholder,
-                }}
-              >
-                Lưu ý: Bạn sẽ không nhận được credits cho các biển báo đã được thẩm định chính xác
-                trước đó.
-              </Text>
             </View>
           </View>
 

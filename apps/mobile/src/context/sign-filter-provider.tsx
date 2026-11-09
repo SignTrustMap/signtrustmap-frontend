@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -28,6 +29,45 @@ import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spat
 import { queryClient } from '@/api/query-client';
 
 export const SIGN_FILTER_STORAGE_KEY = 'stm_sign_filter_presets_v1';
+
+export function parseRouteCategories(rawCategories: unknown): SignCategory[] {
+  if (!rawCategories) {
+    return ['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION'];
+  }
+
+  let rawList: unknown[] = [];
+  if (Array.isArray(rawCategories)) {
+    rawList = rawCategories;
+  } else if (typeof rawCategories === 'string') {
+    const trimmed = rawCategories.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          rawList = parsed;
+        }
+      } catch {
+        rawList = trimmed.replace(/^\[|\]$/g, '').split(',');
+      }
+    } else if (trimmed.length > 0) {
+      rawList = trimmed.split(',');
+    }
+  }
+
+  const mapped = rawList
+    .map((item) => {
+      if (typeof item === 'string') return codeToCategory(item);
+      if (item && typeof item === 'object' && 'code' in item && typeof (item as any).code === 'string') {
+        return codeToCategory((item as any).code);
+      }
+      return null;
+    })
+    .filter((cat): cat is SignCategory => Boolean(cat));
+
+  return mapped.length > 0
+    ? mapped
+    : ['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION'];
+}
 
 export type SignFilterPreset = {
   id: string;
@@ -107,29 +147,44 @@ export function SignFilterProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const inFlightRef = useRef(false);
+
   const loadSavedRoutesFromBackend = useCallback(async () => {
-    if (!accessToken) {
+    if (!accessToken || inFlightRef.current) {
       return;
     }
 
+    inFlightRef.current = true;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       setIsLoading(true);
-      const routes = await getSavedRoutes(undefined, accessToken);
+      const routesResponse = await getSavedRoutes(undefined, accessToken);
+      const routes = Array.isArray(routesResponse)
+        ? routesResponse
+        : Array.isArray((routesResponse as any)?.data)
+        ? ((routesResponse as any).data as SavedRoute[])
+        : Array.isArray((routesResponse as any)?.routes)
+        ? ((routesResponse as any).routes as SavedRoute[])
+        : [];
+
       const mapped: SignFilterPreset[] = routes.map((sr) => ({
         id: sr.id,
-        name: sr.title,
-        categories:
-          sr.filterRules?.categories && sr.filterRules.categories.length > 0
-            ? sr.filterRules.categories.map(codeToCategory)
-            : ['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION'],
+        name: sr.title || (sr as any).name || `${sr.originName || 'Xuất phát'} ➔ ${sr.destinationName || 'Điểm đến'}`,
+        categories: parseRouteCategories(sr.filterRules?.categories),
         onlyFixedSigns: sr.filterRules?.onlyFixedSigns !== false,
-        createdAt: new Date(sr.createdAt).getTime(),
+        createdAt: sr.createdAt ? new Date(sr.createdAt).getTime() : Date.now(),
         savedRoute: sr,
       }));
       setPresets(mapped);
-    } catch (err) {
-      console.error('Failed to load saved routes from backend:', err);
+    } catch (err: any) {
+      if (!controller.signal.aborted) {
+        console.error('Failed to load saved routes from backend:', err);
+      }
     } finally {
+      clearTimeout(timeoutId);
+      inFlightRef.current = false;
       setIsLoading(false);
     }
   }, [accessToken]);

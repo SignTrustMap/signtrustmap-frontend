@@ -1,9 +1,11 @@
+import { REVALIDATION_STATUS_LABELS } from '@/constants/revalidation';
+
 /**
  * Utility functions for formatting sign freshness scores into descriptive status ranges:
  * - 80 - 100: "Vừa được xác thực" (Xanh lá / Green: #10B981)
  * - 50 - 79:  "Cần chú ý" (Vàng / Yellow: #EAB308)
  * - 20 - 49:  "Cần chú ý" (Đỏ / Red: #EF4444)
- * - 0 - 19:   "Đã lâu chưa xác thực" (Xám / Slate: #6B7280)
+ * - 0 - 19:   "Cần tái thẩm định" (Xám / Slate: #6B7280)
  */
 
 export type FreshnessRangeKey = '80_100' | '50_79' | '20_49' | '0_19';
@@ -37,7 +39,7 @@ export function formatFreshnessScore(
   if (status?.toUpperCase() === 'RETIRED') {
     return {
       scorePercent: 0,
-      label: 'Đã lâu chưa xác thực',
+      label: REVALIDATION_STATUS_LABELS.NEEDS_REVALIDATION,
       color: '#6B7280',
       range: '0_19',
       rangeLabel: '0 - 19',
@@ -70,7 +72,7 @@ export function formatFreshnessScore(
   if (clampedScore >= 80) {
     return {
       scorePercent: clampedScore,
-      label: 'Vừa được xác thực',
+      label: REVALIDATION_STATUS_LABELS.FRESH,
       color: '#10B981', // Xanh lá
       range: '80_100',
       rangeLabel: '80 - 100',
@@ -87,7 +89,7 @@ export function formatFreshnessScore(
   if (clampedScore >= 50) {
     return {
       scorePercent: clampedScore,
-      label: 'Cần chú ý',
+      label: REVALIDATION_STATUS_LABELS.ATTENTION_YELLOW,
       color: '#EAB308', // Màu vàng
       range: '50_79',
       rangeLabel: '50 - 79',
@@ -104,7 +106,7 @@ export function formatFreshnessScore(
   if (clampedScore >= 20) {
     return {
       scorePercent: clampedScore,
-      label: 'Cần chú ý',
+      label: REVALIDATION_STATUS_LABELS.ATTENTION_RED,
       color: '#EF4444', // Màu đỏ
       range: '20_49',
       rangeLabel: '20 - 49',
@@ -120,7 +122,7 @@ export function formatFreshnessScore(
 
   return {
     scorePercent: clampedScore,
-    label: 'Đã lâu chưa xác thực',
+    label: REVALIDATION_STATUS_LABELS.NEEDS_REVALIDATION,
     color: '#6B7280', // Xám / Muted
     range: '0_19',
     rangeLabel: '0 - 19',

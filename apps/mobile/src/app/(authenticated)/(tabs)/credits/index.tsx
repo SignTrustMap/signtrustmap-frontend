@@ -1,5 +1,5 @@
-import { CreditsOverviewScreen } from '@/feature/credits/pages/credits-overview-screen';
+import { TopUpScreen } from '@/feature/credits/pages/top-up-screen';
 
 export default function CreditsRoute() {
-  return <CreditsOverviewScreen />;
+  return <TopUpScreen />;
 }

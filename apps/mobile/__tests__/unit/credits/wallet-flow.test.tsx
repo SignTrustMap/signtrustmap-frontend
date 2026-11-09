@@ -132,14 +132,13 @@ describe('Wallet & Credits Flow Unit Test Suite', () => {
   // =========================================================================
   // 1. CreditsOverviewScreen
   // =========================================================================
-  describe('1. CreditsOverviewScreen', () => {
-    it('renders current credit balance and active wallet status', async () => {
-      const { getByText } = await render(<CreditsOverviewScreen />);
+  describe('1. Credits Screen', () => {
+    it('renders current credit balance', async () => {
+      const { getByText, getAllByText } = await render(<CreditsOverviewScreen />);
 
       expect(getByText('Số điểm hiện tại')).toBeTruthy();
       expect(getByText('1250')).toBeTruthy();
-      expect(getByText('Credits')).toBeTruthy();
-      expect(getByText('Đang hoạt động')).toBeTruthy();
+      expect(getAllByText('Credits').length).toBeGreaterThanOrEqual(1);
     });
 
     it('renders recent transactions list', async () => {
@@ -156,11 +155,11 @@ describe('Wallet & Credits Flow Unit Test Suite', () => {
       expect(mockPush).toHaveBeenCalledWith('/credits/history');
     });
 
-    it('navigates to top up screen when pressing "＋  Nạp Credits"', async () => {
-      const { getByText } = await render(<CreditsOverviewScreen />);
+    it('navigates to custom amount screen when pressing "Nhập số lượng tùy chỉnh"', async () => {
+      const { getByLabelText } = await render(<CreditsOverviewScreen />);
 
-      fireEvent.press(getByText('＋  Nạp Credits'));
-      expect(mockPush).toHaveBeenCalledWith('/credits/top-up');
+      fireEvent.press(getByLabelText('Nhập số lượng Credits tùy chỉnh'));
+      expect(mockPush).toHaveBeenCalledWith('/credits/custom-amount');
     });
   });
 

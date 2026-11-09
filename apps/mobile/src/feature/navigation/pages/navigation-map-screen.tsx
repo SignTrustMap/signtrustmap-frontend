@@ -118,6 +118,7 @@ export function NavigationMapScreen() {
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
   );
+  const lastAppliedSavedRouteIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (paramSavedRouteId) {
@@ -570,18 +571,23 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (savedRouteData && !isNavigating) {
-      const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
-      if (modeUpper === "CYCLING" || modeUpper === "BICYCLE") {
-        setVehicleMode("CYCLING");
-      } else if (modeUpper === "WALKING" || modeUpper === "PEDESTRIAN") {
-        setVehicleMode("WALKING");
-      } else if (modeUpper === "MOTORCYCLE" || modeUpper === "BIKE") {
-        setVehicleMode("MOTORCYCLE");
-      } else {
-        setVehicleMode("DRIVING");
+      if (lastAppliedSavedRouteIdRef.current !== savedRouteData.id) {
+        lastAppliedSavedRouteIdRef.current = savedRouteData.id;
+        const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
+        if (modeUpper === "CYCLING" || modeUpper === "BICYCLE") {
+          setVehicleMode("CYCLING");
+        } else if (modeUpper === "WALKING" || modeUpper === "PEDESTRIAN") {
+          setVehicleMode("WALKING");
+        } else if (modeUpper === "MOTORCYCLE" || modeUpper === "BIKE") {
+          setVehicleMode("MOTORCYCLE");
+        } else {
+          setVehicleMode("DRIVING");
+        }
+        void setActivePresetId(savedRouteData.id);
+        snapTo(1);
       }
-      void setActivePresetId(savedRouteData.id);
-      snapTo(1);
+    } else if (!savedRouteData) {
+      lastAppliedSavedRouteIdRef.current = null;
     }
   }, [savedRouteData, isNavigating, setActivePresetId, snapTo]);
 
@@ -710,6 +716,12 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (activePresetId && plannedRouteOrigin && selectedDestination) {
+      if (activeSavedRouteId && activePresetId === activeSavedRouteId) {
+        return;
+      }
+      if (savedRouteData && activePresetId === savedRouteData.id) {
+        return;
+      }
       const isMatching = routeMatchingPresets.some((p) => p.id === activePresetId);
       if (!isMatching) {
         void setActivePresetId(null);
@@ -717,6 +729,8 @@ export function NavigationMapScreen() {
     }
   }, [
     activePresetId,
+    activeSavedRouteId,
+    savedRouteData,
     plannedRouteOrigin,
     selectedDestination,
     routeMatchingPresets,

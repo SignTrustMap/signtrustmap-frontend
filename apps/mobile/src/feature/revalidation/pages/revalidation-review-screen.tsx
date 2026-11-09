@@ -1043,16 +1043,6 @@ export function RevalidationReviewScreen() {
                         numberOfLines={1}
                         style={[styles.telemetryText, { color: theme.placeholder }]}
                       >
-                        {currentItem.evidence.distanceMeters != null
-                          ? `Cách vị trí cũ ${currentItem.evidence.distanceMeters}m`
-                          : 'Đã xác minh vị trí'}
-                      </Text>
-                    </View>
-                    <View style={styles.telemetryItem}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.telemetryText, { color: theme.placeholder }]}
-                      >
                         Thời gian chụp: {formatDate(currentItem.evidence.submittedAt)}
                       </Text>
                     </View>
@@ -1141,10 +1131,10 @@ export function RevalidationReviewScreen() {
                   ]}
                 >
                   {currentItem.evidence.evidenceType === 'REMOVED'
-                    ? 'KẾT LUẬN: BÁO CÁO ĐÃ GỠ'
+                    ? 'Biển báo đã gỡ bỏ'
                     : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'KẾT LUẬN: BÁO CÁO ĐÃ ĐỔI'
-                      : 'KẾT LUẬN: BÁO CÁO VẪN CÒN'}
+                      ? 'Biển báo đã thay đổi'
+                      : 'Biển báo vẫn còn hoạt động'}
                 </Text>
               </View>
 

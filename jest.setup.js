@@ -98,3 +98,17 @@ jest.mock('@/services/offline-map-service', () => ({
   },
   formatBytes: (bytes) => `${bytes} B`,
 }));
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: (props) => React.createElement(View, { testID: 'mock-datetimepicker', ...props }),
+    DateTimePickerAndroid: {
+      open: jest.fn(),
+      dismiss: jest.fn(),
+    },
+  };
+});
+

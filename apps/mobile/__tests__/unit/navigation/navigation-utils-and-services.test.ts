@@ -346,7 +346,7 @@ describe('Navigation Utils, Services, and Hooks', () => {
       await act(async () => {
         await savePlace.current.mutateAsync({ id: 'p-1', name: 'Market' } as any);
       });
-      expect(savePlace.current.isSuccess).toBe(true);
+      await waitFor(() => expect(savePlace.current.isSuccess).toBe(true));
     });
   });
 

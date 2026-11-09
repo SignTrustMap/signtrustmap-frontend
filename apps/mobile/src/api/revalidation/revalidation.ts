@@ -148,7 +148,10 @@ export async function getRevalidationTasksInBounds(
     if (res?.items && Array.isArray(res.items) && res.items.length > 0) {
       return res.items.map(toRevalidationTaskItem);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (signal?.aborted || err?.name === 'AbortError' || String(err).includes('canceled') || String(err).includes('aborted')) {
+      return [];
+    }
     console.warn('getRevalidationTasksInBounds failed or returned empty:', err);
   }
 

@@ -34,6 +34,17 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: jest.fn(),
   }),
+  useQuery: () => ({
+    data: null,
+    isLoading: false,
+  }),
+}));
+
+jest.mock('@/feature/upload/hooks/use-reverse-geocode', () => ({
+  useReverseGeocode: () => ({
+    data: null,
+    isLoading: false,
+  }),
 }));
 
 jest.mock('@/context/session-provider', () => ({
@@ -103,11 +114,11 @@ describe('InspectRevalidateScreen', () => {
   });
 
   it('renders target sign metadata, code, freshness score and road address', async () => {
-    const { getByText } = await render(<InspectRevalidateScreen />);
+    const { getByText, getAllByText } = await render(<InspectRevalidateScreen />);
 
     expect(getByText('P.102')).toBeTruthy();
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
-    expect(getByText('Đường Nguyễn Huệ, Quận 1')).toBeTruthy();
+    expect(getAllByText('Đường Nguyễn Huệ, Quận 1').length).toBeGreaterThanOrEqual(1);
   });
 
   it('navigates back to revalidation map with snap coordinates on header back press', async () => {
@@ -163,7 +174,7 @@ describe('InspectRevalidateScreen', () => {
   });
 
   it('fetches fresh GPS position when user requests current location stamp', async () => {
-    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.7010, 10.7770]);
+    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.701, 10.777]);
 
     const { getByLabelText } = await render(<InspectRevalidateScreen />);
 
@@ -184,7 +195,7 @@ describe('InspectRevalidateScreen', () => {
 
   it('displays proximity distance and prevents submit when location is too far (> 50m)', async () => {
     // 10.7900, 106.7009 is ~1.4km away (> 50m)
-    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.7009, 10.7900]);
+    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.7009, 10.79]);
 
     const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
 
@@ -194,8 +205,10 @@ describe('InspectRevalidateScreen', () => {
     });
 
     await waitFor(() => {
-      expect(getByText(/Cách biển báo mục tiêu/i)).toBeTruthy();
-      expect(getByText(/Tối đa cho phép 50m/i)).toBeTruthy();
+      expect(getByText(/Cách vị trí biển báo cũ/i)).toBeTruthy();
+      const alertMsg = getByText(/Tối đa cho phép 50m/i);
+      expect(alertMsg).toBeTruthy();
+      expect(alertMsg.props.accessibilityRole).toBe('alert');
     });
   });
 });

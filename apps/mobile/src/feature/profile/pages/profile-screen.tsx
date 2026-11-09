@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
@@ -17,9 +17,20 @@ import {
 } from '@/context/session-provider';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { useTheme } from '@/hooks/use-theme';
-import { getProfile } from '@/api/auth/auth';
+import { getProfile, type UserProfileResponse } from '@/api/auth/auth';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const roleMap: Record<string, AccountRole> = {
+  DRIVER: 'driver',
+  REVIEWER: 'reviewer',
+  SURVEYOR: 'surveyor',
+  driver: 'driver',
+  reviewer: 'reviewer',
+  surveyor: 'surveyor',
+};
+
+const useScreenFocusEffect = typeof useFocusEffect === 'function' ? useFocusEffect : useEffect;
 
 const roleLabels: Record<AccountRole, string> = {
   driver: 'Tài xế',
@@ -63,38 +74,32 @@ function PrimaryToWhiteGradient() {
 export function ProfileScreen() {
   const router = useRouter();
   const { logOut, session, setRoleEnabled, updateAccount } = useSession();
-  console.log('ProfileScreen session:', session);
   const theme = useTheme();
 
-  useEffect(() => {
-    let isMounted = true;
-    if (session?.accessToken) {
-      getProfile(session.accessToken)
-        .then((profile) => {
-          if (!isMounted || !profile) return;
-          const hasDifferentAvatar =
-            profile.avatarUrl !== undefined &&
-            profile.avatarUrl !== null &&
-            profile.avatarUrl !== session.account.avatarUrl;
-          const hasDifferentName =
-            profile.fullName && profile.fullName !== session.account.displayName;
-          const hasDifferentAddress =
-            profile.address !== undefined && profile.address !== session.account.address;
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
 
-          if (hasDifferentAvatar || hasDifferentName || hasDifferentAddress) {
-            void updateAccount?.({
-              ...(hasDifferentAvatar ? { avatarUrl: profile.avatarUrl } : {}),
-              ...(hasDifferentName ? { displayName: profile.fullName } : {}),
-              ...(hasDifferentAddress ? { address: profile.address } : {}),
-            });
-          }
-        })
-        .catch(() => {});
+  const fetchProfile = useCallback(async () => {
+    if (!session?.accessToken) return;
+    try {
+      const data = await getProfile(session.accessToken);
+      if (data) {
+        setProfile(data);
+        void updateAccount?.({
+          displayName: data.fullName,
+          avatarUrl: data.avatarUrl ?? null,
+          address: data.address ?? undefined,
+        });
+      }
+    } catch {
+      // ignore
     }
-    return () => {
-      isMounted = false;
-    };
-  }, [session?.accessToken]);
+  }, [session?.accessToken, updateAccount]);
+
+  useScreenFocusEffect(
+    useCallback(() => {
+      void fetchProfile();
+    }, [fetchProfile])
+  );
   const { scrollTo, t } = useLocalSearchParams<{ scrollTo?: string; t?: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
   const signFilterRef = useRef<View>(null);
@@ -148,9 +153,21 @@ export function ProfileScreen() {
     status,
   } = useAppUpdate();
 
-  const displayName = session?.account.displayName ?? 'Người dùng SignTrustMap';
-  const email = session?.account.email ?? '';
-  const activeRolesCount = session?.account.roles?.length ?? 1;
+  const displayName = profile?.fullName ?? session?.account.displayName ?? 'Người dùng SignTrustMap';
+  const email = profile?.email ?? session?.account.email ?? '';
+  const avatarUrl = profile?.avatarUrl !== undefined ? profile.avatarUrl : (session?.account.avatarUrl ?? null);
+
+  const rawRoles = profile?.roles ?? session?.account.roles ?? ['driver'];
+  const userRoles: AccountRole[] = rawRoles
+    .map((r) => roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole))
+    .filter((r): r is AccountRole => Boolean(roleLabels[r]));
+  const effectiveRoles = userRoles.includes('driver') ? userRoles : ['driver', ...userRoles];
+  const activeRolesCount = effectiveRoles.length;
+
+  const handleToggleRole = async (role: OptionalAccountRole, nextEnabled: boolean) => {
+    await setRoleEnabled(role, nextEnabled);
+    void fetchProfile();
+  };
 
   const handleEditPress = () => {
     router.push('/(authenticated)/(tabs)/profile/edit');
@@ -220,10 +237,10 @@ export function ProfileScreen() {
                 accessibilityLabel={`Ảnh đại diện của ${displayName}`}
                 style={[styles.avatar, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }]}
               >
-                {session?.account.avatarUrl ? (
+                {avatarUrl ? (
                   <Image
                     resizeMode="cover"
-                    source={{ uri: session.account.avatarUrl }}
+                    source={{ uri: avatarUrl }}
                     style={styles.avatarImage}
                   />
                 ) : (
@@ -344,7 +361,7 @@ export function ProfileScreen() {
 
                 <View style={styles.roleList}>
                   {ACCOUNT_ROLES.map((role) => {
-                    const isEnabled = session?.account.roles.includes(role) ?? role === 'driver';
+                    const isEnabled = effectiveRoles.includes(role);
 
                     const rowContent = (
                       <>
@@ -402,7 +419,7 @@ export function ProfileScreen() {
                         accessibilityRole="switch"
                         accessibilityState={{ checked: isEnabled }}
                         key={role}
-                        onPress={() => setRoleEnabled(role as OptionalAccountRole, !isEnabled)}
+                        onPress={() => void handleToggleRole(role as OptionalAccountRole, !isEnabled)}
                         style={[styles.roleRow, { borderColor: theme.border }]}
                         variant="ghost"
                       >

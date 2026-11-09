@@ -88,8 +88,8 @@ describe('Credit Routes and CreditFlowState Component', () => {
 
     it('renders index.tsx', async () => {
       const { getByTestId, getByText } = await render(<CreditsRoute />);
-      expect(getByTestId('credits-overview-screen')).toBeTruthy();
-      expect(getByText('Credits Overview Screen')).toBeTruthy();
+      expect(getByTestId('top-up-screen')).toBeTruthy();
+      expect(getByText('Top Up Screen')).toBeTruthy();
     });
 
     it('renders top-up.tsx', async () => {
