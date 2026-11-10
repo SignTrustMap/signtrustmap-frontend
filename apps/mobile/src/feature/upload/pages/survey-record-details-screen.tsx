@@ -189,6 +189,7 @@ export function SurveyRecordDetailsScreen() {
   const {
     submissionId,
     batchSubmissionIds,
+    assetsJson,
     imageUri: paramImageUri,
     imageName: paramImageName,
     imageMimeType: paramImageMimeType,
@@ -205,6 +206,7 @@ export function SurveyRecordDetailsScreen() {
   } = useLocalSearchParams<{
     submissionId?: string;
     batchSubmissionIds?: string;
+    assetsJson?: string;
     imageUri?: string;
     imageName?: string;
     imageMimeType?: string;
@@ -219,6 +221,56 @@ export function SurveyRecordDetailsScreen() {
     assetId?: string;
     capturedAt?: string;
   }>();
+
+  type LocalBatchAsset = {
+    uri: string;
+    fileName?: string;
+    mimeType?: string;
+    type?: string;
+    capturedAt?: string;
+    gps?: { latitude: number; longitude: number } | null;
+    duration?: number;
+    assetId?: string;
+  };
+
+  const parsedAssets = useMemo<LocalBatchAsset[]>(() => {
+    if (assetsJson) {
+      try {
+        const parsed = JSON.parse(assetsJson);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    if (paramImageUri) {
+      const lat = paramLatitude ? Number(paramLatitude) : startLat ? Number(startLat) : undefined;
+      const lon = paramLongitude ? Number(paramLongitude) : startLon ? Number(startLon) : undefined;
+      return [
+        {
+          uri: paramImageUri,
+          fileName: paramImageName,
+          mimeType: paramImageMimeType,
+          type: paramImageType,
+          capturedAt: paramCapturedAt,
+          gps: lat != null && lon != null ? { latitude: lat, longitude: lon } : null,
+          duration: duration ? Number(duration) : undefined,
+          assetId,
+        },
+      ];
+    }
+    return [];
+  }, [
+    assetsJson,
+    paramImageUri,
+    paramImageName,
+    paramImageMimeType,
+    paramImageType,
+    paramLatitude,
+    paramLongitude,
+    startLat,
+    startLon,
+    paramCapturedAt,
+    duration,
+    assetId,
+  ]);
 
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | undefined>(submissionId);
 
@@ -238,22 +290,75 @@ export function SurveyRecordDetailsScreen() {
         .filter(Boolean);
       if (ids.length > 0) return ids;
     }
-    return submissionId ? [submissionId] : [];
-  }, [batchSubmissionIds, submissionId]);
+    if (submissionId) return [submissionId];
+    if (parsedAssets.length > 0) {
+      return parsedAssets.map((_, i) => `local-${i}`);
+    }
+    return [];
+  }, [batchSubmissionIds, submissionId, parsedAssets]);
+
+  const [activeBatchIndex, setActiveBatchIndex] = useState(0);
 
   const currentBatchIndex = useMemo(() => {
-    if (!currentDraftId) return 0;
-    const idx = batchIds.indexOf(currentDraftId);
-    return idx >= 0 ? idx : 0;
-  }, [currentDraftId, batchIds]);
+    if (currentDraftId && batchIds.length > 0) {
+      const idx = batchIds.indexOf(currentDraftId);
+      if (idx >= 0) return idx;
+    }
+    return activeBatchIndex >= 0 && activeBatchIndex < batchIds.length ? activeBatchIndex : 0;
+  }, [currentDraftId, batchIds, activeBatchIndex]);
 
   const [batchDrafts, setBatchDrafts] = useState<{ id: string; uri?: string; fileName?: string }[]>(
-    [],
+    () => {
+      if (parsedAssets.length > 0) {
+        return parsedAssets.map((asset, idx) => ({
+          id: batchIds[idx] ?? `local-${idx}`,
+          uri: asset.uri,
+          fileName: asset.fileName,
+        }));
+      }
+      return [];
+    },
   );
-  const [batchCoords, setBatchCoords] = useState<Record<string, MapCoordinate | undefined>>({});
+
+  const parsedStartLatInit = startLat
+    ? Number(startLat)
+    : paramLatitude
+      ? Number(paramLatitude)
+      : Number.NaN;
+  const parsedStartLonInit = startLon
+    ? Number(startLon)
+    : paramLongitude
+      ? Number(paramLongitude)
+      : Number.NaN;
+  const initialCoordFallback: MapCoordinate | undefined = isValidCoordinate([
+    parsedStartLonInit,
+    parsedStartLatInit,
+  ])
+    ? [parsedStartLonInit, parsedStartLatInit]
+    : undefined;
+
+  const [batchCoords, setBatchCoords] = useState<Record<string, MapCoordinate | undefined>>(() => {
+    const initial: Record<string, MapCoordinate | undefined> = {};
+    if (parsedAssets.length > 0) {
+      parsedAssets.forEach((asset, idx) => {
+        const id = batchIds[idx] ?? `local-${idx}`;
+        if (asset.gps && isValidCoordinate([asset.gps.longitude, asset.gps.latitude])) {
+          initial[id] = [asset.gps.longitude, asset.gps.latitude];
+        } else if (idx === 0 && initialCoordFallback) {
+          initial[id] = initialCoordFallback;
+        }
+      });
+    } else if (submissionId && initialCoordFallback) {
+      initial[submissionId] = initialCoordFallback;
+    }
+    return initial;
+  });
+
+  const [batchNotes, setBatchNotes] = useState<Record<string, string>>({});
+  const [batchCapturedAts, setBatchCapturedAts] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!session || batchIds.length <= 1) return;
+    if (!session || batchIds.length <= 1 || !submissionId) return;
     let active = true;
     Promise.all(
       batchIds.map(async (id) => {
@@ -286,7 +391,7 @@ export function SurveyRecordDetailsScreen() {
     return () => {
       active = false;
     };
-  }, [batchIds, session]);
+  }, [batchIds, session, submissionId]);
 
   const draftQuery = useGetSurveySubmissionStatus(currentDraftId, Boolean(currentDraftId));
   const { mutateAsync: createSubmission } = useCreateSurveySubmission();
@@ -299,7 +404,9 @@ export function SurveyRecordDetailsScreen() {
   const [imageMimeType, setImageMimeType] = useState<string | undefined>(paramImageMimeType);
   const [savedGpxUri, setSavedGpxUri] = useState<string>();
   const [savedGpxName, setSavedGpxName] = useState<string>();
-  const [isDraftLoaded, setIsDraftLoaded] = useState(Boolean(paramImageUri || submissionId));
+  const [isDraftLoaded, setIsDraftLoaded] = useState(
+    Boolean(paramImageUri || submissionId || parsedAssets.length > 0),
+  );
   const isSubmissionMatchingCurrent = draftQuery.data?.submission?.id === currentDraftId;
   const currentSubmission = isSubmissionMatchingCurrent ? draftQuery.data?.submission : undefined;
   const latitude = currentSubmission?.latitude;
@@ -312,6 +419,7 @@ export function SurveyRecordDetailsScreen() {
   ])
     ? [parsedLongitude, parsedLatitude]
     : undefined;
+  console.log('[Surveyor] imageCoordinate:', imageCoordinate);
 
   const isInitialDraft = currentDraftId === submissionId;
   const parsedStartLat = startLat
@@ -352,23 +460,22 @@ export function SurveyRecordDetailsScreen() {
   const effectiveStartCoord = startCoordinate ?? selectedCoordinate ?? imageCoordinate;
 
   useEffect(() => {
-    if (!currentDraftId) return;
-    // CRITICAL: Do NOT sync or save coordinates if the draft hasn't been hydrated for currentDraftId yet!
-    // Stale state from the previous batch item must never leak to this draft.
-    if (hydratedId.current !== currentDraftId) return;
+    if (batchIds.length === 0) return;
+    const currentId = batchIds[currentBatchIndex];
+    if (!currentId) return;
 
     if (isValidCoordinate(effectiveStartCoord)) {
       const coordToSave = effectiveStartCoord;
       setBatchCoords((prev) => {
         if (
-          prev[currentDraftId]?.[0] === coordToSave[0] &&
-          prev[currentDraftId]?.[1] === coordToSave[1]
+          prev[currentId]?.[0] === coordToSave[0] &&
+          prev[currentId]?.[1] === coordToSave[1]
         ) {
           return prev;
         }
-        return { ...prev, [currentDraftId]: coordToSave };
+        return { ...prev, [currentId]: coordToSave };
       });
-      if (session) {
+      if (session && currentDraftId && !currentDraftId.startsWith('local-')) {
         void updateDraftCoordinates(session.account.id, currentDraftId, {
           latitude: coordToSave[1],
           longitude: coordToSave[0],
@@ -376,28 +483,29 @@ export function SurveyRecordDetailsScreen() {
       }
     } else {
       setBatchCoords((prev) => {
-        if (prev[currentDraftId] === undefined) return prev;
+        if (prev[currentId] === undefined) return prev;
         const next = { ...prev };
-        delete next[currentDraftId];
+        delete next[currentId];
         return next;
       });
     }
-  }, [currentDraftId, effectiveStartCoord, session]);
+  }, [batchIds, currentBatchIndex, effectiveStartCoord, session, currentDraftId]);
 
   const currentItemHasGps = isValidCoordinate(effectiveStartCoord);
 
   const missingGpsBatchIndices = useMemo(() => {
     const missing: number[] = [];
     batchIds.forEach((id, index) => {
-      const coord = id === currentDraftId ? effectiveStartCoord : batchCoords[id];
+      const coord = index === currentBatchIndex ? effectiveStartCoord : batchCoords[id];
       if (!isValidCoordinate(coord)) {
         missing.push(index);
       }
     });
     return missing;
-  }, [batchIds, currentDraftId, effectiveStartCoord, batchCoords]);
+  }, [batchIds, currentBatchIndex, effectiveStartCoord, batchCoords]);
 
-  const allMediaSatisfyConditions = batchIds.length > 0 && missingGpsBatchIndices.length === 0;
+  const allMediaSatisfyConditions =
+    batchIds.length <= 1 ? Boolean(currentItemHasGps) : missingGpsBatchIndices.length === 0;
 
   const displayCoordinate = effectiveStartCoord;
   const startLocationQuery = useReverseGeocode(
@@ -475,7 +583,13 @@ export function SurveyRecordDetailsScreen() {
     setSubmitError(undefined);
     setFocusRequestId((prev) => prev + 1);
     setIsLocationPickerOpen(false);
-    if (currentDraftId && session) {
+    if (batchIds.length > 0) {
+      const currentId = batchIds[currentBatchIndex];
+      if (currentId) {
+        setBatchCoords((prev) => ({ ...prev, [currentId]: coord }));
+      }
+    }
+    if (currentDraftId && !currentDraftId.startsWith('local-') && session) {
       void updateDraftCoordinates(session.account.id, currentDraftId, {
         latitude: coord[1],
         longitude: coord[0],
@@ -486,13 +600,20 @@ export function SurveyRecordDetailsScreen() {
   const handleSelectBatchIndex = async (newIndex: number) => {
     if (newIndex < 0 || newIndex >= batchIds.length || isSubmitting) return;
     const targetId = batchIds[newIndex];
-    if (targetId === currentDraftId) return;
+    const currentId = batchIds[currentBatchIndex];
+    if (targetId === currentId) return;
 
-    // Auto-save changes on current draft before switching
-    if (currentDraftId && session && (isModified || isFormDirty)) {
+    // Save current values for this item
+    const currentVals = getValues();
+    if (currentId) {
+      setBatchNotes((prev) => ({ ...prev, [currentId]: currentVals.note }));
+      setBatchCapturedAts((prev) => ({ ...prev, [currentId]: currentVals.capturedAt }));
+    }
+
+    // Auto-save changes on current draft before switching if this is an existing server draft
+    if (currentDraftId && !currentDraftId.startsWith('local-') && session && (isModified || isFormDirty)) {
       try {
         const effectiveStart = startCoordinate ?? selectedCoordinate;
-        const currentVals = getValues();
         const dateValidation = validateCapturedDate(currentVals.capturedAt);
         const formattedCapturedAt =
           dateValidation.isValid && dateValidation.timestamp
@@ -524,21 +645,42 @@ export function SurveyRecordDetailsScreen() {
       }
     }
 
-    hydratedId.current = undefined;
-    setIsDraftLoaded(false);
+    setActiveBatchIndex(newIndex);
     setIsModified(false);
     setSubmitError(undefined);
     setLocationMessage(undefined);
 
-    // Pre-populate with target draft's known coordinates (if any) or clear stale values
-    const targetCoord = batchCoords[targetId];
-    setStartCoordinate(targetCoord);
-    setSelectedCoordinate(targetCoord);
-    setEndCoordinate(targetCoord ? estimateEndPoint(targetCoord, durationSec) : undefined);
-    setCoordinateSource(targetCoord ? 'Ảnh' : undefined);
-    resetForm({ capturedAt: '', note: '' });
+    if (parsedAssets.length > newIndex) {
+      const targetAsset = parsedAssets[newIndex];
+      setImageUri(targetAsset.uri);
+      setImageName(targetAsset.fileName);
+      setImageMimeType(targetAsset.mimeType);
 
-    setActiveSubmissionId(targetId);
+      const targetCoord =
+        batchCoords[targetId] ??
+        (targetAsset.gps && isValidCoordinate([targetAsset.gps.longitude, targetAsset.gps.latitude])
+          ? [targetAsset.gps.longitude, targetAsset.gps.latitude]
+          : undefined);
+      setStartCoordinate(targetCoord);
+      setSelectedCoordinate(targetCoord);
+      setEndCoordinate(targetCoord ? estimateEndPoint(targetCoord, durationSec) : undefined);
+      setCoordinateSource(targetCoord ? 'Ảnh' : undefined);
+
+      const targetDate =
+        batchCapturedAts[targetId] ?? parseInitialCapturedDate(targetAsset.capturedAt);
+      const targetNote = batchNotes[targetId] ?? '';
+      resetForm({ capturedAt: targetDate, note: targetNote });
+    } else {
+      hydratedId.current = undefined;
+      setIsDraftLoaded(false);
+      const targetCoord = batchCoords[targetId];
+      setStartCoordinate(targetCoord);
+      setSelectedCoordinate(targetCoord);
+      setEndCoordinate(targetCoord ? estimateEndPoint(targetCoord, durationSec) : undefined);
+      setCoordinateSource(targetCoord ? 'Ảnh' : undefined);
+      resetForm({ capturedAt: '', note: '' });
+      setActiveSubmissionId(targetId);
+    }
   };
 
   const remoteGpx = draftQuery.data?.mediaFiles?.find(
@@ -575,10 +717,11 @@ export function SurveyRecordDetailsScreen() {
         selectedCoordinate?.[0] !== initialBaseline!.longitude ||
         selectedCoordinate?.[1] !== initialBaseline!.latitude ||
         activeGpxUri !== initialBaseline!.gpxUri));
-  const submissionStatus = draftQuery.data?.submission.status;
+  const submissionStatus = draftQuery.data?.submission?.status;
   const isEditable =
     !currentDraftId ||
     isDirty ||
+    !submissionStatus ||
     submissionStatus === 'DRAFT' ||
     submissionStatus === 'PENDING_CORRECTION' ||
     submissionStatus === 'FAILED';
@@ -809,6 +952,12 @@ export function SurveyRecordDetailsScreen() {
       setIsModified(true);
       setSubmitError(undefined);
       setFocusRequestId((requestId) => requestId + 1);
+      if (batchIds.length > 0) {
+        const currentId = batchIds[currentBatchIndex];
+        if (currentId) {
+          setBatchCoords((prev) => ({ ...prev, [currentId]: coordinate }));
+        }
+      }
     } catch (error) {
       setLocationMessage(error instanceof Error ? error.message : LIVE_GPS_UNAVAILABLE_MESSAGE);
     } finally {
@@ -817,7 +966,7 @@ export function SurveyRecordDetailsScreen() {
   };
   const onValidSubmit = async (formData: SurveyRecordFormData) => {
     if (submissionInProgress.current || isLocating || isLocatingEnd) return;
-    if (!currentDraftId || !isDraftLoaded || !isEditable) {
+    if ((!imageUri && !currentDraftId) || !isDraftLoaded || !isEditable) {
       setSubmitError(LOAD_EDITABLE_DRAFT_BEFORE_SUBMITTING_MESSAGE);
       return;
     }
@@ -866,30 +1015,6 @@ export function SurveyRecordDetailsScreen() {
         capturedAt: formattedCapturedAt,
       });
 
-      let targetSubmissionId = currentDraftId;
-      if (!targetSubmissionId) {
-        const createPayload: CreateSubmissionDto = isVideoDraft
-          ? {
-              submissionType: 'VIDEO_GPX',
-              capturedAt: formattedCapturedAt,
-              coordinateSource: 'File GPX',
-              latitude: effectiveStart[1],
-              longitude: effectiveStart[0],
-              note: note.trim(),
-            }
-          : {
-              submissionType: 'SINGLE_IMAGE',
-              capturedAt: formattedCapturedAt,
-              coordinateSource: coordinateSource ?? 'Ảnh',
-              latitude: effectiveStart[1],
-              longitude: effectiveStart[0],
-              note: note.trim(),
-            };
-        const createRes = await createSubmission({ request: createPayload });
-        targetSubmissionId = readSubmissionId(createRes);
-        setActiveSubmissionId(targetSubmissionId);
-      }
-
       if (isVideoDraft) {
         if (!imageUri) {
           throw new Error(DRAFT_NO_VIDEO_MESSAGE);
@@ -902,7 +1027,22 @@ export function SurveyRecordDetailsScreen() {
 
         const effectiveEnd = endCoordinate ?? estimateEndPoint(effectiveStart, durationSec);
 
-        console.log('[Surveyor] Starting executeChunkedVideoUpload...');
+        let targetSubmissionId =
+          currentDraftId && !currentDraftId.startsWith('local-') ? currentDraftId : undefined;
+        if (!targetSubmissionId) {
+          const createPayload: CreateSubmissionDto = {
+            submissionType: 'VIDEO_GPX',
+            capturedAt: formattedCapturedAt,
+            coordinateSource: 'File GPX',
+            latitude: effectiveStart[1],
+            longitude: effectiveStart[0],
+            note: note.trim(),
+          };
+          const createRes = await createSubmission({ request: createPayload });
+          targetSubmissionId = readSubmissionId(createRes);
+          setActiveSubmissionId(targetSubmissionId);
+        }
+
         // 1. Chunked video upload (1-minute temporal chunks down-res 640p + companion GPX)
         await executeChunkedVideoUpload({
           submissionId: targetSubmissionId,
@@ -920,7 +1060,6 @@ export function SurveyRecordDetailsScreen() {
             setUploadProgress(info);
           },
         });
-        console.log('[Surveyor] executeChunkedVideoUpload finished.');
 
         // 2. Register zero-copy draft for high-res 4K RoI cropping
         await registerZeroCopyDraft(targetSubmissionId, imageUri, assetId);
@@ -941,94 +1080,186 @@ export function SurveyRecordDetailsScreen() {
           },
         });
         console.log('[Surveyor] Submission metadata updated successfully.');
-      } else {
-        // Single Image Upload Flow
-        const request: CreateSubmissionDto = {
-          submissionType: 'SINGLE_IMAGE',
-          capturedAt: formattedCapturedAt,
-          coordinateSource: coordinateSource ?? 'Ảnh',
-          latitude: effectiveStart[1],
-          longitude: effectiveStart[0],
-          note: note.trim(),
-        };
-        const { submissionType: _submissionType, ...updates } = request;
-        await updateSubmission({ submissionId: targetSubmissionId, request: updates });
 
-        const mediaFiles = (draftQuery.data?.mediaFiles ?? []) as any[];
-        const sessions = (draftQuery.data?.sessions ?? []) as any[];
-        const hasMainMedia =
-          mediaFiles.some((file) => {
-            const type = (file.mediaType || file.media_type || '').toUpperCase();
-            return type === 'IMAGE';
-          }) ||
-          sessions.some((upload) => {
-            const type = (upload.mediaType || upload.media_type || '').toUpperCase();
-            return type === 'IMAGE' && upload.status === 'COMPLETED';
-          });
+        // 5. Submit to finalize
+        const submitted = await submitSubmission({ submissionId: targetSubmissionId });
+        const lastStatus = readSubmittedStatus(submitted) ?? 'QUEUED';
 
-        if (!hasMainMedia && imageUri) {
-          const prepared = await prepareSurveyImage({
-            uri: imageUri,
-            fileName: imageName,
-            mimeType: imageMimeType,
-          });
-          const initRes = await initializeUpload({
+        router.replace({
+          pathname: '/work/submission-complete',
+          params: {
+            type: 'upload_submission',
             submissionId: targetSubmissionId,
-            request: {
-              mediaType: 'IMAGE',
-              originalFilename: prepared.fileName,
-              totalChunks: 1,
-              totalSizeBytes: prepared.sizeBytes,
+            submissionStatus: lastStatus,
+          },
+        });
+      } else {
+        // Single Image or Batch Images Upload Flow
+        if (parsedAssets.length > 1) {
+          const createdSubmissionIds: string[] = [];
+          let lastStatus = 'QUEUED';
+
+          for (let i = 0; i < parsedAssets.length; i++) {
+            const asset = parsedAssets[i];
+            const coord =
+              i === currentBatchIndex
+                ? effectiveStart
+                : batchCoords[batchIds[i]] ??
+                  (asset.gps ? [asset.gps.longitude, asset.gps.latitude] : effectiveStart);
+            const itemNote = i === currentBatchIndex ? note.trim() : (batchNotes[batchIds[i]] ?? '');
+            const itemCapturedAt = asset.capturedAt
+              ? new Date(asset.capturedAt).toISOString()
+              : formattedCapturedAt;
+
+            const createPayload: CreateSubmissionDto = {
+              submissionType: 'SINGLE_IMAGE',
+              capturedAt: itemCapturedAt,
+              coordinateSource: coordinateSource ?? 'Ảnh',
+              latitude: coord[1],
+              longitude: coord[0],
+              note: itemNote,
+            };
+            const createRes = await createSubmission({ request: createPayload });
+            const subId = readSubmissionId(createRes);
+            createdSubmissionIds.push(subId);
+
+            const prepared = await prepareSurveyImage({
+              uri: asset.uri,
+              fileName: asset.fileName,
+              mimeType: asset.mimeType,
+            });
+            const initRes = await initializeUpload({
+              submissionId: subId,
+              request: {
+                mediaType: 'IMAGE',
+                originalFilename: prepared.fileName,
+                totalChunks: 1,
+                totalSizeBytes: prepared.sizeBytes,
+              },
+            });
+            await uploadChunk({
+              sessionId: initRes.sessionId,
+              request: prepared.chunk,
+            });
+            await completeUpload({ sessionId: initRes.sessionId });
+
+            const submitted = await submitSubmission({ submissionId: subId });
+            lastStatus = readSubmittedStatus(submitted) ?? lastStatus;
+          }
+
+          router.replace({
+            pathname: '/work/submission-complete',
+            params: {
+              type: 'upload_submission',
+              submissionId: createdSubmissionIds[0],
+              batchSubmissionIds: createdSubmissionIds.join(','),
+              submissionStatus: lastStatus,
             },
           });
-          await uploadChunk({
-            sessionId: initRes.sessionId,
-            request: prepared.chunk,
-          });
-          await completeUpload({ sessionId: initRes.sessionId });
-        }
+        } else {
+          // Single Image
+          let targetSubmissionId =
+            currentDraftId && !currentDraftId.startsWith('local-') ? currentDraftId : undefined;
 
-        // If batch has other items, ensure their coordinates are updated on backend
-        if (batchIds.length > 1) {
-          for (const otherId of batchIds) {
-            if (otherId === targetSubmissionId) continue;
-            const otherCoord = batchCoords[otherId];
-            if (otherCoord) {
-              await updateSubmission({
-                submissionId: otherId,
-                request: {
-                  latitude: otherCoord[1],
-                  longitude: otherCoord[0],
-                  coordinateSource: 'Ảnh',
-                },
-              });
+          if (!targetSubmissionId) {
+            const createPayload: CreateSubmissionDto = {
+              submissionType: 'SINGLE_IMAGE',
+              capturedAt: formattedCapturedAt,
+              coordinateSource: coordinateSource ?? 'Ảnh',
+              latitude: effectiveStart[1],
+              longitude: effectiveStart[0],
+              note: note.trim(),
+            };
+            const createRes = await createSubmission({ request: createPayload });
+            targetSubmissionId = readSubmissionId(createRes);
+            setActiveSubmissionId(targetSubmissionId);
+          } else {
+            const request: CreateSubmissionDto = {
+              submissionType: 'SINGLE_IMAGE',
+              capturedAt: formattedCapturedAt,
+              coordinateSource: coordinateSource ?? 'Ảnh',
+              latitude: effectiveStart[1],
+              longitude: effectiveStart[0],
+              note: note.trim(),
+            };
+            const { submissionType: _submissionType, ...updates } = request;
+            await updateSubmission({ submissionId: targetSubmissionId, request: updates });
+          }
+
+          const mediaFiles = (draftQuery.data?.mediaFiles ?? []) as any[];
+          const sessions = (draftQuery.data?.sessions ?? []) as any[];
+          const hasMainMedia =
+            mediaFiles.some((file) => {
+              const type = (file.mediaType || file.media_type || '').toUpperCase();
+              return type === 'IMAGE';
+            }) ||
+            sessions.some((upload) => {
+              const type = (upload.mediaType || upload.media_type || '').toUpperCase();
+              return type === 'IMAGE' && upload.status === 'COMPLETED';
+            });
+
+          if (!hasMainMedia && imageUri) {
+            const prepared = await prepareSurveyImage({
+              uri: imageUri,
+              fileName: imageName,
+              mimeType: imageMimeType,
+            });
+            const initRes = await initializeUpload({
+              submissionId: targetSubmissionId,
+              request: {
+                mediaType: 'IMAGE',
+                originalFilename: prepared.fileName,
+                totalChunks: 1,
+                totalSizeBytes: prepared.sizeBytes,
+              },
+            });
+            await uploadChunk({
+              sessionId: initRes.sessionId,
+              request: prepared.chunk,
+            });
+            await completeUpload({ sessionId: initRes.sessionId });
+          }
+
+          // If batch has other items in existing server drafts
+          if (batchSubmissionIds && batchIds.length > 1 && !batchIds[0].startsWith('local-')) {
+            for (const otherId of batchIds) {
+              if (otherId === targetSubmissionId) continue;
+              const otherCoord = batchCoords[otherId];
+              if (otherCoord) {
+                await updateSubmission({
+                  submissionId: otherId,
+                  request: {
+                    latitude: otherCoord[1],
+                    longitude: otherCoord[0],
+                    coordinateSource: 'Ảnh',
+                  },
+                });
+              }
             }
           }
+
+          // Finalize submission(s)
+          const finalizeIds =
+            batchSubmissionIds && batchIds.length > 0 && !batchIds[0].startsWith('local-')
+              ? batchIds
+              : [targetSubmissionId];
+          let lastStatus = 'QUEUED';
+          for (const id of finalizeIds) {
+            const submitted = await submitSubmission({ submissionId: id });
+            lastStatus = readSubmittedStatus(submitted) ?? lastStatus;
+          }
+
+          router.replace({
+            pathname: '/work/submission-complete',
+            params: {
+              type: 'upload_submission',
+              submissionId: targetSubmissionId,
+              ...(finalizeIds.length > 1 ? { batchSubmissionIds: finalizeIds.join(',') } : {}),
+              submissionStatus: lastStatus,
+            },
+          });
         }
       }
-
-      // 5. Submit to finalize all drafts in batch
-      console.log('[Surveyor] Finalizing submission(s) via submitSubmission...');
-      const finalizeIds = batchIds.length > 0 ? batchIds : [targetSubmissionId];
-      let lastStatus = 'QUEUED';
-      for (const id of finalizeIds) {
-        const submitted = await submitSubmission({ submissionId: id });
-        lastStatus = readSubmittedStatus(submitted) ?? lastStatus;
-      }
-      console.log('[Surveyor] Submissions finalized:', {
-        batchCount: finalizeIds.length,
-        lastStatus,
-      });
-
-      router.replace({
-        pathname: '/work/submission-complete',
-        params: {
-          type: 'upload_submission',
-          submissionId: currentDraftId,
-          batchSubmissionIds: batchIds.join(','),
-          submissionStatus: lastStatus,
-        },
-      });
     } catch (error) {
       console.error('[Surveyor] handleSubmit ERROR:', error);
       setSubmitError(error instanceof Error ? error.message : UNABLE_TO_SUBMIT_SURVEY_MESSAGE);
@@ -1153,7 +1384,7 @@ export function SurveyRecordDetailsScreen() {
                   const isSelected = index === currentBatchIndex;
                   const itemDraft = batchDrafts.find((d) => d.id === id);
                   const thumbUri = itemDraft?.uri || (isSelected ? imageUri : undefined);
-                  const itemCoord = id === currentDraftId ? effectiveStartCoord : batchCoords[id];
+                  const itemCoord = index === currentBatchIndex ? effectiveStartCoord : batchCoords[id];
                   const hasGps = isValidCoordinate(itemCoord);
 
                   return (

@@ -28,6 +28,22 @@ import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { ImageInspectionModal } from '@/components/image-inspection-modal';
 
+function normalizeMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (
+    !trimmed ||
+    trimmed === 'null' ||
+    trimmed === 'undefined' ||
+    trimmed === 'none' ||
+    trimmed.startsWith('mock/') ||
+    trimmed === 'mock'
+  ) {
+    return undefined;
+  }
+  return trimmed;
+}
+
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -91,9 +107,19 @@ export function RevalidationSignDetailsCard({
   const evidenceCount = evidences.length;
   const latestEvidence = evidenceCount > 0 ? evidences[0] : null;
 
-  const rawCrop = sign.actualCropUrl || latestEvidence?.mediaUrl;
+  const rawCrop =
+    normalizeMediaUrl(sign.actualCropUrl) ||
+    normalizeMediaUrl((sign as any).signCropUrl) ||
+    normalizeMediaUrl((sign as any).historicalCropUrl) ||
+    normalizeMediaUrl(sign.frameUrl) ||
+    normalizeMediaUrl((sign as any).bestFrameUrl) ||
+    normalizeMediaUrl(latestEvidence?.mediaUrl);
   const displaySubmittedCrop = rawCrop ? resolveS3Url(rawCrop) : undefined;
   const hasSubmittedCrop = Boolean(displaySubmittedCrop && !cropError);
+
+  useEffect(() => {
+    setCropError(false);
+  }, [sign.id, displaySubmittedCrop]);
 
   // Entrance slide animation
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -318,20 +344,21 @@ export function RevalidationSignDetailsCard({
                   </Text>
                 </View>
               </View>
-
-              <View style={styles.expandedLocationRow}>
-                <MaterialCommunityIcons
-                  color={theme.placeholder}
-                  name="map-marker-outline"
-                  size={12}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[styles.expandedLocationText, { color: theme.placeholder }]}
-                >
-                  {sign.displayAddress || sign.roadName || 'Không có dữ liệu vị trí.'}
-                </Text>
-              </View>
+              {sign.displayAddress || sign.roadName ? (
+                <View style={styles.expandedLocationRow}>
+                  <MaterialCommunityIcons
+                    color={theme.placeholder || theme.grey || '#888888'}
+                    name="map-marker-outline"
+                    size={12}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.expandedLocationText, { color: theme.grey || '#888888' }]}
+                  >
+                    {sign.displayAddress || sign.roadName}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Action Buttons: Collapse and Close */}
@@ -389,6 +416,7 @@ export function RevalidationSignDetailsCard({
                       accessibilityLabel="Inspect official standard sign"
                       accessibilityRole="button"
                       onPress={() => setInspectPhotoUrl(sign.imageUrl || null)}
+                      style={styles.cropPressable}
                     >
                       <Image
                         contentFit="contain"
@@ -397,7 +425,7 @@ export function RevalidationSignDetailsCard({
                       />
                     </Pressable>
                   ) : (
-                    <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={20} />
+                    <MaterialCommunityIcons color={theme.grey || '#888888'} name="traffic-light" size={20} />
                   )}
                 </View>
               </View>
@@ -418,22 +446,24 @@ export function RevalidationSignDetailsCard({
                       accessibilityLabel="Inspect submitted sign photo"
                       accessibilityRole="button"
                       onPress={() => setInspectPhotoUrl(displaySubmittedCrop || null)}
+                      style={styles.cropPressable}
                     >
                       <Image
                         contentFit="cover"
                         onError={() => setCropError(true)}
                         source={{ uri: displaySubmittedCrop }}
                         style={styles.cropImg}
+                        transition={200}
                       />
                     </Pressable>
                   ) : (
                     <View style={styles.noCropBox}>
                       <MaterialCommunityIcons
-                        color={theme.placeholder}
-                        name="camera-off-outline"
-                        size={18}
+                        color={theme.placeholder || theme.grey || '#888888'}
+                        name="camera-outline"
+                        size={22}
                       />
-                      <Text style={[styles.noCropText, { color: theme.placeholder }]}>
+                      <Text style={[styles.noCropText, { color: theme.placeholder || theme.grey || '#888888' }]}>
                         Chưa có ảnh khảo sát
                       </Text>
                     </View>
@@ -851,18 +881,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
+  cropPressable: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   standardImg: {
     width: 44,
     height: 44,
   },
   cropImg: {
-    width: '50%',
+    width: '100%',
     height: '100%',
+    borderRadius: 6,
   },
   noCropBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
   },
   noCropText: {
     fontSize: 9,
