@@ -15,6 +15,7 @@ import {
 const LOGIN_PATH = '*/api/v1/auth/login';
 const REGISTER_PATH = '*/api/v1/auth/register';
 const GOOGLE_PATH = '*/api/v1/auth/google';
+const ME_PATH = '*/api/v1/auth/me';
 
 // ---------------------------------------------------------------------------
 // 1. Default Authentication Handlers (Standard Project API Behavior)
@@ -162,6 +163,23 @@ export const authHandlers = [
 
     // Default 400 Validation Error
     return HttpResponse.json(mockAuthErrorResponses.badRequest, { status: 400 });
+  }),
+
+  // -------------------------------------------------------------------------
+  // GET /auth/me
+  // -------------------------------------------------------------------------
+  http.get(ME_PATH, () => {
+    return HttpResponse.json(
+      {
+        id: mockUsers.demo.id,
+        email: mockUsers.demo.email,
+        fullName: mockUsers.demo.fullName,
+        phone: '0901234567',
+        avatarUrl: null,
+        roles: [...mockUsers.demo.backendRoles],
+      },
+      { status: 200 }
+    );
   }),
 ];
 

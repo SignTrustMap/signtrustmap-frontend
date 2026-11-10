@@ -1,5 +1,6 @@
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -15,7 +16,16 @@ import {
 } from '@/feature/upload/schemas/survey-record.schema';
 
 export { parseFlexibleCapturedDate, validateCapturedDate };
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
@@ -51,9 +61,7 @@ import {
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
-import {
-  type MapCoordinate,
-} from '@/types/navigationType';
+import { type MapCoordinate } from '@/types/navigationType';
 import {
   useCreateSurveySubmission,
   useInitializeSurveyUpload,
@@ -64,7 +72,10 @@ import {
   useSubmitSurveySubmission,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
-import { readDraftImage, updateDraftCoordinates } from '@/feature/upload/hooks/use-save-survey-draft';
+import {
+  readDraftImage,
+  updateDraftCoordinates,
+} from '@/feature/upload/hooks/use-save-survey-draft';
 import { prepareSurveyImage } from '@/feature/upload/utils/survey-image';
 import { readSubmissionId, readSubmittedStatus } from '@/feature/upload/utils/submission-response';
 import type { CoordinateSource, CreateSubmissionDto } from '@/types/surveySubmissionType';
@@ -73,13 +84,18 @@ import { LocationPickerModal } from '@/feature/upload/components/location-picker
 import { AppInput } from '@/components/input';
 import { extractGpxGpsData } from '@/feature/upload/utils/gpx';
 import { estimateEndPoint } from '@/feature/upload/utils/video-gps';
-import { executeChunkedVideoUpload, type UploadProgressInfo } from '@/feature/upload/utils/chunk-upload-manager';
-import { registerZeroCopyDraft, startSmartPollingSync } from '@/feature/upload/utils/crop-sync-manager';
+import {
+  executeChunkedVideoUpload,
+  type UploadProgressInfo,
+} from '@/feature/upload/utils/chunk-upload-manager';
+import {
+  registerZeroCopyDraft,
+  startSmartPollingSync,
+} from '@/feature/upload/utils/crop-sync-manager';
 import {
   MAX_SURVEY_VIDEO_SIZE_BYTES,
   getVideoFileSizeBytes,
 } from '@/feature/upload/utils/video-processor';
-
 
 import { getMapLibre } from '@/services/maplibre';
 
@@ -142,6 +158,30 @@ async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
 
 // validation functions are imported from survey-record.schema
 
+function parseInitialCapturedDate(dateVal?: string | null): string {
+  if (!dateVal) return '';
+  const trimmed = dateVal.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return formatDate(dateVal);
+}
+
+function parseDateToDateObject(dateStr?: string): Date {
+  if (!dateStr) return new Date();
+  const trimmed = dateStr.trim();
+  const parts = trimmed.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    const date = new Date(year, month, day);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
@@ -161,6 +201,7 @@ export function SurveyRecordDetailsScreen() {
     startLon,
     duration,
     assetId,
+    capturedAt: paramCapturedAt,
   } = useLocalSearchParams<{
     submissionId?: string;
     batchSubmissionIds?: string;
@@ -176,6 +217,7 @@ export function SurveyRecordDetailsScreen() {
     startLon?: string;
     duration?: string;
     assetId?: string;
+    capturedAt?: string;
   }>();
 
   const [activeSubmissionId, setActiveSubmissionId] = useState<string | undefined>(submissionId);
@@ -190,7 +232,10 @@ export function SurveyRecordDetailsScreen() {
 
   const batchIds = useMemo(() => {
     if (batchSubmissionIds) {
-      const ids = batchSubmissionIds.split(',').map((s) => s.trim()).filter(Boolean);
+      const ids = batchSubmissionIds
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (ids.length > 0) return ids;
     }
     return submissionId ? [submissionId] : [];
@@ -202,7 +247,9 @@ export function SurveyRecordDetailsScreen() {
     return idx >= 0 ? idx : 0;
   }, [currentDraftId, batchIds]);
 
-  const [batchDrafts, setBatchDrafts] = useState<{ id: string; uri?: string; fileName?: string }[]>([]);
+  const [batchDrafts, setBatchDrafts] = useState<{ id: string; uri?: string; fileName?: string }[]>(
+    [],
+  );
   const [batchCoords, setBatchCoords] = useState<Record<string, MapCoordinate | undefined>>({});
 
   useEffect(() => {
@@ -259,21 +306,35 @@ export function SurveyRecordDetailsScreen() {
   const longitude = currentSubmission?.longitude;
   const parsedLatitude = latitude != null ? Number(latitude) : Number.NaN;
   const parsedLongitude = longitude != null ? Number(longitude) : Number.NaN;
-  const imageCoordinate: MapCoordinate | undefined =
-    isValidCoordinate([parsedLongitude, parsedLatitude])
-      ? [parsedLongitude, parsedLatitude]
-      : undefined;
+  const imageCoordinate: MapCoordinate | undefined = isValidCoordinate([
+    parsedLongitude,
+    parsedLatitude,
+  ])
+    ? [parsedLongitude, parsedLatitude]
+    : undefined;
 
   const isInitialDraft = currentDraftId === submissionId;
-  const parsedStartLat = startLat ? Number(startLat) : (paramLatitude ? Number(paramLatitude) : parsedLatitude);
-  const parsedStartLon = startLon ? Number(startLon) : (paramLongitude ? Number(paramLongitude) : parsedLongitude);
-  const initialStartCoord: MapCoordinate | undefined =
-    isValidCoordinate([parsedStartLon, parsedStartLat])
-      ? [parsedStartLon, parsedStartLat]
-      : imageCoordinate;
+  const parsedStartLat = startLat
+    ? Number(startLat)
+    : paramLatitude
+      ? Number(paramLatitude)
+      : parsedLatitude;
+  const parsedStartLon = startLon
+    ? Number(startLon)
+    : paramLongitude
+      ? Number(paramLongitude)
+      : parsedLongitude;
+  const initialStartCoord: MapCoordinate | undefined = isValidCoordinate([
+    parsedStartLon,
+    parsedStartLat,
+  ])
+    ? [parsedStartLon, parsedStartLat]
+    : imageCoordinate;
 
   const durationSec = duration ? Math.max(1, Number(duration)) : 60;
-  const [startCoordinate, setStartCoordinate] = useState<MapCoordinate | undefined>(initialStartCoord);
+  const [startCoordinate, setStartCoordinate] = useState<MapCoordinate | undefined>(
+    initialStartCoord,
+  );
   const [endCoordinate, setEndCoordinate] = useState<MapCoordinate | undefined>(() => {
     if (initialStartCoord) {
       return estimateEndPoint(initialStartCoord, durationSec);
@@ -340,12 +401,15 @@ export function SurveyRecordDetailsScreen() {
 
   const displayCoordinate = effectiveStartCoord;
   const startLocationQuery = useReverseGeocode(
-    effectiveStartCoord ? { latitude: effectiveStartCoord[1], longitude: effectiveStartCoord[0] } : null,
+    effectiveStartCoord
+      ? { latitude: effectiveStartCoord[1], longitude: effectiveStartCoord[0] }
+      : null,
   );
   const [focusRequestId, setFocusRequestId] = useState(1);
   const [coordinateSource, setCoordinateSource] = useState<CoordinateSource | undefined>(
     imageCoordinate ? 'Ảnh' : undefined,
   );
+  const initialCapturedDate = parseInitialCapturedDate(paramCapturedAt);
   const {
     control,
     handleSubmit: handleFormSubmit,
@@ -358,7 +422,7 @@ export function SurveyRecordDetailsScreen() {
     resolver: zodResolver(surveyRecordFormSchema),
     mode: 'onChange',
     defaultValues: {
-      capturedAt: '',
+      capturedAt: initialCapturedDate,
       note: '',
     },
   });
@@ -388,9 +452,19 @@ export function SurveyRecordDetailsScreen() {
     gpxUri?: string;
   }>();
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
+  const hasInitialGps = Boolean(initialStartCoord || imageCoordinate);
   const [locationMessage, setLocationMessage] = useState<string | undefined>(
-    imageCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE,
+    hasInitialGps ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE,
   );
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const handleDatePickerChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (event.type === 'set' && selectedDate) {
+      setCapturedAt(formatDate(selectedDate));
+      setSubmitError(undefined);
+    }
+  };
 
   const handleLocationConfirm = (coord: MapCoordinate) => {
     setSelectedCoordinate(coord);
@@ -420,9 +494,10 @@ export function SurveyRecordDetailsScreen() {
         const effectiveStart = startCoordinate ?? selectedCoordinate;
         const currentVals = getValues();
         const dateValidation = validateCapturedDate(currentVals.capturedAt);
-        const formattedCapturedAt = dateValidation.isValid && dateValidation.timestamp
-          ? new Date(dateValidation.timestamp).toISOString()
-          : undefined;
+        const formattedCapturedAt =
+          dateValidation.isValid && dateValidation.timestamp
+            ? new Date(dateValidation.timestamp).toISOString()
+            : undefined;
 
         await updateSubmission({
           submissionId: currentDraftId,
@@ -431,10 +506,10 @@ export function SurveyRecordDetailsScreen() {
             capturedAt: formattedCapturedAt,
             ...(effectiveStart
               ? {
-                latitude: effectiveStart[1],
-                longitude: effectiveStart[0],
-                coordinateSource: coordinateSource ?? 'Ảnh',
-              }
+                  latitude: effectiveStart[1],
+                  longitude: effectiveStart[0],
+                  coordinateSource: coordinateSource ?? 'Ảnh',
+                }
               : {}),
           },
         });
@@ -469,12 +544,13 @@ export function SurveyRecordDetailsScreen() {
   const remoteGpx = draftQuery.data?.mediaFiles?.find(
     (f: any) => (f.mediaType || f.media_type) === 'GPX',
   );
-  const remoteGpxUrl = remoteGpx ? (remoteGpx.fileUrl || remoteGpx.file_url) : undefined;
+  const remoteGpxUrl = remoteGpx ? remoteGpx.fileUrl || remoteGpx.file_url : undefined;
   const activeGpxUri = gpxUri || savedGpxUri;
   const activeGpxName = gpxName || savedGpxName;
-  const displayGpxName = activeGpxName
-    || (activeGpxUri ? activeGpxUri.split('/').pop()?.split('?')[0] : undefined)
-    || (remoteGpxUrl ? (remoteGpxUrl.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
+  const displayGpxName =
+    activeGpxName ||
+    (activeGpxUri ? activeGpxUri.split('/').pop()?.split('?')[0] : undefined) ||
+    (remoteGpxUrl ? (remoteGpxUrl.split('/').pop()?.split('?')[0] ?? 'Attached GPX track') : '');
 
   const handleOpenRouteMap = () => {
     router.push({
@@ -491,13 +567,14 @@ export function SurveyRecordDetailsScreen() {
     });
   };
 
-  const isDirty = isModified
-    || (Boolean(initialBaseline) && (
-      note !== initialBaseline!.note
-      || capturedAt !== initialBaseline!.capturedAt
-      || (selectedCoordinate?.[0] !== initialBaseline!.longitude || selectedCoordinate?.[1] !== initialBaseline!.latitude)
-      || (activeGpxUri !== initialBaseline!.gpxUri)
-    ));
+  const isDirty =
+    isModified ||
+    (Boolean(initialBaseline) &&
+      (note !== initialBaseline!.note ||
+        capturedAt !== initialBaseline!.capturedAt ||
+        selectedCoordinate?.[0] !== initialBaseline!.longitude ||
+        selectedCoordinate?.[1] !== initialBaseline!.latitude ||
+        activeGpxUri !== initialBaseline!.gpxUri));
   const submissionStatus = draftQuery.data?.submission.status;
   const isEditable =
     !currentDraftId ||
@@ -506,10 +583,7 @@ export function SurveyRecordDetailsScreen() {
     submissionStatus === 'PENDING_CORRECTION' ||
     submissionStatus === 'FAILED';
 
-  const captureDateValidation = useMemo(
-    () => validateCapturedDate(capturedAt),
-    [capturedAt],
-  );
+  const captureDateValidation = useMemo(() => validateCapturedDate(capturedAt), [capturedAt]);
 
   const captureDateError =
     formErrors.capturedAt?.message ??
@@ -532,17 +606,17 @@ export function SurveyRecordDetailsScreen() {
   // GPX fields are only relevant for video-based (VIDEO_GPX) submissions.
   // For plain image submissions we hide the GPX section entirely.
   const isImageSubmission =
-    draftQuery.data?.submission.submissionType === 'SINGLE_IMAGE'
-    || (
-      draftQuery.data?.submission.submissionType !== 'VIDEO_GPX'
-      && !imageMimeType?.startsWith('video/')
-      && !(imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
-      && !activeGpxUri
-      && !duration
-    );
+    draftQuery.data?.submission.submissionType === 'SINGLE_IMAGE' ||
+    (draftQuery.data?.submission.submissionType !== 'VIDEO_GPX' &&
+      !imageMimeType?.startsWith('video/') &&
+      !(imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) &&
+      !activeGpxUri &&
+      !duration);
 
   const endLocationQuery = useReverseGeocode(
-    !isImageSubmission && endCoordinate ? { latitude: endCoordinate[1], longitude: endCoordinate[0] } : null,
+    !isImageSubmission && endCoordinate
+      ? { latitude: endCoordinate[1], longitude: endCoordinate[0] }
+      : null,
   );
 
   const handlePickGpx = async () => {
@@ -615,95 +689,107 @@ export function SurveyRecordDetailsScreen() {
         }
       }
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [durationSec, gpxName, gpxUri]);
 
   useEffect(() => {
     const draft = draftQuery.data?.submission;
-    if (!draft || !session || draft.id !== currentDraftId || hydratedId.current === draft.id) return;
+    if (!draft || !session || draft.id !== currentDraftId || hydratedId.current === draft.id)
+      return;
     let active = true;
-    void readDraftImage(session.account.id, draft.id).then(async (local) => {
-      if (!active) return;
-      setIsDraftLoaded(false);
-      const formattedCapturedTime = draft.capturedAt
-        ? formatDate(draft.capturedAt)
-        : formatDate(new Date());
-      resetForm({
-        capturedAt: formattedCapturedTime,
-        note: draft.note ?? '',
-      });
-      const lat = draft.latitude ?? local?.startLat;
-      const lon = draft.longitude ?? local?.startLon;
-      const hasCoordinate = lat != null && lon != null && isValidCoordinate([lon, lat]);
-      if (hasCoordinate) {
-        const coord: MapCoordinate = [lon!, lat!];
-        setSelectedCoordinate(coord);
-        setStartCoordinate(coord);
-        setEndCoordinate(estimateEndPoint(coord, durationSec));
-      } else {
-        setSelectedCoordinate(undefined);
-        setStartCoordinate(undefined);
-        setEndCoordinate(undefined);
-      }
-      setCoordinateSource(hasCoordinate ? ((draft.coordinateSource as CoordinateSource) ?? 'Ảnh') : undefined);
-      setLocationMessage(hasCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE);
-      const remoteItem = draftQuery.data?.mediaFiles?.find((file: any) => {
-        const type = (file.mediaType || file.media_type || '').toUpperCase();
-        return type === 'IMAGE' || type === 'VIDEO';
-      });
-      const remoteKey = remoteItem ? (remoteItem.fileUrl || remoteItem.file_url) : undefined;
-      const remoteResolved = remoteKey ? resolveS3Url(remoteKey) : undefined;
-      setImageUri(local?.uri ?? remoteResolved);
-      setImageName(local?.fileName);
-      setImageMimeType(local?.mimeType);
-      if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
-      if (local?.gpxName) setSavedGpxName(local.gpxName);
-
-      const activeGpx = (draft.id === submissionId ? gpxUri : undefined) || local?.gpxUri;
-      if (activeGpx) {
-        try {
-          const gpxData = await extractGpxGpsData(activeGpx);
-          if (active && gpxData?.coordinates?.length) {
-            setGpxCoordinates(gpxData.coordinates);
-          }
-          if (gpxData?.firstPoint && active) {
-            const coord: MapCoordinate = [gpxData.firstPoint.longitude, gpxData.firstPoint.latitude];
-            setSelectedCoordinate(coord);
-            setStartCoordinate(coord);
-            if (gpxData.lastPoint) {
-              setEndCoordinate([gpxData.lastPoint.longitude, gpxData.lastPoint.latitude]);
-            } else {
-              setEndCoordinate(estimateEndPoint(coord, durationSec));
-            }
-            setCoordinateSource('File GPX');
-            setLocationMessage(undefined);
-            setFocusRequestId((r) => r + 1);
-            if (gpxData.startTime && !draft.capturedAt) {
-              setCapturedAt(formatDate(gpxData.startTime));
-            }
-          }
-        } catch (err) {
-          console.warn('[Surveyor] Failed to extract GPX in details:', err);
+    void readDraftImage(session.account.id, draft.id)
+      .then(async (local) => {
+        if (!active) return;
+        setIsDraftLoaded(false);
+        const formattedCapturedTime = draft.capturedAt
+          ? formatDate(draft.capturedAt)
+          : formatDate(new Date());
+        resetForm({
+          capturedAt: formattedCapturedTime,
+          note: draft.note ?? '',
+        });
+        const lat = draft.latitude ?? local?.startLat;
+        const lon = draft.longitude ?? local?.startLon;
+        const hasCoordinate = lat != null && lon != null && isValidCoordinate([lon, lat]);
+        if (hasCoordinate) {
+          const coord: MapCoordinate = [lon!, lat!];
+          setSelectedCoordinate(coord);
+          setStartCoordinate(coord);
+          setEndCoordinate(estimateEndPoint(coord, durationSec));
+        } else {
+          setSelectedCoordinate(undefined);
+          setStartCoordinate(undefined);
+          setEndCoordinate(undefined);
         }
-      }
+        setCoordinateSource(
+          hasCoordinate ? ((draft.coordinateSource as CoordinateSource) ?? 'Ảnh') : undefined,
+        );
+        setLocationMessage(hasCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE);
+        const remoteItem = draftQuery.data?.mediaFiles?.find((file: any) => {
+          const type = (file.mediaType || file.media_type || '').toUpperCase();
+          return type === 'IMAGE' || type === 'VIDEO';
+        });
+        const remoteKey = remoteItem ? remoteItem.fileUrl || remoteItem.file_url : undefined;
+        const remoteResolved = remoteKey ? resolveS3Url(remoteKey) : undefined;
+        setImageUri(local?.uri ?? remoteResolved);
+        setImageName(local?.fileName);
+        setImageMimeType(local?.mimeType);
+        if (local?.gpxUri) setSavedGpxUri(local.gpxUri);
+        if (local?.gpxName) setSavedGpxName(local.gpxName);
 
-      hydratedId.current = draft.id;
-      setInitialBaseline({
-        note: draft.note ?? '',
-        capturedAt: formattedCapturedTime,
-        longitude: hasCoordinate ? draft.longitude! : undefined,
-        latitude: hasCoordinate ? draft.latitude! : undefined,
-        gpxUri: local?.gpxUri ?? (draft.id === submissionId ? gpxUri : undefined),
-      });
-      setIsDraftLoaded(true);
-      setIsModified(false);
-    }).catch(() => {
-      if (active) {
+        const activeGpx = (draft.id === submissionId ? gpxUri : undefined) || local?.gpxUri;
+        if (activeGpx) {
+          try {
+            const gpxData = await extractGpxGpsData(activeGpx);
+            if (active && gpxData?.coordinates?.length) {
+              setGpxCoordinates(gpxData.coordinates);
+            }
+            if (gpxData?.firstPoint && active) {
+              const coord: MapCoordinate = [
+                gpxData.firstPoint.longitude,
+                gpxData.firstPoint.latitude,
+              ];
+              setSelectedCoordinate(coord);
+              setStartCoordinate(coord);
+              if (gpxData.lastPoint) {
+                setEndCoordinate([gpxData.lastPoint.longitude, gpxData.lastPoint.latitude]);
+              } else {
+                setEndCoordinate(estimateEndPoint(coord, durationSec));
+              }
+              setCoordinateSource('File GPX');
+              setLocationMessage(undefined);
+              setFocusRequestId((r) => r + 1);
+              if (gpxData.startTime && !draft.capturedAt) {
+                setCapturedAt(formatDate(gpxData.startTime));
+              }
+            }
+          } catch (err) {
+            console.warn('[Surveyor] Failed to extract GPX in details:', err);
+          }
+        }
+
+        hydratedId.current = draft.id;
+        setInitialBaseline({
+          note: draft.note ?? '',
+          capturedAt: formattedCapturedTime,
+          longitude: hasCoordinate ? draft.longitude! : undefined,
+          latitude: hasCoordinate ? draft.latitude! : undefined,
+          gpxUri: local?.gpxUri ?? (draft.id === submissionId ? gpxUri : undefined),
+        });
         setIsDraftLoaded(true);
-        setSubmitError(UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE);
-      }
-    });
-    return () => { active = false; };
+        setIsModified(false);
+      })
+      .catch(() => {
+        if (active) {
+          setIsDraftLoaded(true);
+          setSubmitError(UNABLE_TO_RESTORE_DRAFT_MEDIA_MESSAGE);
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [draftQuery.data, durationSec, gpxUri, session, currentDraftId, submissionId]);
 
   const handleUseCurrentLocation = async () => {
@@ -724,11 +810,7 @@ export function SurveyRecordDetailsScreen() {
       setSubmitError(undefined);
       setFocusRequestId((requestId) => requestId + 1);
     } catch (error) {
-      setLocationMessage(
-        error instanceof Error
-          ? error.message
-          : LIVE_GPS_UNAVAILABLE_MESSAGE,
-      );
+      setLocationMessage(error instanceof Error ? error.message : LIVE_GPS_UNAVAILABLE_MESSAGE);
     } finally {
       setIsLocating(false);
     }
@@ -788,21 +870,21 @@ export function SurveyRecordDetailsScreen() {
       if (!targetSubmissionId) {
         const createPayload: CreateSubmissionDto = isVideoDraft
           ? {
-            submissionType: 'VIDEO_GPX',
-            capturedAt: formattedCapturedAt,
-            coordinateSource: 'File GPX',
-            latitude: effectiveStart[1],
-            longitude: effectiveStart[0],
-            note: note.trim(),
-          }
+              submissionType: 'VIDEO_GPX',
+              capturedAt: formattedCapturedAt,
+              coordinateSource: 'File GPX',
+              latitude: effectiveStart[1],
+              longitude: effectiveStart[0],
+              note: note.trim(),
+            }
           : {
-            submissionType: 'SINGLE_IMAGE',
-            capturedAt: formattedCapturedAt,
-            coordinateSource: coordinateSource ?? 'Ảnh',
-            latitude: effectiveStart[1],
-            longitude: effectiveStart[0],
-            note: note.trim(),
-          };
+              submissionType: 'SINGLE_IMAGE',
+              capturedAt: formattedCapturedAt,
+              coordinateSource: coordinateSource ?? 'Ảnh',
+              latitude: effectiveStart[1],
+              longitude: effectiveStart[0],
+              note: note.trim(),
+            };
         const createRes = await createSubmission({ request: createPayload });
         targetSubmissionId = readSubmissionId(createRes);
         setActiveSubmissionId(targetSubmissionId);
@@ -874,11 +956,12 @@ export function SurveyRecordDetailsScreen() {
 
         const mediaFiles = (draftQuery.data?.mediaFiles ?? []) as any[];
         const sessions = (draftQuery.data?.sessions ?? []) as any[];
-        const hasMainMedia = mediaFiles.some((file) => {
-          const type = (file.mediaType || file.media_type || '').toUpperCase();
-          return type === 'IMAGE';
-        })
-          || sessions.some((upload) => {
+        const hasMainMedia =
+          mediaFiles.some((file) => {
+            const type = (file.mediaType || file.media_type || '').toUpperCase();
+            return type === 'IMAGE';
+          }) ||
+          sessions.some((upload) => {
             const type = (upload.mediaType || upload.media_type || '').toUpperCase();
             return type === 'IMAGE' && upload.status === 'COMPLETED';
           });
@@ -932,7 +1015,10 @@ export function SurveyRecordDetailsScreen() {
         const submitted = await submitSubmission({ submissionId: id });
         lastStatus = readSubmittedStatus(submitted) ?? lastStatus;
       }
-      console.log('[Surveyor] Submissions finalized:', { batchCount: finalizeIds.length, lastStatus });
+      console.log('[Surveyor] Submissions finalized:', {
+        batchCount: finalizeIds.length,
+        lastStatus,
+      });
 
       router.replace({
         pathname: '/work/submission-complete',
@@ -945,9 +1031,7 @@ export function SurveyRecordDetailsScreen() {
       });
     } catch (error) {
       console.error('[Surveyor] handleSubmit ERROR:', error);
-      setSubmitError(
-        error instanceof Error ? error.message : UNABLE_TO_SUBMIT_SURVEY_MESSAGE,
-      );
+      setSubmitError(error instanceof Error ? error.message : UNABLE_TO_SUBMIT_SURVEY_MESSAGE);
       setIsModified(true);
     } finally {
       submissionInProgress.current = false;
@@ -978,7 +1062,9 @@ export function SurveyRecordDetailsScreen() {
             <AppButton
               accessibilityLabel="Quay lại"
               hitSlop={Spacing.one}
-              onPress={() => router.replace({ pathname: '/work', params: { currentRole: 'surveyor' } })}
+              onPress={() =>
+                router.replace({ pathname: '/work', params: { currentRole: 'surveyor' } })
+              }
               pressedOpacity={0.7}
               style={styles.backButton}
               variant="ghost"
@@ -1046,7 +1132,11 @@ export function SurveyRecordDetailsScreen() {
                   >
                     <SymbolView
                       fallback={<Text style={{ color: theme.text, fontSize: 14 }}>{'>'}</Text>}
-                      name={{ android: 'chevron_right', ios: 'chevron.right', web: 'chevron_right' }}
+                      name={{
+                        android: 'chevron_right',
+                        ios: 'chevron.right',
+                        web: 'chevron_right',
+                      }}
                       size={16}
                       tintColor={theme.text}
                     />
@@ -1129,7 +1219,9 @@ export function SurveyRecordDetailsScreen() {
           ) : null}
 
           <View
-            accessibilityLabel={imageUri ? 'Phương tiện khảo sát đã chọn' : 'Chưa chọn phương tiện khảo sát'}
+            accessibilityLabel={
+              imageUri ? 'Phương tiện khảo sát đã chọn' : 'Chưa chọn phương tiện khảo sát'
+            }
             style={[
               styles.imageFrame,
               {
@@ -1138,7 +1230,9 @@ export function SurveyRecordDetailsScreen() {
               },
             ]}
           >
-            {imageUri && !imageMimeType?.startsWith('video/') && !/\.(mp4|mov|mkv)$/i.test(imageUri) ? (
+            {imageUri &&
+            !imageMimeType?.startsWith('video/') &&
+            !/\.(mp4|mov|mkv)$/i.test(imageUri) ? (
               <Image
                 accessibilityLabel="Ảnh khảo sát đã chọn"
                 contentFit="cover"
@@ -1150,29 +1244,58 @@ export function SurveyRecordDetailsScreen() {
                 <SymbolView
                   fallback={
                     <Text style={[styles.imageFallback, { color: theme.placeholder }]}>
-                      {imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'VID' : 'IMG'}
+                      {imageMimeType?.startsWith('video/') ||
+                      (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+                        ? 'VID'
+                        : 'IMG'}
                     </Text>
                   }
                   name={{
-                    android: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'videocam' : 'image',
-                    ios: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'video' : 'photo',
-                    web: imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'videocam' : 'image',
+                    android:
+                      imageMimeType?.startsWith('video/') ||
+                      (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+                        ? 'videocam'
+                        : 'image',
+                    ios:
+                      imageMimeType?.startsWith('video/') ||
+                      (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+                        ? 'video'
+                        : 'photo',
+                    web:
+                      imageMimeType?.startsWith('video/') ||
+                      (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+                        ? 'videocam'
+                        : 'image',
                   }}
                   size={40}
                   tintColor={theme.primary}
                 />
                 <Text style={[styles.placeholderLabel, { color: theme.textSecondary }]}>
-                  {imageName ?? (imageMimeType?.startsWith('video/') || (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri)) ? 'Bản ghi khảo sát Video' : 'Không có bản xem trước')}
+                  {imageName ??
+                    (imageMimeType?.startsWith('video/') ||
+                    (imageUri && /\.(mp4|mov|mkv)$/i.test(imageUri))
+                      ? 'Bản ghi khảo sát Video'
+                      : 'Không có bản xem trước')}
                 </Text>
               </>
             )}
           </View>
 
-          {isDraftLoaded && !draftQuery.data?.mediaFiles?.some((file: any) => {
+          {isDraftLoaded &&
+          !draftQuery.data?.mediaFiles?.some((file: any) => {
             const type = (file.mediaType || file.media_type || '').toUpperCase();
             return type === 'IMAGE' || type === 'VIDEO';
-          }) && !imageUri ? (
-            <AppButton label="Chọn phương tiện bản nháp" onPress={() => router.replace({ pathname: '/work/new-survey', params: { draftId: currentDraftId } })} />
+          }) &&
+          !imageUri ? (
+            <AppButton
+              label="Chọn phương tiện bản nháp"
+              onPress={() =>
+                router.replace({
+                  pathname: '/work/new-survey',
+                  params: { draftId: currentDraftId },
+                })
+              }
+            />
           ) : null}
           <View style={styles.section}>
             <Controller
@@ -1191,9 +1314,34 @@ export function SurveyRecordDetailsScreen() {
                   autoCapitalize="none"
                   editable={!isSubmitting}
                   error={captureDateError}
+                  trailingIcon={
+                    <Pressable
+                      accessibilityLabel="Chọn ngày từ lịch"
+                      accessibilityRole="button"
+                      hitSlop={Spacing.one}
+                      onPress={() => setShowDatePicker(true)}
+                      disabled={isSubmitting}
+                      style={styles.calendarIconButton}
+                    >
+                      <MaterialCommunityIcons
+                        name="calendar-month-outline"
+                        size={22}
+                        color={theme.primary}
+                      />
+                    </Pressable>
+                  }
                 />
               )}
             />
+            {showDatePicker ? (
+              <DateTimePicker
+                value={parseDateToDateObject(capturedAt)}
+                mode="date"
+                display="default"
+                maximumDate={new Date()}
+                onChange={handleDatePickerChange}
+              />
+            ) : null}
           </View>
 
           {/* Location / Telemetry Section */}
@@ -1227,26 +1375,40 @@ export function SurveyRecordDetailsScreen() {
                   accessibilityLabel="Vị trí bắt đầu vĩ độ và kinh độ"
                   editable={false}
                   showSoftInputOnFocus={false}
-                  value={effectiveStartCoord
-                    ? `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`
-                    : 'Chưa có vị trí bắt đầu'}
+                  value={
+                    effectiveStartCoord
+                      ? `${effectiveStartCoord[1].toFixed(6)}, ${effectiveStartCoord[0].toFixed(6)}`
+                      : 'Chưa có vị trí bắt đầu'
+                  }
                   placeholder="Chưa có vị trí bắt đầu"
-                  leadingIcon={<MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />}
+                  leadingIcon={
+                    <MaterialCommunityIcons name="map-marker" size={20} color="#16A34A" />
+                  }
                   containerStyle={styles.imageLocationInput}
                 />
                 {effectiveStartCoord ? (
-                  <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.addressResolvedCard,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    ]}
+                  >
                     <View style={styles.addressResolvedHeader}>
                       <MaterialCommunityIcons name="map-marker-radius" size={16} color="#16A34A" />
                       <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                        {startLocationQuery.isLoading ? 'Đang tra cứu vị trí bắt đầu...' : 'Địa chỉ điểm bắt đầu'}
+                        {startLocationQuery.isLoading
+                          ? 'Đang tra cứu vị trí bắt đầu...'
+                          : 'Địa chỉ điểm bắt đầu'}
                       </Text>
                       {startLocationQuery.isLoading ? (
                         <ActivityIndicator size="small" color="#16A34A" style={{ marginLeft: 6 }} />
                       ) : null}
                     </View>
                     <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                      {startLocationQuery.data?.displayAddress || (startLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
+                      {startLocationQuery.data?.displayAddress ||
+                        (startLocationQuery.isLoading
+                          ? 'Đang tra cứu dịch vụ không gian...'
+                          : 'Không thể xác định địa chỉ vị trí')}
                     </Text>
                     {startLocationQuery.data?.roadName ? (
                       <Text style={[styles.addressRoadText, { color: '#16A34A' }]}>
@@ -1263,33 +1425,46 @@ export function SurveyRecordDetailsScreen() {
                   <Text style={[styles.subSectionTitle, { color: theme.text }]}>
                     Điểm kết thúc (D)
                   </Text>
-
                 </View>
                 <AppInput
                   label="Vị trí kết thúc (vĩ độ, kinh độ)"
                   accessibilityLabel="Vị trí kết thúc vĩ độ và kinh độ"
                   editable={false}
                   showSoftInputOnFocus={false}
-                  value={endCoordinate
-                    ? `${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
-                    : 'Ước tính từ thời lượng video...'}
+                  value={
+                    endCoordinate
+                      ? `${endCoordinate[1].toFixed(6)}, ${endCoordinate[0].toFixed(6)}`
+                      : 'Ước tính từ thời lượng video...'
+                  }
                   placeholder="Đang ước tính vị trí kết thúc..."
-                  leadingIcon={<MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />}
+                  leadingIcon={
+                    <MaterialCommunityIcons name="flag-checkered" size={20} color="#DC2626" />
+                  }
                   containerStyle={styles.imageLocationInput}
                 />
                 {endCoordinate ? (
-                  <View style={[styles.addressResolvedCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <View
+                    style={[
+                      styles.addressResolvedCard,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    ]}
+                  >
                     <View style={styles.addressResolvedHeader}>
                       <MaterialCommunityIcons name="flag-checkered" size={16} color="#DC2626" />
                       <Text style={[styles.addressResolvedTitle, { color: theme.textSecondary }]}>
-                        {endLocationQuery.isLoading ? 'Đang tra cứu vị trí kết thúc...' : 'Địa chỉ điểm kết thúc'}
+                        {endLocationQuery.isLoading
+                          ? 'Đang tra cứu vị trí kết thúc...'
+                          : 'Địa chỉ điểm kết thúc'}
                       </Text>
                       {endLocationQuery.isLoading ? (
                         <ActivityIndicator size="small" color="#DC2626" style={{ marginLeft: 6 }} />
                       ) : null}
                     </View>
                     <Text style={[styles.addressResolvedText, { color: theme.text }]}>
-                      {endLocationQuery.data?.displayAddress || (endLocationQuery.isLoading ? 'Đang tra cứu dịch vụ không gian...' : 'Không thể xác định địa chỉ vị trí')}
+                      {endLocationQuery.data?.displayAddress ||
+                        (endLocationQuery.isLoading
+                          ? 'Đang tra cứu dịch vụ không gian...'
+                          : 'Không thể xác định địa chỉ vị trí')}
                     </Text>
                     {endLocationQuery.data?.roadName ? (
                       <Text style={[styles.addressRoadText, { color: '#DC2626' }]}>
@@ -1304,7 +1479,10 @@ export function SurveyRecordDetailsScreen() {
               <View style={styles.section}>
                 <Pressable
                   onPress={() => setIsGpxAccordionOpen(!isGpxAccordionOpen)}
-                  style={[styles.accordionHeader, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  style={[
+                    styles.accordionHeader,
+                    { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+                  ]}
                 >
                   <View style={styles.accordionHeaderLeft}>
                     <AntDesign name="file-text" size={18} color={theme.primary} />
@@ -1320,9 +1498,15 @@ export function SurveyRecordDetailsScreen() {
                 </Pressable>
 
                 {isGpxAccordionOpen ? (
-                  <View style={[styles.accordionBody, { borderColor: theme.border, backgroundColor: theme.neutral }]}>
+                  <View
+                    style={[
+                      styles.accordionBody,
+                      { borderColor: theme.border, backgroundColor: theme.neutral },
+                    ]}
+                  >
                     <Text style={[styles.accordionDesc, { color: theme.textSecondary }]}>
-                      Hệ thống tự động trích xuất GPS và tạo lộ trình GPX tương ứng. Chỉ đính kèm tệp GPX ngoài nếu bạn muốn sử dụng lộ trình từ thiết bị GPS chuyên dụng.
+                      Hệ thống tự động trích xuất GPS và tạo lộ trình GPX tương ứng. Chỉ đính kèm
+                      tệp GPX ngoài nếu bạn muốn sử dụng lộ trình từ thiết bị GPS chuyên dụng.
                     </Text>
                     <AppInput
                       label="Tệp GPX"
@@ -1368,9 +1552,11 @@ export function SurveyRecordDetailsScreen() {
                 accessibilityLabel="Vĩ độ và kinh độ vị trí"
                 editable={false}
                 showSoftInputOnFocus={false}
-                value={displayCoordinate
-                  ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
-                  : ''}
+                value={
+                  displayCoordinate
+                    ? `${displayCoordinate[1].toFixed(6)}, ${displayCoordinate[0].toFixed(6)}`
+                    : ''
+                }
                 placeholder="Chưa có dữ liệu vị trí"
                 leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
                 containerStyle={styles.imageLocationInput}
@@ -1379,9 +1565,10 @@ export function SurveyRecordDetailsScreen() {
                 <AppInput
                   label="Địa chỉ thực tế"
                   editable={false}
+                  multiline={true}
                   value={startLocationQuery.data?.displayAddress || ''}
                   leadingIcon={<AntDesign name="environment" size={18} color={theme.primary} />}
-                  containerStyle={styles.imageLocationInput}
+                  containerStyle={[styles.imageLocationInput, styles.multilineAddressInput]}
                 />
               ) : null}
             </View>
@@ -1416,17 +1603,19 @@ export function SurveyRecordDetailsScreen() {
                     destination={
                       !isImageSubmission && endCoordinate
                         ? {
-                          coordinate: endCoordinate,
-                          id: 'survey-end',
-                          title: 'Điểm kết thúc',
-                          subtitle: 'Lộ trình khảo sát',
-                          category: 'recent',
-                        }
+                            coordinate: endCoordinate,
+                            id: 'survey-end',
+                            title: 'Điểm kết thúc',
+                            subtitle: 'Lộ trình khảo sát',
+                            category: 'recent',
+                          }
                         : undefined
                     }
                     routeCoordinates={
                       !isImageSubmission && effectiveStartCoord && endCoordinate
-                        ? (gpxCoordinates.length > 0 ? gpxCoordinates : [effectiveStartCoord, endCoordinate])
+                        ? gpxCoordinates.length > 0
+                          ? gpxCoordinates
+                          : [effectiveStartCoord, endCoordinate]
                         : undefined
                     }
                     showCurrentLocation
@@ -1442,7 +1631,7 @@ export function SurveyRecordDetailsScreen() {
                 </View>
               ) : (
                 <AppButton
-                  variant='ghost'
+                  variant="ghost"
                   onPress={() => {
                     if (!isImageSubmission && (activeGpxUri || effectiveStartCoord)) {
                       handleOpenRouteMap();
@@ -1483,7 +1672,7 @@ export function SurveyRecordDetailsScreen() {
                 <AntDesign name="expand" size={20} color={theme.primary} />
               </AppButton>
             </View>
-            {locationMessage ? (
+            {locationMessage && !currentItemHasGps ? (
               <Text
                 accessibilityRole="alert"
                 style={[styles.locationMessage, { color: theme.textSecondary }]}
@@ -1511,6 +1700,7 @@ export function SurveyRecordDetailsScreen() {
                   multiline
                   placeholder="Nhập thông tin chi tiết bổ sung..."
                   placeholderTextColor={theme.placeholder}
+                  containerStyle={styles.noteInputContainer}
                   style={[
                     styles.noteInput,
                     {
@@ -1543,9 +1733,9 @@ export function SurveyRecordDetailsScreen() {
                   ? missingGpsBatchIndices.includes(currentBatchIndex)
                     ? formatBatchItemMissingGpsMessage(currentBatchIndex + 1, batchIds.length)
                     : formatBatchRemainingMissingGpsMessage(
-                      missingGpsBatchIndices.length,
-                      missingGpsBatchIndices.map((i) => i + 1).join(', '),
-                    )
+                        missingGpsBatchIndices.length,
+                        missingGpsBatchIndices.map((i) => i + 1).join(', '),
+                      )
                   : SINGLE_ITEM_MISSING_GPS_WARNING}
               </Text>
             </View>
@@ -1575,15 +1765,18 @@ export function SurveyRecordDetailsScreen() {
       </SafeAreaView>
 
       {/* Chunk Upload Progress Modal */}
-      <Modal
-        animationType="fade"
-        transparent
-        visible={Boolean(uploadProgress)}
-      >
+      <Modal animationType="fade" transparent visible={Boolean(uploadProgress)}>
         <View style={styles.progressModalOverlay}>
-          <View style={[styles.progressModalCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <View
+            style={[
+              styles.progressModalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
             <ActivityIndicator color={theme.primary} size="large" />
-            <Text style={[styles.progressModalTitle, { color: theme.text }]}>Đang tải lên Video khảo sát</Text>
+            <Text style={[styles.progressModalTitle, { color: theme.text }]}>
+              Đang tải lên Video khảo sát
+            </Text>
             <Text style={[styles.progressModalStatus, { color: theme.textSecondary }]}>
               {uploadProgress?.statusText}
             </Text>
@@ -1597,7 +1790,9 @@ export function SurveyRecordDetailsScreen() {
             </View>
             <View style={styles.progressMetaRow}>
               <Text style={[styles.progressMetaText, { color: theme.textSecondary }]}>
-                {uploadProgress?.currentChunk ? `Phần ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}` : 'Đang khởi tạo'}
+                {uploadProgress?.currentChunk
+                  ? `Phần ${uploadProgress.currentChunk}/${uploadProgress.totalChunks}`
+                  : 'Đang khởi tạo'}
               </Text>
               <Text style={[styles.progressMetaText, { color: theme.primary, fontWeight: '700' }]}>
                 {`${uploadProgress?.percent ?? 0}%`}
@@ -1704,6 +1899,16 @@ const styles = StyleSheet.create({
   imageLocationInput: {
     paddingLeft: Spacing.two,
   },
+  multilineAddressInput: {
+    height: 'auto',
+    minHeight: 48,
+    paddingVertical: Spacing.one,
+  },
+  calendarIconButton: {
+    paddingHorizontal: Spacing.one,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   attachGpxButton: {
     marginTop: Spacing.two,
   },
@@ -1766,6 +1971,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 600,
     lineHeight: 17,
+  },
+  noteInputContainer: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingLeft: 0,
   },
   noteInput: {
     minHeight: 112,

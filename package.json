@@ -28,11 +28,12 @@
     "build:apk:debug": "cd apps/mobile/android && gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a",
     "ci": "npm run lint:web && npm run build:web && npm run lint:ops && npm run build:ops && npm run lint:mobile && npm run typecheck:mobile",
     "test": "jest --watchAll",
-    "test:ci": "jest --watchAll=false",
-    "test:unit:ci": "jest apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx apps/mobile/__tests__/unit/navigation/spatial.test.ts apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx --watchAll=false --runInBand --forceExit",
+    "test:ci": "jest --watchAll=false --coverage",
+    "test:unit:ci": "jest apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/work/work-roles.test.tsx apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx apps/mobile/__tests__/unit/navigation/spatial.test.ts apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx --watchAll=false --runInBand --forceExit --coverage",
     "test:coverage": "jest --coverage --watchAll=false",
-    "test:integration": "jest apps/mobile/__tests__/intergration --watchAll=false",
-    "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui --watchAll=false",
+    "test:integration": "jest apps/mobile/__tests__/intergration --watchAll=false --coverage",
+    "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui apps/mobile/__tests__/unit/work apps/mobile/__tests__/unit/revalidation apps/mobile/__tests__/unit/credits apps/mobile/__tests__/unit/auth apps/mobile/__tests__/unit/splash --watchAll=false --runInBand --forceExit --coverage",
+    "test:report": "jest --coverage --watchAll=false",
     "test:e2e:upload": "npm run test:e2e:upload --workspace=mobile",
     "test:e2e:survey": "npm run test:e2e:survey --workspace=mobile",
     "test:e2e:reviewer": "npm run test:e2e:reviewer --workspace=mobile",
@@ -61,6 +62,20 @@
     "testEnvironment": "<rootDir>/jest.environment.js",
     "setupFiles": [
       "<rootDir>/jest.setup.js"
+    ],
+    "reporters": [
+      "default",
+      "<rootDir>/scripts/markdown-reporter.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "json-summary",
+      "lcov"
+    ],
+    "collectCoverageFrom": [
+      "apps/mobile/src/**/*.{ts,tsx}",
+      "!apps/mobile/src/**/*.d.ts",
+      "!apps/mobile/src/**/__mocks__/**"
     ],
     "transform": {
       "^.+\\.(js|jsx|ts|tsx|mjs)$": "babel-jest",

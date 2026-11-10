@@ -1,3 +1,5 @@
+jest.unmock('@/hooks/use-offline-maps');
+
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { OfflineMapModal } from '@/components/offline-map-modal';

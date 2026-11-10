@@ -1,3 +1,6 @@
+// Extend Jest timeout for React Native component rendering under coverage instrumentation
+jest.setTimeout(15000);
+
 if (globalThis.__NATIVE_GLOBALS__) {
   for (const [key, value] of Object.entries(globalThis.__NATIVE_GLOBALS__)) {
     if (value !== undefined) {
@@ -95,3 +98,17 @@ jest.mock('@/services/offline-map-service', () => ({
   },
   formatBytes: (bytes) => `${bytes} B`,
 }));
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: (props) => React.createElement(View, { testID: 'mock-datetimepicker', ...props }),
+    DateTimePickerAndroid: {
+      open: jest.fn(),
+      dismiss: jest.fn(),
+    },
+  };
+});
+

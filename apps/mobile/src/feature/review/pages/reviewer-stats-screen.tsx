@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { AppButton } from '@/components/button';
+import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { ListSkeleton, Skeleton } from '@/components/skeleton';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMyReviewHistory, useGetMyReviewerStats } from '@/feature/review/hooks/use-review';
@@ -61,6 +62,7 @@ export function ReviewerStatsScreen() {
     refetch: refetchStats,
     error: statsError,
   } = useGetMyReviewerStats();
+
 
   const {
     data: historyData,
@@ -110,7 +112,10 @@ export function ReviewerStatsScreen() {
   });
 
   const totalHistoryCount = historyData?.total ?? rawHistoryItems.length;
-  const totalPages = Math.max(1, historyData?.totalPages ?? Math.ceil(totalHistoryCount / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    historyData?.totalPages ?? Math.ceil(totalHistoryCount / PAGE_SIZE),
+  );
 
   const handleTabChange = (tab: 'all' | 'approved' | 'rejected') => {
     setActiveHistoryTab(tab);
@@ -118,7 +123,10 @@ export function ReviewerStatsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.screen, { backgroundColor: theme.background }]}
+    >
       <View style={styles.content}>
         {/* Top Header */}
         <View style={styles.header}>
@@ -158,7 +166,11 @@ export function ReviewerStatsScreen() {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           refreshControl={
-            <RefreshControl onRefresh={onRefresh} refreshing={isPullRefreshing} tintColor={theme.primary} />
+            <RefreshControl
+              onRefresh={onRefresh}
+              refreshing={isPullRefreshing}
+              tintColor={theme.primary}
+            />
           }
           showsVerticalScrollIndicator={false}
         >
@@ -190,18 +202,36 @@ export function ReviewerStatsScreen() {
 
               {/* History Section Skeleton */}
               <View style={{ gap: Spacing.two }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.one }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: Spacing.one,
+                  }}
+                >
                   <Skeleton height={20} width={180} />
                   <Skeleton height={14} width={60} />
                 </View>
-                <Skeleton borderRadius={Rounded.md} height={38} style={{ marginBottom: Spacing.two }} />
+                <Skeleton
+                  borderRadius={Rounded.md}
+                  height={38}
+                  style={{ marginBottom: Spacing.two }}
+                />
                 <ListSkeleton count={PAGE_SIZE} lines={2} showThumbnail={true} />
               </View>
             </View>
           ) : statsError ? (
-            <View style={[styles.errorCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.errorCard,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
               <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={36} />
-              <Text style={[styles.errorTitle, { color: theme.text }]}>Không thể tải dữ liệu thống kê</Text>
+              <Text style={[styles.errorTitle, { color: theme.text }]}>
+                Không thể tải dữ liệu thống kê
+              </Text>
               <Text style={[styles.errorDesc, { color: theme.grey }]}>
                 Vui lòng kiểm tra kết nối mạng và thử lại.
               </Text>
@@ -211,12 +241,6 @@ export function ReviewerStatsScreen() {
             <>
               {/* Hero Banner: Reliability Score */}
               <View style={[styles.heroCard, { backgroundColor: theme.primary }]}>
-                <View style={styles.heroTopRow}>
-                  <View style={styles.heroBadgeBox}>
-                    <Text style={styles.heroTierText}>{tierLabel}</Text>
-                  </View>
-                </View>
-
                 <View style={styles.heroScoreRow}>
                   <View style={styles.heroScoreCircle}>
                     <Text style={styles.heroScoreNumber}>{reliabilityPercent}%</Text>
@@ -224,15 +248,18 @@ export function ReviewerStatsScreen() {
                   </View>
 
                   <View style={styles.heroScoreInfo}>
-                    <Text style={styles.heroScoreHeading}>Điểm tín nhiệm</Text>
+                    <Text style={styles.heroScoreHeading}>{tierLabel}</Text>
                     <Text style={styles.heroScoreDesc}>
-                      Dựa trên sự đồng thuận của cộng đồng SignTrustMap với các phiếu thẩm định biển báo của bạn.
+                      Dựa trên sự đồng thuận của cộng đồng SignTrustMap với các phiếu thẩm định biển
+                      báo của bạn.
                     </Text>
 
                     {streak > 1 ? (
                       <View style={styles.streakBadge}>
                         <MaterialCommunityIcons color="#F59E0B" name="fire" size={16} />
-                        <Text style={styles.streakText}>Chuỗi {streak} phiếu chính xác liên tiếp</Text>
+                        <Text style={styles.streakText}>
+                          Chuỗi {streak} phiếu chính xác liên tiếp
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -249,10 +276,16 @@ export function ReviewerStatsScreen() {
                   ]}
                 >
                   <View style={[styles.metricIconWrap, { backgroundColor: '#0671eb15' }]}>
-                    <MaterialCommunityIcons color={theme.primary} name="shield-check-outline" size={22} />
+                    <MaterialCommunityIcons
+                      color={theme.primary}
+                      name="shield-check-outline"
+                      size={22}
+                    />
                   </View>
                   <Text style={[styles.metricValue, { color: theme.text }]}>{totalReviews}</Text>
-                  <Text style={[styles.metricLabel, { color: theme.grey }]}>Tổng lượt thẩm định</Text>
+                  <Text style={[styles.metricLabel, { color: theme.grey }]}>
+                    Tổng lượt thẩm định
+                  </Text>
                 </View>
 
                 {/* 2. Accuracy Rate */}
@@ -306,7 +339,11 @@ export function ReviewerStatsScreen() {
                 style={styles.reviewNowButton}
                 variant="primary"
               >
-                <MaterialCommunityIcons color="#FFFFFF" name="checkbox-multiple-marked-outline" size={20} />
+                <MaterialCommunityIcons
+                  color="#FFFFFF"
+                  name="checkbox-multiple-marked-outline"
+                  size={20}
+                />
                 <Text style={styles.reviewNowButtonText}>Tiếp tục thẩm định hồ sơ</Text>
               </AppButton>
 
@@ -314,9 +351,15 @@ export function ReviewerStatsScreen() {
               <View style={styles.historySection}>
                 <View style={styles.historyHeaderRow}>
                   <View style={styles.historyTitleWrap}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Lịch sử biểu quyết gần đây</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Lịch sử biểu quyết gần đây
+                    </Text>
                     {isHistoryFetching ? (
-                      <ActivityIndicator color={theme.primary} size="small" style={{ marginLeft: Spacing.one }} />
+                      <ActivityIndicator
+                        color={theme.primary}
+                        size="small"
+                        style={{ marginLeft: Spacing.one }}
+                      />
                     ) : null}
                   </View>
                   <Text style={[styles.historyCountText, { color: theme.grey }]}>
@@ -328,7 +371,10 @@ export function ReviewerStatsScreen() {
                 <View
                   accessibilityLabel="Lọc lịch sử"
                   accessibilityRole="tablist"
-                  style={[styles.historyFilterBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                  style={[
+                    styles.historyFilterBar,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
                 >
                   {(['all', 'approved', 'rejected'] as const).map((tab) => {
                     const isActive = activeHistoryTab === tab;
@@ -340,7 +386,10 @@ export function ReviewerStatsScreen() {
                         onPress={() => handleTabChange(tab)}
                         style={[
                           styles.historyFilterTab,
-                          isActive && [styles.historyFilterTabActive, { backgroundColor: theme.primary }],
+                          isActive && [
+                            styles.historyFilterTabActive,
+                            { backgroundColor: theme.primary },
+                          ],
                         ]}
                       >
                         <Text
@@ -364,8 +413,17 @@ export function ReviewerStatsScreen() {
                 {isHistoryLoading || isHistoryFetching ? (
                   <ListSkeleton count={PAGE_SIZE} lines={2} showThumbnail={true} />
                 ) : filteredHistoryItems.length === 0 ? (
-                  <View style={[styles.emptyHistoryBox, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                    <MaterialCommunityIcons color={theme.grey} name="file-document-outline" size={32} />
+                  <View
+                    style={[
+                      styles.emptyHistoryBox,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      color={theme.grey}
+                      name="file-document-outline"
+                      size={32}
+                    />
                     <Text style={[styles.emptyHistoryText, { color: theme.grey }]}>
                       {activeHistoryTab === 'all'
                         ? 'Bạn chưa thực hiện lượt thẩm định nào.'
@@ -373,100 +431,154 @@ export function ReviewerStatsScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <View style={[styles.historyList, isHistoryFetching && styles.historyListFetching]}>
-                    {filteredHistoryItems.map((item, index) => {
-                      const isApproved = item.vote > 0;
-                      const candidate = item.candidate;
-                      const signName =
-                        candidate?.predictedSignType?.nameVi ||
-                        candidate?.predictedSignType?.nameEn ||
-                        candidate?.predictedSignType?.signCode ||
-                        'Biển báo ứng viên';
-                      const signCode = candidate?.predictedSignType?.signCode;
-                      const cropUrl = resolveS3Url(candidate?.signCropUrl || candidate?.bestFrameUrl);
+                  <DateFilterSortList
+                    items={filteredHistoryItems}
+                    getDate={(item) => (item as any).reviewedAt || (item as any).createdAt}
+                    headerTitle="Lọc theo ngày biểu quyết"
+                    startDateLabel="Từ ngày"
+                    endDateLabel="Đến ngày"
+                    showPresets
+                    showSortToggle
+                    showCountBadge
+                    controlsCardStyle={{ marginBottom: Spacing.two }}
+                  >
+                    {({ items: dateFilteredItems, totalCount }) => {
+                      if (dateFilteredItems.length === 0) {
+                        return (
+                          <View
+                            style={[
+                              styles.emptyHistoryBox,
+                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.grey}
+                              name="file-document-outline"
+                              size={32}
+                            />
+                            <Text style={[styles.emptyHistoryText, { color: theme.grey }]}>
+                              {totalCount === 0
+                                ? 'Bạn chưa thực hiện lượt thẩm định nào.'
+                                : 'Không có bản ghi phù hợp với bộ lọc ngày.'}
+                            </Text>
+                          </View>
+                        );
+                      }
 
                       return (
                         <View
-                          key={item.candidateId || String(index)}
-                          style={[
-                            styles.historyCard,
-                            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                          ]}
+                          style={[styles.historyList, isHistoryFetching && styles.historyListFetching]}
                         >
-                          {/* Image Thumbnail or fallback */}
-                          <View style={[styles.historyThumbWrap, { backgroundColor: `${theme.grey}15` }]}>
-                            {cropUrl ? (
-                              <Image
-                                contentFit="cover"
-                                source={{ uri: cropUrl }}
-                                style={styles.historyThumb}
-                                transition={200}
-                              />
-                            ) : (
-                              <MaterialCommunityIcons
-                                color={theme.primary}
-                                name="sign-direction"
-                                size={22}
-                              />
-                            )}
-                          </View>
+                          {dateFilteredItems.map((item, index) => {
+                            const isApproved = item.vote > 0;
+                            const candidate = item.candidate;
+                            const signName =
+                              candidate?.predictedSignType?.nameVi ||
+                              candidate?.predictedSignType?.nameEn ||
+                              candidate?.predictedSignType?.signCode ||
+                              'Biển báo ứng viên';
+                            const signCode = candidate?.predictedSignType?.signCode;
+                            const cropUrl = resolveS3Url(
+                              candidate?.signCropUrl || candidate?.bestFrameUrl,
+                            );
 
-                          {/* Info */}
-                          <View style={styles.historyBody}>
-                            <View style={styles.historyTopRow}>
-                              <Text numberOfLines={1} style={[styles.historySignName, { color: theme.text }]}>
-                                {signName}
-                              </Text>
-
+                            return (
                               <View
+                                key={item.candidateId || String(index)}
                                 style={[
-                                  styles.historyVoteBadge,
-                                  {
-                                    backgroundColor: isApproved
-                                      ? 'rgba(16, 185, 129, 0.12)'
-                                      : 'rgba(239, 68, 68, 0.12)',
-                                  },
+                                  styles.historyCard,
+                                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                                 ]}
                               >
-                                <MaterialCommunityIcons
-                                  color={isApproved ? '#10B981' : '#EF4444'}
-                                  name={isApproved ? 'check-circle' : 'close-circle'}
-                                  size={13}
-                                />
-                                <Text
+                                {/* Image Thumbnail or fallback */}
+                                <View
                                   style={[
-                                    styles.historyVoteText,
-                                    { color: isApproved ? '#10B981' : '#EF4444' },
+                                    styles.historyThumbWrap,
+                                    { backgroundColor: `${theme.grey}15` },
                                   ]}
                                 >
-                                  {isApproved ? 'Đồng ý' : 'Từ chối'}
-                                </Text>
+                                  {cropUrl ? (
+                                    <Image
+                                      contentFit="cover"
+                                      source={{ uri: cropUrl }}
+                                      style={styles.historyThumb}
+                                      transition={200}
+                                    />
+                                  ) : (
+                                    <MaterialCommunityIcons
+                                      color={theme.primary}
+                                      name="sign-direction"
+                                      size={22}
+                                    />
+                                  )}
+                                </View>
+
+                                {/* Info */}
+                                <View style={styles.historyBody}>
+                                  <View style={styles.historyTopRow}>
+                                    <Text
+                                      numberOfLines={1}
+                                      style={[styles.historySignName, { color: theme.text }]}
+                                    >
+                                      {signName}
+                                    </Text>
+
+                                    <View
+                                      style={[
+                                        styles.historyVoteBadge,
+                                        {
+                                          backgroundColor: isApproved
+                                            ? 'rgba(16, 185, 129, 0.12)'
+                                            : 'rgba(239, 68, 68, 0.12)',
+                                        },
+                                      ]}
+                                    >
+                                      <MaterialCommunityIcons
+                                        color={isApproved ? '#10B981' : '#EF4444'}
+                                        name={isApproved ? 'check-circle' : 'close-circle'}
+                                        size={13}
+                                      />
+                                      <Text
+                                        style={[
+                                          styles.historyVoteText,
+                                          { color: isApproved ? '#10B981' : '#EF4444' },
+                                        ]}
+                                      >
+                                        {isApproved ? 'Đồng ý' : 'Từ chối'}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  {signCode ? (
+                                    <Text style={[styles.historySignCode, { color: theme.grey }]}>
+                                      Mã hiệu: {signCode}
+                                    </Text>
+                                  ) : null}
+
+                                  {item.declineReason ? (
+                                    <Text numberOfLines={1} style={styles.historyDeclineReason}>
+                                      Lý do: {item.declineReason}
+                                    </Text>
+                                  ) : null}
+
+                                  <View style={styles.historyFooter}>
+                                    <MaterialCommunityIcons
+                                      color={theme.grey}
+                                      name="clock-outline"
+                                      size={12}
+                                    />
+                                    <Text style={[styles.historyDateText, { color: theme.grey }]}>
+                                      {formatReviewDate(item.reviewedAt || (item as any).createdAt)}
+                                    </Text>
+                                  </View>
+                                </View>
                               </View>
-                            </View>
-
-                            {signCode ? (
-                              <Text style={[styles.historySignCode, { color: theme.grey }]}>
-                                Mã hiệu: {signCode}
-                              </Text>
-                            ) : null}
-
-                            {item.declineReason ? (
-                              <Text numberOfLines={1} style={styles.historyDeclineReason}>
-                                Lý do: {item.declineReason}
-                              </Text>
-                            ) : null}
-
-                            <View style={styles.historyFooter}>
-                              <MaterialCommunityIcons color={theme.grey} name="clock-outline" size={12} />
-                              <Text style={[styles.historyDateText, { color: theme.grey }]}>
-                                {formatReviewDate(item.reviewedAt)}
-                              </Text>
-                            </View>
-                          </View>
+                            );
+                          })}
                         </View>
                       );
-                    })}
-                  </View>
+                    }}
+                  </DateFilterSortList>
                 )}
 
                 {/* Pagination */}
@@ -491,7 +603,11 @@ export function ReviewerStatsScreen() {
                         Trang {historyPage} / {totalPages}
                       </Text>
                       {isHistoryFetching ? (
-                        <ActivityIndicator color={theme.primary} size="small" style={{ marginLeft: 6 }} />
+                        <ActivityIndicator
+                          color={theme.primary}
+                          size="small"
+                          style={{ marginLeft: 6 }}
+                        />
                       ) : null}
                     </View>
                     <AppButton

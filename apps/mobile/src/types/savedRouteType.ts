@@ -9,6 +9,7 @@ export interface SavedRoute {
   id: string;
   userId: string;
   title: string;
+  name?: string;
   vehicleMode: string;
   originName: string;
   originLatitude: number;
@@ -16,7 +17,7 @@ export interface SavedRoute {
   destinationName: string;
   destinationLatitude: number;
   destinationLongitude: number;
-  waypoints?: Array<{ latitude: number; longitude: number; name?: string }>;
+  waypoints?: string[] | Array<{ latitude: number; longitude: number; name?: string }>;
   distanceMeters: number;
   durationSeconds: number;
   encodedPolyline: string;
@@ -34,7 +35,7 @@ export interface CreateSavedRouteDto {
   destinationName: string;
   destinationLatitude: number;
   destinationLongitude: number;
-  waypoints?: Array<{ latitude: number; longitude: number; name?: string }>;
+  waypoints?: string[] | Array<{ latitude: number; longitude: number; name?: string }>;
   distanceMeters?: number;
   durationSeconds?: number;
   encodedPolyline?: string;
@@ -73,8 +74,9 @@ export function categoryToCode(cat: SignCategory): string {
   }
 }
 
-export function codeToCategory(code: string): SignCategory {
-  const norm = (code || '').toUpperCase().trim();
+export function codeToCategory(code: unknown): SignCategory {
+  if (typeof code !== 'string') return 'WARNING';
+  const norm = code.toUpperCase().trim();
   if (norm === 'P' || norm === 'PROHIBITORY' || norm === 'PROHIBITION') return 'PROHIBITORY';
   if (norm === 'W' || norm === 'WARNING') return 'WARNING';
   if (norm === 'R' || norm === 'MANDATORY') return 'MANDATORY';

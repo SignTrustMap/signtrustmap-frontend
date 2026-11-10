@@ -30,7 +30,7 @@ import {
   type RouteSign,
 } from "@/api/navigation/navigation";
 import { resolveLocation, formatResolvedLocationTitle } from "@/api/spatial/spatial";
-import { useGetNavigationRoute } from "../hooks/use-navigation";
+import { useGetNavigationRoute, useInitiateNavigationSession } from "../hooks/use-navigation";
 import { useGetSignsAlongRoute, useGetSignsInBounds } from "../hooks/use-signs";
 import { confirmSignPresence } from "@/api/sign-map/sign-map";
 import { useSignProximityAlert } from "../hooks/use-sign-proximity-alert";
@@ -51,6 +51,7 @@ import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
   GPS_NATIVE_BUILD_REQUIRED_MESSAGE,
   GPS_UNAVAILABLE_MESSAGE,
+  INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE,
   LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE,
   ROUTE_LOADING_MESSAGE,
   UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
@@ -117,6 +118,7 @@ export function NavigationMapScreen() {
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
   );
+  const lastAppliedSavedRouteIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (paramSavedRouteId) {
@@ -254,6 +256,7 @@ export function NavigationMapScreen() {
   }, [paramVehicleMode]);
   const isMotorcycleMode = vehicleMode === "MOTORCYCLE" || vehicleMode === "BIKE";
   const session = useOptionalSession()?.session;
+  const initiateSessionMutation = useInitiateNavigationSession(session?.accessToken);
 
   useEffect(() => {
     if (isCustomStart || startTitle || savedRouteData || !plannedRouteOrigin) {
@@ -490,11 +493,21 @@ export function NavigationMapScreen() {
   const routeSteps = activeRouteResult?.steps;
   const activeDuration = routeDuration ?? 0;
 
+  const userCredits = Number(walletData?.wallet?.balance ?? 0);
+  const isRoutePreviewReady = Boolean(
+    !isNavigating && plannedRouteOrigin && selectedDestination && activeRouteResult?.coordinates?.length,
+  );
+  const hasInsufficientCredits = isRoutePreviewReady && userCredits < 5;
+
   useEffect(() => {
-    if (activeRouteResult?.coordinates?.length) {
-      setNavigationError(undefined);
+    if (activeRouteResult?.coordinates?.length && !isNavigating) {
+      if (userCredits < 5) {
+        setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
+      } else {
+        setNavigationError(undefined);
+      }
     }
-  }, [activeRouteResult?.coordinates]);
+  }, [activeRouteResult?.coordinates, isNavigating, userCredits]);
 
   useEffect(() => {
     setNavigationActive(isNavigating);
@@ -558,18 +571,23 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (savedRouteData && !isNavigating) {
-      const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
-      if (modeUpper === "CYCLING" || modeUpper === "BICYCLE") {
-        setVehicleMode("CYCLING");
-      } else if (modeUpper === "WALKING" || modeUpper === "PEDESTRIAN") {
-        setVehicleMode("WALKING");
-      } else if (modeUpper === "MOTORCYCLE" || modeUpper === "BIKE") {
-        setVehicleMode("MOTORCYCLE");
-      } else {
-        setVehicleMode("DRIVING");
+      if (lastAppliedSavedRouteIdRef.current !== savedRouteData.id) {
+        lastAppliedSavedRouteIdRef.current = savedRouteData.id;
+        const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
+        if (modeUpper === "CYCLING" || modeUpper === "BICYCLE") {
+          setVehicleMode("CYCLING");
+        } else if (modeUpper === "WALKING" || modeUpper === "PEDESTRIAN") {
+          setVehicleMode("WALKING");
+        } else if (modeUpper === "MOTORCYCLE" || modeUpper === "BIKE") {
+          setVehicleMode("MOTORCYCLE");
+        } else {
+          setVehicleMode("DRIVING");
+        }
+        void setActivePresetId(savedRouteData.id);
+        snapTo(1);
       }
-      void setActivePresetId(savedRouteData.id);
-      snapTo(1);
+    } else if (!savedRouteData) {
+      lastAppliedSavedRouteIdRef.current = null;
     }
   }, [savedRouteData, isNavigating, setActivePresetId, snapTo]);
 
@@ -698,6 +716,12 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (activePresetId && plannedRouteOrigin && selectedDestination) {
+      if (activeSavedRouteId && activePresetId === activeSavedRouteId) {
+        return;
+      }
+      if (savedRouteData && activePresetId === savedRouteData.id) {
+        return;
+      }
       const isMatching = routeMatchingPresets.some((p) => p.id === activePresetId);
       if (!isMatching) {
         void setActivePresetId(null);
@@ -705,6 +729,8 @@ export function NavigationMapScreen() {
     }
   }, [
     activePresetId,
+    activeSavedRouteId,
+    savedRouteData,
     plannedRouteOrigin,
     selectedDestination,
     routeMatchingPresets,
@@ -909,6 +935,15 @@ export function NavigationMapScreen() {
       return;
     }
 
+    if (userCredits < 5) {
+      setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
+      setLocationToast({
+        id: Date.now(),
+        message: INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE,
+      });
+      return;
+    }
+
     setIsStartingNavigation(true);
     setNavigationError(undefined);
 
@@ -921,6 +956,38 @@ export function NavigationMapScreen() {
         });
         setNavigationError(LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE);
         return;
+      }
+
+      if (session?.accessToken) {
+        try {
+          await initiateSessionMutation.mutateAsync({
+            origin: {
+              latitude: plannedRouteOrigin[1],
+              longitude: plannedRouteOrigin[0],
+            },
+            destination: {
+              latitude: selectedDestination.coordinate[1],
+              longitude: selectedDestination.coordinate[0],
+            },
+            vehicleType: vehicleMode,
+          });
+        } catch (apiError: any) {
+          console.error("[Navigation] Failed to initiate navigation session:", apiError);
+          const isInsufficient =
+            apiError?.message?.includes("Insufficient") ||
+            apiError?.message?.includes("credit") ||
+            apiError?.status === 400;
+          const errorMsg = isInsufficient
+            ? INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE
+            : apiError?.message || INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE;
+
+          setNavigationError(errorMsg);
+          setLocationToast({
+            id: Date.now(),
+            message: errorMsg,
+          });
+          return;
+        }
       }
 
       await startGpsListening();
@@ -1420,6 +1487,7 @@ export function NavigationMapScreen() {
         onSelectPreset={handleSelectPreset}
         visibleSigns={visibleSigns}
         isStartingNavigation={isStartingNavigation}
+        isStartDisabled={hasInsufficientCredits}
         isRouteBookmarked={isRouteBookmarked}
         onBeginNavigation={handleBeginNavigation}
         onOpenBookmarkModal={() => setIsBookmarkModalOpen(true)}

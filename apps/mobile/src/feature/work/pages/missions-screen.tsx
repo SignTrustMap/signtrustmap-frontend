@@ -396,13 +396,13 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
               <View style={styles.streakTextCol}>
                 <View style={styles.streakHeaderRow}>
                   {streak === 0 ? (
-                    <>  <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
+                    <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
                       Bắt đầu chuỗi ngày đóng góp của bạn ngay!
-                    </Text></>
+                    </Text>
                   ) : (
-                    <>  <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
+                    <Text style={[styles.streakNumberTitle, { color: theme.text }]}>
                       Chuỗi {streak} ngày
-                    </Text></>
+                    </Text>
                   )}
                 </View>
                 <Text style={[styles.streakSubText, { color: theme.grey }]}>

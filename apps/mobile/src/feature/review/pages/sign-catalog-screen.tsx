@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
+import { ImageInspectionModal } from '@/components/image-inspection-modal';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useGetCatalog, useRefreshCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
@@ -39,7 +40,13 @@ function normalizeSearch(value: string) {
     .replace(/\s+/g, ' ');
 }
 
-function SignCard({ sign }: { sign: CatalogSign }) {
+function SignCard({
+  sign,
+  onInspect,
+}: {
+  sign: CatalogSign;
+  onInspect?: (url: string, title: string, subtitle?: string) => void;
+}) {
   const theme = useTheme();
   const colors = categoryColor(sign.category.code);
   const [imageError, setImageError] = useState(false);
@@ -49,8 +56,21 @@ function SignCard({ sign }: { sign: CatalogSign }) {
     !sign.representativeImageKey.includes('signtrustmap.vn') &&
     !imageError;
 
+  const handlePress = () => {
+    if (hasValidUrl && onInspect) {
+      onInspect(
+        sign.representativeImageKey!,
+        sign.nameVi || sign.nameEn,
+        sign.description || sign.signCode,
+      );
+    }
+  };
+
   return (
-    <View
+    <Pressable
+      accessibilityLabel={`Xem biển báo ${sign.nameVi || sign.nameEn}`}
+      accessibilityRole="button"
+      onPress={handlePress}
       style={[
         styles.card,
         { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -80,7 +100,7 @@ function SignCard({ sign }: { sign: CatalogSign }) {
           {sign.description || sign.signCode}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -91,6 +111,11 @@ export function SignCatalogScreen() {
 
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
+  const [inspectPhoto, setInspectPhoto] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
   const { data: catalog, isPending: isLoading, error: catalogError } = useGetCatalog();
   const { mutateAsync: refreshCatalog, isPending: isRefreshing } = useRefreshCatalog();
   const categories = catalog?.categories ?? [];
@@ -231,7 +256,11 @@ export function SignCatalogScreen() {
           ) : filteredSigns.length > 0 ? (
             <View style={styles.grid}>
               {filteredSigns.map((sign) => (
-                <SignCard key={sign.id} sign={sign} />
+                <SignCard
+                  key={sign.id}
+                  onInspect={(url, title, subtitle) => setInspectPhoto({ url, title, subtitle })}
+                  sign={sign}
+                />
               ))}
             </View>
           ) : (
@@ -245,6 +274,13 @@ export function SignCatalogScreen() {
         </ScrollView>
       </SafeAreaView>
       {!role || role === 'reviewer' ? <ReviewBottomTabs activeTab="catalog" /> : null}
+      <ImageInspectionModal
+        imageUrl={inspectPhoto?.url}
+        onClose={() => setInspectPhoto(null)}
+        subtitle={inspectPhoto?.subtitle}
+        title={inspectPhoto?.title}
+        visible={Boolean(inspectPhoto)}
+      />
     </View>
   );
 }

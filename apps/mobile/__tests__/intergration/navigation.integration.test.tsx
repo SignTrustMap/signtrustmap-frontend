@@ -385,8 +385,8 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       });
 
       // Verify vehicle mode tabs appear
-      expect(await waitFor(() => getByLabelText('Car route'))).toBeTruthy();
-      expect(await waitFor(() => getByLabelText('Bike route'))).toBeTruthy();
+      expect(await waitFor(() => getByLabelText(/Car route|Tuyến đường ô tô/i))).toBeTruthy();
+      expect(await waitFor(() => getByLabelText(/Bike route|Tuyến đường xe máy/i))).toBeTruthy();
 
       // Verify Start button is ready in bottom sheet
       expect(await waitFor(() => getByLabelText('Begin navigation'))).toBeTruthy();
@@ -436,7 +436,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       });
 
       // Switch to Bike mode via accessibilityLabel
-      const bikeTab = await findByLabelText('Bike route');
+      const bikeTab = await findByLabelText(/Bike route|Tuyến đường xe máy/i);
       await act(async () => {
         await fireEvent.press(bikeTab);
       });

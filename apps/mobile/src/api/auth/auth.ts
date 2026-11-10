@@ -29,6 +29,8 @@ export type LoginResponse = {
     fullName: string;
     id: string;
     roles: string[];
+    avatarUrl?: string | null;
+    avatar?: string | null;
   };
 };
 
@@ -54,6 +56,7 @@ export async function login(request: LoginRequest): Promise<AppSession> {
       email: response.user.email,
       id: response.user.id,
       roles,
+      avatarUrl: response.user.avatarUrl ?? response.user.avatar ?? null,
     },
   };
   return res;
@@ -74,6 +77,11 @@ export async function loginWithGoogle(idToken: string): Promise<AppSession> {
       email: response.user.email,
       id: response.user.id,
       roles,
+      avatarUrl:
+        response.user.avatarUrl ??
+        response.user.avatar ??
+        (response.user as any).picture ??
+        null,
     },
   };
 }
@@ -91,6 +99,7 @@ export type UpdateProfileRequest = {
   fullName?: string;
   phone?: string;
   avatarUrl?: string;
+  address?: string;
 };
 
 export type UserProfileResponse = {
@@ -99,6 +108,7 @@ export type UserProfileResponse = {
   fullName: string;
   phone?: string | null;
   avatarUrl?: string | null;
+  address?: string | null;
   roles?: string[];
 };
 

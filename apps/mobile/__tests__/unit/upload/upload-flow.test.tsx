@@ -12,6 +12,10 @@ import {
   SELECT_VALID_GPX_FILE_MESSAGE,
 } from '@/constants/message';
 
+jest.mock('expo-blob', () => ({
+  Blob: class MockBlob {},
+}));
+
 // 1. Mock expo-router
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -144,9 +148,25 @@ jest.mock('@/feature/upload/hooks/use-save-survey-draft', () => ({
 
 const mockUpdateSubmission = jest.fn();
 const mockSubmitSubmission = jest.fn();
+const mockCreateSubmission = jest.fn().mockResolvedValue({ id: 'mock-sub-123' });
+const mockInitializeUpload = jest.fn().mockResolvedValue({ uploadId: 'mock-up-1', key: 'mock-key' });
+const mockUploadChunk = jest.fn().mockResolvedValue({ etag: 'mock-etag-1' });
+const mockCompleteUpload = jest.fn().mockResolvedValue({ status: 'completed' });
 let mockSubmissionStatusData: any = null;
 
 jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
+  useCreateSurveySubmission: () => ({
+    mutateAsync: mockCreateSubmission,
+  }),
+  useInitializeSurveyUpload: () => ({
+    mutateAsync: mockInitializeUpload,
+  }),
+  useUploadSurveyChunk: () => ({
+    mutateAsync: mockUploadChunk,
+  }),
+  useCompleteSurveyUpload: () => ({
+    mutateAsync: mockCompleteUpload,
+  }),
   useGetSurveySubmissionStatus: () => ({
     data: mockSubmissionStatusData,
     isLoading: false,
@@ -354,7 +374,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       expect(mockPush).toHaveBeenCalledWith('/work/survey-history');
     });
 
-    it('saves draft and replaces route with /work/new-survey/details upon scan completion', async () => {
+    it('replaces route with /work/new-survey/details upon scan completion without calling draft creation', async () => {
       mockLaunchImageLibraryAsync.mockResolvedValueOnce({
         canceled: false,
         assets: [
@@ -368,7 +388,6 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         ],
       });
       mockExtractImageGpsCoordinates.mockReturnValueOnce({ latitude: 10.7769, longitude: 106.7009 });
-      mockSaveDraft.mockResolvedValueOnce('sub-generated-123');
 
       const { getByText, getByLabelText } = await render(<NewSurveyRecordScreen />);
 
@@ -383,19 +402,18 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       // Submit record
       fireEvent.press(getByText('Tiếp tục ghi nhận'));
 
-      await waitFor(() => {
-        expect(mockSaveDraft).toHaveBeenCalled();
-      });
-
       // Trigger completion callback from scan modal
-      expect(mockScanModalCompleteCallback).toBeDefined();
+      await waitFor(() => {
+        expect(mockScanModalCompleteCallback).toBeDefined();
+      });
       mockScanModalCompleteCallback!();
 
+      expect(mockSaveDraft).not.toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/work/new-survey/details',
           params: expect.objectContaining({
-            submissionId: 'sub-generated-123',
+            imageUri: 'file:///data/photo-1.jpg',
             startLat: '10.7769',
             startLon: '106.7009',
           }),
@@ -648,6 +666,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
   describe('Case 6: Item Details Screen', () => {
     it('hydrates draft metadata, displays reverse geocoded address, and allows editing note and timestamp', async () => {
       mockSearchParams = { submissionId: 'sub-existing-123' };
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
       mockSubmissionStatusData = {
         submission: {
           id: 'sub-existing-123',
@@ -655,7 +674,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
           submissionType: 'SINGLE_IMAGE',
           latitude: 10.7769,
           longitude: 106.7009,
-          capturedAt: '2026-03-01T10:00:00.000Z',
+          capturedAt: validDate,
           coordinateSource: 'IMAGE_EXIF',
           note: 'Initial speed limit note',
         },
@@ -670,19 +689,19 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         type: 'image',
       });
 
-      const { getByLabelText, getByText } = await render(<SurveyRecordDetailsScreen />);
+      const { getByLabelText, getByText, getByDisplayValue } = await render(<SurveyRecordDetailsScreen />);
 
       await waitFor(() => {
-        expect(getByText('New Survey Record')).toBeTruthy();
-        expect(getByText('123 Nguyen Hue, Ben Nghe, District 1')).toBeTruthy();
+        expect(getByText('Ghi nhận khảo sát mới')).toBeTruthy();
+        expect(getByDisplayValue('123 Nguyen Hue, Ben Nghe, District 1')).toBeTruthy();
       });
 
-      const noteInput = getByLabelText('Survey note');
+      const noteInput = getByLabelText('Ghi chú khảo sát');
       expect(noteInput.props.value).toBe('Initial speed limit note');
 
       fireEvent.changeText(noteInput, 'Updated sign description');
       await waitFor(() => {
-        expect(getByLabelText('Survey note').props.value).toBe('Updated sign description');
+        expect(getByLabelText('Ghi chú khảo sát').props.value).toBe('Updated sign description');
       });
     });
 
@@ -705,10 +724,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(<SurveyRecordDetailsScreen />);
 
       await waitFor(() => {
-        expect(getByText('Choose draft media')).toBeTruthy();
+        expect(getByText('Chọn phương tiện bản nháp')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('Choose draft media'));
+      fireEvent.press(getByText('Chọn phương tiện bản nháp'));
 
       expect(mockReplace).toHaveBeenCalledWith({
         pathname: '/work/new-survey',
@@ -722,7 +741,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         submission: {
           id: 'sub-gps-update',
           status: 'DRAFT',
-          submissionType: 'SINGLE_IMAGE',
+          submissionType: 'VIDEO_GPX',
           latitude: null,
           longitude: null,
           capturedAt: '2026-03-01T10:00:00.000Z',
@@ -731,8 +750,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         sessions: [],
       };
       mockReadDraftImage.mockResolvedValueOnce({
-        uri: 'file:///cache/survey.jpg',
+        uri: 'file:///cache/survey.mp4',
         submissionId: 'sub-gps-update',
+        type: 'video',
+        mimeType: 'video/mp4',
       });
 
       mockMapLibreLocation.getCurrentPosition.mockResolvedValueOnce({
@@ -742,10 +763,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(<SurveyRecordDetailsScreen />);
 
       await waitFor(() => {
-        expect(getByText('Use current location')).toBeTruthy();
+        expect(getByText('Lấy vị trí')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('Use current location'));
+      fireEvent.press(getByText('Lấy vị trí'));
 
       await waitFor(() => {
         expect(mockMapLibreLocation.getCurrentPosition).toHaveBeenCalled();
@@ -759,6 +780,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
   describe('Case 7: Upload Submit Screen & Finish Screen Flow', () => {
     it('executes single image submission and navigates to /work/survey-finish', async () => {
       mockSearchParams = { submissionId: 'sub-final-image' };
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
       mockSubmissionStatusData = {
         submission: {
           id: 'sub-final-image',
@@ -766,7 +788,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
           submissionType: 'SINGLE_IMAGE',
           latitude: 10.7769,
           longitude: 106.7009,
-          capturedAt: '2026-03-01T10:00:00.000Z',
+          capturedAt: validDate,
           coordinateSource: 'IMAGE_EXIF',
           note: 'Final sign check',
         },
@@ -785,17 +807,16 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       const { getByText, getByLabelText } = await render(<SurveyRecordDetailsScreen />);
 
       await waitFor(() => {
-        expect(getByLabelText('Survey note').props.value).toBe('Final sign check');
+        expect(getByLabelText('Ghi chú khảo sát').props.value).toBe('Final sign check');
       });
 
-      fireEvent.press(getByText('Submit'));
+      fireEvent.press(getByText('Gửi hồ sơ'));
 
       await waitFor(() => {
-        expect(mockUpdateSubmission).toHaveBeenCalled();
         expect(mockSubmitSubmission).toHaveBeenCalledWith({ submissionId: 'sub-final-image' });
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/work/survey-finish',
+            pathname: '/work/submission-complete',
             params: expect.objectContaining({
               submissionId: 'sub-final-image',
             }),
@@ -806,6 +827,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
     it('executes chunked video upload and registration before finalizing video submission', async () => {
       mockSearchParams = { submissionId: 'sub-final-video', duration: '60' };
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
       mockSubmissionStatusData = {
         submission: {
           id: 'sub-final-video',
@@ -813,7 +835,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
           submissionType: 'VIDEO_GPX',
           latitude: 10.7769,
           longitude: 106.7009,
-          capturedAt: '2026-03-01T10:00:00.000Z',
+          capturedAt: validDate,
           coordinateSource: 'GPX_FILE',
           note: 'Video survey route',
         },
@@ -835,20 +857,19 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       const { getByText, getByLabelText } = await render(<SurveyRecordDetailsScreen />);
 
       await waitFor(() => {
-        expect(getByLabelText('Survey note').props.value).toBe('Video survey route');
+        expect(getByLabelText('Ghi chú khảo sát').props.value).toBe('Video survey route');
       });
 
-      fireEvent.press(getByText('Submit'));
+      fireEvent.press(getByText('Gửi hồ sơ'));
 
       await waitFor(() => {
         expect(mockExecuteChunkedVideoUpload).toHaveBeenCalled();
         expect(mockRegisterZeroCopyDraft).toHaveBeenCalled();
         expect(mockStartSmartPollingSync).toHaveBeenCalled();
-        expect(mockUpdateSubmission).toHaveBeenCalled();
         expect(mockSubmitSubmission).toHaveBeenCalled();
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/work/survey-finish',
+            pathname: '/work/submission-complete',
             params: expect.objectContaining({
               submissionId: 'sub-final-video',
             }),
@@ -865,19 +886,19 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
 
       const { getByText } = await render(<SurveyFinishScreen />);
 
-      expect(getByText('Sign submitted')).toBeTruthy();
-      expect(getByText('Your image was uploaded successfully and is queued for processing.')).toBeTruthy();
-      expect(getByText(/Reference sub-fini - QUEUED/)).toBeTruthy();
+      expect(getByText('Đã gửi hồ sơ khảo sát')).toBeTruthy();
+      expect(getByText('Hình ảnh của bạn đã được tải lên thành công và đang được đưa vào hàng đợi xử lý.')).toBeTruthy();
+      expect(getByText(/Mã tham chiếu sub-fini - QUEUED/)).toBeTruthy();
 
-      // Test "Submit another survey"
-      const submitAnotherBtn = getByText('Submit another survey');
+      // Test "Gửi khảo sát khác"
+      const submitAnotherBtn = getByText('Gửi khảo sát khác');
       fireEvent.press(submitAnotherBtn);
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/work/new-survey');
       });
 
-      // Test "Return to surveyor's home"
-      const returnHomeBtn = getByText("Return to surveyor's home");
+      // Test "Quay lại trang khảo sát"
+      const returnHomeBtn = getByText('Quay lại trang khảo sát');
       fireEvent.press(returnHomeBtn);
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith(
@@ -1049,7 +1070,10 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         ).toBe('');
       });
 
-      fireEvent.press(getByText('Gửi hồ sơ'));
+      fireEvent.changeText(
+        getByLabelText('Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm'),
+        'invalid-date',
+      );
 
       await waitFor(() => {
         expect(
@@ -1219,7 +1243,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
         uri: 'file:///cache/sign.jpg',
         submissionId: 'sub-network-fail',
       });
-      mockUpdateSubmission.mockRejectedValueOnce(new Error('Network connection timeout.'));
+      mockSubmitSubmission.mockRejectedValueOnce(new Error('Network connection timeout.'));
 
       const { getByText, getByLabelText } = await render(<SurveyRecordDetailsScreen />);
 
@@ -1237,7 +1261,7 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
       await waitFor(() => {
         expect(getByText('Network connection timeout.')).toBeTruthy();
         expect(mockReplace).not.toHaveBeenCalledWith(
-          expect.objectContaining({ pathname: '/work/survey-finish' }),
+          expect.objectContaining({ pathname: '/work/submission-complete' }),
         );
       });
       consoleSpy.mockRestore();

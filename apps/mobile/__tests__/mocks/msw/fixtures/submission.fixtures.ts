@@ -7,12 +7,14 @@ import type {
   UploadSessionResponse,
 } from '@/types/surveySubmissionType';
 
+const mockRecentCapturedAt = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+
 export const mockCreatedSubmission = {
   id: 'sub-test-001',
   submissionId: 'sub-test-001',
   status: 'DRAFT' as const,
   submissionType: 'SINGLE_IMAGE' as const,
-  capturedAt: '2026-10-01T08:00:00Z',
+  capturedAt: mockRecentCapturedAt,
   coordinateSource: 'Ảnh' as const,
   latitude: 10.7769,
   longitude: 106.7009,
@@ -62,15 +64,15 @@ export const mockSubmissionStatusResponse: SubmissionStatusResponse = {
     surveyorId: 'surveyor-user-1',
     submissionType: 'SINGLE_IMAGE',
     status: 'DRAFT',
-    capturedAt: '2026-10-01T08:00:00Z',
+    capturedAt: mockRecentCapturedAt,
     coordinateSource: 'Ảnh',
     latitude: 10.7769,
     longitude: 106.7009,
     note: 'Sample draft note',
     failureReason: null,
     totalCandidatesExtracted: 0,
-    createdAt: '2026-10-01T08:00:00Z',
-    updatedAt: '2026-10-01T08:00:00Z',
+    createdAt: mockRecentCapturedAt,
+    updatedAt: mockRecentCapturedAt,
   },
   mediaFiles: [
     {

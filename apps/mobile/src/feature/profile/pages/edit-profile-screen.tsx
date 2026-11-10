@@ -1,7 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { zodResolver } from '@hookform/resolvers/zod';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
   Alert,
@@ -12,17 +14,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getProfile, updateProfile } from '@/api/auth/auth';
 import { AppButton } from '@/components/button';
+import { AppInput } from '@/components/input';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
-import { getProfile, updateProfile } from '@/api/auth/auth';
+
 import { AvatarCropModal } from '../components/avatar-crop-modal';
+import { editProfileSchema, type EditProfileFormData } from '../schemas/edit-profile.schema';
 
 function getInitials(displayName?: string) {
   if (!displayName) return 'ST';
@@ -40,8 +44,6 @@ export function EditProfileScreen() {
   const theme = useTheme();
   const { session, updateAccount } = useSession();
 
-  const [fullName, setFullName] = useState(session?.account.displayName ?? '');
-  const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(session?.account.avatarUrl ?? null);
   const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
   const [selectedPickerUri, setSelectedPickerUri] = useState<string | null>(null);
@@ -49,15 +51,44 @@ export function EditProfileScreen() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<EditProfileFormData>({
+    resolver: zodResolver(editProfileSchema),
+    mode: 'onChange',
+    defaultValues: {
+      fullName: session?.account.displayName ?? '',
+      phone: '',
+      address: session?.account.address ?? '',
+    },
+  });
+
+  const fullName = watch('fullName');
+
   useEffect(() => {
     let isMounted = true;
     if (session?.accessToken) {
       getProfile(session.accessToken)
         .then((profile) => {
           if (isMounted) {
-            if (profile.fullName) setFullName(profile.fullName);
-            if (profile.phone) setPhone(profile.phone);
-            if (profile.avatarUrl !== undefined) setAvatarUrl(profile.avatarUrl ?? null);
+            reset({
+              fullName: profile.fullName || session?.account.displayName || '',
+              phone: profile.phone || '',
+              address: profile.address || session?.account.address || '',
+            });
+            if (profile.avatarUrl !== undefined) {
+              setAvatarUrl(profile.avatarUrl ?? null);
+              if (profile.avatarUrl && profile.avatarUrl !== session.account.avatarUrl) {
+                void updateAccount?.({
+                  avatarUrl: profile.avatarUrl,
+                  ...(profile.address ? { address: profile.address } : {}),
+                });
+              }
+            }
           }
         })
         .catch(() => {
@@ -72,7 +103,7 @@ export function EditProfileScreen() {
     return () => {
       isMounted = false;
     };
-  }, [session?.accessToken]);
+  }, [session?.accessToken, reset]);
 
   const handlePickAvatar = async () => {
     try {
@@ -111,12 +142,7 @@ export function EditProfileScreen() {
     setSelectedPickerUri(null);
   };
 
-  const handleSave = async () => {
-    if (!fullName.trim()) {
-      Alert.alert('Thông báo', 'Họ và tên không được để trống.');
-      return;
-    }
-
+  const handleSave = handleSubmit(async (formData: EditProfileFormData) => {
     if (!session?.accessToken) {
       Alert.alert('Lỗi', 'Phiên đăng nhập không hợp lệ.');
       return;
@@ -125,20 +151,30 @@ export function EditProfileScreen() {
     setIsSaving(true);
     try {
       const finalAvatar = tempAvatarUri !== null ? tempAvatarUri : (avatarUrl ?? undefined);
+      // 1. Update database record via backend API
       const updated = await updateProfile(
         {
-          fullName: fullName.trim(),
-          phone: phone.trim() ? phone.trim() : undefined,
+          fullName: formData.fullName.trim(),
+          phone: formData.phone?.trim() ? formData.phone.trim() : undefined,
+          address: formData.address?.trim() ? formData.address.trim() : undefined,
           avatarUrl: finalAvatar,
         },
         session.accessToken,
       );
 
-      const newDisplayName = updated.fullName || fullName.trim();
+      // 2. Synchronize returned updates with local session storage
+      const newDisplayName = updated.fullName || formData.fullName.trim();
       const newAvatarUrl = updated.avatarUrl !== undefined ? updated.avatarUrl : finalAvatar;
+      const newAddress =
+        updated.address !== undefined
+          ? updated.address
+          : formData.address?.trim()
+            ? formData.address.trim()
+            : undefined;
       await updateAccount?.({
         displayName: newDisplayName,
         avatarUrl: newAvatarUrl,
+        address: newAddress,
       });
 
       Alert.alert('Thành công', 'Thông tin tài khoản đã được cập nhật.', [
@@ -152,7 +188,7 @@ export function EditProfileScreen() {
     } finally {
       setIsSaving(false);
     }
-  };
+  });
 
   const email = session?.account.email ?? '';
 
@@ -244,94 +280,125 @@ export function EditProfileScreen() {
               {/* Full Name Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="account-outline" size={20} />
                   <Text style={[styles.fieldLabel, { color: theme.text }]}>Họ và tên</Text>
                   <Text style={[styles.requiredBadge, { color: theme.danger }]}>*</Text>
                 </View>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    { borderColor: theme.border, backgroundColor: theme.background },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.grey}
-                    name="account-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    autoCapitalize="words"
-                    editable={!isSaving}
-                    maxLength={100}
-                    onChangeText={setFullName}
-                    placeholder="Nhập họ và tên của bạn"
-                    placeholderTextColor={theme.placeholder}
-                    style={[styles.input, { color: theme.text }]}
-                    value={fullName}
-                  />
-                </View>
+                <Controller
+                  control={control}
+                  name="fullName"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <AppInput
+                      accessibilityLabel="Họ và tên"
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      containerStyle={[
+                        styles.inputContainer,
+                        { borderColor: errors.fullName ? theme.danger : '#666', backgroundColor: theme.surface },
+                      ]}
+                      editable={!isSaving}
+                      error={errors.fullName?.message}
+                      maxLength={100}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      placeholder="Nhập họ và tên của bạn"
+                      placeholderTextColor={theme.placeholder}
+                      value={value}
+                    />
+                  )}
+                />
               </View>
 
               {/* Phone Field */}
               <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: theme.text }]}>Số điện thoại</Text>
-                <View
-                  style={[
-                    styles.inputContainer,
-                    { borderColor: theme.border, backgroundColor: theme.background },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.grey}
-                    name="phone-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    editable={!isSaving}
-                    keyboardType="phone-pad"
-                    maxLength={20}
-                    onChangeText={setPhone}
-                    placeholder="Nhập số điện thoại liên hệ"
-                    placeholderTextColor={theme.placeholder}
-                    style={[styles.input, { color: theme.text }]}
-                    value={phone}
-                  />
+                <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="phone-outline" size={20} />
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Số điện thoại</Text>
                 </View>
+                <Controller
+                  control={control}
+                  name="phone"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <AppInput
+                      accessibilityLabel="Số điện thoại"
+                      containerStyle={[
+                        styles.inputContainer,
+                        { borderColor: errors.phone ? theme.danger : '#666', backgroundColor: theme.surface },
+                      ]}
+                      editable={!isSaving}
+                      error={errors.phone?.message}
+                      keyboardType="phone-pad"
+                      maxLength={20}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      placeholder="Nhập số điện thoại liên hệ"
+                      placeholderTextColor={theme.placeholder}
+                      type="phone"
+                      value={value}
+                    />
+                  )}
+                />
+              </View>
+
+              {/* Address Field */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="map-marker-outline" size={20} />
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Địa chỉ</Text>
+                </View>
+                <Controller
+                  control={control}
+                  name="address"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <AppInput
+                      accessibilityLabel="Địa chỉ"
+                      autoCapitalize="sentences"
+                      containerStyle={[
+                        styles.inputContainer,
+                        { borderColor: errors.address ? theme.danger : '#666', backgroundColor: theme.surface },
+                      ]}
+                      editable={!isSaving}
+                      error={errors.address?.message}
+                      maxLength={200}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      placeholder="Nhập địa chỉ của bạn"
+                      placeholderTextColor={theme.placeholder}
+                      value={value}
+                    />
+                  )}
+                />
               </View>
 
               {/* Email (Read-only) Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
+                  <MaterialCommunityIcons color={theme.grey} name="email-outline" size={20} />
                   <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
                   <Text style={[styles.lockedBadge, { color: theme.grey }]}>
                     (Không thể thay đổi)
                   </Text>
                 </View>
-                <View
-                  style={[
+                <AppInput
+                  accessibilityLabel="Email"
+                  containerStyle={[
                     styles.inputContainer,
                     styles.disabledInputContainer,
                     { borderColor: theme.border, backgroundColor: theme.background },
                   ]}
-                >
-                  <MaterialCommunityIcons
-                    color={theme.placeholder}
-                    name="email-outline"
-                    size={20}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    editable={false}
-                    style={[styles.input, { color: theme.placeholder }]}
-                    value={email}
-                  />
-                  <MaterialCommunityIcons
-                    color={theme.placeholder}
-                    name="lock-outline"
-                    size={16}
-                  />
-                </View>
+                  editable={false}
+                  keyboardType="email-address"
+                  style={{ color: theme.placeholder }}
+                  trailingIcon={
+                    <MaterialCommunityIcons
+                      color={theme.placeholder}
+                      name="lock-outline"
+                      size={16}
+                    />
+                  }
+                  type="email"
+                  value={email}
+                />
               </View>
             </View>
 
@@ -339,13 +406,13 @@ export function EditProfileScreen() {
             <View style={styles.saveActionContainer}>
               <AppButton
                 accessibilityLabel="Lưu thông tin hồ sơ"
-                disabled={isSaving || !fullName.trim()}
+                disabled={isSaving || !fullName?.trim()}
                 onPress={handleSave}
                 style={[
                   styles.saveButton,
                   {
                     backgroundColor: theme.primary,
-                    opacity: isSaving || !fullName.trim() ? 0.6 : 1,
+                    opacity: isSaving || !fullName?.trim() ? 0.6 : 1,
                   },
                 ]}
               >
@@ -353,7 +420,11 @@ export function EditProfileScreen() {
                   <ActivityIndicator color={theme.onPrimary} size="small" />
                 ) : (
                   <View style={styles.saveButtonContent}>
-                    <MaterialCommunityIcons color={theme.onPrimary} name="content-save-outline" size={20} />
+                    <MaterialCommunityIcons
+                      color={theme.onPrimary}
+                      name="content-save-outline"
+                      size={20}
+                    />
                     <Text style={[styles.saveButtonText, { color: theme.onPrimary }]}>
                       Lưu thay đổi
                     </Text>
@@ -514,7 +585,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: Rounded.md,
+    borderRadius: Rounded.lg,
     paddingHorizontal: Spacing.three,
     minHeight: 46,
   },

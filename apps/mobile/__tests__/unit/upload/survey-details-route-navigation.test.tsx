@@ -422,6 +422,38 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
       submitButton = getByText('Gửi hồ sơ').parent;
       expect(submitButton?.props.accessibilityState?.disabled).toBe(false);
     });
+
+    it('pre-populates capturedAt from route params and hides GPS warning when GPS coordinates exist', async () => {
+      mockSearchParams = {
+        imageUri: 'file:///cache/photo.jpg',
+        imageName: 'photo.jpg',
+        startLat: '10.731640',
+        startLon: '106.719720',
+        latitude: '10.731640',
+        longitude: '106.719720',
+        capturedAt: '2026-03-01T10:00:00.000Z',
+      };
+      mockSubmissionStatusData = null;
+
+      const { getByLabelText, queryByText } = await render(
+        <SurveyRecordDetailsScreen />,
+      );
+
+      await waitFor(() => {
+        const dateInput = getByLabelText(
+          'Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm',
+        );
+        expect(dateInput.props.value).toBe('01/03/2026');
+      });
+
+      // NO_GPS warning should NOT be displayed because coordinates exist
+      expect(
+        queryByText('Chưa có tọa độ GPS. Nhấn nút phóng to để chọn vị trí.'),
+      ).toBeNull();
+
+      // Calendar button should be present
+      expect(getByLabelText('Chọn ngày từ lịch')).toBeTruthy();
+    });
   });
 });
 

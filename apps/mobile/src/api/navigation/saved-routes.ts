@@ -6,15 +6,16 @@ export interface SavedRouteItem {
   id: string;
   userId: string;
   name: string;
-  title?: string;
+  title: string;
   originName: string;
   originLatitude: number;
   originLongitude: number;
   destinationName: string;
   destinationLatitude: number;
   destinationLongitude: number;
-  vehicleMode: 'MOTORCYCLE' | 'DRIVING' | 'CYCLING' | 'WALKING';
-  filterFixedSignsOnly: boolean;
+  vehicleMode: 'MOTORCYCLE' | 'DRIVING' | 'CYCLING' | 'WALKING' | string;
+  waypoints?: string[];
+  filterFixedSignsOnly?: boolean;
   encodedPolyline?: string;
   distanceMeters?: number;
   durationSeconds?: number;
@@ -41,12 +42,19 @@ export async function getSavedRoutes(
   accessToken?: string,
   signal?: AbortSignal,
 ): Promise<SavedRouteItem[]> {
-  const routes = await apiRequest<any[]>(
+  const raw = await apiRequest<any>(
     API_PATHS.SAVED_ROUTES,
     { signal },
     accessToken,
   );
-  return (routes || []).map((r) => ({
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.data)
+    ? raw.data
+    : Array.isArray(raw?.routes)
+    ? raw.routes
+    : [];
+  return list.map((r: any) => ({
     ...r,
     name: r.name || r.title || `${r.originName || 'Xuất phát'} ➔ ${r.destinationName || 'Điểm đến'}`,
   }));

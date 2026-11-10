@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import {
@@ -154,7 +154,6 @@ export function RevalidationSignPickerModal({
     <Modal
       animationType="slide"
       onRequestClose={handleClose}
-      statusBarTranslucent
       transparent
       visible={visible}
     >
