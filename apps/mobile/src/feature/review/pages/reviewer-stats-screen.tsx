@@ -63,7 +63,6 @@ export function ReviewerStatsScreen() {
     error: statsError,
   } = useGetMyReviewerStats();
 
-
   const {
     data: historyData,
     isLoading: isHistoryLoading,
@@ -434,7 +433,7 @@ export function ReviewerStatsScreen() {
                   <DateFilterSortList
                     items={filteredHistoryItems}
                     getDate={(item) => (item as any).reviewedAt || (item as any).createdAt}
-                    headerTitle="Lọc theo ngày biểu quyết"
+                    headerTitle="Lọc theo ngày"
                     startDateLabel="Từ ngày"
                     endDateLabel="Đến ngày"
                     showPresets
@@ -448,7 +447,10 @@ export function ReviewerStatsScreen() {
                           <View
                             style={[
                               styles.emptyHistoryBox,
-                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                              {
+                                backgroundColor: theme.backgroundElement,
+                                borderColor: theme.border,
+                              },
                             ]}
                           >
                             <MaterialCommunityIcons
@@ -467,7 +469,10 @@ export function ReviewerStatsScreen() {
 
                       return (
                         <View
-                          style={[styles.historyList, isHistoryFetching && styles.historyListFetching]}
+                          style={[
+                            styles.historyList,
+                            isHistoryFetching && styles.historyListFetching,
+                          ]}
                         >
                           {dateFilteredItems.map((item, index) => {
                             const isApproved = item.vote > 0;
@@ -487,7 +492,10 @@ export function ReviewerStatsScreen() {
                                 key={item.candidateId || String(index)}
                                 style={[
                                   styles.historyCard,
-                                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                                  {
+                                    backgroundColor: theme.backgroundElement,
+                                    borderColor: theme.border,
+                                  },
                                 ]}
                               >
                                 {/* Image Thumbnail or fallback */}

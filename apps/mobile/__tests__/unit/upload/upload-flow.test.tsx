@@ -149,7 +149,7 @@ jest.mock('@/feature/upload/hooks/use-save-survey-draft', () => ({
 const mockUpdateSubmission = jest.fn();
 const mockSubmitSubmission = jest.fn();
 const mockCreateSubmission = jest.fn().mockResolvedValue({ id: 'mock-sub-123' });
-const mockInitializeUpload = jest.fn().mockResolvedValue({ uploadId: 'mock-up-1', key: 'mock-key' });
+const mockInitializeUpload = jest.fn().mockResolvedValue({ sessionId: 'mock-session-1', uploadId: 'mock-up-1', key: 'mock-key' });
 const mockUploadChunk = jest.fn().mockResolvedValue({ etag: 'mock-etag-1' });
 const mockCompleteUpload = jest.fn().mockResolvedValue({ status: 'completed' });
 let mockSubmissionStatusData: any = null;
@@ -872,6 +872,160 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
             pathname: '/work/submission-complete',
             params: expect.objectContaining({
               submissionId: 'sub-final-video',
+            }),
+          }),
+        );
+      });
+    });
+
+    it('creates submission and uploads on click submit when user uploaded submission without pre-created draft', async () => {
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
+      mockSearchParams = {
+        imageUri: 'file:///cache/photo-direct.jpg',
+        imageName: 'photo-direct.jpg',
+        imageMimeType: 'image/jpeg',
+        imageType: 'image',
+        latitude: '10.731640',
+        longitude: '106.719720',
+        startLat: '10.731640',
+        startLon: '106.719720',
+        capturedAt: validDate,
+      };
+      mockReverseGeocode.mockReturnValue({
+        data: { displayAddress: 'Đường Nguyễn Lương Bằng, Phường Tân Mỹ, TP. Hồ Chí Minh' },
+        isLoading: false,
+      });
+      mockCreateSubmission.mockResolvedValueOnce({ id: 'sub-new-created-1' });
+      mockInitializeUpload.mockResolvedValueOnce({ sessionId: 'sess-new-1', uploadId: 'up-1' });
+      mockUploadChunk.mockResolvedValueOnce({});
+      mockCompleteUpload.mockResolvedValueOnce({});
+      mockSubmitSubmission.mockResolvedValueOnce({ status: 'QUEUED' });
+
+      const { getByText, queryByText, getByDisplayValue } = await render(<SurveyRecordDetailsScreen />);
+
+      await waitFor(() => {
+        expect(getByDisplayValue(/10.731640,\s*106.719720/)).toBeTruthy();
+        expect(getByDisplayValue('Đường Nguyễn Lương Bằng, Phường Tân Mỹ, TP. Hồ Chí Minh')).toBeTruthy();
+      });
+
+      // Verify GPS warning is NOT shown when coordinates are present
+      expect(queryByText('Chưa có toạ độ GPS. Vui lòng lấy vị trí hiện tại hoặc phóng to bản đồ để chọn vị trí.')).toBeNull();
+
+      // Submit button is enabled and says "Gửi hồ sơ"
+      const submitBtn = getByText('Gửi hồ sơ');
+      expect(submitBtn).toBeTruthy();
+
+      // Draft was NOT created beforehand
+      expect(mockCreateSubmission).not.toHaveBeenCalled();
+
+      // Click Submit
+      fireEvent.press(submitBtn);
+
+      await waitFor(() => {
+        // Submission is created upon submit
+        expect(mockCreateSubmission).toHaveBeenCalledWith({
+          request: expect.objectContaining({
+            submissionType: 'SINGLE_IMAGE',
+            latitude: 10.73164,
+            longitude: 106.71972,
+          }),
+        });
+        // Media is uploaded
+        expect(mockInitializeUpload).toHaveBeenCalledWith({
+          submissionId: 'sub-new-created-1',
+          request: expect.objectContaining({
+            mediaType: 'IMAGE',
+          }),
+        });
+        expect(mockCompleteUpload).toHaveBeenCalledWith({ sessionId: 'sess-new-1' });
+        // Submission is finalized
+        expect(mockSubmitSubmission).toHaveBeenCalledWith({ submissionId: 'sub-new-created-1' });
+        // Navigates to submission complete screen
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/work/submission-complete',
+            params: expect.objectContaining({
+              submissionId: 'sub-new-created-1',
+            }),
+          }),
+        );
+      });
+    });
+
+    it('displays GPS warning banner and disables submit button when media has no GPS in no-draft flow', async () => {
+      mockSearchParams = {
+        imageUri: 'file:///cache/photo-no-gps.jpg',
+        imageName: 'photo-no-gps.jpg',
+        imageMimeType: 'image/jpeg',
+        imageType: 'image',
+      };
+      mockReverseGeocode.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
+
+      const { getByText } = await render(<SurveyRecordDetailsScreen />);
+
+      await waitFor(() => {
+        expect(getByText('Chưa có toạ độ GPS. Vui lòng lấy vị trí hiện tại hoặc phóng to bản đồ để chọn vị trí.')).toBeTruthy();
+      });
+
+      // Submit button is disabled and indicates missing GPS
+      const disabledSubmitButton = getByText('Chưa có toạ độ GPS');
+      expect(disabledSubmitButton).toBeTruthy();
+      fireEvent.press(disabledSubmitButton);
+
+      expect(mockCreateSubmission).not.toHaveBeenCalled();
+      expect(mockSubmitSubmission).not.toHaveBeenCalled();
+    });
+
+    it('creates submission and executes video upload when user submits video without pre-created draft', async () => {
+      const validDate = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
+      mockSearchParams = {
+        imageUri: 'file:///cache/video-direct.mp4',
+        imageName: 'video-direct.mp4',
+        imageMimeType: 'video/mp4',
+        imageType: 'video',
+        startLat: '10.7769',
+        startLon: '106.7009',
+        duration: '60',
+        capturedAt: validDate,
+      };
+      mockCreateSubmission.mockResolvedValueOnce({ id: 'sub-video-new-1' });
+      mockExecuteChunkedVideoUpload.mockResolvedValueOnce(undefined);
+      mockRegisterZeroCopyDraft.mockResolvedValueOnce(undefined);
+      mockUpdateSubmission.mockResolvedValueOnce({});
+      mockSubmitSubmission.mockResolvedValueOnce({ status: 'QUEUED' });
+
+      const { getByText } = await render(<SurveyRecordDetailsScreen />);
+
+      await waitFor(() => {
+        expect(getByText('Gửi hồ sơ')).toBeTruthy();
+      });
+
+      expect(mockCreateSubmission).not.toHaveBeenCalled();
+
+      fireEvent.press(getByText('Gửi hồ sơ'));
+
+      await waitFor(() => {
+        expect(mockCreateSubmission).toHaveBeenCalledWith({
+          request: expect.objectContaining({
+            submissionType: 'VIDEO_GPX',
+            latitude: 10.7769,
+            longitude: 106.7009,
+          }),
+        });
+        expect(mockExecuteChunkedVideoUpload).toHaveBeenCalledWith(
+          expect.objectContaining({
+            submissionId: 'sub-video-new-1',
+          }),
+        );
+        expect(mockSubmitSubmission).toHaveBeenCalledWith({ submissionId: 'sub-video-new-1' });
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/work/submission-complete',
+            params: expect.objectContaining({
+              submissionId: 'sub-video-new-1',
             }),
           }),
         );

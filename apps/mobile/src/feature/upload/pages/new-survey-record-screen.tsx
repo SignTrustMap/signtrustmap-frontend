@@ -97,6 +97,22 @@ export function NewSurveyRecordScreen() {
             }
           : {}),
         ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
+        ...(selectedAssets.length > 1
+          ? {
+              assetsJson: JSON.stringify(
+                selectedAssets.map((asset) => ({
+                  uri: asset.uri,
+                  fileName: asset.fileName,
+                  mimeType: asset.mimeType,
+                  type: asset.type,
+                  capturedAt: asset.capturedAt,
+                  gps: asset.gps,
+                  duration: asset.duration,
+                  assetId: asset.assetId,
+                })),
+              ),
+            }
+          : {}),
       },
     });
   };

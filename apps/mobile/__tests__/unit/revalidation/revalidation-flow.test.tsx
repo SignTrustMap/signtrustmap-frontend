@@ -313,6 +313,32 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
 
       expect(onCloseMock).toHaveBeenCalled();
     });
+
+    it('renders the camera-outline fallback when survey crop image is null or empty', async () => {
+      const mockSign = createMockSign({
+        actualCropUrl: undefined,
+      });
+
+      const { getByText, queryByLabelText } = await render(
+        <RevalidationSignDetailsCard sign={mockSign} onClose={jest.fn()} />,
+      );
+
+      expect(getByText('Chưa có ảnh khảo sát')).toBeTruthy();
+      expect(queryByLabelText('Inspect submitted sign photo')).toBeNull();
+    });
+
+    it('renders the submitted survey photo inspection button when crop image is present', async () => {
+      const mockSign = createMockSign({
+        actualCropUrl: 'https://cdn.signmap.site/stm-sign-crops/crops/real-crop-1.jpg',
+      });
+
+      const { getByLabelText, queryByText } = await render(
+        <RevalidationSignDetailsCard sign={mockSign} onClose={jest.fn()} />,
+      );
+
+      expect(getByLabelText('Inspect submitted sign photo')).toBeTruthy();
+      expect(queryByText('Chưa có ảnh khảo sát')).toBeNull();
+    });
   });
 
   describe('Global Revalidation Tasks List Logic', () => {

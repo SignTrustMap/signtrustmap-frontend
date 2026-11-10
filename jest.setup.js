@@ -69,6 +69,19 @@ jest.mock('@react-native-google-signin/google-signin', () => {
   };
 });
 
+jest.mock('expo-media-library', () => ({
+  getAssetsAsync: jest.fn(),
+  getAssetInfoAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  MediaType: {
+    photo: 'photo',
+    video: 'video',
+  },
+  SortBy: {
+    creationTime: 'creationTime',
+  },
+}));
+
 jest.mock('@/hooks/use-offline-maps', () => ({
   useOfflineMaps: () => ({
     availablePacks: [],

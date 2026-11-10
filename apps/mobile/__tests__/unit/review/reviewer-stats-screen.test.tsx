@@ -2,10 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
 import { ReviewerStatsScreen } from '@/feature/review/pages/reviewer-stats-screen';
-import {
-  useGetMyReviewHistory,
-  useGetMyReviewerStats,
-} from '@/feature/review/hooks/use-review';
+import { useGetMyReviewHistory, useGetMyReviewerStats } from '@/feature/review/hooks/use-review';
 
 // Mock dependencies
 jest.mock('expo-router', () => ({
@@ -288,7 +285,7 @@ describe('ReviewerStatsScreen Unit Test Suite', () => {
     const { getByText, getByLabelText } = await render(<ReviewerStatsScreen />);
 
     // Date filter header and controls in history section
-    expect(getByText('Lọc theo ngày biểu quyết')).toBeTruthy();
+    expect(getByText('Lọc theo ngày')).toBeTruthy();
     expect(getByLabelText('Chọn Từ ngày')).toBeTruthy();
     expect(getByLabelText('Chọn Đến ngày')).toBeTruthy();
 
