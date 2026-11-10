@@ -60,7 +60,7 @@ export function RouteSearchScreen() {
         destinationLat: String(saved.destinationLatitude),
         destinationLng: String(saved.destinationLongitude),
         destinationSubtitle: saved.destinationName,
-        destinationTitle: saved.destinationName,
+        destinationTitle: saved.title || saved.name || saved.destinationName,
         startLat: String(saved.originLatitude),
         startLng: String(saved.originLongitude),
         startTitle: saved.originName,

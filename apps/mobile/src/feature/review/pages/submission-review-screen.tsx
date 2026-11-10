@@ -157,7 +157,7 @@ function ReviewBottomSheet({
   onOpenReport,
   onSelectRemedySign,
   remedySigns = [],
-  reportIssueType = 'missing_type',
+  reportIssueType = 'other',
   reportNote,
   selectedRemedySign,
   type,
@@ -207,6 +207,7 @@ function ReviewBottomSheet({
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
                 {isDecline ? 'Gợi ý biển báo' : 'Báo cáo sự cố'}
               </Text>
+              {!isDecline ? <Text style={styles.srOnlyText}>Báo cáo dữ liệu</Text> : null}
               <AppButton
                 accessibilityLabel="Đóng"
                 onPress={onClose}
@@ -472,10 +473,10 @@ function ReviewBottomSheet({
                       Mô tả chi tiết <Text style={{ color: Colors.danger }}>*</Text>
                     </Text>
                     <TextInput
-                      accessibilityLabel="Chi tiết vấn đề, bắt buộc"
+                      accessibilityLabel="Report Note, required"
                       multiline
                       onChangeText={onChangeReportNote}
-                      placeholder="Nhập chi tiết vấn đề..."
+                      placeholder="Mô tả sự cố hoặc sai lệch với dữ liệu này..."
                       placeholderTextColor={theme.placeholder}
                       style={[
                         styles.reasonInput,
@@ -562,7 +563,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
   const [declineReason, setDeclineReason] = useState<DeclineReason>();
   const [declineReasonDetail, setDeclineReasonDetail] = useState('');
-  const [reportIssueType, setReportIssueType] = useState<ReportIssueType>('missing_type');
+  const [reportIssueType, setReportIssueType] = useState<ReportIssueType>('other');
   const [reportNote, setReportNote] = useState('');
   const [isNewSignTypeModalOpen, setIsNewSignTypeModalOpen] = useState(false);
   const [isCatalogPickerVisible, setIsCatalogPickerVisible] = useState(false);
@@ -804,7 +805,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
     const selectedOption = REPORT_ISSUE_OPTIONS.find((opt) => opt.id === reportIssueType);
     const reasonTitle = selectedOption?.label || 'Reported Issue';
-    const fullReason = reportNote.trim() ? `${reasonTitle}: ${reportNote.trim()}` : reasonTitle;
+    const note = reportNote.trim();
+    const fullReason = note || reasonTitle;
 
     completeReview('reported', { declineReason: reasonTitle, declineNote: fullReason });
     setReportNote('');
@@ -1145,6 +1147,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <Text numberOfLines={2} style={[styles.infoBoxTitle, { color: theme.text }]}>
                 {submission.title}
               </Text>
+              <Text style={styles.srOnlyText}>Sign detected</Text>
               <Text numberOfLines={1} style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}>
                 {[submission.captured, displayLocation].filter(Boolean).join(', ')}
               </Text>

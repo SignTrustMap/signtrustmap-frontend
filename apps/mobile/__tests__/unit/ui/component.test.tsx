@@ -80,14 +80,14 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
       const { getByLabelText, getByText } = await render(<AppBottomTabs activeRoute="/home" />);
 
       // Verify Tab Labels exist
-      expect(getByText('Home')).toBeTruthy();
-      expect(getByText('Work')).toBeTruthy();
-      expect(getByText('Profile')).toBeTruthy();
+      expect(getByText('Trang chủ')).toBeTruthy();
+      expect(getByText('Công việc')).toBeTruthy();
+      expect(getByText('Cá nhân')).toBeTruthy();
 
       // Verify accessibility roles and initial selected state
-      const homeTab = getByLabelText('Home');
-      const workTab = getByLabelText('Work');
-      const profileTab = getByLabelText('Profile');
+      const homeTab = getByLabelText('Trang chủ');
+      const workTab = getByLabelText('Công việc');
+      const profileTab = getByLabelText('Cá nhân');
 
       expect(homeTab.props.accessibilityRole).toBe('tab');
       expect(homeTab.props.accessibilityState).toEqual(
@@ -108,10 +108,10 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('renders fallback icon letters for all tabs', async () => {
       const { getByText } = await render(<AppBottomTabs activeRoute="/home" />);
 
-      // Home fallback: 'H', Work fallback: 'T', Profile fallback: 'P'
-      expect(getByText('H')).toBeTruthy();
-      expect(getByText('T')).toBeTruthy();
-      expect(getByText('P')).toBeTruthy();
+      // Home fallback: 'C', Work fallback: 'V', Profile fallback: 'N'
+      expect(getByText('C')).toBeTruthy();
+      expect(getByText('V')).toBeTruthy();
+      expect(getByText('N')).toBeTruthy();
     });
   });
 
@@ -122,9 +122,9 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('marks Work tab as selected when activeRoute is /work', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/work" />);
 
-      const homeTab = getByLabelText('Home');
-      const workTab = getByLabelText('Work');
-      const profileTab = getByLabelText('Profile');
+      const homeTab = getByLabelText('Trang chủ');
+      const workTab = getByLabelText('Công việc');
+      const profileTab = getByLabelText('Cá nhân');
 
       expect(homeTab.props.accessibilityState).toEqual(
         expect.objectContaining({ selected: false })
@@ -140,9 +140,9 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('marks Profile tab as selected when activeRoute is /profile', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/profile" />);
 
-      const homeTab = getByLabelText('Home');
-      const workTab = getByLabelText('Work');
-      const profileTab = getByLabelText('Profile');
+      const homeTab = getByLabelText('Trang chủ');
+      const workTab = getByLabelText('Công việc');
+      const profileTab = getByLabelText('Cá nhân');
 
       expect(homeTab.props.accessibilityState).toEqual(
         expect.objectContaining({ selected: false })
@@ -163,14 +163,14 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('navigates to /work when Work tab is pressed', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/home" />);
 
-      const initialWorkTab = getByLabelText('Work');
+      const initialWorkTab = getByLabelText('Công việc');
       fireEvent.press(initialWorkTab);
 
       expect(mockReplace).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/work');
 
       await waitFor(() => {
-        expect(getByLabelText('Work').props.accessibilityState).toEqual(
+        expect(getByLabelText('Công việc').props.accessibilityState).toEqual(
           expect.objectContaining({ selected: true })
         );
       });
@@ -179,14 +179,14 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('navigates to /profile when Profile tab is pressed', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/home" />);
 
-      const initialProfileTab = getByLabelText('Profile');
+      const initialProfileTab = getByLabelText('Cá nhân');
       fireEvent.press(initialProfileTab);
 
       expect(mockReplace).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/profile');
 
       await waitFor(() => {
-        expect(getByLabelText('Profile').props.accessibilityState).toEqual(
+        expect(getByLabelText('Cá nhân').props.accessibilityState).toEqual(
           expect.objectContaining({ selected: true })
         );
       });
@@ -195,14 +195,14 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
     it('navigates back to /home when Home tab is pressed from another tab', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/work" />);
 
-      const initialHomeTab = getByLabelText('Home');
+      const initialHomeTab = getByLabelText('Trang chủ');
       fireEvent.press(initialHomeTab);
 
       expect(mockReplace).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/home');
 
       await waitFor(() => {
-        expect(getByLabelText('Home').props.accessibilityState).toEqual(
+        expect(getByLabelText('Trang chủ').props.accessibilityState).toEqual(
           expect.objectContaining({ selected: true })
         );
       });
@@ -215,7 +215,7 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
   describe('Case 4: Container Layout', () => {
     it('handles container onLayout event without errors to calculate indicator width', async () => {
       const { getByLabelText } = await render(<AppBottomTabs activeRoute="/home" />);
-      const homeTab = getByLabelText('Home');
+      const homeTab = getByLabelText('Trang chủ');
       const containerView = homeTab.parent;
       expect(containerView).toBeTruthy();
 
@@ -225,7 +225,7 @@ describe('AppBottomTabs UI Component Unit Tests', () => {
       });
 
       // Assert tabs remain accessible and selectable
-      const profileTab = getByLabelText('Profile');
+      const profileTab = getByLabelText('Cá nhân');
       fireEvent.press(profileTab);
       expect(mockReplace).toHaveBeenCalledWith('/profile');
     });

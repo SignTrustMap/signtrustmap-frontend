@@ -71,7 +71,6 @@ export async function apiRequest<T>(
         response = await fetch(fullUrl, { ...options, headers });
     } catch (error) {
         if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-            console.warn(`[ApiClient] Request aborted: ${method} ${fullUrl}`);
             throw error;
         }
         const cause = error instanceof Error ? error.message : String(error);

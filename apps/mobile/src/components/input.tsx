@@ -16,16 +16,15 @@ import { useTheme } from '@/hooks/use-theme';
 
 type AppInputKind = 'email' | 'password' | 'phone' | 'search' | 'text';
 
-type AppInputProps =
-  Omit<TextInputProps, 'secureTextEntry'> & {
-    containerStyle?: StyleProp<ViewStyle>;
-    error?: string;
-    label?: string;
-    type?: AppInputKind;
-    leadingIcon?: React.ReactNode;
-    trailingIcon?: React.ReactNode;
-    callback?: (text: string) => void;
-  };
+type AppInputProps = Omit<TextInputProps, 'secureTextEntry'> & {
+  containerStyle?: StyleProp<ViewStyle>;
+  error?: string;
+  label?: string;
+  type?: AppInputKind;
+  leadingIcon?: React.ReactNode;
+  trailingIcon?: React.ReactNode;
+  callback?: (text: string) => void;
+};
 
 function getInputConfig(type: AppInputKind): {
   autoCapitalize: TextInputProps['autoCapitalize'];
@@ -105,6 +104,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
       <View
         style={[
           styles.inputShell,
+          inputProps.multiline && styles.inputShellMultiline,
           {
             backgroundColor: theme.background,
             borderColor: error ? styles.errorText.color : theme.border,
@@ -123,7 +123,12 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
           keyboardType={keyboardType ?? config.keyboardType}
           placeholderTextColor={theme.placeholder}
           secureTextEntry={isPassword && !passwordVisible}
-          style={[styles.input, { color: theme.text }, style]}
+          style={[
+            styles.input,
+            inputProps.multiline && styles.inputMultiline,
+            { color: theme.text },
+            style,
+          ]}
           textContentType={textContentType ?? config.textContentType}
           onChangeText={handleChangeText}
           {...inputProps}
@@ -143,7 +148,11 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
+      {error ? (
+        <Text accessibilityRole="alert" style={styles.errorText}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 });
@@ -166,6 +175,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingLeft: 1,
   },
+  inputShellMultiline: {
+    height: 'auto',
+    alignItems: 'flex-start',
+    paddingVertical: Spacing.one,
+  },
   leadingIcon: {
     width: 24,
     fontFamily: Fonts.mono,
@@ -181,6 +195,10 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 15,
     lineHeight: 20,
+  },
+  inputMultiline: {
+    textAlignVertical: 'top',
+    paddingVertical: 0,
   },
   visibilityButton: {
     minHeight: 32,

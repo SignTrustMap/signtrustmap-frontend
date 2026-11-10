@@ -25,6 +25,8 @@ export interface User {
   email: string
   /** Contact phone number. */
   phone?: string
+  /** Physical contact or residential address. */
+  address?: string
   /** Access level and permission scope. */
   role: UserRole
   /** Optional CDN avatar image URL. */
@@ -91,6 +93,8 @@ export interface UpdateProfilePayload {
   fullName?: string
   /** Contact phone number (maximum 20 characters) */
   phone?: string
+  /** Physical contact or residential address (maximum 200 characters) */
+  address?: string
   /** Public avatar image URL (maximum 500 characters) */
   avatarUrl?: string
 }

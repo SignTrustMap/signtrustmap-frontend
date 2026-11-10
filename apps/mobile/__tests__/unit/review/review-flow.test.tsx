@@ -263,6 +263,21 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
   }),
 }));
 
+jest.mock('@/feature/work/hooks/use-daily-tasks', () => {
+  const actual = jest.requireActual('@/feature/work/hooks/use-daily-tasks');
+  return {
+    ...actual,
+    useGetMyTaskCompletions: () => ({
+      data: [],
+      isLoading: false,
+      refetch: jest.fn(),
+    }),
+    useClaimDailyTaskReward: () => ({
+      mutateAsync: jest.fn(),
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Imports of components to test
 // ---------------------------------------------------------------------------

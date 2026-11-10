@@ -34,7 +34,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
     completion?.claimed ||
     mission?.isCompleted ||
     mission?.claimed ||
-    progress >= target
+    progress >= target,
   );
   const isClaimed = Boolean(completion?.claimed || mission?.claimed);
   const canClaim = Boolean(isFinished && !isClaimed && completion?.dailyTaskId);
@@ -97,11 +97,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
     >
       {/* 1. Title Row: Full width, up to 2 lines */}
       <View style={styles.titleRow}>
-        <Text
-          ellipsizeMode="tail"
-          numberOfLines={2}
-          style={[styles.title, { color: theme.text }]}
-        >
+        <Text ellipsizeMode="tail" numberOfLines={2} style={[styles.title, { color: theme.text }]}>
           {taskName}
         </Text>
       </View>
@@ -113,9 +109,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
             <Text style={[styles.progressCountText, { color: theme.text }]}>
               {progress}/{target}
             </Text>
-            <Text style={[styles.progressPercentText, { color: theme.grey }]}>
-              {percentage}%
-            </Text>
+            <Text style={[styles.progressPercentText, { color: theme.grey }]}>{percentage}%</Text>
           </View>
           <View style={[styles.progressBarTrack, { backgroundColor: theme.border }]}>
             <View
@@ -133,7 +127,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
         {/* Reward badge next to progress bar */}
         <View style={[styles.rewardPill, { backgroundColor: '#F59E0B1A' }]}>
           <MaterialCommunityIcons color="#D97706" name="hand-coin-outline" size={13} />
-          <Text style={styles.rewardText}>+{rewardCredits} Xu</Text>
+          <Text style={styles.rewardText}>+{rewardCredits} Credits</Text>
         </View>
       </View>
 
@@ -157,7 +151,7 @@ export function MissionCardItem({ completion, mission, role = 'driver' }: Missio
           ) : (
             <>
               <MaterialCommunityIcons color="#FFFFFF" name="hand-coin" size={16} />
-              <Text style={styles.claimButtonText}>Nhận thưởng +{rewardCredits} Xu</Text>
+              <Text style={styles.claimButtonText}>Nhận thưởng +{rewardCredits} Credits</Text>
             </>
           )}
         </Pressable>

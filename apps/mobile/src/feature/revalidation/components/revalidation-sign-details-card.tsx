@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   LayoutAnimation,
@@ -23,9 +23,26 @@ import type { RouteSign } from '@/api/navigation/navigation';
 import { getFreshnessInfo } from './revalidation-sign-marker';
 import { formatDate } from '@/utils/format-date';
 import { formatFreshnessScore } from '@/utils/freshness';
+import { REVALIDATION_STATUS_LABELS } from '@/constants/revalidation';
 import { useGetTaskEvidences } from '../hooks/use-revalidation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { ImageInspectionModal } from '@/components/image-inspection-modal';
+
+function normalizeMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (
+    !trimmed ||
+    trimmed === 'null' ||
+    trimmed === 'undefined' ||
+    trimmed === 'none' ||
+    trimmed.startsWith('mock/') ||
+    trimmed === 'mock'
+  ) {
+    return undefined;
+  }
+  return trimmed;
+}
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -74,7 +91,7 @@ export function RevalidationSignDetailsCard({
 
   const handleCopyTaskId = async (taskId: string) => {
     try {
-      console.log(taskId)
+      console.log(taskId);
       await Clipboard.setStringAsync(taskId);
       setCopiedTaskId(taskId);
       setTimeout(() => setCopiedTaskId(null), 2000);
@@ -90,9 +107,19 @@ export function RevalidationSignDetailsCard({
   const evidenceCount = evidences.length;
   const latestEvidence = evidenceCount > 0 ? evidences[0] : null;
 
-  const rawCrop = sign.actualCropUrl || latestEvidence?.mediaUrl;
+  const rawCrop =
+    normalizeMediaUrl(sign.actualCropUrl) ||
+    normalizeMediaUrl((sign as any).signCropUrl) ||
+    normalizeMediaUrl((sign as any).historicalCropUrl) ||
+    normalizeMediaUrl(sign.frameUrl) ||
+    normalizeMediaUrl((sign as any).bestFrameUrl) ||
+    normalizeMediaUrl(latestEvidence?.mediaUrl);
   const displaySubmittedCrop = rawCrop ? resolveS3Url(rawCrop) : undefined;
   const hasSubmittedCrop = Boolean(displaySubmittedCrop && !cropError);
+
+  useEffect(() => {
+    setCropError(false);
+  }, [sign.id, displaySubmittedCrop]);
 
   // Entrance slide animation
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -181,7 +208,7 @@ export function RevalidationSignDetailsCard({
     };
   } else {
     statusConfig = {
-      label: 'Cần tái thẩm định',
+      label: REVALIDATION_STATUS_LABELS.NEEDS_REVALIDATION,
       bg: '#FFF1F2',
       border: '#FDA4AF',
       text: '#BE123C',
@@ -258,9 +285,11 @@ export function RevalidationSignDetailsCard({
             </Text>
 
             <View style={styles.compactMetaRow}>
-              <View style={[styles.freshnessMiniDot, { backgroundColor: freshnessColor }]} />
               <Text style={[styles.compactFreshnessText, { color: theme.grey }]}>
-                Độ tươi mới: <Text style={{ color: freshnessColor, fontWeight: '700' }}>{freshnessInfo.label}</Text>
+                Độ mới:{' '}
+                <Text style={{ color: freshnessColor, fontWeight: '700' }}>
+                  {freshnessInfo.label}
+                </Text>
               </Text>
             </View>
           </View>
@@ -285,8 +314,6 @@ export function RevalidationSignDetailsCard({
         >
           {/* Header Row: Icon, Title, Status, Close */}
           <View style={styles.expandedHeader}>
-
-
             <View style={styles.expandedTitleCol}>
               <View style={styles.titleWithBadge}>
                 <Text numberOfLines={1} style={[styles.expandedTitleText, { color: theme.text }]}>
@@ -317,17 +344,21 @@ export function RevalidationSignDetailsCard({
                   </Text>
                 </View>
               </View>
-
-              <View style={styles.expandedLocationRow}>
-                <MaterialCommunityIcons
-                  color={theme.placeholder}
-                  name="map-marker-outline"
-                  size={12}
-                />
-                <Text numberOfLines={1} style={[styles.expandedLocationText, { color: theme.placeholder }]}>
-                  {sign.displayAddress || sign.roadName || 'Không có dữ liệu vị trí.'}
-                </Text>
-              </View>
+              {sign.displayAddress || sign.roadName ? (
+                <View style={styles.expandedLocationRow}>
+                  <MaterialCommunityIcons
+                    color={theme.placeholder || theme.grey || '#888888'}
+                    name="map-marker-outline"
+                    size={12}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.expandedLocationText, { color: theme.grey || '#888888' }]}
+                  >
+                    {sign.displayAddress || sign.roadName}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Action Buttons: Collapse and Close */}
@@ -337,10 +368,13 @@ export function RevalidationSignDetailsCard({
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={toggleExpanded}
-                style={[styles.collapseToggle, {
-                  paddingHorizontal: Spacing.one
-                }]}
-                variant='ghost'
+                style={[
+                  styles.collapseToggle,
+                  {
+                    paddingHorizontal: Spacing.one,
+                  },
+                ]}
+                variant="ghost"
               >
                 <MaterialCommunityIcons color={theme.grey} name="chevron-down" size={20} />
               </AppButton>
@@ -350,10 +384,13 @@ export function RevalidationSignDetailsCard({
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={onClose}
-                style={[styles.collapseToggle, {
-                  paddingHorizontal: Spacing.one
-                }]}
-                variant='ghost'
+                style={[
+                  styles.collapseToggle,
+                  {
+                    paddingHorizontal: Spacing.one,
+                  },
+                ]}
+                variant="ghost"
               >
                 <MaterialCommunityIcons color={theme.grey} name="close" size={18} />
               </AppButton>
@@ -367,23 +404,28 @@ export function RevalidationSignDetailsCard({
           <Text style={[styles.evidenceSectionTitle, { color: theme.text }]}>
             SO SÁNH BẰNG CHỨNG
           </Text>
-          <View style={[styles.evidenceSection, { borderColor: "#666" }]}>
+          <View style={[styles.evidenceSection, { borderColor: '#666' }]}>
             {/* Compact Comparison Grid */}
             <View style={[styles.evidenceGrid, { paddingVertical: 0 }]}>
               {/* Box 1: Official Standard Sign */}
               <View style={[styles.evidenceBox, { borderColor: 'transparent' }]}>
-                <Text style={[styles.evidenceBoxLabel, { color: theme.text }]}>
-                  BIỂN BÁO CHUẨN
-                </Text>
+                <Text style={[styles.evidenceBoxLabel, { color: theme.text }]}>BIỂN BÁO CHUẨN</Text>
                 <View style={styles.evidenceImageFrame}>
                   {sign.imageUrl ? (
-                    <Image
-                      contentFit="contain"
-                      source={{ uri: sign.imageUrl }}
-                      style={styles.standardImg}
-                    />
+                    <Pressable
+                      accessibilityLabel="Inspect official standard sign"
+                      accessibilityRole="button"
+                      onPress={() => setInspectPhotoUrl(sign.imageUrl || null)}
+                      style={styles.cropPressable}
+                    >
+                      <Image
+                        contentFit="contain"
+                        source={{ uri: sign.imageUrl }}
+                        style={styles.standardImg}
+                      />
+                    </Pressable>
                   ) : (
-                    <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={20} />
+                    <MaterialCommunityIcons color={theme.grey || '#888888'} name="traffic-light" size={20} />
                   )}
                 </View>
               </View>
@@ -392,12 +434,7 @@ export function RevalidationSignDetailsCard({
               <View style={styles.horizontalDivider} />
 
               {/* Box 2: Latest Submitted Crop */}
-              <View
-                style={[
-                  styles.evidenceBox,
-                  { borderColor: 'transparent' },
-                ]}
-              >
+              <View style={[styles.evidenceBox, { borderColor: 'transparent' }]}>
                 <View style={styles.submittedLabelRow}>
                   <Text style={[styles.evidenceBoxLabel, { color: '#0671EB' }]}>
                     ẢNH KHẢO SÁT GỬI LÊN
@@ -409,22 +446,24 @@ export function RevalidationSignDetailsCard({
                       accessibilityLabel="Inspect submitted sign photo"
                       accessibilityRole="button"
                       onPress={() => setInspectPhotoUrl(displaySubmittedCrop || null)}
+                      style={styles.cropPressable}
                     >
                       <Image
                         contentFit="cover"
                         onError={() => setCropError(true)}
                         source={{ uri: displaySubmittedCrop }}
                         style={styles.cropImg}
+                        transition={200}
                       />
                     </Pressable>
                   ) : (
                     <View style={styles.noCropBox}>
                       <MaterialCommunityIcons
-                        color={theme.placeholder}
-                        name="camera-off-outline"
-                        size={18}
+                        color={theme.placeholder || theme.grey || '#888888'}
+                        name="camera-outline"
+                        size={22}
                       />
-                      <Text style={[styles.noCropText, { color: theme.placeholder }]}>
+                      <Text style={[styles.noCropText, { color: theme.placeholder || theme.grey || '#888888' }]}>
                         Chưa có ảnh khảo sát
                       </Text>
                     </View>
@@ -465,7 +504,10 @@ export function RevalidationSignDetailsCard({
                   </Text>
                 </View>
 
-                <Text numberOfLines={1} style={[styles.reviewsSubtext, { color: theme.placeholder }]}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.reviewsSubtext, { color: theme.placeholder }]}
+                >
                   {isLoadingEvidences
                     ? 'Đang tải đóng góp từ cộng đồng...'
                     : evidenceCount > 0
@@ -474,16 +516,7 @@ export function RevalidationSignDetailsCard({
                         : 'Bằng chứng thực địa đang chờ đồng thuận'
                       : 'Hãy là khảo sát viên đầu tiên kiểm tra vị trí này để nhận thưởng'}
                 </Text>
-
               </View>
-            </View>
-            <View style={{ marginTop: Spacing.two }}>
-              <Text style={{
-                fontSize: 12,
-                color: theme.placeholder
-              }}>
-                Lưu ý: Bạn sẽ không nhận được credits cho các biển báo đã được thẩm định chính xác trước đó.
-              </Text>
             </View>
           </View>
 
@@ -521,9 +554,7 @@ export function RevalidationSignDetailsCard({
               size={12}
             />
             <Text style={[styles.devCopyCoordsText, copiedTaskId && { color: '#16A34A' }]}>
-              {copiedTaskId
-                ? 'Đã sao chép vào bộ nhớ tạm!'
-                : `Sao chép Mã nhiệm vụ`}
+              {copiedTaskId ? 'Đã sao chép vào bộ nhớ tạm!' : `Sao chép Mã nhiệm vụ`}
             </Text>
           </Pressable>
 
@@ -534,7 +565,7 @@ export function RevalidationSignDetailsCard({
             <View style={styles.freshnessCol}>
               <View style={styles.freshnessMeterHeader}>
                 <Text style={[styles.freshnessLabel, { color: theme.text }]}>
-                  Chỉ số độ tươi mới
+                  Độ mới của biển báo:
                 </Text>
                 <Text style={[styles.freshnessScoreValue, { color: freshnessColor }]}>
                   {displayScore}%
@@ -559,7 +590,9 @@ export function RevalidationSignDetailsCard({
 
             {sign.lastVerifiedAt ? (
               <View style={styles.lastCheckedCol}>
-                <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>Kiểm tra lần cuối</Text>
+                <Text style={[styles.lastCheckedLabel, { color: theme.grey }]}>
+                  Kiểm tra lần cuối
+                </Text>
                 <Text style={[styles.lastCheckedValue, { color: theme.text }]}>
                   {formatDate(sign.lastVerifiedAt)}
                 </Text>
@@ -583,10 +616,7 @@ export function RevalidationSignDetailsCard({
               accessibilityLabel={primaryCtaText}
               disabled={isSubmitting}
               onPress={handleAction}
-              style={[
-                styles.primaryCtaBtn,
-                { backgroundColor: isStale ? '#0671EB' : '#0671EB' },
-              ]}
+              style={[styles.primaryCtaBtn, { backgroundColor: isStale ? '#0671EB' : '#0671EB' }]}
               variant="primary"
             >
               <MaterialCommunityIcons
@@ -851,18 +881,25 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
+  cropPressable: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   standardImg: {
     width: 44,
     height: 44,
   },
   cropImg: {
-    width: '50%',
+    width: '100%',
     height: '100%',
+    borderRadius: 6,
   },
   noCropBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
   },
   noCropText: {
     fontSize: 9,
@@ -974,7 +1011,7 @@ const styles = StyleSheet.create({
     padding: 10,
     paddingHorizontal: 0,
     borderWidth: 1,
-    borderColor: 'transparent'
+    borderColor: 'transparent',
   },
   reviewsLeftRow: {
     flexDirection: 'row',

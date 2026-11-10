@@ -1,79 +1,126 @@
-﻿import { useRouter } from 'expo-router';
+﻿import { useMemo } from 'react';
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '@/components/button';
+import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useGetWallet } from '../hooks/use-wallet';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
-import { TransactionList } from '../components/transaction-list';
+import { TransactionList, type CreditTransaction } from '../components/transaction-list';
 
-const creditHistoryGroups = [
+export interface CreditTransactionItem extends CreditTransaction {
+  createdAt: string;
+}
+
+const DEFAULT_TRANSACTIONS: CreditTransactionItem[] = [
   {
-    label: 'Tháng 8 năm 2026',
-    transactions: [
-      {
-        id: '1',
-        type: 'transaction',
-        name: 'Gia hạn gói Pro',
-        amount: -129000,
-        timestamp: '01 Th08 2026, 10:30',
-      },
-      {
-        id: '2',
-        type: 'transaction',
-        name: 'Nâng cấp lên gói Pro',
-        amount: -129000,
-        timestamp: '15 Th07 2026, 14:20',
-      },
-      {
-        id: '3',
-        type: 'transaction',
-        name: 'Nạp tiền lần 1',
-        amount: -100000,
-        timestamp: '01 Th07 2026, 09:00',
-      },
-    ],
+    id: '1',
+    type: 'transaction',
+    name: 'Gia hạn gói Pro',
+    title: 'Gia hạn gói Pro',
+    amount: -129000,
+    timestamp: '01 Th08 2026, 10:30',
+    createdAt: '2026-08-01T10:30:00.000Z',
+  },
+  {
+    id: '2',
+    type: 'transaction',
+    name: 'Nâng cấp lên gói Pro',
+    title: 'Nâng cấp lên gói Pro',
+    amount: -129000,
+    timestamp: '15 Th07 2026, 14:20',
+    createdAt: '2026-07-15T14:20:00.000Z',
+  },
+  {
+    id: '3',
+    type: 'transaction',
+    name: 'Nạp tiền lần 1',
+    title: 'Nạp tiền lần 1',
+    amount: 100000,
+    timestamp: '01 Th07 2026, 09:00',
+    createdAt: '2026-07-01T09:00:00.000Z',
+  },
+  {
+    id: '4',
+    type: 'transaction',
+    name: 'Thưởng đóng góp biển báo',
+    title: 'Thưởng đóng góp biển báo',
+    amount: 25000,
+    timestamp: '20 Th06 2026, 16:45',
+    createdAt: '2026-06-20T16:45:00.000Z',
+  },
+  {
+    id: '5',
+    type: 'transaction',
+    name: 'Xác thực biển báo thành công',
+    title: 'Xác thực biển báo thành công',
+    amount: 10000,
+    timestamp: '10 Th06 2026, 11:15',
+    createdAt: '2026-06-10T11:15:00.000Z',
   },
 ];
 
 export function CreditHistoryScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { data: walletData } = useGetWallet();
+
+  const transactions: CreditTransactionItem[] = useMemo(() => {
+    const apiTransactions = walletData?.recentTransactions;
+    if (apiTransactions && apiTransactions.length > 0) {
+      return apiTransactions.map((t) => ({
+        id: t.id,
+        title: t.description || t.transactionType,
+        name: t.description || t.transactionType,
+        amount: t.amount,
+        createdAt: t.createdAt,
+        timestamp: new Date(t.createdAt).toLocaleString('vi-VN'),
+        date: new Date(t.createdAt).toLocaleString('vi-VN'),
+        detail: t.referenceType ? `${t.referenceType}` : undefined,
+      }));
+    }
+    return DEFAULT_TRANSACTIONS;
+  }, [walletData?.recentTransactions]);
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <CreditScreenHeader onBack={() => router.back()} title="Lịch sử Credits" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.dateFields}>
-          <DateField label="Từ ngày" value="01 Th08 2026" />
-          <DateField label="Đến ngày" value="17 Th08 2026" />
-        </View>
-        {creditHistoryGroups.map((group) => (
-          <View key={group.label} style={styles.group}>
-            <Text style={[styles.groupLabel, { color: theme.placeholder }]}>{group.label}</Text>
-            <TransactionList transactions={group.transactions} />
-          </View>
-        ))}
+        <DateFilterSortList<CreditTransactionItem>
+          items={transactions}
+          getDate={(item) => item.createdAt}
+          headerTitle="Lọc theo ngày"
+          startDateLabel="Từ ngày"
+          endDateLabel="Đến ngày"
+          showPresets
+          showSortToggle
+          showCountBadge
+        >
+          {({ items }) => (
+            items.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.emptyText, { color: theme.placeholder }]}>
+                  Không có giao dịch nào trong khoảng thời gian này
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.listWrapper}>
+                <TransactionList transactions={items} />
+              </View>
+            )
+          )}
+        </DateFilterSortList>
       </ScrollView>
-    </View>
-  );
-}
-
-function DateField({ label, value }: { label: string; value: string }) {
-  const theme = useTheme();
-
-  return (
-    <View style={styles.dateField}>
-      <Text style={[styles.dateLabel, { color: theme.placeholder }]}>{label}</Text>
-      <AppButton
-        accessibilityLabel={`${label}: ${value}`}
-        style={[styles.dateButton, { borderColor: theme.border }]}
-        variant="surface"
-      >
-        <Text style={[styles.calendarIcon, { color: theme.primary }]}>▣</Text>
-        <Text numberOfLines={1} style={[styles.dateValue, { color: theme.text }]}>{value}</Text>
-      </AppButton>
     </View>
   );
 }
@@ -86,52 +133,23 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 640,
     alignSelf: 'center',
-    gap: Spacing.four,
     padding: Spacing.four,
     paddingBottom: Spacing.six,
   },
-  dateFields: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingTop: Spacing.one,
+  listWrapper: {
+    marginTop: Spacing.two,
   },
-  dateField: {
-    flex: 1,
-    gap: Spacing.one,
-  },
-  dateLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-  },
-  dateButton: {
-    minHeight: 50,
+  emptyCard: {
+    marginTop: Spacing.two,
+    padding: Spacing.five,
     borderWidth: 1,
-    borderRadius: Rounded.md,
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.two,
+    borderRadius: Rounded.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  calendarIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 900,
-  },
-  dateValue: {
-    flex: 1,
+  emptyText: {
     fontFamily: Fonts.body,
     fontSize: 13,
-    fontWeight: 700,
-  },
-  group: {
-    gap: Spacing.two,
-  },
-  groupLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 900,
-    letterSpacing: 0.8,
+    textAlign: 'center',
   },
 });

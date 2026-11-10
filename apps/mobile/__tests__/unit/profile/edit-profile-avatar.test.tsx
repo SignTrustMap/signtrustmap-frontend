@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Image } from 'react-native';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { EditProfileScreen } from '@/feature/profile/pages/edit-profile-screen';
@@ -197,6 +197,47 @@ describe('Profile Avatar Update & Crop Modal Flow', () => {
           avatarUrl: 'file:///path/to/cropped-avatar.jpg',
         }),
       );
+    });
+
+    it('renders and allows editing phone, address, and displays read-only email', async () => {
+      const screen = await render(<EditProfileScreen />);
+
+      // Wait for initial profile load to complete
+      await waitFor(() => {
+        expect(screen.queryByText('Đang tải thông tin...')).toBeNull();
+      });
+
+      const phoneInput = screen.getByPlaceholderText('Nhập số điện thoại liên hệ');
+      expect(phoneInput).toBeTruthy();
+      await act(async () => {
+        fireEvent.changeText(phoneInput, '0987654321');
+      });
+
+      const addressInput = screen.getByPlaceholderText('Nhập địa chỉ của bạn');
+      expect(addressInput).toBeTruthy();
+      await act(async () => {
+        fireEvent.changeText(addressInput, '123 Nguyen Trai, Q1, HCM');
+      });
+
+      const emailInput = screen.getByLabelText('Email');
+      expect(emailInput).toBeTruthy();
+      expect(emailInput.props.editable).toBe(false);
+
+      const saveButton = screen.getByLabelText('Lưu thông tin hồ sơ');
+      await act(async () => {
+        fireEvent.press(saveButton);
+      });
+
+      await waitFor(() => {
+        expect(authApi.updateProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            fullName: 'Nguyen Van A',
+            phone: '0987654321',
+            address: '123 Nguyen Trai, Q1, HCM',
+          }),
+          'test-token',
+        );
+      });
     });
   });
 

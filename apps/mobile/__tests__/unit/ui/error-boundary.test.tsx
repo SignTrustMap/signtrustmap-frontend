@@ -105,8 +105,8 @@ describe('ErrorBoundary Component', () => {
     expect(queryByText('Normal Child Rendered')).toBeNull();
 
     // Default ErrorFallbackView should be visible
-    expect(getByText('Something Went Wrong')).toBeTruthy();
-    expect(getByText('Application Error')).toBeTruthy();
+    expect(getByText('Đã xảy ra sự cố')).toBeTruthy();
+    expect(getByText('Lỗi ứng dụng')).toBeTruthy();
   });
 
   it('triggers SplashScreen.hideAsync when an error is caught', async () => {
@@ -186,8 +186,8 @@ describe('ErrorFallbackView Component', () => {
       <ErrorFallbackView error={mockError} />,
     );
 
-    expect(getByText('Something Went Wrong')).toBeTruthy();
-    expect(getByText(/An unexpected error occurred/)).toBeTruthy();
+    expect(getByText('Đã xảy ra sự cố')).toBeTruthy();
+    expect(getByText(/Đã xảy ra lỗi không mong muốn/)).toBeTruthy();
   });
 
   it('calls onRetry callback when Try Again button is pressed', async () => {
@@ -196,7 +196,7 @@ describe('ErrorFallbackView Component', () => {
       <ErrorFallbackView error={new Error('Network error')} onRetry={onRetryMock} />,
     );
 
-    const retryBtn = getByLabelText('Try again');
+    const retryBtn = getByLabelText('Thử lại');
     fireEvent.press(retryBtn);
 
     await waitFor(() => {
@@ -210,7 +210,7 @@ describe('ErrorFallbackView Component', () => {
       <ErrorFallbackView error={new Error('Broken screen')} onGoHome={onGoHomeMock} />,
     );
 
-    const homeBtn = getByLabelText('Return to home screen');
+    const homeBtn = getByLabelText('Quay về trang chủ');
     fireEvent.press(homeBtn);
 
     expect(onGoHomeMock).toHaveBeenCalled();
@@ -229,7 +229,7 @@ describe('ErrorFallbackView Component', () => {
     expect(queryByText('Syntax parsing failure')).toBeNull();
 
     // Press accordion toggle to expand
-    const toggleBtn = getByLabelText('Show technical details');
+    const toggleBtn = getByLabelText('Xem chi tiết kỹ thuật');
     fireEvent.press(toggleBtn);
 
     // Message and stack should now be visible within waitFor
@@ -239,14 +239,14 @@ describe('ErrorFallbackView Component', () => {
     });
 
     // Copy button
-    const copyBtn = getByLabelText('Copy error details');
+    const copyBtn = getByLabelText('Sao chép chi tiết lỗi');
     fireEvent.press(copyBtn);
 
     await waitFor(() => {
       expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
         expect.stringContaining('Syntax parsing failure'),
       );
-      expect(getByText('Copied to clipboard')).toBeTruthy();
+      expect(getByText('Đã sao chép vào bộ nhớ tạm')).toBeTruthy();
     });
   });
 });
@@ -260,6 +260,6 @@ describe('RouteErrorBoundary Adapter', () => {
       <RouteErrorBoundary error={mockError} retry={mockRetry} />,
     );
 
-    expect(getByText('Something Went Wrong')).toBeTruthy();
+    expect(getByText('Đã xảy ra sự cố')).toBeTruthy();
   });
 });

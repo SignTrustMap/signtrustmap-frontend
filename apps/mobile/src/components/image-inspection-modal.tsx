@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -24,36 +25,37 @@ export function ImageInspectionModal({
     <Modal
       animationType="fade"
       onRequestClose={onClose}
-      statusBarTranslucent
       transparent
       visible={visible}
     >
       <View style={styles.overlay}>
-        {/* Header Bar */}
-        <View style={styles.header}>
-          <View style={styles.headerInfo}>
-            <Text style={styles.title}>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+          {/* Header Bar */}
+          <View style={styles.header}>
+            <View style={styles.headerInfo}>
+              <Text style={styles.title}>{title}</Text>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            </View>
+            <Pressable
+              accessibilityLabel="Close photo inspection"
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={onClose}
+              style={styles.closeBtn}
+            >
+              <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityLabel="Close photo inspection"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={onClose}
-            style={styles.closeBtn}
-          >
-            <MaterialCommunityIcons color="#FFFFFF" name="close" size={24} />
-          </Pressable>
-        </View>
 
-        {/* Full Image */}
-        <View style={styles.imageContainer}>
-          <Image
-            contentFit="contain"
-            source={{ uri: imageUrl }}
-            style={styles.fullImage}
-          />
-        </View>
+          {/* Full Image */}
+          <View style={styles.imageContainer}>
+            <Image
+              contentFit="contain"
+              source={{ uri: imageUrl }}
+              style={styles.fullImage}
+            />
+          </View>
+        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -63,6 +65,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: '#000000FA',
+  },
+  safeArea: {
+    flex: 1,
     justifyContent: 'space-between',
   },
   header: {
@@ -70,7 +75,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 54,
+    paddingTop: 16,
     paddingBottom: 16,
     zIndex: 10,
   },
