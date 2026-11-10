@@ -62,7 +62,7 @@ describe('Survey Submission API Module', () => {
         mockToken,
         undefined,
       );
-      expect(res.id).toBe('sub-101');
+      expect((res as any).id).toBe('sub-101');
     });
   });
 
@@ -81,7 +81,7 @@ describe('Survey Submission API Module', () => {
         }),
         mockToken,
       );
-      expect(res.success).toBe(true);
+      expect((res as any).success).toBe(true);
     });
   });
 
@@ -187,7 +187,7 @@ describe('Survey Submission API Module', () => {
         { method: 'POST', signal: undefined },
         mockToken,
       );
-      expect(res.complete).toBe(true);
+      expect((res as any).complete).toBe(true);
     });
 
     it('sends POST to finalize and submit survey', async () => {
@@ -200,7 +200,7 @@ describe('Survey Submission API Module', () => {
         { method: 'POST', signal: undefined },
         mockToken,
       );
-      expect(res.status).toBe('PROCESSING');
+      expect((res as any).status).toBe('PROCESSING');
     });
   });
 
@@ -254,7 +254,7 @@ describe('Survey Submission API Module', () => {
         { signal: undefined },
         mockToken,
       );
-      expect(res.status).toBe('APPROVED');
+      expect((res as any).status).toBe('APPROVED');
     });
 
     it('fetches upload session info', async () => {
@@ -267,7 +267,7 @@ describe('Survey Submission API Module', () => {
         { signal: undefined },
         mockToken,
       );
-      expect(res.sessionId).toBe('sess-88');
+      expect((res as any).sessionId).toBe('sess-88');
     });
   });
 });

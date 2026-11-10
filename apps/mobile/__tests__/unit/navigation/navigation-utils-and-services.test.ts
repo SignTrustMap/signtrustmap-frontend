@@ -185,7 +185,7 @@ describe('Navigation Utils, Services, and Hooks', () => {
       jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValue({
         [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION]: PermissionsAndroid.RESULTS.GRANTED,
         [PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]: PermissionsAndroid.RESULTS.DENIED,
-      });
+      } as any);
       expect(await ensureLocationPermission()).toBe(true);
     });
 
@@ -275,7 +275,7 @@ describe('Navigation Utils, Services, and Hooks', () => {
         { wrapper }
       );
       await act(async () => {
-        await updatePref.current.mutateAsync({ voiceGuidanceEnabled: true });
+        await updatePref.current.mutateAsync({ voiceGuidanceEnabled: true } as any);
       });
       await waitFor(() => expect(updatePref.current.isSuccess).toBe(true));
 

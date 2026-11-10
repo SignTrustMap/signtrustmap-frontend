@@ -42,16 +42,16 @@ describe('Sign Proximity Alert & Banner Unit Test Suite', () => {
     imageUrl: 'https://cdn.example.com/signs/w201.png',
   };
 
-  const mockSignNoName: RouteSign = {
+  const mockSignNoName = {
     id: 'sign-103',
     signCode: 'P.103',
     coordinate: [106.7001, 10.7725],
-  };
+  } as unknown as RouteSign;
 
-  const mockSignBare: RouteSign = {
+  const mockSignBare = {
     id: 'sign-104',
     coordinate: [106.7002, 10.7725],
-  };
+  } as unknown as RouteSign;
 
   beforeEach(() => {
     jest.clearAllMocks();

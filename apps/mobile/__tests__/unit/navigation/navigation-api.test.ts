@@ -192,7 +192,7 @@ describe('Navigation API Module', () => {
         undefined,
         'PUT',
       );
-      expect(updated.ttsEnabled).toBe(false);
+      expect((updated as any).ttsEnabled).toBe(false);
     });
 
     it('initiates and ends navigation sessions', async () => {
@@ -207,7 +207,7 @@ describe('Navigation API Module', () => {
         { method: 'POST', signal: undefined },
         'token-1',
       );
-      expect(end.success).toBe(true);
+      expect((end as any).success).toBe(true);
     });
 
     it('formats navigation sessions when response is an array', async () => {

@@ -3,6 +3,7 @@ import { Animated, BackHandler, Platform } from 'react-native';
 import { render, fireEvent, renderHook, act, cleanup } from '@testing-library/react-native';
 import { useNavigationSheetGesture } from '@/feature/navigation/hooks/use-navigation-sheet-gesture';
 import { NavigationBottomSheet } from '@/feature/navigation/components/navigation-bottom-sheet';
+import type { SignCategory } from '@/constants/sign-categories';
 
 jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
@@ -87,7 +88,7 @@ describe('useNavigationSheetGesture and NavigationBottomSheet', () => {
       const originalPlatform = Platform.OS;
       Platform.OS = 'android';
 
-      let backPressHandler: (() => boolean) | null = null;
+      let backPressHandler: any = null;
       const addEventListenerSpy = jest
         .spyOn(BackHandler, 'addEventListener')
         .mockImplementation((_, handler) => {
@@ -153,7 +154,7 @@ describe('useNavigationSheetGesture and NavigationBottomSheet', () => {
       routeMatchingPresets: [],
       filterViewMode: 'categories' as const,
       onToggleFilterViewMode: mockOnToggleFilterViewMode,
-      manualCategories: new Set(),
+      manualCategories: new Set<SignCategory>(),
       onToggleManualCategory: mockOnToggleManualCategory,
       onSelectAllManualCategories: mockOnSelectAllManualCategories,
       activePresetId: null,

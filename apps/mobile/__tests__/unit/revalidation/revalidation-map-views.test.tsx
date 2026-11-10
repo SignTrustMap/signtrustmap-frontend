@@ -63,7 +63,7 @@ jest.mock('maplibre-gl', () => {
 
 // Mock browser document for .web component in node environment
 if (typeof document === 'undefined') {
-  (global as any).document = {
+  (globalThis as any).document = {
     createElement: (tag: string) => ({
       style: {},
       appendChild: jest.fn(),
