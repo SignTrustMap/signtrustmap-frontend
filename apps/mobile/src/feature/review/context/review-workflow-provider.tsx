@@ -1,6 +1,8 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 import {
+  reviewKeys,
   useGetReviewQueue,
   useGetReviewHistory,
   useCastVoteOnSignCandidate,
@@ -67,6 +69,7 @@ export type ReviewWorkflowContextValue = {
 export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
 
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
+  const queryClient = useContext(QueryClientContext);
   const { session } = useSession();
   const accessToken = session?.accessToken;
   const accountId = session?.account?.id;
@@ -291,6 +294,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setSessionReviewCount(0);
     setInitialQueueSubmissions([]);
     hasLoadedRef.current = false;
+    void queryClient?.invalidateQueries({ queryKey: reviewKeys.all(accountId) });
     await refresh();
   };
 

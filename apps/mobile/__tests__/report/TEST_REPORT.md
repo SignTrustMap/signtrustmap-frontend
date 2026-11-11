@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-11 01:58:22 UTC  
+> **Generated:** 2026-11-11 02:21:31 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 15.87s  
+> **Execution Duration:** 15.42s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -269,22 +269,22 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/review/catalog-api.test.ts` | 12 / 12 | 1.48s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-api.test.ts` | 12 / 12 | 1.43s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-workflow-api.test.ts` | 8 / 8 | 1.47s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 35 / 35 | 1.56s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 3 / 3 | 2.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 2.57s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 3.69s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 5.25s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/use-recapture-and-instruction.test.tsx` | 5 / 5 | 5.89s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-submission-address.test.tsx` | 3 / 3 | 6.49s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 11 / 11 | 7.30s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 7 / 7 | 7.43s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-skip-summary-flow.test.tsx` | 11 / 11 | 7.43s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 7 / 7 | 7.55s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/recheck-evidence-screen.test.tsx` | 4 / 4 | 7.68s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/reviewer-stats-screen.test.tsx` | 8 / 8 | 8.26s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 22 / 22 | 13.27s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-flow.test.tsx` | 25 / 25 | 14.37s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/catalog-api.test.ts` | 12 / 12 | 1.57s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-workflow-api.test.ts` | 8 / 8 | 1.60s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-api.test.ts` | 12 / 12 | 1.47s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 35 / 35 | 1.79s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 3 / 3 | 2.51s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 2.81s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 3.59s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 5.31s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/use-recapture-and-instruction.test.tsx` | 5 / 5 | 5.88s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-submission-address.test.tsx` | 3 / 3 | 6.84s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 7 / 7 | 7.49s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 11 / 11 | 7.43s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 7 / 7 | 7.57s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-skip-summary-flow.test.tsx` | 11 / 11 | 7.71s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/recheck-evidence-screen.test.tsx` | 4 / 4 | 7.76s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/reviewer-stats-screen.test.tsx` | 8 / 8 | 8.08s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 22 / 22 | 13.08s | ✅ Pass |
+| `apps/mobile/__tests__/unit/review/review-flow.test.tsx` | 25 / 25 | 13.94s | ✅ Pass |
 
