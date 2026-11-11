@@ -29,6 +29,7 @@ export type CompletedReview = {
 
 export type ReviewWorkflowContextValue = {
   beginSubmissionCheck: (targetSubmissionIndex?: number) => void;
+  cancelSubmissionCheck?: () => void;
   checkedReviewIndex: number;
   checkingSubmission: boolean;
   isCheckingSubmission: boolean;
@@ -47,6 +48,7 @@ export type ReviewWorkflowContextValue = {
   goToPreviousCheckedReview: () => void;
   isLoading: boolean;
   jumpToSubmissionIndex?: (index: number) => void;
+  keepCurrentReviewAndNext?: () => boolean;
   pendingSubmissions: ReviewSubmission[];
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
@@ -183,28 +185,96 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const beginSubmissionCheck = (targetSubmissionIndex?: number) => {
     if (targetSubmissionIndex !== undefined && reviewHistory[targetSubmissionIndex]) {
-      const target = reviewHistory[targetSubmissionIndex];
-      setPendingSubmissions([target.submission]);
-      setTotalSubmissions(1);
+      const priorHistory = reviewHistory.slice(0, targetSubmissionIndex);
+      const recheckItems = reviewHistory.slice(targetSubmissionIndex).map(
+        (target) =>
+          ({
+            ...target.submission,
+            previousAction: target.action,
+          }) as ReviewSubmission,
+      );
+      setReviewHistory(priorHistory);
+      setPendingSubmissions(recheckItems);
+      setTotalSubmissions(reviewHistory.length);
       setIsRecheckingSubmission(true);
       setRecheckingReviewIndex(targetSubmissionIndex);
-      setRecheckingPreviousAction(target.action);
-      setReviewHistory((history) => history.filter((_, i) => i !== targetSubmissionIndex));
+      setRecheckingPreviousAction((recheckItems[0] as any)?.previousAction);
       setCheckedReviewIndex(0);
       setIsCheckingSubmission(false);
       return;
     }
 
-    const votedSubmissions = reviewHistory.map((item) => item.submission);
-    setPendingSubmissions(votedSubmissions);
+    const votedSubmissions = reviewHistory.map((item) => ({
+      ...item.submission,
+      previousAction: item.action,
+    }));
+    setPendingSubmissions(votedSubmissions as ReviewSubmission[]);
     setTotalSubmissions(votedSubmissions.length);
     setReviewHistory([]);
     setCheckedReviewIndex(0);
     setIsCheckingSubmission(false);
+    setIsRecheckingSubmission(true);
+    setRecheckingReviewIndex(undefined);
+    setRecheckingPreviousAction(reviewHistory[0]?.action);
+  };
+
+  const cancelSubmissionCheck = useCallback(() => {
+    if (pendingSubmissions.length > 0) {
+      const remainingReviews: CompletedReview[] = pendingSubmissions
+        .map((sub) => {
+          const action =
+            (sub as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+            recheckingPreviousAction;
+          if (!action) return null;
+          return { action, submission: sub };
+        })
+        .filter(Boolean) as CompletedReview[];
+
+      if (remainingReviews.length > 0) {
+        setReviewHistory((history) => [...history, ...remainingReviews]);
+        setPendingSubmissions([]);
+      }
+    }
+    setIsCheckingSubmission(false);
     setIsRecheckingSubmission(false);
     setRecheckingReviewIndex(undefined);
     setRecheckingPreviousAction(undefined);
-  };
+  }, [pendingSubmissions, recheckingPreviousAction]);
+
+  const keepCurrentReviewAndNext = useCallback((): boolean => {
+    if (pendingSubmissions.length === 0) return true;
+    const current = pendingSubmissions[0];
+    const prevAction =
+      (current as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+      recheckingPreviousAction ??
+      'skipped';
+    const completes = pendingSubmissions.length <= 1;
+
+    setReviewHistory((history) => {
+      const keptReview: CompletedReview = {
+        action: prevAction,
+        submission: current,
+      };
+      return [...history, keptReview];
+    });
+
+    setPendingSubmissions((pending) => pending.slice(1));
+    setSessionReviewCount((count) => count + 1);
+
+    if (completes) {
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(false);
+      setRecheckingReviewIndex(undefined);
+      setRecheckingPreviousAction(undefined);
+    } else {
+      const nextItem = pendingSubmissions[1];
+      setRecheckingPreviousAction(
+        (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
+      );
+    }
+
+    return completes;
+  }, [pendingSubmissions, recheckingPreviousAction]);
 
   const finishSubmissionCheck = () => {
     setCheckedReviewIndex(0);
@@ -253,22 +323,22 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     // 1. Immediately update UI state optimistically so review cards advance with zero lag
     setReviewHistory((history) => {
       const completedReview = { action, submission };
-      if (completedRecheckIndex !== undefined) {
-        const nextHistory = [...history];
-        nextHistory.splice(completedRecheckIndex, 0, completedReview);
-        return nextHistory;
-      }
       return [...history, completedReview];
     });
 
+    const completes = pendingSubmissions.length <= 1;
     setPendingSubmissions((pending) => pending.slice(1));
-    if (completedRecheckIndex !== undefined) {
-      setCheckedReviewIndex(completedRecheckIndex);
-      setIsCheckingSubmission(true);
+    if (completes) {
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(false);
+      setRecheckingReviewIndex(undefined);
+      setRecheckingPreviousAction(undefined);
+    } else {
+      const nextItem = pendingSubmissions[1];
+      setRecheckingPreviousAction(
+        (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
+      );
     }
-    setIsRecheckingSubmission(false);
-    setRecheckingReviewIndex(undefined);
-    setRecheckingPreviousAction(undefined);
     setSessionReviewCount((count) => count + 1);
 
     // 2. Dispatch backend network call in background without blocking state progression
@@ -355,6 +425,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     <ReviewWorkflowContext.Provider
       value={{
         beginSubmissionCheck,
+        cancelSubmissionCheck,
         checkedReviewIndex,
         checkingSubmission: isCheckingSubmission,
         isCheckingSubmission,
@@ -365,6 +436,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         goToPreviousCheckedReview,
         isLoading,
         jumpToSubmissionIndex,
+        keepCurrentReviewAndNext,
         pendingSubmissions,
         refresh,
         recheckingPreviousAction,

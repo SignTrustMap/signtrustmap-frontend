@@ -269,4 +269,134 @@ describe('RevalidationReviewScreen', () => {
       params: { type: 'review_revalidation', count: '1' },
     });
   });
+
+  it('displays voted result card during recheck, hiding 4 voting buttons until "Sửa kết quả" is pressed', async () => {
+    const mockCancelEvidenceCheck = jest.fn();
+    const mockWorkflow = createMockWorkflow({
+      isCheckingEvidence: true,
+      recheckingPreviousReview: {
+        action: 'STILL_ACTIVE',
+        item: mockEvidenceItem,
+        userVerdict: 'AGREE',
+      },
+      cancelEvidenceCheck: mockCancelEvidenceCheck,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByText, getAllByText, queryByLabelText, getByLabelText, getByTestId } = await render(
+      <RevalidationReviewScreen />,
+    );
+
+    // Verify voted result card is shown
+    expect(getByText('Kết quả đã đánh giá')).toBeTruthy();
+    expect(getAllByText('ĐÃ XÁC NHẬN HOẠT ĐỘNG').length).toBeGreaterThanOrEqual(1);
+
+    // 4 voting buttons are hidden
+    expect(queryByLabelText('Đồng ý với kết luận của điều tra viên')).toBeNull();
+    expect(queryByLabelText('Từ chối kết luận của điều tra viên')).toBeNull();
+    expect(queryByLabelText('Bỏ qua minh chứng này')).toBeNull();
+    expect(queryByLabelText('Báo cáo minh chứng này')).toBeNull();
+
+    // Verify "Sửa kết quả" button is present
+    const fixResultBtn = getByTestId('reval-fix-result-button');
+    expect(fixResultBtn).toBeTruthy();
+
+    // Press "Sửa kết quả"
+    await act(async () => {
+      fireEvent.press(fixResultBtn);
+    });
+
+    // Now 4 voting buttons appear
+    expect(getByLabelText('Đồng ý với kết luận của điều tra viên')).toBeTruthy();
+    expect(getByLabelText('Từ chối kết luận của điều tra viên')).toBeTruthy();
+    expect(getByLabelText('Bỏ qua minh chứng này')).toBeTruthy();
+    expect(getByLabelText('Báo cáo minh chứng này')).toBeTruthy();
+    expect(getByText('Chọn kết quả thẩm định mới bên dưới')).toBeTruthy();
+  });
+
+  it('displays voted result card for a SKIPPED evidence during recheck, and keeping it restores workflow', async () => {
+    const mockKeepCurrentEvidenceAndNext = jest.fn().mockReturnValue(true);
+    const mockCancelEvidenceCheck = jest.fn();
+    const mockWorkflow = createMockWorkflow({
+      isCheckingEvidence: true,
+      recheckingPreviousReview: {
+        action: 'UNCLEAR',
+        item: mockEvidenceItem,
+        userVerdict: 'SKIP',
+      },
+      cancelEvidenceCheck: mockCancelEvidenceCheck,
+      keepCurrentEvidenceAndNext: mockKeepCurrentEvidenceAndNext,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByText, getAllByText, queryByLabelText, getByTestId } = await render(
+      <RevalidationReviewScreen />,
+    );
+
+    // Verify "ĐÃ BỎ QUA" is shown
+    expect(getByText('Kết quả đã đánh giá')).toBeTruthy();
+    expect(getAllByText('ĐÃ BỎ QUA').length).toBeGreaterThanOrEqual(1);
+
+    // 4 voting buttons are hidden
+    expect(queryByLabelText('Đồng ý với kết luận của điều tra viên')).toBeNull();
+
+    // Verify "Giữ nguyên" button calls keepCurrentEvidenceAndNext and navigates when completed
+    const keepBtn = getByTestId('reval-keep-result-button');
+    await act(async () => {
+      fireEvent.press(keepBtn);
+    });
+
+    expect(mockKeepCurrentEvidenceAndNext).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/work/revalidation-summary');
+  });
+
+  it('keeps current evidence and advances to next when more recheck items exist', async () => {
+    const mockKeepCurrentEvidenceAndNext = jest.fn().mockReturnValue(false);
+    const mockWorkflow = createMockWorkflow({
+      isCheckingEvidence: true,
+      recheckingPreviousReview: {
+        action: 'STILL_ACTIVE',
+        item: mockEvidenceItem,
+        userVerdict: 'AGREE',
+      },
+      keepCurrentEvidenceAndNext: mockKeepCurrentEvidenceAndNext,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByTestId } = await render(<RevalidationReviewScreen />);
+
+    const keepBtn = getByTestId('reval-keep-result-button');
+    await act(async () => {
+      fireEvent.press(keepBtn);
+    });
+
+    expect(mockKeepCurrentEvidenceAndNext).toHaveBeenCalled();
+    // Since completes is false, router.replace to summary should NOT be called
+    expect(mockRouter.replace).not.toHaveBeenCalledWith('/work/revalidation-summary');
+  });
+
+  it('navigates to summary when skip-to-summary button is pressed', async () => {
+    const mockCancelEvidenceCheck = jest.fn();
+    const mockWorkflow = createMockWorkflow({
+      reviewHistory: [
+        {
+          action: 'STILL_ACTIVE',
+          item: mockEvidenceItem,
+          userVerdict: 'AGREE',
+        },
+      ],
+      cancelEvidenceCheck: mockCancelEvidenceCheck,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByTestId } = await render(<RevalidationReviewScreen />);
+
+    const skipToSummaryBtn = getByTestId('reval-skip-to-summary-button');
+    await act(async () => {
+      fireEvent.press(skipToSummaryBtn);
+    });
+
+    expect(mockCancelEvidenceCheck).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/work/revalidation-summary');
+  });
 });

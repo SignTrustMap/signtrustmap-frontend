@@ -44,7 +44,8 @@ jest.mock('@expo/vector-icons', () => {
   const React = require('react');
   const { View } = require('react-native');
   return {
-    MaterialCommunityIcons: (props: any) => React.createElement(View, { testID: `icon-${props.name}`, ...props }),
+    MaterialCommunityIcons: (props: any) =>
+      React.createElement(View, { testID: `icon-${props.name}`, ...props }),
   };
 });
 
@@ -169,9 +170,27 @@ const mockRefetchHistory = jest.fn();
 
 const defaultCatalog = {
   categories: [
-    { id: 1, code: 'WARN', nameEn: 'Warning Signs', nameVi: 'Biển báo nguy hiểm', description: 'Warn of hazards' },
-    { id: 2, code: 'PROHIB', nameEn: 'Prohibitory Signs', nameVi: 'Biển báo cấm', description: 'Prohibit actions' },
-    { id: 3, code: 'GUIDE', nameEn: 'Guide Signs', nameVi: 'Biển chỉ dẫn', description: 'Guide drivers' },
+    {
+      id: 1,
+      code: 'WARN',
+      nameEn: 'Warning Signs',
+      nameVi: 'Biển báo nguy hiểm',
+      description: 'Warn of hazards',
+    },
+    {
+      id: 2,
+      code: 'PROHIB',
+      nameEn: 'Prohibitory Signs',
+      nameVi: 'Biển báo cấm',
+      description: 'Prohibit actions',
+    },
+    {
+      id: 3,
+      code: 'GUIDE',
+      nameEn: 'Guide Signs',
+      nameVi: 'Biển chỉ dẫn',
+      description: 'Guide drivers',
+    },
   ],
   signs: [
     {
@@ -182,7 +201,13 @@ const defaultCatalog = {
       signCode: 'W.201a',
       description: 'Curve to the left ahead',
       representativeImageKey: 'https://s3.signmap.site/catalog/w201a.png',
-      category: { id: 1, code: 'WARN', nameEn: 'Warning Signs', nameVi: 'Biển báo nguy hiểm', description: null },
+      category: {
+        id: 1,
+        code: 'WARN',
+        nameEn: 'Warning Signs',
+        nameVi: 'Biển báo nguy hiểm',
+        description: null,
+      },
     },
     {
       id: 102,
@@ -192,7 +217,13 @@ const defaultCatalog = {
       signCode: 'P.123a',
       description: 'Vehicles must not turn left',
       representativeImageKey: 'https://s3.signmap.site/catalog/p123a.png',
-      category: { id: 2, code: 'PROHIB', nameEn: 'Prohibitory Signs', nameVi: 'Biển báo cấm', description: null },
+      category: {
+        id: 2,
+        code: 'PROHIB',
+        nameEn: 'Prohibitory Signs',
+        nameVi: 'Biển báo cấm',
+        description: null,
+      },
     },
     {
       id: 103,
@@ -202,7 +233,13 @@ const defaultCatalog = {
       signCode: 'I.408',
       description: 'Indicates designated parking space',
       representativeImageKey: 'https://s3.signmap.site/catalog/i408.png',
-      category: { id: 3, code: 'GUIDE', nameEn: 'Guide Signs', nameVi: 'Biển chỉ dẫn', description: null },
+      category: {
+        id: 3,
+        code: 'GUIDE',
+        nameEn: 'Guide Signs',
+        nameVi: 'Biển chỉ dẫn',
+        description: null,
+      },
     },
   ],
 };
@@ -330,9 +367,9 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders reviewer action cards with queue count badge and navigates to submission review', async () => {
       const { getByText, getByLabelText } = await render(<WorkScreen currentRole="reviewer" />);
 
-      expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
+      expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
       expect(getByText('3 MỚI')).toBeTruthy();
-      expect(getByText('Minh chứng tái thẩm định chờ duyệt')).toBeTruthy();
+      expect(getByText('Tái thẩm định cần duyệt')).toBeTruthy();
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
 
       const heroButton = getByLabelText('Thẩm định các hồ sơ chờ xử lý');
@@ -360,7 +397,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText, getByLabelText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -380,7 +417,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen state="loading" />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       expect(getByLabelText('Đang tải danh sách thẩm định')).toBeTruthy();
@@ -395,7 +432,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -410,7 +447,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
             request: { vote: 1 },
-          })
+          }),
         );
         expect(getByText('Đã phê duyệt biển báo')).toBeTruthy();
         // Deck advances to candidate 2
@@ -428,7 +465,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText, getByTestId } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -459,19 +496,18 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
               vote: -1,
               suggestedSignTypeId: 102,
             }),
-          })
+          }),
         );
         expect(getByText('Đã từ chối biển báo')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });
 
-
     it('navigates to report note sheet when report button below "no correct option?" is clicked', async () => {
       const { getByLabelText, getByText, getByPlaceholderText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -505,7 +541,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
             request: {
               reason: 'Sign is completely obscured and unidentifiable',
             },
-          })
+          }),
         );
       });
     });
@@ -514,7 +550,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -541,7 +577,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
               vote: -1,
               declineReason: 'Sign Not Found',
             }),
-          })
+          }),
         );
         const voteCall = mockCastVote.mock.calls[0][0];
         expect(voteCall.request.suggestedSignTypeId).toBeUndefined();
@@ -552,7 +588,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -582,7 +618,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText, getByPlaceholderText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -605,7 +641,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
             request: { reason: 'Vandalized sign candidate requiring supervisor check' },
-          })
+          }),
         );
         expect(getByText('Đã báo cáo biển báo')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
@@ -621,7 +657,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -635,7 +671,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(mockSkipSign).toHaveBeenCalledWith(
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
-          })
+          }),
         );
         expect(getByText('Đã bỏ qua biển báo (không thể nhận diện)')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
@@ -651,7 +687,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText, queryByLabelText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -676,7 +712,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(mockUndoVote).toHaveBeenCalledWith(
           expect.objectContaining({
             params: { candidateId: 'cand-1' },
-          })
+          }),
         );
         // Restored candidate 1 to active card
         expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
@@ -693,7 +729,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText, getAllByLabelText, queryAllByLabelText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -727,7 +763,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByLabelText, getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -748,7 +784,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {
@@ -798,7 +834,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(
         <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
           <SubmissionSummaryScreen />
-        </ReviewWorkflowContext.Provider>
+        </ReviewWorkflowContext.Provider>,
       );
 
       expect(getByText('Tổng kết thẩm định')).toBeTruthy();
@@ -852,7 +888,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(
         <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
           <SubmissionSummaryScreen />
-        </ReviewWorkflowContext.Provider>
+        </ReviewWorkflowContext.Provider>,
       );
 
       const checkButton = getByText('Kiểm tra lại hồ sơ');
@@ -901,7 +937,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(
         <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
           <SubmissionSummaryScreen />
-        </ReviewWorkflowContext.Provider>
+        </ReviewWorkflowContext.Provider>,
       );
 
       const submitButton = getByText('Hoàn tất');
@@ -1036,18 +1072,16 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('resolves S3 and CDN URLs properly with bucket prefixes and handles edge cases', () => {
       // CDN with existing bucket
       expect(resolveS3Url('https://cdn.signmap.site/stm-sign-crops/crop.jpg')).toBe(
-        'https://s3.signmap.site/stm-sign-crops/crop.jpg'
+        'https://s3.signmap.site/stm-sign-crops/crop.jpg',
       );
 
       // CDN without bucket prefix adds stm-sign-crops
       expect(resolveS3Url('https://cdn.signmap.site/crop.jpg')).toBe(
-        'https://s3.signmap.site/stm-sign-crops/crop.jpg'
+        'https://s3.signmap.site/stm-sign-crops/crop.jpg',
       );
 
       // Relative path without bucket adds stm-sign-crops
-      expect(resolveS3Url('crop.jpg')).toBe(
-        'https://s3.signmap.site/stm-sign-crops/crop.jpg'
-      );
+      expect(resolveS3Url('crop.jpg')).toBe('https://s3.signmap.site/stm-sign-crops/crop.jpg');
 
       // Empty or null
       expect(resolveS3Url(null)).toBe('');
@@ -1063,7 +1097,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       const { getByText } = await render(
         <ReviewWorkflowProvider>
           <SubmissionReviewScreen />
-        </ReviewWorkflowProvider>
+        </ReviewWorkflowProvider>,
       );
 
       await waitFor(() => {

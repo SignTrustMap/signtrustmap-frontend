@@ -38,7 +38,14 @@ import {
   RevalidationDecisionBadge,
   RevalidationSwipeBadges,
 } from '../components/revalidation-decision-badge';
-import { useRevalidationWorkflow } from '../context/revalidation-workflow-provider';
+import {
+  RevalidationVotedResultCard,
+  RevalidationEditingBanner,
+} from '../components/revalidation-voted-result-card';
+import {
+  type CompletedRevalidationReview,
+  useRevalidationWorkflow,
+} from '../context/revalidation-workflow-provider';
 
 export type RevalidationReviewAction =
   | 'STILL_ACTIVE'
@@ -49,41 +56,66 @@ export type RevalidationReviewAction =
 
 type SheetType = 'decline' | 'report';
 
-const revalSummaryActionDetails: Record<
+export const revalActionDetails: Record<
   RevalidationReviewAction,
-  { color: string; label: string; summary: string; symbol: string }
+  {
+    bgAlpha: string;
+    color: string;
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    label: string;
+    summary: string;
+    symbol: string;
+    title: string;
+  }
 > = {
   STILL_ACTIVE: {
+    bgAlpha: 'rgba(22, 163, 74, 0.12)',
     color: '#16A34A',
+    icon: 'check-circle',
     label: 'Vẫn hoạt động',
     summary: 'Xác nhận biển báo vẫn tồn tại trên thực địa.',
     symbol: '✓',
+    title: 'ĐÃ XÁC NHẬN HOẠT ĐỘNG',
   },
   REMOVED: {
+    bgAlpha: 'rgba(239, 68, 68, 0.12)',
     color: Colors.danger,
+    icon: 'close-circle',
     label: 'Đã gỡ bỏ',
     summary: 'Xác nhận biển báo đã không còn trên thực địa.',
     symbol: '×',
+    title: 'ĐÃ XÁC NHẬN GỠ BỎ',
   },
   CHANGED: {
+    bgAlpha: 'rgba(249, 115, 22, 0.12)',
     color: '#F97316',
+    icon: 'cached',
     label: 'Đã thay đổi',
     summary: 'Loại biển báo hoặc thông tin đã thay đổi.',
     symbol: '⟳',
+    title: 'ĐÃ GHI NHẬN THAY ĐỔI',
   },
   UNCLEAR: {
+    bgAlpha: 'rgba(37, 99, 235, 0.12)',
     color: '#2563EB',
-    label: 'Không rõ',
-    summary: 'Minh chứng không đủ điều kiện để xác định.',
+    icon: 'arrow-up-circle',
+    label: 'Bỏ qua',
+    summary: 'Đã bỏ qua do không thể nhận diện được biển báo.',
     symbol: '?',
+    title: 'ĐÃ BỎ QUA',
   },
   INVALID: {
+    bgAlpha: 'rgba(100, 116, 139, 0.12)',
     color: '#64748B',
+    icon: 'alert-circle',
     label: 'Không hợp lệ',
     summary: 'Minh chứng không hợp lệ hoặc bị báo cáo vi phạm.',
     symbol: '!',
+    title: 'ĐÃ BÁO CÁO VI PHẠM',
   },
 };
+
+const revalSummaryActionDetails = revalActionDetails;
 
 function RevalSummaryMetric({
   action,
@@ -551,7 +583,28 @@ export function RevalidationReviewScreen() {
     handleSkip: workflowSkip,
     finishReviews: workflowFinish,
     isLoading,
+    isCheckingEvidence,
+    keepCurrentEvidenceAndNext,
+    recheckingPreviousReview,
+    cancelEvidenceCheck,
   } = workflow;
+
+  const displayedPreviousReview =
+    (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))?.previousReview ??
+    recheckingPreviousReview;
+  const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
+  const [isEditingVote, setIsEditingVote] = useState(false);
+
+  useEffect(() => {
+    setIsEditingVote(false);
+  }, [currentItem?.evidenceId, isCheckingEvidence]);
+
+  const handleKeepPreviousReview = useCallback(() => {
+    const completes = keepCurrentEvidenceAndNext?.() ?? true;
+    if (completes) {
+      router.replace('/work/revalidation-summary');
+    }
+  }, [keepCurrentEvidenceAndNext, router]);
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -746,6 +799,17 @@ export function RevalidationReviewScreen() {
           }
         },
         onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
+          if (isRecheckMode && !isEditingVote) {
+            gestureAxis.current = 'none';
+            Animated.spring(pan, {
+              toValue: { x: 0, y: 0 },
+              friction: 6,
+              tension: 50,
+              useNativeDriver: false,
+            }).start();
+            return;
+          }
+
           const SWIPE_THRESHOLD = 90;
           const currentAxis = gestureAxis.current;
           gestureAxis.current = 'none';
@@ -818,7 +882,7 @@ export function RevalidationReviewScreen() {
           }).start();
         },
       }),
-    [handleAgree, handleDecline, handleReport, handleSkip, pan],
+    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, pan],
   );
 
   // Active displayed image URI
@@ -845,7 +909,12 @@ export function RevalidationReviewScreen() {
               <Pressable
                 accessibilityLabel="Quay lại"
                 hitSlop={Spacing.one}
-                onPress={() => router.back()}
+                onPress={() => {
+                  if (isRecheckMode) {
+                    cancelEvidenceCheck?.();
+                  }
+                  router.back();
+                }}
                 style={styles.backButton}
               >
                 <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
@@ -868,7 +937,12 @@ export function RevalidationReviewScreen() {
               <Pressable
                 accessibilityLabel="Xem tổng kết đánh giá"
                 hitSlop={Spacing.one}
-                onPress={() => router.replace('/work/revalidation-summary')}
+                onPress={() => {
+                  if (isRecheckMode) {
+                    cancelEvidenceCheck?.();
+                  }
+                  router.replace('/work/revalidation-summary');
+                }}
                 style={styles.summaryTopButton}
               >
                 <MaterialCommunityIcons color={theme.text} name="format-list-checks" size={22} />
@@ -940,12 +1014,32 @@ export function RevalidationReviewScreen() {
                   />
 
                   {/* Directional Swipe Badges */}
-                  <RevalidationSwipeBadges
-                    agreeOpacity={agreeBadgeOpacity}
-                    declineOpacity={declineBadgeOpacity}
-                    reportOpacity={reportBadgeOpacity}
-                    skipOpacity={skipBadgeOpacity}
-                  />
+                  {!isRecheckMode || isEditingVote ? (
+                    <RevalidationSwipeBadges
+                      agreeOpacity={agreeBadgeOpacity}
+                      declineOpacity={declineBadgeOpacity}
+                      reportOpacity={reportBadgeOpacity}
+                      skipOpacity={skipBadgeOpacity}
+                    />
+                  ) : null}
+
+                  {/* Status badge when rechecking */}
+                  {displayedPreviousReview ? (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            revalActionDetails[displayedPreviousReview.action]?.color ??
+                            Colors.placeholder,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.statusBadgeLabel}>
+                        {revalActionDetails[displayedPreviousReview.action]?.title ?? 'ĐÃ THẨM ĐỊNH'}
+                      </Text>
+                    </View>
+                  ) : null}
 
                   {/* Zoom button */}
                   <View style={styles.zoomButton}>
@@ -1165,16 +1259,53 @@ export function RevalidationReviewScreen() {
               </View>
             </View>
 
+            {/* Action button right below the comparison box, to the right edge of the screen */}
+            <View style={styles.skipToSummaryRow}>
+              <AppButton
+                accessibilityHint="Bỏ qua các minh chứng còn lại và chuyển đến màn hình tổng kết"
+                accessibilityLabel="Chuyển đến màn hình tổng kết"
+                disabled={history.length === 0}
+                label="Tổng kết"
+                onPress={() => {
+                  cancelEvidenceCheck?.();
+                  router.replace('/work/revalidation-summary');
+                }}
+                style={[
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: history.length > 0 ? theme.primary : theme.border,
+                  },
+                ]}
+                testID="reval-skip-to-summary-button"
+                textStyle={styles.summaryShortcutButtonText}
+                variant={history.length > 0 ? 'primary' : 'surface'}
+              />
+            </View>
+
             {/* Bottom Actions: Separate Revalidation Decision Badge Component */}
-            <RevalidationDecisionBadge
-              disabled={isLoading}
-              handleAgree={handleAgree}
-              handleDecline={handleDecline}
-              handleReport={handleReport}
-              handleSkip={handleSkip}
-              onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
-              onOpenHelp={() => setIsHelpModalVisible(true)}
-            />
+            {isRecheckMode && !isEditingVote ? (
+              <RevalidationVotedResultCard
+                onFixResult={() => setIsEditingVote(true)}
+                onKeepResult={handleKeepPreviousReview}
+                review={displayedPreviousReview}
+              />
+            ) : (
+              <>
+                {isRecheckMode && isEditingVote ? (
+                  <RevalidationEditingBanner onCancel={() => setIsEditingVote(false)} />
+                ) : null}
+
+                <RevalidationDecisionBadge
+                  disabled={isLoading}
+                  handleAgree={handleAgree}
+                  handleDecline={handleDecline}
+                  handleReport={handleReport}
+                  handleSkip={handleSkip}
+                  onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
+                  onOpenHelp={() => setIsHelpModalVisible(true)}
+                />
+              </>
+            )}
           </View>
         ) : history.length > 0 ? (
           /* Revalidation Summary Screen (mirrors reviewer flow) */
@@ -2486,5 +2617,129 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 14,
+    left: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  statusBadgeLabel: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  recheckResultContainer: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+  },
+  recheckResultCard: {
+    borderWidth: 1.5,
+    borderRadius: Rounded.lg,
+    padding: Spacing.two,
+    gap: 8,
+  },
+  recheckResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  recheckResultIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recheckResultTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  recheckResultSubLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  recheckResultTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  recheckResultSummary: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  recheckActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    alignItems: 'center',
+  },
+  recheckFixButton: {
+    flex: 1,
+    minHeight: 46,
+  },
+  recheckKeepButton: {
+    flex: 1,
+    minHeight: 46,
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 8,
+    marginBottom: Spacing.one,
+  },
+  editingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  editingBannerText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelEditButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  cancelEditText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  skipToSummaryRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: -2,
+    marginBottom: 4,
+  },
+  summaryShortcutButton: {
+    minHeight: 32,
+    height: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  summaryShortcutButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
   },
 });

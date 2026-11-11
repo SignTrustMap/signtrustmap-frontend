@@ -27,10 +27,14 @@ import {
 import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal';
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
 import { useGetCatalog } from '@/feature/review/hooks/use-review';
-import { resolveS3Url, type RemedySign } from '@/api/reviews/review-workflow';
+import { resolveS3Url, type RemedySign, type ReviewSubmission } from '@/api/reviews/review-workflow';
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
+import {
+  SubmissionVotedResultCard,
+  SubmissionEditingBanner,
+} from '@/feature/review/components/submission-voted-result-card';
 import { RevalidationSignPickerModal } from '@/feature/revalidation/components/revalidation-sign-picker-modal';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -532,9 +536,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const resumeIndexParam = params?.resumeIndex;
   const theme = useTheme();
   const {
+    cancelSubmissionCheck,
     completeCurrentReview,
     isLoading,
     jumpToSubmissionIndex,
+    keepCurrentReviewAndNext,
     pendingSubmissions,
     recheckingPreviousAction,
     recheckingSubmission,
@@ -553,11 +559,22 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [resumeIndexParam, jumpToSubmissionIndex]);
 
   const handleSkipToSummary = useCallback(() => {
+    cancelSubmissionCheck?.();
     router.replace({
       pathname: '/work/submission-summary',
       params: { resumeIndex: String(reviewHistory.length) },
     });
-  }, [reviewHistory.length, router]);
+  }, [cancelSubmissionCheck, reviewHistory.length, router]);
+
+  const handleKeepCurrentReview = useCallback(() => {
+    const completes = keepCurrentReviewAndNext?.() ?? true;
+    if (completes) {
+      router.replace({
+        pathname: '/work/submission-summary',
+        params: { resumeIndex: String(reviewHistory.length) },
+      });
+    }
+  }, [keepCurrentReviewAndNext, reviewHistory.length, router]);
 
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
@@ -579,12 +596,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const { data: catalog } = useGetCatalog();
   const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
 
-  const displayedReviewAction = recheckingPreviousAction;
   const submission = pendingSubmissions[0];
   const nextSubmission = pendingSubmissions[1];
   const optionalSession = useOptionalSession();
   const session = optionalSession?.session;
   const [resolvedAddress, setResolvedAddress] = useState<string>();
+
+  const displayedReviewAction =
+    (submission as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+    recheckingPreviousAction;
+  const isRecheckMode = Boolean(recheckingSubmission && displayedReviewAction);
+  const [isEditingVote, setIsEditingVote] = useState(false);
+
+  useEffect(() => {
+    setIsEditingVote(false);
+  }, [submission?.id, recheckingSubmission]);
 
   useEffect(() => {
     if (!submission) {
@@ -876,6 +902,16 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           const absDy = Math.abs(dy);
           const SWIPE_THRESHOLD = 85;
 
+          if (isRecheckMode && !isEditingVote) {
+            Animated.spring(pan, {
+              toValue: { x: 0, y: 0 },
+              friction: 6,
+              tension: 50,
+              useNativeDriver: false,
+            }).start();
+            return;
+          }
+
           if (absDx > absDy) {
             // Horizontal swipe: Right -> Approve, Left -> Reject
             if (dx > SWIPE_THRESHOLD || (dx > 35 && vx > 0.4)) {
@@ -932,7 +968,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           }).start();
         },
       }),
-    [completeReview, pan],
+    [completeReview, pan, isRecheckMode, isEditingVote],
   );
 
   return (
@@ -944,7 +980,12 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <Pressable
               accessibilityLabel="Go back"
               hitSlop={Spacing.one}
-              onPress={() => router.back()}
+              onPress={() => {
+                if (isRecheckMode) {
+                  cancelSubmissionCheck?.();
+                }
+                router.back();
+              }}
               style={styles.backButton}
             >
               <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
@@ -1058,45 +1099,49 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   </Pressable>
 
                   {/* Directional Swipe Badges */}
-                  <Animated.View
-                    style={[
-                      styles.swipeBadge,
-                      styles.approveBadge,
-                      { opacity: approveBadgeOpacity },
-                    ]}
-                  >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>PHÊ DUYỆT</Text>
-                  </Animated.View>
+                  {!isRecheckMode || isEditingVote ? (
+                    <>
+                      <Animated.View
+                        style={[
+                          styles.swipeBadge,
+                          styles.approveBadge,
+                          { opacity: approveBadgeOpacity },
+                        ]}
+                      >
+                        <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>PHÊ DUYỆT</Text>
+                      </Animated.View>
 
-                  <Animated.View
-                    style={[
-                      styles.swipeBadge,
-                      styles.declineBadge,
-                      { opacity: declineBadgeOpacity },
-                    ]}
-                  >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>TỪ CHỐI</Text>
-                  </Animated.View>
+                      <Animated.View
+                        style={[
+                          styles.swipeBadge,
+                          styles.declineBadge,
+                          { opacity: declineBadgeOpacity },
+                        ]}
+                      >
+                        <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>TỪ CHỐI</Text>
+                      </Animated.View>
 
-                  <Animated.View
-                    style={[
-                      styles.swipeBadge,
-                      styles.skipBadge,
-                      { opacity: skipBadgeOpacity },
-                    ]}
-                  >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BỎ QUA</Text>
-                  </Animated.View>
+                      <Animated.View
+                        style={[
+                          styles.swipeBadge,
+                          styles.skipBadge,
+                          { opacity: skipBadgeOpacity },
+                        ]}
+                      >
+                        <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BỎ QUA</Text>
+                      </Animated.View>
 
-                  <Animated.View
-                    style={[
-                      styles.swipeBadge,
-                      styles.reportBadge,
-                      { opacity: reportBadgeOpacity },
-                    ]}
-                  >
-                    <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BÁO CÁO</Text>
-                  </Animated.View>
+                      <Animated.View
+                        style={[
+                          styles.swipeBadge,
+                          styles.reportBadge,
+                          { opacity: reportBadgeOpacity },
+                        ]}
+                      >
+                        <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BÁO CÁO</Text>
+                      </Animated.View>
+                    </>
+                  ) : null}
 
                   {displayedReviewAction ? (
                     <View
@@ -1108,7 +1153,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                               ? 'rgba(22, 128, 58, 0.9)'
                               : displayedReviewAction === 'declined'
                                 ? 'rgba(239, 68, 68, 0.9)'
-                                : displayedReviewAction === 'reported'
+                                : displayedReviewAction === 'reported' || displayedReviewAction === 'reported_new_sign'
                                   ? 'rgba(249, 115, 22, 0.9)'
                                   : 'rgba(100, 116, 139, 0.9)',
                         },
@@ -1119,7 +1164,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           ? 'ĐÃ PHÊ DUYỆT'
                           : displayedReviewAction === 'declined'
                             ? 'ĐÃ TỪ CHỐI'
-                            : displayedReviewAction === 'reported'
+                            : displayedReviewAction === 'reported' || displayedReviewAction === 'reported_new_sign'
                               ? 'ĐÃ BÁO CÁO'
                               : 'ĐÃ BỎ QUA'}
                       </Text>
@@ -1175,86 +1220,100 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
             {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
             <View style={styles.actionsFooter}>
-              <View style={styles.diamondContainer}>
-                {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                <View style={[styles.diamondItem, styles.diamondTop]}>
-                  <Pressable
-                    accessibilityLabel="Skip submission (cannot identify)"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('skipped')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
-                  </Pressable>
-                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
-                    Bỏ qua
-                  </Text>
-                </View>
+              {isRecheckMode && !isEditingVote ? (
+                <SubmissionVotedResultCard
+                  displayedReviewAction={displayedReviewAction}
+                  onFixResult={() => setIsEditingVote(true)}
+                  onKeepResult={handleKeepCurrentReview}
+                />
+              ) : (
+                <>
+                  {isRecheckMode && isEditingVote ? (
+                    <SubmissionEditingBanner onCancel={() => setIsEditingVote(false)} />
+                  ) : null}
 
-                {/* Left Button: Decline (X) */}
-                <View style={[styles.diamondItem, styles.diamondLeft]}>
-                  <Pressable
-                    accessibilityLabel="Decline submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('decline')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.declineButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
-                  </Pressable>
-                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
-                    Từ chối
-                  </Text>
-                </View>
+                  <View style={styles.diamondContainer}>
+                    {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
+                    <View style={[styles.diamondItem, styles.diamondTop]}>
+                      <Pressable
+                        accessibilityLabel="Skip submission (cannot identify)"
+                        accessibilityRole="button"
+                        onPress={() => completeReview('skipped')}
+                        style={({ pressed }) => [
+                          styles.diamondButton,
+                          styles.neutralDiamondButton,
+                          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                          pressed && styles.circleButtonPressed,
+                        ]}
+                      >
+                        <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                      </Pressable>
+                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                        Bỏ qua
+                      </Text>
+                    </View>
 
-                {/* Right Button: Approve (Heart) */}
-                <View style={[styles.diamondItem, styles.diamondRight]}>
-                  <Pressable
-                    accessibilityLabel="Approve submission"
-                    accessibilityRole="button"
-                    onPress={() => completeReview('approved')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.approveButton,
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
-                  </Pressable>
-                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
-                    Đồng ý
-                  </Text>
-                </View>
+                    {/* Left Button: Decline (X) */}
+                    <View style={[styles.diamondItem, styles.diamondLeft]}>
+                      <Pressable
+                        accessibilityLabel="Decline submission"
+                        accessibilityRole="button"
+                        onPress={() => setActiveSheet('decline')}
+                        style={({ pressed }) => [
+                          styles.diamondButton,
+                          styles.declineButton,
+                          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                          pressed && styles.circleButtonPressed,
+                        ]}
+                      >
+                        <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                      </Pressable>
+                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                        Từ chối
+                      </Text>
+                    </View>
 
-                {/* Bottom Button: Report */}
-                <View style={[styles.diamondItem, styles.diamondBottom]}>
-                  <Pressable
-                    accessibilityLabel="Report submission"
-                    accessibilityRole="button"
-                    onPress={() => setActiveSheet('report')}
-                    style={({ pressed }) => [
-                      styles.diamondButton,
-                      styles.neutralDiamondButton,
-                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                      pressed && styles.circleButtonPressed,
-                    ]}
-                  >
-                    <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
-                  </Pressable>
-                  <Text style={[styles.diamondLabel, { color: theme.text }]}>
-                    Báo cáo
-                  </Text>
-                </View>
-              </View>
+                    {/* Right Button: Approve (Heart) */}
+                    <View style={[styles.diamondItem, styles.diamondRight]}>
+                      <Pressable
+                        accessibilityLabel="Approve submission"
+                        accessibilityRole="button"
+                        onPress={() => completeReview('approved')}
+                        style={({ pressed }) => [
+                          styles.diamondButton,
+                          styles.approveButton,
+                          pressed && styles.circleButtonPressed,
+                        ]}
+                      >
+                        <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                      </Pressable>
+                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                        Đồng ý
+                      </Text>
+                    </View>
+
+                    {/* Bottom Button: Report */}
+                    <View style={[styles.diamondItem, styles.diamondBottom]}>
+                      <Pressable
+                        accessibilityLabel="Report submission"
+                        accessibilityRole="button"
+                        onPress={() => setActiveSheet('report')}
+                        style={({ pressed }) => [
+                          styles.diamondButton,
+                          styles.neutralDiamondButton,
+                          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                          pressed && styles.circleButtonPressed,
+                        ]}
+                      >
+                        <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                      </Pressable>
+                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                        Báo cáo
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
 
               {/* Undo Action (Subtle under the buttons) */}
               {reviewHistory.length > 0 && !recheckingSubmission ? (
@@ -2326,5 +2385,92 @@ const styles = StyleSheet.create({
     minWidth: 100,
     minHeight: 36,
     borderWidth: 1,
+  },
+  votedResultContainer: {
+    width: '100%',
+    maxWidth: 380,
+    alignSelf: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+  },
+  votedResultCard: {
+    borderWidth: 1.5,
+    borderRadius: Rounded.lg,
+    padding: Spacing.two,
+    gap: 8,
+  },
+  votedResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  votedResultIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  votedResultInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  votedResultSubLabel: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  votedResultTitle: {
+    fontFamily: Fonts.title,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  votedResultDesc: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  votedActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    alignItems: 'center',
+  },
+  fixResultButton: {
+    flex: 1,
+    minHeight: 46,
+  },
+  keepResultButton: {
+    flex: 1,
+    minHeight: 46,
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 8,
+    marginBottom: Spacing.one,
+  },
+  editingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  editingBannerText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cancelEditButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  cancelEditText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

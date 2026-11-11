@@ -45,7 +45,6 @@ import type {
   SurveyMediaType,
 } from '@/types/surveySubmissionType';
 
-
 const submissionTypeLabels: Record<SubmissionType, string> = {
   SINGLE_IMAGE: 'Khảo sát hình ảnh',
   VIDEO_GPX: 'Khảo sát Video & GPX',
@@ -87,7 +86,11 @@ function getStatusColor(status: SubmissionStatus): { bg: string; text: string; b
     case 'DRAFT':
     case 'NO_SIGN_DETECTED':
     default:
-      return { bg: 'rgba(100, 116, 139, 0.12)', text: '#64748B', border: 'rgba(100, 116, 139, 0.3)' };
+      return {
+        bg: 'rgba(100, 116, 139, 0.12)',
+        text: '#64748B',
+        border: 'rgba(100, 116, 139, 0.3)',
+      };
   }
 }
 
@@ -108,7 +111,9 @@ type SurveySubmissionDetailsScreenProps = {
   submissionId?: string;
 };
 
-export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmissionDetailsScreenProps) {
+export function SurveySubmissionDetailsScreen({
+  submissionId,
+}: SurveySubmissionDetailsScreenProps) {
   const router = useRouter();
   const theme = useTheme();
 
@@ -227,17 +232,22 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
   const primaryVideoUrl = primaryVideo?.fileUrl
     ? resolveS3Url(primaryVideo.fileUrl)
-    : (submission?.submissionType === 'VIDEO_GPX' && localDraftUri ? localDraftUri : undefined);
+    : submission?.submissionType === 'VIDEO_GPX' && localDraftUri
+      ? localDraftUri
+      : undefined;
 
   const primaryImageUrl = primaryImage?.fileUrl
     ? resolveS3Url(primaryImage.fileUrl)
-    : (submission?.submissionType !== 'VIDEO_GPX' && localDraftUri ? localDraftUri : undefined);
+    : submission?.submissionType !== 'VIDEO_GPX' && localDraftUri
+      ? localDraftUri
+      : undefined;
 
   const isVideoSubmission = submission?.submissionType === 'VIDEO_GPX' || Boolean(primaryVideo);
 
   // If video submission has detected candidate frames, use bestFrameUrl as video thumbnail preview
   const candidateFrameUrl = useMemo(() => {
-    if (!Array.isArray(statusData?.candidates) || statusData.candidates.length === 0) return undefined;
+    if (!Array.isArray(statusData?.candidates) || statusData.candidates.length === 0)
+      return undefined;
     for (const c of statusData.candidates as any[]) {
       const frame = c.bestFrameUrl || c.best_frame_url || c.signCropUrl || c.sign_crop_url;
       if (frame) return resolveS3Url(frame);
@@ -373,7 +383,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ) : (
                   <>
                     <MaterialCommunityIcons color="#EF4444" name="replay" size={16} />
-                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>Thử lại</Text>
+                    <Text style={[styles.retryHeaderButtonText, { color: '#EF4444' }]}>
+                      Thử lại
+                    </Text>
                   </>
                 )}
               </Pressable>
@@ -383,7 +395,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
               accessibilityLabel="Làm mới dữ liệu hồ sơ"
               accessibilityRole="button"
               hitSlop={Spacing.one}
-              onPress={() => { void refetch(); }}
+              onPress={() => {
+                void refetch();
+              }}
               style={styles.refreshButton}
             >
               {isRefetching ? (
@@ -404,7 +418,11 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
           </View>
         ) : !submission ? (
           <View style={styles.centerContainer}>
-            <MaterialCommunityIcons color={theme.placeholder} name="file-question-outline" size={48} />
+            <MaterialCommunityIcons
+              color={theme.placeholder}
+              name="file-question-outline"
+              size={48}
+            />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>Không tìm thấy hồ sơ</Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
               Không tìm thấy hồ sơ khảo sát yêu cầu hoặc đã hết hạn.
@@ -466,7 +484,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     <View style={styles.failureAlertTextWrap}>
                       <Text style={styles.failureAlertTitle}>Xử lý hồ sơ thất bại</Text>
                       <Text style={styles.failureText}>
-                        {submission.failureReason || 'Đã xảy ra lỗi trong quá trình xử lý AI. Bạn có thể gửi lại khảo sát này.'}
+                        {submission.failureReason ||
+                          'Đã xảy ra lỗi trong quá trình xử lý AI. Bạn có thể gửi lại khảo sát này.'}
                       </Text>
                     </View>
                   </View>
@@ -510,13 +529,16 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     style={[
                       styles.pipelineDot,
                       submission.status === 'COMPLETED' ||
-                        submission.totalCandidatesExtracted > 0 ||
-                        ['DETECTING', 'TRACKING', 'CLASSIFYING', 'ESTIMATING'].includes(submission.status)
+                      submission.totalCandidatesExtracted > 0 ||
+                      ['DETECTING', 'TRACKING', 'CLASSIFYING', 'ESTIMATING'].includes(
+                        submission.status,
+                      )
                         ? styles.pipelineDotActive
                         : { backgroundColor: theme.border },
                     ]}
                   >
-                    {submission.status === 'COMPLETED' || submission.totalCandidatesExtracted > 0 ? (
+                    {submission.status === 'COMPLETED' ||
+                    submission.totalCandidatesExtracted > 0 ? (
                       <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
                     ) : (
                       <View style={styles.pipelineDotInner} />
@@ -554,9 +576,13 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
             {/* Media Section: Review the image or video again */}
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Phương tiện ghi nhận khảo sát</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Phương tiện ghi nhận khảo sát
+              </Text>
               <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {isVideoSubmission ? 'Bản ghi video & dữ liệu đo đạc' : 'Ảnh khảo sát độ phân giải cao'}
+                {isVideoSubmission
+                  ? 'Bản ghi video & dữ liệu đo đạc'
+                  : 'Ảnh khảo sát độ phân giải cao'}
               </Text>
             </View>
 
@@ -591,7 +617,11 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     />
                   ) : (
                     <View style={styles.emptyMediaBox}>
-                      <MaterialCommunityIcons color={theme.placeholder} name="image-outline" size={40} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="image-outline"
+                        size={40}
+                      />
                       <Text style={[styles.emptyMediaText, { color: theme.placeholder }]}>
                         {isStatusLoading ? 'Đang tải thông tin ảnh...' : 'Không có ảnh khảo sát'}
                       </Text>
@@ -599,7 +629,11 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   )}
                   {primaryImageUrl ? (
                     <View style={styles.zoomButton}>
-                      <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={18} />
+                      <MaterialCommunityIcons
+                        color="#FFFFFF"
+                        name="magnify-plus-outline"
+                        size={18}
+                      />
                       <Text style={styles.zoomButtonText}>Nhấn để phóng to</Text>
                     </View>
                   ) : null}
@@ -628,9 +662,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                   <View
                     style={[
                       StyleSheet.absoluteFill,
-                      candidateFrameUrl
-                        ? { backgroundColor: 'rgba(15, 23, 42, 0.55)' }
-                        : undefined,
+                      candidateFrameUrl ? { backgroundColor: 'rgba(15, 23, 42, 0.55)' } : undefined,
                     ]}
                   />
                   <MaterialCommunityIcons color="#FFFFFF" name="video" size={48} />
@@ -669,7 +701,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             {/* Extra Media Carousel Tabs if multiple files exist */}
             {normalizedMediaFiles.length > 1 ? (
               <View style={styles.mediaListGroup}>
-                <Text style={[styles.groupLabel, { color: theme.placeholder }]}>Các tệp phương tiện đính kèm</Text>
+                <Text style={[styles.groupLabel, { color: theme.placeholder }]}>
+                  Các tệp phương tiện đính kèm
+                </Text>
                 {normalizedMediaFiles.map((file, idx) => {
                   const isVideo = file.mediaType === 'VIDEO';
                   const isImage = file.mediaType === 'IMAGE';
@@ -695,18 +729,27 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     >
                       <MaterialCommunityIcons
                         color={isVideo ? '#EF4444' : isImage ? theme.primary : '#10B981'}
-                        name={isVideo ? 'video-outline' : isImage ? 'image-outline' : 'map-marker-path'}
+                        name={
+                          isVideo ? 'video-outline' : isImage ? 'image-outline' : 'map-marker-path'
+                        }
                         size={22}
                       />
                       <View style={styles.mediaFileText}>
-                        <Text numberOfLines={1} style={[styles.mediaFileName, { color: theme.text }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.mediaFileName, { color: theme.text }]}
+                        >
                           {file.fileName || `Tệp ${file.mediaType}`}
                         </Text>
                         <Text style={[styles.mediaFileType, { color: theme.placeholder }]}>
                           {file.mediaType} · Nhấn để xem
                         </Text>
                       </View>
-                      <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={20} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="chevron-right"
+                        size={20}
+                      />
                     </Pressable>
                   );
                 })}
@@ -742,7 +785,7 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 <View style={styles.statBox}>
                   <Text style={[styles.statValue, { color: theme.text }]}>
-                    {submission.coordinateSource || 'GPS'}
+                    {submission.coordinateSource || 'DEVICE_GPS'}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Nguồn dữ liệu GPS
@@ -762,8 +805,14 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
               ]}
             >
               <View style={styles.cardHeader}>
-                <MaterialCommunityIcons color={theme.primary} name="information-outline" size={20} />
-                <Text style={[styles.cardTitle, { color: theme.text }]}>Thông tin hồ sơ khảo sát</Text>
+                <MaterialCommunityIcons
+                  color={theme.primary}
+                  name="information-outline"
+                  size={20}
+                />
+                <Text style={[styles.cardTitle, { color: theme.text }]}>
+                  Thông tin hồ sơ khảo sát
+                </Text>
               </View>
 
               <View style={styles.metaList}>
@@ -807,7 +856,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Thời gian ghi nhận</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>
+                    Thời gian ghi nhận
+                  </Text>
                   <View style={styles.metaValueContainer}>
                     <Text
                       numberOfLines={1}
@@ -835,7 +886,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                     </View>
 
                     <View style={styles.metaRow}>
-                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Địa chỉ / Vị trí</Text>
+                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>
+                        Địa chỉ / Vị trí
+                      </Text>
                       <View style={styles.metaValueContainer}>
                         <Text
                           numberOfLines={2}
@@ -853,8 +906,15 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                 {submission.note ? (
                   <View style={styles.metaColumn}>
-                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Ghi chú khảo sát viên</Text>
-                    <Text style={[styles.noteText, { color: theme.text, backgroundColor: theme.background }]}>
+                    <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>
+                      Ghi chú khảo sát viên
+                    </Text>
+                    <Text
+                      style={[
+                        styles.noteText,
+                        { color: theme.text, backgroundColor: theme.background },
+                      ]}
+                    >
                       {submission.note}
                     </Text>
                   </View>
@@ -874,10 +934,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                 ]}
               >
                 <View style={styles.cardHeader}>
-                  <MaterialCommunityIcons color={theme.primary} name="map-marker-distance" size={20} />
-                  <Text style={[styles.cardTitle, { color: theme.text }]}>
-                    Vị trí
-                  </Text>
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="map-marker-distance"
+                    size={20}
+                  />
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>Vị trí</Text>
                 </View>
                 <View
                   style={[
@@ -898,12 +960,12 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       destination={
                         isVideoSubmission && endCoord
                           ? {
-                            coordinate: endCoord,
-                            id: 'survey-end',
-                            title: 'Điểm kết thúc',
-                            subtitle: 'Lộ trình khảo sát',
-                            category: 'recent',
-                          }
+                              coordinate: endCoord,
+                              id: 'survey-end',
+                              title: 'Điểm kết thúc',
+                              subtitle: 'Lộ trình khảo sát',
+                              category: 'recent',
+                            }
                           : undefined
                       }
                       routeCoordinates={
@@ -917,7 +979,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       <Pressable
                         accessibilityLabel="Mở toàn màn hình xem lộ trình"
                         onPress={() => {
-                          const gpx = normalizedMediaFiles.find((m) => m.mediaType === 'GPX')?.fileUrl;
+                          const gpx = normalizedMediaFiles.find(
+                            (m) => m.mediaType === 'GPX',
+                          )?.fileUrl;
                           router.push({
                             pathname: '/work/new-survey/route-map',
                             params: {
@@ -926,7 +990,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                               startLon: startCoord ? String(startCoord[0]) : undefined,
                               endLat: endCoord ? String(endCoord[1]) : undefined,
                               endLon: endCoord ? String(endCoord[0]) : undefined,
-                              title: isVideoSubmission ? 'Lộ trình khảo sát đã gửi' : 'Vị trí khảo sát đã gửi',
+                              title: isVideoSubmission
+                                ? 'Lộ trình khảo sát đã gửi'
+                                : 'Vị trí khảo sát đã gửi',
                             },
                           });
                         }}
@@ -939,7 +1005,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                       accessibilityLabel="Phóng to bản đồ xem trước"
                       accessibilityRole="button"
                       onPress={() => {
-                        const gpx = normalizedMediaFiles.find((m) => m.mediaType === 'GPX')?.fileUrl;
+                        const gpx = normalizedMediaFiles.find(
+                          (m) => m.mediaType === 'GPX',
+                        )?.fileUrl;
                         router.push({
                           pathname: '/work/new-survey/route-map',
                           params: {
@@ -948,7 +1016,9 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                             startLon: startCoord ? String(startCoord[0]) : undefined,
                             endLat: endCoord ? String(endCoord[1]) : undefined,
                             endLon: endCoord ? String(endCoord[0]) : undefined,
-                            title: isVideoSubmission ? 'Lộ trình khảo sát đã gửi' : 'Vị trí khảo sát đã gửi',
+                            title: isVideoSubmission
+                              ? 'Lộ trình khảo sát đã gửi'
+                              : 'Vị trí khảo sát đã gửi',
                           },
                         });
                       }}
@@ -1082,17 +1152,28 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                               transition={150}
                             />
                             <View style={styles.candidateZoomBadge}>
-                              <MaterialCommunityIcons color="#FFFFFF" name="magnify-plus-outline" size={11} />
+                              <MaterialCommunityIcons
+                                color="#FFFFFF"
+                                name="magnify-plus-outline"
+                                size={11}
+                              />
                             </View>
                           </View>
                         ) : (
                           <View
                             style={[
                               styles.candidateThumbnailPlaceholder,
-                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                              {
+                                backgroundColor: theme.backgroundElement,
+                                borderColor: theme.border,
+                              },
                             ]}
                           >
-                            <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={24} />
+                            <MaterialCommunityIcons
+                              color={theme.primary}
+                              name="sign-direction"
+                              size={24}
+                            />
                           </View>
                         )}
                         <View style={styles.candidateInfo}>
@@ -1123,7 +1204,11 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
                           <View style={styles.candidateMetaRow}>
                             {confidence != null ? (
                               <View style={styles.confidenceBadge}>
-                                <MaterialCommunityIcons color="#16A34A" name="check-circle" size={13} />
+                                <MaterialCommunityIcons
+                                  color="#16A34A"
+                                  name="check-circle"
+                                  size={13}
+                                />
                                 <Text style={styles.confidenceText}>Độ tin cậy: {confidence}%</Text>
                               </View>
                             ) : null}
@@ -1144,7 +1229,8 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
 
                           {timestampSec != null ? (
                             <Text style={[styles.candidateMeta, { color: theme.placeholder }]}>
-                              Thời điểm: {Math.floor(timestampSec / 60)}:{String(timestampSec % 60).padStart(2, '0')} ({timestampSec}s)
+                              Thời điểm: {Math.floor(timestampSec / 60)}:
+                              {String(timestampSec % 60).padStart(2, '0')} ({timestampSec}s)
                             </Text>
                           ) : null}
                         </View>
@@ -1228,31 +1314,47 @@ export function SurveySubmissionDetailsScreen({ submissionId }: SurveySubmission
             >
               {/* Modal Header */}
               <View style={styles.retryModalHeader}>
-                <View style={[styles.retryModalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <View
+                  style={[styles.retryModalIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
+                >
                   <MaterialCommunityIcons color="#EF4444" name="replay" size={26} />
                 </View>
                 <View style={styles.retryModalHeaderText}>
-                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>Gửi lại khảo sát</Text>
+                  <Text style={[styles.retryModalTitle, { color: theme.text }]}>
+                    Gửi lại khảo sát
+                  </Text>
                   <Text style={[styles.retryModalSubtitle, { color: theme.placeholder }]}>
-                    #{submission?.id.slice(0, 10)} · {submission ? submissionTypeLabels[submission.submissionType] : ''}
+                    #{submission?.id.slice(0, 10)} ·{' '}
+                    {submission ? submissionTypeLabels[submission.submissionType] : ''}
                   </Text>
                 </View>
               </View>
 
               {/* Modal Description */}
               <Text style={[styles.retryModalBodyText, { color: theme.textSecondary }]}>
-                Chọn phương thức bạn muốn gửi lại khảo sát này. Bạn có thể gửi trực tiếp để xử lý lại qua hệ thống AI, hoặc chỉnh sửa thông tin và tọa độ GPS trước.
+                Chọn phương thức bạn muốn gửi lại khảo sát này. Bạn có thể gửi trực tiếp để xử lý
+                lại qua hệ thống AI, hoặc chỉnh sửa thông tin và tọa độ GPS trước.
               </Text>
 
               {submission?.failureReason ? (
-                <View style={[styles.retryModalFailureBox, { backgroundColor: 'rgba(239, 68, 68, 0.08)' }]}>
+                <View
+                  style={[
+                    styles.retryModalFailureBox,
+                    { backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+                  ]}
+                >
                   <Text style={styles.retryModalFailureLabel}>Lý do thất bại:</Text>
                   <Text style={styles.retryModalFailureText}>{submission.failureReason}</Text>
                 </View>
               ) : null}
 
               {retryError ? (
-                <View style={[styles.retryModalErrorBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                <View
+                  style={[
+                    styles.retryModalErrorBox,
+                    { backgroundColor: 'rgba(239, 68, 68, 0.12)' },
+                  ]}
+                >
                   <MaterialCommunityIcons color="#EF4444" name="alert-circle" size={16} />
                   <Text style={styles.retryModalErrorText}>{retryError}</Text>
                 </View>

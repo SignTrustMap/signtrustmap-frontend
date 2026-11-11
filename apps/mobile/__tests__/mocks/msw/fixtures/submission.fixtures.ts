@@ -65,7 +65,7 @@ export const mockSubmissionStatusResponse: SubmissionStatusResponse = {
     submissionType: 'SINGLE_IMAGE',
     status: 'DRAFT',
     capturedAt: mockRecentCapturedAt,
-    coordinateSource: 'Ảnh',
+    coordinateSource: 'IMAGE_EXIF',
     latitude: 10.7769,
     longitude: 106.7009,
     note: 'Sample draft note',

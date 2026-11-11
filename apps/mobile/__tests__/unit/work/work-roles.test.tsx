@@ -259,9 +259,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('renders hero review queue card with badge and reviewer stats', async () => {
       const { getByText, getByLabelText } = await render(<ReviewerWork />);
 
-      expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
+      expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
       expect(getByText('7 MỚI')).toBeTruthy();
-      expect(getByText('Minh chứng tái thẩm định chờ duyệt')).toBeTruthy();
+      expect(getByText('Tái thẩm định cần duyệt')).toBeTruthy();
       expect(getByText('3')).toBeTruthy();
       expect(getByText('Thống kê của bạn')).toBeTruthy();
       expect(getByText('Độ tin cậy: 96% · Tỷ lệ chính xác: 94%')).toBeTruthy();
@@ -274,7 +274,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('navigates to revalidation-review when pressing revalidation evidence card', async () => {
       const { getByText } = await render(<ReviewerWork />);
 
-      fireEvent.press(getByText('Minh chứng tái thẩm định chờ duyệt'));
+      fireEvent.press(getByText('Tái thẩm định cần duyệt'));
       expect(mockPush).toHaveBeenCalledWith('/work/revalidation-review');
     });
 
@@ -340,7 +340,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
 
     it('acquires real user coordinates via fetchFreshGpsPosition and passes to useGetFirstRevalidationSign', async () => {
-      mockFetchFreshGpsPosition.mockResolvedValue([106.6900, 10.7800]);
+      mockFetchFreshGpsPosition.mockResolvedValue([106.69, 10.78]);
 
       await render(<SurveyorWork />);
 
@@ -348,10 +348,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
         expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
       });
 
-      expect(mockUseGetFirstRevalidationSign).toHaveBeenCalledWith(
-        expect.any(Array),
-        true,
-      );
+      expect(mockUseGetFirstRevalidationSign).toHaveBeenCalledWith(expect.any(Array), true);
     });
 
     it('navigates to revalidation-map with snap coordinates when revalidation card is pressed', async () => {

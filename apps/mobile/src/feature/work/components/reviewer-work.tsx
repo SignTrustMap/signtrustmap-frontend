@@ -31,11 +31,14 @@ export function ReviewerWork({
   // Reviewer queries live directly within the Reviewer component
   const { data: reviewerStatsData } = useGetMyReviewerStats(isReviewer);
   const { data: reviewQueueData } = useGetReviewQueue({ page: '1', pageSize: '20' }, isReviewer);
-  const { data: revalEvidenceQueueData } = useGetRevalidationEvidenceQueue({ page: 1, pageSize: 1 }, isReviewer);
+  const { data: revalEvidenceQueueData } = useGetRevalidationEvidenceQueue(
+    { page: 1, pageSize: 1 },
+    isReviewer,
+  );
 
   const reviewerStats = propReviewerStats ?? reviewerStatsData;
-  const reviewQueueTotal = propReviewQueueTotal ?? (reviewQueueData?.total ?? 0);
-  const revalEvidenceCount = propRevalEvidenceCount ?? (revalEvidenceQueueData?.total ?? 0);
+  const reviewQueueTotal = propReviewQueueTotal ?? reviewQueueData?.total ?? 0;
+  const revalEvidenceCount = propRevalEvidenceCount ?? revalEvidenceQueueData?.total ?? 0;
 
   return (
     <View style={styles.actionList}>
@@ -53,7 +56,7 @@ export function ReviewerWork({
           </View>
           <View style={styles.heroText}>
             <View style={styles.heroTitleRow}>
-              <Text style={styles.heroTitle}>Thẩm định chờ xử lý</Text>
+              <Text style={styles.heroTitle}>Khảo sát cần duyệt</Text>
               {reviewQueueTotal > 0 ? (
                 <View style={styles.heroBadge}>
                   <Text style={styles.heroBadgeText}>{reviewQueueTotal} MỚI</Text>
@@ -75,7 +78,7 @@ export function ReviewerWork({
         accentColor={theme.primary}
         count={revalEvidenceCount}
         icon="clipboard-check-outline"
-        label="Minh chứng tái thẩm định chờ duyệt"
+        label="Tái thẩm định cần duyệt"
         onPress={() => router.push('/work/revalidation-review')}
         subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
       />
@@ -87,11 +90,6 @@ export function ReviewerWork({
         icon="chart-timeline-variant-shimmer"
         label="Thống kê của bạn"
         onPress={() => router.push('/work/reviewer-stats')}
-        subtitle={
-          reviewerStats
-            ? `Độ tin cậy: ${Math.round((reviewerStats.reliabilityScore ?? 0) * 100)}% · Tỷ lệ chính xác: ${Math.round((reviewerStats.accuracyRate ?? 0) * 100)}%`
-            : 'Xem độ tin cậy, tỷ lệ chính xác và lịch sử thẩm định của bạn'
-        }
       />
 
       {/* Secondary Standout Action: Sign Catalog */}
