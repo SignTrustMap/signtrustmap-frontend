@@ -60,6 +60,9 @@
   "jest": {
     "preset": "jest-expo",
     "testEnvironment": "<rootDir>/jest.environment.js",
+    "testMatch": [
+      "<rootDir>/apps/mobile/__tests__/**/*.test.[jt]s?(x)"
+    ],
     "setupFiles": [
       "<rootDir>/jest.setup.js"
     ],

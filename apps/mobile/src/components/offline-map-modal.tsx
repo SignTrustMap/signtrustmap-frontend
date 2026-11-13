@@ -123,7 +123,9 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
             </View>
           ) : isDownloading ? (
             <View style={[styles.statusBadge, { backgroundColor: '#F59E0B20' }]}>
-              <Text style={[styles.statusBadgeText, { color: '#D97706' }]}>Đang tải {percentage}%</Text>
+              <Text style={[styles.statusBadgeText, { color: '#D97706' }]}>
+                Đang tải {percentage}%
+              </Text>
             </View>
           ) : isPaused ? (
             <View style={[styles.statusBadge, { backgroundColor: '#6B728020' }]}>
@@ -169,9 +171,7 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
               <Text style={[styles.progressBytesText, { color: theme.placeholder }]}>
                 {formatBytes(downloadedBytes)} / {formatBytes(totalBytes)}
               </Text>
-              <Text style={[styles.progressPercentText, { color: theme.text }]}>
-                {percentage}%
-              </Text>
+              <Text style={[styles.progressPercentText, { color: theme.text }]}>{percentage}%</Text>
             </View>
           </View>
         ) : null}
@@ -190,7 +190,9 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
           {installed ? (
             <>
               <AppButton
-                accessibilityLabel={isActive ? 'Bỏ kích hoạt bản đồ' : 'Kích hoạt bản đồ ngoại tuyến'}
+                accessibilityLabel={
+                  isActive ? 'Bỏ kích hoạt bản đồ' : 'Kích hoạt bản đồ ngoại tuyến'
+                }
                 onPress={() => toggleActivePack(pack.id)}
                 style={styles.actionBtnPrimary}
                 variant={isActive ? 'surface' : 'primary'}
@@ -219,7 +221,11 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
                 variant="ghost"
               >
                 <View style={styles.buttonInnerRow}>
-                  <MaterialCommunityIcons color={Colors.danger} name="trash-can-outline" size={16} />
+                  <MaterialCommunityIcons
+                    color={Colors.danger}
+                    name="trash-can-outline"
+                    size={16}
+                  />
                   <Text style={[styles.actionBtnText, { color: Colors.danger }]}>Xóa</Text>
                 </View>
               </AppButton>
@@ -297,12 +303,7 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
   };
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.modalOverlay}>
         <View
           style={[
@@ -342,7 +343,7 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
           <View style={[styles.infoBanner, { backgroundColor: theme.backgroundElement }]}>
             <MaterialCommunityIcons color={theme.primary} name="information-outline" size={18} />
             <Text style={[styles.infoBannerText, { color: theme.text }]}>
-              Tải bản đồ vector PMTiles để dẫn đường và tra cứu vị trí biển báo ngay cả khi thiết bị không có sóng 4G/5G hoặc ngoại tuyến.
+              Tải bản đồ để sử dụng cả khi ngoại tuyến.
             </Text>
           </View>
 
@@ -360,7 +361,11 @@ export function OfflineMapModal({ visible, onClose, accessToken }: OfflineMapMod
               </View>
             ) : error && availablePacks.length === 0 ? (
               <View style={styles.centerError}>
-                <MaterialCommunityIcons color={Colors.danger} name="alert-circle-outline" size={40} />
+                <MaterialCommunityIcons
+                  color={Colors.danger}
+                  name="alert-circle-outline"
+                  size={40}
+                />
                 <Text style={[styles.errorText, { color: Colors.danger }]}>{error}</Text>
                 <AppButton
                   accessibilityLabel="Thử lại"

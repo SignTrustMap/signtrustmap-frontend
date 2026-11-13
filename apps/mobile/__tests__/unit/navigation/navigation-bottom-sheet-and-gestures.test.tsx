@@ -219,7 +219,7 @@ describe('useNavigationSheetGesture and NavigationBottomSheet', () => {
       );
 
       expect(getByText('Xe máy')).toBeTruthy();
-      expect(getByText('(3.5 km)')).toBeTruthy();
+      expect(getByText(/3\.5 km/)).toBeTruthy();
 
       // Bookmark button press
       const bookmarkBtn = getByTestId('btn-bookmark-route');

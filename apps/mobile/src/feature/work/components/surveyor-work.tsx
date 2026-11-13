@@ -160,7 +160,7 @@ export function SurveyorWork({
         icon="camera-retake-outline"
         label="Yêu cầu chụp lại ảnh"
         onPress={() => router.push('/work/recaptures')}
-        subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu của Thẩm định viên"
+        subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu"
       />
 
       {/* Standout Action: Offline Maps */}
@@ -170,7 +170,7 @@ export function SurveyorWork({
           icon="map-marker-down"
           label="Bản đồ ngoại tuyến"
           onPress={onOpenOfflineMap}
-          subtitle="Tải bản đồ vector PMTiles để khảo sát khi không có sóng di động"
+          subtitle="Tải bản đồ để sử dụng cả khi ngoại tuyến."
         />
       ) : null}
 
@@ -185,7 +185,7 @@ export function SurveyorWork({
             params: { role: 'surveyor' },
           })
         }
-        subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
+        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
       />
     </View>
   );

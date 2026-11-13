@@ -1,9 +1,6 @@
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
-import { Ionicons } from '@expo/vector-icons';
-import { SymbolView } from 'expo-symbols';
 import { AppButton } from '@/components/button';
-import { Badge } from '@/components/badge';
 import { Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MapCoordinate } from '@/types/navigationType';
@@ -24,8 +21,8 @@ export interface NavigationTopControlsProps {
   unreadNotificationCount?: number;
   onSearchPress: () => void;
   onTopUpPress: () => void;
-  onNotificationsPress: () => void;
-  onLivestreamPress: () => void;
+  onNotificationsPress?: () => void;
+  onLivestreamPress?: () => void;
   onChangeStartPress?: () => void;
   onChangeDestinationPress: () => void;
   onSwapRoutePress?: () => void;
@@ -36,11 +33,8 @@ export function NavigationTopControls({
   plannedRouteOrigin,
   routeStartTitle,
   walletBalance,
-  unreadNotificationCount = 0,
   onSearchPress,
   onTopUpPress,
-  onNotificationsPress,
-  onLivestreamPress,
   onChangeDestinationPress,
 }: NavigationTopControlsProps) {
   const theme = useTheme();
@@ -154,25 +148,6 @@ export function NavigationTopControls({
                 </View>
               </AppButton>
             </View>
-
-            <Pressable
-              accessibilityLabel={`Thông báo${
-                unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''
-              }`}
-              accessibilityRole="button"
-              onPress={onNotificationsPress}
-              style={({ pressed }) => [
-                styles.notificationCircleButton,
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Ionicons name="notifications" size={24} color="#000000" />
-              <Badge
-                count={unreadNotificationCount}
-                maxCount={9}
-                style={styles.notificationBadge}
-              />
-            </Pressable>
           </View>
           {/* <AppButton
             accessibilityLabel="Phát trực tiếp"

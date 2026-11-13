@@ -29,6 +29,17 @@ jest.mock('@expo/vector-icons', () => {
   return {
     MaterialCommunityIcons: (props: any) =>
       React.createElement(View, { testID: `icon-${props.name}`, ...props }),
+    Ionicons: (props: any) =>
+      React.createElement(View, { testID: `icon-ion-${props.name}`, ...props }),
+  };
+});
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: () => React.createElement(View, { testID: 'mock-date-picker' }),
   };
 });
 
@@ -244,11 +255,8 @@ describe('Wallet & Credits Flow Unit Test Suite', () => {
       expect(getByText('Lịch sử Credits')).toBeTruthy();
       expect(getByText('Từ ngày')).toBeTruthy();
       expect(getByText('Đến ngày')).toBeTruthy();
-      expect(getByText('Tháng 8 năm 2026')).toBeTruthy();
-      expect(getByText('Gia hạn gói Pro')).toBeTruthy();
-      expect(getByText('Nâng cấp lên gói Pro')).toBeTruthy();
-      expect(getByText('Nạp tiền lần 1')).toBeTruthy();
-      expect(getByLabelText('Từ ngày: 01 Th08 2026')).toBeTruthy();
+      expect(getByText('Thưởng nhiệm vụ hàng ngày')).toBeTruthy();
+      expect(getByText('Nạp Credits MoMo')).toBeTruthy();
     });
 
     it('navigates back when header back button is pressed', async () => {

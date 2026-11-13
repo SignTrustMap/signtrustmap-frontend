@@ -109,12 +109,7 @@ export function NotificationsScreen() {
     return () => sub.remove();
   }, [router]);
 
-  const {
-    data: notificationData,
-    isLoading,
-    isRefetching,
-    refetch,
-  } = useGetNotifications();
+  const { data: notificationData, isLoading, isRefetching, refetch } = useGetNotifications();
 
   const { data: unreadCount = 0 } = useGetUnreadNotificationCount();
   const { mutate: markAllRead, isPending: isMarkingAll } = useMarkAllNotificationsAsRead();
@@ -141,9 +136,7 @@ export function NotificationsScreen() {
       <Pressable
         accessibilityLabel={`Thông báo: ${item.title}`}
         accessibilityRole="button"
-        onPress={() => {
-          // Placeholder as explicitly specified by requirements: do nothing when pressed
-        }}
+        onPress={() => {}}
         style={({ pressed }) => [
           styles.card,
           {
@@ -156,11 +149,7 @@ export function NotificationsScreen() {
       >
         <View style={styles.cardHeader}>
           <View style={[styles.iconContainer, { backgroundColor: visual.bg }]}>
-            <MaterialCommunityIcons
-              name={visual.icon}
-              size={22}
-              color={visual.iconColor}
-            />
+            <MaterialCommunityIcons name={visual.icon} size={22} color={visual.iconColor} />
           </View>
 
           <View style={styles.headerInfo}>
@@ -175,27 +164,22 @@ export function NotificationsScreen() {
               >
                 {item.title}
               </Text>
-              {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
+              {!item.isRead && (
+                <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+              )}
             </View>
 
             <View style={styles.tagTimeRow}>
               <View style={[styles.tagBadge, { backgroundColor: `${visual.iconColor}15` }]}>
-                <Text style={[styles.tagText, { color: visual.iconColor }]}>
-                  {visual.tag}
-                </Text>
+                <Text style={[styles.tagText, { color: visual.iconColor }]}>{visual.tag}</Text>
               </View>
-              <Text style={[styles.timeText, { color: theme.placeholder }]}>
-                {timeFormatted}
-              </Text>
+              <Text style={[styles.timeText, { color: theme.placeholder }]}>{timeFormatted}</Text>
             </View>
           </View>
         </View>
 
         {Boolean(item.message) && (
-          <Text
-            numberOfLines={4}
-            style={[styles.messageText, { color: theme.textSecondary }]}
-          >
+          <Text numberOfLines={4} style={[styles.messageText, { color: theme.textSecondary }]}>
             {item.message}
           </Text>
         )}
@@ -204,7 +188,10 @@ export function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       {/* Top Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <AppButton
@@ -213,16 +200,14 @@ export function NotificationsScreen() {
           style={styles.backButton}
           variant="ghost"
         >
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
+          <MaterialCommunityIcons name="chevron-left" size={24} color={theme.text} />
         </AppButton>
 
         <View style={styles.headerTitleWrap}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Thông báo</Text>
           {unreadCount > 0 && (
             <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </Text>
+              <Text style={styles.headerBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
             </View>
           )}
         </View>
@@ -231,14 +216,9 @@ export function NotificationsScreen() {
           <Pressable
             disabled={isMarkingAll}
             onPress={handleMarkAllRead}
-            style={({ pressed }) => [
-              styles.markAllButton,
-              pressed && { opacity: 0.7 },
-            ]}
+            style={({ pressed }) => [styles.markAllButton, pressed && { opacity: 0.7 }]}
           >
-            <Text style={[styles.markAllText, { color: theme.primary }]}>
-              Đọc tất cả
-            </Text>
+            <Text style={[styles.markAllText, { color: theme.primary }]}>Đọc tất cả</Text>
           </Pressable>
         ) : (
           <View style={styles.headerRightSpacer} />
@@ -258,11 +238,10 @@ export function NotificationsScreen() {
           <View style={[styles.emptyIconCircle, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="notifications-off-outline" size={44} color={theme.placeholder} />
           </View>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            Chưa có thông báo nào
-          </Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Chưa có thông báo nào</Text>
           <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-            Khi có biển báo bị mất cần kiểm tra hoặc các thông báo mới từ hệ thống, bạn sẽ nhận được tại đây.
+            Khi có biển báo bị mất cần kiểm tra hoặc các thông báo mới từ hệ thống, bạn sẽ nhận được
+            tại đây.
           </Text>
         </View>
       ) : (
@@ -299,8 +278,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',

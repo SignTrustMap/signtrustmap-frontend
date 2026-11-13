@@ -10,6 +10,7 @@ import {
 
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useResponsive } from '@/utils/responsive';
 
 export interface RevalidationDecisionBadgeProps {
   handleAgree: () => void;
@@ -87,6 +88,7 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
   testID = 'revalidation-decision-badge',
 }: RevalidationDecisionBadgeProps) {
   const theme = useTheme();
+  const { isSmallDevice } = useResponsive();
 
   return (
     <View style={styles.actionsFooter} testID={testID}>
@@ -100,12 +102,13 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={onOpenCatalog}
             style={({ pressed }) => [
               styles.fabButton,
+              isSmallDevice && styles.fabButtonSmall,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color={theme.text} name="book-open-outline" size={20} />
+            <MaterialCommunityIcons color={theme.text} name="book-open-outline" size={isSmallDevice ? 17 : 20} />
           </Pressable>
         ) : null}
 
@@ -117,20 +120,21 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={onOpenHelp}
             style={({ pressed }) => [
               styles.fabButton,
+              isSmallDevice && styles.fabButtonSmall,
               { backgroundColor: theme.primary, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color={theme.surface} name="help" size={22} />
+            <MaterialCommunityIcons color={theme.surface} name="help" size={isSmallDevice ? 18 : 22} />
           </Pressable>
         ) : null}
       </View>
 
       {/* Diamond Action Buttons Container */}
-      <View style={styles.diamondContainer}>
+      <View style={[styles.diamondContainer, isSmallDevice && styles.diamondContainerSmall]}>
         {/* Top Button: Skip (Bỏ qua) */}
-        <View style={[styles.diamondItem, styles.diamondTop]}>
+        <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondTopSmall : styles.diamondTop]}>
           <Pressable
             accessibilityLabel="Bỏ qua minh chứng này"
             accessibilityRole="button"
@@ -138,19 +142,20 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={handleSkip}
             style={({ pressed }) => [
               styles.diamondButton,
+              isSmallDevice && styles.diamondButtonSmall,
               styles.neutralDiamondButton,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+            <MaterialCommunityIcons color={theme.text} name="arrow-up" size={isSmallDevice ? 20 : 24} />
           </Pressable>
-          <Text style={[styles.diamondLabel, { color: theme.text }]}>Bỏ qua</Text>
+          <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>Bỏ qua</Text>
         </View>
 
         {/* Left Button: Decline (Từ chối) */}
-        <View style={[styles.diamondItem, styles.diamondLeft]}>
+        <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondLeftSmall : styles.diamondLeft]}>
           <Pressable
             accessibilityLabel="Từ chối kết luận của điều tra viên"
             accessibilityRole="button"
@@ -158,19 +163,20 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={handleDecline}
             style={({ pressed }) => [
               styles.diamondButton,
+              isSmallDevice && styles.diamondButtonSmall,
               styles.declineButton,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+            <MaterialCommunityIcons color={Colors.danger} name="close" size={isSmallDevice ? 22 : 28} />
           </Pressable>
-          <Text style={[styles.diamondLabel, { color: theme.text }]}>Từ chối</Text>
+          <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>Từ chối</Text>
         </View>
 
         {/* Right Button: Agree (Đồng ý với điều tra viên) */}
-        <View style={[styles.diamondItem, styles.diamondRight]}>
+        <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondRightSmall : styles.diamondRight]}>
           <Pressable
             accessibilityLabel="Đồng ý với kết luận của điều tra viên"
             accessibilityRole="button"
@@ -178,19 +184,20 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={handleAgree}
             style={({ pressed }) => [
               styles.diamondButton,
+              isSmallDevice && styles.diamondButtonSmall,
               styles.agreeButton,
               { backgroundColor: theme.primary, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color="#FFFFFF" name="check-bold" size={26} />
+            <MaterialCommunityIcons color="#FFFFFF" name="check-bold" size={isSmallDevice ? 20 : 26} />
           </Pressable>
-          <Text style={[styles.diamondLabel, { color: theme.text }]}>Đồng ý</Text>
+          <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>Đồng ý</Text>
         </View>
 
         {/* Bottom Button: Report (Báo cáo sự cố) */}
-        <View style={[styles.diamondItem, styles.diamondBottom]}>
+        <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondBottomSmall : styles.diamondBottom]}>
           <Pressable
             accessibilityLabel="Báo cáo minh chứng này"
             accessibilityRole="button"
@@ -198,15 +205,16 @@ export const RevalidationDecisionBadge = memo(function RevalidationDecisionBadge
             onPress={handleReport}
             style={({ pressed }) => [
               styles.diamondButton,
+              isSmallDevice && styles.diamondButtonSmall,
               styles.neutralDiamondButton,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               pressed && styles.circleButtonPressed,
               disabled && styles.buttonDisabled,
             ]}
           >
-            <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+            <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={isSmallDevice ? 18 : 22} />
           </Pressable>
-          <Text style={[styles.diamondLabel, { color: theme.text }]}>Báo cáo</Text>
+          <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>Báo cáo</Text>
         </View>
       </View>
     </View>
@@ -314,6 +322,44 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     width: 76,
+  },
+  diamondContainerSmall: {
+    width: 140,
+    height: 160,
+  },
+  diamondItemSmall: {
+    width: 44,
+  },
+  diamondButtonSmall: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  diamondTopSmall: {
+    top: 0,
+    left: 48,
+  },
+  diamondBottomSmall: {
+    top: 96,
+    left: 48,
+  },
+  diamondLeftSmall: {
+    left: 0,
+    top: 48,
+  },
+  diamondRightSmall: {
+    right: 0,
+    top: 48,
+  },
+  diamondLabelSmall: {
+    fontSize: 9,
+    marginTop: 2,
+    width: 60,
+  },
+  fabButtonSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   swipeBadge: {
     alignItems: 'center',

@@ -425,7 +425,11 @@ export function RevalidationSignDetailsCard({
                       />
                     </Pressable>
                   ) : (
-                    <MaterialCommunityIcons color={theme.grey || '#888888'} name="traffic-light" size={20} />
+                    <MaterialCommunityIcons
+                      color={theme.grey || '#888888'}
+                      name="traffic-light"
+                      size={20}
+                    />
                   )}
                 </View>
               </View>
@@ -460,10 +464,15 @@ export function RevalidationSignDetailsCard({
                     <View style={styles.noCropBox}>
                       <MaterialCommunityIcons
                         color={theme.placeholder || theme.grey || '#888888'}
-                        name="camera-outline"
+                        name="image-off-outline"
                         size={22}
                       />
-                      <Text style={[styles.noCropText, { color: theme.placeholder || theme.grey || '#888888' }]}>
+                      <Text
+                        style={[
+                          styles.noCropText,
+                          { color: theme.placeholder || theme.grey || '#888888' },
+                        ]}
+                      >
                         Chưa có ảnh khảo sát
                       </Text>
                     </View>

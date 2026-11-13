@@ -1,28 +1,22 @@
-import {
-  Animated,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import { AppButton } from "@/components/button";
-import { Spacing } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
-import { SIGN_CATEGORIES, type SignCategory, getSignCategory } from "@/constants/sign-categories";
-import type { MapCoordinate, VehicleMode } from "@/types/navigationType";
-import type { RouteSign } from "@/api/navigation/navigation";
-import type { SignFilterPreset } from "@/context/sign-filter-provider";
+import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import { AppButton } from '@/components/button';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { SIGN_CATEGORIES, type SignCategory, getSignCategory } from '@/constants/sign-categories';
+import type { MapCoordinate, VehicleMode } from '@/types/navigationType';
+import type { RouteSign } from '@/api/navigation/navigation';
+import type { SignFilterPreset } from '@/context/sign-filter-provider';
 import {
   formatRouteArrivalTime,
   formatRouteDistanceInKilometers,
   formatRouteDuration,
   formatRouteEstimatedTime,
   formatRouteNavDistance,
-} from "../utils/navigation-formatters";
-import { styles } from "../styles/navigation-map-screen.styles";
+} from '../utils/navigation-formatters';
+import { styles } from '../styles/navigation-map-screen.styles';
 
 export interface NavigationBottomSheetProps {
   sheetHeightAnim: Animated.Value;
@@ -39,9 +33,9 @@ export interface NavigationBottomSheetProps {
     subtitle?: string;
   };
   isNavigating: boolean;
-  vehicleMode: VehicleMode["id"];
+  vehicleMode: VehicleMode['id'];
   isMotorcycleMode: boolean;
-  onSwitchVehicleMode: (mode: VehicleMode["id"]) => void;
+  onSwitchVehicleMode: (mode: VehicleMode['id']) => void;
   carDuration?: number;
   isCarRouteLoading?: boolean;
   motorcycleDuration?: number;
@@ -60,7 +54,7 @@ export interface NavigationBottomSheetProps {
   filteredSignsCount: number;
   visibleSignsCount: number;
   routeMatchingPresets: SignFilterPreset[];
-  filterViewMode: "lists" | "categories";
+  filterViewMode: 'lists' | 'categories';
   onToggleFilterViewMode: () => void;
   manualCategories: Set<SignCategory>;
   onToggleManualCategory: (cat: SignCategory) => void;
@@ -142,14 +136,14 @@ export function NavigationBottomSheet({
         accessibilityRole="button"
         accessibilityLabel={
           sheetSnapIndex === 0
-            ? "Mở rộng xem lộ trình"
+            ? 'Mở rộng xem lộ trình'
             : sheetSnapIndex === 1
-              ? "Mở rộng danh sách bộ lọc biển báo"
-              : "Thu gọn chi tiết lộ trình"
+              ? 'Mở rộng danh sách bộ lọc biển báo'
+              : 'Thu gọn chi tiết lộ trình'
         }
         accessibilityHint="Kéo lên hoặc xuống để thay đổi chiều cao. Chạm để chuyển đổi."
         accessibilityState={{ expanded: sheetSnapIndex > 0 }}
-        accessibilityActions={[{ name: "activate" }]}
+        accessibilityActions={[{ name: 'activate' }]}
         onAccessibilityAction={onCycleSnap}
         style={styles.destinationSheetHandleArea}
         {...panHandlers}
@@ -182,24 +176,20 @@ export function NavigationBottomSheet({
                 <View style={styles.navEstimatedTimeRow}>
                   <MaterialCommunityIcons
                     name={
-                      vehicleMode === "CYCLING"
-                        ? "bicycle"
-                        : vehicleMode === "WALKING"
-                          ? "walk"
+                      vehicleMode === 'CYCLING'
+                        ? 'bicycle'
+                        : vehicleMode === 'WALKING'
+                          ? 'walk'
                           : isMotorcycleMode
-                            ? "motorbike"
-                            : "car"
+                            ? 'motorbike'
+                            : 'car'
                     }
                     size={18}
                     color={theme.primary}
                     style={{ marginRight: 6 }}
                   />
-                  <Text
-                    style={[styles.navEstimatedTimeText, { color: "#E65100" }]}
-                  >
-                    {formatRouteEstimatedTime(
-                      remainingNavDuration ?? activeDuration,
-                    )}
+                  <Text style={[styles.navEstimatedTimeText, { color: '#E65100' }]}>
+                    {formatRouteEstimatedTime(remainingNavDuration ?? activeDuration)}
                   </Text>
                   <MaterialCommunityIcons
                     name="leaf"
@@ -210,32 +200,14 @@ export function NavigationBottomSheet({
                 </View>
 
                 <View style={styles.navSubInfoRow}>
-                  <Text
-                    style={[
-                      styles.navSubInfoText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
+                  <Text style={[styles.navSubInfoText, { color: theme.textSecondary }]}>
                     {(remainingNavDistance ?? routeDistance) !== undefined
-                      ? formatRouteNavDistance(
-                          remainingNavDistance ?? routeDistance!,
-                        )
-                      : "-- km"}
+                      ? formatRouteNavDistance(remainingNavDistance ?? routeDistance!)
+                      : '-- km'}
                   </Text>
-                  <Text
-                    style={[styles.navSubInfoDot, { color: theme.textSecondary }]}
-                  >
-                    •
-                  </Text>
-                  <Text
-                    style={[
-                      styles.navSubInfoText,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {formatRouteArrivalTime(
-                      remainingNavDuration ?? activeDuration,
-                    )}
+                  <Text style={[styles.navSubInfoDot, { color: theme.textSecondary }]}>•</Text>
+                  <Text style={[styles.navSubInfoText, { color: theme.textSecondary }]}>
+                    {formatRouteArrivalTime(remainingNavDuration ?? activeDuration)}
                   </Text>
                 </View>
               </View>
@@ -253,11 +225,7 @@ export function NavigationBottomSheet({
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name="routes"
-                  size={22}
-                  color={theme.text}
-                />
+                <MaterialCommunityIcons name="routes" size={22} color={theme.text} />
               </Pressable>
             </View>
           ) : (
@@ -269,43 +237,19 @@ export function NavigationBottomSheet({
                 onPress={onCycleSnap}
                 style={styles.routeHeaderInfo}
               >
-                <Text
-                  numberOfLines={1}
-                  style={[styles.routeHeaderTitle, { color: theme.text }]}
-                >
-                  {vehicleMode === "CYCLING"
-                    ? "Xe đạp"
-                    : vehicleMode === "WALKING"
-                      ? "Đi bộ"
+                <Text numberOfLines={1} style={[styles.routeHeaderTitle, { color: theme.text }]}>
+                  {vehicleMode === 'CYCLING'
+                    ? 'Xe đạp'
+                    : vehicleMode === 'WALKING'
+                      ? 'Đi bộ'
                       : isMotorcycleMode
-                        ? "Xe máy"
-                        : "Ô tô"}
+                        ? 'Xe máy'
+                        : 'Ô tô'}
                 </Text>
-                {routeDuration !== undefined && routeDistance !== undefined ? (
-                  <>
-                    <View style={styles.headerTimeDistanceGroup}>
-                      <Text style={[styles.headerDurationText]}>
-                        {formatRouteDuration(activeDuration)}
-                      </Text>
-                    </View>
-                    <View style={styles.headerTimeDistanceGroup}>
-                      <Text
-                        style={[
-                          styles.headerDistanceText,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {`(${formatRouteDistanceInKilometers(routeDistance)})`}
-                      </Text>
-                    </View>
-                  </>
-                ) : null}
               </Pressable>
               <AppButton
                 accessibilityLabel={
-                  isRouteBookmarked
-                    ? "Chỉnh sửa lộ trình đã lưu"
-                    : "Lưu lộ trình yêu thích"
+                  isRouteBookmarked ? 'Chỉnh sửa lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
                 }
                 onPress={onOpenBookmarkModal}
                 style={[
@@ -318,7 +262,7 @@ export function NavigationBottomSheet({
                 variant="ghost"
               >
                 <MaterialCommunityIcons
-                  name={isRouteBookmarked ? "bookmark" : "bookmark-outline"}
+                  name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
                   size={20}
                   color={isRouteBookmarked ? theme.primary : theme.text}
                 />
@@ -326,10 +270,7 @@ export function NavigationBottomSheet({
               <AppButton
                 accessibilityLabel="Thu nhỏ xem trước lộ trình"
                 onPress={() => onSnapTo(0)}
-                style={[
-                  styles.sheetCloseButton,
-                  { backgroundColor: theme.backgroundSelected },
-                ]}
+                style={[styles.sheetCloseButton, { backgroundColor: theme.backgroundSelected }]}
                 variant="ghost"
               >
                 <AntDesign name="close" size={18} color={theme.text} />
@@ -339,12 +280,7 @@ export function NavigationBottomSheet({
 
           {/* Vehicle picker */}
           {!isNavigating ? (
-            <View
-              style={[
-                styles.vehicleTabsContainer,
-                { borderBottomColor: theme.border },
-              ]}
-            >
+            <View style={[styles.vehicleTabsContainer, { borderBottomColor: theme.border }]}>
               <ScrollView
                 contentContainerStyle={styles.vehicleTabsScroll}
                 horizontal
@@ -357,45 +293,35 @@ export function NavigationBottomSheet({
                 <AppButton
                   accessibilityLabel="Tuyến đường ô tô"
                   testID="vehicle-tab-car"
-                  onPress={() => onSwitchVehicleMode("DRIVING")}
+                  onPress={() => onSwitchVehicleMode('DRIVING')}
                   style={[
                     styles.vehicleTabButton,
-                    vehicleMode === "DRIVING" && styles.vehicleTabButtonActive,
+                    vehicleMode === 'DRIVING' && styles.vehicleTabButtonActive,
                   ]}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons
                     name="car"
                     size={22}
-                    color={
-                      vehicleMode === "DRIVING"
-                        ? theme.primary
-                        : theme.textSecondary
-                    }
+                    color={vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary}
                   />
                   <Text
                     style={[
                       styles.vehicleTabDurationText,
                       {
-                        color:
-                          vehicleMode === "DRIVING"
-                            ? theme.primary
-                            : theme.textSecondary,
+                        color: vehicleMode === 'DRIVING' ? theme.primary : theme.textSecondary,
                       },
                     ]}
                   >
                     {carDuration !== undefined
                       ? formatRouteDuration(carDuration)
                       : isCarRouteLoading
-                        ? "..."
-                        : "--"}
+                        ? '...'
+                        : '--'}
                   </Text>
-                  {vehicleMode === "DRIVING" ? (
+                  {vehicleMode === 'DRIVING' ? (
                     <View
-                      style={[
-                        styles.vehicleTabActiveLine,
-                        { backgroundColor: theme.primary },
-                      ]}
+                      style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]}
                     />
                   ) : null}
                 </AppButton>
@@ -404,7 +330,7 @@ export function NavigationBottomSheet({
                 <AppButton
                   accessibilityLabel="Tuyến đường xe máy"
                   testID="vehicle-tab-bike"
-                  onPress={() => onSwitchVehicleMode("MOTORCYCLE")}
+                  onPress={() => onSwitchVehicleMode('MOTORCYCLE')}
                   style={[
                     styles.vehicleTabButton,
                     isMotorcycleMode && styles.vehicleTabButtonActive,
@@ -414,34 +340,25 @@ export function NavigationBottomSheet({
                   <MaterialCommunityIcons
                     name="motorbike"
                     size={22}
-                    color={
-                      isMotorcycleMode
-                        ? theme.primary
-                        : theme.textSecondary
-                    }
+                    color={isMotorcycleMode ? theme.primary : theme.textSecondary}
                   />
                   <Text
                     style={[
                       styles.vehicleTabDurationText,
                       {
-                        color: isMotorcycleMode
-                          ? theme.primary
-                          : theme.textSecondary,
+                        color: isMotorcycleMode ? theme.primary : theme.textSecondary,
                       },
                     ]}
                   >
                     {motorcycleDuration !== undefined
                       ? formatRouteDuration(motorcycleDuration)
                       : isMotorcycleRouteLoading
-                        ? "..."
-                        : "--"}
+                        ? '...'
+                        : '--'}
                   </Text>
                   {isMotorcycleMode ? (
                     <View
-                      style={[
-                        styles.vehicleTabActiveLine,
-                        { backgroundColor: theme.primary },
-                      ]}
+                      style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]}
                     />
                   ) : null}
                 </AppButton>
@@ -450,45 +367,35 @@ export function NavigationBottomSheet({
                 <AppButton
                   accessibilityLabel="Tuyến đường xe đạp"
                   testID="vehicle-tab-cycling"
-                  onPress={() => onSwitchVehicleMode("CYCLING")}
+                  onPress={() => onSwitchVehicleMode('CYCLING')}
                   style={[
                     styles.vehicleTabButton,
-                    vehicleMode === "CYCLING" && styles.vehicleTabButtonActive,
+                    vehicleMode === 'CYCLING' && styles.vehicleTabButtonActive,
                   ]}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons
                     name="bicycle"
                     size={22}
-                    color={
-                      vehicleMode === "CYCLING"
-                        ? theme.primary
-                        : theme.textSecondary
-                    }
+                    color={vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary}
                   />
                   <Text
                     style={[
                       styles.vehicleTabDurationText,
                       {
-                        color:
-                          vehicleMode === "CYCLING"
-                            ? theme.primary
-                            : theme.textSecondary,
+                        color: vehicleMode === 'CYCLING' ? theme.primary : theme.textSecondary,
                       },
                     ]}
                   >
                     {cyclingDuration !== undefined
                       ? formatRouteDuration(cyclingDuration)
                       : isCyclingRouteLoading
-                        ? "..."
-                        : "--"}
+                        ? '...'
+                        : '--'}
                   </Text>
-                  {vehicleMode === "CYCLING" ? (
+                  {vehicleMode === 'CYCLING' ? (
                     <View
-                      style={[
-                        styles.vehicleTabActiveLine,
-                        { backgroundColor: theme.primary },
-                      ]}
+                      style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]}
                     />
                   ) : null}
                 </AppButton>
@@ -497,45 +404,35 @@ export function NavigationBottomSheet({
                 <AppButton
                   accessibilityLabel="Tuyến đường đi bộ"
                   testID="vehicle-tab-walking"
-                  onPress={() => onSwitchVehicleMode("WALKING")}
+                  onPress={() => onSwitchVehicleMode('WALKING')}
                   style={[
                     styles.vehicleTabButton,
-                    vehicleMode === "WALKING" && styles.vehicleTabButtonActive,
+                    vehicleMode === 'WALKING' && styles.vehicleTabButtonActive,
                   ]}
                   variant="ghost"
                 >
                   <MaterialCommunityIcons
                     name="walk"
                     size={22}
-                    color={
-                      vehicleMode === "WALKING"
-                        ? theme.primary
-                        : theme.textSecondary
-                    }
+                    color={vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary}
                   />
                   <Text
                     style={[
                       styles.vehicleTabDurationText,
                       {
-                        color:
-                          vehicleMode === "WALKING"
-                            ? theme.primary
-                            : theme.textSecondary,
+                        color: vehicleMode === 'WALKING' ? theme.primary : theme.textSecondary,
                       },
                     ]}
                   >
                     {walkingDuration !== undefined
                       ? formatRouteDuration(walkingDuration)
                       : isWalkingRouteLoading
-                        ? "..."
-                        : "--"}
+                        ? '...'
+                        : '--'}
                   </Text>
-                  {vehicleMode === "WALKING" ? (
+                  {vehicleMode === 'WALKING' ? (
                     <View
-                      style={[
-                        styles.vehicleTabActiveLine,
-                        { backgroundColor: theme.primary },
-                      ]}
+                      style={[styles.vehicleTabActiveLine, { backgroundColor: theme.primary }]}
                     />
                   ) : null}
                 </AppButton>
@@ -551,71 +448,50 @@ export function NavigationBottomSheet({
 
           {/* Lower expandable content */}
           <Animated.View
-            pointerEvents={sheetSnapIndex === 0 ? "none" : "auto"}
-            style={[
-              styles.routeSheetExpandableContent,
-              { opacity: expandableContentOpacity },
-            ]}
+            pointerEvents={sheetSnapIndex === 0 ? 'none' : 'auto'}
+            style={[styles.routeSheetExpandableContent, { opacity: expandableContentOpacity }]}
           >
             <View style={styles.signFilterHeader}>
               <View style={styles.signFilterTitleGroup}>
                 <View style={styles.signFilterTotalBadge}>
-                  <Text
-                    style={[
-                      styles.signFilterTotalText,
-                      { color: theme.text },
-                    ]}
-                  >
-                    {filteredSignsCount === 0 && visibleSignsCount === 0
-                      ? "Không có biển báo thỏa điều kiện"
-                      : `${filteredSignsCount}/${visibleSignsCount} biển báo đang hiển thị`}
+                  <Text>
+                    {formatRouteEstimatedTime(remainingNavDuration ?? activeDuration)}
+                    {` (${formatRouteDistanceInKilometers(routeDistance ?? 0)})`}
                   </Text>
                 </View>
               </View>
               {!isNavigating && routeMatchingPresets.length > 0 ? (
                 <AppButton
                   accessibilityLabel={
-                    filterViewMode === "lists"
-                      ? "Chuyển sang lọc theo danh mục"
-                      : "Chuyển sang danh sách lọc"
+                    filterViewMode === 'lists'
+                      ? 'Chuyển sang lọc theo danh mục'
+                      : 'Chuyển sang danh sách lọc'
                   }
                   onPress={onToggleFilterViewMode}
                   style={styles.toggleAllButton}
                   variant="ghost"
                 >
-                  <Text
-                    style={[
-                      styles.toggleAllText,
-                      { color: theme.primary },
-                    ]}
-                  >
-                    {filterViewMode === "lists" ? "Danh mục" : "Danh sách"}
+                  <Text style={[styles.toggleAllText, { color: theme.primary }]}>
+                    {filterViewMode === 'lists' ? 'Danh mục' : 'Danh sách'}
                   </Text>
                 </AppButton>
               ) : (
                 <AppButton
                   accessibilityLabel={
                     manualCategories.size === SIGN_CATEGORIES.length
-                      ? "Bỏ chọn tất cả danh mục"
-                      : "Chọn tất cả danh mục"
+                      ? 'Bỏ chọn tất cả danh mục'
+                      : 'Chọn tất cả danh mục'
                   }
                   onPress={() =>
-                    onSelectAllManualCategories(
-                      manualCategories.size !== SIGN_CATEGORIES.length,
-                    )
+                    onSelectAllManualCategories(manualCategories.size !== SIGN_CATEGORIES.length)
                   }
                   style={styles.toggleAllButton}
                   variant="ghost"
                 >
-                  <Text
-                    style={[
-                      styles.toggleAllText,
-                      { color: theme.primary },
-                    ]}
-                  >
+                  <Text style={[styles.toggleAllText, { color: theme.primary }]}>
                     {manualCategories.size === SIGN_CATEGORIES.length
-                      ? "Bỏ chọn tất cả"
-                      : "Chọn tất cả"}
+                      ? 'Bỏ chọn tất cả'
+                      : 'Chọn tất cả'}
                   </Text>
                 </AppButton>
               )}
@@ -627,13 +503,11 @@ export function NavigationBottomSheet({
               showsVerticalScrollIndicator
               style={styles.signFilterScrollView}
             >
-              {!isNavigating &&
-              filterViewMode === "lists" &&
-              routeMatchingPresets.length > 0 ? (
+              {!isNavigating && filterViewMode === 'lists' && routeMatchingPresets.length > 0 ? (
                 <>
                   <Pressable
                     accessibilityLabel={`Tất cả biển báo, không lọc, ${
-                      activePresetId === null ? "đã chọn" : "chưa chọn"
+                      activePresetId === null ? 'đã chọn' : 'chưa chọn'
                     }`}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: activePresetId === null }}
@@ -645,10 +519,7 @@ export function NavigationBottomSheet({
                           activePresetId === null
                             ? theme.backgroundSelected
                             : theme.backgroundElement,
-                        borderColor:
-                          activePresetId === null
-                            ? theme.primary
-                            : theme.border,
+                        borderColor: activePresetId === null ? theme.primary : theme.border,
                         opacity: pressed ? 0.75 : 1,
                       },
                     ]}
@@ -670,25 +541,12 @@ export function NavigationBottomSheet({
                         <Text
                           numberOfLines={1}
                           ellipsizeMode="tail"
-                          style={[
-                            styles.signCatLabel,
-                            { color: theme.text },
-                          ]}
+                          style={[styles.signCatLabel, { color: theme.text }]}
                         >
                           Tất cả biển báo (Không lọc)
                         </Text>
-                        <View
-                          style={[
-                            styles.signCountBadge,
-                            { backgroundColor: theme.primary },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.signCountText,
-                              { color: "#FFFFFF" },
-                            ]}
-                          >
+                        <View style={[styles.signCountBadge, { backgroundColor: theme.primary }]}>
+                          <Text style={[styles.signCountText, { color: '#FFFFFF' }]}>
                             {visibleSignsCount}
                           </Text>
                         </View>
@@ -703,7 +561,7 @@ export function NavigationBottomSheet({
                               borderColor: theme.primary,
                             }
                           : {
-                              backgroundColor: "transparent",
+                              backgroundColor: 'transparent',
                               borderColor: theme.border,
                             },
                       ]}
@@ -723,7 +581,7 @@ export function NavigationBottomSheet({
                       <Pressable
                         key={preset.id}
                         accessibilityLabel={`Danh sách ${preset.name}, ${
-                          isSelected ? "đã chọn" : "chưa chọn"
+                          isSelected ? 'đã chọn' : 'chưa chọn'
                         }`}
                         accessibilityRole="radio"
                         accessibilityState={{ checked: isSelected }}
@@ -734,9 +592,7 @@ export function NavigationBottomSheet({
                             backgroundColor: isSelected
                               ? theme.backgroundSelected
                               : theme.backgroundElement,
-                            borderColor: isSelected
-                              ? theme.primary
-                              : theme.border,
+                            borderColor: isSelected ? theme.primary : theme.border,
                             opacity: pressed ? 0.75 : 1,
                           },
                         ]}
@@ -758,13 +614,9 @@ export function NavigationBottomSheet({
                             <Text
                               numberOfLines={1}
                               ellipsizeMode="tail"
-                              style={[
-                                styles.signCatLabel,
-                                { color: theme.text },
-                              ]}
+                              style={[styles.signCatLabel, { color: theme.text }]}
                             >
-                              {preset.savedRoute?.originName &&
-                              preset.savedRoute?.destinationName
+                              {preset.savedRoute?.originName && preset.savedRoute?.destinationName
                                 ? `${preset.savedRoute.originName} ➔ ${preset.savedRoute.destinationName}`
                                 : preset.name}
                             </Text>
@@ -772,9 +624,7 @@ export function NavigationBottomSheet({
                               style={[
                                 styles.signCountBadge,
                                 {
-                                  backgroundColor: isSelected
-                                    ? theme.primary
-                                    : theme.border,
+                                  backgroundColor: isSelected ? theme.primary : theme.border,
                                 },
                               ]}
                             >
@@ -782,9 +632,7 @@ export function NavigationBottomSheet({
                                 style={[
                                   styles.signCountText,
                                   {
-                                    color: isSelected
-                                      ? "#FFFFFF"
-                                      : theme.textSecondary,
+                                    color: isSelected ? '#FFFFFF' : theme.textSecondary,
                                   },
                                 ]}
                               >
@@ -794,10 +642,7 @@ export function NavigationBottomSheet({
                           </View>
                           <Text
                             numberOfLines={1}
-                            style={[
-                              styles.signCatSublabel,
-                              { color: theme.textSecondary },
-                            ]}
+                            style={[styles.signCatSublabel, { color: theme.textSecondary }]}
                           >
                             {preset.categories.length} danh mục
                           </Text>
@@ -811,14 +656,12 @@ export function NavigationBottomSheet({
                                   borderColor: theme.primary,
                                 }
                               : {
-                                  backgroundColor: "transparent",
+                                  backgroundColor: 'transparent',
                                   borderColor: theme.border,
                                 },
                           ]}
                         >
-                          {isSelected ? (
-                            <AntDesign name="check" size={14} color="#FFFFFF" />
-                          ) : null}
+                          {isSelected ? <AntDesign name="check" size={14} color="#FFFFFF" /> : null}
                         </View>
                       </Pressable>
                     );
@@ -836,7 +679,7 @@ export function NavigationBottomSheet({
                       <Pressable
                         key={cat.id}
                         accessibilityLabel={`Biển ${cat.label}, ${
-                          isSelected ? "đã chọn" : "chưa chọn"
+                          isSelected ? 'đã chọn' : 'chưa chọn'
                         }`}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: isSelected }}
@@ -852,27 +695,15 @@ export function NavigationBottomSheet({
                           },
                         ]}
                       >
-                        <View
-                          style={[
-                            styles.signCatIconBadge,
-                            { backgroundColor: cat.bgColor },
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            name={cat.icon}
-                            size={22}
-                            color={cat.color}
-                          />
+                        <View style={[styles.signCatIconBadge, { backgroundColor: cat.bgColor }]}>
+                          <MaterialCommunityIcons name={cat.icon} size={22} color={cat.color} />
                         </View>
                         <View style={styles.signCatInfo}>
                           <View style={styles.signCatTitleRow}>
                             <Text
                               numberOfLines={1}
                               ellipsizeMode="tail"
-                              style={[
-                                styles.signCatLabel,
-                                { color: theme.text },
-                              ]}
+                              style={[styles.signCatLabel, { color: theme.text }]}
                             >
                               {cat.label}
                             </Text>
@@ -880,9 +711,7 @@ export function NavigationBottomSheet({
                               style={[
                                 styles.signCountBadge,
                                 {
-                                  backgroundColor: isSelected
-                                    ? cat.color
-                                    : theme.border,
+                                  backgroundColor: isSelected ? cat.color : theme.border,
                                 },
                               ]}
                             >
@@ -890,9 +719,7 @@ export function NavigationBottomSheet({
                                 style={[
                                   styles.signCountText,
                                   {
-                                    color: isSelected
-                                      ? "#FFFFFF"
-                                      : theme.textSecondary,
+                                    color: isSelected ? '#FFFFFF' : theme.textSecondary,
                                   },
                                 ]}
                               >
@@ -902,10 +729,7 @@ export function NavigationBottomSheet({
                           </View>
                           <Text
                             numberOfLines={1}
-                            style={[
-                              styles.signCatSublabel,
-                              { color: theme.textSecondary },
-                            ]}
+                            style={[styles.signCatSublabel, { color: theme.textSecondary }]}
                           >
                             {cat.sublabel}
                           </Text>
@@ -919,14 +743,12 @@ export function NavigationBottomSheet({
                                   borderColor: cat.color,
                                 }
                               : {
-                                  backgroundColor: "transparent",
+                                  backgroundColor: 'transparent',
                                   borderColor: theme.border,
                                 },
                           ]}
                         >
-                          {isSelected ? (
-                            <AntDesign name="check" size={14} color="#FFFFFF" />
-                          ) : null}
+                          {isSelected ? <AntDesign name="check" size={14} color="#FFFFFF" /> : null}
                         </View>
                       </Pressable>
                     );
@@ -938,37 +760,28 @@ export function NavigationBottomSheet({
 
           {/* Bottom Button Row */}
           {!isNavigating ? (
-            <View
-              style={[
-                styles.sheetBottomButtonRow,
-                { borderTopColor: theme.border },
-              ]}
-            >
+            <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
               <AppButton
                 accessibilityLabel={
                   isStartDisabled
-                    ? "Không đủ credits để bắt đầu điều hướng"
+                    ? 'Không đủ credits để bắt đầu điều hướng'
                     : isStartingNavigation
-                      ? "Starting navigation"
-                      : "Begin navigation"
+                      ? 'Bắt đầu di chuyển...'
+                      : 'Bắt đầu di chuyển'
                 }
                 testID="btn-start-navigation"
                 disabled={isStartingNavigation || isStartDisabled}
                 onPress={onBeginNavigation}
                 style={styles.bottomGoButton}
               >
-                <Text
-                  style={[styles.goButtonLabel, { color: theme.onPrimary }]}
-                >
-                  {isStartingNavigation ? "Đang bắt đầu..." : "Bắt đầu"}
+                <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
+                  {isStartingNavigation ? 'Đang bắt đầu...' : 'Bắt đầu'}
                 </Text>
               </AppButton>
 
               <AppButton
                 accessibilityLabel={
-                  isRouteBookmarked
-                    ? "Lộ trình đã lưu"
-                    : "Lưu lộ trình yêu thích"
+                  isRouteBookmarked ? 'Lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
                 }
                 testID="btn-bookmark-route"
                 onPress={onOpenBookmarkModal}
@@ -982,7 +795,7 @@ export function NavigationBottomSheet({
                 variant="surface"
               >
                 <MaterialCommunityIcons
-                  name={isRouteBookmarked ? "bookmark" : "bookmark-outline"}
+                  name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
                   size={24}
                   color={isRouteBookmarked ? theme.primary : theme.text}
                 />
@@ -990,24 +803,16 @@ export function NavigationBottomSheet({
             </View>
           ) : (
             <SafeAreaView
-              edges={["bottom"]}
-              style={[
-                styles.sheetBottomButtonRow,
-                { borderTopColor: theme.border },
-              ]}
+              edges={['bottom']}
+              style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}
             >
               <AppButton
                 accessibilityLabel="Dừng điều hướng"
                 testID="btn-stop-navigation"
                 onPress={onCloseRoute}
-                style={[
-                  styles.bottomGoButton,
-                  { backgroundColor: theme.danger },
-                ]}
+                style={[styles.bottomGoButton, { backgroundColor: theme.danger }]}
               >
-                <Text style={[styles.goButtonLabel, { color: "#FFFFFF" }]}>
-                  Dừng
-                </Text>
+                <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>Dừng</Text>
               </AppButton>
             </SafeAreaView>
           )}
@@ -1018,21 +823,12 @@ export function NavigationBottomSheet({
           <View>
             <Text
               numberOfLines={1}
-              style={[
-                styles.destinationTitle,
-                styles.selectedPlaceTitle,
-                { color: theme.text },
-              ]}
+              style={[styles.destinationTitle, styles.selectedPlaceTitle, { color: theme.text }]}
             >
               {selectedDestination.title}
             </Text>
             {selectedDestination.subtitle ? (
-              <Text
-                style={[
-                  styles.selectedPlaceDescription,
-                  { color: theme.textSecondary },
-                ]}
-              >
+              <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
                 {selectedDestination.subtitle}
               </Text>
             ) : null}
@@ -1047,11 +843,7 @@ export function NavigationBottomSheet({
               accessibilityLabel="Start route"
               testID="btn-start-route-plan"
               disabled={isStartingNavigation}
-              label={
-                isStartingNavigation
-                  ? "Đang bắt đầu..."
-                  : "Bắt đầu lộ trình"
-              }
+              label={isStartingNavigation ? 'Đang bắt đầu...' : 'Bắt đầu lộ trình'}
               onPress={onGo}
               style={[styles.goButton, styles.destinationActionButton]}
             />

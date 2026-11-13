@@ -553,5 +553,180 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       expect(mockBeginSubmissionCheck).toHaveBeenCalledWith(1);
       expect(mockReplace).toHaveBeenCalledWith('/work/submission-review');
     });
+
+    it('when rechecking submission on review screen, displays voted result and "Sửa kết quả" button without voting diamond buttons until clicked', async () => {
+      const mockCompleteReview = jest.fn().mockResolvedValue(true);
+      const mockWorkflowValue: ReviewWorkflowContextValue = {
+        beginSubmissionCheck: jest.fn(),
+        checkedReviewIndex: 0,
+        checkingSubmission: false,
+        isCheckingSubmission: false,
+        completeCurrentReview: mockCompleteReview,
+        error: undefined,
+        finishSubmissionCheck: jest.fn(),
+        goToNextCheckedReview: jest.fn(),
+        goToPreviousCheckedReview: jest.fn(),
+        isLoading: false,
+        jumpToSubmissionIndex: jest.fn(),
+        pendingSubmissions: [sampleCandidate1],
+        refresh: jest.fn().mockResolvedValue(undefined),
+        recheckingPreviousAction: 'approved',
+        recheckingReviewIndex: 0,
+        recheckingSubmission: true,
+        isRecheckingSubmission: true,
+        resetReviewWorkflow: jest.fn().mockResolvedValue(undefined),
+        reviewCheckedSubmissionAgain: jest.fn().mockResolvedValue(false),
+        reviewHistory: [],
+        sessionReviewCount: 1,
+        skipCurrentReview: jest.fn().mockResolvedValue(true),
+        totalSubmissions: 1,
+        undoLastReview: jest.fn().mockResolvedValue(true),
+      };
+
+      const { getByText, getAllByText, queryByLabelText, getByLabelText, getByTestId } = await render(
+        <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowContext.Provider>,
+      );
+
+      // Verify voted result card is displayed
+      expect(getByText('Kết quả đã thẩm định')).toBeTruthy();
+      expect(getAllByText('ĐÃ PHÊ DUYỆT').length).toBeGreaterThanOrEqual(1);
+
+      // Verify the button to fix the result is present
+      const fixResultBtn = getByTestId('fix-result-button');
+      expect(fixResultBtn).toBeTruthy();
+
+      // Verify the 4 voting diamond buttons are NOT rendered initially
+      expect(queryByLabelText('Approve submission')).toBeNull();
+      expect(queryByLabelText('Decline submission')).toBeNull();
+      expect(queryByLabelText('Skip submission (cannot identify)')).toBeNull();
+      expect(queryByLabelText('Report submission')).toBeNull();
+
+      // Click "Sửa kết quả"
+      await act(async () => {
+        fireEvent.press(fixResultBtn);
+      });
+
+      // Now the 4 voting buttons appear
+      expect(getByLabelText('Approve submission')).toBeTruthy();
+      expect(getByLabelText('Decline submission')).toBeTruthy();
+      expect(getByLabelText('Skip submission (cannot identify)')).toBeTruthy();
+      expect(getByLabelText('Report submission')).toBeTruthy();
+      expect(getByText('Chọn kết quả thẩm định mới bên dưới')).toBeTruthy();
+
+      // Voting with Approve works
+      await act(async () => {
+        fireEvent.press(getByLabelText('Approve submission'));
+      });
+      expect(mockCompleteReview).toHaveBeenCalledWith('approved', undefined);
+    });
+
+    it('displays voted result card for a SKIPPED submission during recheck, hiding voting buttons until "Sửa kết quả" is pressed', async () => {
+      const mockCompleteReview = jest.fn().mockResolvedValue(true);
+
+      const mockWorkflowValue: ReviewWorkflowContextValue = {
+        beginSubmissionCheck: jest.fn(),
+        cancelSubmissionCheck: jest.fn(),
+        checkedReviewIndex: 0,
+        checkingSubmission: false,
+        isCheckingSubmission: false,
+        completeCurrentReview: mockCompleteReview,
+        error: undefined,
+        finishSubmissionCheck: jest.fn(),
+        goToNextCheckedReview: jest.fn(),
+        goToPreviousCheckedReview: jest.fn(),
+        isLoading: false,
+        jumpToSubmissionIndex: jest.fn(),
+        pendingSubmissions: [sampleCandidate1],
+        refresh: jest.fn().mockResolvedValue(undefined),
+        recheckingPreviousAction: 'skipped',
+        recheckingReviewIndex: 0,
+        recheckingSubmission: true,
+        isRecheckingSubmission: true,
+        resetReviewWorkflow: jest.fn().mockResolvedValue(undefined),
+        reviewCheckedSubmissionAgain: jest.fn().mockResolvedValue(false),
+        reviewHistory: [],
+        sessionReviewCount: 1,
+        skipCurrentReview: jest.fn().mockResolvedValue(true),
+        totalSubmissions: 1,
+        undoLastReview: jest.fn().mockResolvedValue(true),
+      };
+
+      const { getByText, getAllByText, queryByLabelText, getByLabelText, getByTestId } = await render(
+        <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowContext.Provider>,
+      );
+
+      // Verify "ĐÃ BỎ QUA" is displayed
+      expect(getByText('Kết quả đã thẩm định')).toBeTruthy();
+      expect(getAllByText('ĐÃ BỎ QUA').length).toBeGreaterThanOrEqual(1);
+
+      // 4 buttons are hidden
+      expect(queryByLabelText('Approve submission')).toBeNull();
+      expect(queryByLabelText('Decline submission')).toBeNull();
+
+      // Click "Sửa kết quả"
+      const fixResultBtn = getByTestId('fix-result-button');
+      await act(async () => {
+        fireEvent.press(fixResultBtn);
+      });
+
+      // Voting buttons appear
+      expect(getByLabelText('Approve submission')).toBeTruthy();
+      expect(getByLabelText('Decline submission')).toBeTruthy();
+      expect(getByLabelText('Skip submission (cannot identify)')).toBeTruthy();
+      expect(getByLabelText('Report submission')).toBeTruthy();
+    });
+
+    it('calls keepCurrentReviewAndNext when pressing "Giữ nguyên" and navigates when completed', async () => {
+      const mockKeepCurrentReviewAndNext = jest.fn().mockReturnValue(true);
+
+      const mockWorkflowValue: ReviewWorkflowContextValue = {
+        beginSubmissionCheck: jest.fn(),
+        cancelSubmissionCheck: jest.fn(),
+        checkedReviewIndex: 0,
+        checkingSubmission: false,
+        isCheckingSubmission: false,
+        completeCurrentReview: jest.fn().mockResolvedValue(true),
+        error: undefined,
+        finishSubmissionCheck: jest.fn(),
+        goToNextCheckedReview: jest.fn(),
+        goToPreviousCheckedReview: jest.fn(),
+        isLoading: false,
+        jumpToSubmissionIndex: jest.fn(),
+        keepCurrentReviewAndNext: mockKeepCurrentReviewAndNext,
+        pendingSubmissions: [sampleCandidate1],
+        refresh: jest.fn().mockResolvedValue(undefined),
+        recheckingPreviousAction: 'approved',
+        recheckingReviewIndex: 0,
+        recheckingSubmission: true,
+        isRecheckingSubmission: true,
+        resetReviewWorkflow: jest.fn().mockResolvedValue(undefined),
+        reviewCheckedSubmissionAgain: jest.fn().mockResolvedValue(false),
+        reviewHistory: [],
+        sessionReviewCount: 1,
+        skipCurrentReview: jest.fn().mockResolvedValue(true),
+        totalSubmissions: 1,
+        undoLastReview: jest.fn().mockResolvedValue(true),
+      };
+
+      const { getByTestId } = await render(
+        <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowContext.Provider>,
+      );
+
+      const keepBtn = getByTestId('keep-result-button');
+      await act(async () => {
+        fireEvent.press(keepBtn);
+      });
+
+      expect(mockKeepCurrentReviewAndNext).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/work/submission-summary' }),
+      );
+    });
   });
 });

@@ -34,6 +34,7 @@ export type CompletedRevalidationReview = {
 
 export type RevalidationWorkflowContextValue = {
   beginEvidenceCheck: (targetIndex?: number) => void;
+  cancelEvidenceCheck?: () => void;
   counts: Record<RevalidationReviewAction, number>;
   currentItem?: RevalidationQueueEvidenceItem;
   finishReviews: () => number;
@@ -46,10 +47,12 @@ export type RevalidationWorkflowContextValue = {
   handleSkip: () => boolean;
   isCheckingEvidence: boolean;
   isLoading: boolean;
+  keepCurrentEvidenceAndNext?: () => boolean;
   nextItem?: RevalidationQueueEvidenceItem;
   progressPercent: number;
   queueItems: RevalidationQueueEvidenceItem[];
   recheckingIndex?: number;
+  recheckingPreviousReview?: CompletedRevalidationReview;
   refetchQueue: () => Promise<void>;
   resetWorkflow: () => void;
   reviewHistory: CompletedRevalidationReview[];
@@ -89,6 +92,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const [totalCount, setTotalCount] = useState(0);
   const [isCheckingEvidence, setIsCheckingEvidence] = useState(false);
   const [recheckingIndex, setRecheckingIndex] = useState<number | undefined>(undefined);
+  const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<CompletedRevalidationReview | undefined>(undefined);
   const hasInitializedRef = useRef(false);
 
   // Sync with incoming queue response initially
@@ -138,10 +142,30 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
       // 1. Advance queue state
       setQueueItems((prev) => prev.slice(1));
-      setReviewHistory((prev) => [
-        ...prev,
-        { item: itemToVote, action, note, suggestedSignTypeId, userVerdict },
-      ]);
+      setReviewHistory((prev) => {
+        const next = [...prev];
+        const newReview: CompletedRevalidationReview = {
+          item: itemToVote,
+          action,
+          note,
+          suggestedSignTypeId,
+          userVerdict,
+        };
+        next.push(newReview);
+        return next;
+      });
+
+      if (completesQueue) {
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+      } else {
+        const nextItem = queueItems[1];
+        setRecheckingPreviousReview(
+          (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+            ?.previousReview,
+        );
+      }
 
       // 2. Dispatch vote API
       const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
@@ -168,7 +192,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
       return completesQueue;
     },
-    [currentItem, queueItems.length, voteMutation],
+    [currentItem, queueItems, voteMutation],
   );
 
   const handleSkip = useCallback((): boolean => {
@@ -177,41 +201,112 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     const completesQueue = queueItems.length <= 1;
 
     setQueueItems((prev) => prev.slice(1));
-    setReviewHistory((prev) => [
-      ...prev,
-      {
+    setReviewHistory((prev) => {
+      const next = [...prev];
+      const newReview: CompletedRevalidationReview = {
         item: itemToSkip,
         action: 'UNCLEAR',
         note: 'Bỏ qua minh chứng (chưa xác định)',
         userVerdict: 'SKIP',
-      },
-    ]);
+      };
+      next.push(newReview);
+      return next;
+    });
+
+    if (completesQueue) {
+      setIsCheckingEvidence(false);
+      setRecheckingIndex(undefined);
+      setRecheckingPreviousReview(undefined);
+    } else {
+      const nextItem = queueItems[1];
+      setRecheckingPreviousReview(
+        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+          ?.previousReview,
+      );
+    }
 
     return completesQueue;
-  }, [currentItem, queueItems.length]);
+  }, [currentItem, queueItems]);
 
   const beginEvidenceCheck = useCallback(
     (targetIndex?: number) => {
       if (targetIndex !== undefined && reviewHistory[targetIndex]) {
-        const target = reviewHistory[targetIndex];
-        setQueueItems([target.item]);
-        setTotalCount(1);
+        const priorHistory = reviewHistory.slice(0, targetIndex);
+        const recheckItems = reviewHistory.slice(targetIndex).map((h) => ({
+          ...h.item,
+          previousReview: h,
+        }));
+        setReviewHistory(priorHistory);
+        setQueueItems(recheckItems);
+        setTotalCount(reviewHistory.length);
         setIsCheckingEvidence(true);
         setRecheckingIndex(targetIndex);
-        setReviewHistory((prev) => prev.filter((_, i) => i !== targetIndex));
+        setRecheckingPreviousReview(reviewHistory[targetIndex]);
         return;
       }
 
       // Recheck all voted items from history
-      const votedItems = reviewHistory.map((h) => h.item);
+      const votedItems = reviewHistory.map((h) => ({
+        ...h.item,
+        previousReview: h,
+      }));
       setQueueItems(votedItems);
       setTotalCount(votedItems.length);
       setReviewHistory([]);
-      setIsCheckingEvidence(false);
+      setIsCheckingEvidence(true);
       setRecheckingIndex(undefined);
+      setRecheckingPreviousReview(reviewHistory[0]);
     },
     [reviewHistory],
   );
+
+  const keepCurrentEvidenceAndNext = useCallback((): boolean => {
+    if (!currentItem) return true;
+
+    const prevReview =
+      (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+        ?.previousReview ?? recheckingPreviousReview;
+
+    const completesQueue = queueItems.length <= 1;
+
+    if (prevReview) {
+      setReviewHistory((prev) => [...prev, prevReview]);
+    }
+
+    setQueueItems((prev) => prev.slice(1));
+
+    if (completesQueue) {
+      setIsCheckingEvidence(false);
+      setRecheckingIndex(undefined);
+      setRecheckingPreviousReview(undefined);
+    } else {
+      const nextItem = queueItems[1];
+      setRecheckingPreviousReview(
+        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+          ?.previousReview,
+      );
+    }
+
+    return completesQueue;
+  }, [currentItem, queueItems, recheckingPreviousReview]);
+
+  const cancelEvidenceCheck = useCallback(() => {
+    if (queueItems.length > 0) {
+      const remainingReviews: CompletedRevalidationReview[] = queueItems
+        .map((item) => {
+          return (item as any)?.previousReview ?? recheckingPreviousReview;
+        })
+        .filter(Boolean) as CompletedRevalidationReview[];
+
+      if (remainingReviews.length > 0) {
+        setReviewHistory((prev) => [...prev, ...remainingReviews]);
+        setQueueItems([]);
+      }
+    }
+    setIsCheckingEvidence(false);
+    setRecheckingIndex(undefined);
+    setRecheckingPreviousReview(undefined);
+  }, [recheckingPreviousReview, recheckingIndex]);
 
   const finishReviews = useCallback((): number => {
     const count = reviewHistory.length;
@@ -225,6 +320,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     setQueueItems([]);
     setIsCheckingEvidence(false);
     setRecheckingIndex(undefined);
+    setRecheckingPreviousReview(undefined);
     hasInitializedRef.current = false;
     return count;
   }, [invalidateWalletAndStats, queryClient, reviewHistory.length]);
@@ -234,6 +330,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     setQueueItems([]);
     setIsCheckingEvidence(false);
     setRecheckingIndex(undefined);
+    setRecheckingPreviousReview(undefined);
     hasInitializedRef.current = false;
     void refetch();
   }, [refetch]);
@@ -249,6 +346,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const value: RevalidationWorkflowContextValue = useMemo(
     () => ({
       beginEvidenceCheck,
+      cancelEvidenceCheck,
       counts,
       currentItem,
       finishReviews,
@@ -256,10 +354,12 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
       queueItems,
       recheckingIndex,
+      recheckingPreviousReview,
       refetchQueue,
       resetWorkflow,
       reviewHistory,
@@ -268,6 +368,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     }),
     [
       beginEvidenceCheck,
+      cancelEvidenceCheck,
       counts,
       currentItem,
       finishReviews,
@@ -275,10 +376,12 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
       queueItems,
       recheckingIndex,
+      recheckingPreviousReview,
       refetchQueue,
       resetWorkflow,
       reviewHistory,
@@ -296,6 +399,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
 const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   beginEvidenceCheck: () => {},
+  cancelEvidenceCheck: () => {},
   counts: { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
   currentItem: undefined,
   finishReviews: () => 0,
@@ -303,10 +407,12 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   handleSkip: () => false,
   isCheckingEvidence: false,
   isLoading: false,
+  keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,
   queueItems: [],
   recheckingIndex: undefined,
+  recheckingPreviousReview: undefined,
   refetchQueue: async () => {},
   resetWorkflow: () => {},
   reviewHistory: [],

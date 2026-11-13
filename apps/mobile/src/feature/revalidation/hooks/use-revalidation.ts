@@ -188,7 +188,7 @@ export function useVoteOnRevalidationEvidence() {
     mutationFn: ({ evidenceId, dto }: { evidenceId: string; dto: EvidenceVoteDto }) =>
       voteOnRevalidationEvidence(evidenceId, dto),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+      // Invalidate reviewer stats and wallet without wiping or refetching the active review queue prematurely
       void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },

@@ -20,7 +20,7 @@ export function DriverWork({ driverSessionsTotal: propDriverSessionsTotal }: Dri
 
   // Driver queries live directly within the Driver component
   const { data: driverSessions } = useGetNavigationSessions({ page: 1, pageSize: 1 }, isDriver);
-  const driverSessionsTotal = propDriverSessionsTotal ?? (driverSessions?.total ?? 0);
+  const driverSessionsTotal = propDriverSessionsTotal ?? driverSessions?.total ?? 0;
 
   return (
     <View style={styles.actionList}>
@@ -31,21 +31,21 @@ export function DriverWork({ driverSessionsTotal: propDriverSessionsTotal }: Dri
         icon="map-clock-outline"
         label="Lịch sử di chuyển"
         onPress={() => router.push('/work/navigation-history')}
-        subtitle="Xem lại các lộ trình và chuyến đi bạn đã điều hướng"
+        subtitle="Tra cứu lịch sử di chuyển."
       />
 
       {/* Action Card: Sign Catalog */}
       <WorkActionCard
         accentColor={theme.primary}
         icon="database-search-outline"
-        label="Tra cứu biển báo giao thông"
+        label="Tra cứu biển báo"
         onPress={() =>
           router.push({
             pathname: '/work/sign-catalog',
             params: { role: 'driver' },
           })
         }
-        subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
+        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
       />
     </View>
   );

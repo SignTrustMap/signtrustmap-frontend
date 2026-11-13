@@ -41,12 +41,13 @@ export function useGetWallet(
       : optionsOrEnabled;
 
   const { session } = useSession();
+  const isEnabled = Boolean(session) && (options.enabled ?? true);
   return useQuery<WalletResponse>({
     queryKey: walletKeys.all(session?.account.id),
     queryFn: session
       ? ({ signal }) => getWallet(session.accessToken, signal)
       : skipToken,
-    enabled: options.enabled ?? true,
+    enabled: isEnabled,
     staleTime: options.staleTime ?? 30_000,
     gcTime: options.gcTime,
     refetchOnMount: options.refetchOnMount,

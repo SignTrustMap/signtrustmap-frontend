@@ -322,7 +322,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       // Initial vehicle tab and header show driving info
       expect(getByText(/Car|Ô tô/i)).toBeTruthy();
       expect(getAllByText(/10 min|10 phút/i).length).toBeGreaterThan(0);
-      expect(getByText('(1.2 km)')).toBeTruthy();
+      expect(getByText(/1\.2 km/)).toBeTruthy();
 
       // 2. Switch vehicle mode to Bike
       const bikeTab = getByLabelText(/Bike route|Tuyến đường xe máy/i);
@@ -340,7 +340,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
       expect(getByText(/Bike|Xe máy/i)).toBeTruthy();
       expect(getAllByText(/5 min|5 phút/i).length).toBeGreaterThan(0);
-      expect(getByText('(1.0 km)')).toBeTruthy();
+      expect(getByText(/1\.0 km/)).toBeTruthy();
 
       // 4. Switch back to Car mode
       const carTab = getByLabelText(/Car route|Tuyến đường ô tô/i);
@@ -392,7 +392,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(mockMapProps.routeCoordinates).toEqual(mockDrivingRoute.coordinates);
       expect(getByText(/Car|Ô tô/i)).toBeTruthy();
       expect(getAllByText(/10 min|10 phút/i).length).toBeGreaterThan(0);
-      expect(getByText('(1.2 km)')).toBeTruthy();
+      expect(getByText(/1\.2 km/)).toBeTruthy();
 
       // Switch vehicle mode to Bike
       const bikeTab = getByLabelText(/Bike route|Tuyến đường xe máy/i);
@@ -409,7 +409,7 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(mockMapProps.routeCoordinates).toEqual(mockBikeRoute.coordinates);
       expect(getByText(/Bike|Xe máy/i)).toBeTruthy();
       expect(getAllByText(/5 min|5 phút/i).length).toBeGreaterThan(0);
-      expect(getByText('(1.0 km)')).toBeTruthy();
+      expect(getByText(/1\.0 km/)).toBeTruthy();
     });
   });
 });

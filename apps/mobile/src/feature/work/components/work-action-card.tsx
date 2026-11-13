@@ -11,6 +11,7 @@ type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 export type WorkActionCardProps = {
+  accessibilityLabel?: string;
   accentColor?: string;
   badgeLabel?: string;
   count?: number;
@@ -23,6 +24,7 @@ export type WorkActionCardProps = {
 };
 
 export function WorkActionCard({
+  accessibilityLabel,
   accentColor,
   badgeLabel,
   count,
@@ -35,11 +37,14 @@ export function WorkActionCard({
 }: WorkActionCardProps) {
   const theme = useTheme();
   const primaryAccent = accentColor ?? theme.primary;
+  const hasBadge = Boolean(badgeLabel) || (count !== undefined && count !== null && count > 0);
 
   return (
     <View style={styles.outerContainer}>
       <Pressable
-        accessibilityLabel={count === undefined ? label : `${label}, ${count} items`}
+        accessibilityLabel={
+          accessibilityLabel ?? (count === undefined ? label : `${label}, ${count} items`)
+        }
         accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [
@@ -55,18 +60,17 @@ export function WorkActionCard({
         ]}
       >
         <View style={styles.contentRow}>
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: `${primaryAccent}15` },
-            ]}
-          >
+          <View style={[styles.iconContainer]}>
             {icon ? (
               <MaterialCommunityIcons color={primaryAccent} name={icon} size={26} />
             ) : symbol ? (
               <SymbolView name={symbol} size={26} tintColor={primaryAccent} />
             ) : (
-              <MaterialCommunityIcons color={primaryAccent} name="checkbox-marked-circle-outline" size={26} />
+              <MaterialCommunityIcons
+                color={primaryAccent}
+                name="checkbox-marked-circle-outline"
+                size={26}
+              />
             )}
           </View>
 
@@ -89,11 +93,12 @@ export function WorkActionCard({
         </View>
       </Pressable>
 
-      {count !== undefined && count !== null && count > 0 ? (
+      {hasBadge ? (
         <Badge
           borderColor={theme.background}
           borderWidth={2}
-          count={count}
+          count={badgeLabel ? undefined : count}
+          label={badgeLabel}
           maxCount={9}
           size="lg"
           style={styles.topRightBadge}
@@ -162,6 +167,6 @@ const styles = StyleSheet.create({
   rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
 });

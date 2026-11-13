@@ -356,8 +356,8 @@ export default function SurveyStudioPage() {
       const coordinateSource: CoordinateSource = isVideo
         ? 'FILE GPX'
         : hasAutoGps
-          ? 'ẢNH'
-          : 'GPS'
+          ? 'IMAGE EXIF'
+          : 'DEVICE_GPS'
 
       let finalGpx = isVideo ? gpxFile : undefined
       // Auto-synthesize companion GPX if video without separate GPX file
