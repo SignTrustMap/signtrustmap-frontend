@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, PanResponder, Platform } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, BackHandler, PanResponder, Platform } from 'react-native';
 
 export interface UseNavigationSheetGestureProps {
   hasPlannedRouteOrigin: boolean;
@@ -23,14 +23,11 @@ export function useNavigationSheetGesture({
     ? isNavigating
       ? 180 + bottomInset
       : 188 + bottomInset
-    : 110 + bottomInset;
+    : 160 + bottomInset;
   const midSheetHeight = hasPlannedRouteOrigin
     ? Math.min(420, windowHeight * 0.52)
     : 188 + bottomInset;
-  const maxSheetHeight = Math.max(
-    midSheetHeight,
-    Math.min(640, windowHeight * 0.82),
-  );
+  const maxSheetHeight = Math.max(midSheetHeight, Math.min(640, windowHeight * 0.82));
 
   const sheetHeightAnim = useRef(new Animated.Value(midSheetHeight)).current;
   const currentHeightRef = useRef(midSheetHeight);
@@ -40,11 +37,7 @@ export function useNavigationSheetGesture({
       snapIndexRef.current = index;
       setSheetSnapIndex(index);
       const targetHeight =
-        index === 0
-          ? peekSheetHeight
-          : index === 1
-            ? midSheetHeight
-            : maxSheetHeight;
+        index === 0 ? peekSheetHeight : index === 1 ? midSheetHeight : maxSheetHeight;
       currentHeightRef.current = targetHeight;
       Animated.spring(sheetHeightAnim, {
         toValue: targetHeight,
@@ -97,7 +90,7 @@ export function useNavigationSheetGesture({
   const expandableContentOpacity = sheetHeightAnim.interpolate({
     inputRange: [peekSheetHeight, peekSheetHeight + 50],
     outputRange: [0, 1],
-    extrapolate: "clamp",
+    extrapolate: 'clamp',
   });
 
   const sheetPanResponder = useMemo(
@@ -113,10 +106,7 @@ export function useNavigationSheetGesture({
         },
         onPanResponderMove: (_, gesture) => {
           const newHeight = currentHeightRef.current - gesture.dy;
-          const clamped = Math.max(
-            peekSheetHeight - 10,
-            Math.min(maxSheetHeight + 15, newHeight),
-          );
+          const clamped = Math.max(peekSheetHeight - 10, Math.min(maxSheetHeight + 15, newHeight));
           sheetHeightAnim.setValue(clamped);
         },
         onPanResponderRelease: (_, gesture) => {
@@ -161,19 +151,12 @@ export function useNavigationSheetGesture({
           snapTo(snapIndexRef.current);
         },
       }),
-    [
-      peekSheetHeight,
-      midSheetHeight,
-      maxSheetHeight,
-      sheetHeightAnim,
-      snapTo,
-      cycleSnap,
-    ],
+    [peekSheetHeight, midSheetHeight, maxSheetHeight, sheetHeightAnim, snapTo, cycleSnap],
   );
 
   useEffect(() => {
-    if (Platform.OS !== "android" || !destinationId || sheetSnapIndex < 2) return;
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+    if (Platform.OS !== 'android' || !destinationId || sheetSnapIndex < 2) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       snapTo(1);
       return true;
     });

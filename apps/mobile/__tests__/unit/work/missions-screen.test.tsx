@@ -28,8 +28,7 @@ jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');
   return {
-    SafeAreaView: ({ children, ...props }: any) =>
-      React.createElement(View, props, children),
+    SafeAreaView: ({ children, ...props }: any) => React.createElement(View, props, children),
   };
 });
 
@@ -240,7 +239,7 @@ describe('MissionsScreen Unit Test Suite', () => {
       const { getByText } = await render(<MissionsScreen initialRole="driver" />);
 
       expect(getByText('Di chuyển 5km')).toBeTruthy();
-      expect(getByText('Nhiệm vụ làm mới vào 00:00 mỗi ngày theo vai trò hiện tại của bạn.')).toBeTruthy();
+      expect(getByText('Nhiệm vụ làm mới vào 00:00 mỗi ngày.')).toBeTruthy();
     });
 
     it('switches to Weekly tab when tab is pressed', async () => {
@@ -261,7 +260,7 @@ describe('MissionsScreen Unit Test Suite', () => {
 
       await waitFor(() => {
         expect(getByText('Đạt cấp độ 5')).toBeTruthy();
-        expect(getByText('Nhiệm vụ toàn hệ thống và các cột mốc chuỗi đóng góp cộng đồng.')).toBeTruthy();
+        expect(getByText('Nhiệm vụ toàn hệ thống.')).toBeTruthy();
       });
     });
   });

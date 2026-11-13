@@ -46,6 +46,7 @@ import {
   type CompletedRevalidationReview,
   useRevalidationWorkflow,
 } from '../context/revalidation-workflow-provider';
+import { useResponsive } from '@/utils/responsive';
 
 export type RevalidationReviewAction =
   | 'STILL_ACTIVE'
@@ -568,6 +569,7 @@ export function RevalidationReviewScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { isSmallDevice, height: windowHeight } = useResponsive();
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -967,6 +969,7 @@ export function RevalidationReviewScreen() {
                 <View
                   style={[
                     styles.peekCard,
+                    isSmallDevice && { maxHeight: Math.min(320, windowHeight * 0.36) },
                     {
                       backgroundColor: theme.backgroundElement,
                       borderColor: theme.border,
@@ -992,6 +995,7 @@ export function RevalidationReviewScreen() {
                 {...panResponder.panHandlers}
                 style={[
                   styles.mainCard,
+                  isSmallDevice && { maxHeight: Math.min(320, windowHeight * 0.36) },
                   Boolean(nextItem) && styles.mainCardOffset,
                   {
                     backgroundColor: theme.backgroundElement,

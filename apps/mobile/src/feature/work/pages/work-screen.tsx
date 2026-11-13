@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { DriverWork } from '@/feature/work/components/driver-work';
 import { ReviewerWork } from '@/feature/work/components/reviewer-work';
@@ -36,24 +36,19 @@ const roleMeta: Record<
   AccountRole,
   {
     description: string;
-    icon: MaterialIconName;
     label: string;
   }
 > = {
   driver: {
     description: 'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
-    icon: 'car-outline',
     label: 'Tài xế',
   },
   surveyor: {
-    description: 'Thu thập tình trạng biển báo giao thông và dữ liệu đo đạc GPS thực địa.',
-    icon: 'camera-outline',
+    description: 'Đóng góp biển báo giao thông cho cộng đồng cùng sử dụng.',
     label: 'Khảo sát',
   },
   reviewer: {
-    description:
-      'Kiểm tra hồ sơ biển báo được gửi lên và bỏ phiếu đồng thuận trước khi đưa vào bản đồ tin cậy.',
-    icon: 'shield-check-outline',
+    description: 'Cùng kiểm tra biển báo được gửi lên và bỏ phiếu trước khi đưa vào bản đồ.',
     label: 'Thẩm định',
   },
 };
@@ -171,8 +166,9 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               />
             ) : null}
 
-            {availableRoles.map((role) => {
+            {availableRoles.map((role, index) => {
               const isActive = selectedRole === role;
+              const isLast = index === availableRoles.length - 1;
               const meta = roleMeta[role];
 
               return (
@@ -182,13 +178,15 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   accessibilityState={{ selected: isActive }}
                   key={role}
                   onPress={() => setActiveRole(role)}
-                  style={({ pressed }) => [styles.roleTab, { opacity: pressed ? 0.8 : 1 }]}
+                  style={({ pressed }) => [
+                    styles.roleTab,
+                    !isLast && {
+                      borderRightWidth: 1,
+                      borderRightColor: theme.border,
+                    },
+                    pressed && { opacity: 0.8 },
+                  ]}
                 >
-                  <MaterialCommunityIcons
-                    color={isActive ? '#FFFFFF' : theme.grey}
-                    name={meta.icon}
-                    size={20}
-                  />
                   <Text style={[styles.roleTabText, { color: isActive ? '#FFFFFF' : theme.text }]}>
                     {meta.label}
                   </Text>
@@ -199,9 +197,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
           {/* Role Summary */}
           <View style={styles.roleSummary}>
-            <Text style={[styles.roleTitle, { color: theme.text }]}>
-              Vai trò: {roleMeta[selectedRole].label}
-            </Text>
             <Text style={[styles.roleDescription, { color: theme.text }]}>
               {roleMeta[selectedRole].description}
             </Text>
@@ -210,7 +205,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Mission Feature Action Card */}
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleWithIcon}>
-              <MaterialCommunityIcons color={theme.primary} name="trophy-outline" size={22} />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ</Text>
             </View>
           </View>
@@ -220,22 +214,21 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
               accentColor={theme.primary}
               count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
               icon="trophy-outline"
-              label="Nhiệm vụ & Thử thách"
+              label="Nhiệm vụ đóng góp"
               onPress={() =>
                 router.push({
                   pathname: '/work/missions',
                   params: { role: selectedRole },
                 })
               }
-              subtitle="Nhiệm vụ hàng ngày, hàng tuần & toàn hệ thống để nhận Xu thưởng"
+              subtitle="Đóng góp cho cộng đồng và nhận phần thưởng."
             />
           </View>
 
           {/* Section Title: Role-Specific Features / Actions */}
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleWithIcon}>
-              <MaterialCommunityIcons color={theme.primary} name="view-grid-outline" size={22} />
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Chức năng</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
             </View>
           </View>
 
@@ -313,7 +306,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    borderRadius: Rounded.round,
     zIndex: 0,
   },
   roleTab: {
@@ -324,7 +316,6 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 46,
     paddingHorizontal: Spacing.one,
-    borderRadius: Rounded.round,
     backgroundColor: 'transparent',
     zIndex: 1,
   },

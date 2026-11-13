@@ -1,52 +1,49 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { Camera } from "expo-camera";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { SymbolView } from "expo-symbols";
-import { AppButton } from "@/components/button";
-import { AppToast } from "@/components/toast";
-import { NavigationManeuverBanner } from "@/components/navigation-maneuver-banner";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Camera } from 'expo-camera';
+import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { AppButton } from '@/components/button';
+import { AppToast } from '@/components/toast';
+import { Badge } from '@/components/badge';
+import { NavigationManeuverBanner } from '@/components/navigation-maneuver-banner';
 import {
   NavigationSignVerifyCard,
   type SignVerifyResult,
-} from "@/components/navigation-sign-verify-card";
-import { Spacing } from "@/constants/theme";
-import type { MapCoordinate, VehicleMode } from "@/types/navigationType";
-import { useTheme } from "@/hooks/use-theme";
-import { useOptionalSession } from "@/context/session-provider";
-import { useNavigationActive } from "@/context/navigation-active-provider";
-import { useSignFilter, type SignFilterPreset } from "@/context/sign-filter-provider";
+} from '@/components/navigation-sign-verify-card';
+import { Spacing } from '@/constants/theme';
+import type { MapCoordinate, VehicleMode } from '@/types/navigationType';
+import { useTheme } from '@/hooks/use-theme';
+import { useOptionalSession } from '@/context/session-provider';
+import { useNavigationActive } from '@/context/navigation-active-provider';
+import { useSignFilter, type SignFilterPreset } from '@/context/sign-filter-provider';
 import {
   useGetSavedRoute,
   useGetSavedRouteSigns,
-} from "@/feature/saved-routes/hooks/use-saved-routes";
-import { NavigationMapView } from "../components/navigation-map-view";
-import { NavigationCompleteModal } from "../components/navigation-complete-modal";
+} from '@/feature/saved-routes/hooks/use-saved-routes';
+import { NavigationMapView } from '../components/navigation-map-view';
+import { NavigationCompleteModal } from '../components/navigation-complete-modal';
 import {
   getNavigationRoute,
   type NavigationStep,
   type RouteSign,
-} from "@/api/navigation/navigation";
-import { resolveLocation, formatResolvedLocationTitle } from "@/api/spatial/spatial";
-import { useGetNavigationRoute, useInitiateNavigationSession } from "../hooks/use-navigation";
-import { useGetSignsAlongRoute, useGetSignsInBounds } from "../hooks/use-signs";
-import { confirmSignPresence } from "@/api/sign-map/sign-map";
-import { useSignProximityAlert } from "../hooks/use-sign-proximity-alert";
-import { speechService } from "@/services/speech";
-import { getStorageItemAsync, setStorageItemAsync } from "@/hooks/use-storage";
-import type { FindSignsInBoundsParams } from "@/types/signMapType";
-import { getRouteProgressMeters } from "../utils/route-progress";
-import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from "../utils/signs";
-import { applyDemoRouteSigns } from "../utils/demo-route-signs";
-import { getMapLibre } from "@/services/maplibre";
-import { useGetWallet } from "@/feature/credits/hooks/use-wallet";
-import { useGetUnreadNotificationCount } from "@/feature/notifications/hooks/use-notifications";
-import {
-  ensureLocationPermission,
-  fetchFreshGpsPosition,
-} from "../utils/gps";
+} from '@/api/navigation/navigation';
+import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
+import { useGetNavigationRoute, useInitiateNavigationSession } from '../hooks/use-navigation';
+import { useGetSignsAlongRoute, useGetSignsInBounds } from '../hooks/use-signs';
+import { confirmSignPresence } from '@/api/sign-map/sign-map';
+import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
+import { speechService } from '@/services/speech';
+import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
+import type { FindSignsInBoundsParams } from '@/types/signMapType';
+import { getRouteProgressMeters } from '../utils/route-progress';
+import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from '../utils/signs';
+import { applyDemoRouteSigns } from '../utils/demo-route-signs';
+import { getMapLibre } from '@/services/maplibre';
+import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
+import { useGetUnreadNotificationCount } from '@/feature/notifications/hooks/use-notifications';
+import { ensureLocationPermission, fetchFreshGpsPosition } from '../utils/gps';
 import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
   GPS_NATIVE_BUILD_REQUIRED_MESSAGE,
@@ -57,27 +54,26 @@ import {
   UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
   UNABLE_TO_LOAD_SIGNS_FOR_ROUTE_MESSAGE,
   UNABLE_TO_LOAD_SIGNS_MESSAGE,
-} from "@/constants/message";
-import {
-  SIGN_CATEGORIES,
-  type SignCategory,
-  getSignCategory,
-} from "@/constants/sign-categories";
+} from '@/constants/message';
+import { SIGN_CATEGORIES, type SignCategory, getSignCategory } from '@/constants/sign-categories';
 
 import {
   formatManeuverDistance,
   formatRouteInstruction,
   getManeuverSymbol,
-} from "../utils/navigation-formatters";
-import { styles } from "../styles/navigation-map-screen.styles";
-import { BookmarkRouteModal } from "../components/bookmark-route-modal";
-import { NavigationUpcomingSigns, type UpcomingSignItem } from "../components/navigation-upcoming-signs";
-import { HomeSignFilterCard } from "../components/home-sign-filter-card";
-import { NavigationTopControls } from "../components/navigation-top-controls";
-import { NavigationBottomSheet } from "../components/navigation-bottom-sheet";
-import { useNativeGps } from "../hooks/use-native-gps";
-import { useAutoReroute } from "../hooks/use-auto-reroute";
-import { useNavigationSheetGesture } from "../hooks/use-navigation-sheet-gesture";
+} from '../utils/navigation-formatters';
+import { styles } from '../styles/navigation-map-screen.styles';
+import { BookmarkRouteModal } from '../components/bookmark-route-modal';
+import {
+  NavigationUpcomingSigns,
+  type UpcomingSignItem,
+} from '../components/navigation-upcoming-signs';
+import { HomeSignFilterCard } from '../components/home-sign-filter-card';
+import { NavigationTopControls } from '../components/navigation-top-controls';
+import { NavigationBottomSheet } from '../components/navigation-bottom-sheet';
+import { useNativeGps } from '../hooks/use-native-gps';
+import { useAutoReroute } from '../hooks/use-auto-reroute';
+import { useNavigationSheetGesture } from '../hooks/use-navigation-sheet-gesture';
 
 export { SIGN_CATEGORIES, type SignCategory, getSignCategory };
 
@@ -141,22 +137,24 @@ export function NavigationMapScreen() {
   );
 
   const [isCompleteModalVisible, setIsCompleteModalVisible] = useState(false);
-  const [lastNavigatedDestinationTitle, setLastNavigatedDestinationTitle] = useState<string | undefined>();
+  const [lastNavigatedDestinationTitle, setLastNavigatedDestinationTitle] = useState<
+    string | undefined
+  >();
   const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
   const selectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
-        category: "recent" as const,
+        category: 'recent' as const,
         coordinate: [Number(destinationLng), Number(destinationLat)] as MapCoordinate,
-        id: destinationId || "destination",
-        subtitle: destinationSubtitle ?? "",
-        title: destinationTitle ?? "Điểm đến",
+        id: destinationId || 'destination',
+        subtitle: destinationSubtitle ?? '',
+        title: destinationTitle ?? 'Điểm đến',
       };
     }
     if (savedRouteData) {
       return {
-        category: "saved" as const,
+        category: 'saved' as const,
         coordinate: [
           savedRouteData.destinationLongitude,
           savedRouteData.destinationLatitude,
@@ -180,9 +178,7 @@ export function NavigationMapScreen() {
   const customStartCoordinate = undefined;
   const fallbackCurrentLocation = useMemo(
     () =>
-      startLng && startLat
-        ? ([Number(startLng), Number(startLat)] as MapCoordinate)
-        : undefined,
+      startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined,
     [startLat, startLng],
   );
 
@@ -200,13 +196,7 @@ export function NavigationMapScreen() {
     if (selectedDestination) {
       setMapFocus(undefined);
     }
-  }, [
-    destinationId,
-    destinationLat,
-    destinationLng,
-    fallbackCurrentLocation,
-    selectedDestination,
-  ]);
+  }, [destinationId, destinationLat, destinationLng, fallbackCurrentLocation, selectedDestination]);
 
   const hasCenteredInitialMapRef = useRef(false);
   useEffect(() => {
@@ -231,30 +221,29 @@ export function NavigationMapScreen() {
     startTitle ||
     (savedRouteData && !fallbackCurrentLocation
       ? savedRouteData.originName
-      : (resolvedOriginTitle ?? "Vị trí của bạn"));
+      : (resolvedOriginTitle ?? 'Vị trí của bạn'));
 
-
-  const [vehicleMode, setVehicleMode] = useState<VehicleMode["id"]>(() => {
+  const [vehicleMode, setVehicleMode] = useState<VehicleMode['id']>(() => {
     if (paramVehicleMode) {
       const mode = paramVehicleMode.toUpperCase();
-      if (mode === "CAR" || mode === "DRIVING") return "DRIVING";
-      if (mode === "CYCLING" || mode === "BICYCLE") return "CYCLING";
-      if (mode === "WALKING" || mode === "PEDESTRIAN") return "WALKING";
-      if (mode === "BIKE" || mode === "MOTORCYCLE") return "BIKE";
+      if (mode === 'CAR' || mode === 'DRIVING') return 'DRIVING';
+      if (mode === 'CYCLING' || mode === 'BICYCLE') return 'CYCLING';
+      if (mode === 'WALKING' || mode === 'PEDESTRIAN') return 'WALKING';
+      if (mode === 'BIKE' || mode === 'MOTORCYCLE') return 'BIKE';
     }
-    return "DRIVING";
+    return 'DRIVING';
   });
 
   useEffect(() => {
     if (paramVehicleMode) {
       const mode = paramVehicleMode.toUpperCase();
-      if (mode === "CAR" || mode === "DRIVING") setVehicleMode("DRIVING");
-      else if (mode === "CYCLING" || mode === "BICYCLE") setVehicleMode("CYCLING");
-      else if (mode === "WALKING" || mode === "PEDESTRIAN") setVehicleMode("WALKING");
-      else if (mode === "BIKE" || mode === "MOTORCYCLE") setVehicleMode("BIKE");
+      if (mode === 'CAR' || mode === 'DRIVING') setVehicleMode('DRIVING');
+      else if (mode === 'CYCLING' || mode === 'BICYCLE') setVehicleMode('CYCLING');
+      else if (mode === 'WALKING' || mode === 'PEDESTRIAN') setVehicleMode('WALKING');
+      else if (mode === 'BIKE' || mode === 'MOTORCYCLE') setVehicleMode('BIKE');
     }
   }, [paramVehicleMode]);
-  const isMotorcycleMode = vehicleMode === "MOTORCYCLE" || vehicleMode === "BIKE";
+  const isMotorcycleMode = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
   const session = useOptionalSession()?.session;
   const initiateSessionMutation = useInitiateNavigationSession(session?.accessToken);
 
@@ -291,8 +280,8 @@ export function NavigationMapScreen() {
 
   const isNavigating = Boolean(
     navigationSession &&
-      selectedDestination &&
-      navigationSession.destinationId === selectedDestination.id,
+    selectedDestination &&
+    navigationSession.destinationId === selectedDestination.id,
   );
 
   useEffect(() => {
@@ -305,13 +294,7 @@ export function NavigationMapScreen() {
     ) {
       setInitialGpsOrigin(userCoordinate);
     }
-  }, [
-    initialGpsOrigin,
-    isNavigating,
-    isCustomStart,
-    fallbackCurrentLocation,
-    userCoordinate,
-  ]);
+  }, [initialGpsOrigin, isNavigating, isCustomStart, fallbackCurrentLocation, userCoordinate]);
 
   const routeKey =
     selectedDestination && plannedRouteOrigin
@@ -332,6 +315,22 @@ export function NavigationMapScreen() {
     windowHeight,
     bottomInset,
   });
+
+  const floatingButtonBottom = useMemo(() => {
+    return sheetHeightAnim.interpolate({
+      inputRange: [0, windowHeight * 0.55, windowHeight * 0.75],
+      outputRange: [16, windowHeight * 0.55 + 16, windowHeight * 0.65],
+      extrapolate: 'clamp',
+    });
+  }, [sheetHeightAnim, windowHeight]);
+
+  const floatingButtonOpacity = useMemo(() => {
+    return sheetHeightAnim.interpolate({
+      inputRange: [0, windowHeight * 0.55, windowHeight * 0.72],
+      outputRange: [1, 1, 0],
+      extrapolate: 'clamp',
+    });
+  }, [sheetHeightAnim, windowHeight]);
 
   const [isStartingNavigation, setIsStartingNavigation] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -355,10 +354,10 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    getStorageItemAsync("signtrust_tts_enabled")
+    getStorageItemAsync('signtrust_tts_enabled')
       .then((val) => {
         if (isMounted && val !== null) {
-          const enabled = val === "true";
+          const enabled = val === 'true';
           setIsTtsEnabled(enabled);
           speechService.setEnabled(enabled);
         }
@@ -373,10 +372,10 @@ export function NavigationMapScreen() {
     setIsTtsEnabled((prev) => {
       const next = !prev;
       speechService.setEnabled(next);
-      void setStorageItemAsync("signtrust_tts_enabled", String(next)).catch(() => {});
+      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
       setLocationToast({
         id: Date.now(),
-        message: next ? "Đã bật thông báo giọng nói" : "Đã tắt thông báo giọng nói",
+        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
       });
       return next;
     });
@@ -392,41 +391,25 @@ export function NavigationMapScreen() {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
     error: carRouteError,
-  } = useGetNavigationRoute(
-    activeRouteOrigin,
-    selectedDestination?.coordinate,
-    "DRIVING",
-  );
+  } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'DRIVING');
 
   const {
     data: motorcycleRouteResult,
     isLoading: isMotorcycleRouteLoading,
     error: motorcycleRouteError,
-  } = useGetNavigationRoute(
-    activeRouteOrigin,
-    selectedDestination?.coordinate,
-    "BIKE",
-  );
+  } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'BIKE');
 
   const {
     data: cyclingRouteResult,
     isLoading: isCyclingRouteLoading,
     error: cyclingRouteError,
-  } = useGetNavigationRoute(
-    activeRouteOrigin,
-    selectedDestination?.coordinate,
-    "CYCLING",
-  );
+  } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'CYCLING');
 
   const {
     data: walkingRouteResult,
     isLoading: isWalkingRouteLoading,
     error: walkingRouteError,
-  } = useGetNavigationRoute(
-    activeRouteOrigin,
-    selectedDestination?.coordinate,
-    "WALKING",
-  );
+  } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'WALKING');
 
   const carDuration = carRouteResult?.duration;
   const motorcycleDuration = motorcycleRouteResult?.duration;
@@ -434,18 +417,18 @@ export function NavigationMapScreen() {
   const walkingDuration = walkingRouteResult?.duration;
 
   const activeRouteResult =
-    vehicleMode === "CYCLING"
+    vehicleMode === 'CYCLING'
       ? cyclingRouteResult
-      : vehicleMode === "WALKING"
+      : vehicleMode === 'WALKING'
         ? walkingRouteResult
         : isMotorcycleMode
           ? motorcycleRouteResult
           : carRouteResult;
 
   const activeRouteError =
-    vehicleMode === "CYCLING"
+    vehicleMode === 'CYCLING'
       ? cyclingRouteError
-      : vehicleMode === "WALKING"
+      : vehicleMode === 'WALKING'
         ? walkingRouteError
         : isMotorcycleMode
           ? motorcycleRouteError
@@ -495,7 +478,10 @@ export function NavigationMapScreen() {
 
   const userCredits = Number(walletData?.wallet?.balance ?? 0);
   const isRoutePreviewReady = Boolean(
-    !isNavigating && plannedRouteOrigin && selectedDestination && activeRouteResult?.coordinates?.length,
+    !isNavigating &&
+    plannedRouteOrigin &&
+    selectedDestination &&
+    activeRouteResult?.coordinates?.length,
   );
   const hasInsufficientCredits = isRoutePreviewReady && userCredits < 5;
 
@@ -516,7 +502,7 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     if (isNavigating) {
-      setFilterViewMode("categories");
+      setFilterViewMode('categories');
       snapTo(0);
     }
   }, [isNavigating, snapTo]);
@@ -540,7 +526,7 @@ export function NavigationMapScreen() {
     const resolvedSigns = rawSigns.map((sign) => ({
       ...sign,
       imageUrl:
-        sign.imageUrl && !sign.imageUrl.includes("mock/")
+        sign.imageUrl && !sign.imageUrl.includes('mock/')
           ? resolveImageUrl(sign.imageUrl)
           : TARGET_SIGN_IMAGE_URL,
     }));
@@ -574,14 +560,14 @@ export function NavigationMapScreen() {
       if (lastAppliedSavedRouteIdRef.current !== savedRouteData.id) {
         lastAppliedSavedRouteIdRef.current = savedRouteData.id;
         const modeUpper = savedRouteData.vehicleMode?.toUpperCase();
-        if (modeUpper === "CYCLING" || modeUpper === "BICYCLE") {
-          setVehicleMode("CYCLING");
-        } else if (modeUpper === "WALKING" || modeUpper === "PEDESTRIAN") {
-          setVehicleMode("WALKING");
-        } else if (modeUpper === "MOTORCYCLE" || modeUpper === "BIKE") {
-          setVehicleMode("MOTORCYCLE");
+        if (modeUpper === 'CYCLING' || modeUpper === 'BICYCLE') {
+          setVehicleMode('CYCLING');
+        } else if (modeUpper === 'WALKING' || modeUpper === 'PEDESTRIAN') {
+          setVehicleMode('WALKING');
+        } else if (modeUpper === 'MOTORCYCLE' || modeUpper === 'BIKE') {
+          setVehicleMode('MOTORCYCLE');
         } else {
-          setVehicleMode("DRIVING");
+          setVehicleMode('DRIVING');
         }
         void setActivePresetId(savedRouteData.id);
         snapTo(1);
@@ -591,15 +577,15 @@ export function NavigationMapScreen() {
     }
   }, [savedRouteData, isNavigating, setActivePresetId, snapTo]);
 
-  const [filterViewMode, setFilterViewMode] = useState<"lists" | "categories">("lists");
+  const [filterViewMode, setFilterViewMode] = useState<'lists' | 'categories'>('lists');
   const [manualCategories, setManualCategories] = useState<Set<SignCategory>>(
-    () => new Set(["WARNING", "MANDATORY", "PROHIBITORY", "INFORMATION", "TEMPORARY"]),
+    () => new Set(['WARNING', 'MANDATORY', 'PROHIBITORY', 'INFORMATION', 'TEMPORARY']),
   );
 
   const handleToggleFilterViewMode = useCallback(() => {
     setFilterViewMode((current) => {
-      const next = current === "lists" ? "categories" : "lists";
-      if (next === "categories") {
+      const next = current === 'lists' ? 'categories' : 'lists';
+      if (next === 'categories') {
         if (activeCategories && activeCategories.size > 0) {
           setManualCategories(new Set(activeCategories));
         } else {
@@ -624,7 +610,7 @@ export function NavigationMapScreen() {
 
   const handleSelectPreset = useCallback(
     (id: string | null) => {
-      setFilterViewMode("lists");
+      setFilterViewMode('lists');
       void setActivePresetId(id);
       if (id) {
         const found = presets.find((p) => p.id === id);
@@ -662,8 +648,7 @@ export function NavigationMapScreen() {
       const [currDestLng, currDestLat] = selectedDestination.coordinate;
 
       const originDiff =
-        Math.abs(sr.originLatitude - currOriginLat) +
-        Math.abs(sr.originLongitude - currOriginLng);
+        Math.abs(sr.originLatitude - currOriginLat) + Math.abs(sr.originLongitude - currOriginLng);
       const destDiff =
         Math.abs(sr.destinationLatitude - currDestLat) +
         Math.abs(sr.destinationLongitude - currDestLng);
@@ -673,13 +658,13 @@ export function NavigationMapScreen() {
       }
 
       const norm = (s?: string) =>
-        (s || "")
+        (s || '')
           .trim()
           .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[,\-–—.]/g, " ")
-          .replace(/\s+/g, " ");
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[,\-–—.]/g, ' ')
+          .replace(/\s+/g, ' ');
 
       const srOrigin = norm(sr.originName);
       const srDest = norm(sr.destinationName);
@@ -701,13 +686,7 @@ export function NavigationMapScreen() {
 
       return false;
     },
-    [
-      plannedRouteOrigin,
-      selectedDestination,
-      activeSavedRouteId,
-      savedRouteData,
-      routeStartTitle,
-    ],
+    [plannedRouteOrigin, selectedDestination, activeSavedRouteId, savedRouteData, routeStartTitle],
   );
 
   const routeMatchingPresets = useMemo(() => {
@@ -742,14 +721,12 @@ export function NavigationMapScreen() {
     if (!cameraResult.granted) return;
     const micResult = await Camera.requestMicrophonePermissionsAsync();
     if (!micResult.granted) return;
-    router.push("/(authenticated)/(tabs)/livestream");
+    router.push('/(authenticated)/(tabs)/livestream');
   }, [router]);
 
   const filteredSigns = useMemo(() => {
     const isCategoriesActive =
-      isNavigating ||
-      filterViewMode === "categories" ||
-      routeMatchingPresets.length === 0;
+      isNavigating || filterViewMode === 'categories' || routeMatchingPresets.length === 0;
 
     if (isCategoriesActive) {
       if (manualCategories.size === SIGN_CATEGORIES.length) {
@@ -780,10 +757,10 @@ export function NavigationMapScreen() {
 
   const isRouteBookmarked = Boolean(
     activeSavedRouteId ||
-      (activePreset?.savedRoute &&
-        selectedDestination &&
-        activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
-        activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0]),
+    (activePreset?.savedRoute &&
+      selectedDestination &&
+      activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
+      activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0]),
   );
 
   const maneuverProgresses = useMemo(
@@ -809,15 +786,12 @@ export function NavigationMapScreen() {
       return undefined;
     }
 
-    const currentProgress = getRouteProgressMeters(
-      navigationCoordinate,
-      routeCoordinates,
-    );
+    const currentProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
     let stepIndex = routeSteps.findIndex((step, index) => {
       const maneuverProgress = maneuverProgresses[index];
 
       return (
-        step.maneuver.type !== "depart" &&
+        step.maneuver.type !== 'depart' &&
         maneuverProgress !== undefined &&
         maneuverProgress >= currentProgress + 10
       );
@@ -826,10 +800,7 @@ export function NavigationMapScreen() {
     if (stepIndex < 0) stepIndex = routeSteps.length - 1;
 
     return {
-      distance: Math.max(
-        0,
-        (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress,
-      ),
+      distance: Math.max(0, (maneuverProgresses[stepIndex] ?? currentProgress) - currentProgress),
       step: routeSteps[stepIndex],
       stepIndex,
     };
@@ -868,7 +839,7 @@ export function NavigationMapScreen() {
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
-    speechLanguage: "vi-VN",
+    speechLanguage: 'vi-VN',
     ttsEnabled: isTtsEnabled,
   });
 
@@ -897,24 +868,13 @@ export function NavigationMapScreen() {
   const verifiedSignIdsRef = useRef<Set<string>>(new Set());
   const [dismissedVerifySignId, setDismissedVerifySignId] = useState<string>();
 
-  const handleSwitchVehicleMode = useCallback(
-    (newMode: VehicleMode["id"]) => {
-      setVehicleMode(newMode);
-      setNavigationSession((prev) =>
-        prev ? { ...prev, vehicleMode: newMode } : undefined,
-      );
-    },
-    [],
-  );
+  const handleSwitchVehicleMode = useCallback((newMode: VehicleMode['id']) => {
+    setVehicleMode(newMode);
+    setNavigationSession((prev) => (prev ? { ...prev, vehicleMode: newMode } : undefined));
+  }, []);
 
   const handleBeginNavigation = async () => {
-    if (
-      Platform.OS === "web" ||
-      !selectedDestination ||
-      !plannedRouteOrigin ||
-      !routeKey
-    )
-      return;
+    if (Platform.OS === 'web' || !selectedDestination || !plannedRouteOrigin || !routeKey) return;
 
     let coords = routeCoordinates;
     if (!coords?.length) {
@@ -972,10 +932,10 @@ export function NavigationMapScreen() {
             vehicleType: vehicleMode,
           });
         } catch (apiError: any) {
-          console.error("[Navigation] Failed to initiate navigation session:", apiError);
+          console.error('[Navigation] Failed to initiate navigation session:', apiError);
           const isInsufficient =
-            apiError?.message?.includes("Insufficient") ||
-            apiError?.message?.includes("credit") ||
+            apiError?.message?.includes('Insufficient') ||
+            apiError?.message?.includes('credit') ||
             apiError?.status === 400;
           const errorMsg = isInsufficient
             ? INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE
@@ -1009,12 +969,12 @@ export function NavigationMapScreen() {
         destinationId: selectedDestination.id,
         vehicleMode,
       });
-      setFilterViewMode("categories");
+      setFilterViewMode('categories');
       if (activeCategories && activeCategories.size > 0 && activePresetId !== null) {
         setManualCategories(new Set(activeCategories));
       }
     } catch (error) {
-      console.error("[GPS] Failed to begin navigation:", error);
+      console.error('[GPS] Failed to begin navigation:', error);
       setNavigationError(GPS_UNAVAILABLE_MESSAGE);
     } finally {
       setIsStartingNavigation(false);
@@ -1052,13 +1012,10 @@ export function NavigationMapScreen() {
         requestId: Date.now(),
       });
     } catch (error) {
-      console.error("[GPS] handleCurrentLocation error:", error);
+      console.error('[GPS] handleCurrentLocation error:', error);
       setLocationToast((current) => ({
         id: (current?.id ?? 0) + 1,
-        message:
-          error instanceof Error
-            ? error.message
-            : UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
+        message: error instanceof Error ? error.message : UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE,
       }));
     } finally {
       setIsLocating(false);
@@ -1077,22 +1034,22 @@ export function NavigationMapScreen() {
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
-    router.replace("/home");
+    router.replace('/home');
   };
 
   const handleDismissCompleteModal = () => {
     setIsCompleteModalVisible(false);
-    router.replace("/home");
+    router.replace('/home');
   };
 
   const handleChangeDestination = () => {
-    router.push("/home/search");
+    router.push('/home/search');
   };
 
   const handleGo = async () => {
     if (!selectedDestination) return;
 
-    if (Platform.OS !== "web") {
+    if (Platform.OS !== 'web') {
       setIsStartingNavigation(true);
       try {
         const hasPermission = await ensureLocationPermission();
@@ -1124,7 +1081,7 @@ export function NavigationMapScreen() {
         });
         setNavigationError(GPS_UNAVAILABLE_MESSAGE);
       } catch (error) {
-        console.error("[GPS] handleGo error:", error);
+        console.error('[GPS] handleGo error:', error);
         setLocationToast({
           id: Date.now(),
           message: GPS_UNAVAILABLE_MESSAGE,
@@ -1145,7 +1102,7 @@ export function NavigationMapScreen() {
           destination={selectedDestination}
           focusCoordinate={mapFocus?.coordinate}
           focusRequestId={mapFocus?.requestId}
-          navigationActive={Platform.OS !== "web" && isNavigating}
+          navigationActive={Platform.OS !== 'web' && isNavigating}
           isNavigatingFeature={isNavigating}
           userCoordinate={userCoordinate}
           hasLiveLocation={hasLiveLocation}
@@ -1180,7 +1137,7 @@ export function NavigationMapScreen() {
             sign={activeSignAlert.sign}
             onVerify={async (sign, result: SignVerifyResult) => {
               verifiedSignIdsRef.current.add(sign.id);
-              const isPresent = result === "present";
+              const isPresent = result === 'present';
               try {
                 const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
                 const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
@@ -1191,24 +1148,24 @@ export function NavigationMapScreen() {
                     latitude: lat,
                     longitude: lon,
                     note: isPresent
-                      ? "Tài xế xác nhận biển báo còn tồn tại"
-                      : "Tài xế báo cáo biển báo không còn tại hiện trường",
+                      ? 'Tài xế xác nhận biển báo còn tồn tại'
+                      : 'Tài xế báo cáo biển báo không còn tại hiện trường',
                   },
-                  session?.accessToken || "",
+                  session?.accessToken || '',
                 );
                 setLocationToast({
                   id: Date.now(),
                   message: isPresent
-                    ? "Đã ghi nhận xác nhận biển báo thành công!"
-                    : "Đã ghi nhận báo cáo không thấy biển báo!",
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
                 });
               } catch (e: any) {
-                console.warn("[Navigation] Confirm sign error:", e?.message);
+                console.warn('[Navigation] Confirm sign error:', e?.message);
                 setLocationToast({
                   id: Date.now(),
                   message: isPresent
-                    ? "Đã ghi nhận xác nhận biển báo thành công!"
-                    : "Đã ghi nhận báo cáo không thấy biển báo!",
+                    ? 'Đã ghi nhận xác nhận biển báo thành công!'
+                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
                 });
               }
             }}
@@ -1222,101 +1179,112 @@ export function NavigationMapScreen() {
 
         {/* Floating Re-center button during navigation */}
         {isNavigating ? (
-          <Pressable
-            accessibilityLabel="Căn giữa"
-            accessibilityRole="button"
-            testID="btn-recenter-map"
-            onPress={() => {
-              const coord = userCoordinate ?? plannedRouteOrigin;
-              if (!coord) return;
-              setMapFocus((current) => ({
-                coordinate: coord,
-                requestId: (current?.requestId ?? 0) + 1,
-              }));
+          <Animated.View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: 16,
+              bottom: floatingButtonBottom,
+              opacity: floatingButtonOpacity,
+              zIndex: 20,
             }}
-            style={({ pressed }) => [
-              styles.navRecenterButton,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderColor: theme.border,
-                bottom: 108 + bottomInset,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
           >
-            <MaterialCommunityIcons
-              name="navigation-variant"
-              size={16}
-              color={theme.primary}
-            />
-            <Text style={[styles.navRecenterText, { color: theme.primary }]}>
-              Căn giữa
-            </Text>
-          </Pressable>
+            <Pressable
+              accessibilityLabel="Căn giữa"
+              accessibilityRole="button"
+              testID="btn-recenter-map"
+              onPress={() => {
+                const coord = userCoordinate ?? plannedRouteOrigin;
+                if (!coord) return;
+                setMapFocus((current) => ({
+                  coordinate: coord,
+                  requestId: (current?.requestId ?? 0) + 1,
+                }));
+              }}
+              style={({ pressed }) => [
+                styles.navRecenterButton,
+                {
+                  position: 'relative',
+                  left: 0,
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                  opacity: pressed ? 0.75 : 1,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
+              <Text style={[styles.navRecenterText, { color: theme.primary }]}>Căn giữa</Text>
+            </Pressable>
+          </Animated.View>
         ) : null}
 
         {/* Floating Sign Filter button during navigation */}
         {isNavigating ? (
-          <Pressable
-            accessibilityLabel="Bộ lọc biển báo"
-            accessibilityRole="button"
-            onPress={() => {
-              setFilterViewMode("categories");
-              const nextSnap = sheetSnapIndex === 0 ? 1 : 0;
-              snapTo(nextSnap);
+          <Animated.View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: Spacing.two,
+              bottom: floatingButtonBottom,
+              opacity: floatingButtonOpacity,
+              zIndex: 20,
             }}
-            style={({ pressed }) => [
-              styles.navFilterButton,
-              {
-                backgroundColor:
-                  manualCategories.size < SIGN_CATEGORIES.length
-                    ? theme.backgroundSelected
-                    : theme.backgroundElement,
-                borderColor:
-                  manualCategories.size < SIGN_CATEGORIES.length
-                    ? theme.primary
-                    : theme.border,
-                bottom: 108 + bottomInset,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
           >
-            <MaterialCommunityIcons
-              name="filter-variant"
-              size={16}
-              color={
-                manualCategories.size < SIGN_CATEGORIES.length
-                  ? theme.primary
-                  : theme.text
-              }
-            />
-            <Text
-              style={[
-                styles.navRecenterText,
+            <Pressable
+              accessibilityLabel="Bộ lọc biển báo"
+              accessibilityRole="button"
+              onPress={() => {
+                setFilterViewMode('categories');
+                const nextSnap = sheetSnapIndex === 0 ? 1 : 0;
+                snapTo(nextSnap);
+              }}
+              style={({ pressed }) => [
+                styles.navFilterButton,
                 {
-                  color:
+                  position: 'relative',
+                  right: 0,
+                  backgroundColor:
                     manualCategories.size < SIGN_CATEGORIES.length
-                      ? theme.primary
-                      : theme.text,
+                      ? theme.backgroundSelected
+                      : theme.backgroundElement,
+                  borderColor:
+                    manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.border,
+                  opacity: pressed ? 0.75 : 1,
                 },
               ]}
             >
-              Bộ lọc
-            </Text>
-            {manualCategories.size < SIGN_CATEGORIES.length ? (
-              <View
+              <MaterialCommunityIcons
+                name="filter-variant"
+                size={16}
+                color={manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text}
+              />
+              <Text
                 style={[
-                  styles.filterActiveBadge,
+                  styles.navRecenterText,
                   {
-                    backgroundColor: theme.primary,
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
+                    color:
+                      manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text,
                   },
                 ]}
-              />
-            ) : null}
-          </Pressable>
+              >
+                Bộ lọc
+              </Text>
+              {manualCategories.size < SIGN_CATEGORIES.length ? (
+                <View
+                  style={[
+                    styles.filterActiveBadge,
+                    {
+                      backgroundColor: theme.primary,
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                    },
+                  ]}
+                />
+              ) : null}
+            </Pressable>
+          </Animated.View>
         ) : null}
 
         {/* Non-navigating Overlay: Top controls, Home filter, and floating map action buttons */}
@@ -1328,9 +1296,9 @@ export function NavigationMapScreen() {
               routeStartTitle={routeStartTitle}
               walletBalance={walletData?.wallet?.balance}
               unreadNotificationCount={unreadNotificationCount}
-              onSearchPress={() => router.push("/home/search")}
-              onTopUpPress={() => router.push("/credits/top-up")}
-              onNotificationsPress={() => router.push("/notifications")}
+              onSearchPress={() => router.push('/home/search')}
+              onTopUpPress={() => router.push('/credits/top-up')}
+              onNotificationsPress={() => router.push('/notifications')}
               onLivestreamPress={handleLivestreamPress}
               onChangeDestinationPress={handleChangeDestination}
             />
@@ -1348,8 +1316,8 @@ export function NavigationMapScreen() {
               onNavigateToProfileFilter={() => {
                 setIsHomeSignFilterOpen(false);
                 router.push({
-                  pathname: "/(authenticated)/(tabs)/profile",
-                  params: { scrollTo: "signFilter", t: Date.now().toString() },
+                  pathname: '/(authenticated)/(tabs)/profile',
+                  params: { scrollTo: 'signFilter', t: Date.now().toString() },
                 });
               }}
             />
@@ -1357,10 +1325,26 @@ export function NavigationMapScreen() {
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
                 <AppButton
+                  accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                  onPress={() => router.push('/notifications')}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    styles.ttsActionButton,
+                  ]}
+                  variant="surface"
+                >
+                  <Ionicons name="notifications" size={22} color="#000000" />
+                  <Badge
+                    count={unreadNotificationCount}
+                    maxCount={9}
+                    style={styles.notificationBadge}
+                  />
+                </AppButton>
+
+                <AppButton
                   accessibilityLabel={
-                    isTtsEnabled
-                      ? "Tắt thông báo giọng nói"
-                      : "Bật thông báo giọng nói"
+                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
                   }
                   onPress={handleToggleTts}
                   style={[
@@ -1371,7 +1355,7 @@ export function NavigationMapScreen() {
                   variant="surface"
                 >
                   <MaterialCommunityIcons
-                    name={isTtsEnabled ? "volume-high" : "volume-off"}
+                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
                     size={22}
                     color="#000000"
                   />
@@ -1380,8 +1364,8 @@ export function NavigationMapScreen() {
                 <AppButton
                   accessibilityLabel={
                     isHomeSignFilterOpen
-                      ? "Đóng danh sách lọc biển báo"
-                      : "Mở danh sách lọc biển báo"
+                      ? 'Đóng danh sách lọc biển báo'
+                      : 'Mở danh sách lọc biển báo'
                   }
                   onPress={() => setIsHomeSignFilterOpen((prev) => !prev)}
                   style={[
@@ -1391,9 +1375,7 @@ export function NavigationMapScreen() {
                       backgroundColor: isHomeSignFilterOpen
                         ? theme.backgroundSelected
                         : theme.backgroundElement,
-                      borderColor: isHomeSignFilterOpen
-                        ? theme.primary
-                        : theme.border,
+                      borderColor: isHomeSignFilterOpen ? theme.primary : theme.border,
                     },
                   ]}
                   variant="surface"
@@ -1404,35 +1386,22 @@ export function NavigationMapScreen() {
                     color={isHomeSignFilterOpen ? theme.primary : theme.text}
                   />
                   {activePresetId !== null ||
-                  (filterViewMode === "categories" &&
+                  (filterViewMode === 'categories' &&
                     manualCategories.size < SIGN_CATEGORIES.length) ? (
-                    <View
-                      style={[
-                        styles.filterActiveBadge,
-                        { backgroundColor: theme.primary },
-                      ]}
-                    />
+                    <View style={[styles.filterActiveBadge, { backgroundColor: theme.primary }]} />
                   ) : null}
                 </AppButton>
 
                 <AppButton
-                  accessibilityLabel={
-                    isLocating
-                      ? "Đang xác định vị trí"
-                      : "Về vị trí hiện tại"
-                  }
+                  accessibilityLabel={isLocating ? 'Đang xác định vị trí' : 'Về vị trí hiện tại'}
                   disabled={isLocating}
                   onPress={handleCurrentLocation}
                   style={styles.mapActionButton}
                 >
-                  <SymbolView
-                    name={{
-                      android: "my_location",
-                      ios: "location.fill",
-                      web: "my_location",
-                    }}
+                  <MaterialIcons
+                    name="my-location"
                     size={22}
-                    tintColor={theme.onPrimary}
+                    color={theme.onPrimary}
                   />
                 </AppButton>
               </View>

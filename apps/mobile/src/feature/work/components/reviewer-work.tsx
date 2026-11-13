@@ -80,7 +80,7 @@ export function ReviewerWork({
         icon="clipboard-check-outline"
         label="Tái thẩm định cần duyệt"
         onPress={() => router.push('/work/revalidation-review')}
-        subtitle="Thẩm định minh chứng thực địa từ khảo sát viên và bỏ phiếu đồng thuận"
+        subtitle="Bỏ phiếu tái thẩm định các biển báo."
       />
 
       {/* Action Card: Reviewer Stats */}
@@ -103,7 +103,7 @@ export function ReviewerWork({
             params: { role: 'reviewer' },
           })
         }
-        subtitle="Tra cứu mã hiệu và phân loại biển báo chuẩn Quy chuẩn Việt Nam"
+        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
       />
     </View>
   );

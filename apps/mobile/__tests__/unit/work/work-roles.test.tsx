@@ -210,7 +210,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
       expect(getByText('9+')).toBeTruthy();
       expect(getByLabelText('Lịch sử di chuyển, 12 items')).toBeTruthy();
-      expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
+      expect(getByText('Tra cứu biển báo')).toBeTruthy();
     });
 
     it('navigates to /work/navigation-history when pressing history card', async () => {
@@ -223,7 +223,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('navigates to /work/sign-catalog with role driver when pressing catalog card', async () => {
       const { getByText } = await render(<DriverWork />);
 
-      fireEvent.press(getByText('Tra cứu biển báo giao thông'));
+      fireEvent.press(getByText('Tra cứu biển báo'));
       expect(mockPush).toHaveBeenCalledWith({
         pathname: '/work/sign-catalog',
         params: { role: 'driver' },
@@ -264,7 +264,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByText('Tái thẩm định cần duyệt')).toBeTruthy();
       expect(getByText('3')).toBeTruthy();
       expect(getByText('Thống kê của bạn')).toBeTruthy();
-      expect(getByText('Độ tin cậy: 96% · Tỷ lệ chính xác: 94%')).toBeTruthy();
 
       const heroBtn = getByLabelText('Thẩm định các hồ sơ chờ xử lý');
       fireEvent.press(heroBtn);
@@ -397,7 +396,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('mounts DriverWork by default when driver is the initial role', async () => {
       const { getByText, queryByText } = await render(<WorkScreen currentRole="driver" />);
 
-      expect(getByText('Vai trò: Tài xế')).toBeTruthy();
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
       expect(queryByText('Thẩm định chờ xử lý')).toBeNull();
       expect(queryByText('Tái xác nhận biển báo')).toBeNull();
@@ -409,7 +407,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       fireEvent.press(getByLabelText('Vai trò Khảo sát'));
 
       await waitFor(() => {
-        expect(getByText('Vai trò: Khảo sát')).toBeTruthy();
         expect(getByText('Lịch sử khảo sát')).toBeTruthy();
         expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
       });
@@ -421,8 +418,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       fireEvent.press(getByLabelText('Vai trò Thẩm định'));
 
       await waitFor(() => {
-        expect(getByText('Vai trò: Thẩm định')).toBeTruthy();
-        expect(getByText('Thẩm định chờ xử lý')).toBeTruthy();
+        expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
         expect(getByText('7 MỚI')).toBeTruthy();
       });
     });
@@ -431,7 +427,11 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       mockSessionUser = { id: 'single-role-user', roles: ['driver'] };
 
       const { getByText } = await render(<WorkScreen currentRole="driver" />);
-      expect(getByText('Vai trò: Tài xế')).toBeTruthy();
+      expect(
+        getByText(
+          'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
+        ),
+      ).toBeTruthy();
     });
 
     it('opens offline map modal when pressing offline map header button', async () => {

@@ -37,6 +37,7 @@ import {
 } from '@/feature/review/components/submission-voted-result-card';
 import { RevalidationSignPickerModal } from '@/feature/revalidation/components/revalidation-sign-picker-modal';
 import { useTheme } from '@/hooks/use-theme';
+import { useResponsive } from '@/utils/responsive';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
 
@@ -535,6 +536,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const params = useLocalSearchParams<{ resumeIndex?: string }>();
   const resumeIndexParam = params?.resumeIndex;
   const theme = useTheme();
+  const { isSmallDevice, height: windowHeight } = useResponsive();
   const {
     cancelSubmissionCheck,
     completeCurrentReview,
@@ -1028,6 +1030,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   importantForAccessibility="no-hide-descendants"
                   style={[
                     styles.peekCard,
+                    isSmallDevice && { maxHeight: Math.min(320, windowHeight * 0.36) },
                     {
                       backgroundColor: theme.backgroundElement,
                       borderColor: theme.border,
@@ -1049,6 +1052,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {...panResponder.panHandlers}
                 style={[
                   styles.mainCard,
+                  isSmallDevice && { maxHeight: Math.min(320, windowHeight * 0.36) },
                   Boolean(nextSubmission) && styles.mainCardOffset,
                   {
                     backgroundColor: theme.backgroundElement,
@@ -1232,82 +1236,86 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                     <SubmissionEditingBanner onCancel={() => setIsEditingVote(false)} />
                   ) : null}
 
-                  <View style={styles.diamondContainer}>
+                  <View style={[styles.diamondContainer, isSmallDevice && styles.diamondContainerSmall]}>
                     {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                    <View style={[styles.diamondItem, styles.diamondTop]}>
+                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondTopSmall : styles.diamondTop]}>
                       <Pressable
                         accessibilityLabel="Skip submission (cannot identify)"
                         accessibilityRole="button"
                         onPress={() => completeReview('skipped')}
                         style={({ pressed }) => [
                           styles.diamondButton,
+                          isSmallDevice && styles.diamondButtonSmall,
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={theme.text} name="arrow-up" size={24} />
+                        <MaterialCommunityIcons color={theme.text} name="arrow-up" size={isSmallDevice ? 20 : 24} />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
                         Bỏ qua
                       </Text>
                     </View>
 
                     {/* Left Button: Decline (X) */}
-                    <View style={[styles.diamondItem, styles.diamondLeft]}>
+                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondLeftSmall : styles.diamondLeft]}>
                       <Pressable
                         accessibilityLabel="Decline submission"
                         accessibilityRole="button"
                         onPress={() => setActiveSheet('decline')}
                         style={({ pressed }) => [
                           styles.diamondButton,
+                          isSmallDevice && styles.diamondButtonSmall,
                           styles.declineButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={Colors.danger} name="close" size={28} />
+                        <MaterialCommunityIcons color={Colors.danger} name="close" size={isSmallDevice ? 22 : 28} />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
                         Từ chối
                       </Text>
                     </View>
 
                     {/* Right Button: Approve (Heart) */}
-                    <View style={[styles.diamondItem, styles.diamondRight]}>
+                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondRightSmall : styles.diamondRight]}>
                       <Pressable
                         accessibilityLabel="Approve submission"
                         accessibilityRole="button"
                         onPress={() => completeReview('approved')}
                         style={({ pressed }) => [
                           styles.diamondButton,
+                          isSmallDevice && styles.diamondButtonSmall,
                           styles.approveButton,
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color="#FFFFFF" name="heart" size={28} />
+                        <MaterialCommunityIcons color="#FFFFFF" name="heart" size={isSmallDevice ? 22 : 28} />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
                         Đồng ý
                       </Text>
                     </View>
 
                     {/* Bottom Button: Report */}
-                    <View style={[styles.diamondItem, styles.diamondBottom]}>
+                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondBottomSmall : styles.diamondBottom]}>
                       <Pressable
                         accessibilityLabel="Report submission"
                         accessibilityRole="button"
                         onPress={() => setActiveSheet('report')}
                         style={({ pressed }) => [
                           styles.diamondButton,
+                          isSmallDevice && styles.diamondButtonSmall,
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={22} />
+                        <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={isSmallDevice ? 18 : 22} />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, { color: theme.text }]}>
+                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
                         Báo cáo
                       </Text>
                     </View>
@@ -1854,6 +1862,39 @@ const styles = StyleSheet.create({
     marginTop: 4,
     width: 76,
     letterSpacing: 0.2,
+  },
+  diamondContainerSmall: {
+    width: 140,
+    height: 160,
+  },
+  diamondItemSmall: {
+    width: 44,
+  },
+  diamondButtonSmall: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  diamondTopSmall: {
+    top: 0,
+    left: 48,
+  },
+  diamondBottomSmall: {
+    top: 96,
+    left: 48,
+  },
+  diamondLeftSmall: {
+    left: 0,
+    top: 48,
+  },
+  diamondRightSmall: {
+    right: 0,
+    top: 48,
+  },
+  diamondLabelSmall: {
+    fontSize: 9,
+    marginTop: 2,
+    width: 60,
   },
   circleButtonPressed: {
     transform: [{ scale: 0.92 }],

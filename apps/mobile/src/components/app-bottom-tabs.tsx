@@ -20,7 +20,12 @@ type AppTab = {
 };
 
 const tabs: AppTab[] = [
-  { fallbackLabel: 'C', label: 'Trang chủ', route: '/home', symbol: { android: 'home', web: 'home' } },
+  {
+    fallbackLabel: 'C',
+    label: 'Trang chủ',
+    route: '/home',
+    symbol: { android: 'home', web: 'home' },
+  },
   {
     fallbackLabel: 'V',
     label: 'Công việc',
@@ -40,7 +45,10 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
   const theme = useTheme();
   const [selectedRoute, setSelectedRoute] = useState(activeRoute);
   const [containerWidth, setContainerWidth] = useState(0);
-  const initialTabIndex = Math.max(0, tabs.findIndex((tab) => tab.route === activeRoute));
+  const initialTabIndex = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.route === activeRoute),
+  );
   const [activePosition] = useState(() => new Animated.Value(initialTabIndex));
   const tabWidth = Math.max(0, containerWidth - Spacing.one * 2) / tabs.length;
 
@@ -100,12 +108,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
               style={styles.tab}
               variant="ghost"
             >
-              <View
-                style={[
-                  styles.iconCircle,
-                  isActive && styles.activeIconContent,
-                ]}
-              >
+              <View style={[styles.iconCircle, isActive && styles.activeIconContent]}>
                 <SymbolView
                   fallback={
                     <Text
@@ -129,7 +132,7 @@ export function AppBottomTabs({ activeRoute }: { activeRoute: AppTab['route'] })
           );
         })}
       </View>
-    </SafeAreaView >
+    </SafeAreaView>
   );
 }
 

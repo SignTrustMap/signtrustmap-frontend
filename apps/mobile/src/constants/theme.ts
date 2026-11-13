@@ -70,5 +70,16 @@ export const Rounded = {
   round: 9999,
 } as const;
 
+/** Standard device width breakpoints for responsive layout */
+export const Breakpoints = {
+  compact: 375,
+  standard: 414,
+  large: 480,
+  tablet: 600,
+} as const;
+
+/**
+ * @deprecated Prefer using dynamic insets from `useSafeAreaInsets().bottom` rather than static insets.
+ */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

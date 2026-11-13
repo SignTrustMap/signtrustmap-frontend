@@ -26,7 +26,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
@@ -181,6 +181,7 @@ function parseDateToDateObject(dateStr?: string): Date {
 export function SurveyRecordDetailsScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { session } = useSession();
   const {
     submissionId,
@@ -1303,7 +1304,10 @@ export function SurveyRecordDetailsScreen() {
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + Spacing.six },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

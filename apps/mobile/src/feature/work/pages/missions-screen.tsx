@@ -94,8 +94,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
     isRefetching: isRefetchingMissions,
   } = useGetMyMissions();
 
-  const isRefreshing =
-    isRefetchingCompletions || isRefetchingDailyTasks || isRefetchingMissions;
+  const isRefreshing = isRefetchingCompletions || isRefetchingDailyTasks || isRefetchingMissions;
 
   const handleRefresh = () => {
     refetchCompletions();
@@ -133,7 +132,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
 
     const matchedTasks = backendTasks.filter((task) => isTaskForRole(task, initialRole));
     const matchedCompletions = backendCompletions.filter((item) =>
-      item.dailyTask ? isTaskForRole(item.dailyTask, initialRole) : true
+      item.dailyTask ? isTaskForRole(item.dailyTask, initialRole) : true,
     );
 
     // 1. If BE provides the daily tasks catalog, map each task with its completion status
@@ -232,16 +231,18 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
         rewardCredits: m.rewardCredits ?? 10,
         isCompleted: Boolean(m.completed || (m.progress ?? 0) >= (m.target ?? 1)),
         claimed: m.rewardGranted,
-        activityType: m.code?.includes('SIGN') || m.code?.includes('VERIFY')
-          ? 'REVIEW_VOTE'
-          : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
-            ? 'HAZARD_REPORT'
-            : 'DAILY_TASK_REWARD',
-        actionUrl: m.code?.includes('SIGN') || m.code?.includes('VERIFY')
-          ? '/work/submission-review'
-          : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
-            ? '/work/recorded-signs'
-            : '/work',
+        activityType:
+          m.code?.includes('SIGN') || m.code?.includes('VERIFY')
+            ? 'REVIEW_VOTE'
+            : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
+              ? 'HAZARD_REPORT'
+              : 'DAILY_TASK_REWARD',
+        actionUrl:
+          m.code?.includes('SIGN') || m.code?.includes('VERIFY')
+            ? '/work/submission-review'
+            : m.code?.includes('ANOMALY') || m.code?.includes('HAZARD')
+              ? '/work/recorded-signs'
+              : '/work',
         periodLabel: 'Chung',
       });
     });
@@ -383,10 +384,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
           >
             <View style={styles.streakTopRow}>
               <View
-                style={[
-                  styles.flameCircle,
-                  { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
-                ]}
+                style={[styles.flameCircle, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
               >
                 <Animated.View style={{ transform: [{ scale: flameScale }] }}>
                   <Text style={styles.flameEmoji}>🔥</Text>
@@ -441,10 +439,10 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                           ? { backgroundColor: '#F59E0B', borderColor: '#D97706' }
                           : isToday
                             ? {
-                              backgroundColor: '#FEF3C7',
-                              borderColor: '#F59E0B',
-                              borderWidth: 2,
-                            }
+                                backgroundColor: '#FEF3C7',
+                                borderColor: '#F59E0B',
+                                borderWidth: 2,
+                              }
                             : { backgroundColor: `${theme.grey}20`, borderColor: 'transparent' },
                       ]}
                     >
@@ -493,10 +491,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                   accessibilityState={{ selected: isActive }}
                   key={tab.key}
                   onPress={() => setActiveTab(tab.key)}
-                  style={({ pressed }) => [
-                    styles.tabButton,
-                    { opacity: pressed ? 0.8 : 1 },
-                  ]}
+                  style={({ pressed }) => [styles.tabButton, { opacity: pressed ? 0.8 : 1 }]}
                 >
                   <MaterialCommunityIcons
                     color={isActive ? '#FFFFFF' : theme.grey}
@@ -504,18 +499,12 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     size={18}
                   />
                   <Text
-                    style={[
-                      styles.tabButtonText,
-                      { color: isActive ? '#FFFFFF' : theme.text },
-                    ]}
+                    style={[styles.tabButtonText, { color: isActive ? '#FFFFFF' : theme.text }]}
                   >
                     {tab.label}
                   </Text>
 
-                  <Badge
-                    count={pendingCount}
-                    size="sm"
-                  />
+                  <Badge count={pendingCount} size="sm" />
                 </Pressable>
               );
             })}
@@ -536,10 +525,10 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
             />
             <Text style={[styles.tabDescriptionText, { color: theme.grey }]}>
               {activeTab === 'daily'
-                ? 'Nhiệm vụ làm mới vào 00:00 mỗi ngày theo vai trò hiện tại của bạn.'
+                ? 'Nhiệm vụ làm mới vào 00:00 mỗi ngày.'
                 : activeTab === 'weekly'
                   ? 'Nhiệm vụ hàng tuần đặt lại vào thứ Hai lúc 00:00 (UTC+7).'
-                  : 'Nhiệm vụ toàn hệ thống và các cột mốc chuỗi đóng góp cộng đồng.'}
+                  : 'Nhiệm vụ toàn hệ thống.'}
             </Text>
           </View>
 
@@ -560,8 +549,14 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                   ]}
                 >
-                  <MaterialCommunityIcons color={theme.grey} name="checkbox-marked-circle-outline" size={36} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ hàng ngày</Text>
+                  <MaterialCommunityIcons
+                    color={theme.grey}
+                    name="checkbox-marked-circle-outline"
+                    size={36}
+                  />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                    Không có nhiệm vụ hàng ngày
+                  </Text>
                   <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
                     Hiện chưa có nhiệm vụ nào cho vai trò này.
                   </Text>
@@ -590,8 +585,14 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                   ]}
                 >
-                  <MaterialCommunityIcons color={theme.grey} name="calendar-blank-outline" size={36} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ tuần</Text>
+                  <MaterialCommunityIcons
+                    color={theme.grey}
+                    name="calendar-blank-outline"
+                    size={36}
+                  />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                    Không có nhiệm vụ tuần
+                  </Text>
                   <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
                     Nhiệm vụ tuần mới sẽ mở vào thứ Hai tuần tới.
                   </Text>
@@ -616,7 +617,9 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                 ]}
               >
                 <MaterialCommunityIcons color={theme.grey} name="earth" size={36} />
-                <Text style={[styles.emptyTitle, { color: theme.text }]}>Không có nhiệm vụ chung</Text>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                  Không có nhiệm vụ chung
+                </Text>
                 <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
                   Bạn đã hoàn thành tất cả nhiệm vụ hệ thống.
                 </Text>

@@ -55,18 +55,17 @@ export function WorkActionCard({
         ]}
       >
         <View style={styles.contentRow}>
-          <View
-            style={[
-              styles.iconContainer,
-              { backgroundColor: `${primaryAccent}15` },
-            ]}
-          >
+          <View style={[styles.iconContainer]}>
             {icon ? (
               <MaterialCommunityIcons color={primaryAccent} name={icon} size={26} />
             ) : symbol ? (
               <SymbolView name={symbol} size={26} tintColor={primaryAccent} />
             ) : (
-              <MaterialCommunityIcons color={primaryAccent} name="checkbox-marked-circle-outline" size={26} />
+              <MaterialCommunityIcons
+                color={primaryAccent}
+                name="checkbox-marked-circle-outline"
+                size={26}
+              />
             )}
           </View>
 

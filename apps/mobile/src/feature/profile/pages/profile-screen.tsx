@@ -7,7 +7,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
 import { OfflineMapModal } from '@/components/offline-map-modal';
-import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   ACCOUNT_ROLES,
@@ -41,7 +40,7 @@ const roleLabels: Record<AccountRole, string> = {
 const roleIcons: Record<AccountRole, MaterialIconName> = {
   driver: 'car-outline',
   reviewer: 'shield-check-outline',
-  surveyor: 'map-marker-path',
+  surveyor: 'camera-outline',
 };
 
 function getInitials(displayName?: string) {
@@ -101,7 +100,7 @@ export function ProfileScreen() {
   useScreenFocusEffect(
     useCallback(() => {
       void fetchProfile();
-    }, [fetchProfile])
+    }, [fetchProfile]),
   );
   const { scrollTo, t } = useLocalSearchParams<{ scrollTo?: string; t?: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -156,13 +155,18 @@ export function ProfileScreen() {
     status,
   } = useAppUpdate();
 
-  const displayName = profile?.fullName ?? session?.account.displayName ?? 'Người dùng SignTrustMap';
+  const displayName =
+    profile?.fullName ?? session?.account.displayName ?? 'Người dùng SignTrustMap';
   const email = profile?.email ?? session?.account.email ?? '';
-  const avatarUrl = profile?.avatarUrl !== undefined ? profile.avatarUrl : (session?.account.avatarUrl ?? null);
+  const avatarUrl =
+    profile?.avatarUrl !== undefined ? profile.avatarUrl : (session?.account.avatarUrl ?? null);
 
   const rawRoles = profile?.roles ?? session?.account.roles ?? ['driver'];
   const userRoles: AccountRole[] = rawRoles
-    .map((r) => roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole))
+    .map(
+      (r) =>
+        roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole),
+    )
     .filter((r): r is AccountRole => Boolean(roleLabels[r]));
   const effectiveRoles = userRoles.includes('driver') ? userRoles : ['driver', ...userRoles];
   const activeRolesCount = effectiveRoles.length;
@@ -338,7 +342,7 @@ export function ProfileScreen() {
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                <View style={[styles.sectionIconBadge]}>
                   <MaterialCommunityIcons
                     color={theme.primary}
                     name="account-switch-outline"
@@ -363,17 +367,14 @@ export function ProfileScreen() {
 
             {isRoleSectionOpen ? (
               <View style={[styles.collapsibleBody, { borderTopColor: theme.border }]}>
-                <Text style={[styles.roleHintText, { color: theme.textSecondary }]}>
-                  Quyền Tài xế luôn được kích hoạt mặc định
-                </Text>
-
                 <View style={styles.roleList}>
-                  {ACCOUNT_ROLES.map((role) => {
+                  {ACCOUNT_ROLES.map((role, index) => {
                     const isEnabled = effectiveRoles.includes(role);
+                    const isLast = index === ACCOUNT_ROLES.length - 1;
 
                     const rowContent = (
                       <>
-                        <View style={[styles.iconTile, { backgroundColor: theme.secondary }]}>
+                        <View style={[styles.iconTile]}>
                           <MaterialCommunityIcons
                             color={theme.primary}
                             name={roleIcons[role]}
@@ -415,24 +416,41 @@ export function ProfileScreen() {
 
                     if (role === 'driver') {
                       return (
-                        <View key={role} style={[styles.roleRow, { borderColor: theme.border }]}>
+                        <View
+                          key={role}
+                          style={[
+                            styles.roleRow,
+                            !isLast && {
+                              borderBottomWidth: StyleSheet.hairlineWidth,
+                              borderBottomColor: theme.border,
+                            },
+                          ]}
+                        >
                           {rowContent}
                         </View>
                       );
                     }
 
                     return (
-                      <AppButton
+                      <Pressable
                         accessibilityLabel={`${isEnabled ? 'Tắt' : 'Bật'} vai trò ${roleLabels[role]}`}
                         accessibilityRole="switch"
                         accessibilityState={{ checked: isEnabled }}
                         key={role}
-                        onPress={() => void handleToggleRole(role as OptionalAccountRole, !isEnabled)}
-                        style={[styles.roleRow, { borderColor: theme.border }]}
-                        variant="ghost"
+                        onPress={() =>
+                          void handleToggleRole(role as OptionalAccountRole, !isEnabled)
+                        }
+                        style={({ pressed }) => [
+                          styles.roleRow,
+                          !isLast && {
+                            borderBottomWidth: StyleSheet.hairlineWidth,
+                            borderBottomColor: theme.border,
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
                       >
                         {rowContent}
-                      </AppButton>
+                      </Pressable>
                     );
                   })}
                 </View>
@@ -458,7 +476,7 @@ export function ProfileScreen() {
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                <View style={[styles.sectionIconBadge]}>
                   <MaterialCommunityIcons color={theme.primary} name="filter-variant" size={20} />
                 </View>
                 <View style={styles.headerTitles}>
@@ -496,7 +514,7 @@ export function ProfileScreen() {
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                <View style={[styles.sectionIconBadge]}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
                 </View>
                 <View style={styles.headerTitles}>
@@ -504,7 +522,7 @@ export function ProfileScreen() {
                     Bản đồ ngoại tuyến
                   </Text>
                   <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
-                    Tải và quản lý gói dữ liệu PMTiles ngoại tuyến
+                    Tải và quản lý bản đồ ngoại tuyến
                   </Text>
                 </View>
               </View>
@@ -815,17 +833,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   roleList: {
-    gap: Spacing.two,
+    gap: 0,
   },
   roleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 56,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    gap: Spacing.two,
+    minHeight: 52,
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.two,
+    gap: Spacing.three,
   },
   iconTile: {
     width: 36,
