@@ -11,6 +11,7 @@ type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 export type WorkActionCardProps = {
+  accessibilityLabel?: string;
   accentColor?: string;
   badgeLabel?: string;
   count?: number;
@@ -23,6 +24,7 @@ export type WorkActionCardProps = {
 };
 
 export function WorkActionCard({
+  accessibilityLabel,
   accentColor,
   badgeLabel,
   count,
@@ -35,11 +37,14 @@ export function WorkActionCard({
 }: WorkActionCardProps) {
   const theme = useTheme();
   const primaryAccent = accentColor ?? theme.primary;
+  const hasBadge = Boolean(badgeLabel) || (count !== undefined && count !== null && count > 0);
 
   return (
     <View style={styles.outerContainer}>
       <Pressable
-        accessibilityLabel={count === undefined ? label : `${label}, ${count} items`}
+        accessibilityLabel={
+          accessibilityLabel ?? (count === undefined ? label : `${label}, ${count} items`)
+        }
         accessibilityRole="button"
         onPress={onPress}
         style={({ pressed }) => [
@@ -83,28 +88,26 @@ export function WorkActionCard({
           </View>
 
           <View style={styles.rightContainer}>
+            {hasBadge ? (
+              <Badge
+                borderColor={theme.backgroundElement}
+                borderWidth={1.5}
+                count={badgeLabel ? undefined : count}
+                label={badgeLabel}
+                maxCount={9}
+                size="md"
+              />
+            ) : null}
             <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
           </View>
         </View>
       </Pressable>
-
-      {count !== undefined && count !== null && count > 0 ? (
-        <Badge
-          borderColor={theme.background}
-          borderWidth={2}
-          count={count}
-          maxCount={9}
-          size="lg"
-          style={styles.topRightBadge}
-        />
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   outerContainer: {
-    position: 'relative',
     width: '100%',
   },
   actionCard: {
@@ -117,13 +120,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
-  },
-  topRightBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    zIndex: 10,
-    elevation: 5,
   },
   contentRow: {
     flexDirection: 'row',
@@ -161,6 +157,6 @@ const styles = StyleSheet.create({
   rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
 });

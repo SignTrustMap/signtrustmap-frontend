@@ -1,10 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Animated,
-  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
-import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { ACCOUNT_ROLES, type AccountRole, useSession } from '@/context/session-provider';
 import { DriverWork } from '@/feature/work/components/driver-work';
 import { ReviewerWork } from '@/feature/work/components/reviewer-work';
@@ -27,8 +25,6 @@ import {
   useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
 import { useTheme } from '@/hooks/use-theme';
-
-type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 type CurrentRole = 'driver' | 'surveyor' | 'reviewer';
 
@@ -86,34 +82,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
     return items.filter((item) => !item.isCompleted && !item.claimed).length;
   }, [completionsData, selectedRole]);
 
-  const activeIndex = availableRoles.indexOf(selectedRole);
-  const [switcherWidth, setSwitcherWidth] = useState<number>(0);
-  const slideAnimation = useRef(new Animated.Value(activeIndex >= 0 ? activeIndex : 0)).current;
-
-  const hasMultipleRoles = availableRoles.length > 1;
-
-  const tabWidth =
-    switcherWidth > 0 && availableRoles.length > 0 ? switcherWidth / availableRoles.length : 0;
-  const translateX = slideAnimation.interpolate({
-    inputRange: hasMultipleRoles ? availableRoles.map((_, i) => i) : [0, 1],
-    outputRange: hasMultipleRoles ? availableRoles.map((_, i) => i * tabWidth) : [0, 0],
-  });
-
-  useEffect(() => {
-    if (hasMultipleRoles && activeIndex >= 0) {
-      Animated.spring(slideAnimation, {
-        toValue: activeIndex,
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 18,
-      }).start();
-    }
-  }, [activeIndex, hasMultipleRoles]);
-
-  const onSwitcherLayout = (e: LayoutChangeEvent) => {
-    setSwitcherWidth(e.nativeEvent.layout.width);
-  };
-
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -146,26 +114,11 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           <View
             accessibilityLabel="Vai trò công việc"
             accessibilityRole="tablist"
-            onLayout={onSwitcherLayout}
             style={[
               styles.roleSwitcher,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
             ]}
           >
-            {/* The Sliding Pill Indicator */}
-            {tabWidth > 0 ? (
-              <Animated.View
-                style={[
-                  styles.slidingIndicator,
-                  {
-                    width: tabWidth,
-                    transform: [{ translateX }],
-                    backgroundColor: theme.primary,
-                  },
-                ]}
-              />
-            ) : null}
-
             {availableRoles.map((role, index) => {
               const isActive = selectedRole === role;
               const isLast = index === availableRoles.length - 1;
@@ -180,14 +133,20 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   onPress={() => setActiveRole(role)}
                   style={({ pressed }) => [
                     styles.roleTab,
+                    isActive && { backgroundColor: theme.primary },
                     !isLast && {
-                      borderRightWidth: 1,
+                      borderRightWidth: 1.5,
                       borderRightColor: theme.border,
                     },
                     pressed && { opacity: 0.8 },
                   ]}
                 >
-                  <Text style={[styles.roleTabText, { color: isActive ? '#FFFFFF' : theme.text }]}>
+                  <Text
+                    style={[
+                      styles.roleTabText,
+                      { color: isActive ? theme.onPrimary : theme.text },
+                    ]}
+                  >
                     {meta.label}
                   </Text>
                 </Pressable>
@@ -294,30 +253,20 @@ const styles = StyleSheet.create({
     lineHeight: 34,
   },
   roleSwitcher: {
-    position: 'relative',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     borderRadius: Rounded.round,
-    borderWidth: 1,
+    borderWidth: 1.5,
     overflow: 'hidden',
-  },
-  slidingIndicator: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 0,
+    height: 44,
   },
   roleTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    minHeight: 46,
     paddingHorizontal: Spacing.one,
     backgroundColor: 'transparent',
-    zIndex: 1,
   },
   roleTabText: {
     fontFamily: Fonts.body,
@@ -344,6 +293,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: Spacing.two,
+    marginBottom: Spacing.half,
   },
   sectionTitleWithIcon: {
     flexDirection: 'row',

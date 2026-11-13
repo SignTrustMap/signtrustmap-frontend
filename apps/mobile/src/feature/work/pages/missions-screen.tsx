@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  type LayoutChangeEvent,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -284,30 +283,6 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
     global: globalPendingCount,
   };
 
-  // Animated sliding pill indicator (identical logic to Role Switcher)
-  const activeIndex = MISSION_TABS.findIndex((tab) => tab.key === activeTab);
-  const [switcherWidth, setSwitcherWidth] = useState<number>(0);
-  const [slideAnimation] = useState(() => new Animated.Value(activeIndex >= 0 ? activeIndex : 0));
-
-  const tabWidth =
-    switcherWidth > 0 && MISSION_TABS.length > 0 ? switcherWidth / MISSION_TABS.length : 0;
-
-  const translateX = slideAnimation.interpolate({
-    inputRange: MISSION_TABS.map((_, i) => i),
-    outputRange: MISSION_TABS.map((_, i) => i * tabWidth),
-  });
-
-  useEffect(() => {
-    if (activeIndex >= 0) {
-      Animated.spring(slideAnimation, {
-        toValue: activeIndex,
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 18,
-      }).start();
-    }
-  }, [activeIndex, slideAnimation]);
-
   // Duolingo-style flame pop animation every time the screen loads
   const [flameScale] = useState(() => new Animated.Value(1));
 
@@ -332,10 +307,6 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
 
     return () => animation.stop();
   }, [flameScale]);
-
-  const onSwitcherLayout = (e: LayoutChangeEvent) => {
-    setSwitcherWidth(e.nativeEvent.layout.width);
-  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -460,28 +431,14 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
           <View
             accessibilityLabel="Phân loại nhiệm vụ"
             accessibilityRole="tablist"
-            onLayout={onSwitcherLayout}
             style={[
               styles.tabSwitcher,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
             ]}
           >
-            {/* The Sliding Pill Indicator */}
-            {tabWidth > 0 ? (
-              <Animated.View
-                style={[
-                  styles.slidingIndicator,
-                  {
-                    width: tabWidth,
-                    transform: [{ translateX }],
-                    backgroundColor: theme.primary,
-                  },
-                ]}
-              />
-            ) : null}
-
-            {MISSION_TABS.map((tab) => {
+            {MISSION_TABS.map((tab, index) => {
               const isActive = activeTab === tab.key;
+              const isLast = index === MISSION_TABS.length - 1;
               const pendingCount = tabBadgeCounts[tab.key];
 
               return (
@@ -491,20 +448,34 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                   accessibilityState={{ selected: isActive }}
                   key={tab.key}
                   onPress={() => setActiveTab(tab.key)}
-                  style={({ pressed }) => [styles.tabButton, { opacity: pressed ? 0.8 : 1 }]}
+                  style={({ pressed }) => [
+                    styles.tabButton,
+                    isActive && { backgroundColor: theme.primary },
+                    !isLast && {
+                      borderRightWidth: 1.5,
+                      borderRightColor: theme.border,
+                    },
+                    pressed && { opacity: 0.8 },
+                  ]}
                 >
                   <MaterialCommunityIcons
-                    color={isActive ? '#FFFFFF' : theme.grey}
+                    color={isActive ? theme.onPrimary : theme.grey}
                     name={tab.icon}
-                    size={18}
+                    size={16}
                   />
                   <Text
-                    style={[styles.tabButtonText, { color: isActive ? '#FFFFFF' : theme.text }]}
+                    numberOfLines={1}
+                    style={[
+                      styles.tabButtonText,
+                      { color: isActive ? theme.onPrimary : theme.text },
+                    ]}
                   >
                     {tab.label}
                   </Text>
 
-                  <Badge count={pendingCount} size="sm" />
+                  {pendingCount > 0 ? (
+                    <Badge count={pendingCount} size="sm" />
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -764,26 +735,20 @@ const styles = StyleSheet.create({
   },
   tabSwitcher: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     borderRadius: Rounded.round,
-    padding: 4,
-    borderWidth: 1,
-    position: 'relative',
-  },
-  slidingIndicator: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    bottom: 4,
-    borderRadius: Rounded.round,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    height: 44,
   },
   tabButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    gap: 6,
-    zIndex: 1,
+    paddingHorizontal: Spacing.half,
+    gap: 4,
+    minWidth: 0,
   },
   tabButtonText: {
     fontFamily: Fonts.sans,

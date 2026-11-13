@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-13 06:56:28 UTC  
+> **Generated:** 2026-11-13 09:11:13 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 2.25s  
+> **Execution Duration:** 3.54s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,8 +11,8 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 1 | 1 | 0 | 0 | 100.0% |
-| **Tests** | 21 | 21 | 0 | 0 | 100.0% |
+| **Test Suites** | 7 | 7 | 0 | 0 | 100.0% |
+| **Tests** | 83 | 83 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
@@ -275,5 +275,11 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/work/work-roles.test.tsx` | 21 / 21 | 2.10s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/daily-tasks-api.test.ts` | 4 / 4 | 0.75s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/work-routes.test.tsx` | 30 / 30 | 1.25s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/daily-tasks-and-mission-card.test.tsx` | 6 / 6 | 1.42s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx` | 5 / 5 | 1.56s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/work-features.test.tsx` | 8 / 8 | 1.77s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/missions-screen.test.tsx` | 9 / 9 | 2.30s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/work-roles.test.tsx` | 21 / 21 | 2.37s | ✅ Pass |
 

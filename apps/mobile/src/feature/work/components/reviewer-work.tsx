@@ -1,9 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { AppButton } from '@/components/button';
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
@@ -42,36 +40,21 @@ export function ReviewerWork({
 
   return (
     <View style={styles.actionList}>
-      {/* Standout Hero Action for Reviewer: Pending Reviews */}
-      <AppButton
+      {/* Standout Action for Reviewer: Pending Reviews */}
+      <WorkActionCard
         accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
+        accentColor={theme.primary}
+        badgeLabel={reviewQueueTotal > 0 ? `${reviewQueueTotal} MỚI` : undefined}
+        count={reviewQueueTotal}
+        icon="shield-check"
+        label="Khảo sát cần duyệt"
         onPress={() => router.push('/work/submission-review')}
-        pressedOpacity={0.9}
-        style={styles.heroActionCard}
-        variant="primary"
-      >
-        <View style={styles.heroLeft}>
-          <View style={styles.heroIconCircle}>
-            <MaterialCommunityIcons color={theme.primary} name="shield-check" size={26} />
-          </View>
-          <View style={styles.heroText}>
-            <View style={styles.heroTitleRow}>
-              <Text style={styles.heroTitle}>Khảo sát cần duyệt</Text>
-              {reviewQueueTotal > 0 ? (
-                <View style={styles.heroBadge}>
-                  <Text style={styles.heroBadgeText}>{reviewQueueTotal} MỚI</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.heroSubtitle}>
-              {reviewQueueTotal > 0
-                ? `${reviewQueueTotal} biển báo cần bạn xác minh`
-                : 'Không có biển báo cần xác minh'}
-            </Text>
-          </View>
-        </View>
-        <MaterialCommunityIcons color={theme.onPrimary} name="chevron-right" size={24} />
-      </AppButton>
+        subtitle={
+          reviewQueueTotal > 0
+            ? `${reviewQueueTotal} biển báo cần bạn xác minh`
+            : 'Không có biển báo cần xác minh'
+        }
+      />
 
       {/* Action Card: Pending Revalidation Evidence */}
       <WorkActionCard
@@ -112,67 +95,5 @@ export function ReviewerWork({
 const styles = StyleSheet.create({
   actionList: {
     gap: Spacing.three,
-  },
-  heroActionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Rounded.lg,
-    shadowColor: '#0671eb',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  heroLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    flex: 1,
-  },
-  heroIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroText: {
-    flex: 1,
-    gap: 2,
-  },
-  heroTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  heroTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    lineHeight: 22,
-  },
-  heroSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 16,
-  },
-  heroBadge: {
-    backgroundColor: '#FEF08A',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Rounded.round,
-  },
-  heroBadgeText: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#854D0E',
   },
 });
