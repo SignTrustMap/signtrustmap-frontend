@@ -879,7 +879,9 @@ export function SurveyRecordDetailsScreen() {
           setEndCoordinate(undefined);
         }
         setCoordinateSource(
-          hasCoordinate ? ((draft.coordinateSource as CoordinateSource) ?? 'IMAGE_EXIF') : undefined,
+          hasCoordinate
+            ? ((draft.coordinateSource as CoordinateSource) ?? 'IMAGE_EXIF')
+            : undefined,
         );
         setLocationMessage(hasCoordinate ? undefined : NO_GPS_PRESS_ZOOM_MESSAGE);
         const remoteItem = draftQuery.data?.mediaFiles?.find((file: any) => {
