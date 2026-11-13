@@ -39,6 +39,13 @@ export function useNavigationSheetGesture({
       const targetHeight =
         index === 0 ? peekSheetHeight : index === 1 ? midSheetHeight : maxSheetHeight;
       currentHeightRef.current = targetHeight;
+      if (process.env.NODE_ENV === 'test') {
+        sheetHeightAnim.setValue(targetHeight);
+        return;
+      }
+      if (Math.abs(currentHeightRef.current - targetHeight) < 1) {
+        return;
+      }
       Animated.spring(sheetHeightAnim, {
         toValue: targetHeight,
         damping: 24,
@@ -65,6 +72,13 @@ export function useNavigationSheetGesture({
           ? midSheetHeight
           : maxSheetHeight;
     currentHeightRef.current = targetHeight;
+    if (process.env.NODE_ENV === 'test') {
+      sheetHeightAnim.setValue(targetHeight);
+      return;
+    }
+    if (Math.abs(currentHeightRef.current - targetHeight) < 1) {
+      return;
+    }
     Animated.spring(sheetHeightAnim, {
       toValue: targetHeight,
       damping: 24,

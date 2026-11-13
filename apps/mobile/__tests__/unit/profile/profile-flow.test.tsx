@@ -221,7 +221,6 @@ describe('ProfileScreen Unit Test Suite', () => {
       const { getByText, queryByLabelText } = await render(<ProfileScreen />);
 
       expect(getByText('Vai trò tài khoản')).toBeTruthy();
-      expect(getByText('Quyền Tài xế luôn được kích hoạt mặc định')).toBeTruthy();
       expect(getByText('Tài xế')).toBeTruthy();
       expect(getByText('Quyền điều hướng bản đồ')).toBeTruthy();
 

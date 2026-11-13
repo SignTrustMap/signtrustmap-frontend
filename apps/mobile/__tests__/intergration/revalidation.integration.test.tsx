@@ -575,7 +575,7 @@ describe('Revalidation Feature End-to-End Integration Tests', () => {
       );
 
       // 1. Open Android Gallery and select an asset
-      const uploadArea = getByLabelText('Tải lên ảnh hoặc video');
+      const uploadArea = getByLabelText('Chọn ảnh từ thư viện.');
       await act(async () => {
         fireEvent.press(uploadArea);
       });
@@ -660,12 +660,16 @@ describe('Revalidation Feature End-to-End Integration Tests', () => {
 
       // Open Android Gallery and select an asset
       await act(async () => {
-        fireEvent.press(getByLabelText('Tải lên ảnh hoặc video'));
+        fireEvent.press(getByLabelText('Chọn ảnh từ thư viện.'));
       });
       const assetItem = await findByLabelText('Select field-inspection.jpg');
       await act(async () => {
         fireEvent.press(assetItem);
-        fireEvent.press(getByLabelText('Sử dụng GPS thiết bị hiện tại'));
+      });
+      const stampGpsBtn = await findByLabelText('Sử dụng GPS thiết bị hiện tại');
+      await act(async () => {
+        fireEvent.press(stampGpsBtn);
+        fireEvent.press(getByLabelText('Đã gỡ bỏ'));
       });
 
       const submitBtn = await waitFor(() => getByLabelText('Gửi bằng chứng tái thẩm định'));
@@ -707,7 +711,7 @@ describe('Revalidation Feature End-to-End Integration Tests', () => {
       // Verified sign name from queue fixture
       expect(await findByText('Cấm đi ngược chiều')).toBeTruthy();
       expect(getByText(/Cách vị trí cũ 6m/)).toBeTruthy();
-      expect(getByText('KẾT LUẬN: BÁO CÁO VẪN CÒN')).toBeTruthy();
+      expect(getByText(/Ghi nhận: Vẫn còn/)).toBeTruthy();
       expect(getByText(/Đã có 2 người bình chọn trước bạn/)).toBeTruthy();
     });
 

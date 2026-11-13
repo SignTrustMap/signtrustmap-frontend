@@ -122,9 +122,11 @@ export function NavigationMapScreen() {
     }
   }, [paramSavedRouteId]);
 
+  const session = useOptionalSession()?.session;
   const { data: savedRouteData } = useGetSavedRoute(activeSavedRouteId);
   const { data: savedRouteSignsData } = useGetSavedRouteSigns(activeSavedRouteId);
   const { data: walletData, refetch: refetchWallet } = useGetWallet({
+    enabled: Boolean(session),
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
@@ -132,8 +134,10 @@ export function NavigationMapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void refetchWallet?.();
-    }, [refetchWallet]),
+      if (session) {
+        void refetchWallet?.();
+      }
+    }, [refetchWallet, session]),
   );
 
   const [isCompleteModalVisible, setIsCompleteModalVisible] = useState(false);
@@ -244,7 +248,6 @@ export function NavigationMapScreen() {
     }
   }, [paramVehicleMode]);
   const isMotorcycleMode = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
-  const session = useOptionalSession()?.session;
   const initiateSessionMutation = useInitiateNavigationSession(session?.accessToken);
 
   useEffect(() => {
@@ -1325,24 +1328,6 @@ export function NavigationMapScreen() {
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
                 <AppButton
-                  accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
-                  onPress={() => router.push('/notifications')}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <Ionicons name="notifications" size={22} color="#000000" />
-                  <Badge
-                    count={unreadNotificationCount}
-                    maxCount={9}
-                    style={styles.notificationBadge}
-                  />
-                </AppButton>
-
-                <AppButton
                   accessibilityLabel={
                     isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
                   }
@@ -1393,16 +1378,30 @@ export function NavigationMapScreen() {
                 </AppButton>
 
                 <AppButton
+                  accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                  onPress={() => router.push('/notifications')}
+                  style={[
+                    styles.mapActionButton,
+                    styles.locationActionButton,
+                    styles.ttsActionButton,
+                  ]}
+                  variant="surface"
+                >
+                  <Ionicons name="notifications" size={22} color="#000000" />
+                  <Badge
+                    count={unreadNotificationCount}
+                    maxCount={9}
+                    style={styles.notificationBadge}
+                  />
+                </AppButton>
+
+                <AppButton
                   accessibilityLabel={isLocating ? 'Đang xác định vị trí' : 'Về vị trí hiện tại'}
                   disabled={isLocating}
                   onPress={handleCurrentLocation}
                   style={styles.mapActionButton}
                 >
-                  <MaterialIcons
-                    name="my-location"
-                    size={22}
-                    color={theme.onPrimary}
-                  />
+                  <MaterialIcons name="my-location" size={22} color={theme.onPrimary} />
                 </AppButton>
               </View>
             ) : null}

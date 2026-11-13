@@ -102,10 +102,19 @@ export async function fetchFreshGpsPosition(timeoutMs = 3500): Promise<MapCoordi
       return null;
     }
 
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<null>((resolve) => {
+      timerId = setTimeout(() => resolve(null), timeoutMs);
+    });
+
     const position = await Promise.race([
       mapLibre.LocationManager.getCurrentPosition(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-    ]);
+      timeoutPromise,
+    ]).finally(() => {
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+    });
 
     if (!position) {
       console.warn(`[GPS] getCurrentPosition timed out after ${timeoutMs}ms; awaiting listener update`);

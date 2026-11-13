@@ -389,7 +389,9 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       expect(await waitFor(() => getByLabelText(/Bike route|Tuyến đường xe máy/i))).toBeTruthy();
 
       // Verify Start button is ready in bottom sheet
-      expect(await waitFor(() => getByLabelText('Begin navigation'))).toBeTruthy();
+      expect(
+        await waitFor(() => getByLabelText(/Begin navigation|Bắt đầu di chuyển/i)),
+      ).toBeTruthy();
 
       // Verify MapView received destination and routeStart coordinates
       expect(mockMapProps.destination).toMatchObject({
@@ -516,7 +518,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
       });
 
       // 2. Press "Begin navigation" to activate active guidance
-      const beginNavBtn = await findByLabelText('Begin navigation');
+      const beginNavBtn = await findByLabelText(/Begin navigation|Bắt đầu di chuyển/i);
       await act(async () => {
         await fireEvent.press(beginNavBtn);
       });
@@ -549,7 +551,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         await fireEvent.press(startRouteBtn);
       });
 
-      const beginNavBtn = await findByLabelText('Begin navigation');
+      const beginNavBtn = await findByLabelText(/Begin navigation|Bắt đầu di chuyển/i);
       await act(async () => {
         await fireEvent.press(beginNavBtn);
       });
@@ -669,7 +671,7 @@ describe('Frontend Navigation Flow Integration Tests (MSW)', () => {
         await fireEvent.press(startRouteBtn);
       });
 
-      const beginNavBtn = await findByLabelText('Begin navigation');
+      const beginNavBtn = await findByLabelText(/Begin navigation|Bắt đầu di chuyển/i);
       await act(async () => {
         await fireEvent.press(beginNavBtn);
       });

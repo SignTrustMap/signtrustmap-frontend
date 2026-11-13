@@ -1,6 +1,8 @@
 // Extend Jest timeout for React Native component rendering under coverage instrumentation
 jest.setTimeout(15000);
 
+global.IS_REACT_ACT_ENVIRONMENT = true;
+
 if (globalThis.__NATIVE_GLOBALS__) {
   for (const [key, value] of Object.entries(globalThis.__NATIVE_GLOBALS__)) {
     if (value !== undefined) {

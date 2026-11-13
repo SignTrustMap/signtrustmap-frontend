@@ -20,10 +20,12 @@ module.exports = class CustomReactNativeEnv extends NodeEnv {
       TextDecoder: this.global.TextDecoder,
     };
     this.global.__NATIVE_GLOBALS__ = this.nativeGlobals;
+    this.global.IS_REACT_ACT_ENVIRONMENT = true;
   }
 
   async setup() {
     await super.setup();
     this.global.__NATIVE_GLOBALS__ = this.nativeGlobals;
+    this.global.IS_REACT_ACT_ENVIRONMENT = true;
   }
 };

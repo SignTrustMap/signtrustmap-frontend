@@ -196,7 +196,8 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await waitFor(() => {});
     cleanup();
   });
 
@@ -248,7 +249,8 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await waitFor(() => {});
     cleanup();
   });
 
@@ -307,7 +309,8 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await waitFor(() => {});
     cleanup();
   });
 
@@ -325,6 +328,10 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByText('Yêu cầu chụp lại ảnh')).toBeTruthy();
       expect(getByText('4')).toBeTruthy();
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
+
+      await waitFor(() => {
+        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
+      });
     });
 
     it('renders offline map card when onOpenOfflineMap callback is provided', async () => {
@@ -336,6 +343,10 @@ describe('Work Roles & Component Architecture Test Suite', () => {
 
       fireEvent.press(offlineCard);
       expect(mockOnOpenOfflineMap).toHaveBeenCalled();
+
+      await waitFor(() => {
+        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
+      });
     });
 
     it('acquires real user coordinates via fetchFreshGpsPosition and passes to useGetFirstRevalidationSign', async () => {
@@ -364,6 +375,10 @@ describe('Work Roles & Component Architecture Test Suite', () => {
           snapLat: '10.7769',
         }),
       });
+
+      await waitFor(() => {
+        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
+      });
     });
 
     it('SurveyorFab renders floating plus button and navigates to /work/new-survey', async () => {
@@ -385,7 +400,8 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await waitFor(() => {});
     cleanup();
   });
 
@@ -409,6 +425,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       await waitFor(() => {
         expect(getByText('Lịch sử khảo sát')).toBeTruthy();
         expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
+        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
       });
     });
 
@@ -446,7 +463,8 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await waitFor(() => {});
     cleanup();
   });
 });

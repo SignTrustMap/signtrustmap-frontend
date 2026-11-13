@@ -88,26 +88,29 @@ export function WorkActionCard({
           </View>
 
           <View style={styles.rightContainer}>
-            {hasBadge ? (
-              <Badge
-                borderColor={theme.backgroundElement}
-                borderWidth={1.5}
-                count={badgeLabel ? undefined : count}
-                label={badgeLabel}
-                maxCount={9}
-                size="md"
-              />
-            ) : null}
             <MaterialCommunityIcons color={theme.grey} name="chevron-right" size={22} />
           </View>
         </View>
       </Pressable>
+
+      {hasBadge ? (
+        <Badge
+          borderColor={theme.background}
+          borderWidth={2}
+          count={badgeLabel ? undefined : count}
+          label={badgeLabel}
+          maxCount={9}
+          size="lg"
+          style={styles.topRightBadge}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   outerContainer: {
+    position: 'relative',
     width: '100%',
   },
   actionCard: {
@@ -120,6 +123,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+  },
+  topRightBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    zIndex: 10,
+    elevation: 5,
   },
   contentRow: {
     flexDirection: 'row',
