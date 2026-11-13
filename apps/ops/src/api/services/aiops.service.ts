@@ -67,8 +67,10 @@ export interface SystemHardwareMetrics {
 }
 
 export interface ActiveLearningConfig {
-  uncertaintyMargin: string
-  minSamplesForAutoRetrain: number
+  uncertaintyMargin?: string
+  minSamplesForAutoRetrain?: number
+  defaultStrategy?: string
+  defaultTopK?: number
 }
 
 export interface SystemHealthResponse {
@@ -143,6 +145,33 @@ export interface SystemConfigResponse {
     discrepancy_threshold: number
     auto_trigger_training: boolean
     dataset_store_path: string
+    r3_cec?: {
+      k_neighbors: number
+      temperature: number
+      query_budget: number
+      apply_calibration: boolean
+      random_state: number
+    }
+    least_confidence?: {
+      aggregation_method: string
+      no_detection_score: number
+    }
+  }
+  timo?: {
+    alpha: number
+    beta: number
+    prompt_template: string
+    normalize_embeddings: boolean
+    classifier_cache_file: string
+  }
+  few_shot_support?: {
+    total_shots_per_class: number
+    num_anchors: number
+    num_medoids: number
+    min_crop_resolution: number
+    min_sharpness_laplacian: number
+    replacement_policy: string
+    preserve_pinned_shots: boolean
   }
   detector: {
     active_model: string
@@ -151,6 +180,7 @@ export interface SystemConfigResponse {
   classifier: {
     active_model: string
     default_conf: number
+    temperature?: number
     prompt_template: string
   }
   system: {
@@ -162,6 +192,12 @@ export interface SystemConfigResponse {
     minio_endpoint: string
     minio_bucket: string
   }
+}
+
+export interface ConfigResetResponse {
+  status: string
+  message: string
+  config: SystemConfigResponse
 }
 
 export const aiopsService = {
@@ -177,6 +213,45 @@ export const aiopsService = {
    */
   getConfig: async (): Promise<SystemConfigResponse> => {
     return edgeFetch<SystemConfigResponse>(API_ENDPOINTS.AIOPS.CONFIG)
+  },
+
+  /**
+   * Fetch configuration for a specific subsystem group (/api/v1/config/{group_name})
+   */
+  getConfigGroup: async (groupName: string): Promise<Record<string, any>> => {
+    return edgeFetch<Record<string, any>>(API_ENDPOINTS.AIOPS.CONFIG_GROUP(groupName))
+  },
+
+  /**
+   * Update multiple configuration groups (PATCH /api/v1/config)
+   */
+  updateConfig: async (updates: Partial<SystemConfigResponse>): Promise<SystemConfigResponse> => {
+    return edgeFetch<SystemConfigResponse>(API_ENDPOINTS.AIOPS.CONFIG, {
+      method: 'PATCH',
+      data: updates,
+    })
+  },
+
+  /**
+   * Update configuration for a specific subsystem group (PATCH /api/v1/config/{group_name})
+   */
+  updateConfigGroup: async (
+    groupName: keyof SystemConfigResponse | string,
+    updates: Record<string, any>
+  ): Promise<Record<string, any>> => {
+    return edgeFetch<Record<string, any>>(API_ENDPOINTS.AIOPS.CONFIG_GROUP(groupName), {
+      method: 'PATCH',
+      data: updates,
+    })
+  },
+
+  /**
+   * Reset all AI system configuration to factory defaults (POST /api/v1/config/reset)
+   */
+  resetConfig: async (): Promise<ConfigResetResponse> => {
+    return edgeFetch<ConfigResetResponse>(API_ENDPOINTS.AIOPS.CONFIG_RESET, {
+      method: 'POST',
+    })
   },
 
   /**

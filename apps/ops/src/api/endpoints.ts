@@ -41,6 +41,8 @@ export const API_ENDPOINTS = {
   // ── Security & Audit Logs ─────────────────────────────────────────
   AUDIT: {
     LOGS: '/api/v1/admin/audit-logs',
+    TASK_HISTORY: '/api/v1/admin/tasks/history',
+    TASK_HISTORY_DETAIL: (taskId: string) => `/api/v1/admin/tasks/${encodeURIComponent(taskId)}/history`,
   },
 
   // ── GIS Spatial Data Export ───────────────────────────────────────
@@ -85,6 +87,7 @@ export const API_ENDPOINTS = {
     CASES: '/api/v1/moderation/cases',
     CASE_DETAIL: (id: string) => `/api/v1/moderation/cases/${id}`,
     RESOLVE_CASE: (id: string) => `/api/v1/moderation/cases/${id}/resolve`,
+    USER_PROFILE: (id: string) => `/api/v1/moderation/users/${id}`,
     REPORT_FROM_REVIEW: '/api/v1/reviews/missing-type',
     CANDIDATES: '/api/v1/reviews/candidates',
     CANDIDATE_QUEUE: '/api/v1/reviews/queue',
@@ -109,12 +112,18 @@ export const API_ENDPOINTS = {
     CONSENSUS_CONFIG: '/api/v1/admin/consensus/config',
     ROUTE_MATRIX: '/api/v1/admin/routes/matrix',
     ROUTE_MATRIX_DETAIL: (id: number | string) => `/api/v1/admin/routes/matrix/${id}`,
+    FRESHNESS_RULES: '/api/v1/admin/freshness-rules',
+    FRESHNESS_RULE_DETAIL: (id: number | string) => `/api/v1/admin/freshness-rules/${id}`,
     BASE: '/api/v1/admin/system-parameters',
     INGESTION: '/api/v1/admin/system-parameters',
     CONSENSUS: '/api/v1/admin/consensus/config',
     FRESHNESS: '/api/v1/admin/routes/matrix',
     MODERATION: '/api/v1/admin/system-parameters',
     MAINTENANCE: '/api/v1/admin/system-parameters/maintenance_mode',
+    SYSTEM_SWITCHES: '/api/v1/admin/system-switches',
+    SYSTEM_SWITCH_KEY: (key: string) => `/api/v1/admin/system-switches/${encodeURIComponent(key)}`,
+    DEMO_MODE_ENABLE: '/api/v1/admin/system-switches/demo-mode/enable',
+    DEMO_MODE_DISABLE: '/api/v1/admin/system-switches/demo-mode/disable',
   },
 
   // ── Economy, Rewards & Wallet Adjustments ─────────────────────────
@@ -198,6 +207,8 @@ export const API_ENDPOINTS = {
     STRATEGIES: `${AIOPS_BASE_URL}/api/v1/active-learning/strategies`,
     CLASSES: `${AIOPS_BASE_URL}/api/v1/classes`,
     CONFIG: `${AIOPS_BASE_URL}/api/v1/config`,
+    CONFIG_GROUP: (groupName: string) => `${AIOPS_BASE_URL}/api/v1/config/${encodeURIComponent(groupName)}`,
+    CONFIG_RESET: `${AIOPS_BASE_URL}/api/v1/config/reset`,
     PIPELINE_STATUS: '/api/v1/mlops/pipeline/status',
     RETRAINING_RUNS: '/api/v1/mlops/retraining-runs',
     TRIGGER_RUN: '/api/v1/mlops/retraining-runs/trigger',

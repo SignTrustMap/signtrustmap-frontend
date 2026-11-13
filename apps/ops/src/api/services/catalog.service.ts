@@ -1,5 +1,75 @@
 import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import type { UserProfileSummary } from './user.service'
+
+export interface RecaptureRequestSummary {
+  id?: string
+  candidateId?: string | null
+  surveyorId?: string | null
+  assignedSurveyor?: UserProfileSummary | null
+  isRandomOrOpenQuest?: boolean
+  reviewerId?: string | null
+  reviewer?: UserProfileSummary | null
+  reason?: string
+  note?: string | null
+  createdAt?: string
+  completedAt?: string | null
+}
+
+/**
+ * Normalizes recapture payloads from either report/case detail or candidate/recaptures endpoints.
+ */
+export function normalizeRecaptureRequestSummary(raw: any): RecaptureRequestSummary | null {
+  if (!raw || typeof raw !== 'object') return null
+  const surveyorId = raw.surveyorId ?? raw.surveyor_id ?? raw.assignedSurveyor?.id ?? raw.surveyor?.id ?? null
+  const rawSurveyor = raw.assignedSurveyor || raw.surveyor
+  const assignedSurveyor: UserProfileSummary | null =
+    rawSurveyor && (rawSurveyor.id || rawSurveyor.fullName || rawSurveyor.full_name || rawSurveyor.email)
+      ? {
+          id: rawSurveyor.id ?? surveyorId ?? undefined,
+          fullName: rawSurveyor.fullName ?? rawSurveyor.full_name ?? raw.surveyorName ?? raw.surveyor_name ?? null,
+          email: rawSurveyor.email ?? raw.surveyorEmail ?? raw.surveyor_email ?? null,
+          avatarUrl: rawSurveyor.avatarUrl ?? rawSurveyor.avatar_url ?? null,
+        }
+      : surveyorId
+      ? {
+          id: surveyorId,
+          fullName: raw.surveyorName ?? raw.surveyor_name ?? null,
+          email: raw.surveyorEmail ?? raw.surveyor_email ?? null,
+        }
+      : null
+
+  const reviewerId = raw.reviewerId ?? raw.reviewer_id ?? raw.reviewer?.id ?? null
+  const rawReviewer = raw.reviewer
+  const reviewer: UserProfileSummary | null =
+    rawReviewer && (rawReviewer.id || rawReviewer.fullName || rawReviewer.full_name || rawReviewer.email)
+      ? {
+          id: rawReviewer.id ?? reviewerId ?? undefined,
+          fullName: rawReviewer.fullName ?? rawReviewer.full_name ?? raw.reviewerName ?? raw.reviewer_name ?? null,
+          email: rawReviewer.email ?? raw.reviewerEmail ?? raw.reviewer_email ?? null,
+        }
+      : reviewerId
+      ? {
+          id: reviewerId,
+          fullName: raw.reviewerName ?? raw.reviewer_name ?? null,
+          email: raw.reviewerEmail ?? raw.reviewer_email ?? null,
+        }
+      : null
+
+  return {
+    id: raw.id,
+    candidateId: raw.candidateId ?? raw.candidate_id ?? null,
+    surveyorId,
+    assignedSurveyor,
+    isRandomOrOpenQuest: raw.isRandomOrOpenQuest ?? !surveyorId,
+    reviewerId,
+    reviewer,
+    reason: raw.reason,
+    note: raw.note ?? '',
+    createdAt: raw.createdAt ?? raw.created_at,
+    completedAt: raw.completedAt ?? raw.completed_at ?? null,
+  }
+}
 
 export interface SignCategoryItem {
   id: number
@@ -111,6 +181,9 @@ export interface MissingTypeReportItem {
   createdAt: string
   updatedAt: string
   candidate?: CandidateEnriched | null
+  reporter?: UserProfileSummary | null
+  reviewer?: UserProfileSummary | null
+  recaptureRequest?: RecaptureRequestSummary | null
 }
 
 export interface PaginatedMissingReportsResponse {
@@ -409,17 +482,7 @@ export const catalogService = {
 
   getCandidateRecaptures: async (
     candidateId: string
-  ): Promise<
-    Array<{
-      id: string
-      candidateId?: string
-      candidate_id?: string
-      reason: string
-      note?: string
-      createdAt?: string
-      created_at?: string
-    }>
-  > => {
+  ): Promise<any[]> => {
     return http.get(API_ENDPOINTS.MODERATION.CANDIDATE_RECAPTURES(candidateId))
   },
 

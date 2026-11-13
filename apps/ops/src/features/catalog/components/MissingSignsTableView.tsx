@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sparkle, Image as ImageIcon } from '@phosphor-icons/react'
 import { Pagination } from '@/components/common/Pagination'
+import { UserIdentityButton } from '@/components/common/UserProfileDetailModal'
+import type { UserProfileSummary } from '@/api/services/user.service'
 import type { MissingSignTypeReport } from '@/data'
 
 interface MissingSignsTableViewProps {
@@ -13,6 +15,7 @@ interface MissingSignsTableViewProps {
   onPageChange: (page: number) => void
   onPageSizeChange: (size: number) => void
   onSelectReport: (report: MissingSignTypeReport) => void
+  onInspectUser?: (userId: string, summary?: UserProfileSummary | null) => void
 }
 
 function formatDate(val?: string, isEn = false): string {
@@ -105,6 +108,7 @@ export function MissingSignsTableView({
   onPageChange,
   onPageSizeChange,
   onSelectReport,
+  onInspectUser,
 }: MissingSignsTableViewProps) {
   const { i18n } = useTranslation(['ops', 'common'])
   const isEn = i18n.language?.startsWith('en')
@@ -190,9 +194,19 @@ export function MissingSignsTableView({
                       </div>
                     </td>
 
-                    {/* 5. Người tạo (Id viết tắt dạng #eaa2eac3) */}
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {shortReporter}
+                    {/* 5. Người tạo (ưu tiên tên, fallback UUID; bấm để xem hồ sơ) */}
+                    <td className="py-3.5 px-4 font-mono text-[11px] text-gray-600 dark:text-gray-400 whitespace-nowrap max-w-[180px]">
+                      {report.reporterId && onInspectUser ? (
+                        <UserIdentityButton
+                          userId={report.reporterId}
+                          initialUser={report.reporter}
+                          isEn={isEn}
+                          onOpenProfile={onInspectUser}
+                          className="max-w-full"
+                        />
+                      ) : (
+                        shortReporter
+                      )}
                     </td>
 
                     {/* 6. Thời gian tạo */}

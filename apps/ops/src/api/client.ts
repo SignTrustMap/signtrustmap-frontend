@@ -87,6 +87,17 @@ apiClient.interceptors.response.use(
 )
 
 /**
+ * Extracts a readable message string from unwrapped NestJS/Axios error payloads.
+ */
+export function extractApiErrorMessage(err: any): string {
+  const rawMessage = err?.response?.data?.message ?? err?.message
+  if (Array.isArray(rawMessage)) {
+    return rawMessage.filter(Boolean).join('; ')
+  }
+  return typeof rawMessage === 'string' ? rawMessage : ''
+}
+
+/**
  * Helper request wrapper for typing
  */
 export const http = {

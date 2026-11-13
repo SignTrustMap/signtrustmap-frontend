@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/context/ToastContext'
+import { extractApiErrorMessage } from '@/api/client'
 import CustomSelect from '@/components/common/CustomSelect'
-import { CircleNotch, Check, ChatText } from '@phosphor-icons/react'
+import { CircleNotch, ChatText } from '@phosphor-icons/react'
 import {
   catalogService,
   STANDARD_SIGN_CATEGORIES,
@@ -488,12 +489,19 @@ export function CatalogProposalStepView({
       // BƯỚC 2: Cập nhật trạng thái ca Escalation sang RESOLVED
       // (Chỉ được phép thực thi sau khi Bước 1 trả về thành công)
       // =========================================================================
-      await escalationService.resolveCase(caseId, {
-        resolutionNote: cleanStaffNotes,
-        actionType: 'APPROVED',
-        targetSignTypeId: newSignTypeId,
-        reportId,
-      })
+      try {
+        await escalationService.resolveCase(caseId, {
+          resolutionNote: cleanStaffNotes,
+          actionType: 'APPROVED',
+          targetSignTypeId: newSignTypeId,
+          reportId,
+        })
+      } catch (resolveErr: any) {
+        const resolveMsg = extractApiErrorMessage(resolveErr)
+        if (!resolveMsg.toLowerCase().includes('already resolved')) {
+          throw resolveErr
+        }
+      }
 
       success(
         isEn
@@ -503,10 +511,10 @@ export function CatalogProposalStepView({
 
       onSuccess()
     } catch (err: any) {
-      console.error('Failed to approve and create sign type:', err)
-      const status = err?.response?.status || err?.status
-      const msg = String(err?.response?.data?.message || err?.message || '')
-      if (status === 409 || msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('trùng')) {
+      const status = err?.response?.status || err?.status || err?.statusCode
+      const formattedMessage = extractApiErrorMessage(err)
+      console.error('Failed to approve and create sign type:', formattedMessage || err)
+      if (status === 409 || formattedMessage.toLowerCase().includes('already exists') || formattedMessage.toLowerCase().includes('trùng')) {
         error(
           isEn
             ? `Sign code "${fullCode}" already exists in the catalog! Please choose another code.`
@@ -514,8 +522,7 @@ export function CatalogProposalStepView({
         )
       } else {
         const errorMsg =
-          err?.response?.data?.message ||
-          err?.message ||
+          formattedMessage ||
           (isEn ? 'Failed to create sign type. Escalation case status remains unchanged.' : 'Không thể tạo biển mới. Ca chuyển tiếp vẫn được giữ nguyên trạng thái!')
         error(errorMsg)
       }
@@ -830,14 +837,13 @@ export function CatalogProposalStepView({
                           setAllowedVehicles([...allowedVehicles, v.value])
                         }
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                         selected
                           ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
                           : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
                       }`}
                     >
                       <span className="truncate">{isEn ? v.labelEn : v.labelVi}</span>
-                      {selected && <Check size={12} weight="bold" className="shrink-0 ml-1" />}
                     </button>
                   )
                 })}
