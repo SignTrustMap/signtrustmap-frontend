@@ -98,6 +98,7 @@ export interface CatalogSignTypeItem {
   aiLabelPrompt?: string | null
   osmMapping?: string | null
   representativeImageKey?: string | null
+  allowedVehicles?: VehicleType[] | null
 }
 
 export interface PaginatedSignTypesResponse {
@@ -131,6 +132,7 @@ export interface CreateSignTypeInput {
   shape?: string
   colorScheme?: string
   isActive?: boolean
+  allowedVehicles?: VehicleType[]
 }
 
 export interface UpdateSignTypeInput extends Partial<CreateSignTypeInput> {}

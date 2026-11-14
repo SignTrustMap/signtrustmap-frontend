@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import { X, UploadSimple, Link as LinkIcon, Trash, Check, CircleNotch } from '@phosphor-icons/react'
+import React, { useState, useEffect, useRef } from 'react'
+import { X, CircleNotch } from '@phosphor-icons/react'
+import { useToast } from '@/context/ToastContext'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import CustomSelect from '@/components/common/CustomSelect'
 import type { CatalogCategory, CatalogEntry } from '@/data/catalogData'
-import { VEHICLE_TYPE_OPTIONS, type VehicleType, catalogService } from '@/api/services/catalog.service'
+import { type VehicleType, catalogService } from '@/api/services/catalog.service'
+import { normalizeSignCodeCase } from '@/features/map/utils/signUrlHelpers'
 
 export interface CreateSignModalProps {
   /** Controls modal visibility. */
@@ -35,13 +36,25 @@ function getPrefixForCatalogCategory(cat: CatalogCategory): string {
   }
 }
 
-/**
- * Modal dialog enabling Administrators to publish a new traffic sign specification
- * into the QCVN 41:2019 reference catalog with AI CLIP vector prompt and OSM tagging rules.
- */
-const DEFAULT_ALLOWED_VEHICLES: VehicleType[] = VEHICLE_TYPE_OPTIONS.map((v) => v.value).filter(
-  (v) => v !== 'PEDESTRIAN'
-)
+const CATEGORY_OPTIONS: Array<{ value: CatalogCategory; label: string; id: number }> = [
+  { value: 'prohibitory', label: 'Biển báo cấm', id: 1 },
+  { value: 'warning', label: 'Biển báo nguy hiểm', id: 2 },
+  { value: 'mandatory', label: 'Biển hiệu lệnh', id: 3 },
+  { value: 'speed_limit', label: 'Biển giới hạn tốc độ', id: 1 },
+  { value: 'guide', label: 'Biển chỉ dẫn', id: 4 },
+  { value: 'additional', label: 'Biển phụ', id: 5 },
+]
+
+const VEHICLE_OPTIONS: Array<{ value: VehicleType; labelVi: string }> = [
+  { value: 'CAR', labelVi: 'Ô tô' },
+  { value: 'MOTORCYCLE', labelVi: 'Xe máy' },
+  { value: 'TRUCK', labelVi: 'Xe tải' },
+  { value: 'BUS', labelVi: 'Xe buýt' },
+  { value: 'BICYCLE', labelVi: 'Xe đạp' },
+  { value: 'PEDESTRIAN', labelVi: 'Người đi bộ' },
+]
+
+const DEFAULT_ALLOWED_VEHICLES: VehicleType[] = VEHICLE_OPTIONS.map((v) => v.value)
 
 export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   isOpen,
@@ -49,8 +62,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   onCreate,
   existingCodes,
 }) => {
-  const { t } = useTranslation('ops')
-
+  const toast = useToast()
   const [codePrefix, setCodePrefix] = useState('P.')
   const [codeNumber, setCodeNumber] = useState('')
   const [codeError, setCodeError] = useState('')
@@ -59,20 +71,16 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   const [newNameVi, setNewNameVi] = useState('')
   const [newNameEn, setNewNameEn] = useState('')
   const [newCategory, setNewCategory] = useState<CatalogCategory>('prohibitory')
-  const [newShape, setNewShape] = useState<'Circle' | 'Triangle' | 'Rectangle' | 'Octagon' | 'Diamond'>('Circle')
-  const [newColor, setNewColor] = useState('')
-  const [newDescriptionVi, setNewDescriptionVi] = useState('')
-  const [newDescriptionEn, setNewDescriptionEn] = useState('')
-  const [newAiPrompt, setNewAiPrompt] = useState('')
-  const [newOsmMapping, setNewOsmMapping] = useState('')
   const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>(DEFAULT_ALLOWED_VEHICLES)
 
-  // Representative Image state (Mandatory)
+  // Representative Image state
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageUrl, setImageUrl] = useState('')
   const [imagePreview, setImagePreview] = useState('')
-  const [imageMode, setImageMode] = useState<'upload' | 'url'>('upload')
+  const [showUrlInput, setShowUrlInput] = useState(false)
   const [imageError, setImageError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
   if (!isOpen) return null
 
@@ -82,25 +90,34 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
     setCodeError('')
     setNewNameVi('')
     setNewNameEn('')
-    setNewDescriptionVi('')
-    setNewDescriptionEn('')
-    setNewAiPrompt('')
-    setNewOsmMapping('')
     setNewCategory('prohibitory')
-    setNewShape('Circle')
-    setNewColor('')
     setAllowedVehicles(DEFAULT_ALLOWED_VEHICLES)
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
     setImageFile(null)
     setImageUrl('')
     setImagePreview('')
+    setShowUrlInput(false)
     setImageError('')
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        setImageError('Dung lượng tệp vượt quá giới hạn tối đa 20MB')
+        return
+      }
       setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+      const newUrl = URL.createObjectURL(file)
+      objectUrlRef.current = newUrl
+      setImagePreview(newUrl)
+      setImageUrl('')
       setImageError('')
     }
   }
@@ -112,13 +129,20 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   }
 
   const handleClearImage = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
     setImageFile(null)
     setImageUrl('')
     setImagePreview('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const cleanCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
-  const hasInputNumber = Boolean(codeNumber.trim())
+  const sanitizedNumber = codeNumber.trim().replace(/^[A-Za-z]+\./, '')
+  const rawFullCode = `${codePrefix}${sanitizedNumber}`
+  const cleanCode = normalizeSignCodeCase(rawFullCode)
+  const hasInputNumber = Boolean(sanitizedNumber)
 
   // Real-time API check for code duplication with debounce
   useEffect(() => {
@@ -128,7 +152,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       return
     }
 
-    if (existingCodes?.some((c) => c.toUpperCase() === cleanCode)) {
+    if (existingCodes?.some((c) => normalizeSignCodeCase(c) === cleanCode)) {
       setIsDuplicateCode(true)
     }
 
@@ -141,13 +165,13 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
         if (isCancelled) return
 
         const isApiDuplicate = Boolean(
-          res?.items?.some((item) => item.signCode?.trim().toUpperCase() === cleanCode)
+          res?.items?.some((item) => normalizeSignCodeCase(item.signCode) === cleanCode)
         )
 
         if (isApiDuplicate) {
           setIsDuplicateCode(true)
         } else {
-          const inLocal = existingCodes?.some((c) => c.toUpperCase() === cleanCode)
+          const inLocal = existingCodes?.some((c) => normalizeSignCodeCase(c) === cleanCode)
           setIsDuplicateCode(Boolean(inLocal))
         }
       } catch (err) {
@@ -168,23 +192,23 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!codeNumber.trim()) {
-      setCodeError('Vui lòng nhập số hiệu biển!')
+      setCodeError('Vui lòng nhập số hiệu biển')
       return
     }
 
     if (isDuplicateCode) {
-      setCodeError(`Mã biển "${cleanCode}" đã bị trùng trong Catalog!`)
+      setCodeError(`Mã biển "${cleanCode}" đã bị trùng trong danh mục`)
       return
     }
 
     if (allowedVehicles.length === 0) {
-      alert('Vui lòng chọn ít nhất một loại phương tiện áp dụng!')
+      toast.error('Vui lòng chọn ít nhất một loại phương tiện áp dụng')
       return
     }
 
     const hasImage = Boolean(imageFile || imageUrl.trim())
     if (!hasImage) {
-      setImageError(t('catalog.err_image_required'))
+      setImageError('Vui lòng tải ảnh đại diện hoặc nhập liên kết ảnh')
       return
     }
 
@@ -197,14 +221,14 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       nameVi: newNameVi.trim() || cleanCode,
       nameEn: newNameEn.trim() || newNameVi.trim(),
       category: newCategory,
-      shape: newShape,
-      color: newColor,
-      description: newDescriptionVi.trim() || 'Standard road sign regulation definition',
-      descriptionVi: newDescriptionVi.trim() || 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
-      descriptionEn: newDescriptionEn.trim() || 'Standard technical traffic regulation definition.',
-      aiPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${cleanCode}`,
-      clipPrompt: newAiPrompt.trim() || `${newShape.toLowerCase()} road traffic sign for ${cleanCode}`,
-      osmMapping: newOsmMapping.trim() || `traffic_sign=VN:${cleanCode}`,
+      shape: 'Circle',
+      color: 'Red-White',
+      description: 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
+      descriptionVi: 'Mô tả quy chuẩn kỹ thuật theo QCVN 41:2019/BGTVT.',
+      descriptionEn: 'Standard technical traffic regulation definition.',
+      aiPrompt: `road traffic sign for ${cleanCode}`,
+      clipPrompt: `road traffic sign for ${cleanCode}`,
+      osmMapping: `traffic_sign=VN:${cleanCode}`,
       standardRef: 'QCVN 41:2019/BGTVT',
       status: 'Active',
       version: 'v2.5',
@@ -223,396 +247,328 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
+        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
         onClick={onClose}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative my-8 animate-in zoom-in-95 duration-200 text-left"
+          className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-4xl w-full shadow-2xl relative my-auto max-h-[92vh] flex flex-col overflow-hidden text-xs text-gray-800 dark:text-gray-200 text-left"
         >
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-white/10 pb-3">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
             <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
-              {t('catalog.modal_title')}
+              Thêm biển báo mới
             </h3>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white cursor-pointer"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 ml-2"
+              title="Đóng"
             >
-              <X size={18} />
+              <X size={18} weight="bold" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('catalog.field_code')} *
-                  </label>
-                  {isCheckingApi ? (
-                    <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
-                      <CircleNotch size={11} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
-                      <span>{t('catalog.checking', 'Đang kiểm tra...')}</span>
-                    </span>
-                  ) : isDuplicateCode ? (
-                    <span className="text-[10px] font-mono text-red-500 font-bold">
-                      {t('catalog.already_exists', 'Đã tồn tại')}
-                    </span>
-                  ) : null}
-                </div>
-
-                {/* 2 ô nhỏ: Tiền tố (không sửa được) & Số hiệu (chỉ nhập số) */}
-                <div className="flex items-center gap-2">
-                  <div className="relative shrink-0">
-                    <input
-                      type="text"
-                      readOnly
-                      tabIndex={-1}
-                      value={codePrefix}
-                      title="Tiền tố tự động gán theo nhóm biển (Không sửa được)"
-                      className={`w-16 sm:w-20 px-3 py-2.5 rounded-xl border text-center font-mono font-bold select-none outline-none transition-colors cursor-not-allowed ${
-                        hasInputNumber
-                          ? isDuplicateCode
-                            ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-400'
-                            : 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
-                          : 'border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300'
-                      }`}
-                    />
+          {/* Form Content - 2 Columns Layout */}
+          <form id="create-sign-form" onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+              {/* ─── CỘT TRÁI: ẢNH ĐẠI DIỆN (5 cols) ───── */}
+              <div className="md:col-span-5 flex flex-col h-full">
+                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] flex flex-col h-full justify-between gap-3 shadow-2xs">
+                  <div className="text-[11px] font-bold text-gray-900 dark:text-white shrink-0">
+                    Ảnh đại diện biển báo <span className="text-red-500">*</span>
                   </div>
 
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      required
-                      placeholder="130"
-                      value={codeNumber}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '')
-                        setCodeNumber(val)
-                        if (codeError) setCodeError('')
-                      }}
-                      className={`w-full px-3.5 py-2.5 rounded-xl font-mono text-gray-900 dark:text-white outline-none transition-colors ${
-                        hasInputNumber
-                          ? isDuplicateCode
-                            ? 'border border-red-500 focus:border-red-600 focus:ring-1 focus:ring-red-500/20 bg-red-50/10'
-                            : 'border border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20 bg-white dark:bg-[#061115]'
-                          : 'border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {!isDuplicateCode && codeError && (
-                  <p className="text-[11px] text-red-500 font-medium pt-0.5">{codeError}</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_category')} *
-                </label>
-                <CustomSelect
-                  value={newCategory}
-                  onChange={(val) => {
-                    const nextCat = val as CatalogCategory
-                    setNewCategory(nextCat)
-                    setCodePrefix(getPrefixForCatalogCategory(nextCat))
-                  }}
-                  className="w-full"
-                  buttonClassName="w-full"
-                  options={[
-                    { value: 'prohibitory', label: t('catalog.cat_prohibitory') },
-                    { value: 'warning', label: t('catalog.cat_warning') },
-                    { value: 'mandatory', label: t('catalog.cat_mandatory') },
-                    { value: 'speed_limit', label: t('catalog.cat_speed_limit') },
-                    { value: 'guide', label: t('catalog.cat_guide') },
-                    { value: 'additional', label: t('catalog.cat_additional') },
-                  ]}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_name')} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder={t('catalog.field_name_placeholder')}
-                  value={newNameVi}
-                  onChange={(e) => setNewNameVi(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_name_en')}
-                </label>
-                <input
-                  type="text"
-                  placeholder={t('catalog.field_name_en_placeholder')}
-                  value={newNameEn}
-                  onChange={(e) => setNewNameEn(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_shape')}
-                </label>
-                <CustomSelect
-                  value={newShape}
-                  onChange={(val) => setNewShape(val as any)}
-                  className="w-full"
-                  buttonClassName="w-full"
-                  options={[
-                    { value: 'Circle', label: t('catalog.shape_circle') },
-                    { value: 'Triangle', label: t('catalog.shape_triangle') },
-                    { value: 'Rectangle', label: t('catalog.shape_rectangle') },
-                    { value: 'Octagon', label: t('catalog.shape_octagon') },
-                    { value: 'Diamond', label: t('catalog.shape_diamond') },
-                  ]}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {t('catalog.field_color')}
-                </label>
-                <input
-                  type="text"
-                  maxLength={30}
-                  placeholder="Đỏ - Trắng"
-                  value={newColor}
-                  onChange={(e) => setNewColor(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                />
-              </div>
-            </div>
-
-            {/* Representative Image (Required) */}
-            <div className="space-y-2 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="block font-mono font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide text-xs">
-                    {t('catalog.field_representative_image')} *
-                  </label>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    {t('catalog.field_representative_image_hint')}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1 bg-gray-200/60 dark:bg-white/10 p-1 rounded-lg text-[11px] font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setImageMode('upload')}
-                    className={`px-2 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer ${
-                      imageMode === 'upload'
-                        ? 'bg-white dark:bg-[#061115] text-[#007b8b] dark:text-[#00c4de] shadow-xs'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <UploadSimple size={13} weight="bold" />
-                    <span>Tải ảnh</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageMode('url')}
-                    className={`px-2 py-1 rounded-md transition-colors flex items-center gap-1 cursor-pointer ${
-                      imageMode === 'url'
-                        ? 'bg-white dark:bg-[#061115] text-[#007b8b] dark:text-[#00c4de] shadow-xs'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <LinkIcon size={13} weight="bold" />
-                    <span>URL</span>
-                  </button>
-                </div>
-              </div>
-
-              {imageMode === 'upload' ? (
-                <div>
-                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 dark:border-white/15 rounded-xl hover:border-[#007b8b] dark:hover:border-[#00c4de] hover:bg-gray-100/50 dark:hover:bg-white/5 transition-all cursor-pointer">
-                    <UploadSimple size={24} className="text-[#007b8b] dark:text-[#00c4de] mb-1.5" />
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-                      {t('catalog.upload_or_drag')}
-                    </span>
-                    <span className="text-[10px] text-gray-400 mt-0.5">
-                      {t('catalog.upload_hint')}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              ) : (
-                <div>
-                  <input
-                    type="url"
-                    placeholder="https://s3.signmap.site/stm-sign-crops/representative/..."
-                    value={imageUrl}
-                    onChange={(e) => handleUrlChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                  />
-                </div>
-              )}
-
-              {/* Preview Card */}
-              {imagePreview && (
-                <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#061115]">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                  {/* Khung ảnh xem trước */}
+                  <div className="relative flex-1 min-h-[220px] rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 overflow-hidden flex items-center justify-center shadow-xs">
+                    {imagePreview ? (
                       <img
                         src={imagePreview}
-                        alt="Representative Preview"
-                        className="w-full h-full object-contain"
+                        alt="Ảnh đại diện"
+                        className="w-full h-full object-contain p-2 max-h-[220px]"
                       />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate block">
-                        {imageFile?.name || (imageUrl ? 'URL Image' : 'Selected image')}
+                    ) : (
+                      <span className="text-gray-400 text-[11px] text-center p-2">
+                        Chưa có ảnh
                       </span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Ảnh đại diện đã sẵn sàng
-                      </span>
+                    )}
+
+                    {/* Badge text góc trên */}
+                    <div className="absolute top-2 left-2">
+                      {imageFile ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
+                          Ảnh mới tải lên
+                        </span>
+                      ) : imagePreview ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-800/80 text-white backdrop-blur-xs">
+                          Ảnh đại diện
+                        </span>
+                      ) : null}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleClearImage}
-                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
-                    title="Xóa ảnh"
-                  >
-                    <Trash size={16} />
-                  </button>
-                </div>
-              )}
 
-              {imageError && (
-                <p className="text-xs text-red-500 font-semibold mt-1">
-                  ⚠ {imageError}
-                </p>
-              )}
-            </div>
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".svg,.png,image/svg+xml,image/png,image/jpeg,image/webp"
+                    className="hidden"
+                  />
 
-            {/* Applicable Vehicle Types */}
-            <div className="space-y-1.5 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02]">
-              <div className="flex items-center justify-between">
-                <label className="block font-mono font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide text-xs">
-                  Phương tiện áp dụng *
-                </label>
-                <div className="flex items-center gap-2 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setAllowedVehicles(VEHICLE_TYPE_OPTIONS.map((v) => v.value))}
-                    className="text-[#007b8b] dark:text-[#00c4de] hover:underline font-semibold cursor-pointer"
-                  >
-                    Chọn tất cả
-                  </button>
-                  <span className="text-gray-300 dark:text-gray-600">•</span>
-                  <button
-                    type="button"
-                    onClick={() => setAllowedVehicles([])}
-                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-semibold cursor-pointer"
-                  >
-                    Bỏ chọn
-                  </button>
+                  {/* Upload Controls */}
+                  <div className="space-y-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/30 hover:bg-gray-100 dark:hover:bg-white/5 text-[11px] font-semibold text-gray-800 dark:text-gray-200 transition-colors cursor-pointer text-center shadow-2xs"
+                      >
+                        {imagePreview ? 'Đổi ảnh khác' : 'Tải ảnh từ máy'}
+                      </button>
+
+                      {imagePreview && (
+                        <button
+                          type="button"
+                          onClick={handleClearImage}
+                          className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 hover:bg-red-100/90 dark:hover:bg-red-900/40 hover:border-red-400 text-[11px] font-semibold text-red-600 dark:text-red-400 transition-colors cursor-pointer text-center shrink-0 shadow-2xs"
+                        >
+                          Gỡ ảnh
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
+                        Hỗ trợ định dạng SVG hoặc PNG, tối đa 20MB
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlInput((prev) => !prev)}
+                        className="text-[11px] text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer shrink-0 ml-1"
+                      >
+                        {showUrlInput ? 'Ẩn URL' : 'Dùng URL'}
+                      </button>
+                    </div>
+
+                    {showUrlInput && (
+                      <input
+                        type="url"
+                        placeholder="https://s3.signmap.site/stm-catalog-images/representative/..."
+                        value={imageUrl}
+                        onChange={(e) => handleUrlChange(e.target.value)}
+                        className="w-full px-3 py-1.5 bg-white dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white outline-none focus:border-[#007b8b]"
+                      />
+                    )}
+
+                    {imageError && (
+                      <p className="text-xs text-red-500 font-semibold mt-1">
+                        ⚠ {imageError}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
-                {VEHICLE_TYPE_OPTIONS.map((v) => {
-                  const selected = allowedVehicles.includes(v.value)
-                  return (
-                    <button
-                      key={v.value}
-                      type="button"
-                      onClick={() => {
-                        if (selected) {
-                          setAllowedVehicles(allowedVehicles.filter((item) => item !== v.value))
-                        } else {
-                          setAllowedVehicles([...allowedVehicles, v.value])
-                        }
+
+              {/* ─── CỘT PHẢI: TOÀN BỘ THÔNG SỐ (7 cols) ───── */}
+              <div className="md:col-span-7 flex flex-col gap-3">
+                {/* Hàng 1: Nhóm biển & Mã biển */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Nhóm biển <span className="text-red-500">*</span>
+                    </label>
+                    <CustomSelect
+                      value={newCategory}
+                      onChange={(val) => {
+                        const nextCat = val as CatalogCategory
+                        setNewCategory(nextCat)
+                        setCodePrefix(getPrefixForCatalogCategory(nextCat))
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                        selected
-                          ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
-                          : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="truncate">{v.labelVi}</span>
-                      {selected && <Check size={12} weight="bold" className="shrink-0 ml-1" />}
-                    </button>
-                  )
-                })}
+                      className="w-full"
+                      buttonClassName="w-full text-xs font-semibold"
+                      options={CATEGORY_OPTIONS}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                        Mã biển <span className="text-red-500">*</span>
+                      </label>
+                      {isCheckingApi ? (
+                        <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                          <CircleNotch size={11} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
+                          <span>Đang kiểm tra...</span>
+                        </span>
+                      ) : isDuplicateCode ? (
+                        <span className="text-[10px] font-mono text-red-500 font-bold">
+                          Đã tồn tại
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* 2 ô nhỏ: Tiền tố & Số hiệu */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative shrink-0">
+                        <input
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={codePrefix}
+                          title="Tiền tố tự động gán theo nhóm biển"
+                          className={`w-16 sm:w-20 px-2.5 py-2 rounded-lg border text-center font-mono font-bold text-xs select-none outline-none transition-colors cursor-not-allowed ${
+                            hasInputNumber
+                              ? isDuplicateCode
+                                ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20 text-red-600 dark:text-red-400'
+                                : 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400'
+                              : 'border-gray-300 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300'
+                          }`}
+                        />
+                      </div>
+
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          required
+                          value={codeNumber}
+                          onChange={(e) => {
+                            setCodeNumber(e.target.value)
+                            if (codeError) setCodeError('')
+                          }}
+                          placeholder="127a hoặc 130"
+                          className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs placeholder:text-gray-400 outline-none transition-colors ${
+                            hasInputNumber
+                              ? isDuplicateCode
+                                ? 'border-red-500 focus:border-red-600 focus:ring-1 focus:ring-red-500/20 bg-red-50/10'
+                                : 'border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500/20'
+                              : 'border-gray-300 dark:border-white/15 focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {!isDuplicateCode && codeError && (
+                      <p className="text-[11px] text-red-500 font-medium pt-0.5">{codeError}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hàng 2: Tên tiếng Việt & Tên tiếng Anh */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newNameVi}
+                      onChange={(e) => setNewNameVi(e.target.value)}
+                      placeholder="Cấm dừng xe và đỗ xe"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Tên tiếng Anh
+                    </label>
+                    <input
+                      type="text"
+                      value={newNameEn}
+                      onChange={(e) => setNewNameEn(e.target.value)}
+                      placeholder="No Stopping and Parking"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Hàng 3: Phương tiện áp dụng */}
+                <div className="space-y-1.5 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Phương tiện áp dụng <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAllowedVehicles(VEHICLE_OPTIONS.map((v) => v.value))}
+                        className="text-[10px] text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer font-medium"
+                      >
+                        Chọn tất cả
+                      </button>
+                      <span className="text-gray-300 dark:text-white/20">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setAllowedVehicles([])}
+                        className="text-[10px] text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:underline cursor-pointer font-medium"
+                      >
+                        Bỏ chọn
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {VEHICLE_OPTIONS.map((v) => {
+                      const selected = allowedVehicles.includes(v.value)
+                      return (
+                        <button
+                          key={v.value}
+                          type="button"
+                          onClick={() => {
+                            if (selected) {
+                              setAllowedVehicles(allowedVehicles.filter((item) => item !== v.value))
+                            } else {
+                              setAllowedVehicles([...allowedVehicles, v.value])
+                            }
+                          }}
+                          className={`flex items-center justify-center px-2.5 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                            selected
+                              ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
+                              : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="truncate">{v.labelVi}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="min-h-[16px] flex items-center">
+                    {allowedVehicles.length === 0 ? (
+                      <p className="text-[10px] text-red-500 font-medium">
+                        Vui lòng chọn ít nhất 1 loại phương tiện áp dụng
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                        Các loại phương tiện tuân thủ theo quy định của biển báo
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <div className="min-h-[16px] flex items-center pt-1">
-                {allowedVehicles.length === 0 ? (
-                  <p className="text-[10px] text-red-500 font-medium animate-in fade-in">
-                    Vui lòng chọn ít nhất 1 loại phương tiện áp dụng.
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500">
-                    Các loại phương tiện tuân thủ theo quy định của biển báo.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                {t('catalog.field_ai_prompt')}
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Mô tả nhận diện hình ảnh..."
-                value={newAiPrompt}
-                onChange={(e) => setNewAiPrompt(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                {t('catalog.field_osm_mapping')}
-              </label>
-              <input
-                type="text"
-                placeholder="hgv=no; traffic_sign=VN:P.106a"
-                value={newOsmMapping}
-                onChange={(e) => setNewOsmMapping(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-white/10">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors cursor-pointer"
-              >
-                {t('catalog.btn_cancel')}
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                <span>{t('catalog.btn_publish')}</span>
-              </button>
             </div>
           </form>
+
+          {/* Footer Actions */}
+          <div className="px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              form="create-sign-form"
+              disabled={!hasInputNumber || isDuplicateCode || !newNameVi.trim() || allowedVehicles.length === 0 || (!imageFile && !imageUrl.trim())}
+              className="px-5 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white flex items-center justify-center min-w-[90px] shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Thêm biển báo
+            </button>
+          </div>
         </div>
       </div>
     </ModalPortal>

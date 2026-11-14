@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Info } from '@phosphor-icons/react'
+import { ArrowRight } from '@phosphor-icons/react'
 import type { CatalogEntry } from '@/data/catalogData'
 import { TrafficSignGraphic } from './TrafficSignGraphic'
 import type { CategoryMeta } from './CatalogDetailModal'
@@ -16,16 +16,14 @@ export interface CatalogGridViewProps {
   getSignPrimaryName: (sign: CatalogEntry) => string
   /** Resolves secondary localized sign name. */
   getSignSecondaryName: (sign: CatalogEntry) => string
-  /** Resolves primary localized description. */
-  getSignPrimaryDesc: (sign: CatalogEntry) => string
-  /** Localizes geometric shape text. */
-  getShapeLabel: (shape: string) => string
-  /** Renders color pill badge. */
-  renderColorPill: (color: string) => React.ReactNode
+  /** Optional backward-compatible props */
+  getSignPrimaryDesc?: (sign: CatalogEntry) => string
+  getShapeLabel?: (shape: string) => string
+  renderColorPill?: (color: string) => React.ReactNode
 }
 
 /**
- * Grid view displaying visual cards for each traffic sign with vector plate preview.
+ * Grid view displaying visual cards for each traffic sign with clean vector plate preview.
  */
 export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
   signs,
@@ -33,17 +31,16 @@ export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
   getCategoryMeta,
   getSignPrimaryName,
   getSignSecondaryName,
-  getSignPrimaryDesc,
-  getShapeLabel,
-  renderColorPill,
 }) => {
   const { t } = useTranslation('ops')
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
       {signs.map((sign) => {
         const meta = getCategoryMeta(sign.category)
         const isActive = sign.status === 'Active'
+        const primaryName = getSignPrimaryName(sign)
+        const secondaryName = getSignSecondaryName(sign)
 
         return (
           <div
@@ -63,50 +60,36 @@ export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
                   </span>
                 </div>
 
-                <div className="w-16 h-16 p-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-xs">
-                  <TrafficSignGraphic sign={sign} className="w-full h-full drop-shadow-xs" />
+                <div className="w-16 h-16 p-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-2xs">
+                  <TrafficSignGraphic sign={sign} className="w-full h-full object-contain drop-shadow-xs" />
                 </div>
               </div>
 
-              <h3 className="font-extrabold text-base text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors line-clamp-1">
-                {getSignPrimaryName(sign)}
+              <h3 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors line-clamp-2 leading-snug">
+                {primaryName}
               </h3>
-              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                {getSignSecondaryName(sign)}
-              </p>
-
-              <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 leading-relaxed font-normal">
-                {getSignPrimaryDesc(sign)}
-              </p>
-
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10">
-                  {getShapeLabel(sign.shape)}
-                </span>
-                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 flex items-center gap-1.5">
-                  {renderColorPill(sign.color)}
-                </span>
-              </div>
+              {secondaryName && secondaryName !== primaryName && (
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                  {secondaryName}
+                </p>
+              )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/10 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-[11px] text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded border border-gray-200 dark:border-white/10">
-                  {sign.version || 'v2.5'}
-                </span>
-                <span
-                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                    isActive
-                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-gray-200 dark:bg-white/10 text-gray-500 dark:text-gray-400'
-                  }`}
-                >
-                  {isActive ? t('catalog.status_active') : t('catalog.status_deprecated')}
-                </span>
-              </div>
-              <span className="text-[#007b8b] dark:text-[#00c4de] font-bold flex items-center gap-1 group-hover:underline">
-                <Info size={15} weight="bold" />
-                <span>{t('catalog.inspect')}</span>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                  isActive
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                    : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400 border border-gray-200 dark:border-white/10'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                {isActive ? t('catalog.status_active', 'Hoạt động') : t('catalog.status_deprecated', 'Ngừng áp dụng')}
+              </span>
+
+              <span className="text-[#007b8b] dark:text-[#00c4de] text-xs font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                <span>{t('catalog.inspect', 'Xem chi tiết')}</span>
+                <ArrowRight size={14} weight="bold" />
               </span>
             </div>
           </div>

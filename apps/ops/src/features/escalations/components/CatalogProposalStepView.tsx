@@ -11,7 +11,7 @@ import {
   type VehicleType,
 } from '@/api/services/catalog.service'
 import { escalationService } from '@/api/services/escalation.service'
-import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
+import { resolveImageUrl, normalizeSignCodeCase } from '@/features/map/utils/signUrlHelpers'
 
 export interface CatalogProposalStepViewProps {
   caseId: string
@@ -415,7 +415,7 @@ export function CatalogProposalStepView({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+    const fullCode = normalizeSignCodeCase(`${codePrefix}${codeNumber.trim()}`)
     const cleanNameVi = nameVi.trim()
     const cleanStaffNotes = staffNotes.trim()
 
@@ -424,11 +424,11 @@ export function CatalogProposalStepView({
       return
     }
 
-    if (existingSignCodes.some((c) => c.toUpperCase() === fullCode)) {
+    if (existingSignCodes.some((c) => normalizeSignCodeCase(c) === fullCode)) {
       warning(
         isEn
           ? `Sign code "${fullCode}" already exists in the catalog! Please choose another number or merge into existing catalog sign.`
-          : `Mã biển "${fullCode}" đã bị trùng (đã tồn tại trong Catalog)! Vui lòng chọn số khác hoặc chuyển sang chức năng Gộp Catalog.`
+          : `Mã biển "${fullCode}" đã bị trùng trong danh mục! Vui lòng chọn số khác hoặc chuyển sang chức năng Gộp Catalog.`
       )
       return
     }
@@ -531,7 +531,7 @@ export function CatalogProposalStepView({
     }
   }
 
-  const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+  const fullCode = normalizeSignCodeCase(`${codePrefix}${codeNumber.trim()}`)
   const hasInputNumber = Boolean(codeNumber.trim())
 
   // Real-time API check for code duplication with debounce
@@ -543,7 +543,7 @@ export function CatalogProposalStepView({
     }
 
     // 1. Instant check against already known sign codes
-    const isLocalDuplicate = existingSignCodes.some((c) => c.toUpperCase() === fullCode)
+    const isLocalDuplicate = existingSignCodes.some((c) => normalizeSignCodeCase(c) === fullCode)
     if (isLocalDuplicate) {
       setIsDuplicateCode(true)
     }
@@ -746,15 +746,12 @@ export function CatalogProposalStepView({
                   <div className="flex-1">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
                       required
                       value={codeNumber}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '')
-                        setCodeNumber(val)
+                        setCodeNumber(e.target.value)
                       }}
-                      placeholder="130"
+                      placeholder="127a hoặc 130"
                       className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs placeholder:text-gray-400 outline-none transition-colors ${
                         hasInputNumber
                           ? isDuplicateCode

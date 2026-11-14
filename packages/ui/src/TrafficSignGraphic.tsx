@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export interface TrafficSignGraphicProps {
   sign: {
@@ -13,20 +13,99 @@ export interface TrafficSignGraphicProps {
   size?: number
 }
 
+const S3_BASE = 'https://s3.signmap.site'
+
+export function normalizeSignCodeCase(code?: string): string {
+  if (!code) return ''
+  const trimmed = code.trim().replace(/\s+/g, '')
+  const m = trimmed.match(/^([A-Za-z]+)\.?([0-9]+)([A-Za-z]*)$/)
+  if (m) {
+    return `${m[1].toUpperCase()}.${m[2]}${m[3].toLowerCase()}`
+  }
+  return trimmed
+}
+
+/**
+ * Normalizes any legacy or missing sign image URLs to the canonical MinIO S3 representative SVG URL.
+ */
+function getCanonicalSignImageUrl(rawUrl?: string, code?: string): string {
+  const cleanCode = normalizeSignCodeCase(code)
+  const fallbackUrl = cleanCode
+    ? `${S3_BASE}/stm-catalog-images/representative/${cleanCode}.svg`
+    : ''
+
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim()) {
+    return fallbackUrl
+  }
+
+  const trimmed = rawUrl.trim()
+
+  // Rewrite old MinIO console browser URLs or old /svg/ folder URLs to canonical representative URL
+  if (
+    cleanCode &&
+    (trimmed.includes('minio.signmap.site/browser') ||
+      trimmed.includes('/stm-catalog-images/svg/'))
+  ) {
+    return fallbackUrl
+  }
+
+  // Normalize case-sensitivity for existing S3 representative URLs without discarding the file
+  if (trimmed.includes('/stm-catalog-images/representative/')) {
+    return trimmed.replace(/\/representative\/([^/?#]+)\.svg$/i, (_, name) => {
+      return `/representative/${normalizeSignCodeCase(name)}.svg`
+    })
+  }
+
+  // Relative paths
+  if (trimmed.startsWith('representative/')) {
+    const filename = trimmed.replace(/^representative\//, '')
+    const cleanName = normalizeSignCodeCase(filename.replace(/\.svg$/i, ''))
+    return `${S3_BASE}/stm-catalog-images/representative/${cleanName}.svg`
+  }
+  if (trimmed.startsWith('stm-catalog-images/')) {
+    return `${S3_BASE}/${trimmed}`
+  }
+
+  return trimmed
+}
+
 export function TrafficSignGraphic({ sign, className = 'w-16 h-16', size }: TrafficSignGraphicProps) {
   const [imgError, setImgError] = useState(false)
+  const [triedFallback, setTriedFallback] = useState(false)
   const style = size ? { width: size, height: size } : undefined
-  const code = (sign.code || '').toUpperCase().trim()
+  const rawCode = sign.code || ''
+  const normalizedCode = normalizeSignCodeCase(rawCode)
+  const code = normalizedCode.toUpperCase()
   const nameLabel = sign.nameVi || sign.name || sign.code
 
-  if (sign.imageUrl && !imgError) {
+  const canonicalFallback = normalizedCode
+    ? `${S3_BASE}/stm-catalog-images/representative/${normalizedCode}.svg`
+    : ''
+  const primaryUrl = getCanonicalSignImageUrl(sign.imageUrl, normalizedCode)
+
+  useEffect(() => {
+    setImgError(false)
+    setTriedFallback(false)
+  }, [sign.imageUrl, sign.code])
+
+  const handleImgError = () => {
+    if (!triedFallback && canonicalFallback && primaryUrl !== canonicalFallback) {
+      setTriedFallback(true)
+    } else {
+      setImgError(true)
+    }
+  }
+
+  const activeUrl = triedFallback ? canonicalFallback : primaryUrl
+
+  if (activeUrl && !imgError) {
     return (
       <img
-        src={sign.imageUrl}
+        src={activeUrl}
         alt={nameLabel}
         className={className}
         style={{ ...style, objectFit: 'contain' }}
-        onError={() => setImgError(true)}
+        onError={handleImgError}
       />
     )
   }
