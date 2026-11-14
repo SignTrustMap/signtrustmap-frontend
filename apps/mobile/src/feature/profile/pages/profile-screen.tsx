@@ -1,22 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
 import { OfflineMapModal } from '@/components/offline-map-modal';
-import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import {
   ACCOUNT_ROLES,
@@ -26,8 +16,20 @@ import {
 } from '@/context/session-provider';
 import { useAppUpdate } from '@/hooks/use-app-update';
 import { useTheme } from '@/hooks/use-theme';
+import { getProfile, type UserProfileResponse } from '@/api/auth/auth';
 
 type MaterialIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const roleMap: Record<string, AccountRole> = {
+  DRIVER: 'driver',
+  REVIEWER: 'reviewer',
+  SURVEYOR: 'surveyor',
+  driver: 'driver',
+  reviewer: 'reviewer',
+  surveyor: 'surveyor',
+};
+
+const useScreenFocusEffect = typeof useFocusEffect === 'function' ? useFocusEffect : useEffect;
 
 const roleLabels: Record<AccountRole, string> = {
   driver: 'Tài xế',
@@ -38,7 +40,7 @@ const roleLabels: Record<AccountRole, string> = {
 const roleIcons: Record<AccountRole, MaterialIconName> = {
   driver: 'car-outline',
   reviewer: 'shield-check-outline',
-  surveyor: 'map-marker-path',
+  surveyor: 'camera-outline',
 };
 
 function getInitials(displayName?: string) {
@@ -72,6 +74,34 @@ export function ProfileScreen() {
   const router = useRouter();
   const { logOut, session, setRoleEnabled } = useSession();
   const theme = useTheme();
+
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchProfile = useCallback(async () => {
+    if (!session?.accessToken) return;
+    try {
+      const data = await getProfile(session.accessToken);
+      if (data && isMountedRef.current) {
+        setProfile(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [session?.accessToken]);
+
+  useScreenFocusEffect(
+    useCallback(() => {
+      void fetchProfile();
+    }, [fetchProfile]),
+  );
   const { scrollTo, t } = useLocalSearchParams<{ scrollTo?: string; t?: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
   const signFilterRef = useRef<View>(null);
@@ -99,7 +129,7 @@ export function ProfileScreen() {
               });
             }
           },
-          () => { }
+          () => {},
         );
       }
     }, 200);
@@ -125,9 +155,26 @@ export function ProfileScreen() {
     status,
   } = useAppUpdate();
 
-  const displayName = session?.account.displayName ?? 'Người dùng SignTrustMap';
-  const email = session?.account.email ?? '';
-  const activeRolesCount = session?.account.roles?.length ?? 1;
+  const displayName =
+    profile?.fullName ?? session?.account.displayName ?? 'Người dùng SignTrustMap';
+  const email = profile?.email ?? session?.account.email ?? '';
+  const avatarUrl =
+    profile?.avatarUrl !== undefined ? profile.avatarUrl : (session?.account.avatarUrl ?? null);
+
+  const rawRoles = profile?.roles ?? session?.account.roles ?? ['driver'];
+  const userRoles: AccountRole[] = rawRoles
+    .map(
+      (r) =>
+        roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole),
+    )
+    .filter((r): r is AccountRole => Boolean(roleLabels[r]));
+  const effectiveRoles = userRoles.includes('driver') ? userRoles : ['driver', ...userRoles];
+  const activeRolesCount = effectiveRoles.length;
+
+  const handleToggleRole = async (role: OptionalAccountRole, nextEnabled: boolean) => {
+    await setRoleEnabled(role, nextEnabled);
+    void fetchProfile();
+  };
 
   const handleEditPress = () => {
     router.push('/(authenticated)/(tabs)/profile/edit');
@@ -146,20 +193,21 @@ export function ProfileScreen() {
   };
 
   const handleLogOut = () => {
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: () => {
-            void logOut();
-          },
+    Alert.alert('Đăng xuất', 'Bạn có muốn đăng xuất không?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Đăng xuất',
+        style: 'destructive',
+        onPress: async () => {
+          setIsMenuOpen(false);
+          try {
+            await logOut();
+          } finally {
+            router.replace('/(public)/login');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -199,29 +247,26 @@ export function ProfileScreen() {
             <View style={styles.profileInfoRow}>
               <View
                 accessibilityLabel={`Ảnh đại diện của ${displayName}`}
-                style={[
-                  styles.avatar,
-                  { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' },
-                ]}
+                style={[styles.avatar, { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }]}
               >
-                <Text style={[styles.avatarText, { color: theme.primary }]}>
-                  {getInitials(displayName)}
-                </Text>
+                {avatarUrl ? (
+                  <Image
+                    resizeMode="cover"
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Text style={[styles.avatarText, { color: theme.primary }]}>
+                    {getInitials(displayName)}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.userDetails}>
-                <Text
-                  ellipsizeMode="tail"
-                  numberOfLines={1}
-                  style={styles.name}
-                >
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.name}>
                   {displayName}
                 </Text>
-                <Text
-                  ellipsizeMode="tail"
-                  numberOfLines={1}
-                  style={styles.email}
-                >
+                <Text ellipsizeMode="tail" numberOfLines={1} style={styles.email}>
                   {email || 'Chưa cập nhật email'}
                 </Text>
               </View>
@@ -289,17 +334,25 @@ export function ProfileScreen() {
             ]}
           >
             <Pressable
-              accessibilityLabel={isRoleSectionOpen ? 'Thu gọn vai trò tài khoản' : 'Mở rộng vai trò tài khoản'}
+              accessibilityLabel={
+                isRoleSectionOpen ? 'Thu gọn vai trò tài khoản' : 'Mở rộng vai trò tài khoản'
+              }
               accessibilityRole="button"
               onPress={() => setIsRoleSectionOpen((prev) => !prev)}
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
-                  <MaterialCommunityIcons color={theme.primary} name="account-switch-outline" size={20} />
+                <View style={[styles.sectionIconBadge]}>
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="account-switch-outline"
+                    size={20}
+                  />
                 </View>
                 <View style={styles.headerTitles}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Vai trò tài khoản</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Vai trò tài khoản
+                  </Text>
                   <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
                     {activeRolesCount} vai trò đang kích hoạt
                   </Text>
@@ -314,17 +367,14 @@ export function ProfileScreen() {
 
             {isRoleSectionOpen ? (
               <View style={[styles.collapsibleBody, { borderTopColor: theme.border }]}>
-                <Text style={[styles.roleHintText, { color: theme.textSecondary }]}>
-                  Quyền Tài xế luôn được kích hoạt mặc định
-                </Text>
-
                 <View style={styles.roleList}>
-                  {ACCOUNT_ROLES.map((role) => {
-                    const isEnabled = session?.account.roles.includes(role) ?? role === 'driver';
+                  {ACCOUNT_ROLES.map((role, index) => {
+                    const isEnabled = effectiveRoles.includes(role);
+                    const isLast = index === ACCOUNT_ROLES.length - 1;
 
                     const rowContent = (
                       <>
-                        <View style={[styles.iconTile, { backgroundColor: theme.secondary }]}>
+                        <View style={[styles.iconTile]}>
                           <MaterialCommunityIcons
                             color={theme.primary}
                             name={roleIcons[role]}
@@ -336,14 +386,18 @@ export function ProfileScreen() {
                             {roleLabels[role]}
                           </Text>
                           <Text style={[styles.rowDescription, { color: theme.placeholder }]}>
-                            {role === 'driver' ? 'Quyền điều hướng bản đồ' : `Công cụ ${roleLabels[role]}`}
+                            {role === 'driver'
+                              ? 'Quyền điều hướng bản đồ'
+                              : `Công cụ ${roleLabels[role]}`}
                           </Text>
                         </View>
                         <View
                           style={[
                             styles.statusPill,
                             {
-                              backgroundColor: isEnabled ? theme.backgroundSelected : theme.background,
+                              backgroundColor: isEnabled
+                                ? theme.backgroundSelected
+                                : theme.background,
                               borderColor: isEnabled ? theme.primary : theme.border,
                             },
                           ]}
@@ -362,24 +416,41 @@ export function ProfileScreen() {
 
                     if (role === 'driver') {
                       return (
-                        <View key={role} style={[styles.roleRow, { borderColor: theme.border }]}>
+                        <View
+                          key={role}
+                          style={[
+                            styles.roleRow,
+                            !isLast && {
+                              borderBottomWidth: StyleSheet.hairlineWidth,
+                              borderBottomColor: theme.border,
+                            },
+                          ]}
+                        >
                           {rowContent}
                         </View>
                       );
                     }
 
                     return (
-                      <AppButton
+                      <Pressable
                         accessibilityLabel={`${isEnabled ? 'Tắt' : 'Bật'} vai trò ${roleLabels[role]}`}
                         accessibilityRole="switch"
                         accessibilityState={{ checked: isEnabled }}
                         key={role}
-                        onPress={() => setRoleEnabled(role as OptionalAccountRole, !isEnabled)}
-                        style={[styles.roleRow, { borderColor: theme.border }]}
-                        variant="ghost"
+                        onPress={() =>
+                          void handleToggleRole(role as OptionalAccountRole, !isEnabled)
+                        }
+                        style={({ pressed }) => [
+                          styles.roleRow,
+                          !isLast && {
+                            borderBottomWidth: StyleSheet.hairlineWidth,
+                            borderBottomColor: theme.border,
+                          },
+                          pressed && { opacity: 0.7 },
+                        ]}
                       >
                         {rowContent}
-                      </AppButton>
+                      </Pressable>
                     );
                   })}
                 </View>
@@ -397,13 +468,15 @@ export function ProfileScreen() {
             ]}
           >
             <Pressable
-              accessibilityLabel={isFilterSectionOpen ? 'Thu gọn bộ lọc biển báo' : 'Mở rộng bộ lọc biển báo'}
+              accessibilityLabel={
+                isFilterSectionOpen ? 'Thu gọn bộ lọc biển báo' : 'Mở rộng bộ lọc biển báo'
+              }
               accessibilityRole="button"
               onPress={() => setIsFilterSectionOpen((prev) => !prev)}
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                <View style={[styles.sectionIconBadge]}>
                   <MaterialCommunityIcons color={theme.primary} name="filter-variant" size={20} />
                 </View>
                 <View style={styles.headerTitles}>
@@ -441,21 +514,19 @@ export function ProfileScreen() {
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
-                <View style={[styles.sectionIconBadge, { backgroundColor: theme.secondary }]}>
+                <View style={[styles.sectionIconBadge]}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
                 </View>
                 <View style={styles.headerTitles}>
-                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Bản đồ ngoại tuyến
+                  </Text>
                   <Text style={[styles.sectionSubtitle, { color: theme.placeholder }]}>
-                    Tải và quản lý gói dữ liệu PMTiles ngoại tuyến
+                    Tải và quản lý bản đồ ngoại tuyến
                   </Text>
                 </View>
               </View>
-              <MaterialCommunityIcons
-                color={theme.placeholder}
-                name="chevron-right"
-                size={22}
-              />
+              <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={22} />
             </Pressable>
           </View>
         </View>
@@ -498,11 +569,11 @@ export function ProfileScreen() {
             >
               <MaterialCommunityIcons color={theme.primary} name="cellphone-arrow-down" size={18} />
               <View style={styles.dropdownItemTextGroup}>
-                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>Cập nhật ứng dụng</Text>
+                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>
+                  Cập nhật ứng dụng
+                </Text>
                 <Text style={[styles.dropdownItemSublabel, { color: theme.placeholder }]}>
-                  {status === 'checking'
-                    ? 'Đang kiểm tra...'
-                    : `Phiên bản ${currentVersion}`}
+                  {status === 'checking' ? 'Đang kiểm tra...' : `Phiên bản ${currentVersion}`}
                 </Text>
               </View>
             </Pressable>
@@ -523,7 +594,9 @@ export function ProfileScreen() {
             >
               <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={18} />
               <View style={styles.dropdownItemTextGroup}>
-                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>Bản đồ ngoại tuyến</Text>
+                <Text style={[styles.dropdownItemLabel, { color: theme.text }]}>
+                  Bản đồ ngoại tuyến
+                </Text>
                 <Text style={[styles.dropdownItemSublabel, { color: theme.placeholder }]}>
                   Quản lý gói PMTiles
                 </Text>
@@ -616,11 +689,16 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontFamily: Fonts.title,
@@ -755,17 +833,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   roleList: {
-    gap: Spacing.two,
+    gap: 0,
   },
   roleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 56,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    gap: Spacing.two,
+    minHeight: 52,
+    paddingHorizontal: 0,
+    paddingVertical: Spacing.two,
+    gap: Spacing.three,
   },
   iconTile: {
     width: 36,

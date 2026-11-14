@@ -155,17 +155,12 @@ function OpsRouteRedirectHandler() {
 }
 
 function AppLayout() {
-  const location = useLocation()
-  const isBarePage = location.pathname === '/about'
-
   return (
     <div className="flex flex-col min-h-[100dvh] w-full relative transition-colors">
-      {!isBarePage && (
-        <div className="sticky top-0 z-[1100] w-full">
+      <div className="sticky top-0 z-[1100] w-full">
           <AnnouncementBar />
           <Navbar />
         </div>
-      )}
       <main className="flex-1 w-full flex flex-col">
         <ErrorBoundary variant="full-page">
           <Suspense fallback={<PageLoadingFallback />}>
@@ -300,8 +295,8 @@ function AppLayout() {
         </Suspense>
       </ErrorBoundary>
     </main>
-      {!isBarePage && <Footer />}
-      {!isBarePage && <ScrollToTop />}
+      <Footer />
+      <ScrollToTop />
     </div>
   )
 }

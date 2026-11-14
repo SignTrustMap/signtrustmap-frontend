@@ -1,498 +1,525 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import CustomSelect from '@/components/common/CustomSelect'
+import { useState, useEffect, useCallback } from 'react'
+import CustomSelect, { type OptionItem } from '@/components/common/CustomSelect'
 import { Pagination } from '@/components/common/Pagination'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
-import { useSidebar } from '@/context/SidebarContext'
 import {
-  Eye,
-  Tray,
-  WarningOctagon,
-  ClockCountdown,
-  CheckCircle,
-  TrafficSignal,
-  User,
+  Sparkle,
+  Image as ImageIcon,
+  CircleNotch,
   ArrowsClockwise,
+  Eye,
 } from '@phosphor-icons/react'
-import { mockCandidates, type CandidateItem, type PriorityLevel, type CandidateStatus } from '@/data'
-import { mockCatalogData } from '@/data/catalogData'
 import { TrafficSignGraphic } from '@/features/catalog/components/TrafficSignGraphic'
-import { candidatesService } from '@/api/services'
+import { candidatesService, type CandidateQueryParams } from '@/api/services'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
+import { CandidateInspectionModal } from './components/CandidateInspectionModal'
 
-function PriorityTag({ priority }: { priority: PriorityLevel }) {
-  const { t } = useTranslation('ops')
-  switch (priority) {
-    case 'Cao':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border border-red-200 dark:border-red-500/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-          {t('candidates.priority_high')}
-        </span>
-      )
-    case 'Vừa':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
-          {t('candidates.priority_med')}
-        </span>
-      )
-    case 'Thấp':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300 border border-gray-200 dark:border-white/10">
-          {t('candidates.priority_low')}
-        </span>
-      )
-  }
+export interface CandidateTableItem {
+  id: string
+  signCode: string
+  signName: string
+  confidenceScore: number
+  status: string
+  statusTagVi?: string
+  cropImageUrl?: string
+  bestFrameUrl?: string
+  location: string
+  surveyorName: string
+  createdAt: string
+  activeLearningPriority?: number
 }
 
-function StatusBadge({ status }: { status: CandidateStatus }) {
-  const { t } = useTranslation('ops')
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return String(dateStr)
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${hours}:${minutes} • ${day}/${month}/${year}`
+}
+
+function getStatusDisplay(status: string, statusTagVi?: string) {
+  if (statusTagVi) {
+    if (status === 'RESOLVED' || status === 'VERIFIED') {
+      return {
+        label: statusTagVi,
+        badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+        dotClass: 'bg-emerald-500',
+      }
+    }
+    if (status === 'IN_CONSENSUS') {
+      return {
+        label: statusTagVi,
+        badgeClass: 'bg-blue-50 text-blue-700 dark:bg-cyan-500/15 dark:text-[#00c4de] border-blue-200 dark:border-cyan-500/30',
+        dotClass: 'bg-[#007b8b] dark:bg-[#00c4de]',
+      }
+    }
+    return {
+      label: statusTagVi,
+      badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+      dotClass: 'bg-amber-500',
+    }
+  }
+
   switch (status) {
-    case 'Đang xem xét':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 dark:bg-cyan-500/15 dark:text-[#00c4de] border border-blue-200 dark:border-cyan-500/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-[#00c4de]" />
-          {t('candidates.status_reviewing')}
-        </span>
-      )
-    case 'Chưa xử lý':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border border-red-200 dark:border-red-500/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-          {t('candidates.status_pending')}
-        </span>
-      )
-    case 'Đã giải quyết':
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          {t('candidates.status_resolved')}
-        </span>
-      )
+    case 'VERIFIED':
+    case 'RESOLVED':
+      return {
+        label: 'Đã giải quyết',
+        badgeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30',
+        dotClass: 'bg-emerald-500',
+      }
+    case 'IN_CONSENSUS':
+      return {
+        label: 'Đang xem xét',
+        badgeClass: 'bg-blue-50 text-blue-700 dark:bg-cyan-500/15 dark:text-[#00c4de] border-blue-200 dark:border-cyan-500/30',
+        dotClass: 'bg-[#007b8b] dark:bg-[#00c4de]',
+      }
+    case 'REJECTED':
+      return {
+        label: 'Đã từ chối',
+        badgeClass: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400 border-red-200 dark:border-red-500/30',
+        dotClass: 'bg-red-500',
+      }
+    case 'RECAPTURE_REQUESTED':
+      return {
+        label: 'Yêu cầu chụp lại',
+        badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+        dotClass: 'bg-amber-500',
+      }
+    case 'PENDING_REVIEW':
+    default:
+      return {
+        label: 'Chưa xử lý',
+        badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border-amber-200 dark:border-amber-500/30',
+        dotClass: 'bg-amber-500',
+      }
   }
-}
-
-function AnomalyTag({ type }: { type?: 'conflict' | 'low_conf' | 'gps_offset' | 'blur' }) {
-  const { t } = useTranslation('ops')
-  if (!type) return null
-
-  const colorMap = {
-    conflict: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 border-purple-200 dark:border-purple-500/30',
-    low_conf: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
-    gps_offset: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300 border-sky-200 dark:border-sky-500/30',
-    blur: 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300 border-orange-200 dark:border-orange-500/30',
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorMap[type]}`}>
-      {t(`candidates.anomaly_${type}`)}
-    </span>
-  )
 }
 
 export default function CandidatesListPage() {
-  const { t } = useTranslation('ops')
-  const navigate = useNavigate()
-  const { isCollapsed } = useSidebar()
-  const [candidates, setCandidates] = useState<CandidateItem[]>(mockCandidates)
+  const [candidates, setCandidates] = useState<CandidateTableItem[]>([])
+  const [totalCount, setTotalCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('all')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [confidenceFilter, setConfidenceFilter] = useState('all')
+  const [selectedSort, setSelectedSort] = useState<'newest' | 'oldest' | 'conf_asc' | 'conf_desc'>('newest')
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  // Fetch live queue from backend
+  // Inspection Modal
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({})
+
+  // Debounce search query
   useEffect(() => {
-    let isMounted = true
-    async function loadQueue() {
-      try {
-        setIsLoading(true)
-        const res: any = await candidatesService.getQueue({ page: 1, pageSize: 50, includeOwnSubmissions: true })
-        const items = res?.items || res?.data?.items || (Array.isArray(res) ? res : [])
-        if (isMounted && Array.isArray(items) && items.length > 0) {
-          const liveItems: CandidateItem[] = items.map((item: any) => {
-            const signCode = item.predictedSignType?.signCode || 'P.102'
-            const signName = item.predictedSignType?.nameVi || item.predictedSignType?.nameEn || 'Biển báo giao thông'
-            const confidenceScore =
-              item.confidenceScore != null
-                ? Math.round((item.confidenceScore <= 1 ? item.confidenceScore * 100 : item.confidenceScore) * 10) / 10
-                : 88.5
-            const priority: PriorityLevel = confidenceScore < 70 ? 'Cao' : confidenceScore < 85 ? 'Vừa' : 'Thấp'
-            const status: CandidateStatus =
-              item.status === 'IN_CONSENSUS'
-                ? 'Đang xem xét'
-                : item.status === 'VERIFIED'
-                  ? 'Đã giải quyết'
-                  : 'Chưa xử lý'
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
-            return {
-              id: item.id,
-              name: `${signCode} - ${signName}`,
-              reportedDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'Hôm nay',
-              reason: item.status === 'IN_CONSENSUS' ? 'Đang chờ hội đồng biểu quyết cộng đồng' : 'Chờ kiểm duyệt và phê duyệt chính thức',
-              priority,
-              status,
-              signCode,
-              signName,
-              anomalyType: confidenceScore < 70 ? 'low_conf' : 'conflict',
-              location: item.locationContext?.displayLocation || item.locationContext?.nearbyRoad || 'Vị trí hiện trường ghi nhận',
-              surveyorName: item.submission?.surveyorId ? `Surveyor #${item.submission.surveyorId.slice(0, 6).toUpperCase()}` : 'Khảo sát viên ẩn danh',
-              aiConfidence: confidenceScore,
-              cropImageUrl: item.signCropUrl ? resolveImageUrl(item.signCropUrl) : undefined,
-              contextImageUrl: item.bestFrameUrl ? resolveImageUrl(item.bestFrameUrl) : undefined,
-              gpsOffset: 1.2,
-            }
-          })
-          setCandidates(liveItems)
-        }
-      } catch (err) {
-        console.warn('[CandidatesList] Failed to load live queue, retaining mock data:', err)
-      } finally {
-        if (isMounted) setIsLoading(false)
+  // Load candidates using the official API GET /api/v1/candidates
+  const loadCandidates = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const params: CandidateQueryParams = {
+        page: currentPage,
+        pageSize,
       }
+
+      if (statusFilter !== 'all') {
+        params.status = statusFilter
+      }
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim()
+      }
+
+      if (selectedSort === 'newest') {
+        params.sortBy = 'createdAt'
+        params.sortOrder = 'DESC'
+      } else if (selectedSort === 'oldest') {
+        params.sortBy = 'createdAt'
+        params.sortOrder = 'ASC'
+      } else if (selectedSort === 'conf_desc') {
+        params.sortBy = 'confidence'
+        params.sortOrder = 'DESC'
+      } else if (selectedSort === 'conf_asc') {
+        params.sortBy = 'confidence'
+        params.sortOrder = 'ASC'
+      }
+
+      const res = await candidatesService.getCandidates(params)
+      const items = res?.items || []
+      const total = res?.total ?? items.length
+
+      setTotalCount(total)
+
+      if (Array.isArray(items)) {
+        const mapped: CandidateTableItem[] = items.map((item: any) => {
+          const signCode = item.predictedSignType?.signCode || item.signCode || '—'
+          const signName =
+            item.predictedSignType?.nameVi ||
+            item.predictedSignType?.nameEn ||
+            item.signName ||
+            'Biển báo giao thông'
+
+          const rawScore = item.confidenceScore != null ? item.confidenceScore : 0.85
+          const confidenceScore = Math.round((rawScore <= 1 ? rawScore * 100 : rawScore) * 10) / 10
+
+          const lat =
+            item.locationContext?.coordinates?.latitude ??
+            item.submission?.latitude ??
+            item.latitude
+          const lng =
+            item.locationContext?.coordinates?.longitude ??
+            item.submission?.longitude ??
+            item.longitude
+
+          const location =
+            item.locationContext?.nearbyRoad ||
+            item.locationContext?.displayLocation ||
+            item.location ||
+            (lat && lng ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : 'Chưa có vị trí')
+
+          const surveyorName =
+            item.submission?.surveyor_id || item.submission?.surveyorId || item.surveyorId
+              ? `#${String(item.submission?.surveyor_id || item.submission?.surveyorId || item.surveyorId).slice(0, 8)}`
+              : 'Khảo sát viên ẩn danh'
+
+          return {
+            id: String(item.id),
+            signCode,
+            signName,
+            confidenceScore,
+            status: item.statusTag || item.status || 'PENDING_REVIEW',
+            statusTagVi: item.statusTagVi,
+            cropImageUrl: item.signCropUrl ? resolveImageUrl(item.signCropUrl) : undefined,
+            bestFrameUrl: item.bestFrameUrl ? resolveImageUrl(item.bestFrameUrl) : undefined,
+            location,
+            surveyorName,
+            createdAt: item.createdAt || item.submission?.captured_at || new Date().toISOString(),
+            activeLearningPriority: item.activeLearningPriority,
+          }
+        })
+
+        // Apply client-side confidence bucket filter if chosen
+        let filtered = mapped
+        if (confidenceFilter === 'high') {
+          filtered = filtered.filter((c) => c.confidenceScore >= 90)
+        } else if (confidenceFilter === 'med') {
+          filtered = filtered.filter((c) => c.confidenceScore >= 70 && c.confidenceScore < 90)
+        } else if (confidenceFilter === 'low') {
+          filtered = filtered.filter((c) => c.confidenceScore < 70)
+        }
+
+        setCandidates(filtered)
+      } else {
+        setCandidates([])
+      }
+    } catch (err) {
+      console.warn('[CandidatesListPage] Failed to load candidates:', err)
+      setCandidates([])
+    } finally {
+      setIsLoading(false)
     }
+  }, [currentPage, pageSize, statusFilter, debouncedSearch, selectedSort, confidenceFilter])
 
-    loadQueue()
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  useEffect(() => {
+    loadCandidates()
+  }, [loadCandidates])
 
-  const filteredCandidates = candidates.filter((c) => {
-    const matchesSearch =
-      c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.location && c.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.surveyorName && c.surveyorName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (c.signCode && c.signCode.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filter & Sort Options (No parentheses)
+  const statusOptions: OptionItem[] = [
+    { value: 'all', label: 'Tất cả trạng thái' },
+    { value: 'PENDING_REVIEW', label: 'Chưa xử lý' },
+    { value: 'IN_CONSENSUS', label: 'Đang xem xét' },
+    { value: 'RESOLVED', label: 'Đã giải quyết' },
+  ]
 
-    let matchesPriority = true
-    if (priorityFilter === 'Cao') matchesPriority = c.priority === 'Cao'
-    if (priorityFilter === 'Vừa') matchesPriority = c.priority === 'Vừa'
-    if (priorityFilter === 'Thấp') matchesPriority = c.priority === 'Thấp'
+  const confidenceOptions: OptionItem[] = [
+    { value: 'all', label: 'Tất cả độ tin cậy' },
+    { value: 'high', label: 'Trên 90%' },
+    { value: 'med', label: 'Từ 70% đến 90%' },
+    { value: 'low', label: 'Dưới 70%' },
+  ]
 
-    let matchesStatus = true
-    if (statusFilter !== 'all') {
-      matchesStatus = c.status === statusFilter
-    }
-
-    return matchesSearch && matchesPriority && matchesStatus
-  })
-
-  const paginatedCandidates = filteredCandidates.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
+  const sortOptions: OptionItem[] = [
+    { value: 'newest', label: 'Mới nhất' },
+    { value: 'oldest', label: 'Cũ nhất' },
+    { value: 'conf_desc', label: 'Độ tin cậy cao nhất' },
+    { value: 'conf_asc', label: 'Độ tin cậy thấp nhất' },
+  ]
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 w-full max-w-[1680px] mx-auto space-y-6">
       {/* ─── HEADER ─────────────────────────────────────────────────── */}
-      <PageHeader title={t('candidates.title')} />
-
-      {/* ─── KPI SUMMARY METRIC CARDS (Uniform & Non-clickable) ──────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Total Queue */}
-        <div className="p-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#0A171C] space-y-2 select-none shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 uppercase">
-              {t('candidates.kpi_total_queue')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center text-gray-600 dark:text-gray-300">
-              <Tray size={18} weight="bold" />
+      <PageHeader
+        title="Ứng viên biển báo"
+        subtitle="Giám sát các biển báo do AI nhận diện từ dữ liệu khảo sát và theo dõi tiến trình thẩm định."
+        actions={
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                Tổng <strong className="font-mono text-gray-900 dark:text-white">{totalCount}</strong> ứng viên
+              </span>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold font-mono text-gray-900 dark:text-white">
-              {candidates.length}
-            </span>
-            <span className="text-xs text-gray-400 font-sans">{t('candidates.unit_cases')}</span>
-          </div>
-        </div>
 
-        {/* KPI 2: Critical Priority */}
-        <div className="p-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#0A171C] space-y-2 select-none shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-red-600 dark:text-red-400 uppercase">
-              {t('candidates.kpi_critical_priority')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400">
-              <WarningOctagon size={18} weight="bold" />
-            </div>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={loadCandidates}
+              className="p-2 border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
+              title="Làm mới dữ liệu"
+            >
+              <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
+            </button>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold font-mono text-red-600 dark:text-red-400">
-              {candidates.filter((c) => c.priority === 'Cao').length}
-            </span>
-            <span className="text-xs text-red-500/80 font-sans">{t('candidates.unit_high_priority')}</span>
-          </div>
-        </div>
+        }
+      />
 
-        {/* KPI 3: Pending Moderation */}
-        <div className="p-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#0A171C] space-y-2 select-none shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 uppercase">
-              {t('candidates.kpi_pending_audit')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <ClockCountdown size={18} weight="bold" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
-              {candidates.filter((c) => c.status === 'Chưa xử lý').length}
-            </span>
-            <span className="text-xs text-amber-600/80 font-sans">{t('candidates.unit_pending')}</span>
-          </div>
-        </div>
-
-        {/* KPI 4: Under Review */}
-        <div className="p-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#0A171C] space-y-2 select-none shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de] uppercase">
-              {t('candidates.kpi_reviewing')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-[#007b8b]/10 dark:bg-[#00c4de]/20 flex items-center justify-center text-[#007b8b] dark:text-[#00c4de]">
-              <CheckCircle size={18} weight="bold" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold font-mono text-[#007b8b] dark:text-[#00c4de]">
-              {candidates.filter((c) => c.status === 'Đang xem xét').length}
-            </span>
-            <span className="text-xs text-[#007b8b]/80 dark:text-[#00c4de]/80 font-sans">{t('candidates.unit_in_progress')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── FILTER CARD: DataFilterBar with Status Tabs ─────────────── */}
+      {/* ─── DATA FILTER BAR ─────────────────────────────────────────── */}
       <DataFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder={t('candidates.search_placeholder')}
-        categories={[
-          {
-            id: 'all',
-            label: t('candidates.status_all', { defaultValue: 'Tất cả' }),
-            count: candidates.length,
-          },
-          {
-            id: 'Chưa xử lý',
-            label: t('candidates.status_pending'),
-            count: candidates.filter((c) => c.status === 'Chưa xử lý').length,
-          },
-          {
-            id: 'Đang xem xét',
-            label: t('candidates.status_reviewing'),
-            count: candidates.filter((c) => c.status === 'Đang xem xét').length,
-          },
-          {
-            id: 'Đã giải quyết',
-            label: t('candidates.status_resolved'),
-            count: candidates.filter((c) => c.status === 'Đã giải quyết').length,
-          },
-        ]}
-        selectedCategory={statusFilter}
-        onSelectCategory={(id) => {
-          setStatusFilter(id)
-          setCurrentPage(1)
-        }}
+        searchPlaceholder="Tìm theo mã ứng viên, mã biển, tên đường, người đóng góp..."
       >
-        <div className="w-36 sm:w-44 shrink-0">
-          <CustomSelect
-            prefixLabel={t('candidates.priority_label', { defaultValue: 'Ưu tiên:' })}
-            value={priorityFilter}
-            onChange={(val) => {
-              setPriorityFilter(val)
-              setCurrentPage(1)
-            }}
-            size="sm"
-            className="w-full"
-            buttonClassName="w-full"
-            options={[
-              { value: 'all', label: t('candidates.priority_all') },
-              { value: 'Cao', label: t('candidates.priority_high') },
-              { value: 'Vừa', label: t('candidates.priority_med') },
-              { value: 'Thấp', label: t('candidates.priority_low') },
-            ]}
-          />
-        </div>
+        <CustomSelect
+          options={statusOptions}
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val)
+            setCurrentPage(1)
+          }}
+          prefixLabel="Trạng thái"
+          size="sm"
+          className="w-full sm:w-48"
+        />
+
+        <CustomSelect
+          options={confidenceOptions}
+          value={confidenceFilter}
+          onChange={(val) => {
+            setConfidenceFilter(val)
+            setCurrentPage(1)
+          }}
+          prefixLabel="Độ tin cậy"
+          size="sm"
+          className="w-full sm:w-48"
+        />
+
+        <CustomSelect
+          options={sortOptions}
+          value={selectedSort}
+          onChange={(val) => {
+            setSelectedSort(val as any)
+            setCurrentPage(1)
+          }}
+          prefixLabel="Sắp xếp"
+          size="sm"
+          className="w-full sm:w-52"
+        />
       </DataFilterBar>
 
-      {/* ─── CANDIDATES LIST TABLE ───────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
-              <tr>
-                <th className="py-2.5 px-3 font-semibold w-24">{t('candidates.th_id')}</th>
-                <th className="py-2.5 px-3 font-semibold">{t('candidates.th_target')}</th>
-                <th className="py-2.5 px-3 font-semibold">{t('candidates.th_reason')}</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">{t('candidates.th_date')}</th>
-                <th className="py-2.5 px-2.5 font-semibold text-center whitespace-nowrap">{t('candidates.th_priority')}</th>
-                <th className="py-2.5 px-2.5 font-semibold text-center whitespace-nowrap">{t('candidates.th_status')}</th>
-                {isCollapsed && (
-                  <>
-                    <th className="py-2.5 px-3 font-semibold whitespace-nowrap hidden md:table-cell animate-in fade-in duration-300">
-                      {t('candidates.th_surveyor')}
-                    </th>
-                    <th className="py-2.5 px-3 font-semibold whitespace-nowrap hidden lg:table-cell animate-in fade-in duration-300">
-                      {t('candidates.th_telemetry')}
-                    </th>
-                  </>
-                )}
-                <th className="py-2.5 px-3 font-semibold text-right whitespace-nowrap w-24">{t('candidates.th_actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-              {isLoading ? (
+      {/* ─── CANDIDATES TABLE VIEW ───────────────────────────────────── */}
+      {isLoading ? (
+        <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
+          <CircleNotch size={28} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+          <p className="text-xs text-neutral-500 font-medium">Đang tải danh sách ứng viên biển báo...</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
                 <tr>
-                  <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
-                    <ArrowsClockwise size={32} className="mx-auto opacity-60 animate-spin text-[#007b8b] dark:text-[#00c4de]" />
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Đang kết nối hàng đợi kiểm duyệt...</p>
-                  </td>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Mã ứng viên</th>
+                  <th className="py-3 px-4 font-semibold min-w-[200px]">Biển báo nhận diện</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Độ tin cậy AI</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Ảnh thực địa</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Vị trí ghi nhận</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Khảo sát viên</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Thời gian tạo</th>
+                  <th className="py-3 px-4 font-semibold whitespace-nowrap">Trạng thái</th>
+                  <th className="py-3 px-4 font-semibold text-center whitespace-nowrap">Thao tác</th>
                 </tr>
-              ) : paginatedCandidates.length === 0 ? (
-                <tr>
-                  <td colSpan={isCollapsed ? 9 : 7} className="py-12 text-center text-gray-400 dark:text-gray-500 space-y-2">
-                    <ArrowsClockwise size={32} className="mx-auto opacity-40" />
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('candidates.empty_title')}</p>
-                    <p className="text-xs">{t('candidates.empty_desc')}</p>
-                  </td>
-                </tr>
-              ) : (
-                paginatedCandidates.map((c) => {
-                  const signEntry = c.signCode
-                    ? mockCatalogData.find(
-                        (s) => s.code.toLowerCase() === c.signCode?.toLowerCase()
-                      )
-                    : null
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                {candidates.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-14 text-center text-gray-400 dark:text-gray-500 space-y-2">
+                      <Sparkle size={36} className="mx-auto opacity-40 text-[#007b8b] dark:text-[#00c4de]" />
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                        Không có ứng viên biển báo nào
+                      </p>
+                      <p className="text-xs">
+                        Hiện không có ứng viên nào khớp với bộ lọc tìm kiếm của bạn.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  candidates.map((c) => {
+                    const status = getStatusDisplay(c.status, c.statusTagVi)
+                    const signEntry = c.signCode !== '—' ? { code: c.signCode, nameVi: c.signName } : null
+                    const hasImgError = failedImages[c.id] || !c.cropImageUrl
 
-                  const targetDetailUrl = `/candidates/${c.id.replace('#', '')}`
-
-                  return (
-                    <tr
-                      key={c.id}
-                      onClick={() => navigate(targetDetailUrl)}
-                      className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors group cursor-pointer"
-                    >
-                      {/* Case ID */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-white/10 text-[11px]">
-                          {c.id}
-                        </span>
-                      </td>
-
-                      {/* Sign target with visual graphic preview */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 flex items-center justify-center p-0.5 shrink-0">
-                            {signEntry ? (
-                              <TrafficSignGraphic sign={signEntry} className="w-full h-full object-contain" />
-                            ) : (
-                              <TrafficSignal size={15} className="text-[#007b8b]" />
-                            )}
-                          </div>
-                          <div className="min-w-0 max-w-[120px] sm:max-w-[160px] lg:max-w-[190px]">
-                            {c.signCode && (
-                              <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de] mr-1 text-[11px]">
-                                {c.signCode}
-                              </span>
-                            )}
-                            <span className="font-semibold text-gray-900 dark:text-white truncate block text-xs" title={c.name}>
-                              {c.name}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Reason & Anomaly Tag */}
-                      <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300">
-                        <div className="flex items-center gap-1.5 min-w-0 max-w-[140px] sm:max-w-[180px] lg:max-w-[220px]">
-                          <AnomalyTag type={c.anomalyType} />
-                          <span className="truncate text-xs" title={c.reason}>
-                            {c.reason}
+                    return (
+                      <tr
+                        key={c.id}
+                        onClick={() => setSelectedCandidateId(c.id)}
+                        className="hover:bg-gray-50/70 dark:hover:bg-white/5 transition-colors group cursor-pointer"
+                      >
+                        {/* 1. Candidate ID */}
+                        <td className="py-3 px-4 font-mono whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-white/10 text-[11px] font-semibold">
+                            #{c.id.slice(0, 8)}
                           </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Reported Date */}
-                      <td className="py-2.5 px-3 text-xs text-gray-500 dark:text-gray-400 font-mono whitespace-nowrap">
-                        {c.reportedDate}
-                      </td>
-
-                      {/* Priority */}
-                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
-                        <PriorityTag priority={c.priority} />
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
-                        <StatusBadge status={c.status} />
-                      </td>
-
-                      {/* ADAPTIVE EXTRA COLUMNS: Visible when menu is collapsed */}
-                      {isCollapsed && (
-                        <>
-                          <td className="py-2.5 px-3 text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[120px] hidden md:table-cell animate-in fade-in duration-300" title={c.surveyorName}>
-                            <div className="flex items-center gap-1.5 truncate">
-                              <User size={13} className="text-gray-400 shrink-0" />
-                              <span className="truncate">{c.surveyorName || '—'}</span>
+                        {/* 2. Detected Sign & Vector Graphic */}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center p-1 shrink-0">
+                              {signEntry ? (
+                                <TrafficSignGraphic sign={signEntry} className="w-full h-full object-contain" />
+                              ) : (
+                                <span className="font-mono text-xs font-bold text-gray-400">?</span>
+                              )}
                             </div>
-                          </td>
-                          <td className="py-2.5 px-3 text-[11px] font-mono whitespace-nowrap hidden lg:table-cell animate-in fade-in duration-300">
-                            {c.aiConfidence !== undefined && (
-                              <span className="text-[#007b8b] dark:text-[#00c4de] font-semibold block leading-tight">
-                                AI: {c.aiConfidence}%
+                            <div className="min-w-0 max-w-[220px]">
+                              {c.signCode !== '—' && (
+                                <span className="font-mono font-bold text-[#007b8b] dark:text-[#00c4de] text-[11px] block">
+                                  {c.signCode}
+                                </span>
+                              )}
+                              <span
+                                className="font-semibold text-gray-900 dark:text-white truncate block text-xs"
+                                title={c.signName}
+                              >
+                                {c.signName}
                               </span>
-                            )}
-                            {c.location && (
-                              <span className="text-gray-400 text-[10px] leading-tight truncate block max-w-[130px]" title={c.location}>
-                                {c.location}
-                              </span>
-                            )}
-                          </td>
-                        </>
-                      )}
+                            </div>
+                          </div>
+                        </td>
 
-                      {/* Actions */}
-                      <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(targetDetailUrl)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#007b8b] hover:bg-[#00606d] text-white font-semibold rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer text-xs"
-                          title={t('candidates.btn_review')}
+                        {/* 3. AI Confidence */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+                              c.confidenceScore >= 90
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                                : c.confidenceScore >= 70
+                                  ? 'bg-blue-50 text-blue-700 dark:bg-cyan-500/15 dark:text-[#00c4de] border-blue-200 dark:border-cyan-500/30'
+                                  : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border-amber-200 dark:border-amber-500/30'
+                            }`}
+                          >
+                            {c.confidenceScore}%
+                          </span>
+                        </td>
+
+                        {/* 4. Evidence Thumbnail */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="w-9 h-9 rounded-lg overflow-hidden border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 flex items-center justify-center shrink-0">
+                            {!hasImgError && c.cropImageUrl ? (
+                              <img
+                                src={c.cropImageUrl}
+                                alt={c.signName}
+                                onError={() => setFailedImages((prev) => ({ ...prev, [c.id]: true }))}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon size={16} className="text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 5. Location */}
+                        <td
+                          className="py-3 px-4 text-gray-700 dark:text-gray-300 max-w-[180px] truncate"
+                          title={c.location}
                         >
-                          <Eye size={13} weight="bold" />
-                          <span>{t('candidates.btn_review')}</span>
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                          <span className="truncate block text-xs">{c.location}</span>
+                        </td>
 
-        {/* Pagination */}
-        <div className="px-5 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-          <Pagination
-            currentPage={currentPage}
-            totalItems={filteredCandidates.length}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize)
-              setCurrentPage(1)
-            }}
-            pageSizeOptions={[5, 10, 20]}
-          />
+                        {/* 6. Surveyor */}
+                        <td className="py-3 px-4 font-mono text-[11px] text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                          {c.surveyorName}
+                        </td>
+
+                        {/* 7. Created At */}
+                        <td className="py-3 px-4 font-mono text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {formatDate(c.createdAt)}
+                        </td>
+
+                        {/* 8. Status */}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${status.badgeClass}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
+                            {status.label}
+                          </span>
+                        </td>
+
+                        {/* 9. Actions */}
+                        <td
+                          className="py-3 px-4 text-center whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCandidateId(c.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#007b8b] hover:bg-[#00606d] text-white font-semibold rounded-lg transition-all shadow-2xs active:scale-95 cursor-pointer text-xs"
+                            title="Xem chi tiết ứng viên"
+                          >
+                            <Eye size={13} weight="bold" />
+                            <span>Chi tiết</span>
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="px-5 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
+            <Pagination
+              currentPage={currentPage}
+              totalItems={totalCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setCurrentPage(1)
+              }}
+              pageSizeOptions={[10, 20, 50]}
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ─── CANDIDATE INSPECTION MODAL ──────────────────────────────── */}
+      <CandidateInspectionModal
+        isOpen={Boolean(selectedCandidateId)}
+        candidateId={selectedCandidateId}
+        onClose={() => setSelectedCandidateId(null)}
+        onStatusUpdated={loadCandidates}
+      />
     </div>
   )
 }

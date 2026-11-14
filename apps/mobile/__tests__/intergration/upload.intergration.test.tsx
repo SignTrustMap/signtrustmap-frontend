@@ -363,7 +363,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
               id: 'sub-video-001',
               submissionId: 'sub-video-001',
               submissionType: 'VIDEO_GPX',
-              coordinateSource: 'GPX_FILE',
+              coordinateSource: 'FILE_GPX',
             },
             { status: 201 },
           );
@@ -386,7 +386,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
           {
             submissionType: 'VIDEO_GPX',
             capturedAt: '2026-10-01T08:00:00Z',
-            coordinateSource: 'GPX_FILE',
+            coordinateSource: 'FILE_GPX',
             latitude: 10.7769,
             longitude: 106.7009,
           },
@@ -401,7 +401,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       expect(submissionId).toBe('sub-video-001');
       expect(createdPayload).toMatchObject({
         submissionType: 'VIDEO_GPX',
-        coordinateSource: 'GPX_FILE',
+        coordinateSource: 'FILE_GPX',
         latitude: 10.7769,
         longitude: 106.7009,
       });
@@ -495,7 +495,7 @@ describe('Frontend Upload Flow Integration Tests (MSW)', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith(
           expect.objectContaining({
-            pathname: '/work/survey-finish',
+            pathname: '/work/submission-complete',
             params: expect.objectContaining({
               submissionId: 'sub-test-001',
             }),

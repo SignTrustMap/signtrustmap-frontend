@@ -1,450 +1,830 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  Sparkle,
   ArrowUpRight,
   ArrowDownLeft,
-  CheckCircle,
-  QrCode,
-  ShieldCheck,
-  Gift,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useToast } from '@/context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import {
-  mockTopupPackages,
-  mockWalletTransactions,
-  type TopupPackageItem,
-  type WalletTransactionItem,
-} from '@/data'
-import { Modal } from '@/components/common/Modal'
+  walletService,
+  type TopUpPackage,
+  type WalletTransaction,
+  DEFAULT_TOP_UP_PACKAGES,
+} from '@/api/services/wallet.service'
+import {
+  dailyTasksService,
+  type DailyTaskItem,
+  type MissionsOverviewResponse,
+} from '@/api/services/daily-tasks.service'
 import { Pagination } from '@/components/common/Pagination'
 import { PageHeader } from '@/components/common/PageHeader'
+import { PaymentCheckoutModal } from './components/PaymentCheckoutModal'
+
+type TransactionFilter = 'ALL' | 'IN' | 'OUT'
+type WalletTab = 'TOPUP' | 'MISSIONS'
 
 export default function WalletPage() {
-  const { user, claimDailyBonus } = useAuth()
+  const { claimDailyBonus } = useAuth()
   const { isDark } = useTheme()
   const { t } = useTranslation('common')
   const toast = useToast()
 
-  const [transactions, setTransactions] = useState<WalletTransactionItem[]>(mockWalletTransactions)
-  const [selectedPkg, setSelectedPkg] = useState<TopupPackageItem | null>(null)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [claimedToday, setClaimedToday] = useState(false)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  // ─── Top-level Tab Navigation ─────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<WalletTab>('TOPUP')
 
-  // Pagination state for transactions
+  // ─── Top-up Packages & Custom Amount State ───────────────────────────────
+  const [packages, setPackages] = useState<TopUpPackage[]>(DEFAULT_TOP_UP_PACKAGES)
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false)
+  const [selectedPkgId, setSelectedPkgId] = useState<number | null>(null)
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false)
+  const [customCredits, setCustomCredits] = useState<number>(300)
+
+  // ─── Payment Checkout Modal State ─────────────────────────────────────────
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false)
+
+  // ─── Transactions State & Filters ─────────────────────────────────────────
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([])
+  const [totalTransactions, setTotalTransactions] = useState<number>(0)
+  const [isLoadingTx, setIsLoadingTx] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(5)
+  const [pageSize, setPageSize] = useState(10)
+  const [txFilter, setTxFilter] = useState<TransactionFilter>('ALL')
 
-  const handleClaimDaily = () => {
-    if (claimedToday) return
-    const bonus = 25
-    claimDailyBonus(bonus)
-    setClaimedToday(true)
-    toast.success(`+${bonus} Credits ${t('wallet.claim_daily_btn')}!`)
+  // ─── Daily Contributor Tasks & Missions State ─────────────────────────────
+  const [dailyTasks, setDailyTasks] = useState<DailyTaskItem[]>([])
+  const [missions, setMissions] = useState<MissionsOverviewResponse | null>(null)
+  const [claimingTaskId, setClaimingTaskId] = useState<number | null>(null)
 
-    setTransactions((prev) => [
-      {
-        id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-        type: 'daily_claim',
-        title: t('wallet.tx_daily_reward'),
-        amountCredits: bonus,
-        status: 'Completed',
-        date: new Date().toLocaleString('vi-VN'),
-      },
-      ...prev,
-    ])
+  // Clean package name helper (removes any English parentheses)
+  const cleanPackageName = (name: string): string => {
+    return name.replace(/\s*\([^)]*\)/g, '').trim()
   }
 
-  const handleCompleteTopup = () => {
-    if (!selectedPkg) return
-    setPaymentSuccess(true)
-    const totalCredits = selectedPkg.credits + (selectedPkg.bonusCredits || 0)
-    claimDailyBonus(totalCredits)
+  // Active selected package
+  const selectedPackage = useMemo(() => {
+    if (isCustomMode) return null
+    return packages.find((p) => p.id === selectedPkgId) || packages[0] || null
+  }, [packages, selectedPkgId, isCustomMode])
 
-    setTransactions((prev) => [
-      {
-        id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-        type: 'topup',
-        title: t('wallet.tx_deposit_pkg', { name: selectedPkg.name, credits: totalCredits }),
-        amountCredits: totalCredits,
-        status: 'Completed',
-        date: new Date().toLocaleString('vi-VN'),
-        paymentMethod: 'VietQR / Banking Transfer',
-      },
-      ...prev,
-    ])
+  // Calculated Credits & VND
+  const effectiveCredits = isCustomMode
+    ? customCredits
+    : (selectedPackage?.creditAmount || 0) + (selectedPackage?.bonusCredits || 0)
 
-    setTimeout(() => {
-      setPaymentSuccess(false)
-      setShowPaymentModal(false)
-      setSelectedPkg(null)
-    }, 2000)
-  }
+  const effectivePriceVnd = isCustomMode
+    ? customCredits * 100
+    : Math.round(Number(selectedPackage?.priceVnd || 0))
 
-  // High-contrast role badge styles matching ProfilePage
-  const getRoleBadge = (role?: string) => {
-    const r = (role || '').trim().toLowerCase()
-    switch (r) {
-      case 'admin':
-        return {
-          label: t('profile.roles.admin'),
-          bg: isDark
-            ? 'bg-purple-900/40 text-purple-200 border-purple-500/50'
-            : 'bg-purple-100 text-purple-900 border-purple-300',
-        }
-      case 'staff':
-        return {
-          label: t('profile.roles.staff'),
-          bg: isDark
-            ? 'bg-blue-900/40 text-blue-200 border-blue-500/50'
-            : 'bg-blue-100 text-blue-900 border-blue-300',
-        }
-      case 'reviewer':
-        return {
-          label: t('profile.roles.reviewer'),
-          bg: isDark
-            ? 'bg-emerald-900/40 text-emerald-200 border-emerald-500/50'
-            : 'bg-emerald-100 text-emerald-900 border-emerald-300',
-        }
-      case 'surveyor':
-        return {
-          label: t('profile.roles.surveyor'),
-          bg: isDark
-            ? 'bg-amber-900/40 text-amber-200 border-amber-500/50'
-            : 'bg-amber-100 text-amber-950 border-amber-300',
-        }
-      default:
-        return {
-          label: t('profile.roles.driver'),
-          bg: isDark
-            ? 'bg-cyan-900/40 text-cyan-200 border-cyan-500/50'
-            : 'bg-cyan-100 text-cyan-950 border-cyan-300',
-        }
-    }
-  }
-
-  const roleBadge = getRoleBadge(user?.role)
-
-  const getStatusBadge = (status?: string) => {
-    const s = (status || '').trim().toLowerCase()
-    if (s === 'completed') {
-      return {
-        label: t('wallet.status_completed'),
-        cls: 'bg-emerald-100 text-emerald-950 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+  // ─── 1. Fetch Packages from Backend ───────────────────────────────────────
+  const fetchPackages = useCallback(async () => {
+    try {
+      setIsLoadingPackages(true)
+      const pkgs = await walletService.getTopupPackages()
+      setPackages(pkgs)
+      if (pkgs.length > 0 && selectedPkgId === null) {
+        setSelectedPkgId(pkgs[0].id)
       }
+    } catch (err) {
+      console.warn('[WalletPage] Failed to fetch top-up packages:', err)
+      setPackages(DEFAULT_TOP_UP_PACKAGES)
+      if (selectedPkgId === null) {
+        setSelectedPkgId(DEFAULT_TOP_UP_PACKAGES[0].id)
+      }
+    } finally {
+      setIsLoadingPackages(false)
     }
-    return {
-      label: t('wallet.status_pending'),
-      cls: 'bg-amber-100 text-amber-950 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+  }, [selectedPkgId])
+
+  // ─── 2. Fetch Transactions from Backend ───────────────────────────────────
+  const fetchTransactions = useCallback(async (page: number, size: number) => {
+    try {
+      setIsLoadingTx(true)
+      const res = await walletService.getTransactions({ page, pageSize: size })
+      if (res && Array.isArray(res.items)) {
+        setTransactions(res.items)
+        setTotalTransactions(res.total)
+      }
+    } catch (err) {
+      console.warn('[WalletPage] Failed to fetch transactions:', err)
+    } finally {
+      setIsLoadingTx(false)
+    }
+  }, [])
+
+  // ─── 3. Fetch Daily Tasks & Missions from Backend ─────────────────────────
+  const fetchDailyTasks = useCallback(async () => {
+    try {
+      const [tasks, missionData] = await Promise.all([
+        dailyTasksService.getTasks(),
+        dailyTasksService.getMissions(),
+      ])
+
+      setDailyTasks(tasks)
+      setMissions(missionData)
+    } catch (err) {
+      console.warn('[WalletPage] Failed to fetch daily tasks:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPackages()
+    fetchDailyTasks()
+  }, [fetchPackages, fetchDailyTasks])
+
+  useEffect(() => {
+    fetchTransactions(currentPage, pageSize)
+  }, [fetchTransactions, currentPage, pageSize])
+
+  // ─── Claim Contributor Daily Task Reward ──────────────────────────────────
+  const handleClaimTaskReward = async (task: DailyTaskItem) => {
+    if (!task.isClaimable || task.isClaimed || claimingTaskId !== null) return
+    setClaimingTaskId(task.id)
+    try {
+      await dailyTasksService.claim(task.id)
+      const reward = task.rewardCredits || 10
+      claimDailyBonus(reward)
+      toast.success(`+${reward} Credits cho nhiệm vụ ${task.name}`)
+      await fetchDailyTasks()
+      await fetchTransactions(currentPage, pageSize)
+    } catch (err: any) {
+      toast.error(err.message || 'Chưa thể nhận thưởng nhiệm vụ lúc này')
+    } finally {
+      setClaimingTaskId(null)
     }
   }
+
+  // ─── Payment Success Callback from Modal ──────────────────────────────────
+  const handlePaymentSuccess = async (creditedCredits: number) => {
+    claimDailyBonus(creditedCredits)
+    await fetchTransactions(currentPage, pageSize)
+  }
+
+  const formatTxType = (type?: string, description?: string) => {
+    const raw = (description || '').trim()
+    const tUpper = (type || '').toUpperCase()
+
+    // 1. Map known types or description text to clean Vietnamese without parentheses
+    if (tUpper === 'REVIEW_REWARD' || raw.toLowerCase().includes('review reward')) {
+      return 'Thưởng duyệt biển báo đồng thuận'
+    }
+    if (tUpper === 'SURVEY_REWARD' || raw.toLowerCase().includes('survey reward')) {
+      return 'Thưởng khảo sát biển báo'
+    }
+    if (
+      tUpper === 'TOPUP' ||
+      tUpper === 'TOP_UP' ||
+      raw.toLowerCase().includes('topup') ||
+      raw.toLowerCase().includes('top-up') ||
+      raw.toLowerCase().includes('nạp')
+    ) {
+      return 'Nạp Credits vào ví'
+    }
+    if (
+      tUpper === 'DAILY_CLAIM' ||
+      tUpper === 'DAILY_REWARD' ||
+      raw.toLowerCase().includes('daily') ||
+      raw.toLowerCase().includes('nhiệm vụ')
+    ) {
+      return 'Thưởng nhiệm vụ đóng góp'
+    }
+    if (tUpper === 'NAVIGATION_FEE' || raw.toLowerCase().includes('navigation')) {
+      return 'Phí điều hướng thông minh'
+    }
+    if (tUpper === 'ADMIN_ADJUSTMENT' || raw.toLowerCase().includes('admin')) {
+      return 'Điều chỉnh số dư từ quản trị'
+    }
+
+    // 2. If description has content, strip any parentheses and explanations inside them
+    if (raw.length > 0) {
+      const sanitized = raw.replace(/\s*\([^)]*\)/g, '').trim()
+      if (sanitized.length > 0) return sanitized
+    }
+
+    return type ? type.replace(/_/g, ' ') : 'Giao dịch Credits'
+  }
+
+  const filteredTransactions = useMemo(() => {
+    if (txFilter === 'IN') return transactions.filter((t) => Number(t.amount) > 0)
+    if (txFilter === 'OUT') return transactions.filter((t) => Number(t.amount) < 0)
+    return transactions
+  }, [transactions, txFilter])
+
+  const currentStreak = missions?.streak?.currentDays || 0
 
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 sm:py-12 transition-colors ${
+      className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
         isDark ? 'bg-[#030708] text-gray-100' : 'bg-[#F8F7F7] text-gray-900'
       }`}
     >
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* ─── Page Header (Standardized via PageHeader) ─────────────── */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-7">
+        {/* ─── Page Header ───────────────────────────────────────────── */}
         <PageHeader
           title={t('wallet.title')}
           subtitle={t('wallet.subtitle')}
-          bordered
         />
 
-        {/* ─── Balance & Earn Overview (2 Columns) ────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          {/* Main Balance Card (8 cols) */}
-          <div
-            className={`lg:col-span-8 rounded-2xl border p-6 sm:p-8 flex flex-col justify-between shadow-xs ${
-              isDark
-                ? 'bg-[#071317] border-white/10 shadow-lg shadow-black/40'
-                : 'bg-white border-[#E8E4E3]'
+        {/* ─── Top-level Navigation Tabs (Cách 1) ──────────────────────── */}
+        <div className="flex border-b border-gray-200 dark:border-white/10 gap-6 sm:gap-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab('TOPUP')}
+            className={`pb-3 text-sm font-extrabold transition-all relative cursor-pointer ${
+              activeTab === 'TOPUP'
+                ? isDark
+                  ? 'text-[#00c4de]'
+                  : 'text-[#007b8b]'
+                : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'
             }`}
           >
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <span className="text-xs uppercase font-bold tracking-wider text-gray-600 dark:text-gray-400 block mb-1">
-                    {t('wallet.available_balance')}
-                  </span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl sm:text-5xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-                      {user?.credits || 0}
-                    </span>
-                    <span className="text-base font-bold text-gray-700 dark:text-gray-300">Credits</span>
-                  </div>
-                  <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1.5 block font-medium">
-                    {t('wallet.convert_value', { amount: ((user?.credits || 0) * 500).toLocaleString('vi-VN') })}
-                  </span>
-                </div>
+            <span>Nạp Credits</span>
+            {activeTab === 'TOPUP' && (
+              <span
+                className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${
+                  isDark ? 'bg-[#00c4de]' : 'bg-[#007b8b]'
+                }`}
+              />
+            )}
+          </button>
 
-                <button
-                  type="button"
-                  disabled={claimedToday}
-                  onClick={handleClaimDaily}
-                  className={`px-5 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 self-start sm:self-center ${
-                    claimedToday
-                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 cursor-not-allowed'
-                      : isDark
-                      ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black hover:brightness-110 shadow-md active:scale-95'
-                      : 'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:brightness-105 shadow-sm active:scale-95'
-                  }`}
-                >
-                  <Gift size={18} weight={claimedToday ? 'fill' : 'bold'} />
-                  <span>{claimedToday ? t('wallet.claimed_daily_btn') : t('wallet.claim_daily_btn')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Bottom Account Status Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-white/10 text-xs">
-              <div>
-                <span className="text-gray-600 dark:text-gray-400 block mb-1 font-medium">
-                  {t('wallet.tier_label')}
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800">
-                  <ShieldCheck size={14} weight="fill" className="text-emerald-600 dark:text-emerald-400" />
-                  <span>Tier A ({user?.trustScore || 100}%)</span>
-                </span>
-              </div>
-
-              <div>
-                <span className="text-gray-600 dark:text-gray-400 block mb-1 font-medium">
-                  {t('wallet.role_label')}
-                </span>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${roleBadge.bg}`}>
-                  {roleBadge.label}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-gray-600 dark:text-gray-400 block mb-1 font-medium">
-                  {t('wallet.privilege_label')}
-                </span>
-                <span className="font-bold text-gray-800 dark:text-gray-200 block truncate">
-                  {t('wallet.privilege_val')}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* How to Earn Side Card (4 cols) */}
-          <div
-            className={`lg:col-span-4 rounded-2xl border p-6 flex flex-col justify-between shadow-xs ${
-              isDark
-                ? 'bg-[#071317] border-white/10 shadow-lg shadow-black/40'
-                : 'bg-white border-[#E8E4E3]'
+          <button
+            type="button"
+            onClick={() => setActiveTab('MISSIONS')}
+            className={`pb-3 text-sm font-extrabold transition-all relative flex items-center gap-2 cursor-pointer ${
+              activeTab === 'MISSIONS'
+                ? isDark
+                  ? 'text-[#00c4de]'
+                  : 'text-[#007b8b]'
+                : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'
             }`}
           >
-            <div>
-              <h3 className="font-extrabold text-base text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Sparkle size={18} weight="fill" className="text-amber-500" />
-                <span>{t('wallet.how_to_earn_title')}</span>
-              </h3>
-
-              <div className="space-y-3 text-xs leading-relaxed">
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <span className="font-bold text-amber-700 dark:text-amber-300 block mb-0.5">
-                    +20 Credits
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {t('wallet.earn_survey_sub')}
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <span className="font-bold text-emerald-700 dark:text-emerald-300 block mb-0.5">
-                    +5 Credits
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {t('wallet.earn_review_sub')}
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
-                  <span className="font-bold text-cyan-700 dark:text-cyan-300 block mb-0.5">
-                    +25 Credits
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-300">
-                    {t('wallet.earn_daily_sub')}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-4 pt-3 border-t border-gray-200 dark:border-white/10">
-              {t('wallet.wallet_note')}
-            </p>
-          </div>
+            <span>Nhiệm vụ đóng góp</span>
+            {currentStreak > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                {currentStreak} ngày chuỗi
+              </span>
+            )}
+            {activeTab === 'MISSIONS' && (
+              <span
+                className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-full ${
+                  isDark ? 'bg-[#00c4de]' : 'bg-[#007b8b]'
+                }`}
+              />
+            )}
+          </button>
         </div>
 
-        {/* ─── Top-up Packages Section (VietQR) ────────────────────────── */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              {t('wallet.packages_title')}
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-              {t('wallet.packages_subtitle')}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {mockTopupPackages.map((pkg) => (
+        {/* ─── TAB 1: Nạp Credits (Dedicated Checkout Workflow) ───────── */}
+        {activeTab === 'TOPUP' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* Left Column (7 cols): Top-up Selector */}
+            <div className="lg:col-span-7 h-full">
               <div
-                key={pkg.id}
-                className={`rounded-2xl p-5 sm:p-6 border transition-all relative flex flex-col justify-between shadow-xs ${
-                  pkg.isPopular
-                    ? isDark
-                      ? 'bg-[#071317] border-2 border-[#00c4de] shadow-lg shadow-[#00c4de]/10'
-                      : 'bg-white border-2 border-[#007b8b] shadow-md'
-                    : isDark
-                    ? 'bg-[#071317] border-white/10 hover:border-white/20'
-                    : 'bg-white border-[#E8E4E3] hover:border-gray-400'
+                className={`rounded-2xl border p-6 shadow-xs h-full flex flex-col justify-between ${
+                  isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
                 }`}
               >
-                {pkg.isPopular && (
-                  <span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                    isDark ? 'bg-[#00c4de] text-black shadow-md' : 'bg-[#007b8b] text-white shadow-sm'
-                  }`}>
-                    {t('wallet.popular_badge')}
-                  </span>
-                )}
-
-                <div>
-                  <h3 className="font-extrabold text-lg text-gray-900 dark:text-white">
-                    {pkg.name}
-                  </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed min-h-[2.5rem]">
-                    {pkg.description}
-                  </p>
-
-                  <div className="mt-4 flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl lg:text-4xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-                        {pkg.credits}
-                      </span>
-                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">Credits</span>
-                    </div>
-                    {pkg.bonusCredits > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 bg-emerald-100 text-emerald-950 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800">
-                        {t('wallet.bonus_badge', { amount: pkg.bonusCredits })}
-                      </span>
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
+                      Chọn số tiền nạp Credits
+                    </h3>
+                    {isLoadingPackages && (
+                      <CircleNotch
+                        size={16}
+                        className={`animate-spin ${
+                          isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
+                        }`}
+                      />
                     )}
                   </div>
 
-                  <span className="text-sm font-mono font-extrabold text-gray-900 dark:text-white block mt-2">
-                    {pkg.priceVnd.toLocaleString('vi-VN')} VND
-                  </span>
-                </div>
+                  {/* Preset Packages Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {packages.map((pkg) => {
+                      const isSelected = !isCustomMode && selectedPkgId === pkg.id
+                      return (
+                        <button
+                          key={pkg.id}
+                          type="button"
+                          onClick={() => {
+                            setIsCustomMode(false)
+                            setSelectedPkgId(pkg.id)
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
+                            isSelected
+                              ? isDark
+                                ? 'bg-[#00c4de]/10 border-2 border-[#00c4de] text-white shadow-xs'
+                                : 'bg-teal-50/70 border-2 border-[#007b8b] text-gray-900 shadow-xs'
+                              : isDark
+                              ? 'bg-white/5 border-white/10 hover:border-white/20 text-gray-300'
+                              : 'bg-gray-50/70 border-gray-200 hover:border-gray-300 text-gray-700'
+                          }`}
+                        >
+                          <div>
+                            <span className="font-mono font-extrabold text-sm block">
+                              {Math.round(Number(pkg.priceVnd)).toLocaleString('vi-VN')} đ
+                            </span>
+                            <span className="text-xs font-bold text-amber-500 dark:text-amber-400 block mt-0.5">
+                              +{pkg.creditAmount} Credits
+                            </span>
+                          </div>
 
-                <div className="pt-5 mt-5 border-t border-gray-200 dark:border-white/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPkg(pkg)
-                      setShowPaymentModal(true)
-                    }}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-                      pkg.isPopular
-                        ? isDark
-                          ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black shadow-md'
-                          : 'bg-[#007b8b] hover:bg-[#00606d] text-white shadow-sm'
-                        : isDark
-                        ? 'bg-white/10 hover:bg-white/15 text-white border border-white/15'
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200'
-                    }`}
-                  >
-                    {t('wallet.btn_select_pay')}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ─── Transaction History Section ────────────────────────────── */}
-        <div
-          className={`rounded-2xl border shadow-xs overflow-hidden ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
-          }`}
-        >
-          <div className="p-5 sm:p-6 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">
-              {t('wallet.history_title')}
-            </h2>
-            <span className="text-xs font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2.5 py-1 rounded-full border border-gray-200 dark:border-white/10">
-              {t('wallet.history_count', { count: transactions.length })}
-            </span>
-          </div>
-
-          <div className="divide-y divide-gray-100 dark:divide-white/5">
-            {transactions
-              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-              .map((tx) => (
-              <div
-                key={tx.id}
-                className={`p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors ${
-                  isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div
-                    className={`p-2.5 rounded-xl shrink-0 ${
-                      tx.amountCredits > 0
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                        : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-                    }`}
-                  >
-                    {tx.amountCredits > 0 ? <ArrowDownLeft size={18} weight="bold" /> : <ArrowUpRight size={18} weight="bold" />}
+                          {(pkg.bonusCredits || 0) > 0 && (
+                            <span className="inline-block mt-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              +{pkg.bonusCredits} thưởng
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
 
-                  <div className="min-w-0">
-                    <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                      {tx.title}
-                    </h4>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">
-                      <span>{tx.id}</span>
-                      <span>•</span>
-                      <span>{tx.date}</span>
+                  {/* Custom Credits Field */}
+                  <div className="pt-4 border-t border-gray-100 dark:border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-gray-600 dark:text-gray-300">
+                        Hoặc nhập số Credits tùy ý:
+                      </span>
+                      <span className="text-xs font-medium text-gray-400">
+                        Tỷ lệ 100 đ cho 1 Credit
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={50}
+                        max={50000}
+                        step={50}
+                        value={isCustomMode ? customCredits || '' : ''}
+                        onFocus={() => setIsCustomMode(true)}
+                        onChange={(e) => {
+                          setIsCustomMode(true)
+                          setCustomCredits(Math.max(0, parseInt(e.target.value, 10) || 0))
+                        }}
+                        placeholder="Ví dụ: 300, 1500..."
+                        className={`w-full px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors outline-none ${
+                          isCustomMode
+                            ? isDark
+                              ? 'bg-black/30 border-[#00c4de] text-white'
+                              : 'bg-white border-[#007b8b] text-gray-900 shadow-xs'
+                            : isDark
+                            ? 'bg-white/5 border-white/10 text-gray-300'
+                            : 'bg-gray-50/70 border-gray-200 text-gray-700'
+                        }`}
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        {isCustomMode && customCredits > 0 && (
+                          <span className="font-mono text-xs font-bold text-amber-500 dark:text-amber-400">
+                            = {(customCredits * 100).toLocaleString('vi-VN')} đ
+                          </span>
+                        )}
+                        <span className="text-xs font-bold text-gray-400">Credits</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column (5 cols): Order Summary & Checkout Trigger */}
+            <div className="lg:col-span-5 h-full">
+              <div
+                className={`rounded-2xl border p-6 shadow-xs h-full flex flex-col justify-between ${
+                  isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+                }`}
+              >
+                <div className="space-y-4">
+                  <h3 className="text-base font-extrabold text-gray-900 dark:text-white pb-3 border-b border-gray-100 dark:border-white/10">
+                    Xác nhận đơn nạp
+                  </h3>
+
+                  {/* Order Line Items */}
+                  <div className="space-y-3 text-xs">
+                    <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                      <span>Gói đã chọn:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        {isCustomMode
+                          ? 'Nạp số lượng tùy chỉnh'
+                          : cleanPackageName(selectedPackage?.packageName || '')}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                      <span>Credits nhận được:</span>
+                      <span className="font-black text-amber-500 dark:text-amber-400 text-sm">
+                        +{effectiveCredits.toLocaleString('vi-VN')} Credits
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                      <span>Tỷ giá quy đổi:</span>
+                      <span className="font-mono text-gray-500 dark:text-gray-400">
+                        100 đ cho 1 Credit
+                      </span>
+                    </div>
+
+                    <div className="border-t border-gray-100 dark:border-white/10 pt-3 flex justify-between items-baseline">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        Tổng thanh toán:
+                      </span>
+                      <span className="text-xl font-mono font-black text-[#007b8b] dark:text-[#00c4de]">
+                        {effectivePriceVnd.toLocaleString('vi-VN')} đ
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <span
-                    className={`text-sm sm:text-base font-extrabold block ${
-                      tx.amountCredits > 0
-                        ? 'text-emerald-700 dark:text-emerald-400'
-                        : 'text-rose-700 dark:text-rose-400'
+                <div className="pt-4">
+                  <button
+                    type="button"
+                    disabled={effectiveCredits <= 0}
+                    onClick={() => setIsCheckoutModalOpen(true)}
+                    className={`w-full py-3 rounded-xl font-extrabold text-sm transition-all shadow-md cursor-pointer ${
+                      isDark
+                        ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black active:scale-98'
+                        : 'bg-[#007b8b] hover:bg-[#00606d] text-white active:scale-98'
                     }`}
                   >
-                    {tx.amountCredits > 0 ? `+${tx.amountCredits}` : tx.amountCredits} Credits
-                  </span>
-                  {(() => {
-                    const statusBadge = getStatusBadge(tx.status)
-                    return (
-                      <span className={`inline-flex items-center mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusBadge.cls}`}>
-                        {statusBadge.label}
-                      </span>
-                    )
-                  })()}
+                    Tiến hành thanh toán
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 2: Nhiệm vụ đóng góp (Dedicated Contributor Hub) ───── */}
+        {activeTab === 'MISSIONS' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* Left Column (5 cols): Combined Streak & Weekly Challenges */}
+            <div className="lg:col-span-5 h-full">
+              <div
+                className={`rounded-2xl border p-6 shadow-xs h-full flex flex-col justify-between ${
+                  isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+                }`}
+              >
+                <div className="space-y-5">
+                  {/* Streak Challenge */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white">
+                          {missions?.streak?.title || 'Chuỗi đóng góp 7 ngày'}
+                        </h3>
+                        {missions?.streak?.badgeEarned && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                            Đã đạt huy hiệu
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-bold text-amber-500 dark:text-amber-400">
+                        +{missions?.streak?.bonusCredits || 50} Credits thưởng
+                      </span>
+                    </div>
+
+                    {/* Visual 7-day progress bars */}
+                    <div className="grid grid-cols-7 gap-1.5 pt-1">
+                      {Array.from({ length: missions?.streak?.requiredDays || 7 }).map((_, index) => {
+                        const dayNum = index + 1
+                        const isReached = currentStreak >= dayNum
+                        return (
+                          <div key={dayNum} className="space-y-1.5 text-center">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                isReached
+                                  ? isDark
+                                    ? 'bg-[#00c4de]'
+                                    : 'bg-[#007b8b]'
+                                  : 'bg-gray-200 dark:bg-white/10'
+                              }`}
+                            />
+                            <span className="text-[11px] font-mono font-medium text-gray-400 block">
+                              {dayNum}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-1">
+                      <span>
+                        Tiến độ: <strong className="text-gray-900 dark:text-white">{currentStreak} / {missions?.streak?.requiredDays || 7} ngày</strong>
+                      </span>
+                      <span>
+                        {currentStreak >= (missions?.streak?.requiredDays || 7)
+                          ? 'Đã đạt mốc thưởng'
+                          : `Còn ${(missions?.streak?.requiredDays || 7) - (currentStreak % (missions?.streak?.requiredDays || 7))} ngày`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Weekly Missions Section */}
+                  {missions?.weekly && (
+                    <div className="border-t border-gray-100 dark:border-white/10 pt-4 space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">
+                          {missions.weekly.title}
+                        </h4>
+                        <span className="font-bold text-amber-500 dark:text-amber-400">
+                          +{missions.weekly.bonusCredits} Credits tuần
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            missions.weekly.completed
+                              ? 'bg-emerald-500'
+                              : isDark
+                              ? 'bg-[#00c4de]'
+                              : 'bg-[#007b8b]'
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round(
+                                (missions.weekly.completedMissions / missions.weekly.target) * 100
+                              )
+                            )}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-400">
+                        <span>
+                          Tiến độ tuần: {missions.weekly.completedMissions} / {missions.weekly.target} nhiệm vụ
+                        </span>
+                        <span>{missions.weekly.completed ? 'Đã hoàn thành' : 'Đang thực hiện'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column (7 cols): Daily Contributor Challenges List */}
+            <div className="lg:col-span-7 h-full">
+              <div
+                className={`rounded-2xl border p-6 shadow-xs h-full flex flex-col justify-between ${
+                  isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+                }`}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-base text-gray-900 dark:text-white">
+                      Nhiệm vụ hằng ngày
+                    </h3>
+                    <span className="text-xs text-gray-500 font-medium">
+                      {dailyTasks.length > 0
+                        ? `${dailyTasks.filter((t) => t.isCompleted).length} / ${dailyTasks.length} hoàn thành`
+                        : 'Đóng góp nhận Credits'}
+                    </span>
+                  </div>
+
+                  {dailyTasks.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {dailyTasks.map((task) => {
+                        const isTaskDone = task.isCompleted || task.isClaimed
+                        const canClaim = task.isClaimable && !task.isClaimed
+                        const progressPercent = Math.min(
+                          100,
+                          Math.round((task.progress / (task.targetCount || 1)) * 100)
+                        )
+
+                        return (
+                          <div
+                            key={task.id}
+                            className="p-3.5 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/60 dark:bg-white/5 flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="font-bold text-gray-900 dark:text-white truncate">
+                                  {task.name}
+                                </span>
+                                <span className="font-bold text-amber-500 ml-2 shrink-0">
+                                  +{task.rewardCredits} Credits
+                                </span>
+                              </div>
+
+                              <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-300 ${
+                                    isTaskDone
+                                      ? 'bg-emerald-500'
+                                      : isDark
+                                      ? 'bg-[#00c4de]'
+                                      : 'bg-[#007b8b]'
+                                  }`}
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+                                <span>
+                                  Tiến độ: {task.progress} / {task.targetCount}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 ml-1">
+                              {canClaim ? (
+                                <button
+                                  type="button"
+                                  disabled={claimingTaskId === task.id}
+                                  onClick={() => handleClaimTaskReward(task)}
+                                  className="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer"
+                                >
+                                  {claimingTaskId === task.id ? 'Đang nhận...' : 'Nhận thưởng'}
+                                </button>
+                              ) : task.isClaimed ? (
+                                <span className="text-emerald-500 font-bold text-xs px-2">Đã nhận</span>
+                              ) : (
+                                <Link
+                                  to={task.activityType === 'SURVEY' ? '/studio' : '/reviews/candidates'}
+                                  className="inline-block px-3 py-1.5 rounded-lg font-bold text-xs border border-[#007b8b]/30 text-[#007b8b] hover:bg-[#007b8b]/10 dark:border-[#00c4de]/30 dark:text-[#00c4de] dark:hover:bg-[#00c4de]/10 transition-colors"
+                                >
+                                  Làm ngay
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-amber-600 dark:text-amber-400 block">+20 Credits</span>
+                          <span className="text-gray-500 text-[11px]">Khảo sát video Dashcam</span>
+                        </div>
+                        <Link
+                          to="/studio"
+                          className="px-3 py-1 rounded-lg font-bold text-xs border border-[#007b8b]/30 text-[#007b8b] hover:bg-[#007b8b]/10 dark:border-[#00c4de]/30 dark:text-[#00c4de]"
+                        >
+                          Khảo sát
+                        </Link>
+                      </div>
+                      <div className="p-3 rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 block">+5 Credits</span>
+                          <span className="text-gray-500 text-[11px]">Duyệt biển báo AI phát hiện</span>
+                        </div>
+                        <Link
+                          to="/reviews/candidates"
+                          className="px-3 py-1 rounded-lg font-bold text-xs border border-[#007b8b]/30 text-[#007b8b] hover:bg-[#007b8b]/10 dark:border-[#00c4de]/30 dark:text-[#00c4de]"
+                        >
+                          Duyệt biển
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Bottom Section: Transaction History ─────────────────────── */}
+        <div
+          className={`rounded-2xl border shadow-xs overflow-hidden mt-8 ${
+            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+          }`}
+        >
+          <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base sm:text-lg font-extrabold text-gray-900 dark:text-white">
+                {t('wallet.history_title')}
+              </h2>
+              <span className="text-xs font-bold text-gray-500 bg-gray-100 dark:bg-white/5 px-2.5 py-0.5 rounded-full border border-gray-200 dark:border-white/10">
+                {t('wallet.history_count', { count: totalTransactions })}
+              </span>
+            </div>
+
+            {/* Transaction Filter Tabs */}
+            <div className="inline-flex p-0.5 rounded-lg bg-gray-100 dark:bg-white/10 self-start sm:self-auto text-xs">
+              <button
+                type="button"
+                onClick={() => setTxFilter('ALL')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'ALL'
+                    ? 'bg-white dark:bg-[#071317] text-gray-900 dark:text-white shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => setTxFilter('IN')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'IN'
+                    ? 'bg-white dark:bg-[#071317] text-emerald-600 dark:text-emerald-400 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Cộng điểm
+              </button>
+              <button
+                type="button"
+                onClick={() => setTxFilter('OUT')}
+                className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                  txFilter === 'OUT'
+                    ? 'bg-white dark:bg-[#071317] text-rose-600 dark:text-rose-400 shadow-xs'
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Khấu trừ
+              </button>
+            </div>
           </div>
 
-          {/* ─── Shared Pagination ──────────────────────────────────── */}
-          {transactions.length > 0 && (
+          <div className="divide-y divide-gray-100 dark:divide-white/5">
+            {isLoadingTx ? (
+              <div className="p-10 text-center text-gray-400">
+                <CircleNotch
+                  size={24}
+                  className={`animate-spin mx-auto mb-2 ${
+                    isDark ? 'text-[#00c4de]' : 'text-[#007b8b]'
+                  }`}
+                />
+                <p className="text-xs">Đang tải lịch sử giao dịch...</p>
+              </div>
+            ) : filteredTransactions.length === 0 ? (
+              <div className="p-10 text-center text-gray-400 text-sm">
+                Chưa có giao dịch nào được ghi nhận.
+              </div>
+            ) : (
+              filteredTransactions.map((tx) => {
+                const isPositive = Number(tx.amount) > 0
+                return (
+                  <div
+                    key={tx.id}
+                    className={`p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors ${
+                      isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center ${
+                          isPositive
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                        }`}
+                      >
+                        {isPositive ? (
+                          <ArrowDownLeft size={14} weight="bold" />
+                        ) : (
+                          <ArrowUpRight size={14} weight="bold" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          {formatTxType(tx.transactionType, tx.description)}
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 font-mono mt-0.5">
+                          <span className="truncate max-w-[120px]">{tx.id}</span>
+                          <span>•</span>
+                          <span>{new Date(tx.createdAt).toLocaleString('vi-VN')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`text-sm sm:text-base font-extrabold block ${
+                          isPositive
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {isPositive ? `+${tx.amount}` : tx.amount} Credits
+                      </span>
+                      {tx.balanceAfter !== undefined && tx.balanceAfter !== null && (
+                        <span className="text-[11px] text-gray-400 block font-mono">
+                          Số dư: {tx.balanceAfter}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Shared Pagination */}
+          {totalTransactions > pageSize && (
             <div className="p-4 sm:px-6">
               <Pagination
                 currentPage={currentPage}
-                totalItems={transactions.length}
+                totalItems={totalTransactions}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={(sz) => {
@@ -457,97 +837,20 @@ export default function WalletPage() {
             </div>
           )}
         </div>
-
-        {/* ─── VietQR Payment Modal ───────────────────────────────────── */}
-        {selectedPkg && (
-          <Modal
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            maxWidth="max-w-md"
-          >
-            <div
-              className={`w-full rounded-2xl border shadow-2xl p-6 sm:p-8 text-center transition-all ${
-                isDark ? 'bg-[#071317] border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'
-              }`}
-            >
-              {paymentSuccess ? (
-                <div className="py-6 space-y-3">
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 mx-auto flex items-center justify-center animate-bounce">
-                    <CheckCircle size={36} weight="fill" />
-                  </div>
-                  <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">
-                    {t('wallet.payment_success_title')}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('wallet.payment_success_desc')}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white mb-1">
-                    {t('wallet.qr_modal_title')}
-                  </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                    {t('wallet.qr_scan_desc')}
-                  </p>
-
-                  <div className="w-52 h-52 mx-auto p-3 rounded-2xl bg-white shadow-xs flex flex-col items-center justify-center border border-gray-300">
-                    <QrCode size={150} className="text-gray-900" />
-                    <span className="text-[11px] font-mono text-gray-700 font-bold mt-1">
-                      NAP {user?.name?.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-xs text-left space-y-1.5 font-mono">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">{t('wallet.modal_package_lbl')}</span>
-                      <span className="font-bold text-gray-900 dark:text-[#00c4de]">{selectedPkg.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">{t('wallet.modal_credits_received')}</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">
-                        {selectedPkg.credits + (selectedPkg.bonusCredits || 0)} Credits
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">{t('wallet.modal_amount_lbl')}</span>
-                      <span className="font-extrabold text-gray-900 dark:text-white">
-                        {selectedPkg.priceVnd.toLocaleString('vi-VN')} VND
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 mt-5">
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentModal(false)}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-colors cursor-pointer ${
-                        isDark
-                          ? 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-300'
-                          : 'bg-gray-100 border-gray-200 hover:bg-gray-200 text-gray-800'
-                      }`}
-                    >
-                      {t('wallet.btn_cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCompleteTopup}
-                      className={`flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm cursor-pointer ${
-                        isDark
-                          ? 'bg-[#00c4de] hover:bg-[#38dbf1] text-black'
-                          : 'bg-[#007b8b] hover:bg-[#00606d] text-white'
-                      }`}
-                    >
-                      {t('wallet.btn_confirm_paid')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </Modal>
-        )}
       </div>
+
+      {/* ─── Professional Payment Checkout Modal ────────────────────── */}
+      <PaymentCheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        isDark={isDark}
+        packageItem={selectedPackage}
+        isCustomMode={isCustomMode}
+        customCredits={customCredits}
+        effectiveCredits={effectiveCredits}
+        effectivePriceVnd={effectivePriceVnd}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </div>
   )
 }
-

@@ -354,10 +354,10 @@ export default function SurveyStudioPage() {
       const isVideo = mode === 'video_gpx'
       const targetFile = isVideo ? videoFile! : photoFile!
       const coordinateSource: CoordinateSource = isVideo
-        ? 'GPX_FILE'
+        ? 'FILE GPX'
         : hasAutoGps
-        ? 'IMAGE_EXIF'
-        : 'DEVICE_GPS'
+          ? 'IMAGE EXIF'
+          : 'DEVICE_GPS'
 
       let finalGpx = isVideo ? gpxFile : undefined
       // Auto-synthesize companion GPX if video without separate GPX file
@@ -447,9 +447,8 @@ export default function SurveyStudioPage() {
         {/* Stepper Progress Bar (Interactive & Clean) */}
         {currentStep !== 'finish' && (
           <div
-            className={`p-1.5 sm:p-2 rounded-2xl border flex items-center justify-between text-xs font-bold transition-colors ${
-              isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-xs'
-            }`}
+            className={`p-1.5 sm:p-2 rounded-2xl border flex items-center justify-between text-xs font-bold transition-colors ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-gray-200 shadow-xs'
+              }`}
           >
             {/* Step 1: Media */}
             <button
@@ -457,35 +456,32 @@ export default function SurveyStudioPage() {
               onClick={() => handleStepClick('media')}
               disabled={isUploading}
               title={t('survey.stepper_media')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
-                currentStep === 'media'
-                  ? isDark
-                    ? 'bg-[#00c4de]/10 text-[#00c4de]'
-                    : 'bg-[#007b8b]/10 text-[#007b8b]'
-                  : isMediaValid
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${currentStep === 'media'
+                ? isDark
+                  ? 'bg-[#00c4de]/10 text-[#00c4de]'
+                  : 'bg-[#007b8b]/10 text-[#007b8b]'
+                : isMediaValid
                   ? 'text-gray-700 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer'
                   : 'text-gray-400 dark:text-gray-500 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer'
-              }`}
+                }`}
             >
               <span
-                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${
-                  currentStep === 'media'
-                    ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
-                    : isMediaValid
+                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${currentStep === 'media'
+                  ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
+                  : isMediaValid
                     ? 'bg-emerald-500'
                     : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+                  }`}
               />
               <span className="truncate">{t('survey.stepper_media')}</span>
             </button>
 
             {/* Divider 1 */}
             <div
-              className={`flex-1 h-px mx-1 sm:mx-3 transition-colors ${
-                isMediaValid
-                  ? 'bg-emerald-500/40 dark:bg-emerald-500/30'
-                  : 'bg-gray-200 dark:bg-white/10'
-              }`}
+              className={`flex-1 h-px mx-1 sm:mx-3 transition-colors ${isMediaValid
+                ? 'bg-emerald-500/40 dark:bg-emerald-500/30'
+                : 'bg-gray-200 dark:bg-white/10'
+                }`}
             />
 
             {/* Step 2: Location and Details */}
@@ -494,37 +490,34 @@ export default function SurveyStudioPage() {
               onClick={() => handleStepClick('details')}
               disabled={!isMediaValid || isUploading}
               title={isMediaValid ? t('survey.stepper_details') : 'Vui lòng chọn phương tiện trước'}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
-                currentStep === 'details'
-                  ? isDark
-                    ? 'bg-[#00c4de]/10 text-[#00c4de]'
-                    : 'bg-[#007b8b]/10 text-[#007b8b]'
-                  : isMediaValid
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${currentStep === 'details'
+                ? isDark
+                  ? 'bg-[#00c4de]/10 text-[#00c4de]'
+                  : 'bg-[#007b8b]/10 text-[#007b8b]'
+                : isMediaValid
                   ? 'text-gray-700 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer'
                   : 'text-gray-400 dark:text-gray-600 opacity-60 cursor-not-allowed'
-              }`}
+                }`}
             >
               <span
-                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${
-                  currentStep === 'details'
-                    ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
-                    : currentStep === 'uploading'
+                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${currentStep === 'details'
+                  ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
+                  : currentStep === 'uploading'
                     ? 'bg-emerald-500'
                     : isMediaValid
-                    ? 'bg-gray-400 dark:bg-gray-500'
-                    : 'bg-gray-300 dark:bg-gray-700'
-                }`}
+                      ? 'bg-gray-400 dark:bg-gray-500'
+                      : 'bg-gray-300 dark:bg-gray-700'
+                  }`}
               />
               <span className="truncate">{t('survey.stepper_details')}</span>
             </button>
 
             {/* Divider 2 */}
             <div
-              className={`flex-1 h-px mx-1 sm:mx-3 transition-colors ${
-                currentStep === 'uploading'
-                  ? 'bg-emerald-500/40 dark:bg-emerald-500/30'
-                  : 'bg-gray-200 dark:bg-white/10'
-              }`}
+              className={`flex-1 h-px mx-1 sm:mx-3 transition-colors ${currentStep === 'uploading'
+                ? 'bg-emerald-500/40 dark:bg-emerald-500/30'
+                : 'bg-gray-200 dark:bg-white/10'
+                }`}
             />
 
             {/* Step 3: AI Processing */}
@@ -533,20 +526,18 @@ export default function SurveyStudioPage() {
               onClick={() => handleStepClick('uploading')}
               disabled={currentStep !== 'uploading'}
               title={t('survey.stepper_upload')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
-                currentStep === 'uploading'
-                  ? isDark
-                    ? 'bg-[#00c4de]/10 text-[#00c4de]'
-                    : 'bg-[#007b8b]/10 text-[#007b8b]'
-                  : 'text-gray-400 dark:text-gray-600 opacity-60 cursor-not-allowed'
-              }`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${currentStep === 'uploading'
+                ? isDark
+                  ? 'bg-[#00c4de]/10 text-[#00c4de]'
+                  : 'bg-[#007b8b]/10 text-[#007b8b]'
+                : 'text-gray-400 dark:text-gray-600 opacity-60 cursor-not-allowed'
+                }`}
             >
               <span
-                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${
-                  currentStep === 'uploading'
-                    ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
-                    : 'bg-gray-300 dark:bg-gray-700'
-                }`}
+                className={`w-2.5 h-2.5 rounded-full transition-all shrink-0 ${currentStep === 'uploading'
+                  ? 'bg-[#007b8b] dark:bg-[#00c4de] ring-4 ring-[#007b8b]/20 dark:ring-[#00c4de]/20'
+                  : 'bg-gray-300 dark:bg-gray-700'
+                  }`}
               />
               <span className="truncate">{t('survey.stepper_upload')}</span>
             </button>
@@ -563,9 +554,8 @@ export default function SurveyStudioPage() {
 
         {/* Stepped Body Container */}
         <div
-          className={`p-6 sm:p-8 rounded-3xl border shadow-sm ${
-            isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200'
-          }`}
+          className={`p-6 sm:p-8 rounded-3xl border shadow-sm ${isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-gray-200'
+            }`}
         >
           {currentStep === 'media' && (
             <SurveyMediaStep

@@ -63,11 +63,13 @@ export const API_ENDPOINTS = {
     TEST_ASSIGN: '/api/v1/reviews/test-assign',
   },
   WALLET: {
-    BALANCE: '/api/v1/economy/wallet/balance',
-    TRANSACTIONS: '/api/v1/economy/wallet/transactions',
-    TOPUP_PACKAGES: '/api/v1/economy/topup-packages',
-    CREATE_PAYMENT: '/api/v1/economy/wallet/topup',
-    REWARDS_CLAIM: '/api/v1/economy/rewards/daily-claim',
+    BASE: '/api/v1/wallet',
+    BALANCE: '/api/v1/wallet',
+    TRANSACTIONS: '/api/v1/wallet/transactions',
+    PACKAGES: '/api/v1/wallet/top-up/packages',
+    TOPUP: '/api/v1/wallet/top-up',
+    TOPUP_CUSTOM: '/api/v1/wallet/top-up/custom',
+    PAYMENT_METHODS: '/api/v1/wallet/payment-methods',
   },
   TASKS: {
     REVALIDATION_LIST: '/api/v1/tasks/revalidations',

@@ -65,8 +65,7 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
       return mutation(variables, session.accessToken);
     },
     onSuccess: () => {
-      // Invalidate review lists and also refresh the reviewer credit score / stats
-      queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) });
+      // Refresh the reviewer credit score / stats without invalidating the active review queue prematurely
       queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
     },
   });
@@ -92,7 +91,6 @@ export function useReportMissingType() {
       return reportMissingType(request, session.accessToken);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: reviewKeys.all(session?.account.id) });
       queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
     },
   });

@@ -24,7 +24,17 @@ export const NOTIFICATIONS_PATH = '*/api/v1/notifications*';
 
 export const navigationHandlers = [
   http.get(WALLET_PATH, () => {
-    return HttpResponse.json({ balance: 100, pendingReward: 10 }, { status: 200 });
+    return HttpResponse.json({
+      wallet: {
+        id: 'mock-wallet-1',
+        userId: 'user-1',
+        balance: 100,
+        updatedAt: new Date().toISOString(),
+      },
+      balance: 100,
+      pendingReward: 10,
+      recentTransactions: [],
+    }, { status: 200 });
   }),
 
   http.get(NOTIFICATIONS_UNREAD_COUNT_PATH, () => {
@@ -290,5 +300,18 @@ export const navigationHandlers = [
   // 16. Saved Routes: DELETE /saved-routes/:id
   http.delete('*/api/v1/saved-routes/:id', ({ params }) => {
     return HttpResponse.json({ success: true, id: params.id || 'mock-saved-route-1' }, { status: 200 });
+  }),
+
+  // 17. POST /navigation/sessions/initiate
+  http.post('*/api/v1/navigation/sessions/initiate', async () => {
+    return HttpResponse.json(
+      {
+        sessionId: 'mock-session-123',
+        status: 'ACTIVE',
+        creditsDeducted: 5,
+        remainingCredits: 95,
+      },
+      { status: 201 },
+    );
   }),
 ];

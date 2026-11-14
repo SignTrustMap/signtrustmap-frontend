@@ -43,6 +43,8 @@ export interface ReviewCandidateDto {
   spatialConfidence?: 'HIGH' | 'LOW' | string
   status?: string
   createdAt?: string
+  activeLearningPriority?: number
+  possibleSigns?: any[]
   predictedSignType?: PredictedSignTypeDto
   submission?: CandidateSubmissionDto
   locationContext?: CandidateLocationContextDto | null
@@ -53,6 +55,10 @@ export interface CandidateDetailResponse {
   submission?: CandidateSubmissionDto | null
   voteCount?: number
   locationContext?: CandidateLocationContextDto | null
+  possibleSigns?: any[]
+  top5?: any[]
+  remedySigns?: any[]
+  predictedSignTypes?: any[]
 }
 
 export interface VoteCandidateDto {
@@ -80,7 +86,56 @@ export interface SignRemedyDto {
   previewUrl?: string
 }
 
+export interface CandidateQueryParams {
+  page?: number
+  pageSize?: number
+  status?: string
+  tag?: string
+  search?: string
+  surveyorId?: string
+  sortBy?: 'reviewedAt' | 'createdAt' | 'confidence' | 'status'
+  sortOrder?: 'ASC' | 'DESC'
+  reviewerId?: string
+}
+
+export interface CandidateCategoryCount {
+  id: string
+  label: string
+  count: number
+}
+
+export interface CandidateListResponse {
+  items: any[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+  counts?: {
+    ALL: number
+    PENDING_REVIEW: number
+    IN_CONSENSUS: number
+    RESOLVED: number
+    all?: number
+    unprocessed?: number
+    inReview?: number
+    reviewed?: number
+  }
+  categories?: CandidateCategoryCount[]
+}
+
 export const candidatesService = {
+  /**
+   * Fetch reviewed candidates history from official NestJS candidates endpoint.
+   * Calls GET /api/v1/candidates
+   */
+  getCandidates: async (params?: CandidateQueryParams): Promise<CandidateListResponse> => {
+    const res: any = await http.get(API_ENDPOINTS.MODERATION.CANDIDATES, { params })
+    if (res?.data && res?.success !== undefined) {
+      return res.data
+    }
+    return res
+  },
+
   /**
    * Retrieve full details of an unverified traffic sign candidate from NestJS backend.
    * Calls GET /api/v1/reviews/candidates/:id
@@ -155,11 +210,11 @@ export const candidatesService = {
   },
 
   /**
-   * Fetch prioritized candidate queue awaiting moderation/peer review.
+   * Fetch prioritized candidate queue awaiting peer review.
    * Calls GET /api/v1/reviews/queue
    */
   getQueue: async (params?: { page?: number; pageSize?: number; includeOwnSubmissions?: boolean }): Promise<any> => {
-    return http.get(API_ENDPOINTS.MODERATION.CANDIDATES, { params })
+    return http.get(API_ENDPOINTS.MODERATION.CANDIDATE_QUEUE, { params })
   },
 }
 

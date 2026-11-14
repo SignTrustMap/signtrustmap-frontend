@@ -1,8 +1,8 @@
 // Request DTOs match the supplied OpenAPI document. Response bodies are not
 // declared there; new responses remain unknown and existing read shapes below
 // retain the last documented local backend contract. Dates are JSON strings.
-export type SubmissionType = 'VIDEO_GPX' | 'SINGLE_IMAGE' | 'LIVE_TRIP';
-export type CoordinateSource = 'IMAGE_EXIF' | 'DEVICE_GPS' | 'MANUAL' | 'GPX_FILE' | 'LIVE_STREAM';
+export type SubmissionType = 'VIDEO_GPX' | 'SINGLE_IMAGE';
+export type CoordinateSource = 'IMAGE_EXIF' | 'DEVICE_GPS' | 'FILE_GPX' | 'MANUAL';
 
 export type CreateSubmissionDto = {
   submissionType: SubmissionType;
@@ -24,12 +24,27 @@ export type SubmitSubmissionResponse = unknown;
 export type SurveyMediaType = 'VIDEO' | 'GPX' | 'IMAGE';
 
 export type UploadStatus =
-  | 'INITIATED' | 'UPLOADING' | 'ASSEMBLING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+  | 'INITIATED'
+  | 'UPLOADING'
+  | 'ASSEMBLING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'EXPIRED';
 
 export type SubmissionStatus =
-  | 'QUEUED' | 'SYNCHRONIZING' | 'DETECTING' | 'TRACKING' | 'ESTIMATING'
-  | 'CLASSIFYING' | 'COMPLETED' | 'PARTIALLY_PROCESSED' | 'FAILED'
-  | 'PENDING_CORRECTION' | 'NO_SIGN_DETECTED' | 'DRAFT' | 'REJECTED';
+  | 'QUEUED'
+  | 'SYNCHRONIZING'
+  | 'DETECTING'
+  | 'TRACKING'
+  | 'ESTIMATING'
+  | 'CLASSIFYING'
+  | 'COMPLETED'
+  | 'PARTIALLY_PROCESSED'
+  | 'FAILED'
+  | 'PENDING_CORRECTION'
+  | 'NO_SIGN_DETECTED'
+  | 'DRAFT'
+  | 'REJECTED';
 
 export type SubmissionIssueDto = {
   /** Maximum length: 100 characters. */
@@ -140,7 +155,11 @@ export type ListMySubmissionsResponse = {
   totalPages: number;
 };
 
-export type PendingSubmissionsResponse = { total: number; pending: number; countsByStatus?: Partial<Record<SubmissionStatus, number>> };
+export type PendingSubmissionsResponse = {
+  total: number;
+  pending: number;
+  countsByStatus?: Partial<Record<SubmissionStatus, number>>;
+};
 
 export type SurveyorStatsResponse = {
   userId: string;

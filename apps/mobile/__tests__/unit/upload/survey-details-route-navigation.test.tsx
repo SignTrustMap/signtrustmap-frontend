@@ -81,7 +81,19 @@ jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
     refetch: jest.fn(),
   }),
   useSaveSurveyDraft: () => ({
-    mutateAsync: jest.fn(),
+    mutateAsync: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  }),
+  useCreateSurveySubmission: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ id: 'draft-123' }),
+  }),
+  useInitializeSurveyUpload: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({ sessionId: 'session-123' }),
+  }),
+  useUploadSurveyChunk: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
+  }),
+  useCompleteSurveyUpload: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
   }),
   useUpdateSurveySubmission: () => ({
     mutateAsync: jest.fn(),
@@ -138,14 +150,21 @@ jest.mock('@/feature/upload/hooks/use-reverse-geocode', () => ({
   }),
 }));
 
+let lastMapProps: any = {};
 jest.mock('@/feature/navigation/components/navigation-map-view', () => ({
   NavigationMapView: (props: any) => {
+    lastMapProps = props;
     const { View, Text } = require('react-native');
     return (
       <View testID="mock-preview-map">
         <Text testID="map-preview-has-route">
           {props.routeCoordinates ? 'has-route' : 'no-route'}
         </Text>
+        {props.locationPin ? (
+          <Text testID="map-preview-location-pin">
+            {`${props.locationPin[0]},${props.locationPin[1]}`}
+          </Text>
+        ) : null}
       </View>
     );
   },
@@ -156,6 +175,7 @@ import { SurveyRecordDetailsScreen } from '@/feature/upload/pages/survey-record-
 describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Image', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    lastMapProps = {};
     mockLocationPickerVisible = false;
     mockSearchParams = {};
   });
@@ -208,9 +228,10 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
 
     // Verify LocationPickerModal was NOT opened
     expect(mockLocationPickerVisible).toBe(false);
+    expect(lastMapProps.locationPin).toBeUndefined();
   });
 
-  it('opens LocationPickerModal when clicking zoom button for a single image submission', async () => {
+  it('opens LocationPickerModal when clicking zoom button for a single image submission and passes locationPin to map', async () => {
     mockSearchParams = {
       submissionId: 'sub-image-456',
     };
@@ -243,6 +264,9 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
 
     await waitFor(() => {
       expect(getByLabelText('Phóng to bản đồ xem trước')).toBeTruthy();
+      expect(lastMapProps.locationPin).toEqual([106.7009, 10.7769]);
+      expect(lastMapProps.showFocusPin).toBe(true);
+      expect(getByTestId('map-preview-location-pin')).toHaveTextContent('106.7009,10.7769');
     });
 
     const zoomBtn = getByLabelText('Phóng to bản đồ xem trước');
@@ -397,6 +421,38 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
 
       submitButton = getByText('Gửi hồ sơ').parent;
       expect(submitButton?.props.accessibilityState?.disabled).toBe(false);
+    });
+
+    it('pre-populates capturedAt from route params and hides GPS warning when GPS coordinates exist', async () => {
+      mockSearchParams = {
+        imageUri: 'file:///cache/photo.jpg',
+        imageName: 'photo.jpg',
+        startLat: '10.731640',
+        startLon: '106.719720',
+        latitude: '10.731640',
+        longitude: '106.719720',
+        capturedAt: '2026-03-01T10:00:00.000Z',
+      };
+      mockSubmissionStatusData = null;
+
+      const { getByLabelText, queryByText } = await render(
+        <SurveyRecordDetailsScreen />,
+      );
+
+      await waitFor(() => {
+        const dateInput = getByLabelText(
+          'Thời gian ghi nhận phương tiện theo định dạng ngày/tháng/năm',
+        );
+        expect(dateInput.props.value).toBe('01/03/2026');
+      });
+
+      // NO_GPS warning should NOT be displayed because coordinates exist
+      expect(
+        queryByText('Chưa có tọa độ GPS. Nhấn nút phóng to để chọn vị trí.'),
+      ).toBeNull();
+
+      // Calendar button should be present
+      expect(getByLabelText('Chọn ngày từ lịch')).toBeTruthy();
     });
   });
 });

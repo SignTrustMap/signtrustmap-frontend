@@ -28,6 +28,7 @@ import {
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
+import { captureTimeFromExif } from '@/feature/upload/utils/selected-asset-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import {
   MAX_SURVEY_IMAGE_SIZE_BYTES,
@@ -222,7 +223,7 @@ export function AndroidGalleryModal({
               capturedAt:
                 asset.creationTime > 0
                   ? new Date(asset.creationTime).toISOString()
-                  : undefined,
+                  : captureTimeFromExif(exif),
               fileName: asset.filename,
               type: 'image',
               uri: assetInfo.localUri ?? asset.uri,

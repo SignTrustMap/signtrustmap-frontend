@@ -29,7 +29,17 @@
         "foregroundImage": "./assets/images/app-logo.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "package": "com.signtrustmap.app",
+      "navigationBar": {
+        "visible": "always",
+        "barStyle": "dark-content",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "androidNavigationBar": {
+      "visible": "always",
+      "barStyle": "dark-content",
+      "backgroundColor": "#FFFFFF"
     },
     "web": {
       "output": "static",

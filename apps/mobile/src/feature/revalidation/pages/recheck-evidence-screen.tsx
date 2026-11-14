@@ -38,19 +38,19 @@ const revalActionDetails: Record<
   },
   UNCLEAR: {
     color: '#2563EB',
-    label: 'Không rõ ràng',
+    label: 'Bỏ qua',
     summary: 'Không thể nhận diện biển báo / hình ảnh mờ.',
     symbol: '?',
   },
+  INVALID: {
+    color: Colors.danger,
+    label: 'Không hợp lệ',
+    summary: 'Minh chứng sai lệch hoặc không chính xác.',
+    symbol: '!',
+  },
 };
 
-function RevalMetric({
-  action,
-  count,
-}: {
-  action: RevalidationReviewAction;
-  count: number;
-}) {
+function RevalMetric({ action, count }: { action: RevalidationReviewAction; count: number }) {
   const theme = useTheme();
   const details = revalActionDetails[action];
 
@@ -62,9 +62,7 @@ function RevalMetric({
       ]}
     >
       <View style={[styles.metricSymbol, { borderColor: details.color }]}>
-        <Text style={[styles.metricSymbolLabel, { color: details.color }]}>
-          {details.symbol}
-        </Text>
+        <Text style={[styles.metricSymbolLabel, { color: details.color }]}>{details.symbol}</Text>
       </View>
       <Text style={[styles.metricCount, { color: theme.text }]}>{count}</Text>
       <Text style={[styles.metricLabel, { color: details.color }]}>
@@ -87,7 +85,7 @@ function ReviewedEvidenceRow({
   const imageSource = resolveS3Url(item.evidence.mediaUrl || item.verifiedSign.signCropUrl);
   const signTitle = item.verifiedSign.signCode
     ? `${item.verifiedSign.signCode} - ${item.verifiedSign.nameVi ?? item.verifiedSign.nameEn ?? 'Biển báo'}`
-    : item.verifiedSign.nameVi ?? item.verifiedSign.nameEn ?? 'Biển báo thực địa';
+    : (item.verifiedSign.nameVi ?? item.verifiedSign.nameEn ?? 'Biển báo thực địa');
   const locationLabel = `${item.evidence.latitude.toFixed(4)}, ${item.evidence.longitude.toFixed(4)}`;
 
   return (
@@ -115,7 +113,14 @@ function ReviewedEvidenceRow({
         />
       ) : (
         <View
-          style={[styles.signImage, { backgroundColor: theme.backgroundSelected, alignItems: 'center', justifyContent: 'center' }]}
+          style={[
+            styles.signImage,
+            {
+              backgroundColor: theme.backgroundSelected,
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+          ]}
         >
           <MaterialCommunityIcons color={theme.textSecondary} name="image-off-outline" size={24} />
         </View>
@@ -134,9 +139,7 @@ function ReviewedEvidenceRow({
       </View>
 
       <View style={[styles.statusBadge, { backgroundColor: `${details.color}18` }]}>
-        <Text style={[styles.statusLabel, { color: details.color }]}>
-          {details.label}
-        </Text>
+        <Text style={[styles.statusLabel, { color: details.color }]}>{details.label}</Text>
       </View>
     </Pressable>
   );
@@ -145,12 +148,7 @@ function ReviewedEvidenceRow({
 export function RecheckEvidenceScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const {
-    beginEvidenceCheck,
-    counts,
-    finishReviews,
-    reviewHistory,
-  } = useRevalidationWorkflow();
+  const { beginEvidenceCheck, counts, finishReviews, reviewHistory } = useRevalidationWorkflow();
 
   const handleBackToReview = () => {
     router.replace('/work/revalidation-review');
@@ -186,9 +184,7 @@ export function RecheckEvidenceScreen() {
 
           {/* Heading */}
           <View style={styles.heading}>
-            <Text style={[styles.title, { color: theme.text }]}>
-              Tổng kết tái thẩm định
-            </Text>
+            <Text style={[styles.title, { color: theme.text }]}>Tổng kết tái thẩm định</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               Hôm nay • Đã đánh giá {reviewHistory.length} minh chứng thực địa
             </Text>

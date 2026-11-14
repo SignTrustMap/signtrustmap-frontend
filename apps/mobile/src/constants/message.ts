@@ -138,6 +138,8 @@ export const CANNOT_RECORD_VOTE_MESSAGE = 'Không thể ghi nhận bình chọn.
 // Wallet & Payment Messages
 // ============================================================================
 export const PAYMENT_FAILED_MESSAGE = 'Thanh toán thất bại. Vui lòng thử lại.';
+export const INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE =
+  'Bạn cần tối thiểu 5 credits để bắt đầu điều hướng.';
 
 // ============================================================================
 // App Update Service Messages

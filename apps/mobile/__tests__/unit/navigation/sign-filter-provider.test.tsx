@@ -241,4 +241,57 @@ describe('SignFilterProvider', () => {
     expect(result.current.presets).toHaveLength(1);
     expect(result.current.presets[0].id).toBe('sr-200');
   });
+
+  it('safely handles non-array categories and wrapped response objects from backend', async () => {
+    const mockSession = {
+      accessToken: 'test-jwt-token',
+      refreshToken: 'test-refresh-token',
+      account: { id: 'u1', email: 'user@example.com', displayName: 'Driver User', roles: ['driver' as const] },
+    };
+    jest.spyOn(sessionModule, 'useOptionalSession').mockReturnValue({
+      session: mockSession,
+      isLoading: false,
+      isInitializing: false,
+      logIn: jest.fn(),
+      logOut: jest.fn(),
+      setRoleEnabled: jest.fn(),
+    });
+
+    const mockSavedRoutes = [
+      {
+        id: 'sr-string-cats',
+        userId: 'u1',
+        title: 'Tuyến string categories',
+        filterRules: {
+          categories: 'P,W' as any,
+        },
+        createdAt: '2026-03-01T08:00:00Z',
+      },
+      {
+        id: 'sr-json-cats',
+        userId: 'u1',
+        title: 'Tuyến JSON categories',
+        filterRules: {
+          categories: '["R", "I"]' as any,
+        },
+        createdAt: '2026-03-01T08:00:00Z',
+      },
+    ];
+
+    (savedRoutesApi.getSavedRoutes as jest.Mock).mockResolvedValueOnce({
+      data: mockSavedRoutes,
+    });
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <SignFilterProvider>{children}</SignFilterProvider>
+    );
+
+    const { result } = await renderHook(() => useSignFilter(), { wrapper });
+
+    await act(async () => {});
+
+    expect(result.current.presets).toHaveLength(2);
+    expect(result.current.presets[0].categories).toEqual(['PROHIBITORY', 'WARNING']);
+    expect(result.current.presets[1].categories).toEqual(['MANDATORY', 'INFORMATION']);
+  });
 });

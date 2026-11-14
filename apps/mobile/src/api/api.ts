@@ -1,6 +1,7 @@
 export const API_PATHS = {
     AUTH_LOGIN: '/auth/login',
     AUTH_REGISTER: '/auth/register',
+    AUTH_GOOGLE: '/auth/google',
     AUTH_FORGOT_PASSWORD: '/auth/forgot-password',
     AUTH_VERIFY_OTP: '/auth/verify-otp',
     AUTH_RESEND_OTP: '/auth/resend-otp',

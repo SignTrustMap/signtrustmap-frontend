@@ -25,15 +25,32 @@ export const walletKeys = {
 /**
  * Fetches the authenticated user's real wallet balance and recent transactions.
  */
-export function useGetWallet(enabled = true) {
+export function useGetWallet(
+  optionsOrEnabled:
+    | boolean
+    | {
+        enabled?: boolean;
+        staleTime?: number;
+        gcTime?: number;
+        refetchOnMount?: boolean | 'always';
+      } = true,
+) {
+  const options =
+    typeof optionsOrEnabled === 'boolean'
+      ? { enabled: optionsOrEnabled }
+      : optionsOrEnabled;
+
   const { session } = useSession();
+  const isEnabled = Boolean(session) && (options.enabled ?? true);
   return useQuery<WalletResponse>({
     queryKey: walletKeys.all(session?.account.id),
     queryFn: session
       ? ({ signal }) => getWallet(session.accessToken, signal)
       : skipToken,
-    enabled,
-    staleTime: 30_000,
+    enabled: isEnabled,
+    staleTime: options.staleTime ?? 30_000,
+    gcTime: options.gcTime,
+    refetchOnMount: options.refetchOnMount,
   });
 }
 

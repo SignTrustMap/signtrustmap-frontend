@@ -1,6 +1,11 @@
 import type { RouteSign, VerifiedMapSign } from '@shared/types'
 
-const S3_BASE = (import.meta.env.VITE_S3_URL || import.meta.env.VITE_CDN_URL || 'https://s3.signmap.site').replace(/\/$/, '')
+const S3_BASE = (
+  import.meta.env.VITE_STORAGE_URL ||
+  import.meta.env.VITE_S3_URL ||
+  import.meta.env.VITE_CDN_URL ||
+  (import.meta.env.DEV ? '/storage' : 'https://s3.signmap.site')
+).replace(/\/$/, '')
 
 /**
  * Resolves standard representative traffic sign image URL (vector/PNG) from S3 CDN.

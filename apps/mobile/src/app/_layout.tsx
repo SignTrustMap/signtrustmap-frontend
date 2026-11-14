@@ -1,9 +1,13 @@
 import 'expo-blob';
+import * as WebBrowser from 'expo-web-browser';
 import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { LogBox, View } from 'react-native';
+
+// Complete incoming OAuth redirect loops if running in a popup/browser session
+WebBrowser.maybeCompleteAuthSession();
 import {
   QueryClientProvider
 } from '@tanstack/react-query';

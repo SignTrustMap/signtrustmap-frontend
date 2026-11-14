@@ -454,4 +454,16 @@ describe('Authentication Flow Integration Tests (MSW)', () => {
     });
     expect(mockStorage.get('session')).toBeUndefined();
   });
+
+  // =========================================================================
+  // TEST 10: Google Token Login Integration
+  // =========================================================================
+  it('authenticates with Google ID token, saves session and normalizes roles', async () => {
+    const { loginWithGoogle } = require('@/api/auth/auth');
+    const session = await loginWithGoogle('valid-google-id-token');
+
+    expect(session.accessToken).toBe('mock-jwt-token-google-user');
+    expect(session.account.email).toBe(mockUsers.google.email);
+    expect(session.account.roles).toEqual(['driver', 'surveyor']);
+  });
 });

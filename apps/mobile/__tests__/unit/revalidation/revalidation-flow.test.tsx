@@ -104,7 +104,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       expect(info55.isFresh).toBe(false);
 
       // Boundary: exactly 50
-      const sign50 = createMockSign({ freshnessScore: 0.50 });
+      const sign50 = createMockSign({ freshnessScore: 0.5 });
       const info50 = getFreshnessInfo(sign50);
       expect(info50.scorePercent).toBe(50);
       expect(info50.isStale).toBe(false);
@@ -122,7 +122,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
 
     it('classifies score >= 80 as FRESH', () => {
       // Boundary: exactly 80
-      const sign80 = createMockSign({ freshnessScore: 0.80 });
+      const sign80 = createMockSign({ freshnessScore: 0.8 });
       const info80 = getFreshnessInfo(sign80);
       expect(info80.scorePercent).toBe(80);
       expect(info80.isStale).toBe(false);
@@ -197,7 +197,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
 
     it('accurately computes distance between two real-world coordinates in HCMC', () => {
       // Ben Thanh Market (10.7725, 106.6980) to Bitexco Tower (10.7716, 106.7047) ~ 740m
-      const dist = calculateDistanceMeters(10.7725, 106.6980, 10.7716, 106.7047);
+      const dist = calculateDistanceMeters(10.7725, 106.698, 10.7716, 106.7047);
       expect(dist).toBeGreaterThan(650);
       expect(dist).toBeLessThan(850);
     });
@@ -257,7 +257,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
     });
 
     it('renders marker for stale sign with exclamation badge (!)', async () => {
-      const staleSign = createMockSign({ freshnessScore: 0.40 });
+      const staleSign = createMockSign({ freshnessScore: 0.4 });
       const { getByText } = await render(
         <RevalidationSignMarker sign={staleSign} isSelected={false} />,
       );
@@ -290,7 +290,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       // Check sign metadata
       expect(getAllByText('Cấm đi ngược chiều').length).toBeGreaterThan(0);
       expect(getAllByText('Đường Nguyễn Huệ, Quận 1').length).toBeGreaterThan(0);
-      expect(getByText(/Độ tươi mới trung bình|Moderate Freshness/)).toBeTruthy();
+      expect(getByText(/Độ (tươi )?mới trung bình|Moderate Freshness/)).toBeTruthy();
       expect(getByText('55%')).toBeTruthy();
 
       // Find and click Inspect button
@@ -305,10 +305,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       const onCloseMock = jest.fn();
 
       const { getByLabelText } = await render(
-        <RevalidationSignDetailsCard
-          sign={mockSign}
-          onClose={onCloseMock}
-        />,
+        <RevalidationSignDetailsCard sign={mockSign} onClose={onCloseMock} />,
       );
 
       const closeButton = getByLabelText(/Đóng chi tiết|Close sign details/);
@@ -316,13 +313,44 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
 
       expect(onCloseMock).toHaveBeenCalled();
     });
+
+    it('renders the camera-outline fallback when survey crop image is null or empty', async () => {
+      const mockSign = createMockSign({
+        actualCropUrl: undefined,
+      });
+
+      const { getByText, queryByLabelText } = await render(
+        <RevalidationSignDetailsCard sign={mockSign} onClose={jest.fn()} />,
+      );
+
+      expect(getByText('Chưa có ảnh khảo sát')).toBeTruthy();
+      expect(queryByLabelText('Inspect submitted sign photo')).toBeNull();
+    });
+
+    it('renders the submitted survey photo inspection button when crop image is present', async () => {
+      const mockSign = createMockSign({
+        actualCropUrl: 'https://cdn.signmap.site/stm-sign-crops/crops/real-crop-1.jpg',
+      });
+
+      const { getByLabelText, queryByText } = await render(
+        <RevalidationSignDetailsCard sign={mockSign} onClose={jest.fn()} />,
+      );
+
+      expect(getByLabelText('Inspect submitted sign photo')).toBeTruthy();
+      expect(queryByText('Chưa có ảnh khảo sát')).toBeNull();
+    });
   });
 
   describe('Global Revalidation Tasks List Logic', () => {
     it('ensures backend revalidation tasks are always present in stale list regardless of viewport', () => {
       // Signs returned from map bounds (e.g. only 1 active sign in current viewport)
       const boundsSigns: RouteSign[] = [
-        createMockSign({ id: 'viewport-sign-1', signCode: 'W.201a', freshnessScore: 0.95, status: 'ACTIVE' }),
+        createMockSign({
+          id: 'viewport-sign-1',
+          signCode: 'W.201a',
+          freshnessScore: 0.95,
+          status: 'ACTIVE',
+        }),
       ];
 
       // Revalidation tasks from backend (located anywhere in the city/country)

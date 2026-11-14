@@ -40,40 +40,10 @@ export class ApiError extends Error {
     }
 }
 
-function resolveHost(host: string | undefined): string {
-    if (!host || host === "localhost" || host === "127.0.0.1") {
-        return Platform.OS === "android" ? "10.0.2.2" : "localhost";
-    }
-    return host;
-}
+import { env } from "@/config/env";
 
-const rawConfiguredUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "") ?? "https://api.signmap.site/api/v1"
-
-export function apiBaseUrl() {
-    if (rawConfiguredUrl) {
-        const configuredUrl = rawConfiguredUrl.endsWith("/api/v1")
-            ? rawConfiguredUrl
-            : `${rawConfiguredUrl}/api/v1`;
-
-        if (
-            Platform.OS === "android" &&
-            (configuredUrl.includes("//localhost:") ||
-                configuredUrl.includes("//127.0.0.1:"))
-        ) {
-            return configuredUrl
-                .replace("//localhost:", "//10.0.2.2:")
-                .replace("//127.0.0.1:", "//10.0.2.2:");
-        }
-        return configuredUrl;
-    }
-
-    if (__DEV__) {
-        const rawHost = Constants.expoConfig?.hostUri?.split(":")[0];
-        const developmentHost = resolveHost(rawHost);
-        return `http://${developmentHost}:3000/api/v1`;
-    }
-
-    throw new Error(API_URL_NOT_CONFIGURED_MESSAGE);
+export function apiBaseUrl(): string {
+    return env.apiBaseUrl;
 }
 
 function errorMessage(body: ApiErrorBody | undefined, status: number) {
@@ -101,7 +71,6 @@ export async function apiRequest<T>(
         response = await fetch(fullUrl, { ...options, headers });
     } catch (error) {
         if (options.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-            console.warn(`[ApiClient] Request aborted: ${method} ${fullUrl}`);
             throw error;
         }
         const cause = error instanceof Error ? error.message : String(error);

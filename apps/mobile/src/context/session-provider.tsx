@@ -1,6 +1,6 @@
 import { getStorageItemAsync, removeStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import { createContext, use, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { SESSION_PROVIDER_REQUIRED_MESSAGE } from '@/constants/message';
 import { toggleRole, backendRoleToAccountRole } from '@/api/auth/auth';
 
@@ -14,6 +14,8 @@ export type Account = {
   email: string;
   id: string;
   roles: AccountRole[];
+  avatarUrl?: string | null;
+  address?: string | null;
 };
 
 export type AppSession = {
@@ -76,6 +78,7 @@ function parseStoredSession(value: string | null): AppSession | null {
         email: parsed.account.email ?? 'demo@example.com',
         id: parsed.account.id,
         roles: normalizeRoles(parsed.account.roles),
+        avatarUrl: parsed.account.avatarUrl ?? null,
       },
     };
   } catch {
@@ -89,6 +92,7 @@ function parseStoredSession(value: string | null): AppSession | null {
         email: 'demo@example.com',
         id: 'demo-account',
         roles: [...ACCOUNT_ROLES],
+        avatarUrl: null,
       },
     };
   }
@@ -97,14 +101,21 @@ function parseStoredSession(value: string | null): AppSession | null {
 export function SessionProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<AppSession | null>(null);
+  const sessionRef = useRef<AppSession | null>(session);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     async function loadSession() {
       try {
         const storedSession = await getStorageItemAsync('session');
-        setSession(parseStoredSession(storedSession));
+        const parsed = parseStoredSession(storedSession);
+        sessionRef.current = parsed;
+        setSession(parsed);
       } finally {
         setIsInitializing(false);
         setIsLoading(false);
@@ -120,18 +131,27 @@ export function SessionProvider({ children }: PropsWithChildren) {
       account: {
         ...nextSession.account,
         roles: normalizeRoles(nextSession.account.roles),
+        avatarUrl: nextSession.account.avatarUrl ?? null,
       },
     };
 
+    sessionRef.current = normalizedSession;
     await setStorageItemAsync('session', JSON.stringify(normalizedSession));
     setSession(normalizedSession);
   }
 
   async function logOut() {
+    sessionRef.current = null;
     setSession(null);
     await queryClient.cancelQueries();
     queryClient.clear();
     await removeStorageItemAsync('session');
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      await GoogleSignin.signOut();
+    } catch {
+      // Ignore if native module is not configured or in testing environment
+    }
   }
 
   async function setRoleEnabled(role: OptionalAccountRole, enabled: boolean) {
@@ -174,14 +194,17 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }
 
   async function updateAccount(updates: Partial<Account>) {
-    if (!session) return;
+    if (!sessionRef.current) return;
+    const current = sessionRef.current;
     const nextSession = {
-      ...session,
+      ...current,
       account: {
-        ...session.account,
+        ...current.account,
         ...updates,
       },
     };
+    if (!sessionRef.current) return;
+    sessionRef.current = nextSession;
     setSession(nextSession);
     await setStorageItemAsync('session', JSON.stringify(nextSession));
   }

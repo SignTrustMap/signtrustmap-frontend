@@ -13,11 +13,15 @@ export async function getSavedRoutes(
   signal?: AbortSignal,
 ): Promise<SavedRoute[]> {
   const query = vehicleMode ? `?vehicleMode=${encodeURIComponent(vehicleMode)}` : '';
-  return apiRequest<SavedRoute[]>(
+  const raw = await apiRequest<any>(
     `${API_PATHS.SAVED_ROUTES}${query}`,
     { signal },
     accessToken,
   );
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.routes)) return raw.routes;
+  return [];
 }
 
 export async function getSavedRouteById(
@@ -25,11 +29,12 @@ export async function getSavedRouteById(
   accessToken?: string,
   signal?: AbortSignal,
 ): Promise<SavedRoute> {
-  return apiRequest<SavedRoute>(
+  const raw = await apiRequest<any>(
     `${API_PATHS.SAVED_ROUTES}/${id}`,
     { signal },
     accessToken,
   );
+  return (raw?.data && typeof raw.data === 'object' && !Array.isArray(raw.data)) ? raw.data : raw;
 }
 
 function sanitizeSavedRouteDto<T extends Partial<CreateSavedRouteDto>>(dto: T): T {

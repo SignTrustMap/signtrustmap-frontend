@@ -7,6 +7,10 @@ export type LoginRequest = {
   password: string;
 };
 
+export type GoogleLoginRequest = {
+  token: string;
+};
+
 export type RegisterRequest = {
   email: string;
   password: string;
@@ -25,6 +29,8 @@ export type LoginResponse = {
     fullName: string;
     id: string;
     roles: string[];
+    avatarUrl?: string | null;
+    avatar?: string | null;
   };
 };
 
@@ -50,10 +56,34 @@ export async function login(request: LoginRequest): Promise<AppSession> {
       email: response.user.email,
       id: response.user.id,
       roles,
+      avatarUrl: response.user.avatarUrl ?? response.user.avatar ?? null,
     },
   };
-  console.log(res.accessToken);
   return res;
+}
+
+export async function loginWithGoogle(idToken: string): Promise<AppSession> {
+  const response = await jsonApiRequest<LoginResponse>(API_PATHS.AUTH_GOOGLE, {
+    token: idToken.trim(),
+  });
+  const roles = response.user.roles
+    .map((role) => backendRoleToAccountRole[role.toUpperCase()])
+    .filter((role): role is AccountRole => Boolean(role));
+
+  return {
+    accessToken: response.accessToken,
+    account: {
+      displayName: response.user.fullName,
+      email: response.user.email,
+      id: response.user.id,
+      roles,
+      avatarUrl:
+        response.user.avatarUrl ??
+        response.user.avatar ??
+        (response.user as any).picture ??
+        null,
+    },
+  };
 }
 
 export async function register(request: RegisterRequest): Promise<RegisterResponse> {
@@ -69,6 +99,7 @@ export type UpdateProfileRequest = {
   fullName?: string;
   phone?: string;
   avatarUrl?: string;
+  address?: string;
 };
 
 export type UserProfileResponse = {
@@ -77,6 +108,7 @@ export type UserProfileResponse = {
   fullName: string;
   phone?: string | null;
   avatarUrl?: string | null;
+  address?: string | null;
   roles?: string[];
 };
 

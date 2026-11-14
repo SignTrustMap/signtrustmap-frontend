@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTranslation } from 'react-i18next'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -19,10 +19,14 @@ import {
 } from '@phosphor-icons/react'
 import {
   adminKpisData,
-  staffKpisData,
   adminActivitiesData,
-  staffActivitiesData,
 } from '@/data'
+import {
+  candidatesService,
+  catalogService,
+  revalidationService,
+  escalationService,
+} from '@/api/services'
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -31,6 +35,47 @@ export default function DashboardPage() {
 
   const [timeRange, setTimeRange] = useState('30d')
   const [feedFilter, setFeedFilter] = useState('all')
+
+  // Live real API stats for staff
+  const [liveStaffStats, setLiveStaffStats] = useState({
+    candidatesCount: 0,
+    reportsCount: 0,
+    tasksCount: 0,
+    casesCount: 0,
+  })
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+
+  useEffect(() => {
+    if (isAdmin) return
+
+    let active = true
+    setIsLoadingStats(true)
+
+    Promise.allSettled([
+      candidatesService.getCandidates({ page: 1, pageSize: 1 }),
+      catalogService.getMissingReports({ page: 1, pageSize: 1, status: 'PENDING' }),
+      revalidationService.getTasks({ page: 1, pageSize: 1, status: 'ALL' }),
+      escalationService.getCases({ page: 1, pageSize: 1, status: 'OPEN' }),
+    ]).then(([qRes, mRes, tRes, cRes]) => {
+      if (!active) return
+      const candidatesCount = qRes.status === 'fulfilled' ? (qRes.value?.total ?? qRes.value?.items?.length ?? 0) : 0
+      const reportsCount = mRes.status === 'fulfilled' ? (mRes.value?.total ?? 0) : 0
+      const tasksCount = tRes.status === 'fulfilled' ? (tRes.value?.total ?? 0) : 0
+      const casesCount = cRes.status === 'fulfilled' ? (cRes.value?.total ?? 0) : 0
+
+      setLiveStaffStats({
+        candidatesCount,
+        reportsCount,
+        tasksCount,
+        casesCount,
+      })
+      setIsLoadingStats(false)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [isAdmin])
 
   // Icons map for KPIs
   const adminIcons = [
@@ -47,64 +92,71 @@ export default function DashboardPage() {
     <Users size={22} weight="bold" />,
   ]
 
-  const baseKpis = isAdmin ? adminKpisData : staffKpisData
-  const currentIcons = isAdmin ? adminIcons : staffIcons
-  const rawActivities = isAdmin ? adminActivitiesData : staffActivitiesData
+  const staffKpis = [
+    {
+      label: t('dashboard.kpi_staff_candidates_label', 'Hồ sơ biển báo cần duyệt'),
+      value: isLoadingStats ? '...' : String(liveStaffStats.candidatesCount),
+      change: `${liveStaffStats.candidatesCount}`,
+      changeText: t('dashboard.kpi_staff_candidates_sub', 'hồ sơ trong hàng đợi'),
+      isWarning: liveStaffStats.candidatesCount > 0,
+      iconBg: 'bg-[#d3f7ff] text-[#007b8b] dark:bg-[#00c4de]/20 dark:text-[#00c4de]',
+    },
+    {
+      label: t('dashboard.kpi_staff_reports_label', 'Đề xuất loại biển mới'),
+      value: isLoadingStats ? '...' : String(liveStaffStats.reportsCount),
+      change: `${liveStaffStats.reportsCount}`,
+      changeText: t('dashboard.kpi_staff_reports_sub', 'chờ xử lý'),
+      isWarning: liveStaffStats.reportsCount > 0,
+      iconBg: 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400',
+    },
+    {
+      label: t('dashboard.kpi_staff_tasks_label', 'Nhiệm vụ tái xác thực'),
+      value: isLoadingStats ? '...' : String(liveStaffStats.tasksCount),
+      change: `${liveStaffStats.tasksCount}`,
+      changeText: t('dashboard.kpi_staff_tasks_sub', 'đang mở trên hệ thống'),
+      isPositive: true,
+      iconBg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
+    },
+    {
+      label: t('dashboard.kpi_staff_credits_label', 'Sự cố / ca tranh chấp'),
+      value: isLoadingStats ? '...' : String(liveStaffStats.casesCount),
+      change: `${liveStaffStats.casesCount}`,
+      changeText: t('dashboard.kpi_staff_credits_sub', 'ca tiếp nhận'),
+      isNeutral: true,
+      iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400',
+    },
+  ]
 
-  // Localized KPIs
-  const currentKpis = baseKpis.map((kpi, idx) => {
+  const adminKpis = adminKpisData.map((kpi, idx) => {
     let label = kpi.label
     let changeText = kpi.changeText
-
-    if (isAdmin) {
-      if (idx === 0) {
-        label = t('dashboard.kpi_admin_users_label')
-        changeText = t('dashboard.kpi_admin_users_sub')
-      } else if (idx === 1) {
-        label = t('dashboard.kpi_admin_staff_label')
-        changeText = t('dashboard.kpi_admin_staff_sub')
-      } else if (idx === 2) {
-        label = t('dashboard.kpi_admin_audit_label')
-        changeText = t('dashboard.kpi_admin_audit_sub')
-      } else if (idx === 3) {
-        label = t('dashboard.kpi_admin_security_label')
-        changeText = t('dashboard.kpi_admin_security_sub')
-      }
-    } else {
-      if (idx === 0) {
-        label = t('dashboard.kpi_staff_candidates_label')
-        changeText = t('dashboard.kpi_staff_candidates_sub')
-      } else if (idx === 1) {
-        label = t('dashboard.kpi_staff_reports_label')
-        changeText = t('dashboard.kpi_staff_reports_sub')
-      } else if (idx === 2) {
-        label = t('dashboard.kpi_staff_tasks_label')
-        changeText = t('dashboard.kpi_staff_tasks_sub')
-      } else if (idx === 3) {
-        label = t('dashboard.kpi_staff_credits_label')
-        changeText = t('dashboard.kpi_staff_credits_sub')
-      }
+    if (idx === 0) {
+      label = t('dashboard.kpi_admin_users_label')
+      changeText = t('dashboard.kpi_admin_users_sub')
+    } else if (idx === 1) {
+      label = t('dashboard.kpi_admin_staff_label')
+      changeText = t('dashboard.kpi_admin_staff_sub')
+    } else if (idx === 2) {
+      label = t('dashboard.kpi_admin_audit_label')
+      changeText = t('dashboard.kpi_admin_audit_sub')
+    } else if (idx === 3) {
+      label = t('dashboard.kpi_admin_security_label')
+      changeText = t('dashboard.kpi_admin_security_sub')
     }
-
-    return {
-      ...kpi,
-      label,
-      changeText,
-    }
+    return { ...kpi, label, changeText }
   })
 
-  // Localized Activities
-  const recentActivities = rawActivities.map((act) => {
-    const prefix = isAdmin ? 'act_admin_' : 'act_staff_'
-    const titleKey = `dashboard.${prefix}${act.id}_title`
-    const descKey = `dashboard.${prefix}${act.id}_desc`
+  const currentKpis = isAdmin ? adminKpis : staffKpis
+  const currentIcons = isAdmin ? adminIcons : staffIcons
 
-    return {
-      ...act,
-      title: t(titleKey, { defaultValue: act.title }),
-      desc: t(descKey, { defaultValue: act.desc }),
-    }
-  })
+  // Admin activities fallback; staff activities is empty if no live events
+  const recentActivities = isAdmin
+    ? adminActivitiesData.map((act) => ({
+        ...act,
+        title: t(`dashboard.act_admin_${act.id}_title`, { defaultValue: act.title }),
+        desc: t(`dashboard.act_admin_${act.id}_desc`, { defaultValue: act.desc }),
+      }))
+    : []
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
@@ -128,7 +180,7 @@ export default function DashboardPage() {
             {/* Export Button */}
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8E4E3] dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-white/5 border border-[#E8E4E3] dark:border-white/10 text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-white/10 transition-colors shadow-xs"
             >
               <DownloadSimple size={16} />
               <span>{t('dashboard.export_report')}</span>
@@ -137,166 +189,126 @@ export default function DashboardPage() {
         }
       />
 
-      {/* 4 KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {currentKpis.map((kpi, idx) => (
-          <div
-            key={kpi.label}
-            className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:border-[#00c4de]/50 hover:shadow-md transition-all group"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{kpi.label}</p>
-                <p className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white mt-1.5 font-mono tracking-tight">
-                  {kpi.value}
-                </p>
+      {/* 4 Top KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {currentKpis.map((kpi, index) => {
+          return (
+            <div
+              key={kpi.label}
+              className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow relative overflow-hidden group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  {kpi.label}
+                </span>
+                <span
+                  className={`p-2 rounded-xl transition-transform group-hover:scale-110 duration-200 ${kpi.iconBg}`}
+                >
+                  {currentIcons[index]}
+                </span>
               </div>
-              <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs transition-transform group-hover:scale-105 ${kpi.iconBg}`}
-              >
-                {currentIcons[idx]}
-              </div>
-            </div>
 
-            <div className="flex items-center gap-1.5 mt-4 text-xs font-semibold">
-              {kpi.isPositive && (
-                <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border dark:border-emerald-500/30 px-2 py-0.5 rounded font-bold inline-flex items-center gap-0.5">
-                  <ArrowUpRight size={13} weight="bold" />
-                  {kpi.change}
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                  {kpi.value}
                 </span>
-              )}
-              {kpi.isWarning && (
-                <span className="text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/50 border dark:border-red-500/30 px-2 py-0.5 rounded font-bold inline-flex items-center gap-0.5">
-                  <ArrowUpRight size={13} weight="bold" />
-                  {kpi.change}
-                </span>
-              )}
-              {kpi.isNeutral && (
-                <span className="text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/10 border dark:border-white/10 px-2 py-0.5 rounded font-bold">
-                  {kpi.change}
-                </span>
-              )}
-              <span className="text-gray-400 font-normal">{kpi.changeText}</span>
+              </div>
+
+              <div className="mt-2 flex items-center gap-1.5 text-xs">
+                {kpi.isPositive ? (
+                  <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-bold">
+                    <ArrowUpRight size={14} weight="bold" />
+                    {kpi.change}
+                  </span>
+                ) : kpi.isWarning ? (
+                  <span className="inline-flex items-center text-amber-600 dark:text-amber-400 font-bold">
+                    <ArrowUpRight size={14} weight="bold" />
+                    {kpi.change}
+                  </span>
+                ) : (
+                  <span className="text-gray-500 font-medium">{kpi.change}</span>
+                )}
+                <span className="text-gray-400 truncate">{kpi.changeText}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Charts 2-Column Section */}
+      {/* Middle Grid: Charts Section (8 cols left, 4 cols right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Growth / Workflow Pipeline Area Chart (8 cols) */}
+        {/* Left: Operations Progress Chart (8 cols) */}
         <div className="lg:col-span-8 bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                {isAdmin ? t('dashboard.chart_traffic_title') : t('dashboard.chart_pipeline_title')}
+                {isAdmin ? t('dashboard.chart_line_admin_title') : t('dashboard.chart_line_staff_title')}
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {isAdmin ? t('dashboard.chart_traffic_subtitle') : t('dashboard.chart_pipeline_subtitle')}
+                {isAdmin ? t('dashboard.chart_line_admin_subtitle') : t('dashboard.chart_line_staff_subtitle')}
               </p>
             </div>
-            <div className="flex items-center gap-5 text-xs sm:text-sm">
-              <span className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16">
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="5.5"
-                    fill="none"
-                    className="stroke-[#007b8b] dark:stroke-[#00c4de]"
-                    strokeWidth="2.5"
-                  />
-                </svg>
-                <span>{isAdmin ? t('dashboard.legend_new_reg') : t('dashboard.legend_intake')}</span>
-              </span>
-
-              <span className="inline-flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16">
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="5.5"
-                    fill="none"
-                    className="stroke-slate-500 dark:stroke-slate-300"
-                    strokeWidth="2"
-                    strokeDasharray="2.5 2"
-                  />
-                </svg>
-                <span>{isAdmin ? t('dashboard.legend_active') : t('dashboard.legend_resolved')}</span>
-              </span>
-
-              <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1 cursor-pointer">
-                <DotsThreeVertical size={18} weight="bold" />
-              </button>
-            </div>
+            <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-1">
+              <DotsThreeVertical size={18} weight="bold" />
+            </button>
           </div>
 
-          {/* SVG Area & Line Chart */}
-          <div className="w-full h-64 relative pt-2">
-            <svg
-              className="w-full h-full overflow-visible"
-              viewBox="0 0 700 220"
-              preserveAspectRatio="none"
-            >
+          {/* SVG Line Chart */}
+          <div className="w-full h-56 pt-2">
+            <svg viewBox="0 0 720 200" className="w-full h-full overflow-visible">
               <defs>
-                <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00c4de" stopOpacity="0.3" />
+                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00c4de" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="#00c4de" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
               {/* Grid Lines */}
-              {[0, 50, 100, 150, 200].map((y) => (
+              {[0, 50, 100, 150].map((y) => (
                 <line
                   key={y}
                   x1="40"
                   y1={y}
-                  x2="690"
+                  x2="700"
                   y2={y}
                   stroke="currentColor"
-                  className="text-gray-200 dark:text-white/10"
-                  strokeDasharray="4 4"
+                  className="text-gray-100 dark:text-white/5"
                   strokeWidth="1"
                 />
               ))}
 
-              {/* Y Axis Labels */}
-              <text x="5" y="10" className="fill-gray-400 text-[10px] font-mono">3,000</text>
-              <text x="5" y="60" className="fill-gray-400 text-[10px] font-mono">2,000</text>
-              <text x="5" y="110" className="fill-gray-400 text-[10px] font-mono">1,500</text>
-              <text x="5" y="160" className="fill-gray-400 text-[10px] font-mono">500</text>
-              <text x="25" y="205" className="fill-gray-400 text-[10px] font-mono">0</text>
-
-              {/* Area Under Curve 1 */}
-              <path
-                d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45 L 670 200 L 50 200 Z"
-                fill="url(#growthGradient)"
+              {/* Area under line 1 */}
+              <polygon
+                points="50,140 210,90 360,110 520,40 670,20 670,180 50,180"
+                fill="url(#chartGradient)"
               />
 
-              {/* Line 1 (Solid Cyan/Teal) */}
-              <path
-                d="M 50 145 C 130 110, 180 125, 210 120 C 270 110, 320 150, 360 145 C 420 140, 480 90, 520 85 C 580 80, 630 40, 670 45"
+              {/* Main Line 1 (Cyan) */}
+              <polyline
+                points="50,140 210,90 360,110 520,40 670,20"
                 fill="none"
                 stroke="#00c4de"
                 strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
 
               {/* Points on Line 1 */}
-              {[[50, 145], [210, 120], [360, 145], [520, 85], [670, 45]].map(([cx, cy], i) => (
+              {[[50, 140], [210, 90], [360, 110], [520, 40], [670, 20]].map(([cx, cy], i) => (
                 <circle
                   key={i}
                   cx={cx}
                   cy={cy}
-                  r="4.5"
-                  fill="#ffffff"
-                  stroke="#007b8b"
-                  strokeWidth="2.5"
+                  r="4"
+                  fill="#00c4de"
+                  className="stroke-white dark:stroke-[#0A171C]"
+                  strokeWidth="2"
                 />
               ))}
 
-              {/* Line 2 (Dashed Slate) */}
-              <path
-                d="M 50 170 C 130 160, 180 150, 210 150 C 270 150, 320 165, 360 160 C 420 155, 480 135, 520 130 C 580 125, 630 105, 670 100"
+              {/* Main Line 2 (Dashed gray) */}
+              <polyline
+                points="50,170 210,150 360,160 520,130 670,100"
                 fill="none"
                 stroke="#94a3b8"
                 strokeWidth="2"
@@ -347,7 +359,6 @@ export default function DashboardPage() {
           {/* SVG Donut */}
           <div className="relative flex items-center justify-center my-4">
             <svg width="180" height="180" viewBox="0 0 180 180" className="transform -rotate-90">
-              {/* Background Track Ring */}
               <circle
                 cx="90"
                 cy="90"
@@ -357,7 +368,6 @@ export default function DashboardPage() {
                 strokeWidth="22"
                 fill="transparent"
               />
-              {/* Ring 1 - Cyan */}
               <circle
                 cx="90"
                 cy="90"
@@ -369,7 +379,6 @@ export default function DashboardPage() {
                 strokeDashoffset="264"
                 strokeLinecap="round"
               />
-              {/* Ring 2 - Red */}
               <circle
                 cx="90"
                 cy="90"
@@ -382,7 +391,6 @@ export default function DashboardPage() {
                 strokeLinecap="round"
                 className="transform rotate-144 origin-center"
               />
-              {/* Ring 3 - Amber */}
               <circle
                 cx="90"
                 cy="90"
@@ -444,38 +452,44 @@ export default function DashboardPage() {
 
         {/* Activity Feed List */}
         <div className="space-y-1.5 pt-1">
-          {recentActivities.map((act) => (
-            <div
-              key={act.id}
-              className="p-3.5 flex items-center justify-between gap-4 hover:bg-gray-100/70 dark:hover:bg-white/5 rounded-xl transition-all cursor-default"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${act.dotColor}`} />
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
-                    {act.title}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                    {act.desc}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6 shrink-0 text-xs">
-                <div className="flex items-center gap-2">
-                  {act.avatar ? (
-                    <span className="w-6 h-6 rounded-full bg-[#d3f7ff] dark:bg-[#00c4de]/20 text-[#007b8b] dark:text-[#00c4de] font-bold text-[10px] flex items-center justify-center">
-                      {act.avatar}
-                    </span>
-                  ) : null}
-                  <span className="font-semibold text-gray-700 dark:text-gray-300">{act.user}</span>
-                </div>
-                <span className="font-mono text-gray-400 w-16 text-right">
-                  {act.time}
-                </span>
-              </div>
+          {recentActivities.length === 0 ? (
+            <div className="py-8 text-center text-xs text-gray-400">
+              {t('dashboard.no_activities', 'Không có hoạt động mới ghi nhận.')}
             </div>
-          ))}
+          ) : (
+            recentActivities.map((act) => (
+              <div
+                key={act.id}
+                className="p-3.5 flex items-center justify-between gap-4 hover:bg-gray-100/70 dark:hover:bg-white/5 rounded-xl transition-all cursor-default"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${act.dotColor}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
+                      {act.title}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                      {act.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6 shrink-0 text-xs">
+                  <div className="flex items-center gap-2">
+                    {act.avatar ? (
+                      <span className="w-6 h-6 rounded-full bg-[#d3f7ff] dark:bg-[#00c4de]/20 text-[#007b8b] dark:text-[#00c4de] font-bold text-[10px] flex items-center justify-center">
+                        {act.avatar}
+                      </span>
+                    ) : null}
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">{act.user}</span>
+                  </div>
+                  <span className="font-mono text-gray-400 w-16 text-right">
+                    {act.time}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

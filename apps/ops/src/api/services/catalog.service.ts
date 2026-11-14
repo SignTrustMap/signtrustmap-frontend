@@ -304,14 +304,84 @@ export const catalogService = {
   },
 
   getMissingReports: async (
-    params?: { status?: string; page?: number; pageSize?: number },
+    params?: { status?: string; page?: number; pageSize?: number; size?: number; search?: string; q?: string },
     config?: Record<string, any>
   ): Promise<PaginatedMissingReportsResponse> => {
-    return http.get<PaginatedMissingReportsResponse>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORTS, { params, ...config })
+    const q: Record<string, any> = {}
+    if (params?.status && params.status !== 'all') {
+      q.status = params.status
+    }
+    if (params?.page !== undefined) {
+      q.page = params.page
+    }
+    const size = params?.pageSize || params?.size || 20
+    q.pageSize = size
+    q.size = size
+    q.limit = size
+    if (params?.search || params?.q) {
+      q.search = params.search || params.q
+    }
+
+    let res: any
+    try {
+      res = await http.get(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORTS, { params: q, ...config })
+    } catch (err: any) {
+      // If 404 on moderation endpoint, try alternative review endpoint
+      if (err?.response?.status === 404 || err?.status === 404) {
+        try {
+          res = await http.get(API_ENDPOINTS.MODERATION.REPORT_FROM_REVIEW, { params: q, ...config })
+        } catch {
+          throw err
+        }
+      } else {
+        throw err
+      }
+    }
+
+    const raw = res?.data ?? res
+    const rawItems: any[] =
+      raw?.items ||
+      raw?.content ||
+      raw?.reports ||
+      raw?.proposals ||
+      (Array.isArray(raw?.data) ? raw.data : []) ||
+      (Array.isArray(raw) ? raw : []) ||
+      (Array.isArray(res) ? res : [])
+
+    const total: number =
+      raw?.total ??
+      raw?.totalElements ??
+      raw?.count ??
+      res?.total ??
+      res?.totalElements ??
+      rawItems.length
+
+    const page: number = raw?.page ?? raw?.number ?? params?.page ?? 1
+    const pageSize: number = raw?.pageSize ?? raw?.size ?? size
+    const totalPages: number = raw?.totalPages ?? Math.ceil(total / Math.max(1, pageSize))
+
+    return {
+      items: rawItems,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    }
   },
 
   getMissingReportById: async (id: string): Promise<MissingTypeReportItem> => {
-    return http.get<MissingTypeReportItem>(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id))
+    try {
+      const res: any = await http.get(API_ENDPOINTS.MODERATION.MISSING_TYPE_REPORT_DETAIL(id))
+      return res?.data?.data || res?.data || res
+    } catch (err: any) {
+      if (err?.response?.status === 404 || err?.status === 404) {
+        const fallbackRes: any = await http
+          .get(`${API_ENDPOINTS.MODERATION.REPORT_FROM_REVIEW}/${id}`)
+          .catch(() => null)
+        if (fallbackRes) return fallbackRes?.data?.data || fallbackRes?.data || fallbackRes
+      }
+      throw err
+    }
   },
 
   updateMissingReport: async (

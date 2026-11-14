@@ -1,15 +1,12 @@
-import { Image, Pressable, Text, View } from "react-native";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import { Ionicons } from "@expo/vector-icons";
-import { SymbolView } from "expo-symbols";
-import { AppButton } from "@/components/button";
-import { Badge } from "@/components/badge";
-import { Rounded, Spacing } from "@/constants/theme";
-import { useTheme } from "@/hooks/use-theme";
-import type { MapCoordinate } from "@/types/navigationType";
-import { styles } from "../styles/navigation-map-screen.styles";
+import { Image, Text, View } from 'react-native';
+import AntDesign from '@expo/vector-icons/AntDesign';
+import { AppButton } from '@/components/button';
+import { Rounded, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import type { MapCoordinate } from '@/types/navigationType';
+import { styles } from '../styles/navigation-map-screen.styles';
 
-const AppLogo = require("@/assets/images/app-logo.png") as number;
+const AppLogo = require('@/assets/images/app-logo.png') as number;
 
 export interface NavigationTopControlsProps {
   selectedDestination?: {
@@ -24,8 +21,8 @@ export interface NavigationTopControlsProps {
   unreadNotificationCount?: number;
   onSearchPress: () => void;
   onTopUpPress: () => void;
-  onNotificationsPress: () => void;
-  onLivestreamPress: () => void;
+  onNotificationsPress?: () => void;
+  onLivestreamPress?: () => void;
   onChangeStartPress?: () => void;
   onChangeDestinationPress: () => void;
   onSwapRoutePress?: () => void;
@@ -36,11 +33,8 @@ export function NavigationTopControls({
   plannedRouteOrigin,
   routeStartTitle,
   walletBalance,
-  unreadNotificationCount = 0,
   onSearchPress,
   onTopUpPress,
-  onNotificationsPress,
-  onLivestreamPress,
   onChangeDestinationPress,
 }: NavigationTopControlsProps) {
   const theme = useTheme();
@@ -48,57 +42,35 @@ export function NavigationTopControls({
   return (
     <View style={styles.topControls}>
       {selectedDestination && plannedRouteOrigin ? (
-        <View
-          style={[
-            styles.selectedRouteRow,
-            { backgroundColor: theme.backgroundElement },
-          ]}
-        >
+        <View style={[styles.selectedRouteRow, { backgroundColor: theme.backgroundElement }]}>
           <View style={styles.selectedRouteFields}>
             <View
               accessibilityLabel="Điểm xuất phát từ vị trí hiện tại"
               style={styles.selectedRouteInput}
             >
               <View style={styles.routeIconWrapper}>
-                <View
-                  style={[
-                    styles.routeOriginCircle,
-                    { borderColor: theme.primary },
-                  ]}
-                />
+                <View style={[styles.routeOriginCircle, { borderColor: theme.primary }]} />
               </View>
-              <Text
-                numberOfLines={1}
-                style={[styles.selectedStartText, { color: theme.text }]}
-              >
-                {routeStartTitle || "Vị trí của bạn"}
+              <Text numberOfLines={1} style={[styles.selectedStartText, { color: theme.text }]}>
+                {routeStartTitle || 'Vị trí của bạn'}
               </Text>
             </View>
             <View
               pointerEvents="none"
-              style={[
-                styles.routeFieldDivider,
-                { backgroundColor: theme.border },
-              ]}
+              style={[styles.routeFieldDivider, { backgroundColor: theme.border }]}
             />
             <View pointerEvents="none" style={styles.selectedRouteConnector}>
               {[0, 1, 2].map((dot) => (
                 <View
                   key={dot}
-                  style={[
-                    styles.selectedRouteDot,
-                    { backgroundColor: theme.placeholder },
-                  ]}
+                  style={[styles.selectedRouteDot, { backgroundColor: theme.placeholder }]}
                 />
               ))}
             </View>
             <AppButton
               accessibilityLabel="Thay đổi điểm đến"
               onPress={onChangeDestinationPress}
-              style={[
-                styles.selectedRouteInput,
-                { paddingRight: Spacing.two },
-              ]}
+              style={[styles.selectedRouteInput, { paddingRight: Spacing.two }]}
               variant="ghost"
             >
               <View style={styles.routeIconWrapper}>
@@ -106,10 +78,7 @@ export function NavigationTopControls({
               </View>
               <Text
                 numberOfLines={1}
-                style={[
-                  styles.selectedDestinationText,
-                  { color: theme.text },
-                ]}
+                style={[styles.selectedDestinationText, { color: theme.text }]}
               >
                 {selectedDestination.title}
               </Text>
@@ -137,10 +106,7 @@ export function NavigationTopControls({
             <Text
               ellipsizeMode="tail"
               numberOfLines={1}
-              style={[
-                styles.selectedDestinationText,
-                { color: theme.text },
-              ]}
+              style={[styles.selectedDestinationText, { color: theme.text }]}
             >
               {selectedDestination.title}
             </Text>
@@ -149,12 +115,7 @@ export function NavigationTopControls({
       ) : (
         <>
           <View style={styles.searchBarHeaderRow}>
-            <View
-              style={[
-                styles.searchBar,
-                { backgroundColor: theme.backgroundElement },
-              ]}
-            >
+            <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}>
               <AppButton
                 accessibilityLabel="Tìm kiếm điểm đến"
                 testID="btn-search-destination"
@@ -168,68 +129,27 @@ export function NavigationTopControls({
                   source={AppLogo}
                   style={styles.appLogo}
                 />
-                <Text
-                  numberOfLines={1}
-                  style={[styles.searchText, { color: theme.placeholder }]}
-                >
+                <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
                   Bắt đầu tìm kiếm...
                 </Text>
               </AppButton>
               <AppButton
-                accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${
-                  walletBalance ?? 0
-                }`}
+                accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletBalance ?? 0}`}
                 onPress={onTopUpPress}
                 pressedOpacity={0.68}
-                style={[
-                  styles.creditContainer,
-                  { backgroundColor: theme.backgroundSelected },
-                ]}
+                style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
                 variant="ghost"
               >
                 <Text style={[styles.creditText, { color: theme.text }]}>
-                  {walletBalance ?? "—"}
+                  {walletBalance ?? '—'}
                 </Text>
-                <View
-                  style={[
-                    styles.addCreditIcon,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.addCreditGlyph,
-                      { color: theme.onPrimary },
-                    ]}
-                  >
-                    +
-                  </Text>
+                <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                  <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
                 </View>
               </AppButton>
             </View>
-
-            <Pressable
-              accessibilityLabel={`Thông báo${
-                unreadNotificationCount > 0
-                  ? `, ${unreadNotificationCount} chưa đọc`
-                  : ""
-              }`}
-              accessibilityRole="button"
-              onPress={onNotificationsPress}
-              style={({ pressed }) => [
-                styles.notificationCircleButton,
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Ionicons name="notifications" size={24} color="#000000" />
-              <Badge
-                count={unreadNotificationCount}
-                maxCount={9}
-                style={styles.notificationBadge}
-              />
-            </Pressable>
           </View>
-          <AppButton
+          {/* <AppButton
             accessibilityLabel="Phát trực tiếp"
             variant="ghost"
             onPress={onLivestreamPress}
@@ -252,7 +172,7 @@ export function NavigationTopControls({
               size={24}
               tintColor="#ff0000"
             />
-          </AppButton>
+          </AppButton> */}
         </>
       )}
     </View>

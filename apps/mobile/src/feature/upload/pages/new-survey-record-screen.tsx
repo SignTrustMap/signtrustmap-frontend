@@ -2,25 +2,15 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useRef, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppButton } from '@/components/button';
-import {
-  CANNOT_SAVE_DRAFT_MESSAGE,
-  VIDEO_NO_GPS_DATA_MESSAGE,
-} from '@/constants/message';
+import { VIDEO_NO_GPS_DATA_MESSAGE } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { AndroidGalleryModal } from '@/feature/upload/components/android-gallery-modal';
 import { SurveyScanModal } from '@/feature/upload/components/survey-scan-modal';
-import { useSaveSurveyDraft } from '@/feature/upload/hooks/use-save-survey-draft';
 import { useSurveyMediaPicker } from '@/feature/upload/hooks/use-survey-media-picker';
 import {
   isValidGpsCoordinates,
@@ -34,8 +24,6 @@ export type { SelectedGpxFile, SelectedSurveyMedia };
 export function NewSurveyRecordScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { draftId } = useLocalSearchParams<{ draftId?: string }>();
-  const saveDraft = useSaveSurveyDraft();
 
   const picker = useSurveyMediaPicker();
   const {
@@ -64,12 +52,9 @@ export function NewSurveyRecordScreen() {
   } = picker;
 
   const isFocused = useRef(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const scanInProgress = useRef(false);
   const scanFinished = useRef(false);
-  const savedDraftId = useRef<string | undefined>(undefined);
-  const savedBatchIds = useRef<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,36 +65,61 @@ export function NewSurveyRecordScreen() {
     }, []),
   );
 
-  const openSavedDraft = () => {
-    if (!isFocused.current || !scanFinished.current || !savedDraftId.current) return;
+  const openDetails = () => {
+    if (!isFocused.current) return;
     setIsScanning(false);
-    setIsSaving(false);
     const initialAsset = selectedAssets[0];
     const initialGps = initialAsset?.gps ?? null;
     router.replace({
       pathname: '/work/new-survey/details',
       params: {
-        submissionId: savedDraftId.current,
-        ...(savedBatchIds.current.length > 1 ? { batchSubmissionIds: savedBatchIds.current.join(',') } : {}),
-        ...(initialGps ? {
-          startLat: String(initialGps.latitude),
-          startLon: String(initialGps.longitude),
-        } : {}),
-        ...(initialAsset?.duration ? {
-          duration: String(Math.round(initialAsset.duration)),
-        } : {}),
-        ...(initialAsset?.assetId ? {
-          assetId: initialAsset.assetId,
-        } : {}),
+        imageUri: initialAsset?.uri,
+        imageName: initialAsset?.fileName ?? undefined,
+        imageMimeType: initialAsset?.mimeType,
+        imageType: initialAsset?.type,
+        ...(initialAsset?.capturedAt ? { capturedAt: initialAsset.capturedAt } : {}),
+        ...(initialGps
+          ? {
+              startLat: String(initialGps.latitude),
+              startLon: String(initialGps.longitude),
+              latitude: String(initialGps.latitude),
+              longitude: String(initialGps.longitude),
+            }
+          : {}),
+        ...(initialAsset?.duration
+          ? {
+              duration: String(Math.round(initialAsset.duration)),
+            }
+          : {}),
+        ...(initialAsset?.assetId
+          ? {
+              assetId: initialAsset.assetId,
+            }
+          : {}),
         ...(selectedGpxFile ? { gpxUri: selectedGpxFile.uri, gpxName: selectedGpxFile.name } : {}),
+        ...(selectedAssets.length > 1
+          ? {
+              assetsJson: JSON.stringify(
+                selectedAssets.map((asset) => ({
+                  uri: asset.uri,
+                  fileName: asset.fileName,
+                  mimeType: asset.mimeType,
+                  type: asset.type,
+                  capturedAt: asset.capturedAt,
+                  gps: asset.gps,
+                  duration: asset.duration,
+                  assetId: asset.assetId,
+                })),
+              ),
+            }
+          : {}),
       },
     });
   };
 
-  const handleSubmitRecord = async () => {
+  const handleSubmitRecord = () => {
     if (selectedAssets.length === 0 || isOpeningGallery || scanInProgress.current) return;
 
-    // Check if any video asset lacks GPX/GPS data before moving to details screen
     for (const asset of selectedAssets) {
       if (asset.type === 'video') {
         const hasAssetGps = isValidGpsCoordinates(asset.gps);
@@ -122,70 +132,14 @@ export function NewSurveyRecordScreen() {
 
     scanInProgress.current = true;
     scanFinished.current = false;
-    savedDraftId.current = undefined;
-    savedBatchIds.current = [];
     setPickerError(undefined);
-    setIsSaving(true);
     setIsScanning(true);
-
-    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
-    // Call saveDraft for all selected assets concurrently while scan modal is active
-    const saveTasks = selectedAssets.map(async (asset, i) => {
-      const isVideo = asset.type === 'video';
-      const parsedCaptureTime = asset.capturedAt ? Date.parse(asset.capturedAt) : NaN;
-      const isCaptureValid =
-        !Number.isNaN(parsedCaptureTime) &&
-        Date.now() - parsedCaptureTime >= 0 &&
-        Date.now() - parsedCaptureTime < THIRTY_DAYS_MS;
-      const safeCapturedAt = isCaptureValid ? asset.capturedAt! : new Date().toISOString();
-
-      return saveDraft(
-        {
-          fileName: asset.fileName ?? undefined,
-          mimeType: asset.mimeType,
-          type: asset.type,
-          uri: asset.uri,
-          startLat: asset.gps?.latitude,
-          startLon: asset.gps?.longitude,
-        },
-        {
-          submissionType: isVideo ? 'VIDEO_GPX' : 'SINGLE_IMAGE',
-          capturedAt: safeCapturedAt,
-          coordinateSource: isVideo ? 'GPX_FILE' : 'IMAGE_EXIF',
-          ...(asset.gps ?? {}),
-        },
-        draftId && i === 0 ? draftId : undefined,
-        selectedGpxFile,
-      );
-    });
-
-    Promise.all(saveTasks)
-      .then((savedIds) => {
-        if (savedIds.length > 0) {
-          savedDraftId.current = savedIds[0];
-          savedBatchIds.current = savedIds;
-          if (scanFinished.current) {
-            openSavedDraft();
-          }
-        }
-      })
-      .catch((error) => {
-        console.warn('[Surveyor] Unable to save survey draft:', error);
-        setPickerError(error instanceof Error ? error.message : CANNOT_SAVE_DRAFT_MESSAGE);
-        setIsScanning(false);
-        setIsSaving(false);
-      })
-      .finally(() => {
-        scanInProgress.current = false;
-      });
   };
 
   const handleScanComplete = () => {
+    scanInProgress.current = false;
     scanFinished.current = true;
-    if (savedDraftId.current) {
-      openSavedDraft();
-    }
+    openDetails();
   };
 
   const selectedAssetIds = selectedAssets
@@ -199,13 +153,8 @@ export function NewSurveyRecordScreen() {
           imageUri={selectedAsset.uri}
           isVideo={selectedAsset.type === 'video'}
           onCancel={() => {
-            scanFinished.current = true;
-            if (savedDraftId.current) {
-              openSavedDraft();
-            } else {
-              setIsScanning(false);
-              setIsSaving(false);
-            }
+            scanInProgress.current = false;
+            setIsScanning(false);
           }}
           onComplete={handleScanComplete}
         />
@@ -262,12 +211,17 @@ export function NewSurveyRecordScreen() {
                 {selectedAsset.type === 'video' ? (
                   <View style={styles.videoPreview}>
                     <SymbolView
-                      fallback={<Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>}
+                      fallback={
+                        <Text style={[styles.imageFallback, { color: theme.onPrimary }]}>VID</Text>
+                      }
                       name={{ android: 'videocam', ios: 'video.fill', web: 'videocam' }}
                       size={36}
                       tintColor={theme.onPrimary}
                     />
-                    <Text numberOfLines={2} style={[styles.videoFileName, { color: theme.onPrimary }]}>
+                    <Text
+                      numberOfLines={2}
+                      style={[styles.videoFileName, { color: theme.onPrimary }]}
+                    >
                       {selectedAsset.fileName ?? 'Đã chọn video'}
                     </Text>
                     {selectedAsset.duration ? (
@@ -288,7 +242,8 @@ export function NewSurveyRecordScreen() {
                 {/* Counter Badge on top-left of image */}
                 <View style={styles.carouselBadge}>
                   <Text style={styles.carouselBadgeText}>
-                    {selectedAsset.type === 'video' ? 'Video' : 'Ảnh'} {activeAssetIndex + 1}/{selectedAssets.length}
+                    {selectedAsset.type === 'video' ? 'Video' : 'Ảnh'} {activeAssetIndex + 1}/
+                    {selectedAssets.length}
                   </Text>
                 </View>
 
@@ -391,9 +346,7 @@ export function NewSurveyRecordScreen() {
                 tintColor={theme.placeholder}
               />
               <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
-                {isOpeningGallery
-                  ? 'Đang mở thư viện...'
-                  : 'Tải lên ảnh hoặc video'}
+                {isOpeningGallery ? 'Đang mở thư viện...' : 'Tải lên ảnh hoặc video'}
               </Text>
             </AppButton>
           )}
@@ -426,7 +379,11 @@ export function NewSurveyRecordScreen() {
                   >
                     <SymbolView
                       fallback={<Text style={{ color: '#F59E0B', fontWeight: '700' }}>!</Text>}
-                      name={{ android: 'warning', ios: 'exclamationmark.triangle.fill', web: 'warning' }}
+                      name={{
+                        android: 'warning',
+                        ios: 'exclamationmark.triangle.fill',
+                        web: 'warning',
+                      }}
                       size={24}
                       tintColor="#F59E0B"
                     />
@@ -435,7 +392,8 @@ export function NewSurveyRecordScreen() {
                         Không tìm thấy dữ liệu GPS trong video
                       </Text>
                       <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
-                        Khảo sát bằng video yêu cầu dữ liệu toạ độ hành trình. Vui lòng tải lên tệp .gpx đồng bộ để tiếp tục.
+                        Khảo sát bằng video yêu cầu dữ liệu toạ độ hành trình. Vui lòng tải lên tệp
+                        .gpx đồng bộ để tiếp tục.
                       </Text>
                     </View>
                   </View>
@@ -446,7 +404,7 @@ export function NewSurveyRecordScreen() {
                     </Text>
                     <AppButton
                       accessibilityLabel="Tải lên tệp GPX hành trình"
-                      disabled={isScanning || isSaving}
+                      disabled={isScanning}
                       onPress={pickGpx}
                       pressedOpacity={0.78}
                       style={[
@@ -460,13 +418,17 @@ export function NewSurveyRecordScreen() {
                       variant="surface"
                     >
                       <SymbolView
-                        fallback={<Text style={[styles.imageFallback, { color: theme.primary }]}>GPX</Text>}
+                        fallback={
+                          <Text style={[styles.imageFallback, { color: theme.primary }]}>GPX</Text>
+                        }
                         name={{ android: 'route', ios: 'map', web: 'route' }}
                         size={28}
                         tintColor={theme.primary}
                       />
                       <View style={{ alignItems: 'center', gap: 2 }}>
-                        <Text style={[styles.uploadLabel, { color: theme.primary, fontWeight: '700' }]}>
+                        <Text
+                          style={[styles.uploadLabel, { color: theme.primary, fontWeight: '700' }]}
+                        >
                           Chọn tệp GPX (.gpx) từ thiết bị
                         </Text>
                         <Text style={[styles.gpxHintText, { color: theme.placeholder }]}>
@@ -494,7 +456,9 @@ export function NewSurveyRecordScreen() {
                     ]}
                   >
                     <SymbolView
-                      fallback={<Text style={{ color: theme.primary, fontWeight: '700' }}>GPX</Text>}
+                      fallback={
+                        <Text style={{ color: theme.primary, fontWeight: '700' }}>GPX</Text>
+                      }
                       name={{ android: 'route', ios: 'checkmark.circle.fill', web: 'route' }}
                       size={24}
                       tintColor={theme.primary}
@@ -559,7 +523,8 @@ export function NewSurveyRecordScreen() {
                         {`Đã phát hiện GPS từ video: ${selectedGps!.latitude.toFixed(5)}, ${selectedGps!.longitude.toFixed(5)}`}
                       </Text>
                       <Text style={[styles.videoGpsSubtitle, { color: theme.textSecondary }]}>
-                        Điểm bắt đầu và kết thúc lộ trình sẽ được thể hiện trên bản đồ ở bước tiếp theo
+                        Điểm bắt đầu và kết thúc lộ trình sẽ được thể hiện trên bản đồ ở bước tiếp
+                        theo
                       </Text>
                     </View>
                   </View>
@@ -571,7 +536,9 @@ export function NewSurveyRecordScreen() {
                     style={styles.advancedGpxToggle}
                   >
                     <Text style={[styles.advancedGpxToggleText, { color: theme.primary }]}>
-                      {showAdvancedGpx ? 'Ẩn tùy chọn tệp GPX ngoài' : 'Tùy chọn nâng cao: Đính kèm tệp GPX ngoài (tùy chọn)'}
+                      {showAdvancedGpx
+                        ? 'Ẩn tùy chọn tệp GPX ngoài'
+                        : 'Tùy chọn nâng cao: Đính kèm tệp GPX ngoài (tùy chọn)'}
                     </Text>
                   </Pressable>
 
@@ -579,7 +546,7 @@ export function NewSurveyRecordScreen() {
                     <>
                       <AppButton
                         accessibilityLabel="Tải lên tệp GPX"
-                        disabled={isScanning || isSaving}
+                        disabled={isScanning}
                         onPress={pickGpx}
                         pressedOpacity={0.78}
                         style={[
@@ -593,7 +560,11 @@ export function NewSurveyRecordScreen() {
                         variant="surface"
                       >
                         <SymbolView
-                          fallback={<Text style={[styles.imageFallback, { color: theme.placeholder }]}>GPX</Text>}
+                          fallback={
+                            <Text style={[styles.imageFallback, { color: theme.placeholder }]}>
+                              GPX
+                            </Text>
+                          }
                           name={{ android: 'route', ios: 'map', web: 'route' }}
                           size={28}
                           tintColor={theme.placeholder}
@@ -617,20 +588,14 @@ export function NewSurveyRecordScreen() {
 
           <AppButton
             disabled={
-              selectedAssets.length === 0 ||
-              isOpeningGallery ||
-              isScanning ||
-              isSaving ||
-              isAnyVideoMissingGpx
+              selectedAssets.length === 0 || isOpeningGallery || isScanning || isAnyVideoMissingGpx
             }
             label={
-              isSaving
-                ? 'Đang lưu bản nháp...'
-                : isAnyVideoMissingGpx
-                  ? 'Cần tải lên tệp GPX cho video để tiếp tục'
-                  : selectedAssets.length > 1
-                    ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
-                    : 'Tiếp tục ghi nhận'
+              isAnyVideoMissingGpx
+                ? 'Cần tải lên tệp GPX cho video để tiếp tục'
+                : selectedAssets.length > 1
+                  ? `Tiếp tục ghi nhận (${selectedAssets.length} tệp)`
+                  : 'Tiếp tục ghi nhận'
             }
             onPress={handleSubmitRecord}
             style={styles.submitButton}

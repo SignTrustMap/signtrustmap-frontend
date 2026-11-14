@@ -39,12 +39,17 @@ import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/context/session-provider';
-import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
+import {
+  extractImageGpsCoordinates,
+  type ImageGpsCoordinates,
+} from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
-import { submitRevalidationEvidence, resolveS3Url } from '@/api/revalidation/revalidation';
+import { resolveS3Url } from '@/api/revalidation/revalidation';
+import { useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
+import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -92,9 +97,9 @@ export function calculateDistanceMeters(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c);
 }
@@ -117,28 +122,25 @@ export type RevalidationSignStatus = RevalidationEvidenceType;
 export const REVALIDATION_STATUS_OPTIONS: Array<{
   id: RevalidationEvidenceType;
   label: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   activeColor: string;
   description: string;
 }> = [
   {
     id: 'STILL_ACTIVE',
     label: 'Vẫn hoạt động',
-    icon: 'check-circle-outline',
     activeColor: '#16A34A',
-    description: 'Biển báo vẫn tồn tại và hoạt động bình thường trên thực địa.',
+    description: 'Biển báo vẫn tồn tại và hoạt động bình thường.',
   },
   {
     id: 'REMOVED',
     label: 'Đã gỡ bỏ',
-    icon: 'close-circle-outline',
     activeColor: '#DC2626',
-    description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn trên thực địa.',
+    description: 'Biển báo đã bị tháo dỡ, mất hoặc không còn.',
   },
   {
     id: 'CHANGED',
     label: 'Đã thay đổi',
-    icon: 'swap-horizontal',
     activeColor: '#D97706',
     description: 'Biển báo đã được thay thế bằng một loại biển báo khác.',
   },
@@ -208,6 +210,17 @@ export function InspectRevalidateScreen() {
       : Math.round(rawScore)
     : 65;
   const freshnessInfo = formatFreshnessScore(freshnessScore);
+  const targetReverseGeocode = useReverseGeocode(
+    targetLat && targetLon ? { latitude: targetLat, longitude: targetLon } : null,
+    !params.displayAddress,
+  );
+  const displayAddress =
+    params.displayAddress ||
+    targetReverseGeocode.data?.displayAddress ||
+    params.roadName ||
+    (targetLat && targetLon
+      ? `GPS: ${targetLat.toFixed(5)}, ${targetLon.toFixed(5)}`
+      : 'Đã tải vị trí mục tiêu');
   const roadName = params.roadName || params.displayAddress || 'Tuyến đường hiện tại';
 
   // Media selection & GPS state
@@ -217,11 +230,12 @@ export function InspectRevalidateScreen() {
   const [isLocatingDevice, setIsLocatingDevice] = useState(false);
   const [pickerError, setPickerError] = useState<string>();
 
-  // Revalidation state directly mapped to Backend evidence_type
-  const [evidenceType, setEvidenceType] = useState<RevalidationEvidenceType>('STILL_ACTIVE');
+  // Revalidation state directly mapped to Backend evidence_type (no default selection)
+  const [evidenceType, setEvidenceType] = useState<RevalidationEvidenceType | null>(null);
   const [customNote, setCustomNote] = useState('');
 
   // Submission state
+  const { mutateAsync: submitRevalidation } = useSubmitRevalidation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
@@ -239,24 +253,16 @@ export function InspectRevalidateScreen() {
   // Proximity Calculation
   const distanceFromTarget =
     detectedGps && targetLat !== undefined && targetLon !== undefined
-      ? calculateDistanceMeters(
-        detectedGps.latitude,
-        detectedGps.longitude,
-        targetLat,
-        targetLon,
-      )
+      ? calculateDistanceMeters(detectedGps.latitude, detectedGps.longitude, targetLat, targetLon)
       : null;
 
   const isWithinProximity =
     distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
 
-  // Validation rules: Location and media are required
+  // Validation rules: Location, media, and selected evidence status are required
   const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
   const isSubmitDisabled =
-    !selectedMedia ||
-    !isLocationValid ||
-    isSubmitting ||
-    isOpeningGallery;
+    !selectedMedia || !isLocationValid || !evidenceType || isSubmitting || isOpeningGallery;
 
   // Dynamic submit button label based on current validation state
   let submitButtonLabel = 'Gửi bằng chứng tái thẩm định';
@@ -265,9 +271,11 @@ export function InspectRevalidateScreen() {
   } else if (!selectedMedia) {
     submitButtonLabel = 'Tải lên ảnh hoặc video bằng chứng';
   } else if (!detectedGps) {
-    submitButtonLabel = 'Cần vị trí (Đóng dấu GPS thiết bị)';
+    submitButtonLabel = 'Cần vị trí (Chọn GPS thiết bị)';
   } else if (isWithinProximity === false) {
     submitButtonLabel = `Vị trí quá xa (${distanceFromTarget}m > 50m)`;
+  } else if (!evidenceType) {
+    submitButtonLabel = 'Vui lòng chọn kết luận.';
   }
 
   /**
@@ -326,9 +334,7 @@ export function InspectRevalidateScreen() {
         sortBy: [[LegacyMediaLibrary.SortBy.creationTime, false]],
       });
 
-      setAndroidGalleryAssets((current) =>
-        after ? [...current, ...page.assets] : page.assets,
-      );
+      setAndroidGalleryAssets((current) => (after ? [...current, ...page.assets] : page.assets));
       setAndroidGalleryCursor(page.endCursor);
       setAndroidGalleryHasNextPage(page.hasNextPage);
     } catch (error) {
@@ -367,9 +373,9 @@ export function InspectRevalidateScreen() {
       const exifCoordinates = extractImageGpsCoordinates(exif);
       const gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
         ? {
-          latitude: assetInfo.location.latitude,
-          longitude: assetInfo.location.longitude,
-        }
+            latitude: assetInfo.location.latitude,
+            longitude: assetInfo.location.longitude,
+          }
         : exifCoordinates;
 
       if (isVideo) {
@@ -394,9 +400,9 @@ export function InspectRevalidateScreen() {
         setDetectedGps(
           videoMeta.hasDeviceGps
             ? {
-              latitude: videoMeta.startCoordinate[1],
-              longitude: videoMeta.startCoordinate[0],
-            }
+                latitude: videoMeta.startCoordinate[1],
+                longitude: videoMeta.startCoordinate[0],
+              }
             : null,
         );
       } else {
@@ -405,9 +411,7 @@ export function InspectRevalidateScreen() {
           type: 'image',
           fileName: asset.filename,
           capturedAt:
-            asset.creationTime > 0
-              ? new Date(asset.creationTime).toISOString()
-              : undefined,
+            asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
           assetId: asset.id,
         });
         setDetectedGps(gpsCoordinates ?? null);
@@ -521,30 +525,30 @@ export function InspectRevalidateScreen() {
       return;
     }
 
+    if (!evidenceType) {
+      setSubmitError('Vui lòng chọn kết luận tái thẩm định.');
+      return;
+    }
+
     try {
-      await submitRevalidationEvidence(
-        targetTaskId,
-        {
+      await submitRevalidation({
+        taskIdOrSignId: targetTaskId,
+        data: {
           latitude: lat,
           longitude: lon,
           capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
         },
-        selectedMedia
+        mediaFile: selectedMedia
           ? {
-            uri: selectedMedia.uri,
-            fileName: selectedMedia.fileName || 'evidence.jpg',
-            mimeType: selectedMedia.mimeType,
-          }
+              uri: selectedMedia.uri,
+              fileName: selectedMedia.fileName || 'evidence.jpg',
+              mimeType: selectedMedia.mimeType,
+            }
           : undefined,
-        session?.accessToken,
-      );
-
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks-in-bounds'] });
-      void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
-      void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
+        accessToken: session?.accessToken,
+      });
 
       setSubmitSuccess(true);
       setTimeout(() => {
@@ -593,7 +597,9 @@ export function InspectRevalidateScreen() {
             </View>
             <View style={[styles.galleryHeader, { borderBottomColor: theme.border }]}>
               <View style={styles.galleryHeading}>
-                <Text style={[styles.galleryTitle, { color: theme.text }]}>Chọn hình ảnh / video bằng chứng</Text>
+                <Text style={[styles.galleryTitle, { color: theme.text }]}>
+                  Chọn hình ảnh / video bằng chứng
+                </Text>
                 <Text style={[styles.gallerySubtitle, { color: theme.textSecondary }]}>
                   Dữ liệu tọa độ GPS gốc sẽ được kiểm tra đối chiếu
                 </Text>
@@ -615,10 +621,7 @@ export function InspectRevalidateScreen() {
 
             <FlatList
               contentContainerStyle={styles.galleryGrid}
-              data={[
-                { id: '__camera__', isCameraTile: true },
-                ...androidGalleryAssets,
-              ]}
+              data={[{ id: '__camera__', isCameraTile: true }, ...androidGalleryAssets]}
               keyExtractor={(item) => item.id}
               ListFooterComponent={
                 androidGalleryHasNextPage ? (
@@ -642,10 +645,7 @@ export function InspectRevalidateScreen() {
                         setIsAndroidGalleryVisible(false);
                         void handleLaunchCamera();
                       }}
-                      style={({ pressed }) => [
-                        styles.galleryItem,
-                        { opacity: pressed ? 0.7 : 1 },
-                      ]}
+                      style={({ pressed }) => [styles.galleryItem, { opacity: pressed ? 0.7 : 1 }]}
                     >
                       <View
                         style={[
@@ -680,7 +680,11 @@ export function InspectRevalidateScreen() {
                       { opacity: pressed || isSelecting ? 0.65 : 1 },
                     ]}
                   >
-                    <Image contentFit="cover" source={{ uri: asset.uri }} style={styles.galleryImage} />
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: asset.uri }}
+                      style={styles.galleryImage}
+                    />
                     {isVideo ? (
                       <View style={styles.galleryVideoBadge}>
                         <MaterialCommunityIcons color="#FFFFFF" name="video" size={14} />
@@ -729,12 +733,17 @@ export function InspectRevalidateScreen() {
               </Pressable>
               <View style={styles.headerTitleCol}>
                 <View style={styles.headerBadgeRow}>
-                  <Text style={[styles.title, { color: theme.text }]}>Kiểm tra & Tái thẩm định</Text>
+                  <Text style={[styles.title, { color: theme.text }]}>
+                    Kiểm tra & Tái thẩm định
+                  </Text>
                   <View style={styles.signCodePill}>
                     <Text style={styles.signCodePillText}>{signCode}</Text>
                   </View>
                 </View>
-                <Text numberOfLines={1} style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+                >
                   {roadName}
                 </Text>
               </View>
@@ -757,10 +766,8 @@ export function InspectRevalidateScreen() {
                   <Text numberOfLines={1} style={[styles.targetSignName, { color: theme.text }]}>
                     {signName}
                   </Text>
-                  <Text style={[styles.targetSignMeta, { color: theme.grey }]}>
-                    {targetLat && targetLon
-                      ? `GPS: ${targetLat.toFixed(5)}, ${targetLon.toFixed(5)}`
-                      : 'Đã tải vị trí mục tiêu'}
+                  <Text numberOfLines={2} style={[styles.targetSignMeta, { color: theme.grey }]}>
+                    {displayAddress}
                   </Text>
                 </View>
                 <View
@@ -777,12 +784,7 @@ export function InspectRevalidateScreen() {
                     name={freshnessInfo.icon as any}
                     size={12}
                   />
-                  <Text
-                    style={[
-                      styles.freshnessBadgeText,
-                      { color: freshnessInfo.color },
-                    ]}
-                  >
+                  <Text style={[styles.freshnessBadgeText, { color: freshnessInfo.color }]}>
                     {freshnessInfo.label}
                   </Text>
                 </View>
@@ -793,7 +795,11 @@ export function InspectRevalidateScreen() {
                 <View style={[styles.miniEvidenceBox, { borderColor: theme.border }]}>
                   <View style={styles.miniImgFrame}>
                     {targetImageUrl ? (
-                      <Image contentFit="contain" source={{ uri: targetImageUrl }} style={styles.miniImg} />
+                      <Image
+                        contentFit="contain"
+                        source={{ uri: targetImageUrl }}
+                        style={styles.miniImg}
+                      />
                     ) : (
                       <MaterialCommunityIcons color={theme.grey} name="traffic-light" size={24} />
                     )}
@@ -805,11 +811,21 @@ export function InspectRevalidateScreen() {
                 <View style={[styles.miniEvidenceBox, { borderColor: '#93C5FD' }]}>
                   <View style={styles.miniImgFrame}>
                     {targetCropUrl ? (
-                      <Image contentFit="cover" source={{ uri: targetCropUrl }} style={styles.miniImgCrop} />
+                      <Image
+                        contentFit="cover"
+                        source={{ uri: targetCropUrl }}
+                        style={styles.miniImgCrop}
+                      />
                     ) : (
                       <View style={styles.noCropMini}>
-                        <MaterialCommunityIcons color={theme.placeholder} name="camera-outline" size={18} />
-                        <Text style={[styles.noCropMiniText, { color: theme.placeholder }]}>Không có ảnh crop</Text>
+                        <MaterialCommunityIcons
+                          color={theme.placeholder}
+                          name="camera-outline"
+                          size={18}
+                        />
+                        <Text style={[styles.noCropMiniText, { color: theme.placeholder }]}>
+                          Không có ảnh crop
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -821,9 +837,7 @@ export function InspectRevalidateScreen() {
             {/* 2. MEDIA EVIDENCE UPLOADER & PREVIEW                             */}
             {/* =============================================================== */}
             <Pressable
-              accessibilityLabel={
-                selectedMedia ? 'Đổi tệp đã chọn' : 'Tải lên ảnh hoặc video'
-              }
+              accessibilityLabel={selectedMedia ? 'Đổi tệp đã chọn' : 'Chọn ảnh từ thư viện.'}
               accessibilityRole="button"
               disabled={isOpeningGallery || isSubmitting}
               onPress={handleOpenGallery}
@@ -867,18 +881,11 @@ export function InspectRevalidateScreen() {
                     tintColor={theme.placeholder}
                   />
                   <Text style={[styles.uploadLabel, { color: theme.textSecondary }]}>
-                    {isOpeningGallery ? 'Đang mở thư viện...' : 'Tải lên ảnh hoặc video'}
+                    {isOpeningGallery ? 'Đang mở thư viện...' : 'Chọn ảnh từ thư viện'}
                   </Text>
                 </>
               )}
             </Pressable>
-
-            {/* Helper text matching new survey screen */}
-            <Text style={[styles.helperText, { color: theme.placeholder }]}>
-              {selectedMedia
-                ? 'Nhấn vào ảnh để chọn tệp khác'
-                : 'Tải ảnh hoặc video biển báo của bạn tại đây'}
-            </Text>
 
             {pickerError ? (
               <Text accessibilityRole="alert" style={styles.errorAlertText}>
@@ -889,17 +896,26 @@ export function InspectRevalidateScreen() {
             {/* =============================================================== */}
             {/* 3. REAL-TIME PROXIMITY & GPS GUARDRAIL                          */}
             {/* =============================================================== */}
+            <Text
+              style={[
+                styles.sectionHeading,
+                { color: theme.text, marginTop: Spacing.two, marginBottom: 2 },
+              ]}
+            >
+              Tọa độ
+            </Text>
             <View
               style={[
                 styles.gpsGuardrailCard,
                 {
                   backgroundColor: theme.backgroundElement,
+                  borderWidth: isWithinProximity !== null ? 1 : 0,
                   borderColor:
                     isWithinProximity === true
                       ? '#10B981'
                       : isWithinProximity === false
                         ? '#EF4444'
-                        : theme.border,
+                        : 'transparent',
                 },
               ]}
             >
@@ -924,20 +940,20 @@ export function InspectRevalidateScreen() {
                 <View style={styles.gpsCardTitleCol}>
                   <Text style={[styles.gpsCardTitle, { color: theme.text }]}>
                     {distanceFromTarget !== null
-                      ? `Cách biển báo mục tiêu ${distanceFromTarget}m`
+                      ? `Cách vị trí biển báo cũ ${distanceFromTarget}m`
                       : detectedGps
                         ? `GPS: ${detectedGps.latitude.toFixed(5)}, ${detectedGps.longitude.toFixed(5)}`
                         : 'Chưa phát hiện tọa độ GPS'}
                   </Text>
-                  <Text style={[styles.gpsCardSubtitle, { color: theme.textSecondary }]}>
-                    {isWithinProximity === true
-                      ? 'Nằm trong bán kính hợp lệ (< 50m). Đạt chuẩn PostGIS.'
-                      : isWithinProximity === false
-                        ? `Bằng chứng cách xa ${distanceFromTarget}m. Tối đa cho phép 50m.`
-                        : 'Chụp ảnh tại hiện trường hoặc nhấn bên dưới để đóng dấu GPS thiết bị.'}
-                  </Text>
                 </View>
               </View>
+              {isWithinProximity !== false ? (
+                <Text style={[styles.gpsCardSubtitle, { color: theme.textSecondary }]}>
+                  {isWithinProximity === true
+                    ? 'Nằm trong bán kính hợp lệ (< 50m).'
+                    : 'Chụp ảnh tại hiện trường hoặc nhấn bên dưới để chọn theo GPS thiết bị.'}
+                </Text>
+              ) : null}
 
               {/* Stamp Live GPS Fallback Button */}
               {!detectedGps || isWithinProximity === false ? (
@@ -948,23 +964,27 @@ export function InspectRevalidateScreen() {
                   style={styles.stampGpsBtn}
                   variant="surface"
                 >
-                  {isLocatingDevice ? (
-                    <ActivityIndicator color={theme.primary} size="small" />
-                  ) : (
-                    <MaterialCommunityIcons color={theme.primary} name="crosshairs-gps" size={16} />
-                  )}
+                  {isLocatingDevice && <ActivityIndicator color={theme.primary} size="small" />}
                   <Text style={[styles.stampGpsBtnText, { color: theme.primary }]}>
-                    {isLocatingDevice ? 'Đang lấy tín hiệu GPS…' : 'Đóng dấu GPS thiết bị hiện tại'}
+                    {isLocatingDevice ? 'Đang lấy tín hiệu GPS…' : 'Chọn theo GPS hiện tại'}
                   </Text>
                 </AppButton>
               ) : null}
             </View>
+            {isWithinProximity === false && distanceFromTarget !== null ? (
+              <View style={styles.gpsErrorRow}>
+                <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={16} />
+                <Text accessibilityRole="alert" style={styles.gpsErrorText}>
+                  {`Bằng chứng cách xa ${distanceFromTarget}m. Tối đa cho phép ${MAX_PROXIMITY_METERS}m.`}
+                </Text>
+              </View>
+            ) : null}
 
             {/* =============================================================== */}
             {/* 4. REVALIDATION STATUS & NOTES                                  */}
             {/* =============================================================== */}
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Kết luận tái thẩm định thực địa</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Kết luận tái thẩm định</Text>
               <Text style={styles.requiredTag}>* Bắt buộc</Text>
             </View>
 
@@ -1005,11 +1025,6 @@ export function InspectRevalidateScreen() {
                           />
                         )}
                       </View>
-                      <MaterialCommunityIcons
-                        color={isSelected ? opt.activeColor : theme.placeholder}
-                        name={opt.icon}
-                        size={20}
-                      />
                       <Text
                         style={[
                           styles.statusOptionLabel,
@@ -1022,12 +1037,7 @@ export function InspectRevalidateScreen() {
                         {opt.label}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.statusOptionDesc,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
+                    <Text style={[styles.statusOptionDesc, { color: theme.textSecondary }]}>
                       {opt.description}
                     </Text>
                   </Pressable>
@@ -1036,18 +1046,22 @@ export function InspectRevalidateScreen() {
             </View>
 
             {evidenceType === 'CHANGED' ? (
-              <View style={[styles.aiNoticeCard, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
-                <MaterialCommunityIcons color="#D97706" name="robot-outline" size={18} />
+              <View
+                style={[
+                  styles.aiNoticeCard,
+                  { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+                ]}
+              >
                 <Text style={styles.aiNoticeText}>
-                  Hệ thống AI sẽ tự động phân tích ảnh thực địa bạn chụp để nhận diện loại biển báo mới.
+                  Hệ thống AI sẽ tự động phân tích ảnh thực địa bạn chụp để nhận diện loại biển báo
+                  mới.
                 </Text>
               </View>
             ) : null}
 
             {/* Labeled input for additional notes */}
             <View style={styles.inputLabelRow}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú chi tiết</Text>
-              <Text style={[styles.optionalTag, { color: theme.grey }]}>Không bắt buộc</Text>
+              <Text style={[styles.inputLabel, { color: theme.text }]}>Ghi chú </Text>
             </View>
 
             <TextInput
@@ -1060,13 +1074,7 @@ export function InspectRevalidateScreen() {
                   scrollViewRef.current?.scrollToEnd({ animated: true });
                 }, 250);
               }}
-              placeholder={
-                evidenceType === 'REMOVED'
-                  ? 'Mô tả hiện trạng vị trí (ví dụ: cột đã bị tháo, công trình đang thi công gỡ bỏ)...'
-                  : evidenceType === 'CHANGED'
-                    ? 'Ghi chú thêm về biển báo mới (ví dụ: biển hạn chế tốc độ mới thay thế)...'
-                    : 'Ghi chú bổ sung (ví dụ: biển còn rõ ràng, quan sát tốt)...'
-              }
+              placeholder="Nhập ghi chú..."
               placeholderTextColor={theme.placeholder}
               style={[
                 styles.notesInput,
@@ -1111,11 +1119,7 @@ export function InspectRevalidateScreen() {
               ]}
               variant="primary"
             >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <MaterialCommunityIcons color="#FFFFFF" name="shield-check" size={20} />
-              )}
+              {isSubmitting && <ActivityIndicator color="#FFFFFF" />}
               <Text style={styles.submitBtnText}>{submitButtonLabel}</Text>
             </AppButton>
           </ScrollView>
@@ -1225,7 +1229,7 @@ const styles = StyleSheet.create({
   evidenceComparisonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginTop: Spacing.two,
     paddingTop: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -1348,10 +1352,24 @@ const styles = StyleSheet.create({
   // GPS Guardrail
   gpsGuardrailCard: {
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     padding: Spacing.three,
-    marginTop: Spacing.two,
+    marginTop: 4,
     gap: Spacing.two,
+  },
+  gpsErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.one,
+    marginHorizontal: 2,
+  },
+  gpsErrorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    flex: 1,
   },
   gpsCardHeader: {
     flexDirection: 'row',

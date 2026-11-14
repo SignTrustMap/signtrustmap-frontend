@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSidebar } from '@/context/SidebarContext'
 import { useToast } from '@/context/ToastContext'
@@ -7,22 +7,68 @@ import PageHeader from '@/components/common/PageHeader'
 import CustomSelect, { type OptionItem } from '@/components/common/CustomSelect'
 import {
   DownloadSimple,
-  Funnel,
-  ShieldCheck,
+  CircleNotch,
 } from '@phosphor-icons/react'
-import { mockSignReports, type SignReportItem, type ReportStatus } from '@/data'
+import type { SignReportItem, ReportStatus, IssueType, ReportPriority } from '@/data/reports'
+import { escalationService, type ModerationCaseItem } from '@/api/services/escalation.service'
 import {
   ReportsKpiCards,
   ReportsTableView,
   ReportDetailModal,
 } from './components'
 
+function mapCaseToSignReport(c: ModerationCaseItem): SignReportItem {
+  const status: ReportStatus =
+    c.status === 'RESOLVED' || c.status === 'DISMISSED'
+      ? 'Resolved'
+      : c.status === 'IN_REVIEW' || c.status === 'ESCALATED_ADMIN'
+      ? 'Investigating'
+      : 'Pending'
+
+  const priority: ReportPriority =
+    c.severity === 'CRITICAL' || c.severity === 'HIGH'
+      ? 'Cao'
+      : c.severity === 'LOW'
+      ? 'Thấp'
+      : 'Vừa'
+
+  const issueType: IssueType =
+    c.case_type?.toLowerCase().includes('damage') ? 'damaged'
+    : c.case_type?.toLowerCase().includes('obscur') ? 'obscured'
+    : c.case_type?.toLowerCase().includes('miss') ? 'missing'
+    : 'incorrect'
+
+  const dateStr = c.created_at || c.createdAt
+  const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('vi-VN') : 'Gần đây'
+
+  return {
+    id: `#CASE-${c.id.slice(0, 8).toUpperCase()}`,
+    signCode: c.target_entity_id ? `REF-${c.target_entity_id.slice(0, 6).toUpperCase()}` : 'SIGN-REF',
+    signName: c.case_type || 'Báo cáo sự cố biển báo',
+    issueType,
+    priority,
+    location: c.target_entity_type ? `${c.target_entity_type}: #${c.target_entity_id?.slice(0, 8)}` : 'Hiện trường ghi nhận',
+    reporter: {
+      name: 'Người dùng cộng đồng',
+      initials: 'ND',
+      avatarBg: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-[#00c4de]',
+    },
+    dateSubmitted: dateFormatted,
+    status,
+    description: c.notes || c.resolutionNote || 'Báo cáo tiếp nhận từ cộng đồng và người đi đường.',
+    photoUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop&q=80',
+    assignedStaff: c.assigned_staff_id ? `Staff #${c.assigned_staff_id.slice(0, 6)}` : undefined,
+    resolvedDate: c.resolved_at || c.resolvedAt ? new Date(c.resolved_at || c.resolvedAt!).toLocaleDateString('vi-VN') : undefined,
+  }
+}
+
 export default function ReportsPage() {
   const { t } = useTranslation('ops')
   const { isCollapsed } = useSidebar()
-  const { success } = useToast()
+  const { success, error: toastError } = useToast()
 
-  const [reports, setReports] = useState<SignReportItem[]>(mockSignReports)
+  const [reports, setReports] = useState<SignReportItem[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
   const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Investigating' | 'Resolved'>('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIssueType, setSelectedIssueType] = useState<string>('all')
@@ -30,6 +76,28 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<SignReportItem | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  const loadCases = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const res = await escalationService.getCases({ page: 1, pageSize: 50 })
+      const items = res?.items || (Array.isArray(res) ? res : [])
+      if (Array.isArray(items)) {
+        setReports(items.map(mapCaseToSignReport))
+      } else {
+        setReports([])
+      }
+    } catch (err) {
+      console.warn('[ReportsPage] Failed to fetch moderation cases from live API:', err)
+      setReports([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadCases()
+  }, [loadCases])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -97,43 +165,29 @@ export default function ReportsPage() {
     })
   }, [reports, searchQuery, activeTab, selectedIssueType, selectedPriority])
 
-  // Handlers
-  function handleUpdateStatus(reportId: string, newStatus: ReportStatus) {
-    setReports((prev) =>
-      prev.map((r) =>
-        r.id === reportId
-          ? {
-              ...r,
-              status: newStatus,
-              resolvedDate: newStatus === 'Resolved' ? 'Hôm nay' : r.resolvedDate,
-              assignedStaff: r.assignedStaff || 'Staff Trực ban',
-            }
-          : r
-      )
-    )
-    if (selectedReport && selectedReport.id === reportId) {
-      setSelectedReport((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: newStatus,
-              resolvedDate: newStatus === 'Resolved' ? 'Hôm nay' : prev.resolvedDate,
-              assignedStaff: prev.assignedStaff || 'Staff Trực ban',
-            }
-          : null
-      )
-    }
-    success(
-      t('reports.toast_status_updated', {
-        id: reportId,
-        status:
-          newStatus === 'Pending'
-            ? t('reports.tab_pending')
-            : newStatus === 'Investigating'
-            ? t('reports.tab_investigating')
-            : t('reports.tab_resolved'),
+  async function handleUpdateStatus(reportId: string, newStatus: ReportStatus) {
+    try {
+      const cleanCaseId = reportId.replace('#CASE-', '').toLowerCase()
+      await escalationService.resolveCase(cleanCaseId, {
+        resolutionNote: `Trạng thái ca chuyển sang ${newStatus} bởi Nhân viên điều hành`,
+        actionType: newStatus === 'Resolved' ? 'RESOLVE' : 'DISMISS',
       })
-    )
+      success(
+        t('reports.toast_status_updated', {
+          id: reportId,
+          status:
+            newStatus === 'Pending'
+              ? t('reports.tab_pending')
+              : newStatus === 'Investigating'
+              ? t('reports.tab_investigating')
+              : t('reports.tab_resolved'),
+        })
+      )
+      loadCases()
+    } catch (err: any) {
+      console.warn('[Reports] Failed to resolve case on backend:', err)
+      toastError(err?.message || 'Không thể cập nhật trạng thái trên máy chủ')
+    }
   }
 
   function handleDispatchSurvey(report: SignReportItem) {
@@ -209,55 +263,46 @@ export default function ReportsPage() {
             },
           ]}
           selectedCategory={activeTab}
-          onSelectCategory={(id) => setActiveTab(id as 'All' | 'Pending' | 'Investigating' | 'Resolved')}
-        />
-
-        {/* Secondary Filters Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-48 sm:w-56">
-              <CustomSelect
-                options={issueTypeOptions}
-                value={selectedIssueType}
-                onChange={setSelectedIssueType}
-                prefixLabel={t('reports.filter_type')}
-                leftIcon={<Funnel size={14} className="text-gray-400" />}
-                size="sm"
-              />
-            </div>
-            <div className="w-40 sm:w-48">
-              <CustomSelect
-                options={priorityOptions}
-                value={selectedPriority}
-                onChange={setSelectedPriority}
-                prefixLabel={t('reports.filter_priority')}
-                size="sm"
-              />
-            </div>
+          onSelectCategory={(id) => setActiveTab(id as any)}
+        >
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <CustomSelect
+              value={selectedIssueType}
+              onChange={setSelectedIssueType}
+              options={issueTypeOptions}
+              size="sm"
+              className="w-full sm:w-44"
+            />
+            <CustomSelect
+              value={selectedPriority}
+              onChange={setSelectedPriority}
+              options={priorityOptions}
+              size="sm"
+              className="w-full sm:w-36"
+            />
           </div>
-
-          {/* Indicator if expanded columns are shown */}
-          {isCollapsed && (
-            <div className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-mono font-medium text-[#007b8b] dark:text-[#00c4de] bg-[#007b8b]/10 dark:bg-[#00c4de]/10 px-2.5 py-1 rounded-lg">
-              <ShieldCheck size={14} weight="bold" />
-              <span>{t('reports.badge_extra_columns')}</span>
-            </div>
-          )}
-        </div>
+        </DataFilterBar>
       </div>
 
-      {/* ─── REPORTS TABLE ──────────────────────────────────────────── */}
-      <ReportsTableView
-        reports={filteredReports}
-        isCollapsed={isCollapsed}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-        onSelectReport={setSelectedReport}
-      />
+      {/* ─── TABLE VIEW ─────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="p-16 text-center text-gray-400 space-y-3">
+          <CircleNotch size={32} className="animate-spin mx-auto text-[#007b8b] dark:text-[#00c4de]" />
+          <p className="text-xs">Đang tải danh sách báo cáo sự cố từ hệ thống...</p>
+        </div>
+      ) : (
+        <ReportsTableView
+          reports={filteredReports}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          isCollapsed={isCollapsed}
+          onSelectReport={(report) => setSelectedReport(report)}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
+      )}
 
-      {/* ─── MODAL: INCIDENT DETAIL & DISPATCH ────────────────────────── */}
+      {/* ─── DETAIL MODAL ───────────────────────────────────────────── */}
       <ReportDetailModal
         report={selectedReport}
         onClose={() => setSelectedReport(null)}

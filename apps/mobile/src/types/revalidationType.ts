@@ -54,7 +54,7 @@ export type GetRevalidationTasksParams = {
 };
 
 export type RevalidationTasksInBoundsResponse = {
-  items: Array<{
+  items: {
     id: string;
     verified_sign_id?: string;
     verifiedSignId?: string;
@@ -77,7 +77,7 @@ export type RevalidationTasksInBoundsResponse = {
     freshnessScore?: number;
     created_at?: string;
     createdAt?: string;
-  }>;
+  }[];
   total: number;
   page?: number;
   pageSize?: number;
@@ -159,6 +159,7 @@ export interface RevalidationQueueEvidenceItem {
     latitude: number;
     longitude: number;
     distanceMeters: number | null;
+    suggestedSignTypeId?: number;
   };
   currentVoteCount: number;
   taskStatus: string;

@@ -96,10 +96,12 @@ jest.mock('@/context/session-provider', () => {
 // 5. Mock Auth API methods
 const mockApiLogin = jest.fn();
 const mockApiRegister = jest.fn();
+const mockApiLoginWithGoogle = jest.fn();
 
 jest.mock('@/api/auth/auth', () => ({
   login: (...args: any[]) => mockApiLogin(...args),
   register: (...args: any[]) => mockApiRegister(...args),
+  loginWithGoogle: (...args: any[]) => mockApiLoginWithGoogle(...args),
 }));
 
 // 6. Test Screen Render Helper with QueryClientProvider
@@ -135,6 +137,15 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
     });
     mockLogOut.mockImplementation(async () => {
       mockStorage.delete('session');
+    });
+    mockApiLoginWithGoogle.mockResolvedValue({
+      accessToken: 'mock-jwt-token-google',
+      account: {
+        id: 'user-google-1',
+        displayName: 'Google User',
+        email: 'google@stm.dev',
+        roles: ['driver'],
+      },
     });
   });
 
@@ -530,16 +541,16 @@ describe('Authentication Flow: Comprehensive Unit Test Suite', () => {
   });
 
   // =========================================================================
-  // CASE 11: Google Sign-in Fallback Notice
+  // CASE 11: Google Sign-in Flow
   // =========================================================================
-  describe('Case 11: Google Sign-in Fallback Notice', () => {
-    it('displays notice when user attempts to log in with Google', async () => {
-      const { getByText, getByLabelText } = await renderScreen(<LoginScreen />);
+  describe('Case 11: Google Sign-in Flow', () => {
+    it('authenticates via Google Sign-in and redirects to home', async () => {
+      const { getByLabelText } = await renderScreen(<LoginScreen />);
 
       await fireEvent.press(getByLabelText('Đăng nhập với Google'));
 
       await waitFor(() => {
-        expect(getByText('Đăng nhập Google hiện chưa khả dụng trên ứng dụng di động.')).toBeTruthy();
+        expect(mockReplace).toHaveBeenCalledWith('/');
       });
     });
   });

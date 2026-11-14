@@ -105,13 +105,16 @@ function useResolvedAddress(
 
   useEffect(() => {
     if (initialName && !isGenericPlaceholder(initialName)) {
-      setAddress({ title: initialName });
+      setAddress((prev) => (prev.title === initialName ? prev : { title: initialName }));
       return;
     }
     if (!coord || !coordKey) return;
 
     if (locationTitleCache.has(coordKey)) {
-      setAddress(locationTitleCache.get(coordKey)!);
+      setAddress((prev) => {
+        const cached = locationTitleCache.get(coordKey)!;
+        return prev.title === cached.title && prev.subtitle === cached.subtitle ? prev : cached;
+      });
       return;
     }
 

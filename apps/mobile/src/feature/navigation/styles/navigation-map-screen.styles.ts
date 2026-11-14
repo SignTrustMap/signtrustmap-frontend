@@ -194,8 +194,9 @@ export const styles = StyleSheet.create({
   mapActions: {
     position: 'absolute',
     right: Spacing.four,
-    bottom: Spacing.four,
+    bottom: Spacing.three,
     gap: Spacing.one,
+    zIndex: 20,
   },
   mapActionButton: {
     width: 50,
@@ -746,7 +747,6 @@ export const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: Spacing.one,
     flexWrap: 'wrap',
-    paddingLeft: Spacing.two,
   },
   headerTimeDistanceGroup: {
     flexDirection: 'row',
@@ -793,7 +793,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: 0,
     minHeight: 46,
     position: 'relative',
     borderRadius: 0,
@@ -931,7 +931,6 @@ export const styles = StyleSheet.create({
   sheetBottomButtonRow: {
     borderTopWidth: 1,
     paddingTop: Spacing.two,
-    paddingBottom: Spacing.two,
     marginTop: 'auto',
     flexDirection: 'row',
     alignItems: 'center',

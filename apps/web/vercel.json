@@ -1,5 +1,36 @@
 {
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Gateway-Proxied",
+          "value": "signtrust-vercel-gateway"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://api.signmap.site/api/v1/:path*"
+    },
+    {
+      "source": "/ai/:path*",
+      "destination": "https://ai.signmap.site/:path*"
+    },
+    {
+      "source": "/storage/:path*",
+      "destination": "https://s3.signmap.site/:path*"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
