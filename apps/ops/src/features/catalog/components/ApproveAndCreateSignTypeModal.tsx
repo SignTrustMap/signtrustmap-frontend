@@ -59,14 +59,9 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
   // Populate initial values when report changes
   useEffect(() => {
     if (report) {
-      // Suggest sign code from label or ID
-      const suggestedCode = report.tempLabel.match(/^[A-Z]\.[0-9a-z]+/i)
-        ? report.tempLabel.match(/^[A-Z]\.[0-9a-z]+/i)![0].toUpperCase()
-        : `NEW_${report.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()}`
-
-      setSignCode(suggestedCode)
-      setNameVi(report.tempLabel)
-      setNameEn(report.clipPrompt || report.tempLabel)
+      setSignCode('')
+      setNameVi('')
+      setNameEn('')
       setDescription(
         report.reporterNote
           ? `Biển báo giao thông theo phản ánh thực địa: ${report.reporterNote}. Chuẩn quy chuẩn kỹ thuật QCVN 41:2019/BGTVT.`
@@ -138,6 +133,7 @@ export const ApproveAndCreateSignTypeModal: React.FC<ApproveAndCreateSignTypeMod
       description: description.trim(),
       aiLabelPrompt: aiLabelPrompt.trim(),
       staffNotes: staffNotes.trim(),
+      allowedVehicles: ['CAR', 'MOTORCYCLE', 'TRUCK', 'BUS', 'BICYCLE'],
     }
 
     await onSubmit(payload, triggerReprocess)

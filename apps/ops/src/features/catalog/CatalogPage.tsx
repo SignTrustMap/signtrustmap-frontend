@@ -27,6 +27,7 @@ import { CatalogDetailModal, type CategoryMeta } from './components/CatalogDetai
 import { CreateSignModal } from './components/CreateSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
 import { CatalogTableView } from './components/CatalogTableView'
+import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 
 /**
  * Maps NestJS backend CatalogSignType entity to UI-consumable CatalogEntry.
@@ -61,9 +62,9 @@ function mapBackendSignTypeToEntry(s: CatalogSignTypeItem): CatalogEntry {
     standardRef: 'QCVN 41:2019/BGTVT',
     status: s.isActive ? 'Active' : 'Deprecated',
     version: 'v2.5',
-    imageUrl: s.representativeImageKey || undefined,
-    representativeImageKey: s.representativeImageKey || undefined,
-    allowedVehicles: (s as any).allowedVehicles,
+    imageUrl: resolveImageUrl(s.representativeImageKey, s.signCode) || undefined,
+    representativeImageKey: resolveImageUrl(s.representativeImageKey, s.signCode) || undefined,
+    allowedVehicles: (s.allowedVehicles || (s as any).allowed_vehicles || undefined) as any,
   }
 }
 

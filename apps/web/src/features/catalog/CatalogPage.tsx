@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { CatalogDetailModal, type CategoryMeta } from './components/CatalogDetailModal'
 import { ProposeSignModal } from './components/ProposeSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
+import { resolveImageUrl } from '@/features/product/utils/signUrlHelpers'
 
 /**
  * Resolves visual badge styling for standard category codes.
@@ -116,7 +117,12 @@ export default function CatalogPage() {
     ])
       .then(([cats, signsRes]) => {
         setCategories(cats || [])
-        setSigns(signsRes.items || [])
+        const rawItems = signsRes?.items || []
+        const normalized = rawItems.map((s) => ({
+          ...s,
+          representativeImageKey: resolveImageUrl(s.representativeImageKey, s.signCode),
+        }))
+        setSigns(normalized)
       })
       .catch((err: any) => {
         console.error('[CatalogPage] Failed to fetch catalog data:', err)

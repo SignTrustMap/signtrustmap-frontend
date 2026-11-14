@@ -6,6 +6,7 @@ import {
   Check,
   Sparkle,
   FloppyDisk,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import type { ActiveLearningStrategiesResponse } from '@/api/services/aiops.service'
 
@@ -20,6 +21,7 @@ interface ActiveLearningTabProps {
   uncertaintyMargin: string
   setUncertaintyMargin: React.Dispatch<React.SetStateAction<string>>
   onSave: () => void
+  isSaving?: boolean
 }
 
 export function ActiveLearningTab({
@@ -33,6 +35,7 @@ export function ActiveLearningTab({
   uncertaintyMargin,
   setUncertaintyMargin,
   onSave,
+  isSaving = false,
 }: ActiveLearningTabProps) {
   const { t } = useTranslation('ops')
 
@@ -105,7 +108,16 @@ export function ActiveLearningTab({
               {/* Dropdown Menu */}
               {strategyDropdownOpen && (
                 <div className="absolute left-0 top-full mt-1 w-full bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-xl shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-                  {(strategiesData?.strategies || ['least_confidence']).map((s) => {
+                  {Array.from(
+                    new Set(
+                      [
+                        ...(strategiesData?.strategies || []),
+                        strategiesData?.default_strategy,
+                        'r3_cec',
+                        'least_confidence',
+                      ].filter(Boolean) as string[]
+                    )
+                  ).map((s) => {
                     const isSelected = selectedStrategy === s
                     return (
                       <div
@@ -233,16 +245,21 @@ export function ActiveLearningTab({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-white/10">
           <span className="text-xs font-mono text-emerald-600 flex items-center gap-1.5">
             <Sparkle size={14} weight="fill" />
-            {t('mlops.al_active_strategy_prefix')} {selectedStrategy} ({selectedAggregation}) • Top {topK}
+            {t('mlops.al_active_strategy_prefix')} {selectedStrategy} • {selectedAggregation} • Top {topK}
           </span>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={isSaving}
               onClick={onSave}
-              className="px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
             >
-              <FloppyDisk size={16} weight="bold" />
+              {isSaving ? (
+                <CircleNotch size={16} className="animate-spin" />
+              ) : (
+                <FloppyDisk size={16} weight="bold" />
+              )}
               <span>{t('mlops.al_btn_save')}</span>
             </button>
           </div>

@@ -104,6 +104,14 @@ function mapBackendTaskToRevalidation(t: RevalidationTaskItem): ExtendedRevalida
     freshnessScore: t.freshness_score ?? t.freshnessScore,
     rewardCredits,
     submittedEvidenceCount,
+    assignedSurveyor:
+      t.assignedSurveyor ||
+      t.surveyorName ||
+      t.surveyor?.fullName ||
+      t.evidences?.[0]?.surveyorName ||
+      t.evidences?.[0]?.surveyor?.fullName ||
+      t.evidences?.[0]?.surveyor_name ||
+      undefined,
     origImageUrl,
     rawBackendItem: t,
   };
@@ -1073,10 +1081,12 @@ export default function TasksPage() {
                           <span className="font-semibold text-gray-800 dark:text-gray-200">
                             {t('tasks.lbl_submitted_by')}{' '}
                             <span className="font-bold text-[#007b8b] dark:text-[#00c4de]">
-                              {latestEvidence.surveyor_name ||
+                              {latestEvidence.surveyor?.fullName ||
+                                latestEvidence.surveyorName ||
+                                latestEvidence.surveyor_name ||
                                 (latestEvidence.userId
                                   ? `Surveyor #${latestEvidence.userId.slice(0, 8)}`
-                                  : 'Surveyor #148')}
+                                  : 'Người khảo sát')}
                             </span>
                           </span>
                           <span className="font-mono font-bold text-amber-600 dark:text-amber-400">

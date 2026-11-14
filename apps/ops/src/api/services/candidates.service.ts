@@ -14,6 +14,11 @@ export interface PredictedSignTypeDto {
 export interface CandidateSubmissionDto {
   surveyor_id?: string
   surveyorId?: string
+  surveyor_name?: string | null
+  surveyorName?: string | null
+  surveyor_email?: string | null
+  surveyorEmail?: string | null
+  surveyor?: { id?: string; fullName?: string; email?: string | null } | null
   captured_at?: string
   createdAt?: string
   submission_type?: string
@@ -48,6 +53,11 @@ export interface ReviewCandidateDto {
   predictedSignType?: PredictedSignTypeDto
   submission?: CandidateSubmissionDto
   locationContext?: CandidateLocationContextDto | null
+  surveyorId?: string | null
+  surveyorName?: string | null
+  surveyor?: { id?: string; fullName?: string; email?: string | null } | null
+  reviews?: any[]
+  recaptures?: any[]
 }
 
 export interface CandidateDetailResponse {

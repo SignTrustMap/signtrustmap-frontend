@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   X,
-  Copy,
-  Check,
   CircleNotch,
 } from '@phosphor-icons/react'
 import { useToast } from '@/context/ToastContext'
@@ -13,9 +11,9 @@ import type { CatalogCategory, CatalogEntry } from '@/data/catalogData'
 import {
   catalogService,
   type CatalogSignTypeItem,
-  type SignCategoryItem,
+  type VehicleType,
 } from '@/api/services/catalog.service'
-import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
+import { resolveImageUrl, normalizeSignCodeCase } from '@/features/map/utils/signUrlHelpers'
 import { TrafficSignGraphic } from './TrafficSignGraphic'
 
 export interface CategoryMeta {
@@ -33,7 +31,7 @@ export interface CatalogDetailModalProps {
   onToggleStatus: (signId: string) => void
   /** Optional callback fired when sign data is updated. */
   onSignUpdated?: (updatedSign: CatalogEntry) => void
-  /** Returns category visual metadata (badge style, label, dot indicator). */
+  /** Returns category visual metadata. */
   getCategoryMeta: (cat: string) => CategoryMeta
   /** Resolves primary localized sign name based on current language. */
   getSignPrimaryName: (sign: CatalogEntry) => string
@@ -49,24 +47,41 @@ export interface CatalogDetailModalProps {
   renderColorPill: (color: string) => React.ReactNode
 }
 
-/** Standard geometric shapes mapped to natural Vietnamese labels without parentheses */
-const SHAPE_OPTIONS = [
-  { value: 'TRIANGLE', label: 'Hình tam giác' },
-  { value: 'CIRCLE', label: 'Hình tròn' },
-  { value: 'RECTANGLE', label: 'Hình chữ nhật' },
-  { value: 'OCTAGON', label: 'Hình bát giác' },
-  { value: 'DIAMOND', label: 'Hình thoi' },
-  { value: 'INVERTED_TRIANGLE', label: 'Hình tam giác ngược' },
-]
+function getPrefixForCatalogCategory(cat: CatalogCategory): string {
+  switch (cat) {
+    case 'prohibitory':
+    case 'speed_limit':
+      return 'P.'
+    case 'warning':
+      return 'W.'
+    case 'mandatory':
+      return 'R.'
+    case 'guide':
+      return 'I.'
+    case 'additional':
+      return 'S.'
+    default:
+      return 'P.'
+  }
+}
 
-/** Standard color schemes mapped to natural Vietnamese labels without parentheses */
-const COLOR_OPTIONS = [
-  { value: 'RED_WHITE', label: 'Đỏ - Trắng' },
-  { value: 'RED_YELLOW', label: 'Đỏ - Vàng' },
-  { value: 'YELLOW_BLACK', label: 'Vàng - Đen' },
-  { value: 'BLUE_WHITE', label: 'Xanh dương - Trắng' },
-  { value: 'GREEN_WHITE', label: 'Xanh lá - Trắng' },
-  { value: 'WHITE_BLACK', label: 'Trắng - Đen' },
+function splitSignCode(code?: string): { prefix: string; number: string } {
+  if (!code) return { prefix: 'P.', number: '' }
+  const clean = normalizeSignCodeCase(code)
+  const match = clean.match(/^([A-Za-z]+)\.?([0-9]+[a-zA-Z]*)$/)
+  if (match) {
+    return { prefix: `${match[1].toUpperCase()}.`, number: match[2] }
+  }
+  return { prefix: 'P.', number: clean }
+}
+
+const CATEGORY_OPTIONS: Array<{ value: CatalogCategory; label: string; id: number }> = [
+  { value: 'prohibitory', label: 'Biển báo cấm', id: 1 },
+  { value: 'warning', label: 'Biển báo nguy hiểm', id: 2 },
+  { value: 'mandatory', label: 'Biển hiệu lệnh', id: 3 },
+  { value: 'speed_limit', label: 'Biển giới hạn tốc độ', id: 1 },
+  { value: 'guide', label: 'Biển chỉ dẫn', id: 4 },
+  { value: 'additional', label: 'Biển phụ', id: 5 },
 ]
 
 const CATEGORY_MAP: Record<string, number> = {
@@ -78,52 +93,15 @@ const CATEGORY_MAP: Record<string, number> = {
   additional: 5,
 }
 
-const CATEGORY_ID_TO_KEY: Record<number, CatalogCategory> = {
-  1: 'prohibitory',
-  2: 'warning',
-  3: 'mandatory',
-  4: 'guide',
-  5: 'additional',
-}
+const VEHICLE_OPTIONS: Array<{ value: VehicleType; labelVi: string }> = [
+  { value: 'CAR', labelVi: 'Ô tô' },
+  { value: 'MOTORCYCLE', labelVi: 'Xe máy' },
+  { value: 'TRUCK', labelVi: 'Xe tải' },
+  { value: 'BUS', labelVi: 'Xe buýt' },
+  { value: 'BICYCLE', labelVi: 'Xe đạp' },
+  { value: 'PEDESTRIAN', labelVi: 'Người đi bộ' },
+]
 
-/**
- * Normalizes backend shape strings to standard option keys so the select control
- * displays the original value accurately.
- */
-function normalizeShapeValue(val?: string | null): string {
-  if (!val) return 'CIRCLE'
-  const v = val.trim().toUpperCase().replace(/[-\s]/g, '_')
-  if (v.includes('TRIANGLE') && v.includes('INVERT')) return 'INVERTED_TRIANGLE'
-  if (v.includes('TRIANGLE')) return 'TRIANGLE'
-  if (v.includes('CIRCLE')) return 'CIRCLE'
-  if (v.includes('RECTANGLE') || v.includes('SQUARE')) return 'RECTANGLE'
-  if (v.includes('OCTAGON')) return 'OCTAGON'
-  if (v.includes('DIAMOND') || v.includes('RHOMBUS')) return 'DIAMOND'
-  return 'CIRCLE'
-}
-
-/**
- * Normalizes backend color_scheme strings to standard option keys so the select control
- * displays the original value accurately.
- */
-function normalizeColorValue(val?: string | null): string {
-  if (!val) return 'RED_WHITE'
-  const v = val.trim().toUpperCase().replace(/[-\s]/g, '_')
-  if (v.includes('RED') && v.includes('YELLOW')) return 'RED_YELLOW'
-  if (v.includes('YELLOW') && v.includes('BLACK')) return 'YELLOW_BLACK'
-  if (v.includes('RED') && v.includes('WHITE')) return 'RED_WHITE'
-  if (v.includes('BLUE') && v.includes('WHITE')) return 'BLUE_WHITE'
-  if (v.includes('GREEN') && v.includes('WHITE')) return 'GREEN_WHITE'
-  if (v.includes('WHITE') && v.includes('BLACK')) return 'WHITE_BLACK'
-  if (v.includes('BLACK') && v.includes('WHITE')) return 'WHITE_BLACK'
-  return 'RED_WHITE'
-}
-
-/**
- * Direct In-Place Editable Traffic Sign Detail Modal.
- * Redesigned for clean aesthetics, zero unnecessary icons, natural terminology,
- * and escalation-style image management.
- */
 export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
   sign,
   onClose,
@@ -133,61 +111,64 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
   const isAdmin = user?.role === 'admin'
   const toast = useToast()
 
-  // Copy status
-  const [copiedCode, setCopiedCode] = useState(false)
-  const [copiedPrompt, setCopiedPrompt] = useState(false)
-  const [copiedOsm, setCopiedOsm] = useState(false)
-
-  // Direct editable backend fields
-  const [editCode, setEditCode] = useState('')
-  const [editNameVi, setEditNameVi] = useState('')
-  const [editNameEn, setEditNameEn] = useState('')
-  const [editCategoryId, setEditCategoryId] = useState<number>(1)
-  const [editShape, setEditShape] = useState('CIRCLE')
-  const [editColor, setEditColor] = useState('RED_WHITE')
-  const [editDescription, setEditDescription] = useState('')
-  const [editAiPrompt, setEditAiPrompt] = useState('')
-  const [editOsmMapping, setEditOsmMapping] = useState('')
+  // Form states
+  const [codePrefix, setCodePrefix] = useState('P.')
+  const [codeNumber, setCodeNumber] = useState('')
+  const [newNameVi, setNewNameVi] = useState('')
+  const [newNameEn, setNewNameEn] = useState('')
+  const [newCategory, setNewCategory] = useState<CatalogCategory>('prohibitory')
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>([])
   const [editStatus, setEditStatus] = useState<'Active' | 'Deprecated'>('Active')
 
-  // Image editing (escalation style)
+  // Image states
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string>('')
-  const [customImageUrl, setCustomImageUrl] = useState<string>('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [imagePreview, setImagePreview] = useState('')
   const [showUrlInput, setShowUrlInput] = useState(false)
+  const [imageError, setImageError] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const objectUrlRef = useRef<string | null>(null)
 
-  // Backend categories
-  const [categories, setCategories] = useState<SignCategoryItem[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Baseline vehicle types for the given sign
+  const initialAllowedVehicles = useMemo<VehicleType[]>(() => {
+    if (Array.isArray(sign?.allowedVehicles) && sign.allowedVehicles.length > 0) {
+      return [...sign.allowedVehicles]
+    }
+    return VEHICLE_OPTIONS.map((v) => v.value)
+  }, [sign])
+
+  const initialImg = useMemo(() => {
+    if (!sign) return ''
+    return resolveImageUrl(sign.representativeImageKey || sign.imageUrl, sign.code)
+  }, [sign])
 
   // Sync state accurately with current sign on open
   useEffect(() => {
     if (!sign) return
-    setEditCode(sign.code)
-    setEditNameVi(sign.nameVi || sign.name || '')
-    setEditNameEn(sign.nameEn || '')
-    setEditCategoryId(sign.categoryId || CATEGORY_MAP[sign.category] || 1)
-    setEditShape(normalizeShapeValue(sign.shape))
-    setEditColor(normalizeColorValue(sign.color))
-    setEditDescription(sign.descriptionVi || sign.description || '')
-    setEditAiPrompt(sign.aiPrompt || sign.clipPrompt || '')
-    setEditOsmMapping(sign.osmMapping || '')
+    const { prefix, number } = splitSignCode(sign.code)
+    setCodePrefix(prefix)
+    setCodeNumber(number)
+    setNewNameVi(sign.nameVi || sign.name || '')
+    setNewNameEn(sign.nameEn || '')
+    setNewCategory((sign.category as CatalogCategory) || 'prohibitory')
+    setAllowedVehicles(initialAllowedVehicles)
     setEditStatus(sign.status === 'Active' ? 'Active' : 'Deprecated')
 
-    // Reset image state
+    // Reset image states
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current)
       objectUrlRef.current = null
     }
     setImageFile(null)
+    setImageUrl('')
     setShowUrlInput(false)
-    setCustomImageUrl('')
+    setImageError('')
 
-    const initialImg = resolveImageUrl(sign.representativeImageKey || sign.imageUrl)
-    setImagePreview(initialImg)
-  }, [sign])
+    const resolved = resolveImageUrl(sign.representativeImageKey || sign.imageUrl, sign.code)
+    setImagePreview(resolved)
+  }, [sign, initialAllowedVehicles])
 
   // Clean up object URL on unmount
   useEffect(() => {
@@ -198,180 +179,184 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
     }
   }, [])
 
-  // Load backend categories
-  useEffect(() => {
-    let isMounted = true
-    catalogService
-      .getCategories()
-      .then((cats) => {
-        if (!isMounted) return
-        const cleanCats = (cats || []).filter(
-          (c) =>
-            !c.code?.toLowerCase().includes('mock') &&
-            !c.nameVi?.toLowerCase().includes('mock')
-        )
-        setCategories(cleanCats)
-      })
-      .catch((err) => {
-        console.warn('Could not load categories in detail modal:', err)
-      })
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const sanitizedNumber = codeNumber.trim().replace(/^[A-Za-z]+\./, '')
+  const rawFullCode = `${codePrefix}${sanitizedNumber}`
+  const cleanCode = normalizeSignCodeCase(rawFullCode)
 
-  if (!sign) return null
-
-  const numericId = parseInt(sign.id.replace(/\D/g, ''), 10)
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(editCode || sign.code)
-    setCopiedCode(true)
-    toast.success('Đã sao chép mã biển')
-    setTimeout(() => setCopiedCode(false), 2000)
-  }
-
-  const handleCopyPrompt = () => {
-    const text = editAiPrompt || sign.aiPrompt || sign.clipPrompt || ''
-    if (!text) return
-    navigator.clipboard.writeText(text)
-    setCopiedPrompt(true)
-    toast.success('Đã sao chép mô tả nhận diện')
-    setTimeout(() => setCopiedPrompt(false), 2000)
-  }
-
-  const handleCopyOsm = () => {
-    const text = editOsmMapping || sign.osmMapping || ''
-    if (!text) return
-    navigator.clipboard.writeText(text)
-    setCopiedOsm(true)
-    toast.success('Đã sao chép mã OpenStreetMap')
-    setTimeout(() => setCopiedOsm(false), 2000)
-  }
-
-  // Handle file selection (SVG or PNG, max 20MB - identical to escalation proposal)
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error('Dung lượng tệp vượt quá giới hạn tối đa 20MB')
-      return
+    if (file) {
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error('Dung lượng tệp vượt quá giới hạn tối đa 20MB')
+        return
+      }
+      setImageFile(file)
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+      const newUrl = URL.createObjectURL(file)
+      objectUrlRef.current = newUrl
+      setImagePreview(newUrl)
+      setImageUrl('')
+      setImageError('')
     }
-
-    const validTypes = ['image/svg+xml', 'image/png']
-    const isSvg = file.name.toLowerCase().endsWith('.svg')
-    const isPng = file.name.toLowerCase().endsWith('.png')
-    if (!validTypes.includes(file.type) && !isSvg && !isPng) {
-      toast.error('Chỉ chấp nhận tệp đồ họa quy chuẩn định dạng SVG hoặc PNG')
-      return
-    }
-
-    setImageFile(file)
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current)
-    }
-    const newUrl = URL.createObjectURL(file)
-    objectUrlRef.current = newUrl
-    setImagePreview(newUrl)
-    setCustomImageUrl('')
-    setShowUrlInput(false)
   }
 
-  // Revert back to original sign image
-  const handleRemoveFile = () => {
+  const handleUrlChange = (val: string) => {
+    setImageUrl(val)
+    setImagePreview(val.trim())
+    if (val.trim()) setImageError('')
+  }
+
+  const handleClearImage = () => {
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current)
       objectUrlRef.current = null
     }
     setImageFile(null)
-    setCustomImageUrl('')
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    setImagePreview(resolveImageUrl(sign.representativeImageKey || sign.imageUrl))
-  }
-
-  const handleApplyUrl = (url: string) => {
-    setCustomImageUrl(url)
-    if (url.trim()) {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current)
-        objectUrlRef.current = null
-      }
-      setImageFile(null)
-      setImagePreview(url.trim())
+    setImageUrl('')
+    if (sign) {
+      setImagePreview(resolveImageUrl(sign.representativeImageKey || sign.imageUrl, sign.code))
+    } else {
+      setImagePreview('')
     }
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handleToggleStatusState = () => {
-    setEditStatus((prev) => (prev === 'Active' ? 'Deprecated' : 'Active'))
-  }
+  // Check whether any value has been modified compared to initial
+  const isDirty = useMemo(() => {
+    if (!sign) return false
+
+    const initialCode = normalizeSignCodeCase(sign.code || '')
+    if (cleanCode !== initialCode) return true
+
+    const initialNameVi = (sign.nameVi || sign.name || '').trim()
+    if (newNameVi.trim() !== initialNameVi) return true
+
+    const initialNameEn = (sign.nameEn || '').trim()
+    if (newNameEn.trim() !== initialNameEn) return true
+
+    const initialCat = (sign.category as CatalogCategory) || 'prohibitory'
+    if (newCategory !== initialCat) return true
+
+    const initialStatus = sign.status === 'Active' ? 'Active' : 'Deprecated'
+    if (editStatus !== initialStatus) return true
+
+    if (imageFile !== null) return true
+    if (imageUrl.trim() !== '' && imageUrl.trim() !== (sign.representativeImageKey || sign.imageUrl || '').trim()) {
+      return true
+    }
+
+    const sortedCurrent = [...allowedVehicles].sort()
+    const sortedInitial = [...initialAllowedVehicles].sort()
+    if (
+      sortedCurrent.length !== sortedInitial.length ||
+      !sortedCurrent.every((v, i) => v === sortedInitial[i])
+    ) {
+      return true
+    }
+
+    return false
+  }, [
+    sign,
+    cleanCode,
+    newNameVi,
+    newNameEn,
+    newCategory,
+    editStatus,
+    imageFile,
+    imageUrl,
+    allowedVehicles,
+    initialAllowedVehicles,
+  ])
+
+  if (!sign) return null
+
+  const numericId = parseInt(sign.id.replace(/\D/g, ''), 10)
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editCode.trim() || !editNameVi.trim()) {
-      toast.error('Vui lòng điền đầy đủ mã biển và tên tiếng Việt')
+    if (!codeNumber.trim()) {
+      toast.error('Vui lòng nhập số hiệu biển')
+      return
+    }
+    if (!newNameVi.trim()) {
+      toast.error('Vui lòng điền tên tiếng Việt')
+      return
+    }
+    if (allowedVehicles.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một loại phương tiện áp dụng')
       return
     }
 
     setIsSubmitting(true)
     try {
       let updatedSignBackend: CatalogSignTypeItem | undefined
+      const categoryId = sign.categoryId || CATEGORY_MAP[newCategory] || 1
+      const isCodeChanged = cleanCode !== normalizeSignCodeCase(sign.code || '')
 
       if (!isNaN(numericId)) {
         if (imageFile) {
           const formData = new FormData()
-          formData.append('signCode', editCode.trim().toUpperCase())
-          formData.append('nameVi', editNameVi.trim())
-          formData.append('nameEn', editNameEn.trim())
-          formData.append('categoryId', String(editCategoryId))
-          formData.append('shape', editShape)
-          formData.append('colorScheme', editColor)
-          formData.append('description', editDescription.trim())
-          formData.append('aiLabelPrompt', editAiPrompt.trim())
-          formData.append('osmMapping', editOsmMapping.trim())
+          if (isCodeChanged) {
+            formData.append('signCode', cleanCode)
+          }
+          formData.append('nameVi', newNameVi.trim())
+          formData.append('nameEn', newNameEn.trim())
+          formData.append('categoryId', String(categoryId))
+          formData.append('shape', sign.shape || 'Circle')
+          formData.append('colorScheme', sign.color || 'Red-White')
           formData.append('isActive', String(editStatus === 'Active'))
+          formData.append('allowedVehicles', JSON.stringify(allowedVehicles))
+          if (sign.descriptionVi || sign.description) {
+            formData.append('description', (sign.descriptionVi || sign.description || '').trim())
+          }
+          if (sign.aiPrompt) {
+            formData.append('aiLabelPrompt', sign.aiPrompt.trim())
+          }
+          if (sign.osmMapping) {
+            formData.append('osmMapping', sign.osmMapping.trim())
+          }
           formData.append('file', imageFile)
 
           updatedSignBackend = await catalogService.updateSignType(numericId, formData)
         } else {
-          updatedSignBackend = await catalogService.updateSignType(numericId, {
-            signCode: editCode.trim().toUpperCase(),
-            nameVi: editNameVi.trim(),
-            nameEn: editNameEn.trim(),
-            categoryId: editCategoryId,
-            shape: editShape,
-            colorScheme: editColor,
-            description: editDescription.trim(),
-            aiLabelPrompt: editAiPrompt.trim(),
-            osmMapping: editOsmMapping.trim(),
+          const updatePayload: any = {
+            nameVi: newNameVi.trim(),
+            nameEn: newNameEn.trim(),
+            categoryId,
+            shape: sign.shape || 'Circle',
+            colorScheme: sign.color || 'Red-White',
             isActive: editStatus === 'Active',
-            representativeImageKey: customImageUrl.trim() || undefined,
-          })
+            allowedVehicles,
+            description: sign.descriptionVi || sign.description,
+            aiLabelPrompt: sign.aiPrompt,
+            osmMapping: sign.osmMapping,
+            representativeImageKey: imageUrl.trim() || undefined,
+          }
+          if (isCodeChanged) {
+            updatePayload.signCode = cleanCode
+          }
+          updatedSignBackend = await catalogService.updateSignType(numericId, updatePayload)
         }
       }
 
-      const resolvedCategory = CATEGORY_ID_TO_KEY[editCategoryId] || sign.category
       const resolvedImg =
         updatedSignBackend?.representativeImageKey ||
+        (imageUrl.trim() ? imageUrl.trim() : undefined) ||
         imagePreview ||
         sign.imageUrl
 
       const updatedEntry: CatalogEntry = {
         ...sign,
-        code: editCode.trim().toUpperCase(),
-        name: editNameVi.trim(),
-        nameVi: editNameVi.trim(),
-        nameEn: editNameEn.trim(),
-        category: resolvedCategory,
-        shape: editShape as any,
-        color: editColor,
-        description: editDescription.trim() || sign.description,
-        descriptionVi: editDescription.trim() || sign.descriptionVi,
-        descriptionEn: editNameEn.trim() || sign.descriptionEn,
-        aiPrompt: editAiPrompt.trim() || sign.aiPrompt,
-        clipPrompt: editAiPrompt.trim() || sign.clipPrompt,
-        osmMapping: editOsmMapping.trim() || sign.osmMapping,
+        code: cleanCode,
+        name: newNameVi.trim() || newNameEn.trim(),
+        nameVi: newNameVi.trim() || cleanCode,
+        nameEn: newNameEn.trim() || newNameVi.trim(),
+        category: newCategory,
+        categoryId,
         status: editStatus,
+        allowedVehicles,
         imageUrl: resolvedImg,
         representativeImageKey: resolvedImg,
       }
@@ -387,21 +372,6 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
     }
   }
 
-  // Category options
-  const categoryOptions =
-    categories.length > 0
-      ? categories.map((c) => ({
-          value: String(c.id),
-          label: c.nameVi,
-        }))
-      : [
-          { value: '1', label: 'Biển báo cấm' },
-          { value: '2', label: 'Biển báo nguy hiểm' },
-          { value: '3', label: 'Biển hiệu lệnh' },
-          { value: '4', label: 'Biển chỉ dẫn' },
-          { value: '5', label: 'Biển phụ' },
-        ]
-
   return (
     <ModalPortal>
       <div
@@ -412,40 +382,13 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-[920px] w-full shadow-2xl animate-in zoom-in-95 my-auto max-h-[92vh] flex flex-col overflow-hidden text-xs text-gray-800 dark:text-gray-200 text-left"
+          className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-4xl w-full shadow-2xl relative my-auto max-h-[92vh] flex flex-col overflow-hidden text-xs text-gray-800 dark:text-gray-200 text-left"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 transition-colors cursor-pointer"
-                title="Sao chép mã biển"
-              >
-                <span>#{editCode || sign.code}</span>
-                {copiedCode ? (
-                  <Check size={12} className="text-emerald-500" />
-                ) : (
-                  <Copy size={12} className="text-gray-400" />
-                )}
-              </button>
-              <span className="text-gray-300 dark:text-gray-600">•</span>
-              <span className="font-semibold text-gray-900 dark:text-white truncate max-w-[260px] sm:max-w-md">
-                {editNameVi || sign.nameVi}
-              </span>
-              <span className="text-gray-300 dark:text-gray-600">•</span>
-              <span
-                className={`font-semibold ${
-                  editStatus === 'Active'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-amber-600 dark:text-amber-400'
-                }`}
-              >
-                {editStatus === 'Active' ? 'Hoạt động' : 'Ngừng áp dụng'}
-              </span>
-            </div>
-
+            <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
+              {isAdmin ? 'Cập nhật biển báo' : 'Chi tiết biển báo'}
+            </h3>
             <button
               type="button"
               onClick={onClose}
@@ -456,78 +399,85 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
             </button>
           </div>
 
-          {/* Modal Body */}
-          <form id="catalog-sign-form" onSubmit={handleUpdate} className="p-5 sm:p-6 overflow-y-auto flex-1 text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-              {/* ─── CỘT TRÁI: Ảnh đại diện & Nhóm biển (5 cols) ─── */}
-              <div className="md:col-span-5 flex flex-col gap-4">
-                {/* Khung ảnh đại diện (Đúng chuẩn Escalation Catalog Proposal) */}
-                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] flex flex-col gap-3 shadow-2xs">
-                  <div className="text-xs font-bold text-gray-900 dark:text-white shrink-0">
-                    Ảnh đại diện biển báo
+          {/* Form Content */}
+          <form id="catalog-sign-form" onSubmit={handleUpdate} className="p-5 overflow-y-auto flex-1 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+              {/* ─── CỘT TRÁI: ẢNH ĐẠI DIỆN (5 cols) ───── */}
+              <div className="md:col-span-5 flex flex-col h-full">
+                <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] flex flex-col h-full justify-between gap-3 shadow-2xs">
+                  <div className="text-[11px] font-bold text-gray-900 dark:text-white shrink-0">
+                    Ảnh đại diện biển báo <span className="text-red-500">*</span>
                   </div>
 
-                  {/* Vùng hiển thị ảnh */}
-                  <div className="relative min-h-[220px] rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 overflow-hidden flex items-center justify-center shadow-xs">
-                    {imagePreview ? (
+                  {/* Khung ảnh xem trước */}
+                  <div className="relative flex-1 min-h-[220px] rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/40 overflow-hidden flex items-center justify-center shadow-xs">
+                    {imageFile ? (
                       <img
                         src={imagePreview}
-                        alt="Ảnh đại diện"
-                        className="w-full h-full object-contain p-3 max-h-[240px]"
+                        alt="Ảnh mới tải lên"
+                        className="w-full h-full object-contain p-2 max-h-[220px]"
+                      />
+                    ) : imageUrl.trim() ? (
+                      <img
+                        src={imageUrl.trim()}
+                        alt="Ảnh từ URL"
+                        className="w-full h-full object-contain p-2 max-h-[220px]"
+                        onError={() => setImageError('Không thể tải ảnh từ URL đã nhập')}
                       />
                     ) : (
                       <TrafficSignGraphic
                         sign={{
-                          ...sign,
-                          code: editCode,
-                          imageUrl: imagePreview || sign.imageUrl,
-                          shape: editShape as any,
-                          color: editColor,
+                          code: sign.code,
+                          nameVi: sign.nameVi || sign.name,
+                          name: sign.nameEn,
+                          imageUrl: initialImg,
+                          shape: sign.shape,
+                          color: sign.color,
                         }}
-                        className="w-full h-full object-contain p-3 drop-shadow-sm max-h-[240px]"
+                        className="w-full h-full object-contain p-2 max-h-[220px]"
                       />
                     )}
 
-                    {/* Badge trạng thái ảnh ở góc trên */}
-                    <div className="absolute top-2.5 left-2.5">
+                    {/* Badge text góc trên */}
+                    <div className="absolute top-2 left-2 pointer-events-none">
                       {imageFile ? (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-xs">
                           Ảnh mới tải lên
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-800/80 text-white backdrop-blur-xs">
-                          Ảnh hiện tại
+                          Ảnh đại diện
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Input tệp ẩn */}
+                  {/* Hidden file input */}
                   <input
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    accept=".svg,.png,image/svg+xml,image/png"
+                    accept=".svg,.png,image/svg+xml,image/png,image/jpeg,image/webp"
                     className="hidden"
                   />
 
-                  {/* Nút thao tác tải ảnh */}
+                  {/* Upload Controls */}
                   {isAdmin && (
                     <div className="space-y-2 shrink-0">
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/30 hover:bg-gray-100 dark:hover:bg-white/5 text-xs font-semibold text-gray-800 dark:text-gray-200 transition-colors cursor-pointer text-center shadow-2xs"
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/30 hover:bg-gray-100 dark:hover:bg-white/5 text-[11px] font-semibold text-gray-800 dark:text-gray-200 transition-colors cursor-pointer text-center shadow-2xs"
                         >
-                          {imageFile ? 'Đổi ảnh khác' : 'Tải ảnh từ máy'}
+                          {imageFile || imageUrl ? 'Đổi ảnh khác' : 'Tải ảnh từ máy'}
                         </button>
 
-                        {imageFile && (
+                        {(imageFile || imageUrl) && (
                           <button
                             type="button"
-                            onClick={handleRemoveFile}
-                            className="px-3 py-2 rounded-lg border border-red-300 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 hover:bg-red-100/90 dark:hover:bg-red-900/40 hover:border-red-400 text-xs font-semibold text-red-600 dark:text-red-400 transition-colors cursor-pointer text-center shrink-0 shadow-2xs"
+                            onClick={handleClearImage}
+                            className="px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 hover:bg-red-100/90 dark:hover:bg-red-900/40 hover:border-red-400 text-[11px] font-semibold text-red-600 dark:text-red-400 transition-colors cursor-pointer text-center shrink-0 shadow-2xs"
                           >
                             Dùng lại ảnh gốc
                           </button>
@@ -536,258 +486,238 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
 
                       <div className="flex items-center justify-between">
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-normal">
-                          Hỗ trợ định dạng SVG hoặc PNG, dung lượng tối đa 20MB.
+                          Hỗ trợ định dạng SVG hoặc PNG, tối đa 20MB
                         </p>
                         <button
                           type="button"
                           onClick={() => setShowUrlInput((prev) => !prev)}
                           className="text-[11px] text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer shrink-0 ml-1"
                         >
-                          {showUrlInput ? 'Ẩn URL' : 'Dùng liên kết URL'}
+                          {showUrlInput ? 'Ẩn URL' : 'Dùng URL'}
                         </button>
                       </div>
 
                       {showUrlInput && (
-                        <div className="pt-1">
-                          <input
-                            type="url"
-                            placeholder="https://domain.com/sign-image.png"
-                            value={customImageUrl}
-                            onChange={(e) => handleApplyUrl(e.target.value)}
-                            className="w-full px-3 py-1.5 bg-white dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white outline-none focus:border-[#007b8b]"
-                          />
-                        </div>
+                        <input
+                          type="url"
+                          placeholder="https://s3.signmap.site/stm-catalog-images/representative/..."
+                          value={imageUrl}
+                          onChange={(e) => handleUrlChange(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white outline-none focus:border-[#007b8b]"
+                        />
+                      )}
+
+                      {imageError && (
+                        <p className="text-xs text-red-500 font-semibold mt-1">
+                          ⚠ {imageError}
+                        </p>
                       )}
                     </div>
                   )}
                 </div>
-
-                {/* Nhóm biển báo */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
-                    Nhóm biển báo
-                  </label>
-                  {isAdmin ? (
-                    <CustomSelect
-                      value={String(editCategoryId)}
-                      onChange={(val) => setEditCategoryId(parseInt(val, 10))}
-                      className="w-full"
-                      buttonClassName="w-full text-xs font-semibold"
-                      options={categoryOptions}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      readOnly
-                      value={categoryOptions.find((c) => c.value === String(editCategoryId))?.label || 'Biển báo'}
-                      className="w-full px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300"
-                    />
-                  )}
-                </div>
-
-                {/* Nút chuyển trạng thái áp dụng */}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={handleToggleStatusState}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
-                      editStatus === 'Active'
-                        ? 'border-amber-300 text-amber-800 dark:border-amber-500/30 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10'
-                        : 'border-emerald-300 text-emerald-800 dark:border-emerald-500/30 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
-                    }`}
-                  >
-                    {editStatus === 'Active'
-                      ? 'Chuyển sang ngừng áp dụng'
-                      : 'Kích hoạt lại biển báo'}
-                  </button>
-                )}
               </div>
 
-              {/* ─── CỘT PHẢI: Thông tin biên tập chi tiết (7 cols) ─── */}
-              <div className="md:col-span-7 space-y-4">
-                {/* Khối 1: Thông tin cơ bản */}
-                <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-3">
-                  <div className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                    Thông tin biển báo
+              {/* ─── CỘT PHẢI: THÔNG SỐ (7 cols) ───── */}
+              <div className="md:col-span-7 flex flex-col gap-3">
+                {/* Hàng 1: Nhóm biển & Mã biển */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Nhóm biển <span className="text-red-500">*</span>
+                    </label>
+                    {isAdmin ? (
+                      <CustomSelect
+                        value={newCategory}
+                        onChange={(val) => {
+                          const nextCat = val as CatalogCategory
+                          setNewCategory(nextCat)
+                          setCodePrefix(getPrefixForCatalogCategory(nextCat))
+                        }}
+                        className="w-full"
+                        buttonClassName="w-full text-xs font-semibold"
+                        options={CATEGORY_OPTIONS}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        readOnly
+                        value={CATEGORY_OPTIONS.find((c) => c.value === newCategory)?.label || newCategory}
+                        className="w-full px-2.5 py-2 bg-gray-100 dark:bg-white/5 border border-gray-300 dark:border-white/15 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300"
+                      />
+                    )}
                   </div>
 
-                  {/* Mã biển báo */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
-                      Mã biển báo *
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Mã biển <span className="text-red-500">*</span>
+                    </label>
+
+                    {/* 2 ô: Tiền tố & Số hiệu */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative shrink-0">
+                        <input
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={codePrefix}
+                          title="Tiền tố tự động gán theo nhóm biển"
+                          className="w-16 sm:w-20 px-2.5 py-2 rounded-lg border text-center font-mono font-bold text-xs select-none outline-none transition-colors cursor-not-allowed border-gray-300 dark:border-white/15 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300"
+                        />
+                      </div>
+
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          required
+                          disabled={!isAdmin}
+                          value={codeNumber}
+                          onChange={(e) => setCodeNumber(e.target.value)}
+                          placeholder="127a hoặc 130"
+                          className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs placeholder:text-gray-400 outline-none transition-colors border-gray-300 dark:border-white/15 focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hàng 2: Tên tiếng Việt & Tên tiếng Anh */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Tên tiếng Việt <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       disabled={!isAdmin}
-                      value={editCode}
-                      onChange={(e) => setEditCode(e.target.value.toUpperCase())}
-                      placeholder="Ví dụ: P.102, W.201..."
-                      className="w-full sm:w-1/2 px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-mono font-bold text-xs uppercase text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b] disabled:opacity-60"
+                      value={newNameVi}
+                      onChange={(e) => setNewNameVi(e.target.value)}
+                      placeholder="Cấm dừng xe và đỗ xe"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 disabled:opacity-60"
                     />
                   </div>
 
-                  {/* Tên tiếng Việt */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
-                      Tên tiếng Việt *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      disabled={!isAdmin}
-                      value={editNameVi}
-                      onChange={(e) => setEditNameVi(e.target.value)}
-                      placeholder="Ví dụ: Cấm đi ngược chiều"
-                      className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-bold text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b] disabled:opacity-60"
-                    />
-                  </div>
-
-                  {/* Tên tiếng Anh */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
                       Tên tiếng Anh
                     </label>
                     <input
                       type="text"
                       disabled={!isAdmin}
-                      value={editNameEn}
-                      onChange={(e) => setEditNameEn(e.target.value)}
-                      placeholder="Ví dụ: No Entry"
-                      className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl font-medium text-xs text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b] disabled:opacity-60"
-                    />
-                  </div>
-
-                  {/* Mô tả chi tiết */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
-                      Mô tả chi tiết
-                    </label>
-                    <textarea
-                      rows={2}
-                      disabled={!isAdmin}
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      placeholder="Nhập mô tả ý nghĩa hoặc quy định áp dụng của biển báo..."
-                      className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-gray-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b] disabled:opacity-60"
+                      value={newNameEn}
+                      onChange={(e) => setNewNameEn(e.target.value)}
+                      placeholder="No Stopping and Parking"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 disabled:opacity-60"
                     />
                   </div>
                 </div>
 
-                {/* Khối 2: Hình dạng & Màu sắc */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
-                      Hình dạng
+                {/* Hàng 3: Phương tiện áp dụng */}
+                <div className="space-y-1.5 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Phương tiện áp dụng <span className="text-red-500">*</span>
                     </label>
-                    {isAdmin ? (
-                      <CustomSelect
-                        value={editShape}
-                        onChange={setEditShape}
-                        className="w-full"
-                        buttonClassName="w-full text-xs font-semibold"
-                        options={SHAPE_OPTIONS}
-                      />
-                    ) : (
-                      <div className="font-semibold text-xs text-gray-900 dark:text-white py-1.5">
-                        {SHAPE_OPTIONS.find((s) => s.value === editShape)?.label || editShape}
+                    {isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAllowedVehicles(VEHICLE_OPTIONS.map((v) => v.value))}
+                          className="text-[10px] text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer font-medium"
+                        >
+                          Chọn tất cả
+                        </button>
+                        <span className="text-gray-300 dark:text-white/20">•</span>
+                        <button
+                          type="button"
+                          onClick={() => setAllowedVehicles([])}
+                          className="text-[10px] text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:underline cursor-pointer font-medium"
+                        >
+                          Bỏ chọn
+                        </button>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-600 dark:text-gray-400 block">
-                      Màu sắc
-                    </label>
-                    {isAdmin ? (
-                      <CustomSelect
-                        value={editColor}
-                        onChange={setEditColor}
-                        className="w-full"
-                        buttonClassName="w-full text-xs font-semibold"
-                        options={COLOR_OPTIONS}
-                      />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {VEHICLE_OPTIONS.map((v) => {
+                      const selected = allowedVehicles.includes(v.value)
+                      return (
+                        <button
+                          key={v.value}
+                          type="button"
+                          disabled={!isAdmin}
+                          onClick={() => {
+                            if (!isAdmin) return
+                            if (selected) {
+                              setAllowedVehicles(allowedVehicles.filter((item) => item !== v.value))
+                            } else {
+                              setAllowedVehicles([...allowedVehicles, v.value])
+                            }
+                          }}
+                          className={`flex items-center justify-center px-2.5 py-2 rounded-lg border text-xs font-semibold transition-all ${isAdmin ? 'cursor-pointer' : 'cursor-default'
+                            } ${selected
+                              ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
+                              : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                            }`}
+                        >
+                          <span className="truncate">{v.labelVi}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className="min-h-[16px] flex items-center">
+                    {allowedVehicles.length === 0 ? (
+                      <p className="text-[10px] text-red-500 font-medium animate-in fade-in">
+                        Vui lòng chọn ít nhất 1 loại phương tiện áp dụng
+                      </p>
                     ) : (
-                      <div className="font-semibold text-xs text-gray-900 dark:text-white py-1.5">
-                        {COLOR_OPTIONS.find((c) => c.value === editColor)?.label || editColor}
-                      </div>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                        Các loại phương tiện tuân thủ theo quy định của biển báo
+                      </p>
                     )}
                   </div>
                 </div>
 
-                {/* Khối 3: Gợi ý nhận diện AI */}
-                <div className="p-4 rounded-xl border border-amber-300/60 dark:border-amber-500/30 bg-amber-50/40 dark:bg-amber-500/5 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-amber-900 dark:text-amber-300 font-bold">
-                      Mô tả nhận diện AI
-                    </div>
+                {/* Hàng 4: Trạng thái áp dụng */}
+                <div className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Trạng thái áp dụng
+                    </label>
+                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                      {editStatus === 'Active' ? 'Biển báo đang có hiệu lực thi hành' : 'Biển báo đang tạm ngừng áp dụng'}
+                    </span>
+                  </div>
+                  {isAdmin ? (
                     <button
                       type="button"
-                      onClick={handleCopyPrompt}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border border-amber-300 dark:border-amber-500/40 bg-white dark:bg-amber-500/20 text-amber-950 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-500/30 transition-all cursor-pointer"
+                      onClick={() => setEditStatus((prev) => (prev === 'Active' ? 'Deprecated' : 'Active'))}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${editStatus === 'Active'
+                        ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-500/30'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-500/30'
+                        }`}
                     >
-                      {copiedPrompt ? (
-                        <>
-                          <Check size={12} className="text-emerald-500" />
-                          <span className="text-emerald-700 dark:text-emerald-400 font-bold">Đã sao chép</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} />
-                          <span>Sao chép</span>
-                        </>
-                      )}
+                      {editStatus === 'Active' ? 'Ngừng áp dụng' : 'Cho phép hoạt động'}
                     </button>
-                  </div>
-                  <textarea
-                    rows={2}
-                    disabled={!isAdmin}
-                    value={editAiPrompt}
-                    onChange={(e) => setEditAiPrompt(e.target.value)}
-                    placeholder="Mô tả đặc điểm hình dạng và màu sắc nhận diện..."
-                    className="w-full p-2.5 rounded-lg border border-amber-200 dark:border-amber-500/20 bg-white dark:bg-black/30 text-amber-950 dark:text-amber-200 font-mono text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-60"
-                  />
-                </div>
-
-                {/* Khối 4: Quy tắc gán thẻ OpenStreetMap */}
-                <div className="p-4 rounded-xl border border-cyan-300/60 dark:border-cyan-500/30 bg-cyan-50/40 dark:bg-cyan-500/5 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-cyan-900 dark:text-cyan-300 font-bold">
-                      Quy tắc gán thẻ OpenStreetMap
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyOsm}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-500/20 text-cyan-950 dark:text-cyan-200 hover:bg-cyan-100 dark:hover:bg-cyan-500/30 transition-all cursor-pointer"
+                  ) : (
+                    <span
+                      className={`px-3 py-1 rounded-lg text-xs font-bold border ${editStatus === 'Active'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                        : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30'
+                        }`}
                     >
-                      {copiedOsm ? (
-                        <>
-                          <Check size={12} className="text-emerald-500" />
-                          <span className="text-emerald-700 dark:text-emerald-400 font-bold">Đã sao chép</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={12} />
-                          <span>Sao chép</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    disabled={!isAdmin}
-                    value={editOsmMapping}
-                    onChange={(e) => setEditOsmMapping(e.target.value)}
-                    placeholder="Ví dụ: traffic_sign=VN:P.102"
-                    className="w-full p-2.5 rounded-lg border border-cyan-200 dark:border-cyan-500/20 bg-white dark:bg-black/30 text-cyan-950 dark:text-cyan-200 font-mono text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#007b8b] disabled:opacity-60"
-                  />
+                      {editStatus === 'Active' ? 'Đang hoạt động' : 'Ngừng áp dụng'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           </form>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end gap-3 px-5 py-3.5 border-t border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] shrink-0">
+          {/* Footer Actions */}
+          <div className="px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
@@ -795,13 +725,12 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
             >
               Đóng
             </button>
-
             {isAdmin && (
               <button
                 type="submit"
                 form="catalog-sign-form"
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white flex items-center justify-center min-w-[90px] shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                disabled={!isDirty || isSubmitting || !codeNumber.trim() || !newNameVi.trim() || allowedVehicles.length === 0}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white flex items-center justify-center min-w-[90px] shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <CircleNotch size={14} className="animate-spin" />
@@ -816,4 +745,3 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
     </ModalPortal>
   )
 }
-

@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
+import { extractApiErrorMessage } from '@/api/client'
 import { Pagination } from '@/components/common/Pagination'
 import { DataFilterBar } from '@/components/common/DataFilterBar'
 import PageHeader from '@/components/common/PageHeader'
 import CustomSelect from '@/components/common/CustomSelect'
 import { ModalPortal } from '@/components/common/ModalPortal'
+import {
+  UserIdentityButton,
+  UserProfileDetailModal,
+  useResolvedUserProfile,
+} from '@/components/common/UserProfileDetailModal'
 import { SignMiniMap } from '@/features/catalog/components/SignMiniMap'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
+import type { UserProfileSummary } from '@/api/services/user.service'
+import { catalogService, normalizeRecaptureRequestSummary } from '@/api/services/catalog.service'
 import {
   X,
   XCircle,
@@ -33,6 +41,7 @@ import {
   type BanTargetRole,
 } from '@/api/services/escalation.service'
 import { CatalogProposalStepView } from './components'
+import { TaskHistoryTimelineModal } from '@/features/audit/components/TaskHistoryTimelineModal'
 
 /** Format Date string cleanly to HH:mm • DD/MM/YYYY */
 function formatDate(dateStr?: string | Date): string {
@@ -208,14 +217,32 @@ export default function AdminEscalationsPage() {
   // 100% Real API State, Zero mock data
   const [cases, setCases] = useState<ModerationCaseItem[]>([])
   const [totalCount, setTotalCount] = useState<number>(0)
+  const [reportTitleById, setReportTitleById] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    const normalized = searchTerm.trim().replace(/^#+/, '').trim()
+    if (!normalized) {
+      setDebouncedSearch('')
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(normalized)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [searchTerm])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, typeFilter, statusFilter])
 
   // Modal State
   const [selectedCase, setSelectedCase] = useState<ModerationCaseItem | null>(null)
@@ -232,19 +259,67 @@ export default function AdminEscalationsPage() {
   const [decisionNotes, setDecisionNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalStep, setModalStep] = useState<'DETAIL' | 'CATALOG_PROPOSAL'>('DETAIL')
+  const [inspectingUser, setInspectingUser] = useState<{
+    id: string
+    summary?: UserProfileSummary | null
+  } | null>(null)
+  const [timelineTaskId, setTimelineTaskId] = useState<string | null>(null)
+
+  const handleOpenUserProfile = useCallback(
+    (userId: string, summary?: UserProfileSummary | null) => {
+      setInspectingUser({ id: userId, summary })
+    },
+    []
+  )
 
   // Fetch Cases from Real Backend API
   const fetchCases = useCallback(async () => {
     setIsLoading(true)
     try {
+      const hasRemoteFilter = Boolean(debouncedSearch) || typeFilter !== 'all'
       const response = await escalationService.getCases({
-        page: currentPage,
-        pageSize,
+        page: hasRemoteFilter ? 1 : currentPage,
+        pageSize: hasRemoteFilter ? 100 : pageSize,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: debouncedSearch || undefined,
       })
       if (response && Array.isArray(response.items)) {
         setCases(response.items)
         setTotalCount(response.total ?? response.items.length)
+
+        // Fallback report title enrichment when backend listCases doesn't include proposedName yet
+        const missingReportTitles = response.items.some((item) => {
+          const tType = (item.targetEntityType || item.target_entity_type || '').toLowerCase()
+          const cType = (item.caseType || item.case_type || '').toUpperCase()
+          return (
+            (tType.includes('report') || tType.includes('missing') || cType === 'CATALOG_PROPOSAL') &&
+            !item.proposedName &&
+            !item.targetTitle
+          )
+        })
+        if (missingReportTitles) {
+          catalogService
+            .getMissingReports({
+              page: 1,
+              pageSize: 100,
+              search: debouncedSearch || undefined,
+            })
+            .then((repRes) => {
+              if (repRes?.items?.length) {
+                setReportTitleById((prev) => {
+                  const next = { ...prev }
+                  for (const rep of repRes.items as Array<Record<string, any>>) {
+                    const title = rep.proposedName || rep.proposed_name || rep.tempLabel
+                    if (rep.id && title) {
+                      next[String(rep.id)] = String(title)
+                    }
+                  }
+                  return next
+                })
+              }
+            })
+            .catch(() => {})
+        }
       } else {
         setCases([])
         setTotalCount(0)
@@ -257,7 +332,7 @@ export default function AdminEscalationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, pageSize, statusFilter, error, isEn])
+  }, [currentPage, pageSize, statusFilter, typeFilter, debouncedSearch, error, isEn])
 
   useEffect(() => {
     fetchCases()
@@ -322,22 +397,69 @@ export default function AdminEscalationsPage() {
   // Handle Admin Resolution Submit
   const handleResolveSubmit = async () => {
     if (!selectedCase) return
+
+    const cType = (selectedCase.caseType || selectedCase.case_type || '').toUpperCase()
+    const tType = (selectedCase.targetEntityType || selectedCase.target_entity_type || '').toLowerCase()
+    const isCatProposal = cType === 'CATALOG_PROPOSAL' || tType.includes('report') || tType.includes('missing')
+    const reportId = targetEntityId || selectedCase.targetEntityId || selectedCase.target_entity_id || (targetData && targetData.id)
+
+    if (isCatProposal && isReportAlreadyFinalized) {
+      const syncNote =
+        decisionNotes.trim() ||
+        rawStaffNote ||
+        (isEn
+          ? `Synced escalation case with finalized report (${reportRawStatus}).`
+          : `Đồng bộ đóng ca theo báo cáo đã xử lý (${reportRawStatus}).`)
+      setIsSubmitting(true)
+      try {
+        await escalationService.resolveCase(selectedCase.id, {
+          resolutionNote: syncNote,
+          actionType:
+            reportRawStatus === 'MERGED'
+              ? 'MERGED'
+              : reportRawStatus === 'REJECTED'
+              ? 'DISMISS'
+              : 'APPROVED',
+          targetSignTypeId: reportMergedSignTypeId,
+          reportId: reportId || undefined,
+        })
+        success(
+          isEn
+            ? `Case #${selectedCase.id.slice(0, 8)} synced and closed!`
+            : `Đã đồng bộ và đóng ca #${selectedCase.id.slice(0, 8)}!`
+        )
+        setSelectedCase(null)
+        fetchCases()
+        window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
+      } catch (err: any) {
+        const msg = extractApiErrorMessage(err)
+        console.error('Failed to sync escalation case:', msg || err)
+        error(msg || (isEn ? 'Failed to sync escalation case' : 'Không thể đồng bộ đóng ca trên máy chủ'))
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
+    }
+
+    if (isCatProposal && isReportIncomplete) {
+      warning(
+        isEn
+          ? 'This report is awaiting field recapture and cannot be adjudicated yet.'
+          : 'Báo cáo này đang chờ Surveyor chụp lại ảnh (INCOMPLETE), chưa thể xử lý.'
+      )
+      return
+    }
+
     if (!decisionNotes.trim()) {
       warning(isEn ? 'Please provide notes!' : 'Vui lòng nhập ghi chú xử lý!')
       return
     }
 
     // Intercept catalog proposals when approving: transition modal to Step 2 (Catalog sign specs)
-    const cType = (selectedCase.caseType || selectedCase.case_type || '').toUpperCase()
-    const tType = (selectedCase.targetEntityType || selectedCase.target_entity_type || '').toLowerCase()
-    const isCatProposal = cType === 'CATALOG_PROPOSAL' || tType.includes('report') || tType.includes('missing')
-
     if (actionType === 'RESOLVE' && isCatProposal) {
       setModalStep('CATALOG_PROPOSAL')
       return
     }
-
-    const reportId = targetEntityId || selectedCase.targetEntityId || selectedCase.target_entity_id || (targetData && targetData.id)
 
     setIsSubmitting(true)
     try {
@@ -390,20 +512,27 @@ export default function AdminEscalationsPage() {
       fetchCases()
       window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     } catch (err: any) {
-      console.error('Failed to resolve moderation case:', err)
-      error(err?.message || (isEn ? 'Failed to resolve case' : 'Không thể giải quyết vụ việc trên máy chủ'))
+      const msg = extractApiErrorMessage(err)
+      console.error('Failed to resolve moderation case:', msg || err)
+      error(msg || (isEn ? 'Failed to resolve case' : 'Không thể giải quyết vụ việc trên máy chủ'))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   // Client Filter for Search & Type
+  const normalizedSearchTerm = searchTerm.trim().replace(/^#+/, '').trim().toLowerCase()
+  const hasLocalFilter = Boolean(normalizedSearchTerm) || typeFilter !== 'all'
+
   const filteredCases = cases.filter((c) => {
-    const q = searchTerm.trim().toLowerCase()
+    const q = normalizedSearchTerm
     const id = (c.id || '').toLowerCase()
-    const targetId = (c.targetEntityId || c.target_entity_id || '').toLowerCase()
+    const rawTargetId = String(c.targetEntityId || c.target_entity_id || '')
+    const targetId = rawTargetId.toLowerCase()
     const targetType = (c.targetEntityType || c.target_entity_type || '').toLowerCase()
     const caseType = (c.caseType || c.case_type || '').toLowerCase()
+    const reportTitle = (c.proposedName || c.targetTitle || reportTitleById[rawTargetId] || '').toLowerCase()
+    const reporterLabel = (c.reporter?.fullName || c.reporter?.email || '').toLowerCase()
     const note = (c.resolutionNote || c.resolution_note || c.notes || '').toLowerCase()
 
     const matchesSearch =
@@ -412,6 +541,8 @@ export default function AdminEscalationsPage() {
       targetId.includes(q) ||
       targetType.includes(q) ||
       caseType.includes(q) ||
+      reportTitle.includes(q) ||
+      reporterLabel.includes(q) ||
       note.includes(q)
 
     const matchesType =
@@ -420,6 +551,10 @@ export default function AdminEscalationsPage() {
 
     return matchesSearch && matchesType
   })
+
+  const paginatedCases = hasLocalFilter
+    ? filteredCases.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filteredCases
 
   // Target entity visual & contextual extraction
   const targetTypeStr = (selectedCase?.targetEntityType || selectedCase?.target_entity_type || '').toLowerCase()
@@ -430,6 +565,15 @@ export default function AdminEscalationsPage() {
     targetTypeStr.includes('report') ||
     targetTypeStr.includes('missing') ||
     caseTypeStr === 'CATALOG_PROPOSAL'
+  const rawReport = targetData?.data || targetData
+  const reportRawStatus = isMissingReport
+    ? String(rawReport?.rawStatus || rawReport?.status || '').toUpperCase()
+    : ''
+  const reportMergedSignTypeId: number | undefined =
+    rawReport?.mergedIntoSignTypeId ?? undefined
+  const isReportAlreadyFinalized =
+    isMissingReport && ['APPROVED', 'MERGED', 'REJECTED'].includes(reportRawStatus)
+  const isReportIncomplete = isMissingReport && reportRawStatus === 'INCOMPLETE'
 
   let cropUrl: string | null = null
   let frameUrl: string | null = null
@@ -439,7 +583,9 @@ export default function AdminEscalationsPage() {
   let locationAddress: string | null = null
   let description: string | null = null
   let reporterId: string | null = null
+  let reporterSummary: UserProfileSummary | null = null
   let reviewedBy: string | null = null
+  let reviewerSummary: UserProfileSummary | null = null
   let targetEntityId: string | null = selectedCase?.targetEntityId || selectedCase?.target_entity_id || null
 
   const isCaseResolved = selectedCase?.status === 'RESOLVED' || selectedCase?.status === 'DISMISSED'
@@ -481,15 +627,44 @@ export default function AdminEscalationsPage() {
         lng = Number(cand.longitude ?? cand.lng ?? raw.lng)
       }
       signName = raw.proposedName || raw.tempLabel || cand?.predictedSignType?.nameVi || cand?.predictedSignType?.nameEn
-      description = raw.description || raw.reporterNote || null
+      description =
+        raw.description ||
+        raw.reporterNote ||
+        raw.reporter_note ||
+        raw.note ||
+        raw.regulationNotes ||
+        raw.fieldNotes ||
+        raw.submission?.note ||
+        cand?.submission?.note ||
+        null
       rawStaffNote = raw.staffNotes || null
       reporterId = raw.reporterId || raw.reportedBy || null
+      reporterSummary = raw.reporter || null
       reviewedBy = raw.reviewedBy || selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
+      reviewerSummary = raw.reviewer || null
       if (raw.id) targetEntityId = raw.id
     } else if (isCandidate) {
       const cand = raw.candidate || raw
       cropUrl = resolveImageUrl(cand.signCropUrl)
       frameUrl = resolveImageUrl(cand.bestFrameUrl)
+      reporterId =
+        raw.submission?.surveyor_id ||
+        raw.submission?.surveyorId ||
+        cand?.submission?.surveyor_id ||
+        cand?.submission?.surveyorId ||
+        cand?.surveyorId ||
+        cand?.surveyor_id ||
+        null
+      const candSurv = raw.submission?.surveyor || cand?.surveyor
+      if (candSurv) {
+        reporterSummary = candSurv
+      } else if (cand?.surveyorName || cand?.surveyor_name || raw.submission?.surveyor_name) {
+        reporterSummary = {
+          id: reporterId || undefined,
+          fullName: cand?.surveyorName || cand?.surveyor_name || raw.submission?.surveyor_name,
+          email: cand?.surveyorEmail || raw.submission?.surveyor_email || null,
+        }
+      }
       if (cand.predictedSignType) {
         signName = isEn
           ? cand.predictedSignType.nameEn || cand.predictedSignType.name_en || cand.predictedSignType.nameVi || cand.predictedSignType.name_vi
@@ -503,9 +678,30 @@ export default function AdminEscalationsPage() {
         lng = Number(cand.longitude)
       }
       locationAddress = raw.locationContext?.displayLocation || null
+      description =
+        raw.description ||
+        raw.reporterNote ||
+        raw.reporter_note ||
+        raw.note ||
+        raw.regulationNotes ||
+        raw.fieldNotes ||
+        raw.submission?.note ||
+        cand?.submission?.note ||
+        null
     } else if (isRevalidation) {
       const ev = raw.evidences?.[0]
       cropUrl = resolveImageUrl(ev?.media_url || ev?.mediaUrl)
+      reporterId = ev?.userId || ev?.user_id || ev?.surveyorId || ev?.surveyor_id || raw.surveyorId || null
+      const revSurv = ev?.surveyor || raw.surveyor
+      if (revSurv) {
+        reporterSummary = revSurv
+      } else if (ev?.surveyorName || ev?.surveyor_name || raw.surveyorName) {
+        reporterSummary = {
+          id: reporterId || undefined,
+          fullName: ev?.surveyorName || ev?.surveyor_name || raw.surveyorName,
+          email: ev?.surveyorEmail || null,
+        }
+      }
       if (raw.location) {
         lat = Number(raw.location.lat)
         lng = Number(raw.location.lon)
@@ -517,6 +713,12 @@ export default function AdminEscalationsPage() {
       }
     }
   }
+
+  const rawTargetObj = targetData?.data || targetData || {}
+  const historyTaskId: string | null =
+    isCandidate || isRevalidation
+      ? targetEntityId
+      : rawTargetObj?.candidateId || rawTargetObj?.candidate?.id || null
 
   // Determine effective Staff Notes: prioritize escalateAction.note to prevent overwrite by admin decisions
   let effectiveStaffNotes: string | null = null
@@ -546,6 +748,25 @@ export default function AdminEscalationsPage() {
     selectedCase?.created_at ||
     targetData?.updatedAt
 
+  const staffSummary: UserProfileSummary | null =
+    (reviewerSummary && (!staffReviewerId || reviewerSummary.id === staffReviewerId)
+      ? reviewerSummary
+      : null) ||
+    (activeCase?.assignedStaff && (!staffReviewerId || activeCase.assignedStaff.id === staffReviewerId)
+      ? activeCase.assignedStaff
+      : null)
+
+  const recaptureRequest = normalizeRecaptureRequestSummary(
+    rawReport?.recaptureRequest || activeCase?.recaptureRequest || null
+  )
+
+  const { displayName: resolvedReporterName } = useResolvedUserProfile(reporterId, reporterSummary)
+  const { displayName: resolvedStaffName } = useResolvedUserProfile(reviewedBy || staffReviewerId, staffSummary)
+  const { displayName: resolvedSurveyorName } = useResolvedUserProfile(
+    recaptureRequest?.surveyorId,
+    recaptureRequest?.assignedSurveyor
+  )
+
   const hasContextFrame = Boolean(frameUrl)
   const activeImageUrl = activeImageTab === 'frame' && frameUrl ? frameUrl : cropUrl
   const hasValidMapLocation = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)
@@ -572,7 +793,7 @@ export default function AdminEscalationsPage() {
       <DataFilterBar
         searchQuery={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder={isEn ? 'Search by ID, keyword...' : 'Tìm theo mã ca, từ khóa...'}
+        searchPlaceholder={isEn ? 'Search by case/proposal ID (#...), report name...' : 'Tìm mã ca, mã đề xuất (#...), tên report...'}
       >
         {/* Case Type Filter */}
         <CustomSelect
@@ -630,7 +851,7 @@ export default function AdminEscalationsPage() {
                     </div>
                   </td>
                 </tr>
-              ) : filteredCases.length === 0 ? (
+              ) : paginatedCases.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="space-y-1">
@@ -644,10 +865,12 @@ export default function AdminEscalationsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredCases.map((item) => {
+                paginatedCases.map((item) => {
                   const caseType = getCaseType(item.caseType || item.case_type)
                   const targetEntity = getTargetEntityType(item.targetEntityType || item.target_entity_type)
                   const status = getStatus(item.status)
+                  const rawTargetId = String(item.targetEntityId || item.target_entity_id || '')
+                  const targetTitle = item.proposedName || item.targetTitle || reportTitleById[rawTargetId]
 
                   return (
                     <tr
@@ -665,9 +888,18 @@ export default function AdminEscalationsPage() {
                         {isEn ? caseType.en : caseType.vi}
                       </td>
 
-                      {/* 3. targetEntityType: từ ngữ thông dụng chuẩn */}
+                      {/* 3. Đối tượng / tên report & mã đối tượng */}
                       <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300">
-                        {isEn ? targetEntity.en : targetEntity.vi}
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate font-medium">
+                            {targetTitle || (isEn ? targetEntity.en : targetEntity.vi)}
+                          </span>
+                          {rawTargetId && (
+                            <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                              #{rawTargetId.slice(0, 8)}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* 4. status: chữ có màu sắc ngữ cảnh nhẹ, không có dấu chấm */}
@@ -707,7 +939,7 @@ export default function AdminEscalationsPage() {
         <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={filteredCases.length === cases.length ? totalCount : filteredCases.length}
+            totalItems={hasLocalFilter ? filteredCases.length : totalCount}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(newSize) => {
@@ -897,27 +1129,40 @@ export default function AdminEscalationsPage() {
                         {/* ─── RIGHT COLUMN: SPECS & VERDICT FORM (7 cols) ───────── */}
                         <div className="md:col-span-7 flex flex-col gap-3">
                           {/* Proposed Sign / Object Title */}
-                          <div>
-                            <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                              {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
-                            </h3>
-                            {targetEntityId && (
-                              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                                <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
-                                <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">#{targetEntityId}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(targetEntityId)
-                                    setCopiedTargetId(true)
-                                    setTimeout(() => setCopiedTargetId(false), 2000)
-                                  }}
-                                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
-                                  title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
-                                >
-                                  {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                                </button>
-                              </div>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                                {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
+                              </h3>
+                              {targetEntityId && (
+                                <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                  <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
+                                  <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">#{targetEntityId}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(targetEntityId)
+                                      setCopiedTargetId(true)
+                                      setTimeout(() => setCopiedTargetId(false), 2000)
+                                    }}
+                                    className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
+                                    title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
+                                  >
+                                    {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {historyTaskId && (
+                              <button
+                                type="button"
+                                onClick={() => setTimelineTaskId(historyTaskId)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-[#007b8b] dark:text-[#00c4de] text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
+                              >
+                                <Clock size={13} weight="bold" />
+                                <span>{isEn ? 'View history' : 'Xem lịch sử'}</span>
+                              </button>
                             )}
                           </div>
 
@@ -929,7 +1174,22 @@ export default function AdminEscalationsPage() {
                             <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                               <div className="flex items-center gap-1 min-w-0">
                                 <User size={12} className="text-gray-400 shrink-0" />
-                                <span className="truncate">{reporterId ? (reporterId.startsWith('#') ? reporterId : '#' + reporterId) : (isEn ? 'Anonymous' : 'Hệ thống')}</span>
+                                {reporterId ? (
+                                  <UserIdentityButton
+                                    userId={reporterId}
+                                    initialUser={reporterSummary}
+                                    prefix={isEn ? 'Reporter' : 'Người báo cáo'}
+                                    isEn={isEn}
+                                    onOpenProfile={handleOpenUserProfile}
+                                  />
+                                ) : (
+                                  <span className="truncate">
+                                    <span>{isEn ? 'Reporter:' : 'Người báo cáo:'}</span>{' '}
+                                    <span className="text-gray-700 dark:text-gray-200">
+                                      {isEn ? 'Anonymous' : 'Hệ thống'}
+                                    </span>
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
                                 <CalendarBlank size={12} />
@@ -942,11 +1202,65 @@ export default function AdminEscalationsPage() {
                               <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                                 <div className="flex items-center gap-1 min-w-0">
                                   <User size={12} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
-                                  <span className="truncate">Staff #{staffReviewerId}</span>
+                                  <UserIdentityButton
+                                    userId={staffReviewerId}
+                                    initialUser={staffSummary}
+                                    prefix="Staff"
+                                    isEn={isEn}
+                                    onOpenProfile={handleOpenUserProfile}
+                                  />
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
                                   <Clock size={12} />
                                   <span>{formatDate(staffReviewedAt)}</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Assigned Surveyor / Recapture Request */}
+                            {(recaptureRequest || (isReportIncomplete && isLoadingDetail)) && (
+                              <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <Camera size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                  {recaptureRequest?.surveyorId ? (
+                                    <UserIdentityButton
+                                      userId={recaptureRequest.surveyorId}
+                                      initialUser={recaptureRequest.assignedSurveyor}
+                                      prefix="Surveyor"
+                                      isEn={isEn}
+                                      onOpenProfile={handleOpenUserProfile}
+                                    />
+                                  ) : (
+                                    <span className="truncate">
+                                      <span>Surveyor:</span>{' '}
+                                      <span className="text-amber-700 dark:text-amber-400">
+                                        {isEn ? 'Assigning' : 'Đang phân công'}
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  <span
+                                    className={`text-[10px] font-semibold ${
+                                      recaptureRequest?.completedAt
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-amber-600 dark:text-amber-400'
+                                    }`}
+                                  >
+                                    {recaptureRequest?.completedAt
+                                      ? isEn
+                                        ? 'Done'
+                                        : 'Đã chụp'
+                                      : isEn
+                                      ? 'Pending'
+                                      : 'Chờ chụp'}
+                                  </span>
+                                  {recaptureRequest?.completedAt && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{formatDate(recaptureRequest.completedAt)}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -1009,6 +1323,47 @@ export default function AdminEscalationsPage() {
                           {(selectedCase.status === 'PENDING' ||
                             selectedCase.status === 'IN_REVIEW' ||
                             selectedCase.status === 'ESCALATED_ADMIN') && (
+                              isReportAlreadyFinalized ? (
+                                <div className="p-3 rounded-xl border border-amber-300/70 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-2.5">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
+                                    <ShieldCheck size={15} weight="bold" className="shrink-0" />
+                                    <span>
+                                      {isEn ? 'Report Already Finalized' : 'Báo cáo đã được xử lý trước đó'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed">
+                                    {isEn
+                                      ? `Linked report status is ${reportRawStatus}${reportMergedSignTypeId ? ` (Sign type #${reportMergedSignTypeId})` : ''}, but this escalation case remained open. Sync to close the case without recreating the sign.`
+                                      : `Báo cáo nguồn đang ở trạng thái ${reportRawStatus === 'APPROVED' ? 'Đã phê duyệt' : reportRawStatus === 'MERGED' ? 'Đã gộp' : 'Đã từ chối'}${reportMergedSignTypeId ? ` (Loại biển #${reportMergedSignTypeId})` : ''}, nhưng ca chuyển tiếp chưa được đóng. Bấm "Đồng bộ & Đóng ca" để hoàn tất ca này.`}
+                                  </p>
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                                      {isEn ? 'Closing note (optional):' : 'Ghi chú đóng ca (không bắt buộc):'}
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      value={decisionNotes}
+                                      onChange={(e) => setDecisionNotes(e.target.value)}
+                                      placeholder={isEn ? 'Optional closing note...' : 'Nhập ghi chú đóng ca (hoặc để trống để dùng mặc định)...'}
+                                      className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
+                                    />
+                                  </div>
+                                </div>
+                              ) : isReportIncomplete ? (
+                                <div className="p-3 rounded-xl border border-amber-300/70 dark:border-amber-700/50 bg-amber-50/70 dark:bg-amber-950/20 space-y-1.5">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
+                                    <Clock size={15} weight="bold" className="shrink-0" />
+                                    <span>
+                                      {isEn ? 'Awaiting Field Recapture' : 'Đang chờ chụp lại ảnh thực địa'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed">
+                                    {isEn
+                                      ? 'This report is currently INCOMPLETE while waiting for a Surveyor to submit recapture evidence. Actions are disabled until recapture completes.'
+                                      : 'Báo cáo đang ở trạng thái INCOMPLETE (chờ Surveyor chụp lại ảnh thực địa). Vui lòng đợi hoàn tất chụp lại trước khi tạo biển mới.'}
+                                  </p>
+                                </div>
+                              ) : (
                               <div className="p-2.5 sm:p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
                                 <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
                                   <ShieldCheck size={15} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
@@ -1076,23 +1431,23 @@ export default function AdminEscalationsPage() {
                                         {
                                           key: 'SURVEYOR' as const,
                                           labelVi: 'Surveyor chụp ảnh',
-                                          subVi: 'Người chụp gần nhất',
+                                          subVi: resolvedSurveyorName || (recaptureRequest?.surveyorId ? `#${recaptureRequest.surveyorId.slice(0, 8)}` : 'Người chụp gần nhất'),
                                           labelEn: 'Surveyor',
-                                          subEn: 'Latest photographer',
+                                          subEn: resolvedSurveyorName || (recaptureRequest?.surveyorId ? `#${recaptureRequest.surveyorId.slice(0, 8)}` : 'Latest photographer'),
                                         },
                                         {
                                           key: 'REVIEWER' as const,
                                           labelVi: 'Reviewer báo cáo',
-                                          subVi: reporterId ? `#${reporterId.slice(0, 8)}` : 'Người báo cáo',
+                                          subVi: resolvedReporterName || (reporterId ? `#${reporterId.slice(0, 8)}` : 'Người báo cáo'),
                                           labelEn: 'Reviewer',
-                                          subEn: reporterId ? `#${reporterId.slice(0, 8)}` : 'Submitter',
+                                          subEn: resolvedReporterName || (reporterId ? `#${reporterId.slice(0, 8)}` : 'Submitter'),
                                         },
                                         {
                                           key: 'STAFF' as const,
                                           labelVi: 'Staff duyệt đơn',
-                                          subVi: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Người chuyển đơn',
+                                          subVi: resolvedStaffName || (reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Người chuyển đơn'),
                                           labelEn: 'Staff',
-                                          subEn: reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Escalating staff',
+                                          subEn: resolvedStaffName || (reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Escalating staff'),
                                         },
                                       ].map((item) => {
                                         const selected = banTarget === item.key
@@ -1125,6 +1480,7 @@ export default function AdminEscalationsPage() {
                                   </label>
                                   <textarea
                                     rows={2}
+                                    maxLength={500}
                                     value={decisionNotes}
                                     onChange={(e) => setDecisionNotes(e.target.value)}
                                     placeholder={isEn ? 'Enter notes...' : 'Nhập ghi chú...'}
@@ -1132,6 +1488,7 @@ export default function AdminEscalationsPage() {
                                   />
                                 </div>
                               </div>
+                              )
                             )}
                         </div>
                       </div>
@@ -1141,13 +1498,13 @@ export default function AdminEscalationsPage() {
                   {/* Modal Footer Actions */}
                   {(selectedCase.status === 'PENDING' ||
                     selectedCase.status === 'IN_REVIEW' ||
-                    selectedCase.status === 'ESCALATED_ADMIN') && (
+                    selectedCase.status === 'ESCALATED_ADMIN') && !isReportIncomplete && (
                       <div className="px-5 py-3 border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/[0.02] flex items-center justify-end gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={handleResolveSubmit}
-                          disabled={isSubmitting || !decisionNotes.trim()}
-                          className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 ${decisionNotes.trim() && !isSubmitting
+                          disabled={isSubmitting || (!isReportAlreadyFinalized && !decisionNotes.trim())}
+                          className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 ${(isReportAlreadyFinalized || decisionNotes.trim()) && !isSubmitting
                               ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
                               : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
                             }`}
@@ -1157,6 +1514,8 @@ export default function AdminEscalationsPage() {
                               <CircleNotch size={14} className="animate-spin" />
                               <span>{isEn ? 'Updating...' : 'Đang cập nhật...'}</span>
                             </span>
+                          ) : isReportAlreadyFinalized ? (
+                            <span>{isEn ? 'Sync & Close Case' : 'Đồng bộ & Đóng ca'}</span>
                           ) : (
                             <span>{isEn ? 'Update' : 'Cập nhật'}</span>
                           )}
@@ -1169,6 +1528,19 @@ export default function AdminEscalationsPage() {
           </div>
         </ModalPortal>
       )}
+
+      <UserProfileDetailModal
+        userId={inspectingUser?.id || null}
+        initialSummary={inspectingUser?.summary}
+        isEn={isEn}
+        onClose={() => setInspectingUser(null)}
+      />
+
+      <TaskHistoryTimelineModal
+        taskId={timelineTaskId}
+        isEn={isEn}
+        onClose={() => setTimelineTaskId(null)}
+      />
     </div>
   )
 }

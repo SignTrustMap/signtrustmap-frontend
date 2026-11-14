@@ -1,5 +1,7 @@
 import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import type { RecaptureRequestSummary } from './catalog.service'
+import type { UserProfileSummary } from './user.service'
 
 export interface ModerationCaseActionItem {
   id: string
@@ -33,6 +35,12 @@ export interface ModerationCaseItem {
   resolvedAt?: string | null
   actions?: ModerationCaseActionItem[]
   reports?: any[]
+  assignedStaff?: UserProfileSummary | null
+  recaptureRequest?: RecaptureRequestSummary | null
+  proposedName?: string | null
+  targetTitle?: string | null
+  reportStatus?: string | null
+  reporter?: UserProfileSummary | null
 }
 
 export interface PaginatedCasesResponse {
@@ -71,7 +79,7 @@ export const escalationService = {
    * Fetch all staff moderation & escalation cases via GET /api/v1/moderation/cases
    */
   getCases: async (
-    params?: { status?: string; page?: number; pageSize?: number },
+    params?: { status?: string; page?: number; pageSize?: number; search?: string },
     config?: Record<string, any>
   ): Promise<PaginatedCasesResponse> => {
     return http.get<PaginatedCasesResponse>(API_ENDPOINTS.MODERATION.CASES, { params, ...config })
