@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   X,
   CircleNotch,
+  Trash,
+  PushPin,
+  Plus,
+  Camera,
 } from '@phosphor-icons/react'
 import { useToast } from '@/context/ToastContext'
 import { useAuth } from '@/features/auth/AuthContext'
@@ -20,6 +24,16 @@ export interface CategoryMeta {
   label: string
   badgeClass: string
   dot: string
+}
+
+export interface SupportShotItem {
+  id: string
+  imageUrl: string
+  imageType?: string
+  role?: 'ANCHOR' | 'MEDOID' | 'REPRESENTATIVE'
+  isPrimary?: boolean
+  isPinned?: boolean
+  sharpness?: number | null
 }
 
 export interface CatalogDetailModalProps {
@@ -130,6 +144,169 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
   const objectUrlRef = useRef<string | null>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const numericId = useMemo(() => {
+    if (!sign?.id) return NaN
+    return parseInt(String(sign.id).replace(/\D/g, ''), 10)
+  }, [sign?.id])
+
+  // Support Shots states
+  const [supportShots, setSupportShots] = useState<SupportShotItem[]>([])
+  const [isLoadingShots, setIsLoadingShots] = useState(false)
+  // Sub-modals for support shots
+  const [previewShot, setPreviewShot] = useState<SupportShotItem | null>(null)
+  const [isAddShotOpen, setIsAddShotOpen] = useState(false)
+  const [shotImageUrl, setShotImageUrl] = useState('')
+  const [shotImageFile, setShotImageFile] = useState<File | null>(null)
+  const [shotImagePreview, setShotImagePreview] = useState('')
+  const [shotShowUrlInput, setShotShowUrlInput] = useState(false)
+  const [shotRole, setShotRole] = useState<'ANCHOR' | 'MEDOID'>('MEDOID')
+  const [shotIsPinned, setShotIsPinned] = useState(false)
+  const [isShotSubmitting, setIsShotSubmitting] = useState(false)
+  const [shotToDelete, setShotToDelete] = useState<SupportShotItem | null>(null)
+  const [isDeletingShot, setIsDeletingShot] = useState(false)
+  const shotFileInputRef = useRef<HTMLInputElement | null>(null)
+  const shotObjectUrlRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (shotObjectUrlRef.current) {
+        URL.revokeObjectURL(shotObjectUrlRef.current)
+      }
+    }
+  }, [])
+
+  // Fetch support shots when sign opens
+  const fetchSupportShots = useCallback(async () => {
+    if (!sign || isNaN(numericId)) return
+    setIsLoadingShots(true)
+    try {
+      const res: any = await catalogService.getSupportShots(numericId)
+      const rawList =
+        res?.shots ||
+        res?.data?.shots ||
+        (Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [])
+      setSupportShots(Array.isArray(rawList) ? rawList : [])
+    } catch (err) {
+      console.error('Lỗi tải danh sách ảnh mẫu nhận diện:', err)
+    } finally {
+      setIsLoadingShots(false)
+    }
+  }, [sign, numericId])
+
+  useEffect(() => {
+    if (sign && !isNaN(numericId)) {
+      fetchSupportShots()
+    } else {
+      setSupportShots([])
+    }
+  }, [sign, numericId, fetchSupportShots])
+
+  // Admin actions on support shots
+  const handleTogglePin = async (shot: SupportShotItem) => {
+    if (!isAdmin || isNaN(numericId)) return
+    try {
+      const nextPinned = !shot.isPinned
+      await catalogService.togglePinSupportShot(numericId, shot.id, nextPinned)
+      toast.success(nextPinned ? 'Đã ghim cố định ảnh mẫu' : 'Đã bỏ ghim ảnh mẫu')
+      fetchSupportShots()
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể cập nhật trạng thái ghim')
+    }
+  }
+
+  const handleOpenAddShot = () => {
+    setIsAddShotOpen(true)
+    setShotImageUrl('')
+    if (shotObjectUrlRef.current) {
+      URL.revokeObjectURL(shotObjectUrlRef.current)
+      shotObjectUrlRef.current = null
+    }
+    setShotImageFile(null)
+    setShotImagePreview('')
+    setShotShowUrlInput(false)
+    setShotRole('MEDOID')
+    setShotIsPinned(false)
+  }
+
+  const handleShotFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('Dung lượng tệp vượt quá giới hạn tối đa 50MB')
+        return
+      }
+      setShotImageFile(file)
+      if (shotObjectUrlRef.current) {
+        URL.revokeObjectURL(shotObjectUrlRef.current)
+      }
+      const newUrl = URL.createObjectURL(file)
+      shotObjectUrlRef.current = newUrl
+      setShotImagePreview(newUrl)
+      setShotImageUrl('')
+    }
+  }
+
+  const handleClearShotImage = () => {
+    if (shotObjectUrlRef.current) {
+      URL.revokeObjectURL(shotObjectUrlRef.current)
+      shotObjectUrlRef.current = null
+    }
+    setShotImageFile(null)
+    setShotImageUrl('')
+    setShotImagePreview('')
+    if (shotFileInputRef.current) shotFileInputRef.current.value = ''
+  }
+
+  const handleSaveShot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const hasImage = Boolean(shotImageFile || shotImageUrl.trim())
+    if (!hasImage) {
+      toast.error('Vui lòng tải tệp ảnh từ máy hoặc nhập đường dẫn ảnh')
+      return
+    }
+    if (isNaN(numericId)) return
+
+    setIsShotSubmitting(true)
+    try {
+      if (shotImageFile) {
+        const formData = new FormData()
+        formData.append('file', shotImageFile)
+        formData.append('role', shotRole)
+        formData.append('isPinned', String(shotIsPinned))
+        await catalogService.addSupportShot(numericId, formData)
+      } else {
+        await catalogService.addSupportShot(numericId, {
+          imageUrl: shotImageUrl.trim(),
+          role: shotRole,
+          isPinned: shotIsPinned,
+        })
+      }
+      toast.success('Đã thêm ảnh mẫu mới thành công')
+      handleClearShotImage()
+      setIsAddShotOpen(false)
+      fetchSupportShots()
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể lưu ảnh mẫu')
+    } finally {
+      setIsShotSubmitting(false)
+    }
+  }
+
+  const handleConfirmDeleteShot = async () => {
+    if (!shotToDelete || isNaN(numericId)) return
+    setIsDeletingShot(true)
+    try {
+      await catalogService.deleteSupportShot(numericId, shotToDelete.id)
+      toast.success('Đã xóa ảnh mẫu thành công')
+      setShotToDelete(null)
+      fetchSupportShots()
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể xóa ảnh mẫu')
+    } finally {
+      setIsDeletingShot(false)
+    }
+  }
 
   // Baseline vehicle types for the given sign
   const initialAllowedVehicles = useMemo<VehicleType[]>(() => {
@@ -271,8 +448,6 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
   ])
 
   if (!sign) return null
-
-  const numericId = parseInt(sign.id.replace(/\D/g, ''), 10)
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -714,6 +889,132 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* ─── DẢI ẢNH MẪU THỰC TẾ NHẬN DIỆN ───── */}
+            <div className="mt-5 pt-4 border-t border-gray-200 dark:border-white/10 flex flex-col gap-3">
+              {/* Tiêu đề danh sách */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-gray-900 dark:text-white">
+                    Ảnh thực tế nhận diện AI
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#007b8b]/10 text-[#007b8b] dark:bg-[#00c4de]/15 dark:text-[#00c4de]">
+                    {supportShots.length} trên 16 ảnh
+                  </span>
+                </div>
+              </div>
+
+              {/* Dải cuộn ảnh */}
+              <div className="relative">
+                {isLoadingShots ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-gray-500 text-xs">
+                    <CircleNotch size={16} className="animate-spin text-[#007b8b]" />
+                    <span>Đang tải danh sách ảnh mẫu</span>
+                  </div>
+                ) : supportShots.length === 0 && !isAdmin ? (
+                  <div className="py-6 px-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-gray-400 dark:text-gray-500 text-xs">
+                    Chưa có ảnh thực tế nào được lưu
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-stretch gap-3 overflow-x-auto scroll-smooth py-1 px-0.5 select-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {supportShots.map((shot, idx) => (
+                      <div
+                        key={shot.id || idx}
+                        className="group relative w-32 min-w-[128px] rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-md hover:border-gray-300 dark:hover:border-white/25 transition-all shrink-0"
+                      >
+                        {/* Khung ảnh */}
+                        <div
+                          onClick={() => setPreviewShot(shot)}
+                          className="relative w-full h-28 bg-gray-50 dark:bg-white/[0.03] overflow-hidden cursor-pointer flex items-center justify-center p-1.5"
+                          title="Bấm để xem ảnh lớn"
+                        >
+                          <img
+                            src={shot.imageUrl}
+                            alt="Ảnh mẫu thực tế"
+                            className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+                            onError={(e) => {
+                              ; (e.target as HTMLElement).style.display = 'none'
+                            }}
+                          />
+
+                          {/* Tag góc trên trái: Vai trò */}
+                          <div className="absolute top-1.5 left-1.5 pointer-events-none">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white shadow-2xs ${shot.role === 'ANCHOR'
+                                ? 'bg-blue-600'
+                                : 'bg-purple-600'
+                                }`}
+                            >
+                              {shot.role === 'ANCHOR' ? 'Mẫu chuẩn' : 'Biến thể'}
+                            </span>
+                          </div>
+
+                          {/* Tag góc trên phải: Ghim */}
+                          {shot.isPinned && (
+                            <div className="absolute top-1.5 right-1.5 pointer-events-none">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-white shadow-2xs">
+                                Đã ghim
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Chân card: Độ nét và Thao tác của Admin */}
+                        <div className="p-2 border-t border-gray-100 dark:border-white/5 flex flex-col gap-1.5 bg-gray-50/50 dark:bg-white/[0.02]">
+                          {shot.sharpness !== null && shot.sharpness !== undefined && (
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                              Độ nét {Math.round(shot.sharpness)} phần trăm
+                            </div>
+                          )}
+
+                          {/* Thao tác dành cho Admin */}
+                          {isAdmin && (
+                            <div className="flex items-center justify-between gap-1 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePin(shot)}
+                                className={`p-1 rounded transition-colors cursor-pointer ${shot.isPinned
+                                  ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                                  : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10'
+                                  }`}
+                                title={shot.isPinned ? 'Bỏ ghim ảnh' : 'Ghim cố định ảnh'}
+                              >
+                                <PushPin size={13} weight={shot.isPinned ? 'fill' : 'bold'} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setShotToDelete(shot)}
+                                className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                                title="Xóa ảnh này"
+                              >
+                                <Trash size={13} weight="bold" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Thẻ Thêm ảnh mới nếu là Admin và chưa đạt 16 ảnh */}
+                    {isAdmin && supportShots.length < 16 && (
+                      <button
+                        type="button"
+                        onClick={handleOpenAddShot}
+                        className="w-32 min-w-[128px] min-h-[160px] rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 hover:border-[#007b8b] dark:hover:border-[#00c4de] bg-gray-50/40 dark:bg-white/[0.01] hover:bg-[#007b8b]/5 dark:hover:bg-[#00c4de]/5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:text-[#007b8b] dark:hover:text-[#00c4de] transition-all cursor-pointer shrink-0"
+                      >
+                        <Plus size={20} weight="bold" />
+                        <span className="text-[11px] font-bold">Thêm ảnh</span>
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500">Tối đa 16 ảnh</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </form>
 
           {/* Footer Actions */}
@@ -742,6 +1043,328 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ─── SUB-MODAL 1: XEM ẢNH LỚN ───── */}
+      {previewShot && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setPreviewShot(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-lg w-full p-4 flex flex-col gap-3 shadow-2xl text-xs text-gray-800 dark:text-gray-200"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-sm text-gray-900 dark:text-white">
+                    Chi tiết ảnh mẫu
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${previewShot.role === 'ANCHOR' ? 'bg-blue-600' : 'bg-purple-600'
+                      }`}
+                  >
+                    {previewShot.role === 'ANCHOR' ? 'Mẫu chuẩn' : 'Biến thể'}
+                  </span>
+                  {previewShot.isPinned && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white">
+                      Đã ghim
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewShot(null)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+
+              <div className="w-full max-h-[60vh] bg-gray-50 dark:bg-black/50 rounded-xl overflow-hidden flex items-center justify-center p-2 border border-gray-200 dark:border-white/10">
+                <img
+                  src={previewShot.imageUrl}
+                  alt="Chi tiết ảnh mẫu"
+                  className="max-h-[55vh] w-auto max-w-full object-contain rounded-lg"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 text-[11px] pt-1">
+                {previewShot.sharpness !== null && previewShot.sharpness !== undefined ? (
+                  <span>Độ nét {Math.round(previewShot.sharpness)} phần trăm</span>
+                ) : (
+                  <span />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewShot(null)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-800 dark:text-gray-200 font-semibold cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* ─── SUB-MODAL 2: THÊM ẢNH MẪU ───── */}
+      {isAddShotOpen && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => {
+              if (!isShotSubmitting) {
+                handleClearShotImage()
+                setIsAddShotOpen(false)
+              }
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-md w-full p-5 flex flex-col gap-4 shadow-2xl text-xs text-gray-800 dark:text-gray-200"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 pb-3">
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                  Thêm ảnh mẫu mới
+                </h4>
+                <button
+                  type="button"
+                  disabled={isShotSubmitting}
+                  onClick={() => {
+                    handleClearShotImage()
+                    setIsAddShotOpen(false)
+                  }}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveShot} className="flex flex-col gap-4">
+                <input
+                  type="file"
+                  ref={shotFileInputRef}
+                  onChange={handleShotFileChange}
+                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                  className="hidden"
+                />
+
+                {/* Chuyển đổi phương thức nguồn ảnh */}
+                <div className="flex p-1 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setShotShowUrlInput(false)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      !shotShowUrlInput
+                        ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
+                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                    }`}
+                  >
+                    Tải tệp từ máy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShotShowUrlInput(true)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      shotShowUrlInput
+                        ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
+                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                    }`}
+                  >
+                    Đường dẫn URL
+                  </button>
+                </div>
+
+                {!shotShowUrlInput ? (
+                  <div className="space-y-2">
+                    {shotImagePreview ? (
+                      <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-black/30 p-3 flex flex-col items-center justify-center gap-3">
+                        <div className="relative rounded-lg overflow-hidden bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 max-h-44 flex items-center justify-center p-1">
+                          <img
+                            src={shotImagePreview}
+                            alt="Ảnh xem trước"
+                            className="max-h-40 w-auto object-contain rounded"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 w-full">
+                          <button
+                            type="button"
+                            onClick={() => shotFileInputRef.current?.click()}
+                            className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-[11px] font-semibold text-gray-800 dark:text-gray-200 transition-colors cursor-pointer text-center"
+                          >
+                            Đổi ảnh khác
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearShotImage}
+                            className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800/60 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 text-[11px] font-semibold text-red-600 dark:text-red-400 transition-colors cursor-pointer"
+                          >
+                            Gỡ ảnh
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => shotFileInputRef.current?.click()}
+                        className="group border-2 border-dashed border-gray-300 dark:border-white/20 hover:border-[#007b8b] dark:hover:border-[#00c4de] rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all bg-gray-50/50 hover:bg-[#007b8b]/5 dark:bg-white/[0.02] dark:hover:bg-[#00c4de]/5"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] flex items-center justify-center mb-2.5 transition-transform group-hover:scale-105">
+                          <Camera size={24} weight="bold" />
+                        </div>
+                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                          Chọn tệp ảnh từ thiết bị
+                        </span>
+                        <span className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                          Hỗ trợ JPG, PNG, WEBP tối đa 50MB
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                      Đường dẫn URL ảnh trực tiếp
+                    </label>
+                    <input
+                      type="url"
+                      value={shotImageUrl}
+                      onChange={(e) => {
+                        setShotImageUrl(e.target.value)
+                        if (shotImageFile) {
+                          handleClearShotImage()
+                        }
+                      }}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 bg-white dark:bg-black/30 border border-gray-300 dark:border-white/15 rounded-xl text-xs text-gray-900 dark:text-white outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] transition-colors"
+                    />
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                      Nhập đường dẫn trực tiếp đến tệp ảnh của biển báo
+                    </p>
+                  </div>
+                )}
+
+                {/* Phân loại vai trò */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                    Phân loại vai trò
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShotRole('MEDOID')}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                        shotRole === 'MEDOID'
+                          ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
+                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-xs">Biến thể</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShotRole('ANCHOR')}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${
+                        shotRole === 'ANCHOR'
+                          ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
+                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-xs">Mẫu chuẩn</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ghim cố định */}
+                <label
+                  htmlFor="pinShotCheckbox"
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] hover:bg-gray-100/60 dark:hover:bg-white/[0.04] transition-colors cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    id="pinShotCheckbox"
+                    checked={shotIsPinned}
+                    onChange={(e) => setShotIsPinned(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-[#007b8b] focus:ring-[#007b8b] cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                      Ghim cố định ảnh mẫu
+                    </span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                      Tránh bị thuật toán tự động thay thế
+                    </span>
+                  </div>
+                </label>
+
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-white/10">
+                  <button
+                    type="button"
+                    disabled={isShotSubmitting}
+                    onClick={() => {
+                      handleClearShotImage()
+                      setIsAddShotOpen(false)
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 font-semibold cursor-pointer transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isShotSubmitting || (!shotImageFile && !shotImageUrl.trim())}
+                    className="px-5 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    {isShotSubmitting && <CircleNotch size={14} className="animate-spin" />}
+                    <span>Thêm ảnh</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* ─── SUB-MODAL 3: XÁC NHẬN XÓA ẢNH MẪU ───── */}
+      {shotToDelete && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => !isDeletingShot && setShotToDelete(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-2xl max-w-sm w-full p-5 flex flex-col gap-3 shadow-2xl text-xs text-gray-800 dark:text-gray-200"
+            >
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                Xác nhận xóa ảnh mẫu
+              </h4>
+              <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
+                Bạn có chắc chắn muốn xóa ảnh này khỏi tập huấn luyện AI không? Thao tác này không thể hoàn tác sau khi thực hiện.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/10">
+                <button
+                  type="button"
+                  disabled={isDeletingShot}
+                  onClick={() => setShotToDelete(null)}
+                  className="px-3.5 py-1.5 rounded-lg bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-700 dark:text-gray-300 font-semibold cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingShot}
+                  onClick={handleConfirmDeleteShot}
+                  className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
+                >
+                  {isDeletingShot && <CircleNotch size={13} className="animate-spin" />}
+                  <span>Xóa ảnh</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </ModalPortal>
   )
 }

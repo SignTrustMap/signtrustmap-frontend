@@ -197,6 +197,17 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem | any): MissingS
   }
 }
 
+function removeAccents(str?: string | null): string {
+  if (!str) return ''
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim()
+}
+
 export default function MissingSignsPage() {
   const { t, i18n } = useTranslation(['ops', 'common'])
   const isEn = i18n.language?.startsWith('en')
@@ -241,7 +252,7 @@ export default function MissingSignsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedSort, setSelectedSort] = useState<
-    'newest' | 'oldest' | 'confidence_asc' | 'confidence_desc' | 'name_asc'
+    'newest' | 'oldest' | 'confidence_asc' | 'confidence_desc' | 'name_asc' | 'name_desc'
   >('newest')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -316,6 +327,22 @@ export default function MissingSignsPage() {
       else if (activeTab === 'Incomplete') statusQuery = 'INCOMPLETE'
       else if (activeTab === 'Rejected') statusQuery = 'REJECTED'
 
+      let sortByParam: string | undefined = undefined
+      let sortOrderParam: 'ASC' | 'DESC' | undefined = undefined
+      if (selectedSort === 'newest') {
+        sortByParam = 'newest'
+        sortOrderParam = 'DESC'
+      } else if (selectedSort === 'oldest') {
+        sortByParam = 'oldest'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'name_asc') {
+        sortByParam = 'a_z'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'name_desc') {
+        sortByParam = 'z_a'
+        sortOrderParam = 'DESC'
+      }
+
       const hasRemoteFilter = Boolean(debouncedSearch) || selectedCategory !== 'all'
       const [response, summaryRes] = await Promise.all([
         catalogService.getMissingReports({
@@ -323,6 +350,8 @@ export default function MissingSignsPage() {
           pageSize: hasRemoteFilter ? 100 : pageSize,
           status: statusQuery,
           search: debouncedSearch || undefined,
+          sortBy: sortByParam,
+          sortOrder: sortOrderParam,
         }),
         debouncedSearch
           ? Promise.resolve(null)
@@ -412,7 +441,7 @@ export default function MissingSignsPage() {
       setIsLoading(false)
       window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     }
-  }, [currentPage, pageSize, activeTab, debouncedSearch, selectedCategory])
+  }, [currentPage, pageSize, activeTab, debouncedSearch, selectedCategory, selectedSort])
 
   useEffect(() => {
     fetchReports()
@@ -482,9 +511,10 @@ export default function MissingSignsPage() {
   const sortOptions: OptionItem[] = useMemo(() => [
     { value: 'newest', label: isEn ? 'Newest first' : 'Mới nhất' },
     { value: 'oldest', label: isEn ? 'Oldest' : 'Cũ nhất' },
-    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
-    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
     { value: 'name_asc', label: isEn ? 'Sign Name: A → Z' : 'Tên biển: A → Z' },
+    { value: 'name_desc', label: isEn ? 'Sign Name: Z → A' : 'Tên biển: Z → A' },
+    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
+    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
   ], [isEn])
 
   // Catalog search filtering for Merge modal
@@ -498,13 +528,16 @@ export default function MissingSignsPage() {
 
   // Main reports filtering & sorting
   const normalizedSearchQuery = searchQuery.trim().replace(/^#+/, '').trim().toLowerCase()
+  const cleanSearchQuery = removeAccents(normalizedSearchQuery)
   const hasLocalFilter = Boolean(normalizedSearchQuery) || selectedCategory !== 'all'
 
   const filteredReports = useMemo(() => {
     const list = reports.filter((r) => {
       const q = normalizedSearchQuery
+      const qClean = cleanSearchQuery
       const cachedProfile = getCachedUserProfile(r.reporterId)
       const cachedName = (cachedProfile?.fullName || cachedProfile?.full_name || cachedProfile?.email || '').toLowerCase()
+      const staffReviewer = (r.reviewedBy || (r as any).staff?.fullName || (r as any).staff?.email || '').toLowerCase()
       const matchesSearch =
         !q ||
         r.id.toLowerCase().includes(q) ||
@@ -516,8 +549,15 @@ export default function MissingSignsPage() {
         (r.reporter?.fullName && r.reporter.fullName.toLowerCase().includes(q)) ||
         (r.reporter?.email && r.reporter.email.toLowerCase().includes(q)) ||
         (cachedName && cachedName.includes(q)) ||
+        (staffReviewer && staffReviewer.includes(q)) ||
         (r.roadAddress && r.roadAddress.toLowerCase().includes(q)) ||
-        r.similarCatalogEntries.some((code) => code.toLowerCase().includes(q))
+        r.similarCatalogEntries.some((code) => code.toLowerCase().includes(q)) ||
+        removeAccents(r.tempLabel).includes(qClean) ||
+        removeAccents(r.reporterNote).includes(qClean) ||
+        removeAccents(r.reportedBy).includes(qClean) ||
+        removeAccents(r.reporter?.fullName).includes(qClean) ||
+        removeAccents(cachedName).includes(qClean) ||
+        removeAccents(staffReviewer).includes(qClean)
 
       const matchesCategory = selectedCategory === 'all' || r.category === selectedCategory
 
@@ -545,11 +585,14 @@ export default function MissingSignsPage() {
         case 'name_asc': {
           return a.tempLabel.localeCompare(b.tempLabel, 'vi')
         }
+        case 'name_desc': {
+          return b.tempLabel.localeCompare(a.tempLabel, 'vi')
+        }
         default:
           return 0
       }
     })
-  }, [reports, normalizedSearchQuery, selectedCategory, selectedSort])
+  }, [reports, normalizedSearchQuery, cleanSearchQuery, selectedCategory, selectedSort])
 
   const paginatedReports = hasLocalFilter
     ? filteredReports.slice((currentPage - 1) * pageSize, currentPage * pageSize)

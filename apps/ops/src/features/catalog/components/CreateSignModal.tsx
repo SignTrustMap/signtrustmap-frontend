@@ -82,8 +82,6 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const objectUrlRef = useRef<string | null>(null)
 
-  if (!isOpen) return null
-
   const resetForm = () => {
     setCodePrefix('P.')
     setCodeNumber('')
@@ -146,7 +144,7 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
 
   // Real-time API check for code duplication with debounce
   useEffect(() => {
-    if (!hasInputNumber) {
+    if (!isOpen || !hasInputNumber) {
       setIsDuplicateCode(false)
       setIsCheckingApi(false)
       return
@@ -187,7 +185,18 @@ export const CreateSignModal: React.FC<CreateSignModalProps> = ({
       isCancelled = true
       clearTimeout(timer)
     }
-  }, [cleanCode, hasInputNumber, existingCodes])
+  }, [cleanCode, hasInputNumber, existingCodes, isOpen])
+
+  // Cleanup object URL on unmount
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+    }
+  }, [])
+
+  if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

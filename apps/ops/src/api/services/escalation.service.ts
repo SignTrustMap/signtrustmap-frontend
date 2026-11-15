@@ -79,7 +79,15 @@ export const escalationService = {
    * Fetch all staff moderation & escalation cases via GET /api/v1/moderation/cases
    */
   getCases: async (
-    params?: { status?: string; page?: number; pageSize?: number; search?: string },
+    params?: {
+      status?: string
+      page?: number
+      pageSize?: number
+      search?: string
+      q?: string
+      sortBy?: string
+      sortOrder?: string
+    },
     config?: Record<string, any>
   ): Promise<PaginatedCasesResponse> => {
     return http.get<PaginatedCasesResponse>(API_ENDPOINTS.MODERATION.CASES, { params, ...config })

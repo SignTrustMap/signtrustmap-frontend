@@ -361,7 +361,7 @@ export const catalogService = {
     return http.post<CatalogSignTypeItem>(
       API_ENDPOINTS.CATALOG.SIGN_TYPES,
       data,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
     )
   },
 
@@ -370,7 +370,7 @@ export const catalogService = {
     return http.patch<CatalogSignTypeItem>(
       API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id),
       data,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
     )
   },
 
@@ -379,7 +379,16 @@ export const catalogService = {
   },
 
   getMissingReports: async (
-    params?: { status?: string; page?: number; pageSize?: number; size?: number; search?: string; q?: string },
+    params?: {
+      status?: string
+      page?: number
+      pageSize?: number
+      size?: number
+      search?: string
+      q?: string
+      sortBy?: string
+      sortOrder?: string
+    },
     config?: Record<string, any>
   ): Promise<PaginatedMissingReportsResponse> => {
     const q: Record<string, any> = {}
@@ -395,6 +404,12 @@ export const catalogService = {
     q.limit = size
     if (params?.search || params?.q) {
       q.search = params.search || params.q
+    }
+    if (params?.sortBy) {
+      q.sortBy = params.sortBy
+    }
+    if (params?.sortOrder) {
+      q.sortOrder = params.sortOrder
     }
 
     let res: any
@@ -549,7 +564,12 @@ export const catalogService = {
   },
 
   addSupportShot: async (signTypeId: number, data: any): Promise<any> => {
-    return http.post<any>(API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId), data)
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.post<any>(
+      API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId),
+      data,
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
+    )
   },
 
   deleteSupportShot: async (signTypeId: number, imageId: string): Promise<any> => {

@@ -2,10 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   TrafficSignal,
-  PlusCircle,
-  SquaresFour,
+  Plus,
   WarningCircle,
-  Rows,
   ArrowsClockwise,
   CircleNotch,
 } from '@phosphor-icons/react'
@@ -26,7 +24,6 @@ import {
 import { CatalogDetailModal, type CategoryMeta } from './components/CatalogDetailModal'
 import { CreateSignModal } from './components/CreateSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
-import { CatalogTableView } from './components/CatalogTableView'
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 
 /**
@@ -88,14 +85,32 @@ export default function CatalogPage() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [isDebouncing, setIsDebouncing] = useState(false)
   const [sortBy, setSortBy] = useState<'code' | 'name'>('code')
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(6)
 
   const [selectedSign, setSelectedSign] = useState<CatalogEntry | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+
+  // Debounce search query to prevent jarring empty-state flicker during typing (especially with Vietnamese IME)
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!trimmed) {
+      setDebouncedSearch('')
+      setIsDebouncing(false)
+      return
+    }
+    setIsDebouncing(true)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed)
+      setIsDebouncing(false)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   /**
    * Fetch official categories and all signs concurrently from backend API.
@@ -310,7 +325,7 @@ export default function CatalogPage() {
    * Filter and sort catalog entries client-side, exactly like web application.
    */
   const filteredCatalog = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim()
+    const q = debouncedSearch.toLowerCase().trim()
     const list = catalog.filter((item) => {
       const matchesCategory =
         selectedCategory === 'all' ||
@@ -339,7 +354,7 @@ export default function CatalogPage() {
       }
       return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' })
     })
-  }, [catalog, selectedCategory, searchQuery, sortBy, getSignPrimaryName])
+  }, [catalog, selectedCategory, debouncedSearch, sortBy, getSignPrimaryName])
 
   const paginatedCatalog = useMemo(() => {
     const start = (currentPage - 1) * pageSize
@@ -391,7 +406,16 @@ export default function CatalogPage() {
         additional: 5,
         temporary: 6,
       }
-      const categoryId = newEntry.categoryId || catMap[newEntry.category] || 1
+      const matchedCategory = categories.find((c) => {
+        const cUpper = (c.code || '').toUpperCase()
+        if (newEntry.category === 'prohibitory' && (cUpper.includes('PROHIB') || cUpper === 'P')) return true
+        if (newEntry.category === 'warning' && (cUpper.includes('WARN') || cUpper === 'W')) return true
+        if (newEntry.category === 'mandatory' && (cUpper.includes('MANDAT') || cUpper === 'R')) return true
+        if (newEntry.category === 'guide' && (cUpper.includes('GUIDE') || cUpper.includes('INFO') || cUpper === 'I')) return true
+        if (newEntry.category === 'additional' && (cUpper.includes('ADD') || cUpper === 'S')) return true
+        return false
+      })
+      const categoryId = newEntry.categoryId || matchedCategory?.id || catMap[newEntry.category] || categories[0]?.id || 1
 
       let created: CatalogSignTypeItem | undefined
       if (file) {
@@ -432,10 +456,9 @@ export default function CatalogPage() {
       toast.success(t('catalog.toast_published'))
       setCurrentPage(1)
     } catch (err: any) {
-      console.warn('Failed to publish sign to server:', err)
-      setCatalog((prev) => [newEntry, ...prev])
-      toast.success(t('catalog.toast_published'))
-      setCurrentPage(1)
+      console.error('Failed to publish sign to server:', err)
+      const errorMsg = err?.response?.data?.message || err?.message || 'Không thể thêm biển báo lên máy chủ'
+      toast.error(Array.isArray(errorMsg) ? errorMsg.join(', ') : String(errorMsg))
     }
   }
 
@@ -499,43 +522,40 @@ export default function CatalogPage() {
       <PageHeader
         title={t('catalog.title')}
         actions={
-          <>
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               disabled={isLoading}
               onClick={fetchCatalogData}
-              className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              className="h-10 w-10 flex items-center justify-center border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
               title="Làm mới danh mục"
             >
               <ArrowsClockwise size={16} weight="bold" className={isLoading ? 'animate-spin' : ''} />
             </button>
 
-            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl border border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <div className="flex flex-col">
-                <span className="text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  SignTrustMap
-                </span>
-                <span className="text-sm font-extrabold text-gray-900 dark:text-white font-mono">
-                  {filteredCatalog.length} / {totalCount || catalog.length}{' '}
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                    {t('catalog.sign_types_unit', 'biển báo')}
-                  </span>
-                </span>
-              </div>
+            <div className="h-10 flex items-center gap-2 px-3.5 rounded-xl border border-[#E8E4E3] dark:border-white/10 bg-white dark:bg-[#0A171C] text-xs shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="font-bold text-gray-900 dark:text-white font-mono">
+                {filteredCatalog.length === (totalCount || catalog.length)
+                  ? (totalCount || catalog.length)
+                  : `${filteredCatalog.length} / ${totalCount || catalog.length}`}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400 font-medium">
+                {t('catalog.sign_types_unit', 'loại biển')}
+              </span>
             </div>
 
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
+                className="h-10 inline-flex items-center gap-2 px-4 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer active:scale-95 shrink-0"
               >
-                <PlusCircle size={17} weight="bold" />
-                <span>{t('catalog.btn_add_sign', 'Thêm biển báo')}</span>
+                <Plus size={16} weight="bold" />
+                <span>{t('catalog.btn_add_sign', 'Thêm biển mới')}</span>
               </button>
             )}
-          </>
+          </div>
         }
       />
 
@@ -543,7 +563,6 @@ export default function CatalogPage() {
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val)
-          setCurrentPage(1)
         }}
         searchPlaceholder={t('catalog.search_placeholder', 'Tìm theo mã hiệu, tên biển hoặc mô tả...')}
         categoryFilterMode="select"
@@ -567,36 +586,7 @@ export default function CatalogPage() {
           setSortBy(val as 'code' | 'name')
           setCurrentPage(1)
         }}
-      >
-        <div className="flex items-center p-1 bg-gray-100 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 text-xs">
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              viewMode === 'grid'
-                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
-            title={t('catalog.view_grid', 'Xem dạng lưới')}
-          >
-            <SquaresFour size={15} weight="bold" />
-            <span className="hidden sm:inline">{t('catalog.view_grid', 'Xem dạng lưới')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              viewMode === 'table'
-                ? 'bg-white dark:bg-[#0A171C] text-gray-900 dark:text-white shadow-xs'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-            }`}
-            title={t('catalog.view_table', 'Xem dạng bảng')}
-          >
-            <Rows size={15} weight="bold" />
-            <span className="hidden sm:inline">{t('catalog.view_table', 'Xem dạng bảng')}</span>
-          </button>
-        </div>
-      </DataFilterBar>
+      />
 
       {isLoading ? (
         <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
@@ -621,6 +611,11 @@ export default function CatalogPage() {
             <span>{t('catalog.retry', 'Thử lại')}</span>
           </button>
         </div>
+      ) : isDebouncing && filteredCatalog.length === 0 ? (
+        <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
+          <CircleNotch size={28} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+          <p className="text-xs text-neutral-500 font-medium">Đang tìm kiếm biển báo...</p>
+        </div>
       ) : filteredCatalog.length === 0 ? (
         <div className="py-16 px-6 text-center space-y-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0A171C] shadow-xs">
           <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mx-auto text-gray-400">
@@ -637,6 +632,7 @@ export default function CatalogPage() {
             onClick={() => {
               setSelectedCategory('all')
               setSearchQuery('')
+              setDebouncedSearch('')
               setCurrentPage(1)
             }}
             className="px-4 py-2 rounded-xl text-xs font-bold bg-[#007b8b] text-white hover:bg-[#00606d] transition-colors cursor-pointer inline-block mt-2"
@@ -646,26 +642,16 @@ export default function CatalogPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {viewMode === 'grid' ? (
-            <CatalogGridView
-              signs={paginatedCatalog}
-              onSelectSign={setSelectedSign}
-              getCategoryMeta={getCategoryMeta}
-              getSignPrimaryName={getSignPrimaryName}
-              getSignSecondaryName={getSignSecondaryName}
-              getSignPrimaryDesc={getSignPrimaryDesc}
-              getShapeLabel={getShapeLabel}
-              renderColorPill={renderColorPill}
-            />
-          ) : (
-            <CatalogTableView
-              signs={paginatedCatalog}
-              onSelectSign={setSelectedSign}
-              getCategoryMeta={getCategoryMeta}
-              getSignPrimaryName={getSignPrimaryName}
-              getSignSecondaryName={getSignSecondaryName}
-            />
-          )}
+          <CatalogGridView
+            signs={paginatedCatalog}
+            onSelectSign={setSelectedSign}
+            getCategoryMeta={getCategoryMeta}
+            getSignPrimaryName={getSignPrimaryName}
+            getSignSecondaryName={getSignSecondaryName}
+            getSignPrimaryDesc={getSignPrimaryDesc}
+            getShapeLabel={getShapeLabel}
+            renderColorPill={renderColorPill}
+          />
 
           <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 sm:px-6 shadow-xs">
             <Pagination
@@ -703,7 +689,7 @@ export default function CatalogPage() {
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreateEntry}
-          existingCodes={catalog.map((c) => c.code)}
+          existingCodes={catalog.map((c) => c?.code || '').filter(Boolean)}
         />
       )}
     </div>

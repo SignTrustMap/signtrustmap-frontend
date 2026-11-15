@@ -34,6 +34,8 @@ import {
   Image as ImageIcon,
   CalendarBlank,
   ChatText,
+  Hash,
+  Tag,
 } from '@phosphor-icons/react'
 import {
   escalationService,
@@ -54,6 +56,150 @@ function formatDate(dateStr?: string | Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const year = d.getFullYear()
   return `${hours}:${minutes} • ${day}/${month}/${year}`
+}
+
+interface ResolvedCoordinates {
+  lat: number
+  lng: number
+}
+
+function parseCoordinateNumber(val: any, min: number, max: number): number | null {
+  if (val == null || val === '') return null
+  const num = typeof val === 'number' ? val : parseFloat(String(val))
+  if (Number.isFinite(num) && num >= min && num <= max) {
+    return num
+  }
+  return null
+}
+
+function extractCoordinatesFromAny(source: any): ResolvedCoordinates | null {
+  if (!source || typeof source !== 'object') return null
+
+  // 1. Direct properties: latitude / longitude, lat / lng, lat / lon, lat_dd / lon_dd, gps_latitude / gps_longitude
+  const directLat = parseCoordinateNumber(source.latitude ?? source.lat ?? source.lat_dd ?? source.gps_latitude ?? source.gps_lat, -90, 90)
+  const directLng = parseCoordinateNumber(source.longitude ?? source.lng ?? source.lon ?? source.lon_dd ?? source.gps_longitude ?? source.gps_lng, -180, 180)
+  if (directLat != null && directLng != null && (directLat !== 0 || directLng !== 0)) {
+    return { lat: directLat, lng: directLng }
+  }
+
+  // 2. Nested locationContext
+  if (source.locationContext) {
+    const coords = extractCoordinatesFromAny(source.locationContext.coordinates || source.locationContext)
+    if (coords) return coords
+  }
+
+  // 3. Array or Object coordinates property
+  if (source.coordinates) {
+    if (Array.isArray(source.coordinates) && source.coordinates.length >= 2) {
+      const c0 = parseFloat(source.coordinates[0])
+      const c1 = parseFloat(source.coordinates[1])
+      if (Number.isFinite(c0) && Number.isFinite(c1) && (c0 !== 0 || c1 !== 0)) {
+        if (Math.abs(c0) > 90 || (c0 > 30 && c1 <= 30)) {
+          return { lat: c1, lng: c0 }
+        }
+        if (c1 > 30 && c0 <= 30) {
+          return { lat: c0, lng: c1 }
+        }
+        return { lat: c1, lng: c0 }
+      }
+    } else if (typeof source.coordinates === 'object') {
+      const coords = extractCoordinatesFromAny(source.coordinates)
+      if (coords) return coords
+    }
+  }
+
+  // 4. Location property: GeoJSON object, coordinates array, object, or string
+  if (source.location) {
+    if (typeof source.location === 'object') {
+      if (Array.isArray(source.location.coordinates)) {
+        const coords = extractCoordinatesFromAny({ coordinates: source.location.coordinates })
+        if (coords) return coords
+      }
+      const coords = extractCoordinatesFromAny(source.location)
+      if (coords) return coords
+    } else if (typeof source.location === 'string') {
+      const wktMatch = source.location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i)
+      if (wktMatch) {
+        const p1 = parseFloat(wktMatch[1])
+        const p2 = parseFloat(wktMatch[2])
+        if (Number.isFinite(p1) && Number.isFinite(p2)) {
+          if (p2 > 90 || (p1 <= 30 && p2 > 30)) {
+            return { lat: p1, lng: p2 }
+          }
+          return { lat: p2, lng: p1 }
+        }
+      }
+      try {
+        const parsed = JSON.parse(source.location)
+        const coords = extractCoordinatesFromAny(parsed)
+        if (coords) return coords
+      } catch { }
+    }
+  }
+
+  // 5. GPS property: object, string lat,lng, or array
+  if (source.gps) {
+    if (typeof source.gps === 'object') {
+      const coords = extractCoordinatesFromAny(source.gps)
+      if (coords) return coords
+    } else if (typeof source.gps === 'string') {
+      const m = source.gps.match(/([-\d.]+)[,\s]+([-\d.]+)/)
+      if (m) {
+        const p1 = parseFloat(m[1])
+        const p2 = parseFloat(m[2])
+        if (Number.isFinite(p1) && Number.isFinite(p2)) {
+          if (p2 > 90 || (p1 <= 30 && p2 > 30)) {
+            return { lat: p1, lng: p2 }
+          }
+          return { lat: p2, lng: p1 }
+        }
+      }
+    }
+  }
+
+  // 6. sign_location or vehicle_location
+  if (source.sign_location || source.signLocation) {
+    const coords = extractCoordinatesFromAny(source.sign_location || source.signLocation)
+    if (coords) return coords
+  }
+  if (source.vehicle_location || source.vehicleLocation) {
+    const coords = extractCoordinatesFromAny(source.vehicle_location || source.vehicleLocation)
+    if (coords) return coords
+  }
+
+  // 7. location_wkt or locationWkt
+  if (source.location_wkt || source.locationWkt) {
+    const str = String(source.location_wkt || source.locationWkt)
+    const wktMatch = str.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i)
+    if (wktMatch) {
+      const p1 = parseFloat(wktMatch[1])
+      const p2 = parseFloat(wktMatch[2])
+      if (Number.isFinite(p1) && Number.isFinite(p2)) {
+        if (p2 > 90 || (p1 <= 30 && p2 > 30)) {
+          return { lat: p1, lng: p2 }
+        }
+        return { lat: p2, lng: p1 }
+      }
+    }
+  }
+
+  // 8. Text note containing GPS: lat, lon
+  const textNote = source.note || source.description || source.reporterNote || source.reporter_note || source.fieldNotes || source.staffNotes
+  if (typeof textNote === 'string') {
+    const m = textNote.match(/GPS:\s*([-\d.]+)[,\s]+([-\d.]+)/i)
+    if (m) {
+      const p1 = parseFloat(m[1])
+      const p2 = parseFloat(m[2])
+      if (Number.isFinite(p1) && Number.isFinite(p2) && (p1 !== 0 || p2 !== 0)) {
+        if (p2 > 90 || (p1 <= 30 && p2 > 30)) {
+          return { lat: p1, lng: p2 }
+        }
+        return { lat: p2, lng: p1 }
+      }
+    }
+  }
+
+  return null
 }
 
 interface ActionDecisionConfig {
@@ -209,6 +355,17 @@ function getStatus(status?: string): { vi: string; en: string; dot: string; text
   }
 }
 
+function removeAccents(str?: string | null): string {
+  if (!str) return ''
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim()
+}
+
 export default function AdminEscalationsPage() {
   const { t, i18n } = useTranslation('ops')
   const { success, warning, error } = useToast()
@@ -225,6 +382,7 @@ export default function AdminEscalationsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedSort, setSelectedSort] = useState<'newest' | 'oldest' | 'a_z' | 'z_a'>('newest')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -242,7 +400,7 @@ export default function AdminEscalationsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, typeFilter, statusFilter])
+  }, [searchTerm, typeFilter, statusFilter, selectedSort])
 
   // Modal State
   const [selectedCase, setSelectedCase] = useState<ModerationCaseItem | null>(null)
@@ -250,12 +408,13 @@ export default function AdminEscalationsPage() {
   const [targetData, setTargetData] = useState<any | null>(null)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
   const [copiedTargetId, setCopiedTargetId] = useState(false)
+  const [copiedCaseId, setCopiedCaseId] = useState(false)
   const [activeImageTab, setActiveImageTab] = useState<'crop' | 'frame'>('crop')
   const [imgLoadError, setImgLoadError] = useState(false)
 
   // Verdict Form
   const [actionType, setActionType] = useState<string>('RESOLVE')
-  const [banTarget, setBanTarget] = useState<BanTargetRole>('SURVEYOR')
+  const [banTarget, setBanTarget] = useState<BanTargetRole>('REVIEWER')
   const [decisionNotes, setDecisionNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalStep, setModalStep] = useState<'DETAIL' | 'CATALOG_PROPOSAL'>('DETAIL')
@@ -276,12 +435,30 @@ export default function AdminEscalationsPage() {
   const fetchCases = useCallback(async () => {
     setIsLoading(true)
     try {
+      let sortByParam = 'newest'
+      let sortOrderParam: 'ASC' | 'DESC' = 'DESC'
+      if (selectedSort === 'newest') {
+        sortByParam = 'newest'
+        sortOrderParam = 'DESC'
+      } else if (selectedSort === 'oldest') {
+        sortByParam = 'oldest'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'a_z') {
+        sortByParam = 'a_z'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'z_a') {
+        sortByParam = 'z_a'
+        sortOrderParam = 'DESC'
+      }
+
       const hasRemoteFilter = Boolean(debouncedSearch) || typeFilter !== 'all'
       const response = await escalationService.getCases({
         page: hasRemoteFilter ? 1 : currentPage,
         pageSize: hasRemoteFilter ? 100 : pageSize,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: debouncedSearch || undefined,
+        sortBy: sortByParam,
+        sortOrder: sortOrderParam,
       })
       if (response && Array.isArray(response.items)) {
         setCases(response.items)
@@ -318,7 +495,7 @@ export default function AdminEscalationsPage() {
                 })
               }
             })
-            .catch(() => {})
+            .catch(() => { })
         }
       } else {
         setCases([])
@@ -332,7 +509,7 @@ export default function AdminEscalationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentPage, pageSize, statusFilter, typeFilter, debouncedSearch, error, isEn])
+  }, [currentPage, pageSize, statusFilter, typeFilter, debouncedSearch, selectedSort, error, isEn])
 
   useEffect(() => {
     fetchCases()
@@ -345,8 +522,9 @@ export default function AdminEscalationsPage() {
     setTargetData(null)
     setDecisionNotes('')
     setActionType('RESOLVE')
-    setBanTarget('SURVEYOR')
+    setBanTarget('REVIEWER')
     setCopiedTargetId(false)
+    setCopiedCaseId(false)
     setActiveImageTab('crop')
     setImgLoadError(false)
     setModalStep('DETAIL')
@@ -418,8 +596,8 @@ export default function AdminEscalationsPage() {
             reportRawStatus === 'MERGED'
               ? 'MERGED'
               : reportRawStatus === 'REJECTED'
-              ? 'DISMISS'
-              : 'APPROVED',
+                ? 'DISMISS'
+                : 'APPROVED',
           targetSignTypeId: reportMergedSignTypeId,
           reportId: reportId || undefined,
         })
@@ -488,7 +666,7 @@ export default function AdminEscalationsPage() {
           REQUEST_RECAPTURE: isEn ? 'Field recapture task assigned to a random surveyor!' : 'Đã giao nhiệm vụ chụp lại thực địa cho một surveyor ngẫu nhiên!',
           BAN_USER: isEn
             ? `User ${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'} has been banned successfully!`
-            : `Đã khóa tài khoản của ${banTarget === 'SURVEYOR' ? 'Surveyor chụp lại' : banTarget === 'REVIEWER' ? 'Reviewer báo cáo' : 'Staff duyệt'}!`,
+            : `Đã khóa tài khoản ${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'}!`,
         }[mappedAction]
 
         success(actionSuccessMsg)
@@ -522,10 +700,12 @@ export default function AdminEscalationsPage() {
 
   // Client Filter for Search & Type
   const normalizedSearchTerm = searchTerm.trim().replace(/^#+/, '').trim().toLowerCase()
+  const cleanSearchTerm = removeAccents(normalizedSearchTerm)
   const hasLocalFilter = Boolean(normalizedSearchTerm) || typeFilter !== 'all'
 
   const filteredCases = cases.filter((c) => {
     const q = normalizedSearchTerm
+    const qClean = cleanSearchTerm
     const id = (c.id || '').toLowerCase()
     const rawTargetId = String(c.targetEntityId || c.target_entity_id || '')
     const targetId = rawTargetId.toLowerCase()
@@ -533,6 +713,8 @@ export default function AdminEscalationsPage() {
     const caseType = (c.caseType || c.case_type || '').toLowerCase()
     const reportTitle = (c.proposedName || c.targetTitle || reportTitleById[rawTargetId] || '').toLowerCase()
     const reporterLabel = (c.reporter?.fullName || c.reporter?.email || '').toLowerCase()
+    const staffName = (c.assignedStaff?.fullName || (c as any).assignedStaff?.full_name || '').toLowerCase()
+    const staffEmail = (c.assignedStaff?.email || '').toLowerCase()
     const note = (c.resolutionNote || c.resolution_note || c.notes || '').toLowerCase()
 
     const matchesSearch =
@@ -543,7 +725,14 @@ export default function AdminEscalationsPage() {
       caseType.includes(q) ||
       reportTitle.includes(q) ||
       reporterLabel.includes(q) ||
-      note.includes(q)
+      staffName.includes(q) ||
+      staffEmail.includes(q) ||
+      note.includes(q) ||
+      removeAccents(reportTitle).includes(qClean) ||
+      removeAccents(reporterLabel).includes(qClean) ||
+      removeAccents(staffName).includes(qClean) ||
+      removeAccents(staffEmail).includes(qClean) ||
+      removeAccents(note).includes(qClean)
 
     const matchesType =
       typeFilter === 'all' ||
@@ -552,9 +741,36 @@ export default function AdminEscalationsPage() {
     return matchesSearch && matchesType
   })
 
+  const sortedCases = [...filteredCases].sort((a, b) => {
+    switch (selectedSort) {
+      case 'newest': {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime()
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime()
+        return dateB - dateA
+      }
+      case 'oldest': {
+        const dateA = new Date(a.createdAt || a.created_at || 0).getTime()
+        const dateB = new Date(b.createdAt || b.created_at || 0).getTime()
+        return dateA - dateB
+      }
+      case 'a_z': {
+        const nameA = a.proposedName || a.targetTitle || a.caseType || a.case_type || a.id || ''
+        const nameB = b.proposedName || b.targetTitle || b.caseType || b.case_type || b.id || ''
+        return nameA.localeCompare(nameB, 'vi')
+      }
+      case 'z_a': {
+        const nameA = a.proposedName || a.targetTitle || a.caseType || a.case_type || a.id || ''
+        const nameB = b.proposedName || b.targetTitle || b.caseType || b.case_type || b.id || ''
+        return nameB.localeCompare(nameA, 'vi')
+      }
+      default:
+        return 0
+    }
+  })
+
   const paginatedCases = hasLocalFilter
-    ? filteredCases.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-    : filteredCases
+    ? sortedCases.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : sortedCases
 
   // Target entity visual & contextual extraction
   const targetTypeStr = (selectedCase?.targetEntityType || selectedCase?.target_entity_type || '').toLowerCase()
@@ -580,7 +796,6 @@ export default function AdminEscalationsPage() {
   let signName: string | null = null
   let lat: number | null = null
   let lng: number | null = null
-  let locationAddress: string | null = null
   let description: string | null = null
   let reporterId: string | null = null
   let reporterSummary: UserProfileSummary | null = null
@@ -623,8 +838,6 @@ export default function AdminEscalationsPage() {
       if (cand) {
         cropUrl = resolveImageUrl(cand.signCropUrl || raw.sampleImageUrl)
         frameUrl = resolveImageUrl(cand.bestFrameUrl || raw.bestFrameUrl)
-        lat = Number(cand.latitude ?? cand.lat ?? raw.lat)
-        lng = Number(cand.longitude ?? cand.lng ?? raw.lng)
       }
       signName = raw.proposedName || raw.tempLabel || cand?.predictedSignType?.nameVi || cand?.predictedSignType?.nameEn
       description =
@@ -638,10 +851,16 @@ export default function AdminEscalationsPage() {
         cand?.submission?.note ||
         null
       rawStaffNote = raw.staffNotes || null
-      reporterId = raw.reporterId || raw.reportedBy || null
-      reporterSummary = raw.reporter || null
-      reviewedBy = raw.reviewedBy || selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
-      reviewerSummary = raw.reviewer || null
+      const rawRep = raw.reporterId || raw.reporter_id || raw.reportedBy || raw.reported_by || null
+      reporterId = typeof rawRep === 'string' ? rawRep : (rawRep?.id ? String(rawRep.id) : null)
+      reporterSummary = (typeof raw.reporter === 'object' && raw.reporter)
+        ? raw.reporter
+        : (typeof rawRep === 'object' && rawRep ? rawRep : null)
+      const rawRev = raw.reviewedBy || raw.reviewed_by || selectedCase?.assignedStaffId || selectedCase?.assigned_staff_id || null
+      reviewedBy = typeof rawRev === 'string' ? rawRev : (rawRev?.id ? String(rawRev.id) : null)
+      reviewerSummary = (typeof raw.reviewer === 'object' && raw.reviewer)
+        ? raw.reviewer
+        : (typeof rawRev === 'object' && rawRev ? rawRev : null)
       if (raw.id) targetEntityId = raw.id
     } else if (isCandidate) {
       const cand = raw.candidate || raw
@@ -670,14 +889,6 @@ export default function AdminEscalationsPage() {
           ? cand.predictedSignType.nameEn || cand.predictedSignType.name_en || cand.predictedSignType.nameVi || cand.predictedSignType.name_vi
           : cand.predictedSignType.nameVi || cand.predictedSignType.name_vi || cand.predictedSignType.nameEn || cand.predictedSignType.name_en
       }
-      if (raw.locationContext?.coordinates) {
-        lat = raw.locationContext.coordinates.latitude
-        lng = raw.locationContext.coordinates.longitude
-      } else if (cand.latitude && cand.longitude) {
-        lat = Number(cand.latitude)
-        lng = Number(cand.longitude)
-      }
-      locationAddress = raw.locationContext?.displayLocation || null
       description =
         raw.description ||
         raw.reporterNote ||
@@ -702,10 +913,6 @@ export default function AdminEscalationsPage() {
           email: ev?.surveyorEmail || null,
         }
       }
-      if (raw.location) {
-        lat = Number(raw.location.lat)
-        lng = Number(raw.location.lon)
-      }
       if (raw.name_en || raw.name_vi) {
         signName = isEn
           ? raw.name_en || raw.name_vi
@@ -715,6 +922,25 @@ export default function AdminEscalationsPage() {
   }
 
   const rawTargetObj = targetData?.data || targetData || {}
+  const candTargetObj = rawTargetObj?.candidate
+
+  // Universal GPS Coordinates & Location Address Extraction
+  const resolvedCoords =
+    extractCoordinatesFromAny(candTargetObj) ||
+    extractCoordinatesFromAny(rawTargetObj) ||
+    extractCoordinatesFromAny(rawTargetObj?.locationContext) ||
+    extractCoordinatesFromAny(candTargetObj?.locationContext) ||
+    extractCoordinatesFromAny(rawTargetObj?.submission) ||
+    extractCoordinatesFromAny(candTargetObj?.submission) ||
+    extractCoordinatesFromAny(rawTargetObj?.evidences?.[0]) ||
+    extractCoordinatesFromAny(detailedCase) ||
+    extractCoordinatesFromAny(selectedCase)
+
+  if (resolvedCoords) {
+    lat = resolvedCoords.lat
+    lng = resolvedCoords.lng
+  }
+
   const historyTaskId: string | null =
     isCandidate || isRevalidation
       ? targetEntityId
@@ -760,12 +986,38 @@ export default function AdminEscalationsPage() {
     rawReport?.recaptureRequest || activeCase?.recaptureRequest || null
   )
 
-  const { displayName: resolvedReporterName } = useResolvedUserProfile(reporterId, reporterSummary)
-  const { displayName: resolvedStaffName } = useResolvedUserProfile(reviewedBy || staffReviewerId, staffSummary)
-  const { displayName: resolvedSurveyorName } = useResolvedUserProfile(
-    recaptureRequest?.surveyorId,
-    recaptureRequest?.assignedSurveyor
+  const surveyorUserId = (typeof recaptureRequest?.surveyorId === 'string' ? recaptureRequest.surveyorId : (recaptureRequest?.surveyorId as any)?.id) || (activeCase as any)?.involvedUsers?.surveyor?.id || (targetData as any)?.candidate?.submission?.surveyorId || null
+  const reviewerUserId = (typeof reporterId === 'string' ? reporterId : (reporterId as any)?.id) || (activeCase as any)?.involvedUsers?.reviewer?.id || null
+  const staffUserId = (typeof reviewedBy === 'string' ? reviewedBy : (reviewedBy as any)?.id) || (typeof staffReviewerId === 'string' ? staffReviewerId : (staffReviewerId as any)?.id) || (activeCase as any)?.involvedUsers?.staff?.id || null
+
+  const surveyorInitial = recaptureRequest?.assignedSurveyor || (activeCase as any)?.involvedUsers?.surveyor || null
+  const reviewerInitial = reporterSummary || (activeCase as any)?.involvedUsers?.reviewer || null
+  const staffInitial = staffSummary || (activeCase as any)?.involvedUsers?.staff || null
+
+  const { profile: surveyorProfile, displayName: resolvedSurveyorName } = useResolvedUserProfile(
+    surveyorUserId,
+    surveyorInitial
   )
+  const { profile: reviewerProfile, displayName: resolvedReporterName } = useResolvedUserProfile(
+    reviewerUserId,
+    reviewerInitial
+  )
+  const { profile: staffProfile, displayName: resolvedStaffName } = useResolvedUserProfile(
+    staffUserId,
+    staffInitial
+  )
+
+  useEffect(() => {
+    if (actionType === 'BAN_USER') {
+      const availableKeys: BanTargetRole[] = []
+      if (surveyorUserId) availableKeys.push('SURVEYOR')
+      if (reviewerUserId) availableKeys.push('REVIEWER')
+      if (staffUserId) availableKeys.push('STAFF')
+      if (availableKeys.length > 0 && !availableKeys.includes(banTarget)) {
+        setBanTarget(availableKeys[0])
+      }
+    }
+  }, [actionType, surveyorUserId, reviewerUserId, staffUserId, banTarget])
 
   const hasContextFrame = Boolean(frameUrl)
   const activeImageUrl = activeImageTab === 'frame' && frameUrl ? frameUrl : cropUrl
@@ -793,7 +1045,18 @@ export default function AdminEscalationsPage() {
       <DataFilterBar
         searchQuery={searchTerm}
         onSearchChange={setSearchTerm}
-        searchPlaceholder={isEn ? 'Search by case/proposal ID (#...), report name...' : 'Tìm mã ca, mã đề xuất (#...), tên report...'}
+        searchPlaceholder={isEn ? 'Search by case ID, staff name, email, report...' : 'Tìm mã ca, tên nhân viên, email, báo cáo...'}
+        sortOptions={[
+          { id: 'newest', label: isEn ? 'Newest' : 'Mới nhất' },
+          { id: 'oldest', label: isEn ? 'Oldest' : 'Cũ nhất' },
+          { id: 'a_z', label: isEn ? 'A to Z' : 'Tên A-Z' },
+          { id: 'z_a', label: isEn ? 'Z to A' : 'Tên Z-A' },
+        ]}
+        selectedSort={selectedSort}
+        onSelectSort={(val) => {
+          setSelectedSort(val as 'newest' | 'oldest' | 'a_z' | 'z_a')
+          setCurrentPage(1)
+        }}
       >
         {/* Case Type Filter */}
         <CustomSelect
@@ -833,7 +1096,8 @@ export default function AdminEscalationsPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
               <tr>
-                <th className="py-3 px-4 font-semibold">{isEn ? 'ID' : 'Mã ca'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Case ID' : 'Mã ca'}</th>
+                <th className="py-3 px-4 font-semibold">{isEn ? 'Target ID' : 'Mã đối tượng'}</th>
                 <th className="py-3 px-4 font-semibold">{isEn ? 'Case type' : 'Phân loại'}</th>
                 <th className="py-3 px-4 font-semibold">{isEn ? 'Target entity' : 'Đối tượng'}</th>
                 <th className="py-3 px-4 font-semibold">{isEn ? 'Status' : 'Trạng thái'}</th>
@@ -844,7 +1108,7 @@ export default function AdminEscalationsPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400 font-medium">
+                  <td colSpan={7} className="py-12 text-center text-gray-400 font-medium">
                     <div className="inline-flex items-center gap-2 text-neutral-500">
                       <CircleNotch size={18} className="animate-spin text-[#007b8b] dark:text-[#00c4de]" />
                       <span>{isEn ? 'Loading escalation cases from server...' : 'Đang tải danh sách ca chuyển tiếp từ API...'}</span>
@@ -853,7 +1117,7 @@ export default function AdminEscalationsPage() {
                 </tr>
               ) : paginatedCases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="space-y-1">
                       <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">
                         {isEn ? 'No escalation cases found' : 'Không có vụ việc nào'}
@@ -878,44 +1142,61 @@ export default function AdminEscalationsPage() {
                       onClick={() => handleOpenModal(item)}
                       className="hover:bg-neutral-50/80 dark:hover:bg-white/[0.03] transition-colors cursor-pointer group"
                     >
-                      {/* 1. ID: tóm gọn, có màu nhấn nhẹ font mono */}
-                      <td className="py-3.5 px-4 font-mono font-semibold text-[#007b8b] dark:text-[#00c4de]">
+                      {/* 1. Mã ca: font mono có màu nhấn nhẹ */}
+                      <td className="py-3.5 px-4 font-mono font-semibold text-[#007b8b] dark:text-[#00c4de] whitespace-nowrap">
                         <span className="group-hover:underline">#{item.id.slice(0, 8)}</span>
                       </td>
 
-                      {/* 2. caseType: chữ rõ ràng, không có dấu chấm */}
-                      <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-gray-100">
+                      {/* 2. Mã đối tượng: cột riêng kèm nút sao chép nhanh */}
+                      <td className="py-3.5 px-4 font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {rawTargetId ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-gray-800 dark:text-gray-200">
+                              #{rawTargetId.slice(0, 8)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(rawTargetId)
+                              }}
+                              className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                              title="Sao chép mã đối tượng"
+                            >
+                              <Copy size={13} weight="bold" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+
+                      {/* 3. Phân loại */}
+                      <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
                         {isEn ? caseType.en : caseType.vi}
                       </td>
 
-                      {/* 3. Đối tượng / tên report & mã đối tượng */}
+                      {/* 4. Đối tượng */}
                       <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300">
-                        <div className="flex flex-col min-w-0">
-                          <span className="truncate font-medium">
-                            {targetTitle || (isEn ? targetEntity.en : targetEntity.vi)}
-                          </span>
-                          {rawTargetId && (
-                            <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                              #{rawTargetId.slice(0, 8)}
-                            </span>
-                          )}
-                        </div>
+                        <span className="truncate font-medium block max-w-xs">
+                          {targetTitle || (isEn ? targetEntity.en : targetEntity.vi)}
+                        </span>
                       </td>
 
-                      {/* 4. status: chữ có màu sắc ngữ cảnh nhẹ, không có dấu chấm */}
-                      <td className="py-3.5 px-4">
+                      {/* 5. Trạng thái */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`font-medium ${status.textColor}`}>
                           {isEn ? status.en : status.vi}
                         </span>
                       </td>
 
-                      {/* 5. createdAt */}
+                      {/* 6. Thời gian tạo */}
                       <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400 font-mono text-[11px] whitespace-nowrap">
                         {formatDate(item.createdAt || item.created_at)}
                       </td>
 
-                      {/* 6. Chi tiết: nút bấm nhẹ nhàng, có hover rõ nét */}
-                      <td className="py-3.5 px-4 text-center">
+                      {/* 7. Chi tiết */}
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={(e) => {
@@ -924,7 +1205,7 @@ export default function AdminEscalationsPage() {
                           }}
                           className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-[#007b8b] hover:text-white dark:bg-white/10 dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
                         >
-                          {isEn ? 'Chi tiết' : 'Chi tiết'}
+                          Chi tiết
                         </button>
                       </td>
                     </tr>
@@ -969,6 +1250,14 @@ export default function AdminEscalationsPage() {
                     <span className="font-semibold text-gray-900 dark:text-white">
                       {isEn ? 'Create Traffic Sign' : 'Tạo biển báo mới'}
                     </span>
+                    {targetEntityId && (
+                      <>
+                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                          {isEn ? 'Target' : 'Đối tượng'} #{targetEntityId.slice(0, 8)}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   <button
@@ -1066,8 +1355,8 @@ export default function AdminEscalationsPage() {
                                     setImgLoadError(false)
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeImageTab === 'crop'
-                                      ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
-                                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
+                                    ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
                                     }`}
                                 >
                                   {isEn ? 'Crop' : 'Ảnh cắt'}
@@ -1079,8 +1368,8 @@ export default function AdminEscalationsPage() {
                                     setImgLoadError(false)
                                   }}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeImageTab === 'frame'
-                                      ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
-                                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
+                                    ? 'bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black shadow-xs'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/10'
                                     }`}
                                 >
                                   {isEn ? 'Context' : 'Toàn cảnh'}
@@ -1105,19 +1394,12 @@ export default function AdminEscalationsPage() {
 
                           {/* 2. Map */}
                           {hasValidMapLocation ? (
-                            <div className="space-y-1">
-                              <SignMiniMap
-                                lat={lat!}
-                                lng={lng!}
-                                title={signName || (isEn ? 'Field location' : 'Vị trí thực địa')}
-                                heightClassName="w-full h-[160px] sm:h-[180px]"
-                              />
-                              {locationAddress && (
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate px-1 shrink-0">
-                                  {locationAddress}
-                                </p>
-                              )}
-                            </div>
+                            <SignMiniMap
+                              lat={lat!}
+                              lng={lng!}
+                              title={signName || (isEn ? 'Field location' : 'Vị trí thực địa')}
+                              heightClassName="w-full h-[160px] sm:h-[180px]"
+                            />
                           ) : (
                             <div className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-gray-400 text-xs min-h-[140px]">
                               <MapPin size={16} className="mx-auto mb-1 opacity-50" />
@@ -1129,30 +1411,10 @@ export default function AdminEscalationsPage() {
                         {/* ─── RIGHT COLUMN: SPECS & VERDICT FORM (7 cols) ───────── */}
                         <div className="md:col-span-7 flex flex-col gap-3">
                           {/* Proposed Sign / Object Title */}
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
-                                {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
-                              </h3>
-                              {targetEntityId && (
-                                <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                                  <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
-                                  <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">#{targetEntityId}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(targetEntityId)
-                                      setCopiedTargetId(true)
-                                      setTimeout(() => setCopiedTargetId(false), 2000)
-                                    }}
-                                    className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
-                                    title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
-                                  >
-                                    {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight min-w-0">
+                              {signName || (isEn ? 'Catalog Proposal' : 'Đề xuất biển mới')}
+                            </h3>
 
                             {historyTaskId && (
                               <button
@@ -1168,7 +1430,57 @@ export default function AdminEscalationsPage() {
 
                           {/* Key-Value Specs Card (Clean, neutral layout) */}
                           <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5 text-xs">
+                            {/* Mã ca chính */}
+                            <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                              <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 shrink-0">
+                                <Hash size={12} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
+                                <span>{isEn ? 'Case ID:' : 'Mã ca:'}</span>
+                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0 font-mono">
+                                <span className="font-semibold text-[#007b8b] dark:text-[#00c4de] select-all truncate">
+                                  #{selectedCase.id}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(selectedCase.id)
+                                    setCopiedCaseId(true)
+                                    setTimeout(() => setCopiedCaseId(false), 2000)
+                                  }}
+                                  className="p-0.5 rounded text-gray-400 hover:text-[#007b8b] dark:hover:text-[#00c4de] cursor-pointer shrink-0 transition-colors"
+                                  title={isEn ? 'Copy full case UUID' : 'Sao chép UUID ca'}
+                                >
+                                  {copiedCaseId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                </button>
+                              </div>
+                            </div>
 
+                            {/* Mã đối tượng */}
+                            {targetEntityId && (
+                              <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                                <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 shrink-0">
+                                  <Tag size={12} className="text-gray-400 shrink-0" />
+                                  <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
+                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0 font-mono">
+                                  <span className="text-gray-700 dark:text-gray-300 select-all truncate">
+                                    #{targetEntityId}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(targetEntityId)
+                                      setCopiedTargetId(true)
+                                      setTimeout(() => setCopiedTargetId(false), 2000)
+                                    }}
+                                    className="p-0.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0 transition-colors"
+                                    title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
+                                  >
+                                    {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Reporter & Submitted Date */}
                             <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
@@ -1241,19 +1553,18 @@ export default function AdminEscalationsPage() {
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
                                   <span
-                                    className={`text-[10px] font-semibold ${
-                                      recaptureRequest?.completedAt
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : 'text-amber-600 dark:text-amber-400'
-                                    }`}
+                                    className={`text-[10px] font-semibold ${recaptureRequest?.completedAt
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-amber-600 dark:text-amber-400'
+                                      }`}
                                   >
                                     {recaptureRequest?.completedAt
                                       ? isEn
                                         ? 'Done'
                                         : 'Đã chụp'
                                       : isEn
-                                      ? 'Pending'
-                                      : 'Chờ chụp'}
+                                        ? 'Pending'
+                                        : 'Chờ chụp'}
                                   </span>
                                   {recaptureRequest?.completedAt && (
                                     <>
@@ -1338,13 +1649,13 @@ export default function AdminEscalationsPage() {
                                   </p>
                                   <div className="space-y-1">
                                     <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                                      {isEn ? 'Closing note (optional):' : 'Ghi chú đóng ca (không bắt buộc):'}
+                                      {isEn ? 'Closing note optional:' : 'Ghi chú đóng ca:'}
                                     </label>
                                     <textarea
                                       rows={2}
                                       value={decisionNotes}
                                       onChange={(e) => setDecisionNotes(e.target.value)}
-                                      placeholder={isEn ? 'Optional closing note...' : 'Nhập ghi chú đóng ca (hoặc để trống để dùng mặc định)...'}
+                                      placeholder={isEn ? 'Optional closing note...' : 'Nhập ghi chú đóng ca hoặc để trống để dùng mặc định...'}
                                       className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
                                     />
                                   </div>
@@ -1360,134 +1671,201 @@ export default function AdminEscalationsPage() {
                                   <p className="text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed">
                                     {isEn
                                       ? 'This report is currently INCOMPLETE while waiting for a Surveyor to submit recapture evidence. Actions are disabled until recapture completes.'
-                                      : 'Báo cáo đang ở trạng thái INCOMPLETE (chờ Surveyor chụp lại ảnh thực địa). Vui lòng đợi hoàn tất chụp lại trước khi tạo biển mới.'}
+                                      : 'Báo cáo đang ở trạng thái INCOMPLETE - chờ Surveyor chụp lại ảnh thực địa. Vui lòng đợi hoàn tất chụp lại trước khi tạo biển mới.'}
                                   </p>
                                 </div>
                               ) : (
-                              <div className="p-2.5 sm:p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
-                                  <ShieldCheck size={15} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
-                                  <span>{isEn ? 'Action Decision' : 'Quyết định xử lý'}</span>
-                                </div>
+                                <div className="p-2.5 sm:p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
+                                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-white">
+                                    <ShieldCheck size={15} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />
+                                    <span>{isEn ? 'Action Decision' : 'Quyết định xử lý'}</span>
+                                  </div>
 
-                                {/* Action Choice Pills (Clean, simple, non-flashy, text-only) */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActionType('RESOLVE')}
-                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'RESOLVE'
+                                  {/* Action Choice Pills (Clean, simple, non-flashy, text-only) */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActionType('RESOLVE')}
+                                      className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'RESOLVE'
                                         ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
                                         : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                      }`}
-                                  >
-                                    {isEn ? 'Approve' : 'Phê chuẩn'}
-                                  </button>
+                                        }`}
+                                    >
+                                      {isEn ? 'Approve' : 'Phê chuẩn'}
+                                    </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setActionType('DISMISS')}
-                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'DISMISS'
+                                    <button
+                                      type="button"
+                                      onClick={() => setActionType('DISMISS')}
+                                      className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'DISMISS'
                                         ? 'bg-gray-800 text-white border-gray-800 dark:bg-white dark:text-black dark:border-white shadow-xs'
                                         : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                      }`}
-                                  >
-                                    {isEn ? 'Dismiss' : 'Bác bỏ'}
-                                  </button>
+                                        }`}
+                                    >
+                                      {isEn ? 'Dismiss' : 'Bác bỏ'}
+                                    </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setActionType('REQUEST_RECAPTURE')}
-                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'REQUEST_RECAPTURE'
+                                    <button
+                                      type="button"
+                                      onClick={() => setActionType('REQUEST_RECAPTURE')}
+                                      className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'REQUEST_RECAPTURE'
                                         ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
                                         : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                      }`}
-                                  >
-                                    {isEn ? 'Recapture' : 'Yêu cầu chụp lại'}
-                                  </button>
+                                        }`}
+                                    >
+                                      {isEn ? 'Recapture' : 'Yêu cầu chụp lại'}
+                                    </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => setActionType('BAN_USER')}
-                                    className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'BAN_USER'
+                                    <button
+                                      type="button"
+                                      onClick={() => setActionType('BAN_USER')}
+                                      className={`py-2 px-2 rounded-lg border text-[11px] sm:text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap ${actionType === 'BAN_USER'
                                         ? 'bg-red-600 text-white border-red-600 shadow-xs'
                                         : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5'
-                                      }`}
-                                  >
-                                    {isEn ? 'Ban user' : 'Khóa tài khoản'}
-                                  </button>
-                                </div>
-
-                                {/* Ban Target Selector (Rendered when actionType === 'BAN_USER') */}
-                                {actionType === 'BAN_USER' && (
-                                  <div className="p-2.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/70 dark:bg-red-950/20 space-y-1.5">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-red-700 dark:text-red-400">
-                                      <span>{isEn ? 'Select User to Ban' : 'Chọn đối tượng cần khóa tài khoản'} <span className="text-red-500">*</span></span>
-                                      <span className="text-[10px] font-normal text-red-600/80 dark:text-red-400/80">
-                                        {isEn ? 'System access will be revoked' : 'Thu hồi quyền truy cập hệ thống'}
-                                      </span>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                                      {[
-                                        {
-                                          key: 'SURVEYOR' as const,
-                                          labelVi: 'Surveyor chụp ảnh',
-                                          subVi: resolvedSurveyorName || (recaptureRequest?.surveyorId ? `#${recaptureRequest.surveyorId.slice(0, 8)}` : 'Người chụp gần nhất'),
-                                          labelEn: 'Surveyor',
-                                          subEn: resolvedSurveyorName || (recaptureRequest?.surveyorId ? `#${recaptureRequest.surveyorId.slice(0, 8)}` : 'Latest photographer'),
-                                        },
-                                        {
-                                          key: 'REVIEWER' as const,
-                                          labelVi: 'Reviewer báo cáo',
-                                          subVi: resolvedReporterName || (reporterId ? `#${reporterId.slice(0, 8)}` : 'Người báo cáo'),
-                                          labelEn: 'Reviewer',
-                                          subEn: resolvedReporterName || (reporterId ? `#${reporterId.slice(0, 8)}` : 'Submitter'),
-                                        },
-                                        {
-                                          key: 'STAFF' as const,
-                                          labelVi: 'Staff duyệt đơn',
-                                          subVi: resolvedStaffName || (reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Người chuyển đơn'),
-                                          labelEn: 'Staff',
-                                          subEn: resolvedStaffName || (reviewedBy ? `#${reviewedBy.slice(0, 8)}` : 'Escalating staff'),
-                                        },
-                                      ].map((item) => {
-                                        const selected = banTarget === item.key
-                                        return (
-                                          <button
-                                            key={item.key}
-                                            type="button"
-                                            onClick={() => setBanTarget(item.key)}
-                                            className={`flex flex-col text-left px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer ${selected
-                                                ? 'bg-red-600 text-white border-red-600 shadow-xs'
-                                                : 'bg-white dark:bg-black/40 border-red-200/60 dark:border-red-900/40 text-gray-800 dark:text-gray-200 hover:bg-red-50/50'
-                                              }`}
-                                          >
-                                            <span className="font-bold text-[11px]">{isEn ? item.labelEn : item.labelVi}</span>
-                                            <span className={`text-[10px] truncate ${selected ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'}`}>
-                                              {isEn ? item.subEn : item.subVi}
-                                            </span>
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
+                                        }`}
+                                    >
+                                      {isEn ? 'Ban user' : 'Khóa tài khoản'}
+                                    </button>
                                   </div>
-                                )}
 
-                                {/* Verdict Justification Textarea */}
-                                <div className="space-y-1">
-                                  <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                                    {isEn ? 'Notes: ' : 'Ghi chú: '}
-                                    <span className="text-red-500">*</span>
-                                  </label>
-                                  <textarea
-                                    rows={2}
-                                    maxLength={500}
-                                    value={decisionNotes}
-                                    onChange={(e) => setDecisionNotes(e.target.value)}
-                                    placeholder={isEn ? 'Enter notes...' : 'Nhập ghi chú...'}
-                                    className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
-                                  />
+                                  {/* Ban Target Selector (Rendered when actionType === 'BAN_USER') */}
+                                  {actionType === 'BAN_USER' && (
+                                    <div className="p-3 rounded-xl border border-gray-200/90 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.02] space-y-2">
+                                      <div className="text-[11px] font-bold text-gray-800 dark:text-gray-200">
+                                        <span>{isEn ? 'Select User to Ban' : 'Chọn đối tượng cần khóa tài khoản'} <span className="text-red-500">*</span></span>
+                                      </div>
+
+                                      {/* Vertical List of Ban Candidates with Reputation Badges */}
+                                      <div className="flex flex-col gap-2">
+                                        {(() => {
+                                          const candidates = [
+                                            ...(surveyorUserId
+                                              ? [
+                                                {
+                                                  key: 'SURVEYOR' as const,
+                                                  roleTitleVi: 'Surveyor',
+                                                  roleTitleEn: 'Surveyor',
+                                                  userId: surveyorUserId,
+                                                  userName: (resolvedSurveyorName && resolvedSurveyorName !== '[object Object]')
+                                                    ? resolvedSurveyorName
+                                                    : `#${String(surveyorUserId).slice(0, 8)}`,
+                                                  profile: surveyorProfile,
+                                                  summary: surveyorInitial,
+                                                  statistics: surveyorProfile?.statistics || (surveyorInitial as any)?.statistics,
+                                                },
+                                              ]
+                                              : []),
+                                            ...(reviewerUserId
+                                              ? [
+                                                {
+                                                  key: 'REVIEWER' as const,
+                                                  roleTitleVi: 'Reviewer',
+                                                  roleTitleEn: 'Reviewer',
+                                                  userId: reviewerUserId,
+                                                  userName: (resolvedReporterName && resolvedReporterName !== '[object Object]')
+                                                    ? resolvedReporterName
+                                                    : `#${String(reviewerUserId).slice(0, 8)}`,
+                                                  profile: reviewerProfile,
+                                                  summary: reviewerInitial,
+                                                  statistics: reviewerProfile?.statistics || (reviewerInitial as any)?.statistics,
+                                                },
+                                              ]
+                                              : []),
+                                            ...(staffUserId
+                                              ? [
+                                                {
+                                                  key: 'STAFF' as const,
+                                                  roleTitleVi: 'Staff',
+                                                  roleTitleEn: 'Staff',
+                                                  userId: staffUserId,
+                                                  userName: (resolvedStaffName && resolvedStaffName !== '[object Object]')
+                                                    ? resolvedStaffName
+                                                    : `#${String(staffUserId).slice(0, 8)}`,
+                                                  profile: staffProfile,
+                                                  summary: staffInitial,
+                                                  statistics: staffProfile?.statistics || (staffInitial as any)?.statistics,
+                                                },
+                                              ]
+                                              : []),
+                                          ]
+
+                                          if (candidates.length === 0) {
+                                            return (
+                                              <div className="p-3 text-center text-xs text-gray-500">
+                                                {isEn ? 'No users found to ban' : 'Không tìm thấy người dùng phù hợp để khóa tài khoản'}
+                                              </div>
+                                            )
+                                          }
+
+                                          return candidates.map((item) => {
+                                            const selected = banTarget === item.key
+                                            return (
+                                              <div
+                                                key={item.key}
+                                                onClick={() => setBanTarget(item.key)}
+                                                className={`px-3.5 py-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${selected
+                                                  ? 'bg-white dark:bg-white/5 border-rose-500 dark:border-rose-500 shadow-xs ring-1 ring-rose-500/20'
+                                                  : 'bg-white dark:bg-white/[0.02] border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
+                                                  }`}
+                                              >
+                                                {/* Left: Radio + Role Title */}
+                                                <div className="flex items-center gap-2.5 shrink-0">
+                                                  <div
+                                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${selected
+                                                      ? 'border-rose-500 bg-rose-500 text-white'
+                                                      : 'border-gray-300 dark:border-white/30 bg-transparent'
+                                                      }`}
+                                                  >
+                                                    {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                                  </div>
+
+                                                  <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                                    {isEn ? item.roleTitleEn : item.roleTitleVi}
+                                                  </span>
+                                                </div>
+
+                                                {/* Right: User Name Clickable Link to View Profile Modal */}
+                                                {item.userId && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      handleOpenUserProfile(item.userId!, item.profile || item.summary)
+                                                    }}
+                                                    className="text-xs font-mono text-gray-600 dark:text-gray-300 hover:text-[#007b8b] dark:hover:text-[#00c4de] hover:underline cursor-pointer truncate max-w-[220px] text-right transition-colors"
+                                                    title={
+                                                      isEn
+                                                        ? `UUID: ${item.userId} - Click to view details`
+                                                        : `UUID: ${item.userId} - Bấm để xem thông tin người dùng`
+                                                    }
+                                                  >
+                                                    {item.userName}
+                                                  </button>
+                                                )}
+                                              </div>
+                                            )
+                                          })
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Verdict Justification Textarea */}
+                                  <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                                      {isEn ? 'Notes: ' : 'Ghi chú: '}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                      rows={2}
+                                      maxLength={500}
+                                      value={decisionNotes}
+                                      onChange={(e) => setDecisionNotes(e.target.value)}
+                                      placeholder={isEn ? 'Enter notes...' : 'Nhập ghi chú...'}
+                                      className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 text-xs resize-none"
+                                    />
+                                  </div>
                                 </div>
-                              </div>
                               )
                             )}
                         </div>
@@ -1505,8 +1883,8 @@ export default function AdminEscalationsPage() {
                           onClick={handleResolveSubmit}
                           disabled={isSubmitting || (!isReportAlreadyFinalized && !decisionNotes.trim())}
                           className={`inline-flex items-center justify-center px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-98 ${(isReportAlreadyFinalized || decisionNotes.trim()) && !isSubmitting
-                              ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
-                              : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
+                            ? 'bg-[#007b8b] hover:bg-[#006471] dark:bg-[#00c4de] dark:hover:bg-[#00b2c9] text-white dark:text-black shadow-[#007b8b]/20'
+                            : 'bg-gray-200 dark:bg-white/10 text-gray-400 cursor-not-allowed'
                             }`}
                         >
                           {isSubmitting ? (
