@@ -9,7 +9,18 @@ import {
   parseGpmfGps,
   findTelemetryChunkOffsets,
   extractMetadataFromBuffer,
+  extractGpsFromVideoFile,
 } from '@/feature/upload/utils/video-file-gps';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
+
+jest.mock('expo-file-system/legacy', () => ({
+  getInfoAsync: jest.fn(),
+  readAsStringAsync: jest.fn(),
+  EncodingType: {
+    Base64: 'base64',
+  },
+}));
 
 describe('video-file-gps utility', () => {
   describe('nmeaToDecimal', () => {
@@ -234,6 +245,166 @@ describe('video-file-gps utility', () => {
 
       const offsets = findTelemetryChunkOffsets(buffer);
       expect(offsets).toEqual([73202576]);
+    });
+  });
+
+  describe('extractGpsFromVideoFile', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      Platform.OS = 'android';
+    });
+
+    // Helper to create a base64 encoded buffer with an ©xyz atom
+    function createSampleXyzBase64(): string {
+      const buffer = new Uint8Array(128);
+      // mvhd at index 4 (10 seconds duration)
+      buffer[4] = 0x6d; buffer[5] = 0x76; buffer[6] = 0x68; buffer[7] = 0x64;
+      const view = new DataView(buffer.buffer);
+      view.setUint32(20, 1000, false);
+      view.setUint32(24, 10000, false);
+
+      // ©xyz atom at index 40
+      buffer[40] = 0xa9; buffer[41] = 0x78; buffer[42] = 0x79; buffer[43] = 0x7a;
+      const coordStr = '+10.776900+106.700900/';
+      for (let i = 0; i < coordStr.length; i++) {
+        buffer[46 + i] = coordStr.charCodeAt(i);
+      }
+      return Buffer.from(buffer).toString('base64');
+    }
+
+    it('extracts GPS and duration from small video file (<= 3MB) via native FileSystem', async () => {
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: true,
+        size: 2 * 1024 * 1024, // 2 MB
+      });
+      (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue(createSampleXyzBase64());
+
+      const result = await extractGpsFromVideoFile('file:///path/to/small-video.mp4');
+
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.7769, 4);
+      expect(result?.longitude).toBeCloseTo(106.7009, 4);
+      expect(result?.durationSeconds).toBe(10);
+      expect(result?.source).toBe('quicktime_xyz');
+    });
+
+    it('extracts GPS from large video file (> 3MB) by reading header and footer slices', async () => {
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: true,
+        size: 50 * 1024 * 1024, // 50 MB
+      });
+      // Header has no GPS, footer has GPS
+      (FileSystem.readAsStringAsync as jest.Mock)
+        .mockResolvedValueOnce(Buffer.from(new Uint8Array(64)).toString('base64')) // header
+        .mockResolvedValueOnce(createSampleXyzBase64()); // footer
+
+      const result = await extractGpsFromVideoFile('file:///path/to/large-video.mp4');
+
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.7769, 4);
+      expect(result?.longitude).toBeCloseTo(106.7009, 4);
+      expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('recovers GPS from mid-file telemetry chunk offset when not in header/footer', async () => {
+      // 1. Create header with moov pointing to telemetry offset at 1000
+      const headerBuf = new Uint8Array(128);
+      headerBuf[10] = 0x63; headerBuf[11] = 0x61; headerBuf[12] = 0x6d; headerBuf[13] = 0x6d; // camm
+      headerBuf[20] = 0x63; headerBuf[21] = 0x6f; headerBuf[22] = 0x36; headerBuf[23] = 0x34; // co64
+      const view = new DataView(headerBuf.buffer);
+      view.setUint32(28, 1, false);
+      view.setUint32(32, 0, false);
+      view.setUint32(36, 1000, false); // offset = 1000
+
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: true,
+        size: 10 * 1024 * 1024,
+      });
+
+      // Call 1: header, Call 2: footer, Call 3: telemetry slice at offset 1000
+      (FileSystem.readAsStringAsync as jest.Mock)
+        .mockResolvedValueOnce(Buffer.from(headerBuf).toString('base64'))
+        .mockResolvedValueOnce(Buffer.from(new Uint8Array(64)).toString('base64'))
+        .mockResolvedValueOnce(createSampleXyzBase64());
+
+      const result = await extractGpsFromVideoFile('file:///path/to/telemetry-video.mp4');
+
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.7769, 4);
+      expect(result?.longitude).toBeCloseTo(106.7009, 4);
+    });
+
+    it('falls back to HTTP HEAD when FileSystem info does not provide size', async () => {
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({ exists: false });
+
+      const mockFetch = jest.fn().mockImplementation((url, opts) => {
+        if (opts?.method === 'HEAD') {
+          return Promise.resolve({
+            headers: {
+              get: (header: string) => (header.toLowerCase() === 'content-length' ? '1048576' : null),
+            },
+          });
+        }
+        return Promise.reject(new Error('Unknown fetch'));
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue(createSampleXyzBase64());
+
+      const result = await extractGpsFromVideoFile('https://example.com/video.mp4');
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.7769, 4);
+    });
+
+    it('handles web platform and reads ArrayBuffer from Blob', async () => {
+      Platform.OS = 'web';
+
+      const sampleBase64 = createSampleXyzBase64();
+      const rawBytes = Buffer.from(sampleBase64, 'base64');
+
+      const mockBlob = {
+        size: rawBytes.length,
+        slice: jest.fn().mockReturnThis(),
+        arrayBuffer: jest.fn().mockResolvedValue(rawBytes.buffer),
+      };
+
+      (globalThis as any).fetch = jest.fn().mockImplementation((url, opts) => {
+        if (opts?.method === 'HEAD') {
+          // blob: URLs typically don't support HEAD or don't return content-length
+          return Promise.resolve({
+            headers: { get: () => null },
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(mockBlob),
+        });
+      });
+
+      const result = await extractGpsFromVideoFile('blob:http://localhost/video-123');
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.7769, 4);
+    });
+
+    it('returns null when video has no GPS atoms anywhere', async () => {
+      (FileSystem.getInfoAsync as jest.Mock).mockResolvedValue({
+        exists: true,
+        size: 1024,
+      });
+      (FileSystem.readAsStringAsync as jest.Mock).mockResolvedValue(
+        Buffer.from(new Uint8Array(64)).toString('base64')
+      );
+
+      const result = await extractGpsFromVideoFile('file:///path/to/no-gps-video.mp4');
+      expect(result).toBeNull();
+    });
+
+    it('returns null gracefully on unexpected filesystem error', async () => {
+      (FileSystem.getInfoAsync as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+      (globalThis as any).fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
+      const result = await extractGpsFromVideoFile('file:///path/to/corrupt.mp4');
+      expect(result).toBeNull();
     });
   });
 });

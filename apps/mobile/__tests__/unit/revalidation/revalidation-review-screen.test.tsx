@@ -399,4 +399,77 @@ describe('RevalidationReviewScreen', () => {
     expect(mockCancelEvidenceCheck).toHaveBeenCalled();
     expect(mockRouter.replace).toHaveBeenCalledWith('/work/revalidation-summary');
   });
+
+  it('opens report modal when pressing Report button and submits report', async () => {
+    const mockWorkflow = createMockWorkflow();
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByLabelText, getByText } = await render(<RevalidationReviewScreen />);
+
+    const reportBtn = getByLabelText('Báo cáo minh chứng này');
+    await act(async () => {
+      fireEvent.press(reportBtn);
+    });
+
+    expect(getByText('Báo cáo sự cố minh chứng')).toBeTruthy();
+
+    const sendReportBtn = getByText('Gửi báo cáo');
+    await act(async () => {
+      fireEvent.press(sendReportBtn);
+    });
+
+    expect(mockWorkflow.handleVote).toHaveBeenCalledWith('UNCLEAR', expect.any(String), undefined, 'REPORT');
+  });
+
+  it('declines with CHANGED action in decline modal', async () => {
+    const mockWorkflow = createMockWorkflow();
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByLabelText, getByText } = await render(<RevalidationReviewScreen />);
+
+    const declineBtn = getByLabelText('Từ chối kết luận của điều tra viên');
+    await act(async () => {
+      fireEvent.press(declineBtn);
+    });
+
+    const changedRadio = getByText('Biển báo đã thay đổi');
+    await act(async () => {
+      fireEvent.press(changedRadio);
+    });
+
+    const confirmBtn = getByText('Xác nhận từ chối');
+    await act(async () => {
+      fireEvent.press(confirmBtn);
+    });
+
+    expect(mockWorkflow.handleVote).toHaveBeenCalledWith('CHANGED', undefined, undefined, 'DECLINE');
+  });
+
+  it('navigates to work dashboard when pressing "Quay lại công việc" from summary screen', async () => {
+    const mockHistory = [
+      {
+        action: 'STILL_ACTIVE' as const,
+        item: mockEvidenceItem,
+        userVerdict: 'AGREE' as const,
+      },
+    ];
+
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(
+      createMockWorkflow({
+        currentItem: undefined,
+        queueItems: [],
+        reviewHistory: mockHistory,
+        counts: { STILL_ACTIVE: 1, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
+      }),
+    );
+
+    const { getByText } = await render(<RevalidationReviewScreen />);
+
+    const backToWorkBtn = getByText('Quay lại công việc');
+    await act(async () => {
+      fireEvent.press(backToWorkBtn);
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalled();
+  });
 });

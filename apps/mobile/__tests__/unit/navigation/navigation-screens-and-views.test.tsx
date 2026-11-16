@@ -75,29 +75,33 @@ jest.mock('@/context/session-provider', () => ({
   }),
 }));
 
+let mockNavigationSessionsData: any = {
+  items: [
+    {
+      id: 'session-1',
+      originName: 'Nhà',
+      destinationName: 'Công ty',
+      origin: { coordinates: [106.7, 10.7] },
+      destination: { coordinates: [106.71, 10.78] },
+      distanceMeters: 2500,
+      durationSeconds: 600,
+      vehicleMode: 'MOTORCYCLE',
+      status: 'COMPLETED',
+    },
+  ],
+  total: 1,
+  totalPages: 1,
+};
+let mockIsSessionsLoading = false;
+const mockRefetchSessions = jest.fn();
+
 jest.mock('@/feature/navigation/hooks/use-navigation', () => ({
   useGetNavigationSessions: () => ({
-    data: {
-      items: [
-        {
-          id: 'session-1',
-          originName: 'Nhà',
-          destinationName: 'Công ty',
-          origin: { coordinates: [106.7, 10.7] },
-          destination: { coordinates: [106.71, 10.78] },
-          distanceMeters: 2500,
-          durationSeconds: 600,
-          vehicleMode: 'MOTORCYCLE',
-          status: 'COMPLETED',
-        },
-      ],
-      total: 1,
-      totalPages: 1,
-    },
-    isLoading: false,
+    data: mockNavigationSessionsData,
+    isLoading: mockIsSessionsLoading,
     isFetching: false,
     isRefetching: false,
-    refetch: jest.fn(),
+    refetch: mockRefetchSessions,
   }),
 }));
 
@@ -284,6 +288,25 @@ describe('Navigation Screens and Map Views', () => {
     });
 
     it('renders NavigationHistoryScreen with trip card and allows re-navigation', async () => {
+      mockIsSessionsLoading = false;
+      mockNavigationSessionsData = {
+        items: [
+          {
+            id: 'session-1',
+            originName: 'Nhà',
+            destinationName: 'Công ty',
+            origin: { coordinates: [106.7, 10.7] },
+            destination: { coordinates: [106.71, 10.78] },
+            distanceMeters: 2500,
+            durationSeconds: 600,
+            vehicleMode: 'MOTORCYCLE',
+            status: 'COMPLETED',
+          },
+        ],
+        total: 1,
+        totalPages: 1,
+      };
+
       const { getByText, getByLabelText } = await render(<NavigationHistoryScreen />);
 
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
@@ -303,6 +326,62 @@ describe('Navigation Screens and Map Views', () => {
           }),
         })
       );
+    });
+
+    it('renders empty state when no navigation sessions exist and navigates to map', async () => {
+      mockIsSessionsLoading = false;
+      mockNavigationSessionsData = {
+        items: [],
+        total: 0,
+        totalPages: 0,
+      };
+
+      const { getByText } = await render(<NavigationHistoryScreen />);
+
+      expect(getByText('Chưa có chuyến đi nào')).toBeTruthy();
+
+      const newTripBtn = getByText('Bắt đầu điều hướng');
+      fireEvent.press(newTripBtn);
+
+      expect(mockPush).toHaveBeenCalledWith('/(authenticated)/(tabs)/home');
+    });
+
+    it('renders loading indicator when sessions are loading', async () => {
+      mockIsSessionsLoading = true;
+      mockNavigationSessionsData = null;
+
+      const screen = await render(<NavigationHistoryScreen />);
+      expect(screen.toJSON()).toBeTruthy();
+    });
+
+    it('handles car and walking vehicle modes and back button', async () => {
+      mockIsSessionsLoading = false;
+      mockNavigationSessionsData = {
+        items: [
+          {
+            id: 'session-car',
+            originName: 'Điểm xuất phát',
+            destinationName: 'Điểm đến',
+            originLatitude: 10.77,
+            originLongitude: 106.70,
+            destinationLatitude: 10.78,
+            destinationLongitude: 106.71,
+            distanceMeters: 5000,
+            durationSeconds: 1200,
+            vehicleMode: 'CAR',
+            status: 'COMPLETED',
+          },
+        ],
+        total: 1,
+        totalPages: 1,
+      };
+
+      const { getByText, getByLabelText } = await render(<NavigationHistoryScreen />);
+      expect(getByText('Ô tô')).toBeTruthy();
+
+      const backBtn = getByLabelText('Quay lại danh mục công việc tài xế');
+      fireEvent.press(backBtn);
+      expect(mockReplace).toHaveBeenCalled();
     });
   });
 

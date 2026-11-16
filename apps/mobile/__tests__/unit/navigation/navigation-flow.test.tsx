@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { NavigationMapScreen } from '@/feature/navigation/pages/navigation-map-screen';
 import { useGetNavigationRoute } from '@/feature/navigation/hooks/use-navigation';
 import { ensureLocationPermission, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
@@ -28,8 +28,31 @@ jest.mock('expo-router', () => {
 
 // 2. Mock vector icons and expo UI modules
 jest.mock('@expo/vector-icons/AntDesign', () => 'AntDesign');
+jest.mock('@expo/vector-icons/Ionicons', () => {
+  const R = require('react');
+  const { View } = require('react-native');
+  return (props: any) => R.createElement(View, { testID: 'mock-ionicons', ...props });
+});
 jest.mock('@expo/vector-icons', () => ({
   MaterialCommunityIcons: 'MaterialCommunityIcons',
+  Ionicons: 'Ionicons',
+  AntDesign: 'AntDesign',
+  MaterialIcons: 'MaterialIcons',
+}));
+
+jest.mock('@/context/session-provider', () => ({
+  useSession: () => ({
+    session: {
+      accessToken: 'test-token',
+      account: { id: 'user-1' },
+    },
+  }),
+  useOptionalSession: () => ({
+    session: {
+      accessToken: 'test-token',
+      account: { id: 'user-1' },
+    },
+  }),
 }));
 jest.mock('expo-symbols', () => ({
   SymbolView: 'SymbolView',
@@ -55,11 +78,17 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 // 4. Mock navigation hooks & wallet
+const mockInitiateSession = jest.fn().mockResolvedValue({ sessionId: 'mock-session-1' });
 jest.mock('@/feature/navigation/hooks/use-navigation', () => ({
   useGetNavigationRoute: jest.fn(),
   useInitiateNavigationSession: jest.fn(() => ({
-    mutateAsync: jest.fn().mockResolvedValue({ sessionId: 'mock-session-1' }),
+    mutateAsync: mockInitiateSession,
   })),
+}));
+
+const mockConfirmSignPresence = jest.fn().mockResolvedValue({});
+jest.mock('@/api/sign-map/sign-map', () => ({
+  confirmSignPresence: (...args: any[]) => mockConfirmSignPresence(...args),
 }));
 
 jest.mock('@/feature/navigation/hooks/use-signs', () => ({
@@ -67,8 +96,9 @@ jest.mock('@/feature/navigation/hooks/use-signs', () => ({
   useGetSignsInBounds: jest.fn(() => ({ data: [] })),
 }));
 
+let mockActiveAlert: any = undefined;
 jest.mock('@/feature/navigation/hooks/use-sign-proximity-alert', () => ({
-  useSignProximityAlert: jest.fn(() => ({ activeAlert: undefined })),
+  useSignProximityAlert: jest.fn(() => ({ activeAlert: mockActiveAlert })),
 }));
 
 jest.mock('@/feature/navigation/hooks/use-saved-routes', () => ({
@@ -90,12 +120,13 @@ jest.mock('@/context/navigation-active-provider', () => ({
   useNavigationActive: jest.fn(() => ({ setNavigationActive: jest.fn() })),
 }));
 
+let mockWalletData: any = { wallet: { balance: 100 } };
 jest.mock('@/feature/credits/hooks/use-wallet', () => ({
-  useGetWallet: jest.fn(() => ({ data: undefined, refetch: jest.fn() })),
+  useGetWallet: jest.fn(() => ({ data: mockWalletData, refetch: jest.fn() })),
 }));
 
 jest.mock('@/feature/notifications/hooks/use-notifications', () => ({
-  useGetUnreadNotificationCount: jest.fn(() => ({ data: 0 })),
+  useGetUnreadNotificationCount: jest.fn(() => ({ data: 2 })),
 }));
 
 jest.mock('@/feature/navigation/hooks/use-places', () => ({
@@ -410,6 +441,203 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
       expect(getByText(/Bike|Xe máy/i)).toBeTruthy();
       expect(getAllByText(/5 min|5 phút/i).length).toBeGreaterThan(0);
       expect(getByText(/1\.0 km/)).toBeTruthy();
+    });
+  });
+
+  describe('Navigation Active Session and Interactive Controls', () => {
+    const mockActiveRoute = {
+      coordinates: [
+        [106.698, 10.7725],
+        [106.701, 10.772],
+        [106.704688, 10.771674],
+      ],
+      distance: 1200,
+      duration: 600,
+      steps: [
+        {
+          maneuver: { type: 'depart', instruction: 'Khởi hành về hướng Đông' },
+          instruction: 'Khởi hành về hướng Đông',
+          distance: 100,
+          duration: 30,
+        },
+        {
+          maneuver: { type: 'turn-right', instruction: 'Rẽ phải vào đường Hai Bà Trưng' },
+          instruction: 'Rẽ phải vào đường Hai Bà Trưng',
+          distance: 500,
+          duration: 150,
+        },
+      ],
+      geometry: [],
+    };
+
+    it('starts turn-by-turn navigation, handles map recenter, and stops navigation', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        ...defaultDestinationParams,
+        startId: 'start-market',
+        startLat: '10.7725',
+        startLng: '106.6980',
+        startTitle: 'Ben Thanh Market',
+      });
+      (ensureLocationPermission as jest.Mock).mockResolvedValue(true);
+      (fetchFreshGpsPosition as jest.Mock).mockResolvedValue([106.698, 10.7725]);
+      (useGetNavigationRoute as jest.Mock).mockReturnValue({
+        data: mockActiveRoute,
+        isLoading: false,
+        error: null,
+      });
+
+      const { getByTestId, queryByTestId } = await render(<NavigationMapScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('btn-start-navigation')).toBeTruthy();
+      });
+
+      // 1. Start Navigation
+      const startNavBtn = getByTestId('btn-start-navigation');
+      await act(async () => {
+        fireEvent.press(startNavBtn);
+      });
+
+      await waitFor(() => {
+        expect(mockInitiateSession).toHaveBeenCalled();
+        expect(getByTestId('btn-stop-navigation')).toBeTruthy();
+        expect(getByTestId('btn-recenter-map')).toBeTruthy();
+      });
+
+      // 2. Press Re-center button
+      const recenterBtn = getByTestId('btn-recenter-map');
+      await act(async () => {
+        fireEvent.press(recenterBtn);
+      });
+
+      expect(mockMapProps.focusCoordinate).toBeDefined();
+
+      // 3. Stop Navigation
+      const stopNavBtn = getByTestId('btn-stop-navigation');
+      await act(async () => {
+        fireEvent.press(stopNavBtn);
+      });
+
+      await waitFor(() => {
+        expect(queryByTestId('btn-stop-navigation')).toBeNull();
+        expect(getByTestId('btn-start-navigation')).toBeTruthy();
+      });
+    });
+
+    it('handles top controls actions: swap route and change destination', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        ...defaultDestinationParams,
+        startId: 'start-market',
+        startLat: '10.7725',
+        startLng: '106.6980',
+        startTitle: 'Ben Thanh Market',
+      });
+      (useGetNavigationRoute as jest.Mock).mockReturnValue({
+        data: mockActiveRoute,
+        isLoading: false,
+        error: null,
+      });
+
+      const { getByTestId, getByLabelText } = await render(<NavigationMapScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('btn-swap-route')).toBeTruthy();
+      });
+
+      // Test swap route button
+      const swapBtn = getByTestId('btn-swap-route');
+      await act(async () => {
+        fireEvent.press(swapBtn);
+      });
+
+      // Test change destination button
+      const changeDestBtn = getByLabelText('Thay đổi điểm đến');
+      await act(async () => {
+        fireEvent.press(changeDestBtn);
+      });
+
+      expect(mockPush).toHaveBeenCalledWith('/home/search');
+    });
+
+    it('handles home screen state when no destination is selected', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      (useGetNavigationRoute as jest.Mock).mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: null,
+      });
+
+      const { getByTestId, getByLabelText } = await render(<NavigationMapScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('btn-search-destination')).toBeTruthy();
+      });
+
+      // 1. Search button press
+      const searchBtn = getByTestId('btn-search-destination');
+      await act(async () => {
+        fireEvent.press(searchBtn);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/home/search');
+
+      // 2. Top-up press
+      const topUpBtn = getByLabelText(/Nạp điểm/);
+      await act(async () => {
+        fireEvent.press(topUpBtn);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/credits/top-up');
+
+      // 3. Notifications button press
+      const notifBtn = getByLabelText(/Thông báo/);
+      await act(async () => {
+        fireEvent.press(notifBtn);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/notifications');
+
+      // 4. TTS toggle button press
+      const ttsBtn = getByLabelText(/thông báo giọng nói/i);
+      await act(async () => {
+        fireEvent.press(ttsBtn);
+      });
+
+      // 5. Filter card toggle button press
+      const filterBtn = getByLabelText(/Mở danh sách lọc biển báo/);
+      await act(async () => {
+        fireEvent.press(filterBtn);
+      });
+
+      // 6. Current location button press
+      (fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.7009, 10.7769]);
+      const locationBtn = getByLabelText(/Về vị trí hiện tại/);
+      await act(async () => {
+        fireEvent.press(locationBtn);
+      });
+    });
+
+    it('opens bookmark route modal from action sheet', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        ...defaultDestinationParams,
+        startId: 'start-market',
+        startLat: '10.7725',
+        startLng: '106.6980',
+        startTitle: 'Ben Thanh Market',
+      });
+      (useGetNavigationRoute as jest.Mock).mockReturnValue({
+        data: mockActiveRoute,
+        isLoading: false,
+        error: null,
+      });
+
+      const { getByTestId } = await render(<NavigationMapScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('btn-bookmark-route')).toBeTruthy();
+      });
+
+      const bookmarkBtn = getByTestId('btn-bookmark-route');
+      await act(async () => {
+        fireEvent.press(bookmarkBtn);
+      });
     });
   });
 });

@@ -1,5 +1,4 @@
 import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import { AppButton } from '@/components/button';
@@ -788,7 +787,7 @@ export function NavigationBottomSheet({
                 style={[
                   styles.bottomBookmarkButton,
                   {
-                    borderColor: theme.border,
+                    borderColor: '#666666',
                     backgroundColor: theme.backgroundElement,
                   },
                 ]}
@@ -797,15 +796,12 @@ export function NavigationBottomSheet({
                 <MaterialCommunityIcons
                   name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
                   size={24}
-                  color={isRouteBookmarked ? theme.primary : theme.text}
+                  color={isRouteBookmarked ? theme.primary : '#666666'}
                 />
               </AppButton>
             </View>
           ) : (
-            <SafeAreaView
-              edges={['bottom']}
-              style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}
-            >
+            <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
               <AppButton
                 accessibilityLabel="Dừng điều hướng"
                 testID="btn-stop-navigation"
@@ -814,7 +810,7 @@ export function NavigationBottomSheet({
               >
                 <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>Dừng</Text>
               </AppButton>
-            </SafeAreaView>
+            </View>
           )}
         </View>
       ) : (
@@ -850,6 +846,19 @@ export function NavigationBottomSheet({
           </View>
         </>
       )}
+
+      {bottomInset > 0 ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.sheetBottomSafeAreaBackground,
+            {
+              height: bottomInset,
+            },
+          ]}
+          testID="sheet-safe-area-bottom"
+        />
+      ) : null}
     </Animated.View>
   );
 }

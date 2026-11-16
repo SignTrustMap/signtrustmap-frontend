@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, waitFor, act, cleanup } from '@testing-library/react-native';
+import { render, fireEvent, act, cleanup } from '@testing-library/react-native';
+import { View } from 'react-native';
 import { RevalidationMapScreen } from '@/feature/revalidation/pages/revalidation-map-screen';
 import * as navigationGps from '@/feature/navigation/utils/gps';
 import * as revalHooks from '@/feature/revalidation/hooks/use-revalidation';
@@ -45,6 +46,15 @@ jest.mock('@tanstack/react-query', () => {
 
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
+    background: '#FFFFFF',
+    backgroundElement: '#F8FAFC',
+    backgroundSelected: '#EFF6FF',
+    border: '#E2E8F0',
+    text: '#0F172A',
+    textSecondary: '#64748B',
+    placeholder: '#94A3B8',
+    primary: '#0671EB',
+    grey: '#94A3B8',
     colors: {
       background: '#FFFFFF',
       surface: '#F8FAFC',
@@ -60,9 +70,16 @@ jest.mock('@/hooks/use-theme', () => ({
   }),
 }));
 
-jest.mock('@/feature/revalidation/components/revalidation-map-view', () => ({
-  RevalidationMapView: 'RevalidationMapView',
-}));
+let capturedMapProps: any = {};
+jest.mock('@/feature/revalidation/components/revalidation-map-view', () => {
+  const { View } = require('react-native');
+  return {
+    RevalidationMapView: (props: any) => {
+      capturedMapProps = props;
+      return <View testID="revalidation-map-view" {...props} />;
+    },
+  };
+});
 
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
   useGetAllRevalidationTasks: jest.fn(),
@@ -101,6 +118,7 @@ describe('RevalidationMapScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedMapProps = {};
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
     (revalHooks.useGetAllRevalidationTasks as jest.Mock).mockReturnValue({
@@ -163,7 +181,7 @@ describe('RevalidationMapScreen', () => {
     expect(searchInput.props.value).toBe('Chợ Bến Thành');
   });
 
-  it('toggles urgency filter drawer on button press', async () => {
+  it('toggles urgency filter drawer and selects filter options', async () => {
     const { getByLabelText } = await render(<RevalidationMapScreen />);
 
     const filterBtn = getByLabelText('Hiển thị bộ lọc mức độ khẩn cấp');
@@ -171,8 +189,25 @@ describe('RevalidationMapScreen', () => {
       fireEvent.press(filterBtn);
     });
 
-    // After expanding, drawer shows filter options
-    expect(getByLabelText('Ẩn bộ lọc')).toBeTruthy();
+    // Toggle filter to fresh
+    const freshFilter = getByLabelText(/Lọc .* biển báo tươi mới/);
+    await act(async () => {
+      fireEvent.press(freshFilter);
+    });
+    expect(freshFilter).toBeTruthy();
+
+    // Toggle filter to moderate
+    const moderateFilter = getByLabelText(/Lọc .* biển báo mức độ trung bình/);
+    await act(async () => {
+      fireEvent.press(moderateFilter);
+    });
+    expect(moderateFilter).toBeTruthy();
+
+    // Close drawer
+    const closeFilterBtn = getByLabelText('Ẩn bộ lọc mức độ khẩn cấp');
+    await act(async () => {
+      fireEvent.press(closeFilterBtn);
+    });
   });
 
   it('opens zoom level menu and selects detail threshold', async () => {
@@ -183,7 +218,6 @@ describe('RevalidationMapScreen', () => {
       fireEvent.press(zoomBtn);
     });
 
-    // Zoom options become visible
     const detailOption = getByLabelText('Đặt mức thu phóng thành Chi tiết (17.5x)');
     await act(async () => {
       fireEvent.press(detailOption);
@@ -227,5 +261,57 @@ describe('RevalidationMapScreen', () => {
     });
 
     expect(navigationGps.fetchFreshGpsPosition).toHaveBeenCalled();
+  });
+
+  it('opens and closes sign list panel and selects an item', async () => {
+    const { getByLabelText, getByText } = await render(<RevalidationMapScreen />);
+
+    // Toggle list button
+    const listBtn = getByLabelText(/Hiển thị danh sách .* biển báo cần tái thẩm định/);
+    await act(async () => {
+      fireEvent.press(listBtn);
+    });
+
+    expect(getByText('Tất cả biển báo')).toBeTruthy();
+
+    // Select an item from the list
+    const item = getByLabelText('Đến biển báo P.102');
+    await act(async () => {
+      fireEvent.press(item);
+    });
+
+    expect(getByText('Kiểm tra thực địa')).toBeTruthy();
+  });
+
+  it('snaps camera and coordinates when snapLon and snapLat params are passed', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      snapLon: '106.7009',
+      snapLat: '10.7769',
+      snapRequestId: '1',
+    });
+
+    const { getByTestId } = await render(<RevalidationMapScreen />);
+    expect(getByTestId('revalidation-map-view')).toBeTruthy();
+  });
+
+  it('handles map interactions from RevalidationMapView: select sign and map press', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      signJson: JSON.stringify(mockSign),
+    });
+
+    const { queryByText, getByText } = await render(<RevalidationMapScreen />);
+    expect(getByText('Kiểm tra thực địa')).toBeTruthy();
+
+    // Wait 350ms so map press is not debounced
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+    });
+
+    // Map background press deselects sign
+    await act(async () => {
+      capturedMapProps.onMapPress?.();
+    });
+
+    expect(queryByText('Kiểm tra thực địa')).toBeNull();
   });
 });

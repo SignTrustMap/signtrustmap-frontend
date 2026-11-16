@@ -938,6 +938,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
+  sheetBottomSafeAreaBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#666666',
+  },
   sheetBottomButtonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',

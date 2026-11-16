@@ -32,14 +32,14 @@
       "package": "com.signtrustmap.app",
       "navigationBar": {
         "visible": "always",
-        "barStyle": "dark-content",
-        "backgroundColor": "#FFFFFF"
+        "barStyle": "light-content",
+        "backgroundColor": "#666666"
       }
     },
     "androidNavigationBar": {
       "visible": "always",
-      "barStyle": "dark-content",
-      "backgroundColor": "#FFFFFF"
+      "barStyle": "light-content",
+      "backgroundColor": "#666666"
     },
     "web": {
       "output": "static",
