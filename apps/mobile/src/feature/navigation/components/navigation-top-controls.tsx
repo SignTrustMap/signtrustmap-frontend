@@ -1,5 +1,7 @@
-import { Image, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Image, Pressable, Text, View } from 'react-native';
 import AntDesign from '@expo/vector-icons/AntDesign';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { AppButton } from '@/components/button';
 import { Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -36,8 +38,27 @@ export function NavigationTopControls({
   onSearchPress,
   onTopUpPress,
   onChangeDestinationPress,
+  onSwapRoutePress,
 }: NavigationTopControlsProps) {
   const theme = useTheme();
+  const swapRotation = useRef(new Animated.Value(0)).current;
+  const isRotatedRef = useRef(false);
+
+  const handleSwapPress = () => {
+    isRotatedRef.current = !isRotatedRef.current;
+    Animated.spring(swapRotation, {
+      toValue: isRotatedRef.current ? 1 : 0,
+      damping: 14,
+      stiffness: 160,
+      useNativeDriver: true,
+    }).start();
+    onSwapRoutePress?.();
+  };
+
+  const rotateInterpolation = swapRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   return (
     <View style={styles.topControls}>
@@ -84,6 +105,26 @@ export function NavigationTopControls({
               </Text>
             </AppButton>
           </View>
+
+          {onSwapRoutePress ? (
+            <Pressable
+              accessibilityLabel="Đổi chiều điểm đi và đến"
+              accessibilityRole="button"
+              testID="btn-swap-route"
+              onPress={handleSwapPress}
+              style={({ pressed }) => [
+                styles.routeSwapButton,
+                {
+                  opacity: pressed ? 0.7 : 1,
+                  backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+                },
+              ]}
+            >
+              <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
+                <Ionicons name="swap-vertical" size={22} color={theme.primary} />
+              </Animated.View>
+            </Pressable>
+          ) : null}
         </View>
       ) : selectedDestination ? (
         <View

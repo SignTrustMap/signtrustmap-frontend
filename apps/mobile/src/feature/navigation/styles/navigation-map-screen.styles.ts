@@ -4,6 +4,7 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 export const styles = StyleSheet.create({
   selectedRouteRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: Rounded.lg,
     paddingHorizontal: Spacing.two,
     shadowColor: '#09233C',
@@ -52,11 +53,12 @@ export const styles = StyleSheet.create({
   },
   destinationWithSwap: { paddingRight: 40 },
   routeSwapButton: {
-    position: 'absolute',
-    right: Spacing.half,
-    bottom: 0,
-    width: 44,
-    minHeight: 48,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.one,
     paddingHorizontal: 0,
     paddingVertical: 0,
   },

@@ -146,7 +146,23 @@ export function NavigationMapScreen() {
   >();
   const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
-  const selectedDestination = useMemo(() => {
+  const [swappedRoute, setSwappedRoute] = useState<{
+    origin: MapCoordinate;
+    originTitle: string;
+    destination: {
+      category: 'recent' | 'saved';
+      coordinate: MapCoordinate;
+      id: string;
+      subtitle: string;
+      title: string;
+    };
+  } | null>(null);
+
+  useEffect(() => {
+    setSwappedRoute(null);
+  }, [destinationId, destinationLat, destinationLng, paramSavedRouteId, startLat, startLng]);
+
+  const baseSelectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
         category: 'recent' as const,
@@ -193,6 +209,23 @@ export function NavigationMapScreen() {
     fallbackCurrentLocation,
   );
 
+  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
+
+  const basePlannedRouteOrigin =
+    savedRouteData && !fallbackCurrentLocation
+      ? ([savedRouteData.originLongitude, savedRouteData.originLatitude] as MapCoordinate)
+      : (fallbackCurrentLocation ?? initialGpsOrigin);
+
+  const baseRouteStartTitle =
+    startTitle ||
+    (savedRouteData && !fallbackCurrentLocation
+      ? savedRouteData.originName
+      : (resolvedOriginTitle ?? 'Vị trí của bạn'));
+
+  const selectedDestination = swappedRoute ? swappedRoute.destination : baseSelectedDestination;
+  const plannedRouteOrigin = swappedRoute ? swappedRoute.origin : basePlannedRouteOrigin;
+  const routeStartTitle = swappedRoute ? swappedRoute.originTitle : baseRouteStartTitle;
+
   useEffect(() => {
     if (fallbackCurrentLocation) {
       setInitialGpsOrigin(fallbackCurrentLocation);
@@ -213,19 +246,6 @@ export function NavigationMapScreen() {
       });
     }
   }, [selectedDestination, userCoordinate]);
-
-  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
-
-  const plannedRouteOrigin =
-    savedRouteData && !fallbackCurrentLocation
-      ? ([savedRouteData.originLongitude, savedRouteData.originLatitude] as MapCoordinate)
-      : (fallbackCurrentLocation ?? initialGpsOrigin);
-
-  const routeStartTitle =
-    startTitle ||
-    (savedRouteData && !fallbackCurrentLocation
-      ? savedRouteData.originName
-      : (resolvedOriginTitle ?? 'Vị trí của bạn'));
 
   const [vehicleMode, setVehicleMode] = useState<VehicleMode['id']>(() => {
     if (paramVehicleMode) {
@@ -1025,13 +1045,39 @@ export function NavigationMapScreen() {
     }
   };
 
+  const handleSwapRoute = useCallback(() => {
+    if (!selectedDestination || !plannedRouteOrigin) return;
+
+    setRerouteOrigin(undefined);
+    setMapFocus((current) => ({
+      coordinate: undefined as any,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+
+    if (swappedRoute) {
+      setSwappedRoute(null);
+    } else {
+      setSwappedRoute({
+        origin: selectedDestination.coordinate,
+        originTitle: selectedDestination.title,
+        destination: {
+          category: 'recent',
+          coordinate: plannedRouteOrigin,
+          id: `swapped-${Date.now()}`,
+          subtitle: routeStartTitle !== 'Vị trí của bạn' ? routeStartTitle : '',
+          title: routeStartTitle,
+        },
+      });
+    }
+  }, [selectedDestination, plannedRouteOrigin, routeStartTitle, swappedRoute]);
+
   const handleCloseRoute = () => {
+    setSwappedRoute(null);
     if (isNavigating) {
       setLastNavigatedDestinationTitle(selectedDestination?.title);
       setNavigationSession(undefined);
-      setActiveSavedRouteId(undefined);
       resetReroute();
-      setIsCompleteModalVisible(true);
+      snapTo(1);
       return;
     }
     setNavigationSession(undefined);
@@ -1046,6 +1092,7 @@ export function NavigationMapScreen() {
   };
 
   const handleChangeDestination = () => {
+    setSwappedRoute(null);
     router.push('/home/search');
   };
 
@@ -1221,75 +1268,6 @@ export function NavigationMapScreen() {
           </Animated.View>
         ) : null}
 
-        {/* Floating Sign Filter button during navigation */}
-        {isNavigating ? (
-          <Animated.View
-            pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: Spacing.two,
-              bottom: floatingButtonBottom,
-              opacity: floatingButtonOpacity,
-              zIndex: 20,
-            }}
-          >
-            <Pressable
-              accessibilityLabel="Bộ lọc biển báo"
-              accessibilityRole="button"
-              onPress={() => {
-                setFilterViewMode('categories');
-                const nextSnap = sheetSnapIndex === 0 ? 1 : 0;
-                snapTo(nextSnap);
-              }}
-              style={({ pressed }) => [
-                styles.navFilterButton,
-                {
-                  position: 'relative',
-                  right: 0,
-                  backgroundColor:
-                    manualCategories.size < SIGN_CATEGORIES.length
-                      ? theme.backgroundSelected
-                      : theme.backgroundElement,
-                  borderColor:
-                    manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="filter-variant"
-                size={16}
-                color={manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text}
-              />
-              <Text
-                style={[
-                  styles.navRecenterText,
-                  {
-                    color:
-                      manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text,
-                  },
-                ]}
-              >
-                Bộ lọc
-              </Text>
-              {manualCategories.size < SIGN_CATEGORIES.length ? (
-                <View
-                  style={[
-                    styles.filterActiveBadge,
-                    {
-                      backgroundColor: theme.primary,
-                      position: 'absolute',
-                      top: 6,
-                      right: 6,
-                    },
-                  ]}
-                />
-              ) : null}
-            </Pressable>
-          </Animated.View>
-        ) : null}
-
         {/* Non-navigating Overlay: Top controls, Home filter, and floating map action buttons */}
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
@@ -1304,6 +1282,7 @@ export function NavigationMapScreen() {
               onNotificationsPress={() => router.push('/notifications')}
               onLivestreamPress={handleLivestreamPress}
               onChangeDestinationPress={handleChangeDestination}
+              onSwapRoutePress={handleSwapRoute}
             />
 
             <HomeSignFilterCard

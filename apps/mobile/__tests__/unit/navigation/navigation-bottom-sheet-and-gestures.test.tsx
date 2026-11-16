@@ -3,13 +3,20 @@ import { Animated, BackHandler, Platform } from 'react-native';
 import { render, fireEvent, renderHook, act, cleanup } from '@testing-library/react-native';
 import { useNavigationSheetGesture } from '@/feature/navigation/hooks/use-navigation-sheet-gesture';
 import { NavigationBottomSheet } from '@/feature/navigation/components/navigation-bottom-sheet';
+import { NavigationTopControls } from '@/feature/navigation/components/navigation-top-controls';
 import type { SignCategory } from '@/constants/sign-categories';
 
 jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
   return {
     MaterialCommunityIcons: (props: any) => <View testID={`mc-icon-${props.name}`} />,
+    Ionicons: (props: any) => <View testID={`io-icon-${props.name}`} />,
   };
+});
+
+jest.mock('@expo/vector-icons/Ionicons', () => {
+  const { View } = require('react-native');
+  return (props: any) => <View testID={`io-icon-${props.name}`} />;
 });
 
 jest.mock('@expo/vector-icons/AntDesign', () => {
@@ -120,6 +127,90 @@ describe('useNavigationSheetGesture and NavigationBottomSheet', () => {
 
       addEventListenerSpy.mockRestore();
       Platform.OS = originalPlatform;
+    });
+
+    it('snaps based on distance thresholds when dragging and releasing', async () => {
+      const { result } = await renderHook(() =>
+        useNavigationSheetGesture({
+          hasPlannedRouteOrigin: true,
+          isNavigating: false,
+          windowHeight: 800,
+          bottomInset: 0,
+        })
+      );
+
+      const panResponder = result.current.sheetPanResponder;
+      const createTouchEvent = (
+        startY: number,
+        prevY: number,
+        currY: number,
+        prevTime: number,
+        currTime: number
+      ) =>
+        ({
+          nativeEvent: { touches: [] },
+          touchHistory: {
+            mostRecentTimeStamp: currTime,
+            touchBank: [
+              {
+                touchActive: true,
+                startPageX: 100,
+                startPageY: startY,
+                startTimeStamp: 0,
+                currentPageX: 100,
+                currentPageY: currY,
+                previousPageX: 100,
+                previousPageY: prevY,
+                currentTimeStamp: currTime,
+                previousTimeStamp: prevTime,
+              },
+            ],
+            numberActiveTouches: 1,
+            indexOfSingleActiveTouch: 0,
+          },
+        }) as any;
+
+      // 1. Slow drag down towards peek (dy = 200 => finalHeight = 416 - 200 = 216 < 302, vy = 200 / 1000 = 0.2 < 0.45) -> should snap to 0
+      await act(async () => {
+        (panResponder as any).panHandlers.onResponderGrant(
+          createTouchEvent(100, 100, 100, 0, 1000)
+        );
+        (panResponder as any).panHandlers.onResponderMove(
+          createTouchEvent(100, 100, 300, 1000, 2000)
+        );
+        (panResponder as any).panHandlers.onResponderRelease(
+          createTouchEvent(100, 300, 300, 2000, 2010)
+        );
+      });
+      expect(result.current.sheetSnapIndex).toBe(0);
+
+      // 2. Slow drag up from peek towards mid (dy = -200 => finalHeight = 188 - (-200) = 388 between 302 and 528, vy = -0.2 > -0.45) -> should snap to 1
+      await act(async () => {
+        (panResponder as any).panHandlers.onResponderGrant(
+          createTouchEvent(300, 300, 300, 0, 3000)
+        );
+        (panResponder as any).panHandlers.onResponderMove(
+          createTouchEvent(300, 300, 100, 3000, 4000)
+        );
+        (panResponder as any).panHandlers.onResponderRelease(
+          createTouchEvent(300, 100, 100, 4000, 4010)
+        );
+      });
+      expect(result.current.sheetSnapIndex).toBe(1);
+
+      // 3. Slow drag up from mid towards max (dy = -200 => finalHeight = 416 - (-200) = 616 > 528, vy = -0.2 > -0.45) -> should snap to 2
+      await act(async () => {
+        (panResponder as any).panHandlers.onResponderGrant(
+          createTouchEvent(300, 300, 300, 0, 5000)
+        );
+        (panResponder as any).panHandlers.onResponderMove(
+          createTouchEvent(300, 300, 100, 5000, 6000)
+        );
+        (panResponder as any).panHandlers.onResponderRelease(
+          createTouchEvent(300, 100, 100, 6000, 6010)
+        );
+      });
+      expect(result.current.sheetSnapIndex).toBe(2);
     });
   });
 
@@ -272,6 +363,41 @@ describe('useNavigationSheetGesture and NavigationBottomSheet', () => {
         fireEvent.press(stopBtn);
       });
       expect(mockOnCloseRoute).toHaveBeenCalled();
+    });
+  });
+
+  describe('NavigationTopControls Component', () => {
+    it('renders swap button when plannedRouteOrigin and selectedDestination are present and calls onSwapRoutePress', async () => {
+      const mockOnSwapRoutePress = jest.fn();
+      const mockOnChangeDestinationPress = jest.fn();
+      const destination = {
+        id: 'dest-1',
+        coordinate: [106.70, 10.78] as [number, number],
+        title: 'Chợ Bến Thành',
+      };
+
+      const { getByTestId, getByText } = await render(
+        <NavigationTopControls
+          selectedDestination={destination}
+          plannedRouteOrigin={[106.68, 10.77]}
+          routeStartTitle="Vị trí của bạn"
+          onSearchPress={jest.fn()}
+          onTopUpPress={jest.fn()}
+          onChangeDestinationPress={mockOnChangeDestinationPress}
+          onSwapRoutePress={mockOnSwapRoutePress}
+        />
+      );
+
+      expect(getByText('Vị trí của bạn')).toBeTruthy();
+      expect(getByText('Chợ Bến Thành')).toBeTruthy();
+
+      const swapBtn = getByTestId('btn-swap-route');
+      expect(swapBtn).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(swapBtn);
+      });
+      expect(mockOnSwapRoutePress).toHaveBeenCalled();
     });
   });
 });
