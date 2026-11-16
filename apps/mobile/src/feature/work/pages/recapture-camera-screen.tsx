@@ -1,6 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -62,7 +65,6 @@ async function uriToBlob(uri: string, mimeType = 'image/jpeg'): Promise<Blob> {
     return blob;
   } catch (fetchErr) {
     console.warn('[Recapture] fetch uri to blob failed, falling back to FileSystem:', fetchErr);
-    const FileSystem = await import('expo-file-system/legacy');
     const base64 = await FileSystem.readAsStringAsync(uri, {
       encoding: FileSystem.EncodingType.Base64,
     });
@@ -165,7 +167,6 @@ export function RecaptureCameraScreen() {
   // 1. Chụp ảnh trực tiếp tại hiện trường (bắt buộc mở app chụp để đính kèm GPS thiết bị)
   const handleLaunchCamera = async () => {
     try {
-      const ImagePicker = await import('expo-image-picker');
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('Cần quyền máy ảnh', 'Vui lòng cấp quyền truy cập máy ảnh để chụp lại biển báo.');
@@ -214,7 +215,6 @@ export function RecaptureCameraScreen() {
   const handlePickImage = async () => {
     try {
       if (Platform.OS === 'android') {
-        const DocumentPicker = await import('expo-document-picker');
         const result = await DocumentPicker.getDocumentAsync({
           type: ['image/jpeg', 'image/png', 'image/webp', 'image/*'],
           copyToCacheDirectory: true,
@@ -244,7 +244,6 @@ export function RecaptureCameraScreen() {
       }
 
       // iOS: Thư viện ảnh hỗ trợ đầy đủ EXIF
-      const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
         quality: 1,
         allowsEditing: false,

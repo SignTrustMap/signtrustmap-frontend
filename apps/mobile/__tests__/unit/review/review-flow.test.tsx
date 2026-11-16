@@ -1105,5 +1105,73 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
         expect(getByText('All reviews completed')).toBeTruthy();
       });
     });
+
+    it('toggles sign focus mode between ROI focus and full context in main card and fullscreen zoom', async () => {
+      const { getByText, getByLabelText, getAllByLabelText } = await render(
+        <ReviewWorkflowProvider>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowProvider>,
+      );
+
+      await waitFor(() => {
+        expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
+      });
+
+      // 1. Toggle focus on the card
+      const focusToggle = getByText('Focus Biển báo');
+      await fireEvent.press(focusToggle);
+      expect(getByText('Toàn cảnh')).toBeTruthy();
+
+      await fireEvent.press(getByText('Toàn cảnh'));
+      expect(getByText('Focus Biển báo')).toBeTruthy();
+
+      // 2. Open zoom modal and toggle focus in fullscreen
+      const candidateImage = getByLabelText('Ảnh biển báo. Chạm để phóng to.');
+      await fireEvent.press(candidateImage);
+
+      await waitFor(() => {
+        expect(getByLabelText('Toggle sign focus in fullscreen')).toBeTruthy();
+      });
+
+      const fullscreenToggle = getByLabelText('Toggle sign focus in fullscreen');
+      await fireEvent.press(fullscreenToggle);
+
+      expect(getByText('Chế độ: Toàn cảnh')).toBeTruthy();
+
+      // Close zoom modal
+      const closeBtn = getAllByLabelText('Đóng xem phóng to')[0];
+      await fireEvent.press(closeBtn);
+    });
+
+    it('submits missing_type report for candidate with custom proposed name', async () => {
+      const { getByText, getByLabelText } = await render(
+        <ReviewWorkflowProvider>
+          <SubmissionReviewScreen />
+        </ReviewWorkflowProvider>,
+      );
+
+      await waitFor(() => {
+        expect(getByText('Speed Limit 50 (P.127)')).toBeTruthy();
+      });
+
+      // Open report modal
+      await fireEvent.press(getByLabelText(/Report submission/i));
+
+      await waitFor(() => {
+        expect(getByText('Báo cáo dữ liệu')).toBeTruthy();
+      });
+
+      // Select missing type radio option
+      const missingTypeOption = getByText('Biển chưa có trong danh mục');
+      await fireEvent.press(missingTypeOption);
+
+      // Confirm report directly
+      const confirmButton = getByText('Gửi báo cáo');
+      await fireEvent.press(confirmButton);
+
+      await waitFor(() => {
+        expect(getByText('Đã gửi báo cáo biển mới thành công!')).toBeTruthy();
+      });
+    });
   });
 });

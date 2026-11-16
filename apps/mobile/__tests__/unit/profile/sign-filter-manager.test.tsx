@@ -193,18 +193,97 @@ describe('SignFilterManager Component', () => {
     expect(getByText('Lộ trình & bộ lọc mới')).toBeTruthy();
 
     const nameInput = getByPlaceholderText('Tự động tạo: [Điểm xuất phát] ➔ [Điểm đến]');
-    fireEvent.changeText(nameInput, 'Tuyến mới');
-
-    // Select vehicle mode 'Ô tô'
     const carMode = getByText('Ô tô');
-    fireEvent.press(carMode);
+    const saveButton = getByLabelText('Lưu danh sách lọc');
 
-    // Save button triggers error if start/dest not selected
+    await act(async () => {
+      fireEvent.changeText(nameInput, 'Tuyến mới');
+      fireEvent.press(carMode);
+      fireEvent.press(saveButton);
+    });
+
+    expect(getByText('Vui lòng chọn Điểm bắt đầu (nhập tìm kiếm hoặc chọn Vị trí hiện tại).')).toBeTruthy();
+  });
+
+  it('selects GPS current location for start and destination points and saves new preset', async () => {
+    const { getByText, getByLabelText } = await render(<SignFilterManager />);
+
+    const createButton = getByText('Thêm mới');
+    await act(async () => {
+      fireEvent.press(createButton);
+    });
+
+    // 1. Pick current location for Start
+    const startGpsBtn = getByLabelText('Chọn vị trí hiện tại cho điểm bắt đầu');
+    await act(async () => {
+      fireEvent.press(startGpsBtn);
+    });
+
+    // 2. Pick current location for Destination
+    const destGpsBtn = getByLabelText('Chọn vị trí hiện tại cho điểm đến');
+    await act(async () => {
+      fireEvent.press(destGpsBtn);
+    });
+
+    // 3. Save preset
     const saveButton = getByLabelText('Lưu danh sách lọc');
     await act(async () => {
       fireEvent.press(saveButton);
     });
 
-    expect(getByText('Vui lòng chọn Điểm bắt đầu (nhập tìm kiếm hoặc chọn Vị trí hiện tại).')).toBeTruthy();
+    expect(mockCreatePreset).toHaveBeenCalledWith(
+      expect.stringContaining('Vị trí GPS'),
+      expect.any(Array),
+      expect.objectContaining({
+        originLatitude: 10.77,
+        originLongitude: 106.7,
+        destinationLatitude: 10.77,
+        destinationLongitude: 106.7,
+      })
+    );
+  });
+
+  it('opens edit modal for existing preset, toggles categories, and updates preset', async () => {
+    const { getAllByText, getByLabelText } = await render(<SignFilterManager />);
+
+    const editButtons = getAllByText('Bộ lọc');
+    await act(async () => {
+      fireEvent.press(editButtons[0]);
+    });
+
+    // Save update
+    const saveButton = getByLabelText('Lưu danh sách lọc');
+    await act(async () => {
+      fireEvent.press(saveButton);
+    });
+
+    expect(mockUpdatePreset).toHaveBeenCalledWith(
+      'preset-1',
+      expect.objectContaining({
+        name: 'Đi làm',
+      })
+    );
+  });
+
+  it('shows error when renaming preset to empty string', async () => {
+    const { getAllByText, getByPlaceholderText, getByText } = await render(<SignFilterManager />);
+
+    const renameButtons = getAllByText('Đổi tên');
+    await act(async () => {
+      fireEvent.press(renameButtons[0]);
+    });
+
+    const input = getByPlaceholderText('Tên lộ trình');
+    await act(async () => {
+      fireEvent.changeText(input, '   ');
+    });
+
+    const saveBtn = getByText('Lưu');
+    await act(async () => {
+      fireEvent.press(saveBtn);
+    });
+
+    expect(getByText('Tên danh sách không được để trống.')).toBeTruthy();
+    expect(mockRenamePreset).not.toHaveBeenCalled();
   });
 });
