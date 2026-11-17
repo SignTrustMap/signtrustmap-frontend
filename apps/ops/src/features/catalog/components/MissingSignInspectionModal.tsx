@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   CircleNotch,
   ChatText,
+  Tag,
 } from '@phosphor-icons/react'
 import { SignMiniMap } from './SignMiniMap'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -498,30 +499,37 @@ export function MissingSignInspectionModal({
                   <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {report.tempLabel}
                   </h3>
-                  {report.id && (
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                      <span>Mã đối tượng:</span>
-                      <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">
-                        #{report.id}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(report.id)
-                          setCopiedTargetId(true)
-                          setTimeout(() => setCopiedTargetId(false), 2000)
-                        }}
-                        className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
-                        title="Sao chép UUID đối tượng"
-                      >
-                        {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Key-Value Specs Card (Clean, neutral layout) */}
                 <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5 text-xs">
+                  {/* Mã đối tượng */}
+                  {report.id && (
+                    <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                      <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 shrink-0">
+                        <Tag size={12} className="text-gray-400 shrink-0" />
+                        <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0 font-mono">
+                        <span className="text-gray-700 dark:text-gray-300 select-all truncate">
+                          #{report.id}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(report.id)
+                            setCopiedTargetId(true)
+                            setTimeout(() => setCopiedTargetId(false), 2000)
+                          }}
+                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0 transition-colors"
+                          title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
+                        >
+                          {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Reporter & Submitted Date */}
                   <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                     <div className="flex items-center gap-1 min-w-0">
@@ -570,14 +578,14 @@ export function MissingSignInspectionModal({
                   )}
 
                   {/* Assigned Surveyor / Recapture Request */}
-                  {(recaptureDetails || (report.status === 'Incomplete' && isLoadingRecapture)) && (
+                  {(recaptureDetails || (report.status === 'Incomplete' && isLoadingRecapture) || (report as any)?.assignedSurveyor) && (
                     <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                       <div className="flex items-center gap-1 min-w-0">
                         <Camera size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                        {recaptureDetails?.surveyorId ? (
+                        {(recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id) ? (
                           <UserIdentityButton
-                            userId={recaptureDetails.surveyorId}
-                            initialUser={recaptureDetails.assignedSurveyor}
+                            userId={recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id}
+                            initialUser={recaptureDetails?.assignedSurveyor || (report as any)?.assignedSurveyor}
                             prefix="Surveyor"
                             isEn={isEn}
                             onOpenProfile={(id, summary) => setInspectingUser({ id, summary })}

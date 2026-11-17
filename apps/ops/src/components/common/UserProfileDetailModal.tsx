@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import { CircleNotch, X, Copy, Check, ShieldCheck, ChartBar, Camera } from '@phosphor-icons/react'
+import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 import {
   userService,
   getCachedUserProfile,
@@ -73,10 +74,12 @@ function ProfileAvatar({
       ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
       : (words[0]?.[0] || 'U').toUpperCase()
 
-  if (url && !imgError) {
+  const resolvedUrl = url ? resolveImageUrl(url) : null
+
+  if (resolvedUrl && !imgError) {
     return (
       <img
-        src={url}
+        src={resolvedUrl}
         alt={name || ''}
         onError={() => setImgError(true)}
         className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-white/10 shrink-0"
@@ -290,11 +293,28 @@ export function UserProfileDetailModal({
     getSummaryDisplayName(initialSummary) ||
     (isEn ? 'Unnamed user' : 'Chưa đặt tên')
   const email = profile?.email || initialSummary?.email || '—'
+  let localAvatar: string | null = null
+  if (typeof window !== 'undefined' && userId) {
+    try {
+      localAvatar = localStorage.getItem('stm_avatar_' + userId)
+      if (!localAvatar) {
+        const rawOpsUser = localStorage.getItem('stm_ops_user')
+        if (rawOpsUser) {
+          const parsed = JSON.parse(rawOpsUser)
+          if (parsed?.id === userId && parsed?.avatar) {
+            localAvatar = parsed.avatar
+          }
+        }
+      }
+    } catch {}
+  }
+
   const avatarUrl =
     profile?.avatar_url ??
     profile?.avatarUrl ??
     initialSummary?.avatarUrl ??
     initialSummary?.avatar_url ??
+    localAvatar ??
     null
   const roles = (profile?.roles || []).map((r) => r.toUpperCase())
   const status = profile?.status
@@ -428,11 +448,10 @@ export function UserProfileDetailModal({
                       return (
                         <div
                           key={r.code}
-                          className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${
-                            isAssigned
-                              ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
-                              : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
-                          }`}
+                          className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${isAssigned
+                            ? 'bg-[#007b8b] text-white border-[#007b8b] dark:bg-[#00c4de] dark:text-black dark:border-[#00c4de] shadow-xs'
+                            : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
+                            }`}
                         >
                           {r.label}
                         </div>
@@ -448,29 +467,26 @@ export function UserProfileDetailModal({
                   </label>
                   <div className="grid grid-cols-3 gap-1.5">
                     <div
-                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${
-                        status === 'ACTIVE'
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                          : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
-                      }`}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${status === 'ACTIVE'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
+                        }`}
                     >
                       {isEn ? 'Active' : 'Hoạt động'}
                     </div>
                     <div
-                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${
-                        status === 'SUSPENDED'
-                          ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                          : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
-                      }`}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${status === 'SUSPENDED'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
+                        }`}
                     >
                       {isEn ? 'Suspended' : 'Tạm khóa'}
                     </div>
                     <div
-                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${
-                        status === 'BANNED'
-                          ? 'bg-red-600 text-white border-red-600 shadow-xs'
-                          : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
-                      }`}
+                      className={`py-2 px-2 rounded-lg border text-xs font-semibold text-center select-none ${status === 'BANNED'
+                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                        : 'bg-white/60 dark:bg-black/20 border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500'
+                        }`}
                     >
                       {isEn ? 'Banned' : 'Đã cấm'}
                     </div>
@@ -487,13 +503,12 @@ export function UserProfileDetailModal({
                       </label>
                       {profile.statistics.reviews?.standing && (
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            profile.statistics.reviews.standing === 'ACTIVE'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/40'
-                              : profile.statistics.reviews.standing === 'SUSPENDED'
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${profile.statistics.reviews.standing === 'ACTIVE'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/40'
+                            : profile.statistics.reviews.standing === 'SUSPENDED'
                               ? 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border border-red-300 dark:border-red-800/40'
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800/40'
-                          }`}
+                            }`}
                         >
                           {profile.statistics.reviews.standing}
                         </span>
@@ -521,13 +536,12 @@ export function UserProfileDetailModal({
                               {isEn ? 'Reliability Score' : 'Độ tin cậy'}
                             </span>
                             <span
-                              className={`font-mono font-bold ${
-                                Number(profile.statistics.reviews.reliabilityScore || 0) < 60
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : Number(profile.statistics.reviews.reliabilityScore || 0) >= 80
+                              className={`font-mono font-bold ${Number(profile.statistics.reviews.reliabilityScore || 0) < 60
+                                ? 'text-red-600 dark:text-red-400'
+                                : Number(profile.statistics.reviews.reliabilityScore || 0) >= 80
                                   ? 'text-emerald-600 dark:text-emerald-400'
                                   : 'text-amber-600 dark:text-amber-400'
-                              }`}
+                                }`}
                             >
                               {profile.statistics.reviews.reliabilityScore ?? '—'}%
                             </span>
@@ -547,11 +561,10 @@ export function UserProfileDetailModal({
                               {isEn ? 'Consecutive Errors' : 'Lỗi liên tiếp'}
                             </span>
                             <span
-                              className={`font-mono font-bold ${
-                                Number(profile.statistics.reviews.consecutiveErrors || 0) > 0
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-gray-800 dark:text-gray-200'
-                              }`}
+                              className={`font-mono font-bold ${Number(profile.statistics.reviews.consecutiveErrors || 0) > 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-800 dark:text-gray-200'
+                                }`}
                             >
                               {profile.statistics.reviews.consecutiveErrors ?? 0}
                             </span>
@@ -562,11 +575,10 @@ export function UserProfileDetailModal({
                               {isEn ? 'Flags' : 'Gắn cờ vi phạm'}
                             </span>
                             <span
-                              className={`font-mono font-bold ${
-                                Number(profile.statistics.reviews.flagged || 0) > 0
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-gray-800 dark:text-gray-200'
-                              }`}
+                              className={`font-mono font-bold ${Number(profile.statistics.reviews.flagged || 0) > 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-800 dark:text-gray-200'
+                                }`}
                             >
                               {profile.statistics.reviews.flagged ?? 0}
                             </span>
@@ -596,13 +608,12 @@ export function UserProfileDetailModal({
                               {isEn ? 'Acceptance Rate' : 'Tỷ lệ chấp thuận'}
                             </span>
                             <span
-                              className={`font-mono font-bold ${
-                                Number(profile.statistics.surveys.acceptanceRate || 0) < 60
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : Number(profile.statistics.surveys.acceptanceRate || 0) >= 80
+                              className={`font-mono font-bold ${Number(profile.statistics.surveys.acceptanceRate || 0) < 60
+                                ? 'text-red-600 dark:text-red-400'
+                                : Number(profile.statistics.surveys.acceptanceRate || 0) >= 80
                                   ? 'text-emerald-600 dark:text-emerald-400'
                                   : 'text-amber-600 dark:text-amber-400'
-                              }`}
+                                }`}
                             >
                               {profile.statistics.surveys.acceptanceRate ?? '—'}%
                             </span>
@@ -622,11 +633,10 @@ export function UserProfileDetailModal({
                               {isEn ? 'Rejected Surveys' : 'Bị từ chối'}
                             </span>
                             <span
-                              className={`font-mono font-bold ${
-                                Number(profile.statistics.surveys.rejected || 0) > 0
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-gray-800 dark:text-gray-200'
-                              }`}
+                              className={`font-mono font-bold ${Number(profile.statistics.surveys.rejected || 0) > 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-800 dark:text-gray-200'
+                                }`}
                             >
                               {profile.statistics.surveys.rejected ?? 0}
                             </span>
