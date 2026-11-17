@@ -101,10 +101,7 @@ export function ClassifierRebuildForm({
   return (
     <div className="p-5 rounded-xl border bg-white dark:bg-[#0A171C] border-[#E8E4E3] dark:border-white/10 shadow-xs space-y-4 text-left">
       <div>
-        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">
-          Tối ưu hóa medoids & trọng số TIMO
-        </span>
-        <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white mt-0.5">
+        <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white">
           Rebuild classifier
         </h4>
       </div>
@@ -201,7 +198,7 @@ export function ClassifierRebuildForm({
             {isSubmitting && (
               <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
             )}
-            <span>{isSubmitting ? 'Đang rebuild trên GPU...' : 'Rebuild classifier'}</span>
+            <span>{isSubmitting ? 'Rebuild classifier...' : 'Rebuild classifier'}</span>
           </button>
         </div>
       </form>

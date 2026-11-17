@@ -94,8 +94,8 @@ export function ModelLifecycleTab() {
     try {
       const res = await AiopsService.deployClassifier(versionId)
       toast.success(res.message || `Đã triển khai thành công phiên bản ${res.version_tag}`)
-      await fetchClassifierVersions()
-      await fetchStatusAndDiff()
+      fetchClassifierVersions()
+      fetchStatusAndDiff()
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Không thể triển khai mô hình phân loại')
       throw err
@@ -107,8 +107,8 @@ export function ModelLifecycleTab() {
     try {
       const res = await AiopsService.rollbackClassifier()
       toast.success(res.message || `Đã quay về phiên bản ${res.version_tag}`)
-      await fetchClassifierVersions()
-      await fetchStatusAndDiff()
+      fetchClassifierVersions()
+      fetchStatusAndDiff()
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Không thể hoàn tác phiên bản phân loại')
       throw err
@@ -120,8 +120,8 @@ export function ModelLifecycleTab() {
     try {
       const res = await AiopsService.switchClassifier(versionId)
       toast.success(res.message || `Đã chuyển đổi sang phiên bản ${res.version_tag}`)
-      await fetchClassifierVersions()
-      await fetchStatusAndDiff()
+      fetchClassifierVersions()
+      fetchStatusAndDiff()
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Không thể chuyển đổi phiên bản phân loại')
       throw err
@@ -133,7 +133,7 @@ export function ModelLifecycleTab() {
     try {
       const res = await AiopsService.rollbackDetector()
       toast.success(res.message || `Đã quay về phiên bản ${res.version_tag}`)
-      await fetchDetectorVersions()
+      fetchDetectorVersions()
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Không thể hoàn tác phiên bản nhận diện')
       throw err
@@ -145,7 +145,7 @@ export function ModelLifecycleTab() {
     try {
       const res = await AiopsService.switchDetector(versionId)
       toast.success(res.message || `Đã chuyển đổi sang phiên bản ${res.version_tag}`)
-      await fetchDetectorVersions()
+      fetchDetectorVersions()
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Không thể chuyển đổi phiên bản nhận diện')
       throw err
@@ -183,11 +183,11 @@ export function ModelLifecycleTab() {
           </button>
         </div>
 
-        <div className="text-[11px] font-mono text-gray-500">
-          {subTab === 'classifier'
-            ? 'Hỗ trợ kiểm tra dữ liệu, cấu hình tham số và cập nhật trực tiếp trên GPU'
-            : 'Mô hình detector được huấn luyện offline và đồng bộ trọng số engine'}
-        </div>
+        {subTab === 'detector' && (
+          <div className="text-[11px] font-mono text-gray-500">
+            Mô hình detector được huấn luyện offline và đồng bộ trọng số engine
+          </div>
+        )}
       </div>
 
       {/* Sub-tab 1: Classifier Lifecycle */}

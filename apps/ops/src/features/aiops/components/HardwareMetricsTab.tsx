@@ -44,11 +44,10 @@ export function HardwareMetricsTab({
               <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
                 {t('mlops.metrics_live_node')}
               </span>
-              <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tabular-nums ${
-                !isStreaming
-                  ? 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/10'
-                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-              }`}>
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tabular-nums ${!isStreaming
+                ? 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-white/10'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                }`}>
                 {!isStreaming ? t('mlops.metrics_stream_paused') : t('mlops.metrics_stream_live')}
               </span>
 
@@ -291,38 +290,54 @@ export function HardwareMetricsTab({
             </div>
 
             {/* 6. STORAGE & DISK IO (Span 2) */}
-            <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 sm:p-4.5 shadow-xs h-[190px] flex flex-col justify-between lg:col-span-2 overflow-hidden">
-              <div className="flex items-center justify-between pb-1">
-                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                  {t('mlops.metrics_storage_card')}
-                </span>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
-                  {(metrics.disks || []).map((d, idx) => (
-                    <div key={idx} className="space-y-1 text-xs min-w-0">
-                      <div className="flex items-center justify-between gap-1.5 font-mono tabular-nums text-[11px]">
-                        <span
-                          className="font-bold text-gray-800 dark:text-gray-200 truncate"
-                          title={`${d.mountpoint} • ${d.fstype}`}
-                        >
-                          {d.mountpoint} <span className="text-gray-400 font-normal">• {d.fstype}</span>
-                        </span>
-                        <span className="text-gray-400 shrink-0 text-[10px]">
-                          {(d.used_gb ?? 0).toFixed(1)}/{(d.total_gb ?? 0).toFixed(0)}G • {d.percent ?? 0}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-100 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${(d.percent ?? 0) > 85 ? 'bg-red-500' : 'bg-[#007b8b] dark:bg-[#00c4de]'}`}
-                          style={{ width: `${Math.min(100, Math.max(0, d.percent ?? 0))}%` }}
-                        />
-                      </div>
+            {(() => {
+              const totalDiskUsed = (metrics.disks || []).reduce((acc, d) => acc + (d.used_gb ?? 0), 0)
+              const totalDiskTotal = (metrics.disks || []).reduce((acc, d) => acc + (d.total_gb ?? 0), 0)
+              const totalDiskPercent = totalDiskTotal > 0 ? (totalDiskUsed / totalDiskTotal) * 100 : 0
+
+              return (
+                <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 shadow-xs h-[190px] flex flex-col justify-between lg:col-span-2 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      {t('mlops.metrics_storage_card')}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
+                      {(metrics.disks || []).map((d, idx) => (
+                        <div key={idx} className="space-y-1 text-xs min-w-0">
+                          <div className="flex items-center justify-between gap-1.5 font-mono tabular-nums text-[11px]">
+                            <span
+                              className="font-bold text-gray-800 dark:text-gray-200 truncate"
+                              title={`${d.mountpoint} • ${d.fstype}`}
+                            >
+                              {d.mountpoint} <span className="text-gray-400 font-normal">• {d.fstype}</span>
+                            </span>
+                            <span className="text-gray-400 shrink-0 text-[10px]">
+                              {(d.used_gb ?? 0).toFixed(1)}/{(d.total_gb ?? 0).toFixed(0)}G • <strong className={(d.percent ?? 0) > 85 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}>{d.percent ?? 0}%</strong>
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200/70 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${(d.percent ?? 0) > 85 ? 'bg-red-500' : 'bg-[#007b8b] dark:bg-[#00c4de]'}`}
+                              style={{ width: `${Math.min(100, Math.max(0, d.percent ?? 0))}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="pt-1.5 border-t border-gray-100 dark:border-white/10 text-[11px] font-mono tabular-nums text-gray-400 flex justify-between items-center">
+                    <span>{t('mlops.metrics_storage_total')}</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-300">
+                      {totalDiskUsed.toFixed(1)}G / {totalDiskTotal.toFixed(0)}G ({totalDiskPercent.toFixed(1)}%)
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )
+            })()}
 
             {/* 7. NETWORK THROUGHPUT */}
             <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-4 sm:p-4.5 shadow-xs h-[190px] flex flex-col justify-between overflow-hidden">

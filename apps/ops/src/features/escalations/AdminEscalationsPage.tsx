@@ -655,15 +655,23 @@ export default function AdminEscalationsPage() {
           return
         }
 
-        await escalationService.applyAdminMissingReportAction(reportId, {
+        const res: any = await escalationService.applyAdminMissingReportAction(reportId, {
           actionType: mappedAction,
           reason: decisionNotes.trim(),
           banTarget: mappedAction === 'BAN_USER' ? banTarget : undefined,
         })
 
+        const rec = normalizeRecaptureRequestSummary(res?.recaptureRequest || res)
+        const assignedSurveyor = res?.assignedSurveyor || rec?.assignedSurveyor
+        const surveyorName =
+          assignedSurveyor?.fullName ||
+          (rec?.surveyorId ? `#${rec.surveyorId.slice(0, 8)}` : null)
+
         const actionSuccessMsg = {
           REJECT: isEn ? `Report #${reportId.slice(0, 8)} rejected successfully!` : `Đã từ chối báo cáo #${reportId.slice(0, 8)}!`,
-          REQUEST_RECAPTURE: isEn ? 'Field recapture task assigned to a random surveyor!' : 'Đã giao nhiệm vụ chụp lại thực địa cho một surveyor ngẫu nhiên!',
+          REQUEST_RECAPTURE: surveyorName
+            ? (isEn ? `Recapture task assigned to Surveyor ${surveyorName}!` : `Đã phân công cho Surveyor ${surveyorName} chụp lại thực địa!`)
+            : (isEn ? 'Field recapture task assigned to a random surveyor!' : 'Đã giao nhiệm vụ chụp lại thực địa cho một surveyor ngẫu nhiên!'),
           BAN_USER: isEn
             ? `User ${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'} has been banned successfully!`
             : `Đã khóa tài khoản ${banTarget === 'SURVEYOR' ? 'Surveyor' : banTarget === 'REVIEWER' ? 'Reviewer' : 'Staff'}!`,
@@ -677,15 +685,28 @@ export default function AdminEscalationsPage() {
       }
 
       // Standard moderation case resolve
-      await escalationService.resolveCase(selectedCase.id, {
+      const res: any = await escalationService.resolveCase(selectedCase.id, {
         resolutionNote: decisionNotes.trim(),
         actionType,
       })
-      success(
-        isEn
-          ? `Case #${selectedCase.id.slice(0, 8)} resolved successfully!`
-          : `Đã xử lý ca #${selectedCase.id.slice(0, 8)} thành công!`
-      )
+      if (actionType === 'REQUEST_RECAPTURE') {
+        const rec = normalizeRecaptureRequestSummary(res?.recaptureRequest || res)
+        const assignedSurveyor = res?.assignedSurveyor || rec?.assignedSurveyor
+        const surveyorName =
+          assignedSurveyor?.fullName ||
+          (res?.surveyorId ? `#${res.surveyorId.slice(0, 8)}` : null)
+        success(
+          surveyorName
+            ? (isEn ? `Recapture task assigned to Surveyor ${surveyorName}!` : `Đã phân công cho Surveyor ${surveyorName} chụp lại thực địa!`)
+            : (isEn ? `Case #${selectedCase.id.slice(0, 8)} resolved with recapture request!` : `Đã yêu cầu chụp lại cho ca #${selectedCase.id.slice(0, 8)}!`)
+        )
+      } else {
+        success(
+          isEn
+            ? `Case #${selectedCase.id.slice(0, 8)} resolved successfully!`
+            : `Đã xử lý ca #${selectedCase.id.slice(0, 8)} thành công!`
+        )
+      }
       setSelectedCase(null)
       fetchCases()
       window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
@@ -1534,10 +1555,10 @@ export default function AdminEscalationsPage() {
                               <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                                 <div className="flex items-center gap-1 min-w-0">
                                   <Camera size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                                  {recaptureRequest?.surveyorId ? (
+                                  {(recaptureRequest?.surveyorId || recaptureRequest?.assignedSurveyor?.id || (activeCase as any)?.involvedUsers?.surveyor?.id) ? (
                                     <UserIdentityButton
-                                      userId={recaptureRequest.surveyorId}
-                                      initialUser={recaptureRequest.assignedSurveyor}
+                                      userId={recaptureRequest?.surveyorId || recaptureRequest?.assignedSurveyor?.id || (activeCase as any)?.involvedUsers?.surveyor?.id}
+                                      initialUser={recaptureRequest?.assignedSurveyor || (activeCase as any)?.involvedUsers?.surveyor}
                                       prefix="Surveyor"
                                       isEn={isEn}
                                       onOpenProfile={handleOpenUserProfile}

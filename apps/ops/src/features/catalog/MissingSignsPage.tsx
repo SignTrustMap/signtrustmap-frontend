@@ -193,7 +193,15 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem | any): MissingS
     staffNotes: r.staffNotes || r.staff_notes || null,
     reporter: r.reporter || null,
     reviewer: r.reviewer || null,
-    recaptureRequest: normalizeRecaptureRequestSummary(r.recaptureRequest),
+    recaptureRequest: normalizeRecaptureRequestSummary(
+      r.recaptureRequest ||
+      (r.assignedSurveyor || r.surveyorId || r.surveyor_id
+        ? {
+            surveyorId: r.surveyorId || r.surveyor_id || r.assignedSurveyor?.id,
+            assignedSurveyor: r.assignedSurveyor,
+          }
+        : null)
+    ),
   }
 }
 
@@ -680,12 +688,15 @@ export default function MissingSignsPage() {
     const candidateId = selectedReport.candidateId
     setIsSubmittingRecapture(true)
     try {
-      await catalogService.updateMissingReport(reportId, {
+      const res: any = await catalogService.updateMissingReport(reportId, {
         actionType: 'REQUEST_RECAPTURE',
         staffNotes: note,
       })
 
-      if (candidateId) {
+      const rec = normalizeRecaptureRequestSummary(res?.recaptureRequest || res)
+      if (candidateId && rec) {
+        candidateRecaptureCache.set(candidateId, rec)
+      } else if (candidateId) {
         candidateRecaptureCache.set(candidateId, {
           reason,
           note,
@@ -693,7 +704,16 @@ export default function MissingSignsPage() {
         })
       }
 
-      success(`Đã phân bổ Surveyor thực địa chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      const assignedSurveyor = res?.assignedSurveyor || rec?.assignedSurveyor
+      const surveyorName =
+        assignedSurveyor?.fullName ||
+        (rec?.surveyorId ? `#${rec.surveyorId.slice(0, 8)}` : null)
+
+      if (surveyorName) {
+        success(`Đã phân công cho Surveyor ${surveyorName} chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      } else {
+        success(`Đã phân bổ Surveyor thực địa chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      }
       setIsRecaptureModalOpen(false)
       setSelectedReport(null)
       fetchReports()

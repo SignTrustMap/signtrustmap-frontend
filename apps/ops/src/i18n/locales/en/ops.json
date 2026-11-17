@@ -468,6 +468,8 @@
     "metrics_power_card": "Power consumption",
     "metrics_power_rail_optimal": "Power Rail: Optimal (5V Input)",
     "metrics_storage_card": "Storage",
+    "metrics_storage_total": "Total Capacity:",
+    "metrics_storage_partitions": "partitions",
     "metrics_network_card": "Network",
     "metrics_net_dl": "DL:",
     "metrics_net_ul": "UL:",

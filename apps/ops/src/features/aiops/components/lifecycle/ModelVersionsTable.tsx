@@ -1,8 +1,18 @@
 import { useState, useMemo } from 'react'
 import { ModalPortal } from '@/components/common/ModalPortal'
 import { Pagination } from '@/components/common/Pagination'
+import CustomSelect, { type OptionItem } from '@/components/common/CustomSelect'
 import type { ModelVersionItem } from '@/api/services/aiops.service'
 import { ModelEvaluationModal } from './ModelEvaluationModal'
+
+type SortKey = 'newest' | 'oldest' | 'name_asc' | 'name_desc'
+
+const SORT_OPTIONS: OptionItem[] = [
+  { value: 'newest', label: 'Mới nhất' },
+  { value: 'oldest', label: 'Cũ nhất' },
+  { value: 'name_asc', label: 'Tên A - Z' },
+  { value: 'name_desc', label: 'Tên Z - A' },
+]
 
 interface ModelVersionsTableProps {
   modelType: 'CLASSIFIER' | 'DETECTOR'
@@ -27,31 +37,65 @@ export function ModelVersionsTable({
   const [actionLoading, setActionLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [selectedSort, setSelectedSort] = useState<SortKey>('newest')
 
   const canRollback = versions.length > 1
 
+  const sortedVersions = useMemo(() => {
+    const list = [...versions]
+    switch (selectedSort) {
+      case 'newest':
+        return list.sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return tB - tA || b.id - a.id
+        })
+      case 'oldest':
+        return list.sort((a, b) => {
+          const tA = a.created_at ? new Date(a.created_at).getTime() : 0
+          const tB = b.created_at ? new Date(b.created_at).getTime() : 0
+          return tA - tB || a.id - b.id
+        })
+      case 'name_asc':
+        return list.sort((a, b) =>
+          a.version_tag.localeCompare(b.version_tag, undefined, { numeric: true, sensitivity: 'base' })
+        )
+      case 'name_desc':
+        return list.sort((a, b) =>
+          b.version_tag.localeCompare(a.version_tag, undefined, { numeric: true, sensitivity: 'base' })
+        )
+      default:
+        return list
+    }
+  }, [versions, selectedSort])
+
   const paginatedVersions = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return versions.slice(start, start + pageSize)
-  }, [versions, currentPage, pageSize])
+    return sortedVersions.slice(start, start + pageSize)
+  }, [sortedVersions, currentPage, pageSize])
 
   const handleRollbackConfirm = async () => {
     setActionLoading(true)
     try {
       await onRollback()
-      setConfirmRollbackModal(false)
+    } catch (err) {
+      console.error('Rollback error:', err)
     } finally {
+      setConfirmRollbackModal(false)
       setActionLoading(false)
     }
   }
 
   const handleSwitchConfirm = async () => {
     if (!confirmSwitchId) return
+    const idToSwitch = confirmSwitchId
     setActionLoading(true)
     try {
-      await onSwitch(confirmSwitchId)
-      setConfirmSwitchId(null)
+      await onSwitch(idToSwitch)
+    } catch (err) {
+      console.error('Switch error:', err)
     } finally {
+      setConfirmSwitchId(null)
       setActionLoading(false)
     }
   }
@@ -61,15 +105,24 @@ export function ModelVersionsTable({
       {/* Table Header Bar */}
       <div className="px-5 py-3 border-b border-gray-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 block">
-            Lịch sử phiên bản mô hình
-          </span>
-          <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white mt-0.5">
+          <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white">
             {modelType === 'CLASSIFIER' ? 'Danh sách phiên bản classifier' : 'Danh sách phiên bản detector'}
           </h4>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <CustomSelect
+            options={SORT_OPTIONS}
+            value={selectedSort}
+            onChange={(val) => {
+              setSelectedSort(val as SortKey)
+              setCurrentPage(1)
+            }}
+            prefixLabel="Sắp xếp"
+            size="sm"
+            className="w-44 sm:w-48"
+          />
+
           <button
             type="button"
             onClick={onRefresh}
@@ -108,10 +161,34 @@ export function ModelVersionsTable({
             <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 text-[11px] text-gray-500 dark:text-gray-400">
               <tr>
                 <th className="py-2.5 px-4 font-semibold w-16">ID</th>
-                <th className="py-2.5 px-4 font-semibold">Tên phiên bản</th>
+                <th
+                  onClick={() => {
+                    setSelectedSort((prev) => (prev === 'name_asc' ? 'name_desc' : 'name_asc'))
+                    setCurrentPage(1)
+                  }}
+                  className="py-2.5 px-4 font-semibold cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Tên phiên bản</span>
+                    {selectedSort === 'name_asc' && <span className="text-[#007b8b] font-bold">↑</span>}
+                    {selectedSort === 'name_desc' && <span className="text-[#007b8b] font-bold">↓</span>}
+                  </div>
+                </th>
                 <th className="py-2.5 px-4 font-semibold text-center">Trạng thái</th>
                 <th className="py-2.5 px-4 font-semibold">Ghi chú</th>
-                <th className="py-2.5 px-4 font-semibold">Thời gian tạo</th>
+                <th
+                  onClick={() => {
+                    setSelectedSort((prev) => (prev === 'newest' ? 'oldest' : 'newest'))
+                    setCurrentPage(1)
+                  }}
+                  className="py-2.5 px-4 font-semibold cursor-pointer select-none hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Thời gian tạo</span>
+                    {selectedSort === 'newest' && <span className="text-[#007b8b] font-bold">↓</span>}
+                    {selectedSort === 'oldest' && <span className="text-[#007b8b] font-bold">↑</span>}
+                  </div>
+                </th>
                 <th className="py-2.5 px-4 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
@@ -179,11 +256,11 @@ export function ModelVersionsTable({
       )}
 
       {/* Standard Catalog Pagination Footer */}
-      {!loading && versions.length > 0 && (
+      {!loading && sortedVersions.length > 0 && (
         <div className="px-5 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5">
           <Pagination
             currentPage={currentPage}
-            totalItems={versions.length}
+            totalItems={sortedVersions.length}
             pageSize={pageSize}
             onPageChange={setCurrentPage}
             onPageSizeChange={(sz) => {

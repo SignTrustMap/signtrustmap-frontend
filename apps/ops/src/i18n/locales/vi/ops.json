@@ -481,6 +481,8 @@
     "metrics_power_card": "Điện năng tiêu thụ",
     "metrics_power_rail_optimal": "Nguồn cấp: Tối ưu 5V",
     "metrics_storage_card": "Bộ nhớ",
+    "metrics_storage_total": "Tổng dung lượng:",
+    "metrics_storage_partitions": "phân vùng",
     "metrics_network_card": "Mạng",
     "metrics_net_dl": "Tải xuống:",
     "metrics_net_ul": "Tải lên:",

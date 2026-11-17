@@ -578,14 +578,14 @@ export function MissingSignInspectionModal({
                   )}
 
                   {/* Assigned Surveyor / Recapture Request */}
-                  {(recaptureDetails || (report.status === 'Incomplete' && isLoadingRecapture)) && (
+                  {(recaptureDetails || (report.status === 'Incomplete' && isLoadingRecapture) || (report as any)?.assignedSurveyor) && (
                     <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                       <div className="flex items-center gap-1 min-w-0">
                         <Camera size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                        {recaptureDetails?.surveyorId ? (
+                        {(recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id) ? (
                           <UserIdentityButton
-                            userId={recaptureDetails.surveyorId}
-                            initialUser={recaptureDetails.assignedSurveyor}
+                            userId={recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id}
+                            initialUser={recaptureDetails?.assignedSurveyor || (report as any)?.assignedSurveyor}
                             prefix="Surveyor"
                             isEn={isEn}
                             onOpenProfile={(id, summary) => setInspectingUser({ id, summary })}

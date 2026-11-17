@@ -37,17 +37,17 @@ export function TrainingDataStatusCard({
       {/* Top row: Title and Eligibility Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">
-            Dữ liệu huấn luyện classifier
-          </span>
-          <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white mt-0.5">
+          <h4 className="text-sm font-bold font-mono text-gray-900 dark:text-white">
             Trạng thái tập mẫu verified
           </h4>
         </div>
 
         <div className="flex items-center gap-2">
           {loading ? (
-            <span className="text-xs font-mono text-gray-400">Đang đồng bộ...</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#007b8b]/10 text-[#007b8b] dark:text-[#00c4de] border border-[#007b8b]/20 animate-in fade-in duration-150">
+              <span className="w-2.5 h-2.5 border-1.5 border-[#007b8b]/30 border-t-[#007b8b] dark:border-[#00c4de]/30 dark:border-t-[#00c4de] rounded-full animate-spin shrink-0" />
+              <span>Đang đồng bộ...</span>
+            </span>
           ) : isEligible ? (
             <span className="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
               Đủ điều kiện rebuild
@@ -61,7 +61,8 @@ export function TrainingDataStatusCard({
           <button
             type="button"
             onClick={onRefresh}
-            className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer text-gray-700 dark:text-gray-300"
+            disabled={loading}
+            className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Làm mới
           </button>
@@ -141,7 +142,7 @@ export function TrainingDataStatusCard({
             onClick={() => setShowCatalogModal(true)}
             className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 text-gray-800 dark:text-gray-200 font-bold transition-colors cursor-pointer"
           >
-            Xem catalog 429 biển báo QCVN 41:2019
+            Xem catalog
           </button>
         </div>
       </div>

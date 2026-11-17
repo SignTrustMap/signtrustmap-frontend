@@ -74,7 +74,7 @@ export function resolveImageUrl(signCropUrl?: string | null, signCode?: string):
     const hasBucket = ['stm-catalog-images', 'stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => rawPath.startsWith(b + '/'))
     return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${rawPath}`
   }
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:') || raw.startsWith('blob:')) {
     return raw
   }
   const clean = raw.replace(/^\/+/, '')
