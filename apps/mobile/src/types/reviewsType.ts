@@ -46,6 +46,7 @@ export type MyReviewHistoryParams = {
     page: string,
     pageSize: string,
     status?: string,
+    state?: string,
     search?: string,
     surveyorId?: string,
 }

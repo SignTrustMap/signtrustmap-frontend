@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -19,6 +19,7 @@ import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { ListSkeleton, Skeleton } from '@/components/skeleton';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMyReviewHistory, useGetMyReviewerStats } from '@/feature/review/hooks/use-review';
+import type { MyReviewHistoryParams } from '@/types/reviewsType';
 import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkRoute } from '@/hooks/use-work-route';
@@ -63,12 +64,18 @@ export function ReviewerStatsScreen() {
     error: statsError,
   } = useGetMyReviewerStats();
 
+  const historyParams: MyReviewHistoryParams = {
+    page: String(historyPage),
+    pageSize: String(PAGE_SIZE),
+    ...(activeHistoryTab !== 'all' ? { state: activeHistoryTab } : {}),
+  };
+
   const {
     data: historyData,
     isLoading: isHistoryLoading,
     isFetching: isHistoryFetching,
     refetch: refetchHistory,
-  } = useGetMyReviewHistory({ page: String(historyPage), pageSize: String(PAGE_SIZE) });
+  } = useGetMyReviewHistory(historyParams);
 
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
 
@@ -110,7 +117,7 @@ export function ReviewerStatsScreen() {
     return true;
   });
 
-  const totalHistoryCount = historyData?.total ?? rawHistoryItems.length;
+  const totalHistoryCount = historyData?.total ?? filteredHistoryItems.length;
   const totalPages = Math.max(
     1,
     historyData?.totalPages ?? Math.ceil(totalHistoryCount / PAGE_SIZE),

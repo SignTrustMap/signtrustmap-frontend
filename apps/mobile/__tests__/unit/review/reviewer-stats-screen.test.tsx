@@ -245,9 +245,13 @@ describe('ReviewerStatsScreen Unit Test Suite', () => {
 
     const { getByText, queryByText, getAllByRole } = await render(<ReviewerStatsScreen />);
 
-    // Initially 'all' tab -> both items visible
+    // Initially 'all' tab -> both items visible and query called with page & pageSize
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
     expect(getByText('Đường cong nguy hiểm')).toBeTruthy();
+    expect(useGetMyReviewHistory).toHaveBeenCalledWith({
+      page: '1',
+      pageSize: '10',
+    });
 
     const tabs = getAllByRole('tab');
 
@@ -256,6 +260,11 @@ describe('ReviewerStatsScreen Unit Test Suite', () => {
       fireEvent.press(tabs[1]);
     });
 
+    expect(useGetMyReviewHistory).toHaveBeenCalledWith({
+      page: '1',
+      pageSize: '10',
+      state: 'approved',
+    });
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
     expect(queryByText('Đường cong nguy hiểm')).toBeNull();
 
@@ -264,6 +273,11 @@ describe('ReviewerStatsScreen Unit Test Suite', () => {
       fireEvent.press(tabs[2]);
     });
 
+    expect(useGetMyReviewHistory).toHaveBeenCalledWith({
+      page: '1',
+      pageSize: '10',
+      state: 'rejected',
+    });
     expect(queryByText('Cấm đi ngược chiều')).toBeNull();
     expect(getByText('Đường cong nguy hiểm')).toBeTruthy();
   });
