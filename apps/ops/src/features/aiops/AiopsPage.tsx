@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/context/ToastContext'
 import PageHeader from '@/components/common/PageHeader'
-import {
-  Broadcast,
-  Package,
-  SlidersHorizontal,
-  Tag,
-  GearSix,
-  Scales,
-} from '@phosphor-icons/react'
 import {
   AiopsService,
   type SystemHardwareMetrics,
@@ -24,7 +17,7 @@ import { ModelsTab } from './components/ModelsTab'
 import { ActiveLearningTab } from './components/ActiveLearningTab'
 import { ClassesTab } from './components/ClassesTab'
 import { SystemConfigTab } from './components/SystemConfigTab'
-import { CandidateEvaluationTab } from './components/CandidateEvaluationTab'
+import { ModelLifecycleTab } from './components/lifecycle/ModelLifecycleTab'
 import { ErrorBoundary } from '@shared/ui'
 
 function formatUptime(seconds: number): string {
@@ -41,15 +34,38 @@ export default function AiopsPage() {
   const toast = useToast()
   const isEn = i18n.language?.startsWith('en')
 
-  // 6 Active Tabs: Metrics, Models, Active Learning, Classes, Config, and Candidate Evaluation
-  const [activeTab, setActiveTab] = useState<
-    'metrics' | 'models' | 'active-learning' | 'classes' | 'config' | 'evaluation'
-  >('metrics')
+  // Search Params for direct URL linking (?tab=versions hoặc ?tab=lifecycle)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+  const validTabs = ['metrics', 'models', 'active-learning', 'classes', 'config', 'evaluation', 'lifecycle', 'versions']
 
-  // Model Evaluation & Governed Deployment State
-  const [activeModelVersion, setActiveModelVersion] = useState('YOLOv11x-v2.3')
-  const [candidateModelVersion] = useState('YOLOv11x-v2.4-retrained')
-  const [candidateStatus, setCandidateStatus] = useState<'pending_review' | 'promoted' | 'rejected'>('pending_review')
+  // 6 Active Tabs: Metrics, Models, Active Learning, Classes, Config, and Model Versions
+  const [activeTab, setActiveTabState] = useState<
+    'metrics' | 'models' | 'active-learning' | 'classes' | 'config' | 'versions'
+  >(() => {
+    if (tabFromUrl && validTabs.includes(tabFromUrl)) {
+      if (tabFromUrl === 'evaluation' || tabFromUrl === 'lifecycle' || tabFromUrl === 'versions') {
+        return 'versions'
+      }
+      return tabFromUrl as any
+    }
+    return 'metrics'
+  })
+
+  const setActiveTab = useCallback(
+    (tab: 'metrics' | 'models' | 'active-learning' | 'classes' | 'config' | 'versions') => {
+      setActiveTabState(tab)
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', tab)
+          return next
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   // Infrastructure Health (/api/v1/system/health)
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
@@ -90,11 +106,19 @@ export default function AiopsPage() {
   const [configViewMode, setConfigViewMode] = useState<'tree' | 'json'>('tree')
   const [collapsedBranches, setCollapsedBranches] = useState<Record<string, boolean>>({})
 
-  // 1. Fetch One-Time Health Snapshot on Mount
+  // 1. Fetch One-Time Health Snapshot on Mount & Preload Tab Counts
   useEffect(() => {
     AiopsService.getSystemHealth()
       .then((data) => setHealth(data))
       .catch((err) => console.warn('Could not fetch initial system health:', err))
+
+    AiopsService.getModels()
+      .then((data) => setModelsData(data))
+      .catch(() => {})
+
+    AiopsService.getClasses()
+      .then((data) => setClassesData(data))
+      .catch(() => {})
   }, [])
 
   // 2. Fetch Models when Tab is Opened
@@ -231,7 +255,7 @@ export default function AiopsPage() {
       const backendOk = backendRes.status === 'fulfilled'
 
       if (edgeOk && backendOk) {
-        toast.success(isEn ? 'Active learning settings saved' : 'Đã lưu cấu hình học chủ động')
+        toast.success(isEn ? 'Active learning settings saved' : 'Đã lưu cấu hình Active learning')
       } else if (edgeOk || backendOk) {
         toast.warning(
           isEn
@@ -239,7 +263,7 @@ export default function AiopsPage() {
             : 'Đã lưu nhưng một máy chủ chưa đồng bộ được'
         )
       } else {
-        toast.error(isEn ? 'Could not save active learning settings' : 'Không thể lưu cấu hình học chủ động')
+        toast.error(isEn ? 'Could not save active learning settings' : 'Không thể lưu cấu hình Active learning')
       }
 
       if (edgeOk && configFetched) {
@@ -312,30 +336,25 @@ export default function AiopsPage() {
   }
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6 w-full">
+    <div className="p-4 sm:p-6 lg:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-5 w-full">
       {/* Page Title Only - Clean & Minimalist */}
       <PageHeader title={t('mlops.title')} />
 
-      {/* Sleek Segmented Tab Navigation Bar */}
-      <div className="p-1 bg-neutral-100 dark:bg-neutral-900/80 border border-neutral-200/80 dark:border-white/10 rounded-2xl inline-flex flex-wrap items-center gap-1 shadow-2xs max-w-full overflow-x-auto">
+      {/* Sleek Segmented Tab Navigation Bar - Compact, Icon-Free, Never Wraps */}
+      <div className="p-1 bg-neutral-100 dark:bg-neutral-900/80 border border-neutral-200/80 dark:border-white/10 rounded-xl inline-flex items-center gap-1 shadow-2xs max-w-full overflow-x-auto flex-nowrap scrollbar-none">
         {/* Tab 1: Live Hardware Telemetry */}
         <button
           type="button"
           onClick={() => setActiveTab('metrics')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeTab === 'metrics'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Broadcast
-            size={15}
-            weight={activeTab === 'metrics' ? 'bold' : 'regular'}
-            className={activeTab === 'metrics' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
           <span>{t('mlops.tab_metrics')}</span>
           {isStreaming && (
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
           )}
         </button>
 
@@ -343,20 +362,15 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('models')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeTab === 'models'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Package
-            size={15}
-            weight={activeTab === 'models' ? 'bold' : 'regular'}
-            className={activeTab === 'models' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
-          <span>{t('mlops.tab_models')}</span>
+          <span>{isEn ? 'Model Files' : 'Tệp mô hình'}</span>
           {modelsData && (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
               {modelsData.total_detectors + modelsData.total_classifiers}
             </span>
           )}
@@ -366,17 +380,12 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('active-learning')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeTab === 'active-learning'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <SlidersHorizontal
-            size={15}
-            weight={activeTab === 'active-learning' ? 'bold' : 'regular'}
-            className={activeTab === 'active-learning' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
           <span>{t('mlops.tab_active_learning')}</span>
         </button>
 
@@ -384,21 +393,16 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('classes')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeTab === 'classes'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Tag
-            size={15}
-            weight={activeTab === 'classes' ? 'bold' : 'regular'}
-            className={activeTab === 'classes' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
           <span>{t('mlops.tab_classes')}</span>
-          {classesData && (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-700 dark:text-neutral-300">
-              {classesData.total}
+          {Boolean(classesData?.total_classes || classesData?.total || classesData?.classes?.length) && (
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-neutral-200/70 dark:bg-white/10 text-neutral-600 dark:text-neutral-300">
+              {classesData?.total_classes ?? classesData?.total ?? classesData?.classes?.length}
             </span>
           )}
         </button>
@@ -407,46 +411,32 @@ export default function AiopsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('config')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
             activeTab === 'config'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <GearSix
-            size={15}
-            weight={activeTab === 'config' ? 'bold' : 'regular'}
-            className={activeTab === 'config' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
           <span>{t('mlops.tab_config')}</span>
         </button>
 
-        {/* Tab 6: Candidate Evaluation & Controlled Deployment */}
+        {/* Tab 6: Model Rebuild & Version Management */}
         <button
           type="button"
-          onClick={() => setActiveTab('evaluation')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'evaluation'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+          onClick={() => setActiveTab('versions')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
+            activeTab === 'versions'
+              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10 font-bold'
               : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
           }`}
         >
-          <Scales
-            size={15}
-            weight={activeTab === 'evaluation' ? 'bold' : 'regular'}
-            className={activeTab === 'evaluation' ? 'text-[#007b8b] dark:text-[#00c4de]' : 'text-neutral-400'}
-          />
-          <span>Đánh giá & Triển khai</span>
-          {candidateStatus === 'pending_review' && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400">
-              Ứng viên v2.4
-            </span>
-          )}
+          <span>{isEn ? 'Model Versions' : 'Quản lý phiên bản'}</span>
         </button>
       </div>
 
       {/* Tab Contents protected by ErrorBoundary */}
       <ErrorBoundary
+        key={activeTab}
         variant="card"
         title="Module AI MLOps tạm thời gặp sự cố"
         description="Đã xảy ra lỗi khi kết nối hoặc dựng dữ liệu từ AI Service (ai.signmap.site). Vui lòng thử lại tab này."
@@ -520,15 +510,9 @@ export default function AiopsPage() {
         />
       )}
 
-      {/* Tab 6: Candidate Model Evaluation & Controlled Deployment */}
-      {activeTab === 'evaluation' && (
-        <CandidateEvaluationTab
-          activeModelVersion={activeModelVersion}
-          setActiveModelVersion={setActiveModelVersion}
-          candidateModelVersion={candidateModelVersion}
-          candidateStatus={candidateStatus}
-          setCandidateStatus={setCandidateStatus}
-        />
+      {/* Tab 6: Model Rebuild & Version Management */}
+      {activeTab === 'versions' && (
+        <ModelLifecycleTab />
       )}
       </ErrorBoundary>
     </div>

@@ -26,8 +26,12 @@ export async function edgeFetch<T = any>(
   options: EdgeRequestOptions = {}
 ): Promise<T> {
   const { timeoutMs, headers, ...rest } = options
+  let url = endpoint
+  if (AIOPS_BASE_URL && url.startsWith(AIOPS_BASE_URL)) {
+    url = url.slice(AIOPS_BASE_URL.length) || '/'
+  }
   const response = await edgeApiClient.request<T>({
-    url: endpoint,
+    url,
     timeout: timeoutMs || 15000,
     headers: {
       ...headers,

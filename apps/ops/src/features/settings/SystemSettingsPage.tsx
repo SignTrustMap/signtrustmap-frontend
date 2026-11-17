@@ -1047,7 +1047,7 @@ export default function SystemSettingsPage() {
                                       : 'text-gray-400'
                                   }`}
                                 >
-                                  {rule.isActive ? (isEn ? 'Active' : 'Đang bật') : isEn ? 'Inactive' : 'Đã tắt'}
+                                  {rule.isActive ? (isEn ? 'Active' : 'Bật') : isEn ? 'Inactive' : 'Tắt'}
                                 </span>
                               </td>
                               <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
