@@ -1,6 +1,8 @@
 export type ImageGpsCoordinates = {
   latitude: number;
   longitude: number;
+  accuracy?: number;
+  heading?: number;
 };
 
 type ExifRecord = Record<string, unknown>;
@@ -129,5 +131,20 @@ export function extractImageGpsCoordinates(exif: ExifRecord | null | undefined) 
     return null;
   }
 
-  return { latitude, longitude } satisfies ImageGpsCoordinates;
+  const accuracyValue =
+    findExifValue(exif, ['GPSHPositioningError', 'hPositioningError', 'accuracy']) ??
+    (gpsRecord ? findExifValue(gpsRecord, ['GPSHPositioningError', 'HPositioningError', 'accuracy']) : undefined);
+  const headingValue =
+    findExifValue(exif, ['GPSImgDirection', 'imgDirection', 'GPSDestBearing', 'heading']) ??
+    (gpsRecord ? findExifValue(gpsRecord, ['GPSImgDirection', 'ImgDirection', 'heading']) : undefined);
+
+  const accuracy = parseScalar(accuracyValue);
+  const heading = parseScalar(headingValue);
+
+  return {
+    latitude,
+    longitude,
+    ...(typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0 ? { accuracy } : {}),
+    ...(typeof heading === 'number' && Number.isFinite(heading) && heading >= 0 && heading <= 360 ? { heading } : {}),
+  } satisfies ImageGpsCoordinates;
 }

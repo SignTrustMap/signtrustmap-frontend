@@ -559,6 +559,44 @@ describe('Revalidation API Module', () => {
       expect((FileSystem.uploadAsync as jest.Mock).mock.calls[0][2].parameters.note).toBeUndefined();
     });
 
+    it('downsizes local image file before uploading when compression succeeds', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-compressed-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
+
+      const surveyImageUtils = require('@/feature/upload/utils/survey-image');
+      const spy = jest.spyOn(surveyImageUtils, 'compressAndResizeSurveyImage').mockResolvedValueOnce({
+        uri: 'file:///cache/downsized-evidence.jpg',
+        width: 1280,
+        height: 960,
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/huge-camera-photo.png',
+        fileName: 'huge-camera-photo.png',
+        mimeType: 'image/png',
+      };
+
+      const result = await submitRevalidationEvidence('task-101', dto, mediaFile);
+
+      expect(spy).toHaveBeenCalledWith('file:///data/huge-camera-photo.png');
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks/task-101/evidence'),
+        'file:///cache/downsized-evidence.jpg',
+        expect.objectContaining({
+          mimeType: 'image/jpeg',
+        }),
+      );
+      expect(result.id).toBe('evidence-compressed-1');
+      spy.mockRestore();
+    });
+
     it('submits evidence with mediaUrl when no file is passed, auto-resolving token from storage', async () => {
       const mockSuccessResponse = {
         id: 'evidence-1000',
@@ -654,6 +692,95 @@ describe('Revalidation API Module', () => {
             longitude: '106.7009',
           }),
         }),
+      );
+    });
+
+    it('submits evidence with all Swagger fields (accuracyMeters, confirmedSignId, headingDegrees, isLiveCapture)', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-full-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/live-photo.jpg',
+        fileName: 'live-photo.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      await submitRevalidationEvidence(
+        'task-101',
+        {
+          latitude: 10.7769,
+          longitude: 106.7009,
+          accuracyMeters: 4.8,
+          confirmedSignId: 'sign-uuid-123',
+          headingDegrees: 180,
+          isLiveCapture: true,
+          capturedAt: '2026-11-17T11:00:00.000Z',
+          evidenceType: 'STILL_ACTIVE',
+          note: 'This client note should be omitted from parameters',
+        },
+        mediaFile,
+      );
+
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        'https://api.signmap.site/api/v1/revalidation/tasks/task-101/evidence',
+        'file:///data/live-photo.jpg',
+        expect.objectContaining({
+          parameters: {
+            latitude: '10.7769',
+            longitude: '106.7009',
+            evidenceType: 'STILL_ACTIVE',
+            accuracyMeters: '4.8',
+            capturedAt: '2026-11-17T11:00:00.000Z',
+            confirmedSignId: 'sign-uuid-123',
+            headingDegrees: '180',
+            isLiveCapture: 'true',
+          },
+        }),
+      );
+    });
+
+    it('falls back to fetch(FormData) when uploadAsync fails with PROTOCOL_ERROR', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockRejectedValueOnce(
+        new Error('stream was reset: PROTOCOL_ERROR'),
+      );
+      const mockSuccessResponse = {
+        id: 'evidence-fallback-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockSuccessResponse);
+
+      const mediaFile = {
+        uri: 'file:///data/local-photo.jpg',
+        fileName: 'local-photo.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      const result = await submitRevalidationEvidence(
+        'task-101',
+        {
+          latitude: 10.7769,
+          longitude: 106.7009,
+          evidenceType: 'STILL_ACTIVE',
+        },
+        mediaFile,
+      );
+
+      expect(result.id).toBe('evidence-fallback-1');
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-101/evidence',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+        }),
+        expect.any(String),
       );
     });
 

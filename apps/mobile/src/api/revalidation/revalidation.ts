@@ -4,6 +4,7 @@ import { getStorageItemAsync } from '@/hooks/use-storage';
 import { getSignCategory } from '@/constants/sign-categories';
 import { resolveImageUrl, resolveRepresentativeSignUrl } from '@/feature/navigation/utils/signs';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { Platform } from 'react-native';
 
 export { resolveS3Url };
@@ -40,6 +41,32 @@ export type {
 };
 
 /**
+ * Converts a local file URI (e.g. file://, content://, cache) to a standard Blob
+ * compatible with WinterCG fetch and React Native FormData.
+ */
+async function uriToBlob(uri: string, mimeType = 'image/jpeg'): Promise<Blob> {
+  try {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    if (!blob.type || blob.type === 'text/plain') {
+      return new Blob([blob], { type: mimeType });
+    }
+    return blob;
+  } catch (fetchErr) {
+    console.warn('[Revalidation] fetch uri to blob failed, falling back to FileSystem base64:', fetchErr);
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const binary = typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mimeType });
+  }
+}
+
+/**
  * Reads the JWT access token that the SessionProvider stores under the
  * 'session' key in SecureStore / localStorage.  Returns undefined when the
  * user is not logged in or the stored value cannot be parsed.
@@ -71,7 +98,9 @@ function normalizeStatus(raw?: string): TaskStatus {
   return 'OPEN';
 }
 
-export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['items'][number]): RevalidationTaskItem {
+export function toRevalidationTaskItem(
+  raw: RevalidationTasksInBoundsResponse['items'][number],
+): RevalidationTaskItem {
   const code = raw.sign_code || raw.signCode || 'Traffic Sign';
   const name = raw.name_vi || raw.nameVi || raw.name_en || raw.nameEn || code;
   const rawCrop = raw.sign_crop_url || raw.signCropUrl || '';
@@ -80,11 +109,7 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
 
   const rawAny = raw as any;
   const rawLat =
-    raw.latitude ??
-    rawAny.lat ??
-    rawAny.location?.lat ??
-    rawAny.location?.latitude ??
-    rawAny.y;
+    raw.latitude ?? rawAny.lat ?? rawAny.location?.lat ?? rawAny.location?.latitude ?? rawAny.y;
   const rawLon =
     raw.longitude ??
     rawAny.lon ??
@@ -109,7 +134,12 @@ export function toRevalidationTaskItem(raw: RevalidationTasksInBoundsResponse['i
     category: getSignCategory({ signCode: code, name }),
     priority: normalizePriority(raw.priority),
     status: normalizeStatus(raw.status),
-    staleDays: raw.created_at ? Math.max(1, Math.round((Date.now() - new Date(raw.created_at).getTime()) / (1000 * 3600 * 24))) : 60,
+    staleDays: raw.created_at
+      ? Math.max(
+          1,
+          Math.round((Date.now() - new Date(raw.created_at).getTime()) / (1000 * 3600 * 24)),
+        )
+      : 60,
     latitude,
     longitude,
     historicalCropUrl: resolvedCrop,
@@ -149,7 +179,12 @@ export async function getRevalidationTasksInBounds(
       return res.items.map(toRevalidationTaskItem);
     }
   } catch (err: any) {
-    if (signal?.aborted || err?.name === 'AbortError' || String(err).includes('canceled') || String(err).includes('aborted')) {
+    if (
+      signal?.aborted ||
+      err?.name === 'AbortError' ||
+      String(err).includes('canceled') ||
+      String(err).includes('aborted')
+    ) {
       return [];
     }
     console.warn('getRevalidationTasksInBounds failed or returned empty:', err);
@@ -364,7 +399,8 @@ export async function getTaskEvidences(
       submittedAt: row.submitted_at ?? row.submittedAt,
       capturedAt: row.captured_at ?? row.capturedAt ?? row.submitted_at ?? row.submittedAt,
       locationWkt: row.location_wkt ?? row.locationWkt,
-      distanceMeters: row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
+      distanceMeters:
+        row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
       note: row.note,
       status: row.status,
     }));
@@ -399,7 +435,8 @@ export async function getSignEvidences(
       submittedAt: row.submitted_at ?? row.submittedAt,
       capturedAt: row.captured_at ?? row.capturedAt ?? row.submitted_at ?? row.submittedAt,
       locationWkt: row.location_wkt ?? row.locationWkt,
-      distanceMeters: row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
+      distanceMeters:
+        row.distance_meters != null ? Number(row.distance_meters) : row.distanceMeters,
       note: row.note,
       status: row.status,
     }));
@@ -408,7 +445,6 @@ export async function getSignEvidences(
     return [];
   }
 }
-
 
 function normalizeEvidenceResponse(body: unknown): SubmitRevalidationEvidenceResponse {
   const res = body as SubmitRevalidationEvidenceResponse;
@@ -441,136 +477,195 @@ export async function submitRevalidationEvidence(
   }
 
   try {
-    const isLocalFile = Boolean(
-      Platform.OS !== 'web' &&
+    let uploadMediaFile = mediaFile;
+    if (
       mediaFile?.uri &&
+      !mediaFile.mimeType?.startsWith('video/') &&
       !mediaFile.uri.startsWith('http://') &&
       !mediaFile.uri.startsWith('https://')
-    );
-
-    // On native platforms (Android & iOS), when uploading a local file by URI,
-    // use FileSystem.uploadAsync instead of fetch(FormData).
-    // React Native / Expo's modern fetch throws "Unsupported FormDataPart implementation"
-    // when given a plain { uri, name, type } object in FormData.
-    if (isLocalFile && mediaFile?.uri) {
-      const baseUrl = apiBaseUrl();
-      const url = `${baseUrl}/revalidation/tasks/${encodeURIComponent(taskIdOrSignId)}/evidence`;
-      console.log(`[Revalidation] Native uploadAsync -> POST ${url} (file=${mediaFile.uri})`);
-
-      const parameters: Record<string, string> = {
-        latitude: String(data.latitude),
-        longitude: String(data.longitude),
-        evidenceType,
-      };
-      if (data.capturedAt) parameters.capturedAt = data.capturedAt;
-      if (data.suggestedSignTypeId != null) {
-        parameters.suggestedSignTypeId = String(data.suggestedSignTypeId);
-      }
-
-      let result = await FileSystem.uploadAsync(url, mediaFile.uri, {
-        fieldName: 'file',
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-        mimeType: mediaFile.mimeType || 'image/jpeg',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        parameters,
-      });
-
-      let body: unknown;
+    ) {
       try {
-        body = JSON.parse(result.body);
-      } catch {
-        body = result.body;
-      }
-
-      if (result.status >= 200 && result.status < 300) {
-        console.log(`[Revalidation] Native uploadAsync <- [HTTP ${result.status}] OK`);
-        return normalizeEvidenceResponse(body);
-      }
-
-      // If 404 "not found", taskIdOrSignId might be a verifiedSignId rather than a taskId.
-      // Attempt to look up the active revalidation task in bounds matching this sign.
-      if (result.status === 404) {
-        console.warn(`[Revalidation] Task ${taskIdOrSignId} returned 404. Attempting to look up active task by verified sign ID...`);
-        try {
-          const tasks = await getRevalidationTasksInBounds(
-            {
-              minLat: data.latitude - 0.05,
-              maxLat: data.latitude + 0.05,
-              minLon: data.longitude - 0.05,
-              maxLon: data.longitude + 0.05,
-              pageSize: 50,
-            },
-            signal,
-            token,
-          );
-          const matched = tasks.find(
-            (t) => t.verifiedSignId === taskIdOrSignId || t.id === taskIdOrSignId,
-          );
-          if (matched && matched.id !== taskIdOrSignId) {
-            console.log(`[Revalidation] Found matching task ID ${matched.id} for sign ${taskIdOrSignId}, re-uploading...`);
-            const retryUrl = `${baseUrl}/revalidation/tasks/${encodeURIComponent(matched.id)}/evidence`;
-            const retryResult = await FileSystem.uploadAsync(retryUrl, mediaFile.uri, {
-              fieldName: 'file',
-              httpMethod: 'POST',
-              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-              mimeType: mediaFile.mimeType || 'image/jpeg',
-              headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              parameters,
-            });
-            let retryBody: unknown;
-            try {
-              retryBody = JSON.parse(retryResult.body);
-            } catch {
-              retryBody = retryResult.body;
-            }
-            if (retryResult.status >= 200 && retryResult.status < 300) {
-              console.log(`[Revalidation] Retry uploadAsync <- [HTTP ${retryResult.status}] OK`);
-              return normalizeEvidenceResponse(retryBody);
-            }
-            result = retryResult;
-            body = retryBody;
-          }
-        } catch (resolveErr) {
-          console.warn('[Revalidation] Failed to auto-resolve active task:', resolveErr);
+        const compressed = await compressAndResizeSurveyImage(mediaFile.uri);
+        if (compressed.uri) {
+          uploadMediaFile = {
+            ...mediaFile,
+            uri: compressed.uri,
+            fileName: mediaFile.fileName
+              ? !mediaFile.fileName.toLowerCase().endsWith('.jpg') &&
+                !mediaFile.fileName.toLowerCase().endsWith('.jpeg')
+                ? `${mediaFile.fileName.replace(/\.[^/.]+$/, '')}.jpg`
+                : mediaFile.fileName
+              : 'evidence.jpg',
+            mimeType: 'image/jpeg',
+          };
         }
+      } catch (compErr) {
+        console.warn('[Revalidation] Image downsize skipped or failed, using original:', compErr);
       }
-
-      console.error(`[Revalidation] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
-      const message = typeof body === 'object' && body && 'message' in body
-        ? (Array.isArray((body as any).message) ? (body as any).message.join(' ') : String((body as any).message))
-        : `Tải minh chứng lên thất bại với mã trạng thái ${result.status}`;
-      throw new ApiError(message, result.status);
     }
 
-    // Web or URL-only fallback (no local file to stream)
+    const isLocalFile = Boolean(
+      Platform.OS !== 'web' &&
+      uploadMediaFile?.uri &&
+      !uploadMediaFile.uri.startsWith('http://') &&
+      !uploadMediaFile.uri.startsWith('https://'),
+    );
+
+    // On native platforms (Android & iOS), first attempt FileSystem.uploadAsync.
+    // If uploadAsync encounters HTTP/2 connection or stream reset issues (e.g. PROTOCOL_ERROR from proxy),
+    // it automatically falls back to standard fetch(FormData) with uriToBlob.
+    if (isLocalFile && uploadMediaFile?.uri) {
+      try {
+        const baseUrl = apiBaseUrl();
+        const url = `${baseUrl}/revalidation/tasks/${encodeURIComponent(taskIdOrSignId)}/evidence`;
+        console.log(`[Revalidation] Native uploadAsync -> POST ${url} (file=${uploadMediaFile.uri})`);
+
+        const parameters: Record<string, string> = {
+          latitude: String(data.latitude),
+          longitude: String(data.longitude),
+        };
+        if (evidenceType) parameters.evidenceType = evidenceType;
+        if (
+          typeof data.accuracyMeters === 'number' &&
+          Number.isFinite(data.accuracyMeters) &&
+          data.accuracyMeters >= 0
+        ) {
+          parameters.accuracyMeters = String(Math.round(data.accuracyMeters * 10) / 10);
+        }
+        if (data.capturedAt) {
+          const parsedTime = new Date(data.capturedAt).getTime();
+          parameters.capturedAt = !Number.isNaN(parsedTime)
+            ? new Date(parsedTime).toISOString()
+            : data.capturedAt;
+        }
+        if (data.confirmedSignId) {
+          parameters.confirmedSignId = data.confirmedSignId;
+        }
+        if (
+          typeof data.headingDegrees === 'number' &&
+          Number.isFinite(data.headingDegrees) &&
+          data.headingDegrees >= 0 &&
+          data.headingDegrees <= 360
+        ) {
+          parameters.headingDegrees = String(Math.round(data.headingDegrees));
+        }
+        if (typeof data.isLiveCapture === 'boolean') {
+          parameters.isLiveCapture = String(data.isLiveCapture);
+        }
+        if (data.suggestedSignTypeId != null && !Number.isNaN(Number(data.suggestedSignTypeId))) {
+          parameters.suggestedSignTypeId = String(Math.round(Number(data.suggestedSignTypeId)));
+        }
+        if (data.mediaUrl) {
+          parameters.mediaUrl = data.mediaUrl;
+        }
+
+        const result = await FileSystem.uploadAsync(url, uploadMediaFile.uri, {
+          fieldName: 'file',
+          httpMethod: 'POST',
+          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          mimeType: uploadMediaFile.mimeType || 'image/jpeg',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          parameters,
+        });
+
+        let body: unknown;
+        try {
+          body = JSON.parse(result.body);
+        } catch {
+          body = result.body;
+        }
+
+        if (result.status >= 200 && result.status < 300) {
+          console.log(`[Revalidation] Native uploadAsync <- [HTTP ${result.status}] OK`);
+          return normalizeEvidenceResponse(body);
+        }
+
+        console.error(`[Revalidation] Native uploadAsync FAILED [HTTP ${result.status}]:`, body);
+        const message =
+          typeof body === 'object' && body && 'message' in body
+            ? Array.isArray((body as any).message)
+              ? (body as any).message.join(', ')
+              : String((body as any).message)
+            : `Tải minh chứng lên thất bại với mã trạng thái ${result.status}`;
+        throw new ApiError(message, result.status);
+      } catch (uploadAsyncErr: any) {
+        if (uploadAsyncErr instanceof ApiError) {
+          throw uploadAsyncErr;
+        }
+        console.warn(
+          `[Revalidation] Native uploadAsync failed (${uploadAsyncErr?.message || uploadAsyncErr}), falling back to fetch(FormData)...`,
+        );
+      }
+    }
+
+    // Web, URL-only, or Native fallback when uploadAsync encounters stream reset / transport error
     const formData = new FormData();
     formData.append('latitude', String(data.latitude));
     formData.append('longitude', String(data.longitude));
-    formData.append('evidenceType', evidenceType);
-    if (data.capturedAt) formData.append('capturedAt', data.capturedAt);
-    if (data.suggestedSignTypeId != null) {
-      formData.append('suggestedSignTypeId', String(data.suggestedSignTypeId));
+    if (evidenceType) formData.append('evidenceType', evidenceType);
+    if (
+      typeof data.accuracyMeters === 'number' &&
+      Number.isFinite(data.accuracyMeters) &&
+      data.accuracyMeters >= 0
+    ) {
+      formData.append('accuracyMeters', String(Math.round(data.accuracyMeters * 10) / 10));
+    }
+    if (data.capturedAt) {
+      const parsedTime = new Date(data.capturedAt).getTime();
+      formData.append(
+        'capturedAt',
+        !Number.isNaN(parsedTime) ? new Date(parsedTime).toISOString() : data.capturedAt,
+      );
+    }
+    if (data.confirmedSignId) {
+      formData.append('confirmedSignId', data.confirmedSignId);
+    }
+    if (
+      typeof data.headingDegrees === 'number' &&
+      Number.isFinite(data.headingDegrees) &&
+      data.headingDegrees >= 0 &&
+      data.headingDegrees <= 360
+    ) {
+      formData.append('headingDegrees', String(Math.round(data.headingDegrees)));
+    }
+    if (typeof data.isLiveCapture === 'boolean') {
+      formData.append('isLiveCapture', String(data.isLiveCapture));
+    }
+    if (data.suggestedSignTypeId != null && !Number.isNaN(Number(data.suggestedSignTypeId))) {
+      formData.append('suggestedSignTypeId', String(Math.round(Number(data.suggestedSignTypeId))));
     }
 
-    if (mediaFile) {
-      if (typeof File !== 'undefined' && (mediaFile as unknown) instanceof File) {
-        formData.append('file', mediaFile as unknown as Blob);
-      } else if (mediaFile.uri && (mediaFile.uri.startsWith('blob:') || mediaFile.uri.startsWith('data:'))) {
-        const blob = await fetch(mediaFile.uri).then((r) => r.blob());
-        formData.append('file', blob, mediaFile.fileName || 'evidence.jpg');
-      } else if (mediaFile.uri && (mediaFile.uri.startsWith('http://') || mediaFile.uri.startsWith('https://'))) {
-        formData.append('mediaUrl', mediaFile.uri);
-      } else {
-        formData.append('file', {
-          uri: mediaFile.uri,
-          name: mediaFile.fileName || 'evidence.jpg',
-          type: mediaFile.mimeType || 'image/jpeg',
-        } as any);
+    if (uploadMediaFile) {
+      if (typeof File !== 'undefined' && (uploadMediaFile as unknown) instanceof File) {
+        formData.append('file', uploadMediaFile as unknown as Blob);
+      } else if (
+        uploadMediaFile.uri &&
+        (uploadMediaFile.uri.startsWith('blob:') || uploadMediaFile.uri.startsWith('data:'))
+      ) {
+        const blob = await fetch(uploadMediaFile.uri).then((r) => r.blob());
+        formData.append('file', blob, uploadMediaFile.fileName || 'evidence.jpg');
+      } else if (
+        uploadMediaFile.uri &&
+        (uploadMediaFile.uri.startsWith('http://') || uploadMediaFile.uri.startsWith('https://'))
+      ) {
+        formData.append('mediaUrl', uploadMediaFile.uri);
+      } else if (uploadMediaFile.uri) {
+        try {
+          const blob = await uriToBlob(
+            uploadMediaFile.uri,
+            uploadMediaFile.mimeType || 'image/jpeg',
+          );
+          formData.append('file', blob, uploadMediaFile.fileName || 'evidence.jpg');
+        } catch (blobErr) {
+          console.warn('[Revalidation] uriToBlob fallback to object descriptor:', blobErr);
+          formData.append('file', {
+            uri: uploadMediaFile.uri,
+            name: uploadMediaFile.fileName || 'evidence.jpg',
+            type: uploadMediaFile.mimeType || 'image/jpeg',
+          } as any);
+        }
       }
     } else if (data.mediaUrl) {
       formData.append('mediaUrl', data.mediaUrl);
@@ -687,16 +782,13 @@ export async function getRevalidationTasks(
   if (params?.sort) searchParams.append('sort', params.sort);
   if (params?.lat != null) searchParams.append('lat', String(params.lat));
   if (params?.lon != null) searchParams.append('lon', String(params.lon));
-  if (params?.radiusMeters != null) searchParams.append('radiusMeters', String(params.radiusMeters));
+  if (params?.radiusMeters != null)
+    searchParams.append('radiusMeters', String(params.radiusMeters));
 
   const qs = searchParams.toString();
   const url = `${API_PATHS.REVALIDATION_TASKS}${qs ? `?${qs}` : ''}`;
   try {
-    const res = await apiRequest<RevalidationTasksInBoundsResponse>(
-      url,
-      { signal },
-      token,
-    );
+    const res = await apiRequest<RevalidationTasksInBoundsResponse>(url, { signal }, token);
     const rawItems = Array.isArray(res?.items) ? res.items : [];
     return {
       items: rawItems,
@@ -759,7 +851,8 @@ export async function getRevalidationTask(
             submittedAt: e.submitted_at ?? e.submittedAt,
             capturedAt: e.captured_at ?? e.capturedAt ?? e.submitted_at,
             locationWkt: e.location_wkt ?? e.locationWkt,
-            distanceMeters: e.distance_meters != null ? Number(e.distance_meters) : e.distanceMeters,
+            distanceMeters:
+              e.distance_meters != null ? Number(e.distance_meters) : e.distanceMeters,
             status: e.status,
           }))
         : [],
@@ -810,5 +903,3 @@ export async function getEvidenceDecisions(
     return [];
   }
 }
-
-

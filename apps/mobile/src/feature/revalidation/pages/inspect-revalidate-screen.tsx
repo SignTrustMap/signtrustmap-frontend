@@ -44,7 +44,8 @@ import {
   type ImageGpsCoordinates,
 } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
-import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
+import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { resolveS3Url } from '@/api/revalidation/revalidation';
 import { useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
@@ -77,6 +78,7 @@ type SelectedMedia = {
   capturedAt?: string;
   duration?: number;
   assetId?: string;
+  isLiveCapture?: boolean;
 };
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
@@ -303,11 +305,13 @@ export function InspectRevalidateScreen() {
     setIsLocatingDevice(true);
     setPickerError(undefined);
     try {
-      const pos = await fetchFreshGpsPosition();
-      if (pos) {
+      const loc = await fetchFreshGpsLocation();
+      if (loc) {
         setDetectedGps({
-          latitude: pos[1],
-          longitude: pos[0],
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: loc.accuracy,
+          heading: loc.heading,
         });
       } else {
         setPickerError(COULD_NOT_ACQUIRE_GPS_MESSAGE);
@@ -396,6 +400,7 @@ export function InspectRevalidateScreen() {
           duration: videoMeta.durationSeconds,
           capturedAt: videoMeta.capturedAt,
           assetId: asset.id,
+          isLiveCapture: false,
         });
         setDetectedGps(
           videoMeta.hasDeviceGps
@@ -406,13 +411,32 @@ export function InspectRevalidateScreen() {
             : null,
         );
       } else {
+        let finalImageUri = assetInfo.localUri ?? asset.uri;
+        let finalImageName = asset.filename;
+        try {
+          const compressed = await compressAndResizeSurveyImage(finalImageUri);
+          if (compressed.uri) {
+            finalImageUri = compressed.uri;
+            if (
+              !finalImageName.toLowerCase().endsWith('.jpg') &&
+              !finalImageName.toLowerCase().endsWith('.jpeg')
+            ) {
+              finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+            }
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Pre-compression skipped:', compErr);
+        }
+
         setSelectedMedia({
-          uri: assetInfo.localUri ?? asset.uri,
+          uri: finalImageUri,
           type: 'image',
-          fileName: asset.filename,
+          fileName: finalImageName,
+          mimeType: 'image/jpeg',
           capturedAt:
             asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
           assetId: asset.id,
+          isLiveCapture: false,
         });
         setDetectedGps(gpsCoordinates ?? null);
       }
@@ -447,12 +471,30 @@ export function InspectRevalidateScreen() {
         const asset: ImagePickerAsset = result.assets[0];
         const gps = extractImageGpsCoordinates(asset.exif);
 
+        let finalImageUri = asset.uri;
+        let finalImageName = asset.fileName || 'anh-kiem-tra.jpg';
+        try {
+          const compressed = await compressAndResizeSurveyImage(finalImageUri);
+          if (compressed.uri) {
+            finalImageUri = compressed.uri;
+            if (
+              !finalImageName.toLowerCase().endsWith('.jpg') &&
+              !finalImageName.toLowerCase().endsWith('.jpeg')
+            ) {
+              finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+            }
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Camera image compression skipped:', compErr);
+        }
+
         setSelectedMedia({
-          uri: asset.uri,
+          uri: finalImageUri,
           type: 'image',
-          fileName: asset.fileName || 'anh-kiem-tra.jpg',
-          mimeType: asset.mimeType,
+          fileName: finalImageName,
+          mimeType: 'image/jpeg',
           capturedAt: new Date().toISOString(),
+          isLiveCapture: true,
         });
 
         if (gps) {
@@ -492,13 +534,36 @@ export function InspectRevalidateScreen() {
         const isVideo = asset.type === 'video';
         const gps = extractImageGpsCoordinates(asset.exif);
 
+        let finalImageUri = asset.uri;
+        let finalImageName = asset.fileName || (isVideo ? 'video.mp4' : 'anh-kiem-tra.jpg');
+        let finalMimeType = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+
+        if (!isVideo) {
+          try {
+            const compressed = await compressAndResizeSurveyImage(finalImageUri);
+            if (compressed.uri) {
+              finalImageUri = compressed.uri;
+              finalMimeType = 'image/jpeg';
+              if (
+                !finalImageName.toLowerCase().endsWith('.jpg') &&
+                !finalImageName.toLowerCase().endsWith('.jpeg')
+              ) {
+                finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+              }
+            }
+          } catch (compErr) {
+            console.warn('[InspectRevalidate] Gallery image compression skipped:', compErr);
+          }
+        }
+
         setSelectedMedia({
-          uri: asset.uri,
+          uri: finalImageUri,
           type: isVideo ? 'video' : 'image',
-          fileName: asset.fileName,
-          mimeType: asset.mimeType,
+          fileName: finalImageName,
+          mimeType: finalMimeType,
           duration: asset.duration ? asset.duration / 1000 : undefined,
           capturedAt: new Date().toISOString(),
+          isLiveCapture: false,
         });
         setDetectedGps(gps ?? null);
       }
@@ -531,20 +596,40 @@ export function InspectRevalidateScreen() {
     }
 
     try {
+      let uploadMedia = selectedMedia;
+      if (selectedMedia && selectedMedia.type === 'image' && selectedMedia.uri) {
+        try {
+          const compressed = await compressAndResizeSurveyImage(selectedMedia.uri);
+          if (compressed.uri && compressed.uri !== selectedMedia.uri) {
+            uploadMedia = {
+              ...selectedMedia,
+              uri: compressed.uri,
+              mimeType: 'image/jpeg',
+            };
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Submit image compression fallback:', compErr);
+        }
+      }
+
       await submitRevalidation({
         taskIdOrSignId: targetTaskId,
         data: {
           latitude: lat,
           longitude: lon,
-          capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
+          accuracyMeters: detectedGps?.accuracy,
+          headingDegrees: detectedGps?.heading,
+          isLiveCapture: uploadMedia?.isLiveCapture ?? (uploadMedia?.type === 'image'),
+          confirmedSignId: signId,
+          capturedAt: uploadMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
         },
-        mediaFile: selectedMedia
+        mediaFile: uploadMedia
           ? {
-              uri: selectedMedia.uri,
-              fileName: selectedMedia.fileName || 'evidence.jpg',
-              mimeType: selectedMedia.mimeType,
+              uri: uploadMedia.uri,
+              fileName: uploadMedia.fileName || 'evidence.jpg',
+              mimeType: uploadMedia.mimeType,
             }
           : undefined,
         accessToken: session?.accessToken,

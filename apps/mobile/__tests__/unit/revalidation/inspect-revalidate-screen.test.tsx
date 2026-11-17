@@ -23,6 +23,29 @@ jest.mock('expo-symbols', () => ({
   SymbolView: 'SymbolView',
 }));
 
+jest.mock('@/feature/upload/utils/survey-image', () => ({
+  compressAndResizeSurveyImage: jest.fn((uri: string) =>
+    Promise.resolve({ uri: `${uri}-downsized.jpg`, width: 1280, height: 960 }),
+  ),
+}));
+
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  launchCameraAsync: jest.fn(() =>
+    Promise.resolve({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///data/camera-raw.jpg',
+          fileName: 'camera-raw.jpg',
+          mimeType: 'image/jpeg',
+          exif: { GPSLatitude: 10.7769, GPSLongitude: 106.7009 },
+        },
+      ],
+    }),
+  ),
+}));
+
 jest.mock('expo-media-library/legacy', () => ({
   getAssetsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
@@ -79,6 +102,7 @@ jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
 
 jest.mock('@/feature/navigation/utils/gps', () => ({
   fetchFreshGpsPosition: jest.fn(),
+  fetchFreshGpsLocation: jest.fn(),
 }));
 
 describe('InspectRevalidateScreen', () => {
@@ -210,5 +234,40 @@ describe('InspectRevalidateScreen', () => {
       expect(alertMsg).toBeTruthy();
       expect(alertMsg.props.accessibilityRole).toBe('alert');
     });
+  });
+
+  it('downsizes captured photo before submitting revalidation evidence', async () => {
+    const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
+
+    // 1. Select status option (e.g. STILL_ACTIVE)
+    const activeOption = getByLabelText('Vẫn hoạt động');
+    await act(async () => {
+      fireEvent.press(activeOption);
+    });
+
+    // 2. Open camera to snap photo
+    const cameraBtn = getByLabelText('Mở máy ảnh');
+    await act(async () => {
+      fireEvent.press(cameraBtn);
+    });
+
+    // Verify compressAndResizeSurveyImage was invoked on raw camera URI
+    const surveyImageUtils = require('@/feature/upload/utils/survey-image');
+    expect(surveyImageUtils.compressAndResizeSurveyImage).toHaveBeenCalledWith('file:///data/camera-raw.jpg');
+
+    // 3. Submit evidence
+    const submitBtn = getByText('Gửi kết quả tái thẩm định');
+    await act(async () => {
+      fireEvent.press(submitBtn);
+    });
+
+    expect(mockSubmitRevalidation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskIdOrSignId: 'task-55',
+        mediaFile: expect.objectContaining({
+          uri: 'file:///data/camera-raw.jpg-downsized.jpg',
+        }),
+      }),
+    );
   });
 });

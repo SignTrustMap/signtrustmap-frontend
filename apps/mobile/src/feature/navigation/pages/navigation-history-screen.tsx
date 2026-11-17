@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatResolvedLocationTitle, resolveLocation } from '@/api/spatial/spatial';
 import { AppButton } from '@/components/button';
+import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useGetNavigationSessions } from '@/feature/navigation/hooks/use-navigation';
@@ -440,62 +441,83 @@ export function NavigationHistoryScreen() {
         </View>
 
         {/* Main List */}
-        <FlatList
-          contentContainerStyle={styles.listContent}
-          data={allItems}
-          keyExtractor={(item, index) => item.id || String(index)}
-          onRefresh={() => {
-            void refetch();
-          }}
-          ref={listRef}
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={theme.primary} />
-          }
-          refreshing={isRefetching}
-          renderItem={({ item }) => (
-            <NavigationSessionCard
-              accessToken={session?.accessToken}
-              item={item}
-              onNavigate={handleReNavigate}
+        <DateFilterSortList<NavigationSessionItem>
+          items={allItems}
+          getDate={(item) => item.createdAt || item.startedAt}
+          headerTitle="Lọc theo ngày"
+          startDateLabel="Từ ngày"
+          endDateLabel="Đến ngày"
+          showPresets
+          showSortToggle
+          controlsCardStyle={{ marginHorizontal: Spacing.four, marginBottom: Spacing.two }}
+        >
+          {({ items: dateFilteredItems, totalCount, hasActiveFilters }) => (
+            <FlatList
+              contentContainerStyle={styles.listContent}
+              data={dateFilteredItems}
+              keyExtractor={(item, index) => item.id || String(index)}
+              onRefresh={() => {
+                void refetch();
+              }}
+              ref={listRef}
+              refreshControl={
+                <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={theme.primary} />
+              }
+              refreshing={isRefetching}
+              renderItem={({ item }) => (
+                <NavigationSessionCard
+                  accessToken={session?.accessToken}
+                  item={item}
+                  onNavigate={handleReNavigate}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  {isLoading ? (
+                    <ActivityIndicator
+                      accessibilityLabel="Đang tải lịch sử di chuyển"
+                      color={theme.primary}
+                      size="large"
+                    />
+                  ) : error ? (
+                    <View style={styles.emptyCard}>
+                      <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={42} />
+                      <Text style={[styles.emptyTitle, { color: theme.text }]}>Không thể tải lịch sử</Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+                        Có lỗi xảy ra khi lấy danh sách chuyến đi từ hệ thống.
+                      </Text>
+                      <AppButton label="Thử lại" onPress={() => refetch()} style={{ marginTop: Spacing.two }} />
+                    </View>
+                  ) : (
+                    <View style={styles.emptyCard}>
+                      <View style={[styles.emptyIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                        <MaterialCommunityIcons color={theme.primary} name="map-clock-outline" size={38} />
+                      </View>
+                      <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                        {hasActiveFilters && totalCount > 0
+                          ? 'Không có chuyến đi phù hợp'
+                          : 'Chưa có chuyến đi nào'}
+                      </Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
+                        {hasActiveFilters && totalCount > 0
+                          ? 'Thử thay đổi khoảng thời gian hoặc đặt lại bộ lọc để xem các chuyến đi khác.'
+                          : 'Khi bạn sử dụng tính năng điều hướng và chỉ dẫn giao thông, các chuyến đi sẽ được lưu lại tại đây.'}
+                      </Text>
+                      {hasActiveFilters && totalCount > 0 ? null : (
+                        <AppButton
+                          label="Bắt đầu điều hướng"
+                          onPress={() => router.push('/(authenticated)/(tabs)/home')}
+                          style={{ marginTop: Spacing.three }}
+                          variant="primary"
+                        />
+                      )}
+                    </View>
+                  )}
+                </View>
+              }
             />
           )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              {isLoading ? (
-                <ActivityIndicator
-                  accessibilityLabel="Đang tải lịch sử di chuyển"
-                  color={theme.primary}
-                  size="large"
-                />
-              ) : error ? (
-                <View style={styles.emptyCard}>
-                  <MaterialCommunityIcons color="#EF4444" name="alert-circle-outline" size={42} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Không thể tải lịch sử</Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
-                    Có lỗi xảy ra khi lấy danh sách chuyến đi từ hệ thống.
-                  </Text>
-                  <AppButton label="Thử lại" onPress={() => refetch()} style={{ marginTop: Spacing.two }} />
-                </View>
-              ) : (
-                <View style={styles.emptyCard}>
-                  <View style={[styles.emptyIconCircle, { backgroundColor: `${theme.primary}15` }]}>
-                    <MaterialCommunityIcons color={theme.primary} name="map-clock-outline" size={38} />
-                  </View>
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>Chưa có chuyến đi nào</Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
-                    Khi bạn sử dụng tính năng điều hướng và chỉ dẫn giao thông, các chuyến đi sẽ được lưu lại tại đây.
-                  </Text>
-                  <AppButton
-                    label="Bắt đầu điều hướng"
-                    onPress={() => router.push('/(authenticated)/(tabs)/home')}
-                    style={{ marginTop: Spacing.three }}
-                    variant="primary"
-                  />
-                </View>
-              )}
-            </View>
-          }
-        />
+        </DateFilterSortList>
 
         {/* Pagination if multiple pages */}
         {totalPages > 1 ? (

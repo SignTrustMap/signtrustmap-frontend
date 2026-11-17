@@ -60,6 +60,15 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: () => React.createElement(View, { testID: 'mock-date-picker' }),
+  };
+});
+
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
     background: '#FFFFFF',
@@ -242,5 +251,27 @@ describe('SurveyHistoryScreen', () => {
       fireEvent.press(nextBtn);
     });
     // Triggers internal page state update
+  });
+
+  it('renders date filter and sort controls and responds to sorting', async () => {
+    const { getByText, getByLabelText } = await render(<SurveyHistoryScreen />);
+
+    // Date filter headers and inputs
+    expect(getByText('Lọc theo ngày')).toBeTruthy();
+    expect(getByLabelText('Chọn Từ ngày')).toBeTruthy();
+    expect(getByLabelText('Chọn Đến ngày')).toBeTruthy();
+
+    // Presets
+    expect(getByText('Hôm nay')).toBeTruthy();
+    expect(getByText('7 ngày')).toBeTruthy();
+
+    // Toggle sort order
+    expect(getByText('Mới nhất')).toBeTruthy();
+    const sortBtn = getByLabelText('Sắp xếp ngày: Mới nhất');
+    await act(async () => {
+      fireEvent.press(sortBtn);
+    });
+
+    expect(getByText('Cũ nhất')).toBeTruthy();
   });
 });

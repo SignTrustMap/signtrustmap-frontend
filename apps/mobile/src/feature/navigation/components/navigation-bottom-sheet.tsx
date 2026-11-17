@@ -16,6 +16,7 @@ import {
   formatRouteNavDistance,
 } from '../utils/navigation-formatters';
 import { styles } from '../styles/navigation-map-screen.styles';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export interface NavigationBottomSheetProps {
   sheetHeightAnim: Animated.Value;
@@ -801,7 +802,10 @@ export function NavigationBottomSheet({
               </AppButton>
             </View>
           ) : (
-            <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
+            <SafeAreaView
+              edges={['bottom']}
+              style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}
+            >
               <AppButton
                 accessibilityLabel="Dừng điều hướng"
                 testID="btn-stop-navigation"
@@ -810,7 +814,7 @@ export function NavigationBottomSheet({
               >
                 <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>Dừng</Text>
               </AppButton>
-            </View>
+            </SafeAreaView>
           )}
         </View>
       ) : (

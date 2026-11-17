@@ -84,6 +84,8 @@ export async function compressAndResizeSurveyImage(
   }
 }
 
+export const compressAndResizeImage = compressAndResizeSurveyImage;
+
 function imageMimeType(fileName: string, preferred?: string) {
   if (preferred?.startsWith('image/') || preferred?.startsWith('video/')) return preferred;
   const extension = fileName.toLowerCase().split('.').pop();
