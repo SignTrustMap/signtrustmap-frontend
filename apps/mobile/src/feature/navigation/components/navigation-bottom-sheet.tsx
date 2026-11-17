@@ -824,7 +824,10 @@ export function NavigationBottomSheet({
               {selectedDestination.title}
             </Text>
             {selectedDestination.subtitle ? (
-              <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+              <Text
+                style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}
+                numberOfLines={2}
+              >
                 {selectedDestination.subtitle}
               </Text>
             ) : null}
@@ -846,19 +849,6 @@ export function NavigationBottomSheet({
           </View>
         </>
       )}
-
-      {bottomInset > 0 ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.sheetBottomSafeAreaBackground,
-            {
-              height: bottomInset,
-            },
-          ]}
-          testID="sheet-safe-area-bottom"
-        />
-      ) : null}
     </Animated.View>
   );
 }

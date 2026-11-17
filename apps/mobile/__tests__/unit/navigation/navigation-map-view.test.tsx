@@ -342,4 +342,26 @@ describe('NavigationMapView Component with Native MapLibre', () => {
     const outdated = getSignFreshness(0.2, 'NEEDS_REVALIDATION');
     expect(outdated).toHaveProperty('label');
   });
+
+  it('renders fallback icon badge when sign has missing or failing imageUrl', async () => {
+    const signsWithMissingImage: RouteSign[] = [
+      {
+        id: 'sign-missing',
+        coordinate: [106.705, 10.779],
+        name: 'Biển chỉ dẫn',
+        signCode: 'I.401',
+        freshnessScore: 0.95,
+        status: 'VERIFIED',
+        imageUrl: '',
+      },
+    ];
+
+    const screen = await render(
+      <NavigationMapView
+        routeSigns={signsWithMissingImage}
+      />,
+    );
+
+    expect(screen.getByLabelText('Xem chi tiết cho Biển chỉ dẫn')).toBeTruthy();
+  });
 });

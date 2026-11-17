@@ -127,3 +127,10 @@ jest.mock('@react-native-community/datetimepicker', () => {
   };
 });
 
+try {
+  require('@shopify/flash-list/jestSetup');
+} catch {
+  // Gracefully fallback if jestSetup is unavailable
+}
+
+

@@ -1391,7 +1391,7 @@ export function NavigationMapScreen() {
       <NavigationBottomSheet
         sheetHeightAnim={sheetHeightAnim}
         sheetSnapIndex={sheetSnapIndex}
-        bottomInset={bottomInset}
+        bottomInset={0}
         panHandlers={sheetPanResponder.panHandlers}
         onCycleSnap={cycleSnap}
         onSnapTo={snapTo}

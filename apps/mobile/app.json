@@ -32,14 +32,14 @@
       "package": "com.signtrustmap.app",
       "navigationBar": {
         "visible": "always",
-        "barStyle": "light-content",
-        "backgroundColor": "#666666"
+        "barStyle": "dark-content",
+        "backgroundColor": "#000000"
       }
     },
     "androidNavigationBar": {
       "visible": "always",
-      "barStyle": "light-content",
-      "backgroundColor": "#666666"
+      "barStyle": "dark-content",
+      "backgroundColor": "#000000"
     },
     "web": {
       "output": "static",
@@ -70,10 +70,7 @@
           "photosPermission": "Allow SignTrustMap to read the selected photo's location metadata.",
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": true,
-          "granularPermissions": [
-            "photo",
-            "video"
-          ]
+          "granularPermissions": ["photo", "video"]
         }
       ],
       [

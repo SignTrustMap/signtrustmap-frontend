@@ -5,12 +5,11 @@ import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { LogBox, View } from 'react-native';
+import { NavigationBar } from 'expo-navigation-bar';
 
 // Complete incoming OAuth redirect loops if running in a popup/browser session
 WebBrowser.maybeCompleteAuthSession();
-import {
-  QueryClientProvider
-} from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Colors } from '@/constants/theme';
 import { SPLASH_PROGRESS_DURATION_MS } from '@/constants/const';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
@@ -79,11 +78,14 @@ function RootNavigation() {
         // Ignore storage errors during forced log-out.
       });
     });
-    return () => { unsubscribe(); };
+    return () => {
+      unsubscribe();
+    };
   }, [logOut]);
 
   return (
     <View style={{ flex: 1 }}>
+      <NavigationBar style="dark" />
       <Stack
         screenOptions={{
           headerShown: false,

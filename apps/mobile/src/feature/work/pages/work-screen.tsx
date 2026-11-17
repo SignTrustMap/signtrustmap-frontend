@@ -2,13 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
@@ -95,19 +89,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             <View style={styles.header}>
               <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
             </View>
-            <AppButton
-              accessibilityLabel="Bản đồ ngoại tuyến"
-              accessibilityRole="button"
-              variant="surface"
-              hitSlop={8}
-              onPress={() => setIsOfflineMapModalOpen(true)}
-              style={[
-                styles.headerOfflineBtn,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-            >
-              <MaterialCommunityIcons color={theme.primary} name="map-marker-down" size={20} />
-            </AppButton>
           </View>
 
           {/* Role Switcher Tabs */}
@@ -142,10 +123,7 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   ]}
                 >
                   <Text
-                    style={[
-                      styles.roleTabText,
-                      { color: isActive ? theme.onPrimary : theme.text },
-                    ]}
+                    style={[styles.roleTabText, { color: isActive ? theme.onPrimary : theme.text }]}
                   >
                     {meta.label}
                   </Text>

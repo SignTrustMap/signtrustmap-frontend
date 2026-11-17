@@ -26,12 +26,12 @@ import type { FindSignsInBoundsParams } from '@/types/signMapType';
 import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 import { offlineMapService } from '@/services/offline-map-service';
-import {
-  MAP_BUILD_REQUIRED_DESCRIPTION,
-  MAP_BUILD_REQUIRED_TITLE,
-} from '@/constants/message';
+import { MAP_BUILD_REQUIRED_DESCRIPTION, MAP_BUILD_REQUIRED_TITLE } from '@/constants/message';
 import { calculateDistanceMeters, getRouteForwardBearing, isValidCoordinate } from '../utils/geo';
-import { useGetSignEvidences, useGetTaskEvidences } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  useGetSignEvidences,
+  useGetTaskEvidences,
+} from '@/feature/revalidation/hooks/use-revalidation';
 import { resolveImageUrl } from '../utils/signs';
 import { formatDate } from '@/utils/format-date';
 import { formatFreshnessScore } from '@/utils/freshness';
@@ -55,7 +55,7 @@ type NavigationMapViewProps = {
   hasLiveLocation?: boolean;
   isCustomStart?: boolean;
   onSignSelect?: (sign: RouteSign | null) => void;
-  vehicleMode?: VehicleMode["id"] | string;
+  vehicleMode?: VehicleMode['id'] | string;
   locationPin?: MapCoordinate;
   locationPinColor?: string;
   showFocusPin?: boolean;
@@ -123,15 +123,46 @@ function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: strin
   );
 }
 
-function SignMarkerIcon({ imageUrl, name, signCode }: { imageUrl?: string; name?: string; signCode?: string }) {
+function SignMarkerIcon({
+  imageUrl,
+  actualCropUrl,
+  name,
+  signCode,
+}: {
+  imageUrl?: string;
+  actualCropUrl?: string;
+  name?: string;
+  signCode?: string;
+}) {
+  const [triedActualCrop, setTriedActualCrop] = useState(false);
   const [hasError, setHasError] = useState(false);
-  if (!imageUrl || hasError) return null;
+
+  const activeUrl = !triedActualCrop && imageUrl
+    ? imageUrl
+    : actualCropUrl && actualCropUrl !== imageUrl
+      ? actualCropUrl
+      : null;
+
+  if (!activeUrl || hasError) {
+    return (
+      <View style={styles.fallbackSignBadge}>
+        <MaterialCommunityIcons color="#023C69" name="traffic-light" size={20} />
+      </View>
+    );
+  }
 
   return (
     <Image
       accessibilityLabel={name || signCode}
-      source={{ uri: imageUrl }}
-      onError={() => setHasError(true)}
+      key={activeUrl}
+      source={{ uri: activeUrl }}
+      onError={() => {
+        if (!triedActualCrop && actualCropUrl && actualCropUrl !== imageUrl) {
+          setTriedActualCrop(true);
+        } else {
+          setHasError(true);
+        }
+      }}
       resizeMode="contain"
       style={styles.stopSignImage}
     />
@@ -230,7 +261,7 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
   const signTitle =
     signCode && signName && !signName.toLowerCase().includes(signCode.toLowerCase())
       ? `${signName} - ${signCode}`
-      : (signName || signCode || 'Biển báo giao thông');
+      : signName || signCode || 'Biển báo giao thông';
 
   const verifiedImages = useMemo(() => {
     const list: { id: string; uri: string; label: string; date?: string }[] = [];
@@ -287,7 +318,14 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
     }
 
     return list;
-  }, [sign.frameUrl, sign.actualCropUrl, sign.imageUrl, sign.createdAt, sign.lastVerifiedAt, evidences]);
+  }, [
+    sign.frameUrl,
+    sign.actualCropUrl,
+    sign.imageUrl,
+    sign.createdAt,
+    sign.lastVerifiedAt,
+    evidences,
+  ]);
 
   return (
     <Animated.View
@@ -310,7 +348,12 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
 
       {/* 1. Header row: sign image, sign name - sign code, x button in far right corner */}
       <View style={styles.sheetHeaderRow}>
-        <View style={[styles.sheetSignIconContainer, { backgroundColor: theme.background, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.sheetSignIconContainer,
+            { backgroundColor: theme.background, borderColor: theme.border },
+          ]}
+        >
           {sign.imageUrl ? (
             <ExpoImage
               accessibilityLabel={signTitle}
@@ -328,7 +371,6 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
             <Text numberOfLines={2} style={[styles.sheetSignTitle, { color: theme.text }]}>
               {signTitle}
             </Text>
-            <View style={[styles.sheetFreshnessDot, { backgroundColor: freshness.color }]} />
           </View>
           <View style={styles.sheetFreshnessRow}>
             <Text style={[styles.sheetFreshnessText, { color: freshness.color }]}>
@@ -337,7 +379,10 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
             {sign.roadName ? (
               <>
                 <Text style={[styles.sheetDotSeparator, { color: theme.textSecondary }]}>•</Text>
-                <Text numberOfLines={1} style={[styles.sheetRoadName, { color: theme.textSecondary }]}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.sheetRoadName, { color: theme.textSecondary }]}
+                >
                   {sign.roadName}
                 </Text>
               </>
@@ -350,7 +395,10 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
           accessibilityRole="button"
           hitSlop={12}
           onPress={onClose}
-          style={[styles.sheetCloseBtn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          style={[
+            styles.sheetCloseBtn,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+          ]}
         >
           <MaterialCommunityIcons color={theme.text} name="close" size={18} />
         </Pressable>
@@ -376,7 +424,10 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
               accessibilityRole="button"
               key={item.id || `${item.uri}-${index}`}
               onPress={() => setSelectedPreviewImage(item.uri)}
-              style={[styles.carouselCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+              style={[
+                styles.carouselCard,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
             >
               <ExpoImage
                 contentFit="cover"
@@ -435,7 +486,12 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
               const previewItem = verifiedImages.find((img) => img.uri === selectedPreviewImage);
               return previewItem?.date ? (
                 <View style={styles.modalDateBadge}>
-                  <MaterialCommunityIcons color="#FFFFFF" name="calendar-clock-outline" size={14} style={{ marginRight: 6 }} />
+                  <MaterialCommunityIcons
+                    color="#FFFFFF"
+                    name="calendar-clock-outline"
+                    size={14}
+                    style={{ marginRight: 6 }}
+                  />
                   <Text style={styles.modalDateText}>Ngày ghi nhận: {previewItem.date}</Text>
                 </View>
               ) : null;
@@ -475,8 +531,20 @@ export function NavigationMapView({
   const isMotorcycle = vehicleMode === 'MOTORCYCLE' || vehicleMode === 'BIKE';
   const isBicycle = vehicleMode === 'CYCLING';
   const isWalking = vehicleMode === 'WALKING';
-  const routeLineColor = isWalking ? '#10B981' : isBicycle ? '#F59E0B' : isMotorcycle ? '#0D9488' : theme.primary;
-  const routeCasingColor = isWalking ? '#064E3B' : isBicycle ? '#78350F' : isMotorcycle ? '#042F2E' : '#1E3A8A';
+  const routeLineColor = isWalking
+    ? '#10B981'
+    : isBicycle
+      ? '#F59E0B'
+      : isMotorcycle
+        ? '#0D9488'
+        : theme.primary;
+  const routeCasingColor = isWalking
+    ? '#064E3B'
+    : isBicycle
+      ? '#78350F'
+      : isMotorcycle
+        ? '#042F2E'
+        : '#1E3A8A';
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignPressTimeRef = useRef<number>(0);
@@ -554,7 +622,7 @@ export function NavigationMapView({
   }, [routeSigns, signs, selectedSignId]);
 
   const selectedSign = useMemo(
-    () => (selectedSignId ? sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null : null),
+    () => (selectedSignId ? (sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null) : null),
     [sortedRouteSigns, selectedSignId],
   );
 
@@ -568,14 +636,17 @@ export function NavigationMapView({
       return;
     }
 
-    const clickLngLat: [number, number] | undefined =
-      event?.nativeEvent?.lngLat ?? event?.lngLat;
-    const clickPoint: [number, number] | undefined =
-      event?.nativeEvent?.point ?? event?.point;
+    const clickLngLat: [number, number] | undefined = event?.nativeEvent?.lngLat ?? event?.lngLat;
+    const clickPoint: [number, number] | undefined = event?.nativeEvent?.point ?? event?.point;
 
     if (sortedRouteSigns.length > 0) {
       // 1. Screen-pixel distance hit test (most accurate for touch interaction)
-      if (clickPoint && Array.isArray(clickPoint) && clickPoint.length >= 2 && mapRef.current?.project) {
+      if (
+        clickPoint &&
+        Array.isArray(clickPoint) &&
+        clickPoint.length >= 2 &&
+        mapRef.current?.project
+      ) {
         try {
           let bestSign: RouteSign | null = null;
           let bestDist = Number.POSITIVE_INFINITY;
@@ -586,7 +657,7 @@ export function NavigationMapView({
             if (projected && Array.isArray(projected) && projected.length >= 2) {
               const dx = projected[0] - clickPoint[0];
               // Marker anchor is 'bottom', height is 36dp. Icon center is ~18dp above coordinate.
-              const dy = (projected[1] - 18) - clickPoint[1];
+              const dy = projected[1] - 18 - clickPoint[1];
               const dist = Math.hypot(dx, dy);
               if (dist < bestDist && dist <= 38) {
                 bestDist = dist;
@@ -723,7 +794,10 @@ export function NavigationMapView({
     };
 
     // Give the native Camera node time to mount before issuing commands.
-    const t0 = setTimeout(() => { cameraReadyRef.current = true; triggerFly(); }, 300);
+    const t0 = setTimeout(() => {
+      cameraReadyRef.current = true;
+      triggerFly();
+    }, 300);
     const t1 = setTimeout(triggerFly, 600);
     const t2 = setTimeout(triggerFly, 1000);
 
@@ -760,7 +834,9 @@ export function NavigationMapView({
     return (
       <View style={[styles.fallback, { backgroundColor: theme.background }]}>
         <View style={[styles.fallbackPanel, { backgroundColor: theme.backgroundElement }]}>
-          <Text style={[styles.fallbackTitle, { color: theme.text }]}>{MAP_BUILD_REQUIRED_TITLE}</Text>
+          <Text style={[styles.fallbackTitle, { color: theme.text }]}>
+            {MAP_BUILD_REQUIRED_TITLE}
+          </Text>
           <Text style={[styles.fallbackCopy, { color: theme.textSecondary }]}>
             {MAP_BUILD_REQUIRED_DESCRIPTION}
           </Text>
@@ -776,11 +852,16 @@ export function NavigationMapView({
       <Map
         ref={mapRef}
         onPress={handleMapPress}
-        onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) => reportBounds(event.nativeEvent.bounds)}
+        onRegionDidChange={(event: { nativeEvent: { bounds: [number, number, number, number] } }) =>
+          reportBounds(event.nativeEvent.bounds)
+        }
         onDidFinishLoadingMap={() => {
-          void mapRef.current?.getBounds().then(reportBounds).catch(() => {
-            // The next region change reports bounds if the map is not ready yet.
-          });
+          void mapRef.current
+            ?.getBounds()
+            .then(reportBounds)
+            .catch(() => {
+              // The next region change reports bounds if the map is not ready yet.
+            });
         }}
         attribution
         attributionPosition={{ bottom: 8, right: 8 }}
@@ -798,17 +879,17 @@ export function NavigationMapView({
             initialViewState={
               (userCoordinate ?? routeStart)
                 ? {
-                  center: (userCoordinate ?? routeStart)!,
-                  zoom: 18,
-                  pitch: 55,
-                  bearing: forwardBearing,
-                  padding: {
-                    bottom: 220,
-                    left: 24,
-                    right: 24,
-                    top: 100,
-                  },
-                }
+                    center: (userCoordinate ?? routeStart)!,
+                    zoom: 18,
+                    pitch: 55,
+                    bearing: forwardBearing,
+                    padding: {
+                      bottom: 220,
+                      left: 24,
+                      right: 24,
+                      top: 100,
+                    },
+                  }
                 : undefined
             }
             key="navigation-active-camera"
@@ -911,6 +992,7 @@ export function NavigationMapView({
                   style={styles.stopSignMarker}
                 >
                   <SignMarkerIcon
+                    actualCropUrl={sign.actualCropUrl}
                     imageUrl={sign.imageUrl}
                     name={sign.name}
                     signCode={sign.signCode}
@@ -929,20 +1011,11 @@ export function NavigationMapView({
         {navigationActive ? (
           <>
             {hasLiveLocation ? (
-              <UserLocation
-                accuracy
-                animated
-                heading
-                minDisplacement={0}
-              />
+              <UserLocation accuracy animated heading minDisplacement={0} />
             ) : null}
           </>
         ) : showCurrentLocation && userCoordinate ? (
-          <Marker
-            anchor="center"
-            id="current-location"
-            lngLat={userCoordinate}
-          >
+          <Marker anchor="center" id="current-location" lngLat={userCoordinate}>
             <>
               <View style={styles.currentLocationHalo}>
                 <View style={[styles.currentLocationDot, { backgroundColor: theme.primary }]} />
@@ -952,7 +1025,9 @@ export function NavigationMapView({
         ) : null}
 
         {/* Show the start marker only when the user explicitly selected a custom start point */}
-        {isCustomStart && routeStart && (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
+        {isCustomStart &&
+        routeStart &&
+        (!navigationActive || (navigationActive && !hasLiveLocation)) ? (
           <Marker anchor="center" id="route-start-location" lngLat={routeStart}>
             <View style={styles.startMarker}>
               <Text style={styles.startMarkerText}>S</Text>
@@ -966,12 +1041,12 @@ export function NavigationMapView({
           </Marker>
         ) : null}
 
-        {hasValidLocationPin && (!destination || destination.coordinate[0] !== effectiveLocationPin[0] || destination.coordinate[1] !== effectiveLocationPin[1]) ? (
+        {hasValidLocationPin &&
+        (!destination ||
+          destination.coordinate[0] !== effectiveLocationPin[0] ||
+          destination.coordinate[1] !== effectiveLocationPin[1]) ? (
           <Marker anchor="bottom" id="location-pin" lngLat={effectiveLocationPin}>
-            <MapLocationPin
-              color={locationPinColor || '#EF4444'}
-              testID="map-location-pin"
-            />
+            <MapLocationPin color={locationPinColor || '#EF4444'} testID="map-location-pin" />
           </Marker>
         ) : null}
       </Map>
@@ -1076,6 +1151,21 @@ const styles = StyleSheet.create({
   stopSignImage: {
     width: 36,
     height: 36,
+  },
+  fallbackSignBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#023C69',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#09233C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.24,
+    shadowRadius: 3,
+    elevation: 4,
   },
   markerFreshnessDot: {
     position: 'absolute',
