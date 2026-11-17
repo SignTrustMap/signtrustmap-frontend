@@ -930,7 +930,6 @@ export const styles = StyleSheet.create({
     flexShrink: 0,
   },
   sheetBottomButtonRow: {
-    borderTopWidth: 1,
     marginTop: 'auto',
     flexDirection: 'row',
     alignItems: 'center',

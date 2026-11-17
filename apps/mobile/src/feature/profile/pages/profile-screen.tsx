@@ -202,8 +202,8 @@ export function ProfileScreen() {
           setIsMenuOpen(false);
           try {
             await logOut();
-          } finally {
-            router.replace('/(public)/login');
+          } catch (err) {
+            Alert.alert('Đăng xuất thất bại', 'Không thể đăng xuất. Vui lòng thử lại sau.');
           }
         },
       },

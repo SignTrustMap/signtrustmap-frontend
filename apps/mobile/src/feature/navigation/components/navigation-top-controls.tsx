@@ -24,7 +24,6 @@ export interface NavigationTopControlsProps {
   onSearchPress: () => void;
   onTopUpPress: () => void;
   onNotificationsPress?: () => void;
-  onLivestreamPress?: () => void;
   onChangeStartPress?: () => void;
   onChangeDestinationPress: () => void;
   onSwapRoutePress?: () => void;
@@ -190,30 +189,6 @@ export function NavigationTopControls({
               </AppButton>
             </View>
           </View>
-          {/* <AppButton
-            accessibilityLabel="Phát trực tiếp"
-            variant="ghost"
-            onPress={onLivestreamPress}
-            style={[
-              {
-                backgroundColor: theme.background,
-                boxShadow: "0px 4px 12px 1px #ccc",
-                marginLeft: "auto",
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: Spacing.half,
-              },
-            ]}
-          >
-            <SymbolView
-              name={{
-                android: "live_tv",
-                ios: "dot.radiowaves.left.and.right",
-              }}
-              size={24}
-              tintColor="#ff0000"
-            />
-          </AppButton> */}
         </>
       )}
     </View>

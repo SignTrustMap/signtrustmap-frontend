@@ -361,9 +361,6 @@ export function ReviewerStatsScreen() {
                       />
                     ) : null}
                   </View>
-                  <Text style={[styles.historyCountText, { color: theme.grey }]}>
-                    {totalHistoryCount} bản ghi
-                  </Text>
                 </View>
 
                 {/* Filter Pills */}
@@ -438,7 +435,6 @@ export function ReviewerStatsScreen() {
                     endDateLabel="Đến ngày"
                     showPresets
                     showSortToggle
-                    showCountBadge
                     controlsCardStyle={{ marginBottom: Spacing.two }}
                   >
                     {({ items: dateFilteredItems, totalCount }) => {

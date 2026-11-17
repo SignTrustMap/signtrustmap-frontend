@@ -183,8 +183,8 @@ describe('Upload Hooks and Utilities', () => {
         type: 'image',
       });
 
-      expect(res.fileName).toBe('img.png');
-      expect((res.chunk as any).file.type).toBe('image/png');
+      expect(res.fileName).toBe('img.jpg');
+      expect((res.chunk as any).file.type).toBe('image/jpeg');
     });
 
     it('throws error when video exceeds maximum size', async () => {

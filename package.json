@@ -107,5 +107,10 @@
   "overrides": {
     "@react-native/jest-preset": "^0.86.3",
     "test-renderer": "1.2.0"
+  },
+  "dependencies": {
+    "expo": "~57.0.7",
+    "react": "19.2.3",
+    "react-native": "0.86.0"
   }
 }

@@ -1,5 +1,5 @@
 import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Image,
@@ -548,6 +548,7 @@ export function NavigationMapView({
   const mapRef = useRef<MapRef>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSignPressTimeRef = useRef<number>(0);
+  const lastSignPressIdRef = useRef<string | null>(null);
   const [selectedSignId, setSelectedSignId] = useState<string | null>(null);
   const [activeOfflinePack, setActiveOfflinePack] = useState<InstalledOfflineMapPack | null>(null);
   // Tracks whether the navigation Camera's native view is ready to receive setStop commands.
@@ -579,14 +580,23 @@ export function NavigationMapView({
     };
   }, [selectedSignId, destination, onSignSelect]);
 
-  const handleSignPress = (sign: RouteSign) => {
-    lastSignPressTimeRef.current = Date.now();
-    setSelectedSignId((prev) => {
-      const next = prev === sign.id ? null : sign.id;
-      onSignSelect?.(next ? sign : null);
-      return next;
-    });
-  };
+  const handleSignPress = useCallback(
+    (sign: RouteSign) => {
+      if (!sign || !sign.id) return;
+      const now = Date.now();
+      // Guard against duplicate synthetic press events (e.g. Marker and inner Pressable firing in same frame)
+      if (lastSignPressIdRef.current === sign.id && now - lastSignPressTimeRef.current < 400) {
+        return;
+      }
+      lastSignPressTimeRef.current = now;
+      lastSignPressIdRef.current = sign.id;
+
+      const nextId = selectedSignId === sign.id ? null : sign.id;
+      setSelectedSignId(nextId);
+      onSignSelect?.(nextId ? sign : null);
+    },
+    [selectedSignId, onSignSelect],
+  );
 
   const sortedRouteSigns = useMemo(() => {
     const effectiveRouteSigns = routeSigns.length > 0 ? routeSigns : (signs ?? []);

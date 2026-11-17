@@ -82,7 +82,8 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(Spacing.two, insets.bottom - Spacing.two);
+  const bottomInset =
+    insets.bottom > 0 ? insets.bottom - Spacing.four : Platform.OS === 'ios' ? 34 : 0;
 
   const { setNavigationActive } = useNavigationActive();
   const {
@@ -739,14 +740,6 @@ export function NavigationMapScreen() {
     setActivePresetId,
   ]);
 
-  const handleLivestreamPress = useCallback(async () => {
-    const cameraResult = await Camera.requestCameraPermissionsAsync();
-    if (!cameraResult.granted) return;
-    const micResult = await Camera.requestMicrophonePermissionsAsync();
-    if (!micResult.granted) return;
-    router.push('/(authenticated)/(tabs)/livestream');
-  }, [router]);
-
   const filteredSigns = useMemo(() => {
     const isCategoriesActive =
       isNavigating || filterViewMode === 'categories' || routeMatchingPresets.length === 0;
@@ -1280,7 +1273,6 @@ export function NavigationMapScreen() {
               onSearchPress={() => router.push('/home/search')}
               onTopUpPress={() => router.push('/credits/top-up')}
               onNotificationsPress={() => router.push('/notifications')}
-              onLivestreamPress={handleLivestreamPress}
               onChangeDestinationPress={handleChangeDestination}
               onSwapRoutePress={handleSwapRoute}
             />
@@ -1391,7 +1383,7 @@ export function NavigationMapScreen() {
       <NavigationBottomSheet
         sheetHeightAnim={sheetHeightAnim}
         sheetSnapIndex={sheetSnapIndex}
-        bottomInset={0}
+        bottomInset={bottomInset}
         panHandlers={sheetPanResponder.panHandlers}
         onCycleSnap={cycleSnap}
         onSnapTo={snapTo}
