@@ -137,11 +137,12 @@ function SignMarkerIcon({
   const [triedActualCrop, setTriedActualCrop] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  const activeUrl = !triedActualCrop && imageUrl
-    ? imageUrl
-    : actualCropUrl && actualCropUrl !== imageUrl
-      ? actualCropUrl
-      : null;
+  const activeUrl =
+    !triedActualCrop && imageUrl
+      ? imageUrl
+      : actualCropUrl && actualCropUrl !== imageUrl
+        ? actualCropUrl
+        : null;
 
   if (!activeUrl || hasError) {
     return (
@@ -354,16 +355,12 @@ function SignDetailsBottomSheet({ sign, onClose }: SignDetailsBottomSheetProps) 
             { backgroundColor: theme.background, borderColor: theme.border },
           ]}
         >
-          {sign.imageUrl ? (
-            <ExpoImage
-              accessibilityLabel={signTitle}
-              contentFit="contain"
-              source={{ uri: sign.imageUrl }}
-              style={styles.sheetSignIcon}
-            />
-          ) : (
-            <MaterialCommunityIcons color={theme.primary} name="traffic-light" size={26} />
-          )}
+          <ExpoImage
+            accessibilityLabel={signTitle}
+            contentFit="contain"
+            source={{ uri: sign.imageUrl ?? verifiedImages[0].uri }}
+            style={styles.sheetSignIcon}
+          />
         </View>
 
         <View style={styles.sheetHeaderInfo}>

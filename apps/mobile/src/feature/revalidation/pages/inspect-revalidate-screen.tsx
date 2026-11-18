@@ -619,7 +619,7 @@ export function InspectRevalidateScreen() {
           longitude: lon,
           accuracyMeters: detectedGps?.accuracy,
           headingDegrees: detectedGps?.heading,
-          isLiveCapture: uploadMedia?.isLiveCapture ?? (uploadMedia?.type === 'image'),
+          isLiveCapture: uploadMedia?.isLiveCapture ?? uploadMedia?.type === 'image',
           confirmedSignId: signId,
           capturedAt: uploadMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
@@ -638,12 +638,7 @@ export function InspectRevalidateScreen() {
       setSubmitSuccess(true);
       setTimeout(() => {
         router.replace({
-          pathname: '/work/submission-complete',
-          params: {
-            type: 'upload_revalidation',
-            taskId: targetTaskId,
-            signCode,
-          },
+          pathname: '/work/revalidation-map',
         });
       }, 1000);
     } catch (err) {
