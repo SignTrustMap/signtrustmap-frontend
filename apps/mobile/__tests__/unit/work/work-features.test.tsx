@@ -97,6 +97,14 @@ jest.mock('@/feature/upload/utils/image-file-gps', () => ({
   extractGpsFromImageFile: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock('expo-blob', () => ({
+  Blob: class MockBlob {},
+}));
+
+jest.mock('@/api/revalidation/revalidation', () => ({
+  fetchFirstRevalidationSign: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
     background: '#FFFFFF',

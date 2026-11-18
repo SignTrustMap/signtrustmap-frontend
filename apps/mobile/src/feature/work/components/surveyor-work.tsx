@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
@@ -14,9 +14,14 @@ import {
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
 import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  getFallbackMissionsForRole,
+  isTaskForRole,
+  useGetMyTaskCompletions,
+} from '@/feature/work/hooks/use-daily-tasks';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
-import { WorkActionCard } from './work-action-card';
+import { WorkActionBadge } from './work-action-badge';
 
 export interface SurveyorWorkProps {
   pendingSurveyCount?: number;
@@ -26,6 +31,7 @@ export interface SurveyorWorkProps {
   userCoordinate?: MapCoordinate;
   onOpenOfflineMap?: () => void;
   onOpenRevalidationMap?: () => void;
+  incompleteMissionsCount?: number;
 }
 
 export function SurveyorWork({
@@ -36,6 +42,7 @@ export function SurveyorWork({
   userCoordinate: propUserCoordinate,
   onOpenOfflineMap,
   onOpenRevalidationMap,
+  incompleteMissionsCount: propMissionsCount,
 }: SurveyorWorkProps = {}) {
   const router = useRouter();
   const theme = useTheme();
@@ -92,6 +99,19 @@ export function SurveyorWork({
   const recapturesCount = propRecapturesCount ?? recapturesData?.total ?? 0;
   const firstRevalSign = propFirstRevalSign !== undefined ? propFirstRevalSign : firstRevalSignData;
 
+  const { data: completionsData } = useGetMyTaskCompletions(
+    undefined,
+    isSurveyor && propMissionsCount === undefined,
+  );
+
+  const incompleteMissionsCount = useMemo(() => {
+    if (propMissionsCount !== undefined) return propMissionsCount;
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, 'surveyor'));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole('surveyor');
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, propMissionsCount]);
+
   const handleOpenRevalidationMap = async () => {
     if (onOpenRevalidationMap) {
       onOpenRevalidationMap();
@@ -132,61 +152,86 @@ export function SurveyorWork({
   };
 
   return (
-    <View style={styles.actionList}>
-      {/* Standout Action: Survey History */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={pendingSurveyCount}
-        icon="cloud-upload-outline"
-        label="Lịch sử khảo sát"
-        onPress={() => router.push('/work/survey-history')}
-        subtitle="Lịch sử ghi nhận biển báo đã nộp, duyệt, từ chối"
-      />
+    <View style={styles.container}>
+      {/* Section 1: Tính năng khác */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Standout Action: Revalidation Map */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={revalidationTaskCount}
+            icon="map-search-outline"
+            label="Tái xác nhận biển báo"
+            onPress={handleOpenRevalidationMap}
+          />
 
-      {/* Standout Action: Revalidation Map */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={revalidationTaskCount}
-        icon="map-search-outline"
-        label="Tái xác nhận biển báo"
-        onPress={handleOpenRevalidationMap}
-        subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
-      />
+          {/* Standout Action: Recaptures Requested */}
+          <WorkActionBadge
+            accentColor="#F59E0B"
+            count={recapturesCount}
+            icon="camera-retake-outline"
+            label="Yêu cầu chụp lại ảnh"
+            onPress={() => router.push('/work/recaptures')}
+          />
 
-      {/* Standout Action: Recaptures Requested */}
-      <WorkActionCard
-        accentColor="#F59E0B"
-        count={recapturesCount}
-        icon="camera-retake-outline"
-        label="Yêu cầu chụp lại ảnh"
-        onPress={() => router.push('/work/recaptures')}
-        subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu"
-      />
+          {/* Standout Action: Offline Maps */}
+          {onOpenOfflineMap ? (
+            <WorkActionBadge
+              accentColor={theme.primary}
+              icon="map-marker-down"
+              label="Bản đồ ngoại tuyến"
+              onPress={onOpenOfflineMap}
+            />
+          ) : null}
 
-      {/* Standout Action: Offline Maps */}
-      {onOpenOfflineMap ? (
-        <WorkActionCard
-          accentColor={theme.primary}
-          icon="map-marker-down"
-          label="Bản đồ ngoại tuyến"
-          onPress={onOpenOfflineMap}
-          subtitle="Tải bản đồ để sử dụng cả khi ngoại tuyến."
-        />
-      ) : null}
+          {/* Action Badge: Sign Catalog */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            icon="database-search-outline"
+            label="Tra cứu biển báo giao thông"
+            onPress={() =>
+              router.push({
+                pathname: '/work/sign-catalog',
+                params: { role: 'surveyor' },
+              })
+            }
+          />
+        </View>
+      </View>
 
-      {/* Action Card: Sign Catalog */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        icon="database-search-outline"
-        label="Tra cứu biển báo giao thông"
-        onPress={() =>
-          router.push({
-            pathname: '/work/sign-catalog',
-            params: { role: 'surveyor' },
-          })
-        }
-        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
-      />
+      {/* Section 2: Nhiệm vụ và tiện ích */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ và tiện ích</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Missions */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
+            icon="trophy-outline"
+            label="Nhiệm vụ"
+            onPress={() =>
+              router.push({
+                pathname: '/work/missions',
+                params: { role: 'surveyor' },
+              })
+            }
+          />
+
+          {/* Survey / Vote History */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={pendingSurveyCount}
+            icon="cloud-upload-outline"
+            label="Lịch sử vote"
+            onPress={() => router.push('/work/survey-history')}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -221,8 +266,27 @@ export function SurveyorFab() {
 }
 
 const styles = StyleSheet.create({
-  actionList: {
-    gap: Spacing.three,
+  container: {
+    gap: Spacing.four,
+  },
+  sectionContainer: {
+    gap: Spacing.two,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.two,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: Spacing.two,
   },
   floatingAction: {
     position: 'absolute',

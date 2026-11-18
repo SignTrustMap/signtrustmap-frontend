@@ -245,7 +245,7 @@ describe('MissionsScreen Unit Test Suite', () => {
     it('switches to Weekly tab when tab is pressed', async () => {
       const { getByLabelText, getByText } = await render(<MissionsScreen initialRole="driver" />);
 
-      fireEvent.press(getByLabelText('Tab Hàng tuần'));
+      fireEvent.press(getByLabelText('Tab Tuần'));
 
       await waitFor(() => {
         expect(getByText('Tuần lễ khảo sát')).toBeTruthy();

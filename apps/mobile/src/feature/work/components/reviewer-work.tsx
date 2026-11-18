@@ -1,24 +1,32 @@
-import { StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
 import { useGetRevalidationEvidenceQueue } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  getFallbackMissionsForRole,
+  isTaskForRole,
+  useGetMyTaskCompletions,
+} from '@/feature/work/hooks/use-daily-tasks';
 import type { ReviewerStatsResponse } from '@/types/reviewsType';
-import { WorkActionCard } from './work-action-card';
+import { WorkActionBadge } from './work-action-badge';
 
 export interface ReviewerWorkProps {
   reviewQueueTotal?: number;
   revalEvidenceCount?: number;
   reviewerStats?: ReviewerStatsResponse | null;
+  incompleteMissionsCount?: number;
 }
 
 export function ReviewerWork({
   reviewQueueTotal: propReviewQueueTotal,
   revalEvidenceCount: propRevalEvidenceCount,
   reviewerStats: propReviewerStats,
+  incompleteMissionsCount: propMissionsCount,
 }: ReviewerWorkProps = {}) {
   const router = useRouter();
   const theme = useTheme();
@@ -38,62 +46,117 @@ export function ReviewerWork({
   const reviewQueueTotal = propReviewQueueTotal ?? reviewQueueData?.total ?? 0;
   const revalEvidenceCount = propRevalEvidenceCount ?? revalEvidenceQueueData?.total ?? 0;
 
+  const { data: completionsData } = useGetMyTaskCompletions(
+    undefined,
+    isReviewer && propMissionsCount === undefined,
+  );
+
+  const incompleteMissionsCount = useMemo(() => {
+    if (propMissionsCount !== undefined) return propMissionsCount;
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, 'reviewer'));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole('reviewer');
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, propMissionsCount]);
+
   return (
-    <View style={styles.actionList}>
-      {/* Standout Action for Reviewer: Pending Reviews */}
-      <WorkActionCard
-        accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
-        accentColor={theme.primary}
-        badgeLabel={reviewQueueTotal > 0 ? `${reviewQueueTotal} MỚI` : undefined}
-        count={reviewQueueTotal}
-        icon="shield-check"
-        label="Khảo sát cần duyệt"
-        onPress={() => router.push('/work/submission-review')}
-        subtitle={
-          reviewQueueTotal > 0
-            ? `${reviewQueueTotal} biển báo cần bạn xác minh`
-            : 'Không có biển báo cần xác minh'
-        }
-      />
+    <View style={styles.container}>
+      {/* Section 1: Tính năng khác */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Standout Action for Reviewer: Pending Reviews */}
+          <WorkActionBadge
+            accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
+            accentColor={theme.primary}
+            badgeLabel={reviewQueueTotal > 0 ? `${reviewQueueTotal} MỚI` : undefined}
+            count={reviewQueueTotal}
+            icon="shield-check"
+            label="Khảo sát cần duyệt"
+            onPress={() => router.push('/work/submission-review')}
+          />
 
-      {/* Action Card: Pending Revalidation Evidence */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={revalEvidenceCount}
-        icon="clipboard-check-outline"
-        label="Tái thẩm định cần duyệt"
-        onPress={() => router.push('/work/revalidation-review')}
-        subtitle="Bỏ phiếu tái thẩm định các biển báo."
-      />
+          {/* Action Badge: Pending Revalidation Evidence */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={revalEvidenceCount}
+            icon="clipboard-check-outline"
+            label="Tái thẩm định cần duyệt"
+            onPress={() => router.push('/work/revalidation-review')}
+          />
+        </View>
+      </View>
 
-      {/* Action Card: Reviewer Stats */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={reviewerStats?.totalReviews}
-        icon="chart-timeline-variant-shimmer"
-        label="Thống kê của bạn"
-        onPress={() => router.push('/work/reviewer-stats')}
-      />
+      {/* Section 2: Nhiệm vụ và tiện ích */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ và tiện ích</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Missions */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
+            icon="trophy-outline"
+            label="Nhiệm vụ"
+            onPress={() =>
+              router.push({
+                pathname: '/work/missions',
+                params: { role: 'reviewer' },
+              })
+            }
+          />
 
-      {/* Secondary Standout Action: Sign Catalog */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        icon="database-search-outline"
-        label="Tra cứu biển báo giao thông"
-        onPress={() =>
-          router.push({
-            pathname: '/work/sign-catalog',
-            params: { role: 'reviewer' },
-          })
-        }
-        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
-      />
+          {/* Sign Catalog */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            icon="database-search-outline"
+            label="Tra cứu biển báo giao thông"
+            onPress={() =>
+              router.push({
+                pathname: '/work/sign-catalog',
+                params: { role: 'reviewer' },
+              })
+            }
+          />
+
+          {/* Reviewer Stats */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={reviewerStats?.totalReviews}
+            icon="chart-timeline-variant-shimmer"
+            label="Thống kê của bạn"
+            onPress={() => router.push('/work/reviewer-stats')}
+          />
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actionList: {
-    gap: Spacing.three,
+  container: {
+    gap: Spacing.four,
+  },
+  sectionContainer: {
+    gap: Spacing.two,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.two,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: Spacing.two,
   },
 });
