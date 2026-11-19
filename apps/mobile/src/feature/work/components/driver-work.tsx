@@ -48,25 +48,7 @@ export function DriverWork({
   return (
     <View style={styles.container}>
       {/* Section 1: Tính năng khác */}
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
-        </View>
-        <View style={styles.gridRow}>
-          {/* Action Badge: Sign Catalog */}
-          <WorkActionBadge
-            accentColor={theme.primary}
-            icon="database-search-outline"
-            label="Tra cứu biển báo"
-            onPress={() =>
-              router.push({
-                pathname: '/work/sign-catalog',
-                params: { role: 'driver' },
-              })
-            }
-          />
-        </View>
-      </View>
+      <View style={styles.sectionContainer}></View>
 
       {/* Section 2: Nhiệm vụ và tiện ích */}
       <View style={styles.sectionContainer}>
@@ -95,6 +77,19 @@ export function DriverWork({
             icon="map-clock-outline"
             label="Lịch sử di chuyển"
             onPress={() => router.push('/work/navigation-history')}
+          />
+
+          {/* Action Badge: Sign Catalog */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            icon="database-search-outline"
+            label="Tra cứu biển báo"
+            onPress={() =>
+              router.push({
+                pathname: '/work/sign-catalog',
+                params: { role: 'driver' },
+              })
+            }
           />
         </View>
       </View>

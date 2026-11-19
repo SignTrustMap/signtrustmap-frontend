@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
@@ -112,6 +112,10 @@ export function SurveyorWork({
     return items.filter((item) => !item.isCompleted && !item.claimed).length;
   }, [completionsData, propMissionsCount]);
 
+  const handleOpenReturnedSubmissions = () => {
+    router.push('/work/returned-submissions-list');
+  };
+
   const handleOpenRevalidationMap = async () => {
     if (onOpenRevalidationMap) {
       onOpenRevalidationMap();
@@ -153,7 +157,6 @@ export function SurveyorWork({
 
   return (
     <View style={styles.container}>
-      {/* Section 1: Tính năng khác */}
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
@@ -187,17 +190,11 @@ export function SurveyorWork({
             />
           ) : null}
 
-          {/* Action Badge: Sign Catalog */}
           <WorkActionBadge
             accentColor={theme.primary}
-            icon="database-search-outline"
-            label="Tra cứu biển báo giao thông"
-            onPress={() =>
-              router.push({
-                pathname: '/work/sign-catalog',
-                params: { role: 'surveyor' },
-              })
-            }
+            icon="camera-document-off"
+            label="Ảnh bị trả về"
+            onPress={handleOpenReturnedSubmissions}
           />
         </View>
       </View>
@@ -229,6 +226,19 @@ export function SurveyorWork({
             icon="cloud-upload-outline"
             label="Lịch sử vote"
             onPress={() => router.push('/work/survey-history')}
+          />
+
+          {/* Action Badge: Sign Catalog */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            icon="database-search-outline"
+            label="Tra cứu biển báo giao thông"
+            onPress={() =>
+              router.push({
+                pathname: '/work/sign-catalog',
+                params: { role: 'surveyor' },
+              })
+            }
           />
         </View>
       </View>

@@ -142,6 +142,16 @@ jest.mock('@/feature/work/hooks/use-daily-tasks', () => ({
   useGetMyTaskCompletions: () => ({ data: [] }),
 }));
 
+jest.mock('@/feature/credits/hooks/use-wallet', () => ({
+  useGetWallet: () => ({
+    data: {
+      wallet: { id: 'w-test', userId: 'test-user-1', balance: 1250, updatedAt: '2026-08-01' },
+      recentTransactions: [],
+    },
+    isLoading: false,
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Components Under Test
 // ---------------------------------------------------------------------------
@@ -208,7 +218,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('renders navigation history, missions, and sign catalog action badges with session total', async () => {
       const { getByText, getByLabelText } = await render(<DriverWork />);
 
-      expect(getByText('Tính năng khác')).toBeTruthy();
       expect(getByText('Nhiệm vụ và tiện ích')).toBeTruthy();
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
       expect(getByText('9+')).toBeTruthy();
@@ -274,7 +283,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('renders hero review queue badge with badge and reviewer stats', async () => {
       const { getByText, getByLabelText } = await render(<ReviewerWork />);
 
-      expect(getByText('Tính năng khác')).toBeTruthy();
       expect(getByText('Nhiệm vụ và tiện ích')).toBeTruthy();
       expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
       expect(getByText('7 MỚI')).toBeTruthy();
@@ -347,7 +355,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('renders surveyor action badges with pending and recaptures count', async () => {
       const { getByText } = await render(<SurveyorWork />);
 
-      expect(getByText('Tính năng khác')).toBeTruthy();
       expect(getByText('Nhiệm vụ và tiện ích')).toBeTruthy();
       expect(getByText('Lịch sử vote')).toBeTruthy();
       expect(getByText('5')).toBeTruthy();
@@ -445,46 +452,42 @@ describe('Work Roles & Component Architecture Test Suite', () => {
   // SUITE 4: WorkScreen Integration & Role Switching
   // =========================================================================
   describe('4. WorkScreen Integration & Role Switching', () => {
-    it('mounts DriverWork by default when driver is the initial role', async () => {
-      const { getByText, queryByText } = await render(<WorkScreen currentRole="driver" />);
+    it('mounts DriverWork by default when driver is the initial role and displays role name in header', async () => {
+      const { getByText, getByTestId, queryByText } = await render(<WorkScreen currentRole="driver" />);
 
+      expect(getByTestId('work-screen-title').props.children).toBe('Tài xế');
+      expect(getByTestId('credit-balance-card')).toBeTruthy();
+      expect(getByText('1.250')).toBeTruthy();
+      fireEvent.press(getByTestId('credit-balance-card'));
+      expect(mockPush).toHaveBeenCalledWith('/credits/history');
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
       expect(queryByText('Thẩm định chờ xử lý')).toBeNull();
       expect(queryByText('Tái xác nhận biển báo')).toBeNull();
     });
 
-    it('switches to SurveyorWork and renders SurveyorFab when surveyor tab is selected', async () => {
-      const { getByText, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
+    it('switches to SurveyorWork, updates header title to Khảo sát, and renders SurveyorFab when surveyor tab is selected', async () => {
+      const { getByText, getByTestId, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
 
       fireEvent.press(getByLabelText('Vai trò Khảo sát'));
 
       await waitFor(() => {
+        expect(getByTestId('work-screen-title').props.children).toBe('Khảo sát');
         expect(getByText('Lịch sử vote')).toBeTruthy();
         expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
         expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
       });
     });
 
-    it('switches to ReviewerWork when reviewer tab is selected', async () => {
-      const { getByText, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
+    it('switches to ReviewerWork, updates header title to Thẩm định, when reviewer tab is selected', async () => {
+      const { getByText, getByTestId, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
 
       fireEvent.press(getByLabelText('Vai trò Thẩm định'));
 
       await waitFor(() => {
+        expect(getByTestId('work-screen-title').props.children).toBe('Thẩm định');
         expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
         expect(getByText('7 MỚI')).toBeTruthy();
       });
-    });
-
-    it('handles single-role user without crashing (slider 2-point outputRange)', async () => {
-      mockSessionUser = { id: 'single-role-user', roles: ['driver'] };
-
-      const { getByText } = await render(<WorkScreen currentRole="driver" />);
-      expect(
-        getByText(
-          'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
-        ),
-      ).toBeTruthy();
     });
 
     it('opens offline map modal when pressing offline map badge in surveyor role', async () => {

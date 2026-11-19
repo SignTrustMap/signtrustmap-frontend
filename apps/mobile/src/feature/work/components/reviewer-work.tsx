@@ -61,10 +61,9 @@ export function ReviewerWork({
 
   return (
     <View style={styles.container}>
-      {/* Section 1: Tính năng khác */}
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng khác</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng</Text>
         </View>
         <View style={styles.gridRow}>
           {/* Standout Action for Reviewer: Pending Reviews */}

@@ -222,6 +222,11 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       expect(getByText('Tổng kết')).toBeTruthy();
       expect(skipButton.props.accessibilityState?.disabled).toBe(true);
 
+      const locationButton = getByTestId('move-to-sign-location-button');
+      expect(locationButton).toBeTruthy();
+      expect(getByText('Vị trí biển báo')).toBeTruthy();
+      fireEvent.press(locationButton);
+
       // Pressing it while disabled does not navigate
       fireEvent.press(skipButton);
       expect(mockReplace).not.toHaveBeenCalled();
@@ -613,7 +618,7 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       expect(getByLabelText('Decline submission')).toBeTruthy();
       expect(getByLabelText('Skip submission (cannot identify)')).toBeTruthy();
       expect(getByLabelText('Report submission')).toBeTruthy();
-      expect(getByText('Chọn kết quả thẩm định mới bên dưới')).toBeTruthy();
+      expect(getByText(/Chọn kết quả.*mới bên dưới/)).toBeTruthy();
 
       // Voting with Approve works
       await act(async () => {

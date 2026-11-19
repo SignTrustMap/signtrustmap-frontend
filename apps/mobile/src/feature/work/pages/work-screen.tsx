@@ -9,6 +9,7 @@ import { DriverWork } from '@/feature/work/components/driver-work';
 import { ReviewerWork } from '@/feature/work/components/reviewer-work';
 import { SurveyorWork, SurveyorFab } from '@/feature/work/components/surveyor-work';
 import { OfflineMapModal } from '@/components/offline-map-modal';
+import { CreditBalanceCard } from '@/components/credit-balance-card';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
@@ -21,20 +22,17 @@ type CurrentRole = 'driver' | 'surveyor' | 'reviewer';
 const roleMeta: Record<
   AccountRole,
   {
-    description: string;
+    description?: string;
     label: string;
   }
 > = {
   driver: {
-    description: 'Xác minh biển báo giao thông và báo cáo tình trạng đường trên lộ trình của bạn.',
     label: 'Tài xế',
   },
   surveyor: {
-    description: 'Đóng góp biển báo giao thông cho cộng đồng cùng sử dụng.',
     label: 'Khảo sát',
   },
   reviewer: {
-    description: 'Cùng kiểm tra biển báo được gửi lên và bỏ phiếu trước khi đưa vào bản đồ.',
     label: 'Thẩm định',
   },
 };
@@ -83,7 +81,13 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           {/* Clean Header */}
           <View style={styles.headerRow}>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.text }]}>Công việc</Text>
+              <Text
+                accessibilityRole="header"
+                style={[styles.title, { color: theme.text }]}
+                testID="work-screen-title"
+              >
+                {roleMeta[selectedRole].label}
+              </Text>
             </View>
           </View>
 
@@ -128,13 +132,6 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
             })}
           </View>
 
-          {/* Role Summary */}
-          <View style={styles.roleSummary}>
-            <Text style={[styles.roleDescription, { color: theme.text }]}>
-              {roleMeta[selectedRole].description}
-            </Text>
-          </View>
-
           {/* Role-Specific Work Actions (Section 1: Tính năng khác & Section 2: Nhiệm vụ và tiện ích) */}
           {selectedRole === 'surveyor' ? (
             <SurveyorWork
@@ -146,6 +143,9 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
           ) : (
             <DriverWork incompleteMissionsCount={incompleteMissionsCount} />
           )}
+
+          {/* Credit Balance Card */}
+          <CreditBalanceCard />
         </ScrollView>
 
         {/* Surveyor Floating Action Button */}
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   },
   roleTabText: {
     fontFamily: Fonts.body,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   roleSummary: {

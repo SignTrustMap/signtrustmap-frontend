@@ -1202,8 +1202,31 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               </Text>
             </View>
 
-            {/* Action button right below the name, to the right edge of the screen */}
+            {/* Action buttons right below the name, location button on the left and summary on the right */}
             <View style={styles.skipToSummaryRow}>
+              <AppButton
+                accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
+                accessibilityLabel="Di chuyển đến vị trí biển báo"
+                onPress={() => {
+                  // Placeholder: di chuyển đến vị trí biển báo (sẽ implement sau)
+                }}
+                style={[
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: theme.border,
+                  },
+                ]}
+                testID="move-to-sign-location-button"
+                variant="surface"
+              >
+                <View style={styles.locationButtonContent}>
+                  <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={15} />
+                  <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
+                    Vị trí biển báo
+                  </Text>
+                </View>
+              </AppButton>
+
               <AppButton
                 accessibilityHint="Bỏ qua các biển báo còn lại và chuyển đến màn hình tổng kết"
                 accessibilityLabel="Chuyển đến màn hình tổng kết"
@@ -1542,9 +1565,15 @@ const styles = StyleSheet.create({
   skipToSummaryRow: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: -2,
     marginBottom: 4,
+  },
+  locationButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   summaryShortcutButton: {
     minHeight: 32,
