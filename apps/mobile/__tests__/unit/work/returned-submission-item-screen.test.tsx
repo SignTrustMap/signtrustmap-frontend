@@ -1,8 +1,13 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { render, fireEvent, act } from '@testing-library/react-native';
+import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 
-import { ReturnedSubmissionItemScreen } from '@/feature/work/pages/returned-submission-item-screen';
+import {
+  ReturnedSubmissionItemScreen,
+  getSignColorFromCode,
+  normalizeVietnameseSearch,
+  getBoxColor,
+} from '@/feature/work/pages/returned-submission-item-screen';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -85,51 +90,114 @@ describe('ReturnedSubmissionItemScreen', () => {
 
     // Bounding box should now be formed with "Biển báo #1"
     expect(getAllByText('Biển báo #1').length).toBeGreaterThan(0);
-    expect(getByTestId('box-controls-card')).toBeTruthy();
+    expect(getByTestId('box-classification-section')).toBeTruthy();
   });
 
-  it('supports adding up to 3 boxes using the Add Box button and resizing via expand/shrink buttons', async () => {
-    const { getByTestId, getByText, getAllByText } = await render(
+  it('opens catalog bottom sheet, searches signs in Vietnamese, and applies sign category color', async () => {
+    const { getByTestId, getByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    const addBoxBtn = getByTestId('add-box-btn');
+    await act(async () => {
+      fireEvent.press(addBoxBtn);
+    });
+
+    // Classification section should be visible
+    expect(getByTestId('box-classification-section')).toBeTruthy();
+    expect(getByText('Box 1')).toBeTruthy();
+    expect(getByTestId('box-color-square-0')).toBeTruthy();
+
+    // The catalog picker trigger button
+    const catalogTrigger = getByTestId('box-catalog-trigger-0');
+    expect(catalogTrigger).toBeTruthy();
+
+    // Open catalog bottom sheet
+    await act(async () => {
+      fireEvent.press(catalogTrigger);
+    });
+
+    // Catalog modal should be visible
+    expect(getByTestId('catalog-bottom-sheet')).toBeTruthy();
+    expect(getByText('Chọn biển báo thay thế từ danh mục')).toBeTruthy();
+
+    // Vietnamese search: search by name without diacritics "duong cam"
+    const searchInput = getByTestId('catalog-search-input');
+    await act(async () => {
+      fireEvent.changeText(searchInput, 'duong cam');
+    });
+
+    // Should find P.101 - Đường cấm
+    expect(getByText('Đường cấm')).toBeTruthy();
+    expect(getByText('P.101')).toBeTruthy();
+
+    // Select the sign P.101
+    const signItem = getByTestId('catalog-sign-item-P.101');
+    await act(async () => {
+      fireEvent.press(signItem);
+    });
+
+    // Box 1 trigger should now reflect P.101 and Đường cấm
+    await waitFor(() => {
+      expect(getByText('P.101')).toBeTruthy();
+      expect(getByText('Đường cấm')).toBeTruthy();
+    });
+  });
+
+  it('supports adding up to 7 boxes using the Add Box button', async () => {
+    const { getByTestId, getByText } = await render(
       <ReturnedSubmissionItemScreen id="test-item-999" />
     );
 
     const addBoxBtn = getByTestId('add-box-btn');
 
-    // Add 1st box
-    await act(async () => {
-      fireEvent.press(addBoxBtn);
-    });
-    expect(getAllByText('Biển báo #1').length).toBeGreaterThan(0);
+    // Add 7 boxes
+    for (let i = 1; i <= 7; i++) {
+      await act(async () => {
+        fireEvent.press(addBoxBtn);
+      });
+      expect(getByText(`Box ${i}`)).toBeTruthy();
+    }
 
-    // Test expanding size
-    const expandBtn = getByTestId('expand-box-btn');
-    await act(async () => {
-      fireEvent.press(expandBtn);
-    });
-    expect(getByText('105 × 105 px')).toBeTruthy();
+    expect(getByText('Đã đủ 7 box')).toBeTruthy();
+    expect(getByText('7/7 box')).toBeTruthy();
 
-    // Test shrinking size
-    const shrinkBtn = getByTestId('shrink-box-btn');
-    await act(async () => {
-      fireEvent.press(shrinkBtn);
-    });
-    expect(getByText('85 × 85 px')).toBeTruthy();
-
-    // Add 2nd box
-    await act(async () => {
-      fireEvent.press(addBoxBtn);
-    });
-    expect(getAllByText('Biển báo #2').length).toBeGreaterThan(0);
-
-    // Add 3rd box
-    await act(async () => {
-      fireEvent.press(addBoxBtn);
-    });
-    expect(getAllByText('Biển báo #3').length).toBeGreaterThan(0);
-    expect(getByText('Đã đủ 3 box')).toBeTruthy();
-
-    // Verify button is disabled when max 3 boxes is reached
+    // Verify button is disabled when max 7 boxes is reached
     expect(addBoxBtn.props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('filters by category tab and correctly determines colors by first letter (P, W, R, I, T)', async () => {
+    const { getByTestId, getByText, queryByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    const addBoxBtn = getByTestId('add-box-btn');
+    await act(async () => {
+      fireEvent.press(addBoxBtn);
+    });
+
+    // Open catalog bottom sheet
+    await act(async () => {
+      fireEvent.press(getByTestId('box-catalog-trigger-0'));
+    });
+
+    // Tap warning filter tab
+    const warningTab = getByTestId('catalog-filter-w');
+    await act(async () => {
+      fireEvent.press(warningTab);
+    });
+
+    // Should display W signs like W.201a and not P signs
+    expect(getByText('W.201a')).toBeTruthy();
+    expect(queryByText('P.101')).toBeNull();
+
+    // Select W.201a
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-sign-item-W.201a'));
+    });
+
+    // Box 1 should now display W.201a
+    expect(getByText('W.201a')).toBeTruthy();
   });
 
   it('removes bounding box when Undo button is pressed', async () => {
@@ -185,5 +253,37 @@ describe('ReturnedSubmissionItemScreen', () => {
         'Chỉ chọn nếu bạn chắc chắn rằng ảnh có biển báo hợp lệ, nếu không, hệ thống sẽ trừ điểm credits của bạn.'
       )
     ).toBeTruthy();
+  });
+
+  describe('helper functions', () => {
+    it('getSignColorFromCode determines color from first letter: P (red), W (yellow), R (blue), I (green), T (orange)', () => {
+      expect(getSignColorFromCode('P.101')).toBe('#EF4444');
+      expect(getSignColorFromCode('p.102')).toBe('#EF4444');
+      expect(getSignColorFromCode('W.201a')).toBe('#F59E0B');
+      expect(getSignColorFromCode('w.208')).toBe('#F59E0B');
+      expect(getSignColorFromCode('R.301a')).toBe('#3B82F6');
+      expect(getSignColorFromCode('r.407a')).toBe('#3B82F6');
+      expect(getSignColorFromCode('I.401')).toBe('#10B981');
+      expect(getSignColorFromCode('i.408')).toBe('#10B981');
+      expect(getSignColorFromCode('T.501')).toBe('#F97316');
+      expect(getSignColorFromCode('t.504')).toBe('#F97316');
+      expect(getSignColorFromCode(undefined, '#00838F')).toBe('#00838F');
+    });
+
+    it('normalizeVietnameseSearch strips diacritics, d/đ, punctuation for friendly search', () => {
+      expect(normalizeVietnameseSearch('Đường cấm')).toBe('duong cam');
+      expect(normalizeVietnameseSearch('duong cam')).toBe('duong cam');
+      expect(normalizeVietnameseSearch('P.101')).toBe('p101');
+      expect(normalizeVietnameseSearch('p101')).toBe('p101');
+      expect(normalizeVietnameseSearch('Cảnh báo nguy hiểm')).toBe('canh bao nguy hiem');
+    });
+
+    it('getBoxColor prioritizes signCode first letter', () => {
+      const boxWithCode = { id: '1', x: 0, y: 0, width: 85, height: 85, signCode: 'P.101' };
+      expect(getBoxColor(boxWithCode, '#00838F')).toBe('#EF4444');
+
+      const boxWithoutCode = { id: '2', x: 0, y: 0, width: 85, height: 85 };
+      expect(getBoxColor(boxWithoutCode, '#00838F')).toBe('#00838F');
+    });
   });
 });

@@ -110,6 +110,7 @@ jest.mock('@/services/offline-map-service', () => ({
     subscribeToMetadata: jest.fn(() => () => {}),
     deleteMapPack: jest.fn().mockResolvedValue(undefined),
     setActivePack: jest.fn().mockResolvedValue(undefined),
+    getActiveOfflinePack: jest.fn().mockResolvedValue(null),
   },
   formatBytes: (bytes) => `${bytes} B`,
 }));
@@ -126,6 +127,10 @@ jest.mock('@react-native-community/datetimepicker', () => {
     },
   };
 });
+
+jest.mock('expo-blob', () => ({
+  Blob: class {},
+}));
 
 try {
   require('@shopify/flash-list/jestSetup');
