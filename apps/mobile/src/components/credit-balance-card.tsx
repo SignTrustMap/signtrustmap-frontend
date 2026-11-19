@@ -31,7 +31,7 @@ export function CreditBalanceCard({
     if (onPress) {
       onPress();
     } else {
-      router.push('/credits/history');
+      router.push('/credits/top-up');
     }
   };
 
