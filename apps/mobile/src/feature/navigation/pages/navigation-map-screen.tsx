@@ -82,7 +82,8 @@ export function NavigationMapScreen() {
   const theme = useTheme();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(Spacing.two, insets.bottom - Spacing.two);
+  const bottomInset =
+    insets.bottom > 0 ? insets.bottom - Spacing.four : Platform.OS === 'ios' ? 34 : 0;
 
   const { setNavigationActive } = useNavigationActive();
   const {
@@ -144,7 +145,6 @@ export function NavigationMapScreen() {
   const [lastNavigatedDestinationTitle, setLastNavigatedDestinationTitle] = useState<
     string | undefined
   >();
-  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
   const [swappedRoute, setSwappedRoute] = useState<{
     origin: MapCoordinate;
@@ -739,14 +739,6 @@ export function NavigationMapScreen() {
     setActivePresetId,
   ]);
 
-  const handleLivestreamPress = useCallback(async () => {
-    const cameraResult = await Camera.requestCameraPermissionsAsync();
-    if (!cameraResult.granted) return;
-    const micResult = await Camera.requestMicrophonePermissionsAsync();
-    if (!micResult.granted) return;
-    router.push('/(authenticated)/(tabs)/livestream');
-  }, [router]);
-
   const filteredSigns = useMemo(() => {
     const isCategoriesActive =
       isNavigating || filterViewMode === 'categories' || routeMatchingPresets.length === 0;
@@ -1276,11 +1268,9 @@ export function NavigationMapScreen() {
               plannedRouteOrigin={plannedRouteOrigin}
               routeStartTitle={routeStartTitle}
               walletBalance={walletData?.wallet?.balance}
-              unreadNotificationCount={unreadNotificationCount}
               onSearchPress={() => router.push('/home/search')}
               onTopUpPress={() => router.push('/credits/top-up')}
               onNotificationsPress={() => router.push('/notifications')}
-              onLivestreamPress={handleLivestreamPress}
               onChangeDestinationPress={handleChangeDestination}
               onSwapRoutePress={handleSwapRoute}
             />
@@ -1306,25 +1296,6 @@ export function NavigationMapScreen() {
 
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
-                <AppButton
-                  accessibilityLabel={
-                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
-                  }
-                  onPress={handleToggleTts}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <MaterialCommunityIcons
-                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
-                    size={22}
-                    color="#000000"
-                  />
-                </AppButton>
-
                 <AppButton
                   accessibilityLabel={
                     isHomeSignFilterOpen
@@ -1355,10 +1326,11 @@ export function NavigationMapScreen() {
                     <View style={[styles.filterActiveBadge, { backgroundColor: theme.primary }]} />
                   ) : null}
                 </AppButton>
-
                 <AppButton
-                  accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
-                  onPress={() => router.push('/notifications')}
+                  accessibilityLabel={
+                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
+                  }
+                  onPress={handleToggleTts}
                   style={[
                     styles.mapActionButton,
                     styles.locationActionButton,
@@ -1366,11 +1338,10 @@ export function NavigationMapScreen() {
                   ]}
                   variant="surface"
                 >
-                  <Ionicons name="notifications" size={22} color="#000000" />
-                  <Badge
-                    count={unreadNotificationCount}
-                    maxCount={9}
-                    style={styles.notificationBadge}
+                  <MaterialCommunityIcons
+                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
+                    size={22}
+                    color="#000000"
                   />
                 </AppButton>
 

@@ -7,6 +7,9 @@ import { Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MapCoordinate } from '@/types/navigationType';
 import { styles } from '../styles/navigation-map-screen.styles';
+import { router } from 'expo-router';
+import { useGetUnreadNotificationCount } from '@/feature/notifications/hooks/use-notifications';
+import { Badge } from '@/components/badge';
 
 const AppLogo = require('@/assets/images/app-logo.png') as number;
 
@@ -24,7 +27,6 @@ export interface NavigationTopControlsProps {
   onSearchPress: () => void;
   onTopUpPress: () => void;
   onNotificationsPress?: () => void;
-  onLivestreamPress?: () => void;
   onChangeStartPress?: () => void;
   onChangeDestinationPress: () => void;
   onSwapRoutePress?: () => void;
@@ -59,6 +61,8 @@ export function NavigationTopControls({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
+
+  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
   return (
     <View style={styles.topControls}>
@@ -155,65 +159,61 @@ export function NavigationTopControls({
         </View>
       ) : (
         <>
-          <View style={styles.searchBarHeaderRow}>
-            <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}>
+          <View>
+            <View style={{ display: 'flex', flex: 1, gap: Spacing.one }}>
+              <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement }]}>
+                <AppButton
+                  accessibilityLabel="Tìm kiếm điểm đến"
+                  testID="btn-search-destination"
+                  onPress={onSearchPress}
+                  style={styles.searchButton}
+                  variant="ghost"
+                >
+                  <Image
+                    accessibilityLabel="Logo ứng dụng"
+                    resizeMode="contain"
+                    source={AppLogo}
+                    style={styles.appLogo}
+                  />
+                  <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
+                    Bắt đầu tìm kiếm...
+                  </Text>
+                </AppButton>
+                <AppButton
+                  accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletBalance ?? 0}`}
+                  onPress={onTopUpPress}
+                  pressedOpacity={0.68}
+                  style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
+                  variant="ghost"
+                >
+                  <Text style={[styles.creditText, { color: theme.text }]}>
+                    {walletBalance ?? '—'}
+                  </Text>
+                  <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
+                    <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
+                  </View>
+                </AppButton>
+              </View>
               <AppButton
-                accessibilityLabel="Tìm kiếm điểm đến"
-                testID="btn-search-destination"
-                onPress={onSearchPress}
-                style={styles.searchButton}
-                variant="ghost"
+                accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
+                onPress={() => router.push('/notifications')}
+                style={[
+                  styles.mapActionButton,
+                  styles.locationActionButton,
+                  styles.ttsActionButton,
+                  { alignSelf: 'flex-end' },
+                ]}
+                variant="surface"
               >
-                <Image
-                  accessibilityLabel="Logo ứng dụng"
-                  resizeMode="contain"
-                  source={AppLogo}
-                  style={styles.appLogo}
+                <Ionicons name="notifications" size={22} color="#000000" />
+                <Badge
+                  count={unreadNotificationCount}
+                  maxCount={9}
+                  style={styles.notificationBadge}
                 />
-                <Text numberOfLines={1} style={[styles.searchText, { color: theme.placeholder }]}>
-                  Bắt đầu tìm kiếm...
-                </Text>
-              </AppButton>
-              <AppButton
-                accessibilityLabel={`Nạp điểm. Số điểm hiện tại: ${walletBalance ?? 0}`}
-                onPress={onTopUpPress}
-                pressedOpacity={0.68}
-                style={[styles.creditContainer, { backgroundColor: theme.backgroundSelected }]}
-                variant="ghost"
-              >
-                <Text style={[styles.creditText, { color: theme.text }]}>
-                  {walletBalance ?? '—'}
-                </Text>
-                <View style={[styles.addCreditIcon, { backgroundColor: theme.primary }]}>
-                  <Text style={[styles.addCreditGlyph, { color: theme.onPrimary }]}>+</Text>
-                </View>
               </AppButton>
             </View>
           </View>
-          {/* <AppButton
-            accessibilityLabel="Phát trực tiếp"
-            variant="ghost"
-            onPress={onLivestreamPress}
-            style={[
-              {
-                backgroundColor: theme.background,
-                boxShadow: "0px 4px 12px 1px #ccc",
-                marginLeft: "auto",
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: Spacing.half,
-              },
-            ]}
-          >
-            <SymbolView
-              name={{
-                android: "live_tv",
-                ios: "dot.radiowaves.left.and.right",
-              }}
-              size={24}
-              tintColor="#ff0000"
-            />
-          </AppButton> */}
         </>
       )}
     </View>

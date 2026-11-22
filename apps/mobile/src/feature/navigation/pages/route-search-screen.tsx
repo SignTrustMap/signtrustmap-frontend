@@ -11,9 +11,7 @@ import { AppToast } from '@/components/toast';
 import { SearchSuggestionSkeleton } from '@/components/skeleton';
 import { Fonts, Spacing, Rounded } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
-import {
-  type MapCoordinate,
-} from '@/types/navigationType';
+import { type MapCoordinate } from '@/types/navigationType';
 import type { ApiPlace } from '@/api/navigation/places';
 import { usePlaceSuggestions, useSaveRecentPlace } from '../hooks/use-places';
 import { useSavedRoutes } from '../hooks/use-saved-routes';
@@ -40,7 +38,8 @@ export function RouteSearchScreen() {
   const { data: locations, isLoading, error } = usePlaceSuggestions(query);
   const { mutate: saveRecent } = useSaveRecentPlace();
   const coordinateStart = useMemo(
-    () => (startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined),
+    () =>
+      startLng && startLat ? ([Number(startLng), Number(startLat)] as MapCoordinate) : undefined,
     [startLat, startLng],
   );
   const routeStart = coordinateStart;
@@ -49,7 +48,7 @@ export function RouteSearchScreen() {
   useFocusEffect(
     useCallback(() => {
       void refetchSavedRoutes();
-    }, [refetchSavedRoutes])
+    }, [refetchSavedRoutes]),
   );
 
   const handleSelectSavedRoute = (saved: SavedRouteItem) => {
@@ -122,10 +121,7 @@ export function RouteSearchScreen() {
                 style={styles.backButton}
                 variant="ghost"
               >
-                <AntDesign
-                  name="arrow-left"
-                  style={[styles.backIcon, { color: theme.text }]}
-                />
+                <AntDesign name="arrow-left" style={[styles.backIcon, { color: theme.text }]} />
               </AppButton>
             }
             trailingIcon={
@@ -141,11 +137,7 @@ export function RouteSearchScreen() {
                   style={styles.clearButton}
                   variant="ghost"
                 >
-                  <AntDesign
-                    color={theme.placeholder}
-                    name="close-circle"
-                    size={18}
-                  />
+                  <AntDesign color={theme.placeholder} name="close-circle" size={18} />
                 </AppButton>
               ) : null
             }
@@ -164,7 +156,10 @@ export function RouteSearchScreen() {
               TUYẾN ĐƯỜNG YÊU THÍCH (WISHLIST)
             </Text>
             {savedRoutes.map((saved) => {
-              const displayName = saved.name || (saved as any).title || `${saved.originName} ➔ ${saved.destinationName}`;
+              const displayName =
+                saved.name ||
+                (saved as any).title ||
+                `${saved.originName} ➔ ${saved.destinationName}`;
               return (
                 <AppButton
                   accessibilityLabel={displayName}
@@ -178,16 +173,19 @@ export function RouteSearchScreen() {
                     <AntDesign color="#F59E0B" name="star" size={17} />
                   </View>
                   <View style={styles.locationCopy}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={[styles.locationTitle, { color: theme.text }]}>{displayName}</Text>
-                      <View style={{ backgroundColor: theme.backgroundSelected, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: theme.primary }}>
-                          {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
-                        </Text>
-                      </View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Text style={[styles.locationTitle, { color: theme.text }]}>
+                        {displayName}
+                      </Text>
                     </View>
                     <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
-                      {saved.originName} ➔ {saved.destinationName}
+                      Phương tiện: {saved.vehicleMode === 'MOTORCYCLE' ? 'Xe máy' : 'Ô tô'}
                     </Text>
                   </View>
                 </AppButton>
@@ -196,54 +194,57 @@ export function RouteSearchScreen() {
           </>
         ) : null}
 
-        <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-          {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'ĐÃ LƯU & GẦN ĐÂY'}
-        </Text>
-        {isLoading ? (
-          <SearchSuggestionSkeleton
-            circleSize={36}
-            count={5}
-            itemStyle={[styles.locationRow, { borderColor: theme.border }]}
-          />
-        ) : null}
-        {!isLoading && error ? (
-          <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>{error}</Text>
-        ) : null}
-        {!isLoading && !error && locations.length === 0 ? (
-          <Text style={[styles.error, { color: theme.textSecondary }]}>Không có điểm đến.</Text>
-        ) : null}
-        {!isLoading && locations.map((location) => (
-          <AppButton
-            accessibilityLabel={location.title}
-            testID="search-result-item"
-            key={location.id}
-            onPress={() => handleSelectLocation(location)}
-            pressedOpacity={0.72}
-            style={[styles.locationRow, { borderColor: theme.border }]}
-            variant="ghost"
-          >
-            <View style={[styles.recentIconCircle, { backgroundColor: theme.background }]}>
-              <SymbolView
-                name={{ android: 'history', ios: 'clock', web: 'history' }}
-                size={17}
-                tintColor={theme.text}
-              />
-            </View>
-            <View style={styles.locationCopy}>
-              <Text style={[styles.locationTitle, { color: theme.text }]}>{location.title}</Text>
-              <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
-                {location.address}
-              </Text>
-            </View>
-          </AppButton>
-        ))}
+        <View style={{ marginTop: Spacing.three }}>
+          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+            {query.trim().length >= 2 ? 'KẾT QUẢ TÌM KIẾM' : 'GẦN ĐÂY'}
+          </Text>
+          {isLoading ? (
+            <SearchSuggestionSkeleton
+              circleSize={36}
+              count={5}
+              itemStyle={[styles.locationRow, { borderColor: theme.border }]}
+            />
+          ) : null}
+          {!isLoading && error ? (
+            <Text accessibilityRole="alert" style={[styles.error, { color: theme.textSecondary }]}>
+              {error}
+            </Text>
+          ) : null}
+          {!isLoading && !error && locations.length === 0 ? (
+            <Text style={[styles.error, { color: theme.textSecondary }]}>Không có điểm đến.</Text>
+          ) : null}
+          {!isLoading &&
+            locations.map((location) => (
+              <AppButton
+                accessibilityLabel={location.title}
+                testID="search-result-item"
+                key={location.id}
+                onPress={() => handleSelectLocation(location)}
+                pressedOpacity={0.72}
+                style={[styles.locationRow, { borderColor: theme.border }]}
+                variant="ghost"
+              >
+                <View style={[styles.recentIconCircle, { backgroundColor: theme.background }]}>
+                  <SymbolView
+                    name={{ android: 'history', ios: 'clock', web: 'history' }}
+                    size={17}
+                    tintColor={theme.text}
+                  />
+                </View>
+                <View style={styles.locationCopy}>
+                  <Text style={[styles.locationTitle, { color: theme.text }]}>
+                    {location.title}
+                  </Text>
+                  <Text style={[styles.locationSubtitle, { color: theme.textSecondary }]}>
+                    {location.address}
+                  </Text>
+                </View>
+              </AppButton>
+            ))}
+        </View>
       </ScrollView>
       {toast ? (
-        <AppToast
-          key={toast.id}
-          message={toast.message}
-          onDismiss={() => setToast(undefined)}
-        />
+        <AppToast key={toast.id} message={toast.message} onDismiss={() => setToast(undefined)} />
       ) : null}
     </SafeAreaView>
   );
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     fontWeight: 900,
-    marginBottom: Spacing.one,
+    marginBottom: Spacing.half,
   },
   loading: { paddingVertical: Spacing.four },
   error: {
@@ -336,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: 0,
-    paddingVertical: Spacing.three,
+    paddingVertical: Spacing.one,
   },
   recentIconCircle: {
     padding: Spacing.one * 1.2,
@@ -347,6 +348,7 @@ const styles = StyleSheet.create({
   locationCopy: {
     flex: 1,
     minWidth: 0,
+    maxWidth: '100%',
   },
   locationTitle: {
     fontFamily: Fonts.body,
@@ -355,7 +357,7 @@ const styles = StyleSheet.create({
   },
   locationSubtitle: {
     fontFamily: Fonts.body,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 600,
     paddingTop: Spacing.half,
   },

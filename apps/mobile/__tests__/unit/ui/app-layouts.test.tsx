@@ -28,13 +28,10 @@ jest.mock('expo-router', () => {
         <Text>{href}</Text>
       </View>
     ),
-    Stack: Object.assign(
-      ({ children }: any) => <View testID="stack">{children}</View>,
-      {
-        Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
-        Protected: ({ children, guard }: any) => (guard ? children : null),
-      }
-    ),
+    Stack: Object.assign(({ children }: any) => <View testID="stack">{children}</View>, {
+      Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
+      Protected: ({ children, guard }: any) => (guard ? children : null),
+    }),
     Slot: () => <View testID="slot" />,
     useSegments: () => mockSegments,
     DefaultTheme: { dark: false, colors: { background: '#ffffff' } },
@@ -45,13 +42,10 @@ jest.mock('expo-router', () => {
 jest.mock('expo-router/stack', () => {
   const { View } = require('react-native');
   return {
-    Stack: Object.assign(
-      ({ children }: any) => <View testID="stack">{children}</View>,
-      {
-        Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
-        Protected: ({ children, guard }: any) => (guard ? children : null),
-      }
-    ),
+    Stack: Object.assign(({ children }: any) => <View testID="stack">{children}</View>, {
+      Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
+      Protected: ({ children, guard }: any) => (guard ? children : null),
+    }),
   };
 });
 
@@ -92,13 +86,6 @@ jest.mock('@/feature/notifications/pages/notifications-screen', () => {
   };
 });
 
-jest.mock('@/feature/streaming/pages/livestream-screen', () => {
-  const { View } = require('react-native');
-  return {
-    LivestreamScreen: () => <View testID="livestream-screen" />,
-  };
-});
-
 jest.mock('@/components/app-bottom-tabs', () => {
   const { View, Text } = require('react-native');
   return {
@@ -124,7 +111,6 @@ import IndexRoute from '@/app/index';
 import AuthenticatedLayout from '@/app/(authenticated)/_layout';
 import NotificationsRoute from '@/app/(authenticated)/notifications';
 import AppTabsLayout from '@/app/(authenticated)/(tabs)/_layout';
-import LivestreamRoute from '@/app/(authenticated)/(tabs)/livestream';
 import { Divider } from '@/components/divider';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -196,11 +182,6 @@ describe('App Layouts & Navigation Roots', () => {
       expect(getByTestId('slot')).toBeTruthy();
       expect(queryByTestId('app-bottom-tabs')).toBeNull();
     });
-
-    it('renders LivestreamRoute correctly', async () => {
-      const { getByTestId } = await render(<LivestreamRoute />);
-      expect(getByTestId('livestream-screen')).toBeTruthy();
-    });
   });
 
   describe('UI Base Components: Divider, ThemedText, ThemedView', () => {
@@ -220,7 +201,7 @@ describe('App Layouts & Navigation Roots', () => {
           <ThemedText type="link">Link Text</ThemedText>
           <ThemedText type="linkPrimary">Primary Link Text</ThemedText>
           <ThemedText type="code">Code Text</ThemedText>
-        </>
+        </>,
       );
       expect(getByText('Default Text')).toBeTruthy();
       expect(getByText('Title Text')).toBeTruthy();
@@ -233,7 +214,7 @@ describe('App Layouts & Navigation Roots', () => {
       const { toJSON } = await render(
         <ThemedView type="background">
           <Text>View Content</Text>
-        </ThemedView>
+        </ThemedView>,
       );
       expect(toJSON()).toBeTruthy();
     });

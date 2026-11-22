@@ -264,28 +264,24 @@ describe('ProfileScreen Unit Test Suite', () => {
   });
 
   // =========================================================================
-  // CASE 3: Sign Filter Manager Section
+  // CASE 3: Sign Filter Navigation Section
   // =========================================================================
-  describe('Case 3: Sign Filter Manager Section', () => {
-    it('renders the embedded SignFilterManager component when section is opened', async () => {
-      const { getByTestId, getByText, getByLabelText } = await render(<ProfileScreen />);
+  describe('Case 3: Sign Filter Navigation Section', () => {
+    it('navigates to sign-filters screen when sign filter card is pressed', async () => {
+      const { getByText, getByLabelText } = await render(<ProfileScreen />);
 
-      const openFilterButton = getByLabelText('Mở rộng bộ lọc biển báo');
+      expect(getByText('Bộ lọc biển báo')).toBeTruthy();
+      const openFilterButton = getByLabelText('Mở màn hình bộ lọc biển báo');
       fireEvent.press(openFilterButton);
 
-      await waitFor(() => {
-        expect(getByTestId('sign-filter-manager')).toBeTruthy();
-        expect(getByText('Sign Filter Manager Section')).toBeTruthy();
-      });
+      expect(mockRouter.push).toHaveBeenCalledWith('/(authenticated)/(tabs)/profile/sign-filters');
     });
 
-    it('handles scrollTo="signFilter" param and automatically expands section', async () => {
+    it('handles scrollTo="signFilter" param and navigates to sign-filters screen', async () => {
       mockLocalSearchParams = { scrollTo: 'signFilter' };
 
-      const { getByTestId } = await render(<ProfileScreen />);
-      await waitFor(() => {
-        expect(getByTestId('sign-filter-manager')).toBeTruthy();
-      });
+      await render(<ProfileScreen />);
+      expect(mockRouter.push).toHaveBeenCalledWith('/(authenticated)/(tabs)/profile/sign-filters');
     });
   });
 

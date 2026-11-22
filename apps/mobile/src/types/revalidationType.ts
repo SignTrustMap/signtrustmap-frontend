@@ -219,12 +219,17 @@ export interface EvidenceVoteResponse {
 export type SubmitRevalidationEvidenceDto = {
   latitude: number;
   longitude: number;
+  accuracyMeters?: number;
   capturedAt?: string;
+  confirmedSignId?: string;
+  evidenceType?: RevalidationEvidenceType;
+  headingDegrees?: number;
+  isLiveCapture?: boolean;
+  mediaUrl?: string;
+  suggestedSignTypeId?: number;
+  // UI-only helper fields (omitted from outgoing payload)
   note?: string;
   condition?: string;
-  mediaUrl?: string;
-  evidenceType?: RevalidationEvidenceType;
-  suggestedSignTypeId?: number;
 };
 
 export type SubmitRevalidationEvidenceResponse = {

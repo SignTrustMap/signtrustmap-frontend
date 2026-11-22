@@ -2,6 +2,7 @@ import React from 'react';
 import { render, fireEvent, waitFor, act, cleanup } from '@testing-library/react-native';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import {
@@ -19,13 +20,33 @@ import { AndroidGalleryModal } from '@/feature/upload/components/android-gallery
 jest.mock('expo-media-library/legacy', () => ({
   getAssetsAsync: jest.fn(),
   getAssetInfoAsync: jest.fn(),
+  getAlbumsAsync: jest.fn(),
+  createAssetAsync: jest.fn(),
   MediaType: {
     photo: 'photo',
     video: 'video',
   },
   SortBy: {
     creationTime: 'creationTime',
+    modificationTime: 'modificationTime',
   },
+}));
+
+jest.mock('expo-blob', () => ({
+  Blob: class MockBlob {},
+}));
+
+jest.mock('expo-image-manipulator', () => ({
+  manipulateAsync: jest.fn((uri: string) => Promise.resolve({ uri, width: 1280, height: 960 })),
+  SaveFormat: {
+    JPEG: 'jpeg',
+    PNG: 'png',
+  },
+}));
+
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: jest.fn(),
+  launchCameraAsync: jest.fn(),
 }));
 
 jest.mock('expo-file-system/legacy', () => ({
@@ -121,6 +142,38 @@ describe('AndroidGalleryModal Component', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (LegacyMediaLibrary.getAlbumsAsync as jest.Mock).mockResolvedValue([
+      { id: 'album-screenshots', title: 'Screenshots', assetCount: 12 },
+    ]);
+    (LegacyMediaLibrary.createAssetAsync as jest.Mock).mockImplementation((uri: string) =>
+      Promise.resolve({
+        id: 'captured-asset-1',
+        filename: 'camera-photo.jpg',
+        uri,
+        mediaType: 'photo',
+        duration: 0,
+        creationTime: Date.now(),
+        modificationTime: Date.now(),
+      }),
+    );
+    (ImagePicker.requestCameraPermissionsAsync as jest.Mock).mockResolvedValue({
+      status: 'granted',
+    });
+    (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///data/user/0/cache/camera-photo.jpg',
+          fileName: 'camera-photo.jpg',
+          width: 1920,
+          height: 1080,
+          exif: {
+            GPSLatitude: 10.7769,
+            GPSLongitude: 106.7009,
+          },
+        },
+      ],
+    });
     (LegacyMediaLibrary.getAssetsAsync as jest.Mock).mockResolvedValue({
       assets: mockAssets,
       endCursor: 'cursor-1',
@@ -321,5 +374,93 @@ describe('AndroidGalleryModal Component', () => {
     });
 
     expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('renders camera capture button on first square and launches camera when pressed', async () => {
+    const { getByLabelText, getByText } = await render(
+      <AndroidGalleryModal
+        visible={true}
+        onClose={mockOnClose}
+        onConfirm={mockOnConfirm}
+      />
+    );
+
+    const cameraButton = getByLabelText('Chụp ảnh mới');
+    expect(cameraButton).toBeTruthy();
+    expect(getByText('Chụp ảnh')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(cameraButton);
+    });
+
+    expect(ImagePicker.requestCameraPermissionsAsync).toHaveBeenCalled();
+    expect(ImagePicker.launchCameraAsync).toHaveBeenCalled();
+    expect(LegacyMediaLibrary.createAssetAsync).toHaveBeenCalledWith(
+      'file:///data/user/0/cache/camera-photo.jpg'
+    );
+    await waitFor(() => {
+      expect(getByText(/Đã chọn 1 tệp/)).toBeTruthy();
+    });
+  });
+
+  it('renders albums and filters assets when an album pill is selected', async () => {
+    const { getByLabelText } = await render(
+      <AndroidGalleryModal
+        visible={true}
+        onClose={mockOnClose}
+        onConfirm={mockOnConfirm}
+      />
+    );
+
+    await waitFor(() => {
+      expect(getByLabelText('Album Screenshots')).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Album Screenshots'));
+    });
+
+    expect(LegacyMediaLibrary.getAssetsAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        album: 'album-screenshots',
+        sortBy: [['modificationTime', false]],
+      })
+    );
+  });
+
+  it('resets album filter when switching from an album back to "Tất cả"', async () => {
+    const { getByLabelText } = await render(
+      <AndroidGalleryModal
+        visible={true}
+        onClose={mockOnClose}
+        onConfirm={mockOnConfirm}
+      />
+    );
+
+    await waitFor(() => {
+      expect(getByLabelText('Album Screenshots')).toBeTruthy();
+    });
+
+    // Select Screenshots album
+    await act(async () => {
+      fireEvent.press(getByLabelText('Album Screenshots'));
+    });
+
+    expect(LegacyMediaLibrary.getAssetsAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        album: 'album-screenshots',
+      })
+    );
+
+    // Switch back to "Tất cả"
+    await act(async () => {
+      fireEvent.press(getByLabelText('Tất cả ảnh và video'));
+    });
+
+    expect(LegacyMediaLibrary.getAssetsAsync).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({
+        album: expect.anything(),
+      })
+    );
   });
 });

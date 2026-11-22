@@ -46,12 +46,12 @@ interface TabMeta {
 const MISSION_TABS: TabMeta[] = [
   {
     key: 'daily',
-    label: 'Hàng ngày',
+    label: 'Ngày',
     icon: 'calendar-today',
   },
   {
     key: 'weekly',
-    label: 'Hàng tuần',
+    label: 'Tuần',
     icon: 'calendar-week',
   },
   {
@@ -473,9 +473,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     {tab.label}
                   </Text>
 
-                  {pendingCount > 0 ? (
-                    <Badge count={pendingCount} size="sm" />
-                  ) : null}
+                  {pendingCount > 0 ? <Badge count={pendingCount} size="sm" /> : null}
                 </Pressable>
               );
             })}

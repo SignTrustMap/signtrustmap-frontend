@@ -4,7 +4,6 @@ import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { SignFilterManager } from '../components/sign-filter-manager';
 import { UpdateModal } from '@/components/update-modal';
 import { OfflineMapModal } from '@/components/offline-map-modal';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -108,41 +107,15 @@ export function ProfileScreen() {
   const menuButtonRef = useRef<View>(null);
 
   const [isRoleSectionOpen, setIsRoleSectionOpen] = useState(true);
-  const [isFilterSectionOpen, setIsFilterSectionOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 195, right: 20 });
   const [isOfflineMapModalOpen, setIsOfflineMapModalOpen] = useState(false);
 
-  const performScrollToSignFilter = useCallback(() => {
-    if (scrollTo !== 'signFilter' && scrollTo !== 'sign-filter') return;
-    setIsFilterSectionOpen(true);
-
-    setTimeout(() => {
-      if (signFilterRef.current && scrollViewRef.current) {
-        signFilterRef.current.measureLayout(
-          scrollViewRef.current as any,
-          (_x, y) => {
-            if (y > 0) {
-              scrollViewRef.current?.scrollTo({
-                y: Math.max(0, y - 16),
-                animated: true,
-              });
-            }
-          },
-          () => {},
-        );
-      }
-    }, 200);
-  }, [scrollTo]);
-
   useEffect(() => {
     if (scrollTo === 'signFilter' || scrollTo === 'sign-filter') {
-      setIsFilterSectionOpen(true);
-      performScrollToSignFilter();
-      const timer = setTimeout(performScrollToSignFilter, 400);
-      return () => clearTimeout(timer);
+      router.push('/(authenticated)/(tabs)/profile/sign-filters');
     }
-  }, [scrollTo, t, performScrollToSignFilter]);
+  }, [router, scrollTo, t]);
 
   const {
     checkForUpdates,
@@ -202,8 +175,8 @@ export function ProfileScreen() {
           setIsMenuOpen(false);
           try {
             await logOut();
-          } finally {
-            router.replace('/(public)/login');
+          } catch (err) {
+            Alert.alert('Đăng xuất thất bại', 'Không thể đăng xuất. Vui lòng thử lại sau.');
           }
         },
       },
@@ -458,7 +431,7 @@ export function ProfileScreen() {
             ) : null}
           </View>
 
-          {/* Section 2: Collapsible Sign Filter Section */}
+          {/* Section 2: Sign Filter Navigation Card */}
           <View
             collapsable={false}
             ref={signFilterRef}
@@ -468,11 +441,9 @@ export function ProfileScreen() {
             ]}
           >
             <Pressable
-              accessibilityLabel={
-                isFilterSectionOpen ? 'Thu gọn bộ lọc biển báo' : 'Mở rộng bộ lọc biển báo'
-              }
+              accessibilityLabel="Mở màn hình bộ lọc biển báo"
               accessibilityRole="button"
-              onPress={() => setIsFilterSectionOpen((prev) => !prev)}
+              onPress={() => router.push('/(authenticated)/(tabs)/profile/sign-filters')}
               style={styles.collapsibleHeader}
             >
               <View style={styles.headerLeft}>
@@ -488,16 +459,10 @@ export function ProfileScreen() {
               </View>
               <MaterialCommunityIcons
                 color={theme.placeholder}
-                name={isFilterSectionOpen ? 'chevron-up' : 'chevron-down'}
+                name="chevron-right"
                 size={22}
               />
             </Pressable>
-
-            {isFilterSectionOpen ? (
-              <View style={[styles.collapsibleBody, { borderTopColor: theme.border }]}>
-                <SignFilterManager />
-              </View>
-            ) : null}
           </View>
 
           {/* Section 3: Offline Maps Card */}

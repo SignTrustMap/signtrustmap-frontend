@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { View, Text } from 'react-native';
 
 // ---------------------------------------------------------------------------
@@ -227,6 +227,15 @@ if (typeof document === 'undefined') {
   };
 }
 
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: () => React.createElement(View, { testID: 'mock-date-picker' }),
+  };
+});
+
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
     background: '#FFFFFF',
@@ -382,6 +391,40 @@ describe('Navigation Screens and Map Views', () => {
       const backBtn = getByLabelText('Quay lại danh mục công việc tài xế');
       fireEvent.press(backBtn);
       expect(mockReplace).toHaveBeenCalled();
+    });
+
+    it('renders date filter and sort controls and allows sorting trips', async () => {
+      mockIsSessionsLoading = false;
+      mockNavigationSessionsData = {
+        items: [
+          {
+            id: 'session-1',
+            originName: 'Nhà',
+            destinationName: 'Công ty',
+            createdAt: '2026-11-01T08:00:00.000Z',
+            vehicleMode: 'MOTORCYCLE',
+            status: 'COMPLETED',
+          },
+        ],
+        total: 1,
+        totalPages: 1,
+      };
+
+      const { getByText, getByLabelText } = await render(<NavigationHistoryScreen />);
+
+      // Date filter headers and controls
+      expect(getByText('Lọc theo ngày')).toBeTruthy();
+      expect(getByLabelText('Chọn Từ ngày')).toBeTruthy();
+      expect(getByLabelText('Chọn Đến ngày')).toBeTruthy();
+
+      // Toggle sort
+      expect(getByText('Mới nhất')).toBeTruthy();
+      const sortBtn = getByLabelText('Sắp xếp ngày: Mới nhất');
+      await act(async () => {
+        fireEvent.press(sortBtn);
+      });
+
+      expect(getByText('Cũ nhất')).toBeTruthy();
     });
   });
 

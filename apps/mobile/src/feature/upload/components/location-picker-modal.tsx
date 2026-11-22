@@ -16,7 +16,10 @@ import { AppButton } from '@/components/button';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MapCoordinate } from '@/types/navigationType';
-import { NavigationMapView, MapLocationPin } from '@/feature/navigation/components/navigation-map-view';
+import {
+  NavigationMapView,
+  MapLocationPin,
+} from '@/feature/navigation/components/navigation-map-view';
 import { usePlaceSuggestions } from '@/feature/navigation/hooks/use-places';
 import type { ApiPlace } from '@/api/navigation/places';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
@@ -98,9 +101,7 @@ export function LocationPickerModal({
   const { data: suggestions, isLoading: isSearching } = usePlaceSuggestions(searchQuery);
 
   const reverseGeocodeQuery = useReverseGeocode(
-    centerCoordinate
-      ? { latitude: centerCoordinate[1], longitude: centerCoordinate[0] }
-      : null,
+    centerCoordinate ? { latitude: centerCoordinate[1], longitude: centerCoordinate[0] } : null,
   );
 
   // Initialize with device GPS if no initialCoordinate provided
@@ -139,7 +140,12 @@ export function LocationPickerModal({
   const handleBoundsChange = useCallback((bounds: FindSignsInBoundsParams) => {
     const lat = (bounds.minLat + bounds.maxLat) / 2;
     const lon = (bounds.minLon + bounds.maxLon) / 2;
-    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lon) <= 180
+    ) {
       setCenterCoordinate([lon, lat]);
     }
   }, []);
@@ -171,9 +177,7 @@ export function LocationPickerModal({
 
   const handleConfirm = () => {
     const resolvedAddress =
-      reverseGeocodeQuery.data?.displayAddress ||
-      reverseGeocodeQuery.data?.roadName ||
-      undefined;
+      reverseGeocodeQuery.data?.displayAddress || reverseGeocodeQuery.data?.roadName || undefined;
     onConfirm(centerCoordinate, resolvedAddress);
     onClose();
   };
@@ -184,12 +188,7 @@ export function LocationPickerModal({
     'Đang tải địa chỉ...';
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-      visible={visible}
-    >
+    <Modal animationType="slide" onRequestClose={onClose} statusBarTranslucent visible={visible}>
       <View style={[styles.container, { backgroundColor: theme.background }]}>
         {/* Full-screen Map */}
         <View style={StyleSheet.absoluteFill}>
@@ -203,7 +202,12 @@ export function LocationPickerModal({
 
         {/* Center Crosshair Pin */}
         <View pointerEvents="none" style={styles.centerPinWrapper}>
-          <MapLocationPin color="#EF4444" size={46} style={styles.centerPin} testID="center-crosshair-pin" />
+          <MapLocationPin
+            color="#EF4444"
+            size={46}
+            style={styles.centerPin}
+            testID="center-crosshair-pin"
+          />
         </View>
 
         {/* Top Header & Search Area */}
@@ -212,7 +216,10 @@ export function LocationPickerModal({
             <Pressable
               accessibilityLabel="Đóng"
               onPress={onClose}
-              style={[styles.circleButton, { backgroundColor: theme.background, borderColor: theme.border }]}
+              style={[
+                styles.circleButton,
+                { backgroundColor: theme.background, borderColor: theme.border },
+              ]}
             >
               <MaterialCommunityIcons name="arrow-left" size={22} color={theme.text} />
             </Pressable>
@@ -220,7 +227,6 @@ export function LocationPickerModal({
             <View style={styles.searchBoxWrapper}>
               <AppInput
                 containerStyle={styles.searchInputContainer}
-                leadingIcon={<MaterialCommunityIcons name="magnify" size={20} color={theme.placeholder} />}
                 onChangeText={(text) => {
                   setSearchQuery(text);
                   setIsSearchFocused(true);
@@ -246,7 +252,12 @@ export function LocationPickerModal({
 
           {/* Autocomplete Search Dropdown */}
           {isSearchFocused && searchQuery.trim().length >= 2 ? (
-            <View style={[styles.searchDropdown, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.searchDropdown,
+                { backgroundColor: theme.background, borderColor: theme.border },
+              ]}
+            >
               {isSearching ? (
                 <View style={styles.dropdownLoading}>
                   <ActivityIndicator color={theme.primary} size="small" />
@@ -255,23 +266,30 @@ export function LocationPickerModal({
                   </Text>
                 </View>
               ) : suggestions && suggestions.length > 0 ? (
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  style={styles.dropdownScroll}
-                >
+                <ScrollView keyboardShouldPersistTaps="handled" style={styles.dropdownScroll}>
                   {suggestions.map((item) => (
                     <Pressable
                       key={item.id}
                       onPress={() => handleSelectPlace(item)}
                       style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
                     >
-                      <MaterialCommunityIcons name="map-marker-outline" size={20} color={theme.primary} />
+                      <MaterialCommunityIcons
+                        name="map-marker-outline"
+                        size={20}
+                        color={theme.primary}
+                      />
                       <View style={styles.dropdownItemCopy}>
-                        <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.dropdownItemTitle, { color: theme.text }]}
+                        >
                           {item.title}
                         </Text>
                         {item.address ? (
-                          <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.textSecondary }]}>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.dropdownItemSubtitle, { color: theme.textSecondary }]}
+                          >
                             {item.address}
                           </Text>
                         ) : null}
@@ -295,7 +313,11 @@ export function LocationPickerModal({
           <Pressable
             accessibilityLabel="Đến vị trí hiện tại"
             onPress={handleCurrentLocation}
-            style={[styles.circleButton, styles.gpsButton, { backgroundColor: theme.background, borderColor: theme.border }]}
+            style={[
+              styles.circleButton,
+              styles.gpsButton,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
           >
             {isLocating ? (
               <ActivityIndicator color={theme.primary} size="small" />
@@ -307,7 +329,12 @@ export function LocationPickerModal({
 
         {/* Bottom Details & Confirmation Panel */}
         <SafeAreaView edges={['bottom']} style={styles.bottomArea}>
-          <View style={[styles.bottomCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          <View
+            style={[
+              styles.bottomCard,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
             <View style={styles.bottomAddressRow}>
               <View style={[styles.addressBadge, { backgroundColor: theme.backgroundSelected }]}>
                 <MaterialCommunityIcons name="map-marker" size={18} color={theme.primary} />
@@ -322,9 +349,7 @@ export function LocationPickerModal({
               </View>
             </View>
 
-            {errorMessage ? (
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            ) : null}
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
             <AppButton
               label="Xác nhận vị trí này"
@@ -469,7 +494,7 @@ const styles = StyleSheet.create({
   floatingActions: {
     position: 'absolute',
     right: Spacing.two,
-    bottom: 170,
+    bottom: 220,
     zIndex: 15,
   },
   gpsButton: {

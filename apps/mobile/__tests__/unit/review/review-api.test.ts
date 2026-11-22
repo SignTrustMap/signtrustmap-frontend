@@ -41,6 +41,21 @@ describe('Review API Module', () => {
         mockToken,
       );
     });
+
+    it('serializes state query param when provided', async () => {
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ items: [], total: 0 });
+
+      await getMyReviewHistory(
+        { page: '1', pageSize: '10', state: 'approved' },
+        mockToken,
+      );
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        expect.stringMatching(/\/reviews\/me\/history\?page=1&pageSize=10&state=approved/),
+        { signal: undefined },
+        mockToken,
+      );
+    });
   });
 
   describe('getCandidateSignDetails', () => {

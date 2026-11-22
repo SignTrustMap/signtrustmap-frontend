@@ -16,6 +16,7 @@ import {
   formatRouteNavDistance,
 } from '../utils/navigation-formatters';
 import { styles } from '../styles/navigation-map-screen.styles';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export interface NavigationBottomSheetProps {
   sheetHeightAnim: Animated.Value;
@@ -801,7 +802,10 @@ export function NavigationBottomSheet({
               </AppButton>
             </View>
           ) : (
-            <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
+            <SafeAreaView
+              edges={['bottom']}
+              style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}
+            >
               <AppButton
                 accessibilityLabel="Dừng điều hướng"
                 testID="btn-stop-navigation"
@@ -810,7 +814,7 @@ export function NavigationBottomSheet({
               >
                 <Text style={[styles.goButtonLabel, { color: '#FFFFFF' }]}>Dừng</Text>
               </AppButton>
-            </View>
+            </SafeAreaView>
           )}
         </View>
       ) : (
@@ -824,7 +828,10 @@ export function NavigationBottomSheet({
               {selectedDestination.title}
             </Text>
             {selectedDestination.subtitle ? (
-              <Text style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}>
+              <Text
+                style={[styles.selectedPlaceDescription, { color: theme.textSecondary }]}
+                numberOfLines={2}
+              >
                 {selectedDestination.subtitle}
               </Text>
             ) : null}
@@ -846,19 +853,6 @@ export function NavigationBottomSheet({
           </View>
         </>
       )}
-
-      {bottomInset > 0 ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.sheetBottomSafeAreaBackground,
-            {
-              height: bottomInset,
-            },
-          ]}
-          testID="sheet-safe-area-bottom"
-        />
-      ) : null}
     </Animated.View>
   );
 }

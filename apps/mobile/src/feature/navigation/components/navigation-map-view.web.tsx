@@ -69,17 +69,40 @@ function createSignMarkerElement(sign: RouteSign) {
   container.style.alignItems = 'center';
   container.style.justifyContent = 'center';
 
+  const fallback = document.createElement('div');
+  fallback.style.width = '36px';
+  fallback.style.height = '36px';
+  fallback.style.borderRadius = '18px';
+  fallback.style.background = '#FFFFFF';
+  fallback.style.border = '2px solid #023C69';
+  fallback.style.display = 'none';
+  fallback.style.alignItems = 'center';
+  fallback.style.justifyContent = 'center';
+  fallback.style.fontSize = '18px';
+  fallback.innerHTML = '🚸';
+  container.appendChild(fallback);
+
   const marker = document.createElement('img');
-  marker.src = sign.imageUrl || '';
+  marker.src = sign.imageUrl || sign.actualCropUrl || '';
   marker.alt = sign.name || sign.signCode;
   marker.style.width = '36px';
   marker.style.height = '36px';
   marker.style.objectFit = 'contain';
   marker.style.filter = 'drop-shadow(0 2px 3px rgba(9, 35, 60, 0.24))';
   marker.onerror = () => {
+    if (sign.actualCropUrl && marker.src !== sign.actualCropUrl) {
+      marker.src = sign.actualCropUrl;
+      return;
+    }
     marker.style.display = 'none';
+    fallback.style.display = 'flex';
   };
   container.appendChild(marker);
+
+  if (!sign.imageUrl && !sign.actualCropUrl) {
+    marker.style.display = 'none';
+    fallback.style.display = 'flex';
+  }
 
   const rawScore =
     typeof sign.freshnessScore === 'number' && !Number.isNaN(sign.freshnessScore)

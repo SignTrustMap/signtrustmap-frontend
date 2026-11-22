@@ -127,10 +127,7 @@ export function SubmissionEditingBanner({
   return (
     <View style={styles.banner}>
       <View style={styles.bannerLeft}>
-        <MaterialCommunityIcons color={theme.primary} name="pencil" size={16} />
-        <Text style={[styles.bannerText, { color: theme.text }]}>
-          Chọn kết quả thẩm định mới bên dưới
-        </Text>
+        <Text style={[styles.bannerText, { color: theme.text }]}>Chọn kết quả mới bên dưới</Text>
       </View>
       <Pressable
         accessibilityLabel="Hủy sửa kết quả"

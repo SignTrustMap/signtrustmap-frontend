@@ -26,7 +26,7 @@ export function useNavigationSheetGesture({
     : 160 + bottomInset;
   const midSheetHeight = hasPlannedRouteOrigin
     ? Math.min(420, windowHeight * 0.52)
-    : 188 + bottomInset;
+    : 160 + bottomInset;
   const maxSheetHeight = Math.max(midSheetHeight, Math.min(640, windowHeight * 0.82));
 
   const sheetHeightAnim = useRef(new Animated.Value(midSheetHeight)).current;

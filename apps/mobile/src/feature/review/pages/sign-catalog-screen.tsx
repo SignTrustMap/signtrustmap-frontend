@@ -2,21 +2,27 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
 import { ImageInspectionModal } from '@/components/image-inspection-modal';
+import { VirtualList } from '@/components/virtual-list';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useGetCatalog, useRefreshCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
-import {
-  type CatalogSign,
-} from '@/api/reviews/catalog';
+import { type CatalogSign } from '@/api/reviews/catalog';
 import { useTheme } from '@/hooks/use-theme';
 
 type CatalogFilter = 'all' | number;
-
 
 function categoryColor(code: string) {
   const normalized = code.toUpperCase();
@@ -71,10 +77,7 @@ function SignCard({
       accessibilityLabel={`Xem biển báo ${sign.nameVi || sign.nameEn}`}
       accessibilityRole="button"
       onPress={handlePress}
-      style={[
-        styles.card,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-      ]}
+      style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
     >
       <View style={[styles.imageShell, { backgroundColor: theme.neutral }]}>
         {hasValidUrl ? (
@@ -153,7 +156,7 @@ export function SignCatalogScreen() {
           ]}
         >
           <AppButton
-            accessibilityLabel='Quay lại'
+            accessibilityLabel="Quay lại"
             hitSlop={Spacing.one}
             onPress={() => router.back()}
             style={styles.backButton}
@@ -169,109 +172,107 @@ export function SignCatalogScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl
-              colors={[theme.primary]}
-              onRefresh={handleRefresh}
-              refreshing={isRefreshing}
-              tintColor={theme.primary}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          <View
-            style={[
-              styles.searchShell,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
-            <SymbolView
-              name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
-              size={19}
-              tintColor={theme.placeholder}
-            />
-            <TextInput
-              accessibilityLabel="Tìm kiếm biển báo"
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setSearch}
-              placeholder="Tìm kiếm biển báo..."
-              placeholderTextColor={theme.placeholder}
-              returnKeyType="search"
-              style={[styles.searchInput, { color: theme.text }]}
-              value={search}
-            />
-          </View>
+        <View style={styles.container}>
+          <View style={styles.controlsShell}>
+            <View
+              style={[
+                styles.searchShell,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              <SymbolView
+                name={{ android: 'search', ios: 'magnifyingglass', web: 'search' }}
+                size={19}
+                tintColor={theme.placeholder}
+              />
+              <TextInput
+                accessibilityLabel="Tìm kiếm biển báo"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setSearch}
+                placeholder="Tìm kiếm biển báo..."
+                placeholderTextColor={theme.placeholder}
+                returnKeyType="search"
+                style={[styles.searchInput, { color: theme.text }]}
+                value={search}
+              />
+            </View>
 
-          <ScrollView
-            contentContainerStyle={styles.filters}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {[
-              { id: 'all' as const, label: 'Tất cả biển báo' },
-              ...categories.map((c) => ({
-                id: c.id,
-                label: (c as any).nameVi || c.nameEn,
-              })),
-            ].map((category) => {
-              const selected = activeCategory === category.id;
+            <ScrollView
+              contentContainerStyle={styles.filters}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              {[
+                { id: 'all' as const, label: 'Tất cả biển báo' },
+                ...categories.map((c) => ({
+                  id: c.id,
+                  label: (c as any).nameVi || c.nameEn,
+                })),
+              ].map((category) => {
+                const selected = activeCategory === category.id;
 
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  key={category.id}
-                  onPress={() => setActiveCategory(category.id)}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: selected ? theme.primary : theme.backgroundElement,
-                      borderColor: selected ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  <Text
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    key={category.id}
+                    onPress={() => setActiveCategory(category.id)}
                     style={[
-                      styles.filterLabel,
-                      { color: selected ? theme.onPrimary : theme.text },
+                      styles.filterChip,
+                      {
+                        backgroundColor: selected ? theme.primary : theme.backgroundElement,
+                        borderColor: selected ? theme.primary : theme.border,
+                      },
                     ]}
                   >
-                    {category.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                    <Text
+                      style={[styles.filterLabel, { color: selected ? theme.onPrimary : theme.text }]}
+                    >
+                      {category.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
 
-          {isLoading ? (
-            <ActivityIndicator color={theme.primary} size="large" style={styles.loading} />
-          ) : error ? (
-            <View style={styles.emptyState}>
-              <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>Không thể tải danh mục</Text>
-              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>{error}</Text>
-            </View>
-          ) : filteredSigns.length > 0 ? (
-            <View style={styles.grid}>
-              {filteredSigns.map((sign) => (
-                <SignCard
-                  key={sign.id}
-                  onInspect={(url, title, subtitle) => setInspectPhoto({ url, title, subtitle })}
-                  sign={sign}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>Không tìm thấy biển báo</Text>
-              <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>
-                Thử tìm theo tên, mô tả hoặc danh mục khác.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+          <VirtualList<CatalogSign>
+            contentContainerStyle={styles.listContent}
+            data={filteredSigns}
+            emptyDescription="Thử tìm theo tên, mô tả hoặc danh mục khác."
+            emptyTitle="Không tìm thấy biển báo"
+            estimatedItemSize={270}
+            isLoading={isLoading}
+            keyExtractor={(item) => String(item.id)}
+            ListEmptyComponent={
+              error ? (
+                <View style={styles.emptyState}>
+                  <Text accessibilityRole="alert" style={[styles.emptyTitle, { color: theme.text }]}>
+                    Không thể tải danh mục
+                  </Text>
+                  <Text style={[styles.emptyCopy, { color: theme.textSecondary }]}>{error}</Text>
+                </View>
+              ) : undefined
+            }
+            numColumns={2}
+            refreshControl={
+              <RefreshControl
+                colors={[theme.primary]}
+                onRefresh={handleRefresh}
+                refreshing={isRefreshing}
+                tintColor={theme.primary}
+              />
+            }
+            renderItem={({ item }) => (
+              <SignCard
+                onInspect={(url, title, subtitle) => setInspectPhoto({ url, title, subtitle })}
+                sign={item}
+              />
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
       </SafeAreaView>
       {!role || role === 'reviewer' ? <ReviewBottomTabs activeTab="catalog" /> : null}
       <ImageInspectionModal
@@ -305,13 +306,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSpacer: { width: 48 },
-  content: {
+  container: {
+    flex: 1,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
+  },
+  controlsShell: {
     gap: Spacing.two,
-    padding: Spacing.two,
-    paddingBottom: Spacing.four,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.one,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.half,
+    paddingBottom: Spacing.six,
   },
   searchShell: {
     minHeight: 46,
@@ -339,9 +348,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
   },
   filterLabel: { fontFamily: Fonts.body, fontSize: 11, fontWeight: 700 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one },
   card: {
-    width: '48%',
+    flex: 1,
+    margin: Spacing.half,
     minHeight: 262,
     overflow: 'hidden',
     borderWidth: 1,
@@ -362,7 +371,12 @@ const styles = StyleSheet.create({
   },
   signImage: { width: '100%', height: '100%' },
   cardCopy: { gap: Spacing.half, paddingTop: Spacing.one },
-  categoryBadge: { alignSelf: 'flex-start', borderRadius: Rounded.sm, paddingHorizontal: 5, paddingVertical: 2 },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: Rounded.sm,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
   categoryBadgeLabel: { fontFamily: Fonts.body, fontSize: 8, fontWeight: 900, letterSpacing: 0.35 },
   signName: { fontFamily: Fonts.body, fontSize: 15, fontWeight: 800, lineHeight: 20 },
   signDescription: { fontFamily: Fonts.body, fontSize: 11, fontWeight: 500, lineHeight: 15 },

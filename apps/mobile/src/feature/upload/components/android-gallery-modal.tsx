@@ -1,16 +1,18 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -29,6 +31,7 @@ import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { captureTimeFromExif } from '@/feature/upload/utils/selected-asset-gps';
+import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import {
   MAX_SURVEY_IMAGE_SIZE_BYTES,
@@ -41,6 +44,11 @@ import {
 } from '../types/survey-media';
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
+const CAMERA_TILE_ID = '__camera_tile__';
+
+type GalleryGridItem =
+  | { id: typeof CAMERA_TILE_ID; isCamera: true }
+  | (MediaLibraryAsset & { isCamera?: false });
 
 export type AndroidGalleryModalProps = {
   visible: boolean;
@@ -59,6 +67,8 @@ export function AndroidGalleryModal({
 }: AndroidGalleryModalProps) {
   const theme = useTheme();
   const [assets, setAssets] = useState<MediaLibraryAsset[]>([]);
+  const [albums, setAlbums] = useState<LegacyMediaLibrary.Album[]>([]);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string>();
   const [cursor, setCursor] = useState<string>();
   const [hasNextPage, setHasNextPage] = useState(false);
   const [error, setError] = useState<string>();
@@ -66,8 +76,21 @@ export function AndroidGalleryModal({
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const isLoadingRef = useRef(false);
+  const selectedAlbumRef = useRef<string | undefined>(undefined);
 
-  const loadPage = async (after?: string) => {
+  const loadAlbums = async () => {
+    try {
+      const userAlbums = await LegacyMediaLibrary.getAlbumsAsync({
+        includeSmartAlbums: true,
+      });
+      const validAlbums = (userAlbums || []).filter((a) => (a.assetCount ?? 0) > 0);
+      setAlbums(validAlbums);
+    } catch (err) {
+      console.warn('[Surveyor] Unable to load media albums:', err);
+    }
+  };
+
+  const loadPage = async (after?: string, targetAlbum?: string | null) => {
     if (isLoadingRef.current) return;
 
     isLoadingRef.current = true;
@@ -75,12 +98,26 @@ export function AndroidGalleryModal({
     setError(undefined);
 
     try {
-      const page = await LegacyMediaLibrary.getAssetsAsync({
+      // If targetAlbum is passed: null means explicitly "Tất cả", string is a specific album.
+      // If targetAlbum is undefined (e.g. pagination scroll), read from selectedAlbumRef.current.
+      const effectiveAlbum =
+        targetAlbum !== undefined
+          ? targetAlbum === null
+            ? undefined
+            : targetAlbum
+          : selectedAlbumRef.current;
+
+      const options: LegacyMediaLibrary.AssetsOptions = {
         after,
         first: ANDROID_GALLERY_PAGE_SIZE,
         mediaType: [LegacyMediaLibrary.MediaType.photo, LegacyMediaLibrary.MediaType.video],
-        sortBy: [[LegacyMediaLibrary.SortBy.creationTime, false]],
-      });
+        sortBy: [[LegacyMediaLibrary.SortBy.modificationTime, false]],
+      };
+      if (effectiveAlbum) {
+        options.album = effectiveAlbum;
+      }
+
+      const page = await LegacyMediaLibrary.getAssetsAsync(options);
 
       setAssets((currentAssets) =>
         after ? [...currentAssets, ...page.assets] : page.assets,
@@ -102,10 +139,85 @@ export function AndroidGalleryModal({
       setCursor(undefined);
       setHasNextPage(false);
       setError(undefined);
+      selectedAlbumRef.current = undefined;
+      setSelectedAlbumId(undefined);
       setSelectedAssetIds(initialSelectedAssetIds);
-      void loadPage();
+      void loadAlbums();
+      void loadPage(undefined, null);
     }
   }, [visible]);
+
+  const handleSelectAlbum = (albumId?: string) => {
+    if (selectedAlbumRef.current === albumId) return;
+    selectedAlbumRef.current = albumId;
+    setSelectedAlbumId(albumId);
+    setAssets([]);
+    setCursor(undefined);
+    setHasNextPage(false);
+    setError(undefined);
+    void loadPage(undefined, albumId ?? null);
+  };
+
+  const handleLaunchCamera = async () => {
+    if (isProcessing) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setError('Ứng dụng cần quyền camera để chụp ảnh.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.9,
+        exif: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const captured = result.assets[0];
+      let newAsset: MediaLibraryAsset | null = null;
+      try {
+        newAsset = await LegacyMediaLibrary.createAssetAsync(captured.uri);
+      } catch (createErr) {
+        console.warn('[Surveyor] Unable to save captured photo to media library:', createErr);
+      }
+
+      const assetId = newAsset?.id || `camera-${Date.now()}`;
+      const exifCoords = extractImageGpsCoordinates(captured.exif as Record<string, unknown> | undefined);
+
+      const cameraAsset: MediaLibraryAsset = newAsset ?? {
+        id: assetId,
+        filename: captured.fileName || `camera-${Date.now()}.jpg`,
+        mediaType: LegacyMediaLibrary.MediaType.photo,
+        uri: captured.uri,
+        duration: 0,
+        creationTime: Date.now(),
+        modificationTime: Date.now(),
+        width: captured.width,
+        height: captured.height,
+      };
+
+      if (exifCoords) {
+        (cameraAsset as any).location = exifCoords;
+      }
+
+      setAssets((current) => [cameraAsset, ...current]);
+      setSelectedAssetIds((prev) => {
+        if (prev.includes(assetId)) return prev;
+        if (prev.length >= 3) {
+          setError(MAX_UPLOAD_FILES_EXCEEDED_MESSAGE);
+          return prev;
+        }
+        return [...prev, assetId];
+      });
+    } catch (err) {
+      console.warn('[Surveyor] Error capturing camera photo:', err);
+      setError('Không thể mở camera trên thiết bị.');
+    }
+  };
 
   const handleToggleAsset = (assetId: string) => {
     const asset = assets.find((a) => a.id === assetId);
@@ -150,11 +262,21 @@ export function AndroidGalleryModal({
         if (!asset) continue;
 
         try {
-          const assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+          let assetInfo: any;
+          try {
+            assetInfo = await LegacyMediaLibrary.getAssetInfoAsync(asset);
+          } catch {
+            assetInfo = {
+              localUri: asset.uri,
+              location: (asset as any).location,
+              exif: null,
+            };
+          }
+
           const assetType =
             asset.mediaType === LegacyMediaLibrary.MediaType.video ? 'video' : 'image';
 
-          const targetUri = assetInfo.localUri ?? asset.uri;
+          const targetUri = assetInfo?.localUri ?? asset.uri;
           let fileSize = 0;
           if (Platform.OS !== 'web' && targetUri) {
             try {
@@ -174,9 +296,9 @@ export function AndroidGalleryModal({
             continue;
           }
 
-          const exif = assetInfo.exif as Record<string, unknown> | undefined;
+          const exif = assetInfo?.exif as Record<string, unknown> | undefined;
           const exifCoordinates = extractImageGpsCoordinates(exif);
-          let gpsCoordinates = isValidGpsCoordinates(assetInfo.location)
+          let gpsCoordinates = isValidGpsCoordinates(assetInfo?.location)
             ? {
               latitude: assetInfo.location.latitude,
               longitude: assetInfo.location.longitude,
@@ -192,10 +314,17 @@ export function AndroidGalleryModal({
             } catch { }
           }
 
+          const capturedTimestamp =
+            asset.creationTime > 0
+              ? new Date(asset.creationTime).toISOString()
+              : (asset as any).modificationTime > 0
+                ? new Date((asset as any).modificationTime).toISOString()
+                : captureTimeFromExif(exif) || new Date().toISOString();
+
           if (assetType === 'video') {
             const videoMeta = await extractVideoMetadataAsync({
               id: asset.id,
-              uri: assetInfo.localUri ?? asset.uri,
+              uri: targetUri,
               filename: asset.filename,
               duration: asset.duration,
               creationTime: asset.creationTime,
@@ -207,7 +336,7 @@ export function AndroidGalleryModal({
               capturedAt: videoMeta.capturedAt,
               fileName: asset.filename,
               type: 'video',
-              uri: assetInfo.localUri ?? asset.uri,
+              uri: targetUri,
               duration: videoMeta.durationSeconds,
               assetId: asset.id,
               hasEmbeddedGps: videoMeta.hasDeviceGps,
@@ -219,14 +348,27 @@ export function AndroidGalleryModal({
                 : null,
             });
           } else {
+            let finalImageUri = targetUri;
+            let finalImageName = asset.filename;
+            if (targetUri) {
+              try {
+                const compressed = await compressAndResizeSurveyImage(targetUri);
+                if (compressed.uri) {
+                  finalImageUri = compressed.uri;
+                  if (!finalImageName.toLowerCase().endsWith('.jpg') && !finalImageName.toLowerCase().endsWith('.jpeg')) {
+                    finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+                  }
+                }
+              } catch (compErr) {
+                console.warn('[Surveyor] Pre-compression skipped:', compErr);
+              }
+            }
+
             processed.push({
-              capturedAt:
-                asset.creationTime > 0
-                  ? new Date(asset.creationTime).toISOString()
-                  : captureTimeFromExif(exif),
-              fileName: asset.filename,
+              capturedAt: capturedTimestamp,
+              fileName: finalImageName,
               type: 'image',
-              uri: assetInfo.localUri ?? asset.uri,
+              uri: finalImageUri,
               duration: asset.duration,
               assetId: asset.id,
               gps: gpsCoordinates ?? null,
@@ -247,6 +389,10 @@ export function AndroidGalleryModal({
       setIsProcessing(false);
     }
   };
+
+  const gridItems = useMemo<GalleryGridItem[]>(() => {
+    return [{ id: CAMERA_TILE_ID, isCamera: true }, ...assets];
+  }, [assets]);
 
   return (
     <Modal
@@ -286,6 +432,70 @@ export function AndroidGalleryModal({
             />
           </View>
 
+          {/* Album Selector Filter */}
+          <View style={[styles.albumFilterContainer, { borderBottomColor: theme.border }]}>
+            <ScrollView
+              contentContainerStyle={styles.albumFilterList}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+            >
+              <Pressable
+                accessibilityLabel="Tất cả ảnh và video"
+                accessibilityRole="button"
+                onPress={() => handleSelectAlbum(undefined)}
+                style={[
+                  styles.albumPill,
+                  {
+                    backgroundColor: selectedAlbumId === undefined ? theme.primary : theme.backgroundElement,
+                    borderColor: selectedAlbumId === undefined ? theme.primary : theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.albumPillText,
+                    {
+                      color: selectedAlbumId === undefined ? '#FFFFFF' : theme.text,
+                      fontWeight: selectedAlbumId === undefined ? '700' : '500',
+                    },
+                  ]}
+                >
+                  Tất cả
+                </Text>
+              </Pressable>
+              {albums.map((album) => {
+                const isSelected = selectedAlbumId === album.id;
+                return (
+                  <Pressable
+                    accessibilityLabel={`Album ${album.title}`}
+                    accessibilityRole="button"
+                    key={album.id}
+                    onPress={() => handleSelectAlbum(album.id)}
+                    style={[
+                      styles.albumPill,
+                      {
+                        backgroundColor: isSelected ? theme.primary : theme.backgroundElement,
+                        borderColor: isSelected ? theme.primary : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.albumPillText,
+                        {
+                          color: isSelected ? '#FFFFFF' : theme.text,
+                          fontWeight: isSelected ? '700' : '500',
+                        },
+                      ]}
+                    >
+                      {album.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
           {error ? (
             <Text accessibilityRole="alert" style={styles.galleryErrorText}>
               {error}
@@ -293,24 +503,21 @@ export function AndroidGalleryModal({
           ) : null}
 
           <FlatList
-            contentContainerStyle={
-              assets.length === 0 ? styles.galleryEmptyContent : styles.galleryGrid
-            }
-            data={assets}
-            keyExtractor={(asset) => asset.id}
-            ListEmptyComponent={
-              <View style={styles.galleryEmptyState}>
-                {isLoading ? (
-                  <ActivityIndicator color={theme.primary} size="large" />
-                ) : null}
-                <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
-                  {isLoading ? 'Đang tải tệp phương tiện…' : 'Không tìm thấy ảnh hoặc video nào'}
-                </Text>
-              </View>
-            }
+            contentContainerStyle={styles.galleryGrid}
+            data={gridItems}
+            keyExtractor={(item) => item.id}
             ListFooterComponent={
               hasNextPage ? (
                 <ActivityIndicator color={theme.primary} style={styles.galleryFooterLoader} />
+              ) : assets.length === 0 ? (
+                <View style={styles.galleryEmptyState}>
+                  {isLoading ? (
+                    <ActivityIndicator color={theme.primary} size="large" />
+                  ) : null}
+                  <Text style={[styles.galleryEmptyText, { color: theme.textSecondary }]}>
+                    {isLoading ? 'Đang tải tệp phương tiện…' : 'Không tìm thấy ảnh hoặc video nào'}
+                  </Text>
+                </View>
               ) : null
             }
             numColumns={3}
@@ -321,6 +528,41 @@ export function AndroidGalleryModal({
             }}
             onEndReachedThreshold={0.5}
             renderItem={({ item }) => {
+              if ('isCamera' in item && item.isCamera) {
+                return (
+                  <Pressable
+                    accessibilityLabel="Chụp ảnh mới"
+                    accessibilityRole="button"
+                    disabled={isProcessing}
+                    onPress={handleLaunchCamera}
+                    style={({ pressed }) => [
+                      styles.galleryItem,
+                      { opacity: pressed ? 0.75 : 1 },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.cameraTileContent,
+                        {
+                          backgroundColor: theme.backgroundElement,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.cameraIconCircle,
+                          { backgroundColor: theme.primary + '18' },
+                        ]}
+                      >
+                        <MaterialCommunityIcons color={theme.primary} name="camera" size={24} />
+                      </View>
+                      <Text style={[styles.cameraTileText, { color: theme.text }]}>Chụp ảnh</Text>
+                    </View>
+                  </Pressable>
+                );
+              }
+
               const isSelected = selectedAssetIds.includes(item.id);
               const isVideo = item.mediaType === LegacyMediaLibrary.MediaType.video;
 
@@ -445,6 +687,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
   },
+  albumFilterContainer: {
+    paddingVertical: Spacing.one,
+    borderBottomWidth: 1,
+  },
+  albumFilterList: {
+    paddingHorizontal: Spacing.three,
+    gap: Spacing.one,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  albumPill: {
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 6,
+    borderRadius: Rounded.round,
+    borderWidth: 1,
+  },
+  albumPillText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+  },
   galleryErrorText: {
     color: '#B42318',
     fontFamily: Fonts.body,
@@ -477,6 +739,30 @@ const styles = StyleSheet.create({
     width: '33.3333%',
     aspectRatio: 1,
     padding: Spacing.half,
+  },
+  cameraTileContent: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Rounded.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.half,
+  },
+  cameraIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  cameraTileText: {
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   galleryImage: {
     width: '100%',
