@@ -602,13 +602,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const session = optionalSession?.session;
   const [resolvedAddress, setResolvedAddress] = useState<string>();
 
-  const candidateDetailsResult =
-    typeof useGetCandidateSignDetails === 'function'
-      ? useGetCandidateSignDetails(
-          submission?.id ? { candidateId: submission.id } : undefined,
-          Boolean(submission?.id),
-        )
-      : undefined;
+  const candidateDetailsResult = useGetCandidateSignDetails(
+    submission?.id ? { candidateId: submission.id } : undefined,
+    Boolean(submission?.id),
+  );
   const candidateDetails = candidateDetailsResult?.data;
 
   const currentCoordinate = useMemo(() => {
