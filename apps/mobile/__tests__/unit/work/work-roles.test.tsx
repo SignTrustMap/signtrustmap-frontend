@@ -459,7 +459,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByTestId('credit-balance-card')).toBeTruthy();
       expect(getByText('1.250')).toBeTruthy();
       fireEvent.press(getByTestId('credit-balance-card'));
-      expect(mockPush).toHaveBeenCalledWith('/credits/history');
+      expect(mockPush).toHaveBeenCalledWith('/credits/top-up');
       expect(getByText('Lịch sử di chuyển')).toBeTruthy();
       expect(queryByText('Thẩm định chờ xử lý')).toBeNull();
       expect(queryByText('Tái xác nhận biển báo')).toBeNull();
