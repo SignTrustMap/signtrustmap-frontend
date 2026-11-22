@@ -92,7 +92,31 @@ class MarkdownReporter {
     let coverageSummary = null;
     let fileCoverageList = [];
 
-    if (results.coverageMap && typeof results.coverageMap.getCoverageSummary === 'function') {
+    // Prefer coverage/coverage-summary.json if it exists on disk, as it holds the complete merged report from istanbul
+    const jsonSummaryPath = path.resolve(process.cwd(), 'coverage/coverage-summary.json');
+    if (fs.existsSync(jsonSummaryPath)) {
+      try {
+        const jsonCov = JSON.parse(fs.readFileSync(jsonSummaryPath, 'utf8'));
+        if (jsonCov.total) {
+          coverageSummary = jsonCov.total;
+          fileCoverageList = Object.keys(jsonCov)
+            .filter((k) => k !== 'total')
+            .map((file) => {
+              const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
+              return {
+                file: relPath,
+                statements: jsonCov[file].statements,
+                branches: jsonCov[file].branches,
+                functions: jsonCov[file].functions,
+                lines: jsonCov[file].lines,
+                uncoveredLines: [],
+              };
+            });
+        }
+      } catch {}
+    }
+
+    if (!coverageSummary && results.coverageMap && typeof results.coverageMap.getCoverageSummary === 'function') {
       coverageSummary = results.coverageMap.getCoverageSummary();
       const files = results.coverageMap.files();
       fileCoverageList = files.map((file) => {
@@ -109,30 +133,6 @@ class MarkdownReporter {
           uncoveredLines,
         };
       });
-    } else {
-      // Fallback: check if coverage/coverage-summary.json exists on disk
-      const jsonSummaryPath = path.resolve(process.cwd(), 'coverage/coverage-summary.json');
-      if (fs.existsSync(jsonSummaryPath)) {
-        try {
-          const jsonCov = JSON.parse(fs.readFileSync(jsonSummaryPath, 'utf8'));
-          if (jsonCov.total) {
-            coverageSummary = jsonCov.total;
-            fileCoverageList = Object.keys(jsonCov)
-              .filter((k) => k !== 'total')
-              .map((file) => {
-                const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
-                return {
-                  file: relPath,
-                  statements: jsonCov[file].statements,
-                  branches: jsonCov[file].branches,
-                  functions: jsonCov[file].functions,
-                  lines: jsonCov[file].lines,
-                  uncoveredLines: [],
-                };
-              });
-          }
-        } catch {}
-      }
     }
 
     if (coverageSummary) {

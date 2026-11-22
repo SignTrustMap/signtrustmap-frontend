@@ -118,6 +118,18 @@ export function useGetReviewHistory(enabled = true) {
   });
 }
 
+/** Load raw review history with timestamps and vote values for history review & editing. */
+export function useGetMyRawReviewHistory(enabled = true) {
+  const { session } = useSession();
+  const params: MyReviewHistoryParams = { page: '1', pageSize: '100' };
+  return useQuery({
+    queryKey: ['my-raw-review-history', session?.account?.id],
+    queryFn: session ? ({ signal }) => getMyReviewHistory(params, session.accessToken, signal) : skipToken,
+    enabled,
+    staleTime: 15_000,
+  });
+}
+
 export function useGetCatalog(enabled = true) {
   const { session } = useSession();
   return useQuery({

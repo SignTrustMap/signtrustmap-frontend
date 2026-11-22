@@ -65,6 +65,7 @@ describe('DateFilterSortList UI Component Unit Tests', () => {
       <DateFilterSortList
         items={mockList}
         getDate={(item) => item.date}
+        showCountBadge
       >
         {({ items }) => (
           <FlatList

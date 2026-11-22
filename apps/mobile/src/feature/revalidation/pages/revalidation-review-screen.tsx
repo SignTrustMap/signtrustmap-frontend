@@ -30,7 +30,7 @@ import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
-import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { extractCoordinateFromCandidate, resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
@@ -47,6 +47,7 @@ import {
   useRevalidationWorkflow,
 } from '../context/revalidation-workflow-provider';
 import { useResponsive } from '@/utils/responsive';
+import { useReviewerSignNavigation } from '@/feature/review/hooks/use-reviewer-sign-navigation';
 
 export type RevalidationReviewAction =
   | 'STILL_ACTIVE'
@@ -570,6 +571,8 @@ export function RevalidationReviewScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { isSmallDevice, height: windowHeight } = useResponsive();
+
+  const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -1268,8 +1271,33 @@ export function RevalidationReviewScreen() {
               <AppButton
                 accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
                 accessibilityLabel="Di chuyển đến vị trí biển báo"
+                disabled={isNavigatingToSign}
                 onPress={() => {
-                  // Placeholder: di chuyển đến vị trí biển báo (sẽ implement sau)
+                  if (currentItem) {
+                    const coord =
+                      extractCoordinateFromCandidate(currentItem.evidence) ??
+                      extractCoordinateFromCandidate(currentItem.verifiedSign) ??
+                      extractCoordinateFromCandidate(currentItem);
+
+                    void navigateToSign({
+                      latitude:
+                        coord.latitude ??
+                        currentItem.evidence?.latitude ??
+                        (currentItem.verifiedSign as any)?.latitude ??
+                        (currentItem as any)?.latitude,
+                      longitude:
+                        coord.longitude ??
+                        currentItem.evidence?.longitude ??
+                        (currentItem.verifiedSign as any)?.longitude ??
+                        (currentItem as any)?.longitude,
+                      title:
+                        currentItem.verifiedSign?.nameVi ||
+                        currentItem.verifiedSign?.signCode ||
+                        'Biển báo tái xác thực',
+                      subtitle: currentItem.verifiedSign?.signCode,
+                      signId: currentItem.evidenceId || currentItem.taskId,
+                    });
+                  }
                 }}
                 style={[
                   styles.summaryShortcutButton,
@@ -1283,7 +1311,7 @@ export function RevalidationReviewScreen() {
                 <View style={styles.locationButtonContent}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={15} />
                   <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
-                    Vị trí biển báo
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
                   </Text>
                 </View>
               </AppButton>

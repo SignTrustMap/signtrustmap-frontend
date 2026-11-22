@@ -23,10 +23,7 @@ export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoo
  * Calculates the great-circle distance between two [longitude, latitude] coordinates in meters
  * using the Haversine formula.
  */
-export function calculateDistanceMeters(
-  coord1: MapCoordinate,
-  coord2: MapCoordinate,
-): number {
+export function calculateDistanceMeters(coord1: MapCoordinate, coord2: MapCoordinate): number {
   const [lon1, lat1] = coord1;
   const [lon2, lat2] = coord2;
 
@@ -36,10 +33,7 @@ export function calculateDistanceMeters(
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-    Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -60,10 +54,7 @@ export function isWithinDistance(
 /**
  * Calculates the forward bearing (azimuth) from coord1 to coord2 in degrees [0, 360).
  */
-export function calculateBearing(
-  coord1: MapCoordinate,
-  coord2: MapCoordinate,
-): number {
+export function calculateBearing(coord1: MapCoordinate, coord2: MapCoordinate): number {
   const [lon1, lat1] = coord1;
   const [lon2, lat2] = coord2;
 
@@ -76,8 +67,7 @@ export function calculateBearing(
 
   const y = Math.sin(dLon) * Math.cos(lat2Rad);
   const x =
-    Math.cos(lat1Rad) * Math.sin(lat2Rad) -
-    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+    Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
 
   const bearing = (toDeg(Math.atan2(y, x)) + 360) % 360;
   return Math.round(bearing);
@@ -125,18 +115,12 @@ export function getRouteForwardBearing(
   }
 
   if (closestIndex < routeCoordinates.length - 1) {
-    return calculateBearing(
-      routeCoordinates[closestIndex],
-      routeCoordinates[closestIndex + 1],
-    );
+    return calculateBearing(routeCoordinates[closestIndex], routeCoordinates[closestIndex + 1]);
   }
 
   // If near the end of the route, use the final segment's bearing
   if (closestIndex > 0) {
-    return calculateBearing(
-      routeCoordinates[closestIndex - 1],
-      routeCoordinates[closestIndex],
-    );
+    return calculateBearing(routeCoordinates[closestIndex - 1], routeCoordinates[closestIndex]);
   }
 
   return 0;

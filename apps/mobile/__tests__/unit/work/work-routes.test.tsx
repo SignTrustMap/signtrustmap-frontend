@@ -21,6 +21,11 @@ jest.mock('expo-router', () => ({
     const { View, Text } = require('react-native');
     return React.createElement(View, { testID: 'slot' }, React.createElement(Text, null, 'Slot Content'));
   },
+  Redirect: ({ href }: any) => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return React.createElement(Text, { testID: 'redirect' }, `Redirect to ${href}`);
+  },
 }));
 
 jest.mock('@/feature/review/pages/sign-catalog-screen', () => ({
@@ -291,8 +296,8 @@ describe('Work Tab Route Components', () => {
 
     it('renders submission-summary.tsx correctly', async () => {
       const { getByTestId, getByText } = await render(<SubmissionSummaryRoute />);
-      expect(getByTestId('submission-summary-screen')).toBeTruthy();
-      expect(getByText('Submission Summary Screen')).toBeTruthy();
+      expect(getByTestId('redirect')).toBeTruthy();
+      expect(getByText('Redirect to /work/reviewer-history')).toBeTruthy();
     });
 
     it('renders survey-finish.tsx correctly with upload_submission type', async () => {

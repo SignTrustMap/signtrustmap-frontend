@@ -83,6 +83,7 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
     isPending: false,
     error: null,
   }),
+  useGetCandidateSignDetails: () => ({ data: undefined }),
 }));
 
 import type { ReviewSubmission } from '@/api/reviews/review-workflow';

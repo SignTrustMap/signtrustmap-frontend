@@ -109,6 +109,7 @@ jest.mock('@/hooks/use-theme', () => ({
 }));
 
 import { SignFilterManager } from '@/feature/profile/components/sign-filter-manager';
+import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 
 describe('SignFilterManager Component', () => {
   afterEach(async () => {
@@ -285,5 +286,126 @@ describe('SignFilterManager Component', () => {
 
     expect(getByText('Tên danh sách không được để trống.')).toBeTruthy();
     expect(mockRenamePreset).not.toHaveBeenCalled();
+  });
+
+  it('selects "Tất cả biển báo (Không lọc)" and resets active preset', async () => {
+    const { getByText } = await render(<SignFilterManager />);
+
+    const noFilter = getByText('Tất cả biển báo (Không lọc)');
+    await act(async () => {
+      fireEvent.press(noFilter);
+    });
+
+    expect(mockSetActivePresetId).toHaveBeenCalledWith(null);
+  });
+
+  it('handles GPS errors in editor for start and destination', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    // GPS returns null
+    (fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce(null);
+
+    const { getByText, getByLabelText } = await render(<SignFilterManager />);
+
+    await act(async () => {
+      fireEvent.press(getByText('Thêm mới'));
+    });
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chọn vị trí hiện tại cho điểm bắt đầu'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Không thể xác định vị trí', expect.any(String));
+
+    // GPS throws error
+    (fetchFreshGpsPosition as jest.Mock).mockRejectedValueOnce(new Error('GPS error'));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chọn vị trí hiện tại cho điểm đến'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Lỗi GPS', expect.any(String));
+
+    alertSpy.mockRestore();
+  });
+
+  it('allows selecting suggestions, vehicle modes, and validates destination in editor', async () => {
+    const { getByText, getByPlaceholderText, getByLabelText } = await render(<SignFilterManager />);
+
+    await act(async () => {
+      fireEvent.press(getByText('Thêm mới'));
+    });
+
+    // Start suggestion
+    const startInput = getByPlaceholderText('Tìm kiếm điểm xuất phát...');
+    await act(async () => {
+      fireEvent(startInput, 'focus');
+      fireEvent.changeText(startInput, 'Địa điểm');
+    });
+
+    const startSug = getByText('Địa điểm A');
+    await act(async () => {
+      fireEvent.press(startSug);
+    });
+
+    // Validate without destination
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+    expect(getByText('Vui lòng chọn Điểm đến (nhập tìm kiếm hoặc chọn Vị trí hiện tại).')).toBeTruthy();
+
+    // Destination suggestion
+    const destInput = getByPlaceholderText('Tìm kiếm điểm đến...');
+    await act(async () => {
+      fireEvent(destInput, 'focus');
+      fireEvent.changeText(destInput, 'Địa điểm');
+    });
+
+    const destSug = getByText('Địa điểm A');
+    await act(async () => {
+      fireEvent.press(destSug);
+    });
+
+    // Switch vehicle modes
+    await act(async () => {
+      fireEvent.press(getByText('Xe đạp'));
+    });
+    await act(async () => {
+      fireEvent.press(getByText('Đi bộ'));
+    });
+    await act(async () => {
+      fireEvent.press(getByText('Xe máy'));
+    });
+
+    // Save
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+
+    expect(mockCreatePreset).toHaveBeenCalledWith(
+      'Địa điểm A ➔ Địa điểm A',
+      expect.any(Array),
+      expect.objectContaining({
+        vehicleMode: 'MOTORCYCLE',
+      }),
+    );
+  });
+
+  it('prevents deselecting the last category in editor', async () => {
+    const { getAllByText, getByLabelText, getByText } = await render(<SignFilterManager />);
+
+    const editButtons = getAllByText('Bộ lọc');
+    await act(async () => {
+      fireEvent.press(editButtons[0]);
+    });
+
+    // Deselect MANDATORY
+    await act(async () => {
+      fireEvent.press(getByLabelText('Biển Biển hiệu lệnh, đã bao gồm'));
+    });
+
+    // Deselect WARNING
+    await act(async () => {
+      fireEvent.press(getByLabelText('Biển Biển cảnh báo, đã bao gồm'));
+    });
+
+    expect(getByText('Danh sách phải bao gồm ít nhất một danh mục biển báo.')).toBeTruthy();
   });
 });

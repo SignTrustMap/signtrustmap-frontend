@@ -8,15 +8,17 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 // 1. Mock expo-router
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  replace: mockReplace,
+  canGoBack: () => true,
+  back: jest.fn(),
+};
 jest.mock('expo-router', () => {
   const React = require('react');
   return {
-    useRouter: jest.fn(() => ({
-      push: mockPush,
-      replace: mockReplace,
-      canGoBack: () => true,
-      back: jest.fn(),
-    })),
+    useRouter: jest.fn(() => mockRouter),
+    router: mockRouter,
     useLocalSearchParams: jest.fn(),
     useFocusEffect: (cb: any) => {
       React.useEffect(() => {

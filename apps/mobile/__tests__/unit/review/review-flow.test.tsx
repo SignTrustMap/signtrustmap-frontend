@@ -110,6 +110,7 @@ jest.mock('@/context/session-provider', () => ({
 const mockInvalidateWalletAndStats = jest.fn();
 jest.mock('@/feature/credits/hooks/use-wallet', () => ({
   useInvalidateWalletAndStats: () => mockInvalidateWalletAndStats,
+  useGetWallet: () => ({ data: { wallet: { balance: 1250 } }, isLoading: false }),
 }));
 
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
@@ -271,6 +272,7 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
   useReportMissingType: () => ({
     mutateAsync: jest.fn().mockResolvedValue({ success: true }),
   }),
+  useGetCandidateSignDetails: () => ({ data: undefined }),
   useSkipSign: () => ({
     mutateAsync: mockSkipSign,
   }),
@@ -756,7 +758,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
   // CASE 9: Queue Completion & Navigation to Summary
   // =========================================================================
   describe('Case 9: Queue Completion & Navigation to Summary', () => {
-    it('automatically transitions to /work/submission-summary when reviewing the final card in queue', async () => {
+    it('displays completion state when reviewing the final card in queue and navigates to reviewer history', async () => {
       mockQueueSubmissions = [defaultCandidate1];
       mockQueueTotal = 1;
 
@@ -773,8 +775,11 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       await fireEvent.press(getByLabelText('Approve submission'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/work/submission-summary');
+        expect(getByText('All reviews completed')).toBeTruthy();
       });
+
+      fireEvent.press(getByText('Lịch sử thẩm định'));
+      expect(mockReplace).toHaveBeenCalledWith('/work/reviewer-history');
     });
 
     it('renders "All reviews completed" with a "View Summary" button when queue is finished', async () => {

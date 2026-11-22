@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -454,7 +455,6 @@ export function InspectRevalidateScreen() {
   const handleLaunchCamera = async () => {
     setPickerError(undefined);
     try {
-      const ImagePicker = await import('expo-image-picker');
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
         setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
@@ -521,7 +521,6 @@ export function InspectRevalidateScreen() {
         return;
       }
 
-      const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
         exif: true,

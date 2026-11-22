@@ -121,6 +121,7 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
   useCastVoteOnSignCandidate: () => ({
     mutateAsync: mockCastVote,
   }),
+  useGetCandidateSignDetails: () => ({ data: undefined }),
   useReportSignCandidate: () => ({
     mutateAsync: mockReportCandidate,
   }),
@@ -270,12 +271,9 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       expect(skipButton).toBeTruthy();
       expect(skipButton.props.accessibilityState?.disabled).toBe(false);
 
-      // Pressing it navigates to summary screen with resumeIndex = '1'
+      // Pressing it navigates to reviewer history screen
       fireEvent.press(skipButton);
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/work/submission-summary',
-        params: { resumeIndex: '1' },
-      });
+      expect(mockReplace).toHaveBeenCalledWith('/work/reviewer-history');
     });
   });
 
@@ -729,9 +727,7 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       });
 
       expect(mockKeepCurrentReviewAndNext).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ pathname: '/work/submission-summary' }),
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/work/reviewer-history');
     });
   });
 });

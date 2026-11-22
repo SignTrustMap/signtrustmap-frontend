@@ -230,6 +230,7 @@ export function RevalidationSignDetailsCard({
 
   return (
     <Animated.View
+      testID="revalidation-sign-details-card"
       onLayout={(e) => onCardHeightChange?.(e.nativeEvent.layout.height)}
       onStartShouldSetResponder={() => true}
       onTouchEnd={(e) => e.stopPropagation()}
@@ -245,7 +246,7 @@ export function RevalidationSignDetailsCard({
       ]}
     >
       {/* Draggable Top Handle */}
-      <View {...panResponder.panHandlers} style={styles.dragHandleBar}>
+      <View testID="revalidation-drag-handle" {...panResponder.panHandlers} style={styles.dragHandleBar}>
         <View style={styles.dragPill} />
       </View>
 

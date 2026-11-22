@@ -47,7 +47,30 @@ jest.mock('expo-image-picker', () => ({
 }));
 
 jest.mock('expo-media-library/legacy', () => ({
-  getAssetsAsync: jest.fn(),
+  getAssetsAsync: jest.fn(() =>
+    Promise.resolve({
+      assets: [
+        {
+          id: 'asset-1',
+          uri: 'file:///data/gallery-pic.jpg',
+          filename: 'gallery-pic.jpg',
+          mediaType: 'photo',
+          creationTime: 1700000000000,
+        },
+      ],
+      endCursor: null,
+      hasNextPage: false,
+    }),
+  ),
+  getAssetInfoAsync: jest.fn((asset) =>
+    Promise.resolve({
+      id: asset.id,
+      uri: asset.uri,
+      localUri: asset.uri,
+      filename: asset.filename,
+      location: { latitude: 10.7769, longitude: 106.7009 },
+    }),
+  ),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
   MediaType: { photo: 'photo', video: 'video' },
   SortBy: { creationTime: 'creationTime' },
@@ -198,7 +221,12 @@ describe('InspectRevalidateScreen', () => {
   });
 
   it('fetches fresh GPS position when user requests current location stamp', async () => {
-    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.701, 10.777]);
+    (navigationGps.fetchFreshGpsLocation as jest.Mock).mockResolvedValueOnce({
+      latitude: 10.7769,
+      longitude: 106.7009,
+      accuracy: 5,
+      heading: 0,
+    });
 
     const { getByLabelText } = await render(<InspectRevalidateScreen />);
 
@@ -207,7 +235,7 @@ describe('InspectRevalidateScreen', () => {
       fireEvent.press(gpsStampBtn);
     });
 
-    expect(navigationGps.fetchFreshGpsPosition).toHaveBeenCalled();
+    expect(navigationGps.fetchFreshGpsLocation).toHaveBeenCalled();
   });
 
   it('disables submit button when no evidence media has been selected', async () => {
@@ -219,7 +247,12 @@ describe('InspectRevalidateScreen', () => {
 
   it('displays proximity distance and prevents submit when location is too far (> 50m)', async () => {
     // 10.7900, 106.7009 is ~1.4km away (> 50m)
-    (navigationGps.fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce([106.7009, 10.79]);
+    (navigationGps.fetchFreshGpsLocation as jest.Mock).mockResolvedValueOnce({
+      latitude: 10.79,
+      longitude: 106.7009,
+      accuracy: 5,
+      heading: 0,
+    });
 
     const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
 
@@ -237,37 +270,133 @@ describe('InspectRevalidateScreen', () => {
   });
 
   it('downsizes captured photo before submitting revalidation evidence', async () => {
+    const { Platform } = require('react-native');
+    const originalOS = Platform.OS;
+    Platform.OS = 'android';
+
+    try {
+      const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
+
+      // 1. Select status option (e.g. STILL_ACTIVE)
+      const activeOption = getByLabelText('Vẫn hoạt động');
+      await act(async () => {
+        fireEvent.press(activeOption);
+      });
+
+      // 2. Open Android gallery modal
+      const pickBtn = getByLabelText(/Chọn ảnh từ thư viện/i);
+      await act(async () => {
+        fireEvent.press(pickBtn);
+      });
+
+      // 3. Tap camera tile inside gallery modal
+      const cameraBtn = getByLabelText('Mở máy ảnh');
+      await act(async () => {
+        fireEvent.press(cameraBtn);
+      });
+
+      // Verify compressAndResizeSurveyImage was invoked on raw camera URI
+      const surveyImageUtils = require('@/feature/upload/utils/survey-image');
+      expect(surveyImageUtils.compressAndResizeSurveyImage).toHaveBeenCalledWith('file:///data/camera-raw.jpg');
+
+      // 4. Submit evidence
+      const submitBtn = getByText('Gửi bằng chứng tái thẩm định');
+      await act(async () => {
+        fireEvent.press(submitBtn);
+      });
+
+      expect(mockSubmitRevalidation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskIdOrSignId: 'task-55',
+          data: expect.objectContaining({
+            confirmedSignId: 'sign-101',
+            evidenceType: 'STILL_ACTIVE',
+          }),
+          mediaFile: expect.objectContaining({
+            fileName: 'camera-raw.jpg',
+          }),
+        }),
+      );
+    } finally {
+      Platform.OS = originalOS;
+    }
+  });
+
+  it('handles GPS errors and displays message when acquiring live location', async () => {
+    (navigationGps.fetchFreshGpsLocation as jest.Mock).mockResolvedValueOnce(null);
+
     const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
 
-    // 1. Select status option (e.g. STILL_ACTIVE)
-    const activeOption = getByLabelText('Vẫn hoạt động');
+    const gpsStampBtn = getByLabelText('Sử dụng GPS thiết bị hiện tại');
     await act(async () => {
-      fireEvent.press(activeOption);
+      fireEvent.press(gpsStampBtn);
     });
 
-    // 2. Open camera to snap photo
-    const cameraBtn = getByLabelText('Mở máy ảnh');
+    expect(getByText(/Không thể lấy tọa độ GPS hiện tại/i)).toBeTruthy();
+
+    // Now test rejection
+    (navigationGps.fetchFreshGpsLocation as jest.Mock).mockRejectedValueOnce(new Error('GPS Timeout'));
     await act(async () => {
-      fireEvent.press(cameraBtn);
+      fireEvent.press(gpsStampBtn);
     });
 
-    // Verify compressAndResizeSurveyImage was invoked on raw camera URI
-    const surveyImageUtils = require('@/feature/upload/utils/survey-image');
-    expect(surveyImageUtils.compressAndResizeSurveyImage).toHaveBeenCalledWith('file:///data/camera-raw.jpg');
+    expect(getByText(/Không thể lấy vị trí GPS hiện tại/i)).toBeTruthy();
+  });
 
-    // 3. Submit evidence
-    const submitBtn = getByText('Gửi kết quả tái thẩm định');
-    await act(async () => {
-      fireEvent.press(submitBtn);
-    });
+  it('shows permission error when media library permission is denied', async () => {
+    const LegacyMediaLibrary = require('expo-media-library/legacy');
+    (LegacyMediaLibrary.requestPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'denied' });
 
-    expect(mockSubmitRevalidation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        taskIdOrSignId: 'task-55',
-        mediaFile: expect.objectContaining({
-          uri: 'file:///data/camera-raw.jpg-downsized.jpg',
-        }),
-      }),
-    );
+    const { Platform } = require('react-native');
+    const originalOS = Platform.OS;
+    Platform.OS = 'android';
+
+    try {
+      const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
+
+      const pickBtn = getByLabelText(/Chọn ảnh từ thư viện/i);
+      await act(async () => {
+        fireEvent.press(pickBtn);
+      });
+
+      expect(getByText(/Cần cấp quyền truy cập thư viện phương tiện để chọn ảnh/i)).toBeTruthy();
+    } finally {
+      Platform.OS = originalOS;
+    }
+  });
+
+  it('handles submitRevalidation rejection and displays submit error', async () => {
+    mockSubmitRevalidation.mockRejectedValueOnce(new Error('Network error 500'));
+
+    const { Platform } = require('react-native');
+    const originalOS = Platform.OS;
+    Platform.OS = 'android';
+
+    try {
+      const { getByLabelText, getByText } = await render(<InspectRevalidateScreen />);
+
+      // Select status option
+      await act(async () => {
+        fireEvent.press(getByLabelText('Vẫn hoạt động'));
+      });
+
+      // Open Android gallery modal and tap camera
+      await act(async () => {
+        fireEvent.press(getByLabelText(/Chọn ảnh từ thư viện/i));
+      });
+      await act(async () => {
+        fireEvent.press(getByLabelText('Mở máy ảnh'));
+      });
+
+      // Submit
+      await act(async () => {
+        fireEvent.press(getByText('Gửi bằng chứng tái thẩm định'));
+      });
+
+      expect(mockSubmitRevalidation).toHaveBeenCalled();
+      expect(getByText('Network error 500')).toBeTruthy();
+    } finally {
+      Platform.OS = originalOS;
+    }
   });
 });

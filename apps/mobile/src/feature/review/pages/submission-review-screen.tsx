@@ -26,8 +26,10 @@ import {
 } from '@/feature/review/context/review-workflow-provider';
 import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal';
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
-import { useGetCatalog } from '@/feature/review/hooks/use-review';
-import { resolveS3Url, type RemedySign, type ReviewSubmission } from '@/api/reviews/review-workflow';
+import { useGetCatalog, useGetCandidateSignDetails } from '@/feature/review/hooks/use-review';
+import { getCandidateSignDetails } from '@/api/reviews/review';
+import { useReviewerSignNavigation } from '@/feature/review/hooks/use-reviewer-sign-navigation';
+import { extractCoordinateFromCandidate, resolveS3Url, type RemedySign, type ReviewSubmission } from '@/api/reviews/review-workflow';
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
@@ -551,6 +553,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     undoLastReview,
   } = useReviewWorkflow();
 
+  const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+
   useEffect(() => {
     if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
       const idx = parseInt(resumeIndexParam, 10);
@@ -562,21 +566,15 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
   const handleSkipToSummary = useCallback(() => {
     cancelSubmissionCheck?.();
-    router.replace({
-      pathname: '/work/submission-summary',
-      params: { resumeIndex: String(reviewHistory.length) },
-    });
-  }, [cancelSubmissionCheck, reviewHistory.length, router]);
+    router.replace('/work/reviewer-history');
+  }, [cancelSubmissionCheck, router]);
 
   const handleKeepCurrentReview = useCallback(() => {
     const completes = keepCurrentReviewAndNext?.() ?? true;
     if (completes) {
-      router.replace({
-        pathname: '/work/submission-summary',
-        params: { resumeIndex: String(reviewHistory.length) },
-      });
+      router.replace('/work/reviewer-history');
     }
-  }, [keepCurrentReviewAndNext, reviewHistory.length, router]);
+  }, [keepCurrentReviewAndNext, router]);
 
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
@@ -604,6 +602,28 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const session = optionalSession?.session;
   const [resolvedAddress, setResolvedAddress] = useState<string>();
 
+  const candidateDetailsResult =
+    typeof useGetCandidateSignDetails === 'function'
+      ? useGetCandidateSignDetails(
+          submission?.id ? { candidateId: submission.id } : undefined,
+          Boolean(submission?.id),
+        )
+      : undefined;
+  const candidateDetails = candidateDetailsResult?.data;
+
+  const currentCoordinate = useMemo(() => {
+    if (!submission) return { latitude: null, longitude: null };
+    const fromSubmission = extractCoordinateFromCandidate(submission);
+    if (fromSubmission.latitude != null && fromSubmission.longitude != null) {
+      return fromSubmission;
+    }
+    const fromDetails = extractCoordinateFromCandidate(candidateDetails);
+    if (fromDetails.latitude != null && fromDetails.longitude != null) {
+      return fromDetails;
+    }
+    return { latitude: null, longitude: null };
+  }, [submission, candidateDetails]);
+
   const displayedReviewAction =
     (submission as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
     recheckingPreviousAction;
@@ -625,8 +645,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       return;
     }
 
-    const lat = submission.latitude;
-    const lon = submission.longitude;
+    const detailsLocation = (candidateDetails as any)?.locationContext?.displayLocation;
+    if (detailsLocation && detailsLocation !== 'Estimated GPS coordinates available') {
+      setResolvedAddress(detailsLocation.replace(/^[•\s,.-]+/, '').trim());
+      return;
+    }
+
+    const lat = currentCoordinate.latitude;
+    const lon = currentCoordinate.longitude;
     if (lat == null || lon == null) {
       setResolvedAddress(undefined);
       return;
@@ -652,15 +678,53 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     return () => {
       isMounted = false;
     };
-  }, [submission?.id, submission?.location, submission?.latitude, submission?.longitude, session?.accessToken]);
+  }, [submission?.id, submission?.location, candidateDetails, currentCoordinate.latitude, currentCoordinate.longitude, session?.accessToken]);
 
   const displayLocation = useMemo(() => {
     if (resolvedAddress) return resolvedAddress;
+    const detailsLoc = (candidateDetails as any)?.locationContext?.displayLocation;
+    if (detailsLoc && detailsLoc !== 'Estimated GPS coordinates available') {
+      return detailsLoc;
+    }
     if (submission?.location && submission.location !== 'Estimated GPS coordinates available') {
       return submission.location;
     }
+    if (currentCoordinate.latitude != null && currentCoordinate.longitude != null) {
+      return `${currentCoordinate.latitude.toFixed(4)}, ${currentCoordinate.longitude.toFixed(4)}`;
+    }
     return '';
-  }, [resolvedAddress, submission?.location]);
+  }, [resolvedAddress, candidateDetails, submission?.location, currentCoordinate.latitude, currentCoordinate.longitude]);
+
+  const handleNavigateToSignLocation = useCallback(async () => {
+    if (!submission) return;
+
+    let lat = currentCoordinate.latitude;
+    let lon = currentCoordinate.longitude;
+
+    if ((lat == null || lon == null) && session?.accessToken && submission.id) {
+      try {
+        const freshDetails = await getCandidateSignDetails(
+          { candidateId: submission.id },
+          session.accessToken,
+        );
+        const fromFresh = extractCoordinateFromCandidate(freshDetails);
+        if (fromFresh.latitude != null && fromFresh.longitude != null) {
+          lat = fromFresh.latitude;
+          lon = fromFresh.longitude;
+        }
+      } catch {
+        // ignore and fallback to Alert
+      }
+    }
+
+    void navigateToSign({
+      latitude: lat,
+      longitude: lon,
+      title: submission.title,
+      subtitle: displayLocation,
+      signId: submission.id,
+    });
+  }, [submission, currentCoordinate.latitude, currentCoordinate.longitude, session?.accessToken, displayLocation, navigateToSign]);
 
   const totalInQueue = Math.max(
     totalSubmissions,
@@ -763,11 +827,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         tone: action === 'approved' || action === 'reported_new_sign' ? 'success' : 'default',
       }));
 
-      if (completesReviewQueue) {
-        router.replace('/work/submission-summary');
+      if (isRecheckMode) {
+        router.replace('/work/reviewer-history');
       }
     },
-    [completeCurrentReview, pendingSubmissions.length, router, submission],
+    [completeCurrentReview, isRecheckMode, pendingSubmissions.length, router, submission],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -1207,9 +1271,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <AppButton
                 accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
                 accessibilityLabel="Di chuyển đến vị trí biển báo"
-                onPress={() => {
-                  // Placeholder: di chuyển đến vị trí biển báo (sẽ implement sau)
-                }}
+                disabled={isNavigatingToSign}
+                onPress={handleNavigateToSignLocation}
                 style={[
                   styles.summaryShortcutButton,
                   {
@@ -1222,7 +1285,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 <View style={styles.locationButtonContent}>
                   <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={15} />
                   <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
-                    Vị trí biển báo
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
                   </Text>
                 </View>
               </AppButton>
@@ -1389,13 +1452,18 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
               Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.
             </Text>
-            {reviewHistory.length > 0 ? (
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <AppButton
-                label="Xem tổng kết"
-                onPress={() => router.replace('/work/submission-summary')}
-                style={styles.completeSummaryButton}
+                label="Lịch sử thẩm định"
+                onPress={() => router.replace('/work/reviewer-history')}
+                variant="primary"
               />
-            ) : null}
+              <AppButton
+                label="Trang làm việc"
+                onPress={() => router.replace('/work')}
+                variant="surface"
+              />
+            </View>
           </View>
         )}
       </SafeAreaView>

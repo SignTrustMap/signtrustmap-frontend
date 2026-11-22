@@ -330,6 +330,13 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       });
     });
 
+    it('navigates to reviewer-history when pressing history badge', async () => {
+      const { getByText } = await render(<ReviewerWork />);
+
+      fireEvent.press(getByText('Lịch sử thẩm định'));
+      expect(mockPush).toHaveBeenCalledWith('/work/reviewer-history');
+    });
+
     it('guards reviewer queries with isReviewer check', async () => {
       mockSessionUser = { id: 'driver-only', roles: ['driver'] };
       await render(<ReviewerWork />);

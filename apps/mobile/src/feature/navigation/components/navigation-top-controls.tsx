@@ -39,6 +39,7 @@ export function NavigationTopControls({
   walletBalance,
   onSearchPress,
   onTopUpPress,
+  onNotificationsPress,
   onChangeDestinationPress,
   onSwapRoutePress,
 }: NavigationTopControlsProps) {
@@ -196,7 +197,7 @@ export function NavigationTopControls({
               </View>
               <AppButton
                 accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
-                onPress={() => router.push('/notifications')}
+                onPress={onNotificationsPress ?? (() => router.push('/notifications'))}
                 style={[
                   styles.mapActionButton,
                   styles.locationActionButton,

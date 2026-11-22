@@ -85,6 +85,16 @@ export function ReviewerWork({
             label="Tái thẩm định cần duyệt"
             onPress={() => router.push('/work/revalidation-review')}
           />
+
+          {/* Action Badge: Review History & Edit Votes */}
+          <WorkActionBadge
+            accessibilityLabel="Lịch sử thẩm định và sửa vote trong ngày"
+            accentColor={theme.primary}
+            icon="clipboard-edit-outline"
+            label="Lịch sử thẩm định"
+            onPress={() => router.push('/work/reviewer-history')}
+            testID="reviewer-work-history-badge"
+          />
         </View>
       </View>
 

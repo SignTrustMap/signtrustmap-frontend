@@ -51,7 +51,7 @@ describe('Review API Module', () => {
       );
 
       expect(apiClient.apiRequest).toHaveBeenCalledWith(
-        expect.stringMatching(/\/reviews\/me\/history\?page=1&pageSize=10&state=approved/),
+        expect.stringMatching(/\/reviews\/me\/history\?page=1&pageSize=10&status=approved/),
         { signal: undefined },
         mockToken,
       );

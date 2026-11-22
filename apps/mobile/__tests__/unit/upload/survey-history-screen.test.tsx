@@ -57,6 +57,7 @@ jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
   return {
     MaterialCommunityIcons: (props: any) => <View testID={`mc-icon-${props.name}`} {...props} />,
+    Ionicons: (props: any) => <View testID={`ion-icon-${props.name}`} {...props} />,
   };
 });
 
@@ -205,7 +206,7 @@ describe('SurveyHistoryScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/work/survey-submission-details',
-      params: { id: 'sub-comp-1' },
+      params: { id: 'sub-failed-3' },
     });
   });
 

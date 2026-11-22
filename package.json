@@ -29,7 +29,7 @@
     "ci": "npm run lint:web && npm run build:web && npm run lint:ops && npm run build:ops && npm run lint:mobile && npm run typecheck:mobile",
     "test": "jest --watchAll",
     "test:ci": "jest --watchAll=false --coverage",
-    "test:unit:ci": "jest apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/work/work-roles.test.tsx apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx apps/mobile/__tests__/unit/navigation/spatial.test.ts apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx --watchAll=false --runInBand --forceExit --coverage",
+    "test:unit:ci": "jest apps/mobile/__tests__/unit --watchAll=false --runInBand --forceExit --coverage",
     "test:coverage": "jest --coverage --watchAll=false",
     "test:integration": "jest apps/mobile/__tests__/intergration --watchAll=false --coverage",
     "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui apps/mobile/__tests__/unit/work apps/mobile/__tests__/unit/revalidation apps/mobile/__tests__/unit/credits apps/mobile/__tests__/unit/auth apps/mobile/__tests__/unit/splash --watchAll=false --runInBand --forceExit --coverage",
@@ -78,7 +78,9 @@
     "collectCoverageFrom": [
       "apps/mobile/src/**/*.{ts,tsx}",
       "!apps/mobile/src/**/*.d.ts",
-      "!apps/mobile/src/**/__mocks__/**"
+      "!apps/mobile/src/**/__mocks__/**",
+      "!apps/mobile/src/app/**",
+      "!apps/mobile/src/types/**"
     ],
     "transform": {
       "^.+\\.(js|jsx|ts|tsx|mjs)$": "babel-jest",

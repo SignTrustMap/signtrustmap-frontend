@@ -24,6 +24,10 @@ jest.mock('@expo/vector-icons/AntDesign', () => {
   return (props: any) => <View testID={`ant-icon-${props.name}`} />;
 });
 
+jest.mock('@/feature/notifications/hooks/use-notifications', () => ({
+  useGetUnreadNotificationCount: () => ({ data: 0 }),
+}));
+
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
     background: '#FFFFFF',

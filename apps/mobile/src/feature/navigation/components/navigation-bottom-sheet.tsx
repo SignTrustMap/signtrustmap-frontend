@@ -64,6 +64,7 @@ export interface NavigationBottomSheetProps {
   visibleSigns: RouteSign[];
   isStartingNavigation: boolean;
   isStartDisabled?: boolean;
+  isFreeNavigation?: boolean;
   isRouteBookmarked: boolean;
   onBeginNavigation: () => void;
   onOpenBookmarkModal: () => void;
@@ -112,6 +113,7 @@ export function NavigationBottomSheet({
   visibleSigns,
   isStartingNavigation,
   isStartDisabled = false,
+  isFreeNavigation = false,
   isRouteBookmarked,
   onBeginNavigation,
   onOpenBookmarkModal,
@@ -760,7 +762,28 @@ export function NavigationBottomSheet({
 
           {/* Bottom Button Row */}
           {!isNavigating ? (
-            <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
+            <View style={{ width: '100%' }}>
+              {isFreeNavigation ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    paddingVertical: 4,
+                    paddingHorizontal: 8,
+                    marginBottom: 6,
+                    backgroundColor: 'rgba(22, 163, 74, 0.12)',
+                    borderRadius: 8,
+                  }}
+                >
+                  <MaterialCommunityIcons name="shield-check" size={16} color="#16A34A" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>
+                    Thẩm định viên • Điều hướng miễn phí (0 credits)
+                  </Text>
+                </View>
+              ) : null}
+              <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
               <AppButton
                 accessibilityLabel={
                   isStartDisabled
@@ -800,6 +823,7 @@ export function NavigationBottomSheet({
                   color={isRouteBookmarked ? theme.primary : '#666666'}
                 />
               </AppButton>
+            </View>
             </View>
           ) : (
             <SafeAreaView

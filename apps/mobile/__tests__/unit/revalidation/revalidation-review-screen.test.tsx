@@ -87,6 +87,14 @@ jest.mock('@/feature/credits/hooks/use-wallet', () => ({
   useInvalidateWalletAndStats: () => jest.fn(),
 }));
 
+const mockNavigateToSign = jest.fn();
+jest.mock('@/feature/review/hooks/use-reviewer-sign-navigation', () => ({
+  useReviewerSignNavigation: () => ({
+    navigateToSign: mockNavigateToSign,
+    isNavigatingToSign: false,
+  }),
+}));
+
 describe('RevalidationReviewScreen', () => {
   const mockRouter = {
     back: jest.fn(),
@@ -311,7 +319,7 @@ describe('RevalidationReviewScreen', () => {
     expect(getByLabelText('Từ chối kết luận của điều tra viên')).toBeTruthy();
     expect(getByLabelText('Bỏ qua minh chứng này')).toBeTruthy();
     expect(getByLabelText('Báo cáo minh chứng này')).toBeTruthy();
-    expect(getByText('Chọn kết quả thẩm định mới bên dưới')).toBeTruthy();
+    expect(getByText('Chọn kết quả mới bên dưới')).toBeTruthy();
   });
 
   it('displays voted result card for a SKIPPED evidence during recheck, and keeping it restores workflow', async () => {
@@ -471,5 +479,67 @@ describe('RevalidationReviewScreen', () => {
     });
 
     expect(mockRouter.replace).toHaveBeenCalled();
+  });
+
+  it('triggers navigateToSign when pressing "Vị trí biển báo" button', async () => {
+    const { getByTestId } = await render(<RevalidationReviewScreen />);
+
+    const moveBtn = getByTestId('reval-move-to-sign-location-button');
+    await act(async () => {
+      fireEvent.press(moveBtn);
+    });
+
+    expect(mockNavigateToSign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.any(String),
+      }),
+    );
+  });
+
+  it('declines with REMOVED action in decline modal', async () => {
+    const mockWorkflow = createMockWorkflow();
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+
+    const { getByLabelText, getByText } = await render(<RevalidationReviewScreen />);
+
+    const declineBtn = getByLabelText('Từ chối kết luận của điều tra viên');
+    await act(async () => {
+      fireEvent.press(declineBtn);
+    });
+
+    const removedRadio = getByText('Biển báo đã bị gỡ bỏ');
+    await act(async () => {
+      fireEvent.press(removedRadio);
+    });
+
+    const confirmBtn = getByText('Xác nhận từ chối');
+    await act(async () => {
+      fireEvent.press(confirmBtn);
+    });
+
+    expect(mockWorkflow.handleVote).toHaveBeenCalledWith('REMOVED', undefined, undefined, 'DECLINE');
+  });
+
+  it('opens and closes swipe gesture help modal', async () => {
+    const { getByText, queryByText, getByLabelText } = await render(<RevalidationReviewScreen />);
+
+    expect(queryByText('Hướng dẫn quẹt thẻ')).toBeNull();
+
+    // Open help modal
+    const helpBtn = getByLabelText('Hướng dẫn thao tác quẹt');
+    await act(async () => {
+      fireEvent.press(helpBtn);
+    });
+
+    expect(getByText('Hướng dẫn quẹt thẻ')).toBeTruthy();
+    expect(getByText('Quẹt sang PHẢI: Đồng ý')).toBeTruthy();
+
+    // Close help modal
+    const closeBtn = getByText('Đã hiểu');
+    await act(async () => {
+      fireEvent.press(closeBtn);
+    });
+
+    expect(queryByText('Hướng dẫn quẹt thẻ')).toBeNull();
   });
 });

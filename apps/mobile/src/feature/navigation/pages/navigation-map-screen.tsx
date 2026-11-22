@@ -92,6 +92,7 @@ export function NavigationMapScreen() {
     destinationLng,
     destinationSubtitle,
     destinationTitle,
+    isFreeNavigation,
     savedRouteId: paramSavedRouteId,
     startId,
     startLat,
@@ -104,6 +105,7 @@ export function NavigationMapScreen() {
     destinationLng?: string;
     destinationSubtitle?: string;
     destinationTitle?: string;
+    isFreeNavigation?: string;
     savedRouteId?: string;
     startId?: string;
     startLat?: string;
@@ -111,6 +113,8 @@ export function NavigationMapScreen() {
     startTitle?: string;
     vehicleMode?: string;
   }>();
+
+  const isFreeReviewerNavigation = isFreeNavigation === 'true';
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
@@ -506,17 +510,17 @@ export function NavigationMapScreen() {
     selectedDestination &&
     activeRouteResult?.coordinates?.length,
   );
-  const hasInsufficientCredits = isRoutePreviewReady && userCredits < 5;
+  const hasInsufficientCredits = !isFreeReviewerNavigation && isRoutePreviewReady && userCredits < 5;
 
   useEffect(() => {
     if (activeRouteResult?.coordinates?.length && !isNavigating) {
-      if (userCredits < 5) {
+      if (!isFreeReviewerNavigation && userCredits < 5) {
         setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       } else {
         setNavigationError(undefined);
       }
     }
-  }, [activeRouteResult?.coordinates, isNavigating, userCredits]);
+  }, [activeRouteResult?.coordinates, isFreeReviewerNavigation, isNavigating, userCredits]);
 
   useEffect(() => {
     setNavigationActive(isNavigating);
@@ -910,7 +914,7 @@ export function NavigationMapScreen() {
       return;
     }
 
-    if (userCredits < 5) {
+    if (!isFreeReviewerNavigation && userCredits < 5) {
       setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       setLocationToast({
         id: Date.now(),
@@ -933,7 +937,7 @@ export function NavigationMapScreen() {
         return;
       }
 
-      if (session?.accessToken) {
+      if (session?.accessToken && !isFreeReviewerNavigation) {
         try {
           await initiateSessionMutation.mutateAsync({
             origin: {
@@ -1406,6 +1410,7 @@ export function NavigationMapScreen() {
         visibleSigns={visibleSigns}
         isStartingNavigation={isStartingNavigation}
         isStartDisabled={hasInsufficientCredits}
+        isFreeNavigation={isFreeReviewerNavigation}
         isRouteBookmarked={isRouteBookmarked}
         onBeginNavigation={handleBeginNavigation}
         onOpenBookmarkModal={() => setIsBookmarkModalOpen(true)}

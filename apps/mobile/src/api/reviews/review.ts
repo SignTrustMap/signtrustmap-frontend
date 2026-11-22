@@ -26,7 +26,8 @@ export function getMyReviewHistory(
     page: params.page,
     pageSize: params.pageSize,
   });
-  if (params.state !== undefined) queryParams.set('status', params.state);
+  const statusValue = params.status ?? params.state;
+  if (statusValue !== undefined) queryParams.set('status', statusValue);
   if (params.search !== undefined) queryParams.set('search', params.search);
   if (params.surveyorId !== undefined) queryParams.set('surveyorId', params.surveyorId);
 
