@@ -27,9 +27,9 @@ jest.mock('expo-image', () => ({
 }));
 
 describe('isVoteEditable Business Rule', () => {
-  const today = new Date('2026-11-22T12:00:00Z');
+  const referenceTime = new Date('2026-11-22T12:00:00Z');
 
-  it('allows editing when vote is today and candidate status is PENDING', () => {
+  it('allows editing when vote is within 24 hours and candidate status is PENDING', () => {
     const record: ReviewHistoryRecord = {
       candidateId: 'cand-1',
       candidate: {
@@ -42,10 +42,26 @@ describe('isVoteEditable Business Rule', () => {
       vote: 1,
     };
 
-    expect(isVoteEditable(record, today)).toBe(true);
+    expect(isVoteEditable(record, referenceTime)).toBe(true);
   });
 
-  it('allows editing when candidate status is unset/undefined and vote is today', () => {
+  it('allows editing across midnight boundary as long as within 24 hours', () => {
+    const record: ReviewHistoryRecord = {
+      candidateId: 'cand-midnight',
+      candidate: {
+        id: 'cand-midnight',
+        createdAt: '2026-11-21T23:00:00Z',
+        submissionId: 'sub-midnight',
+        status: 'PENDING',
+      },
+      reviewedAt: '2026-11-21T23:30:00Z',
+      vote: 1,
+    };
+
+    expect(isVoteEditable(record, referenceTime)).toBe(true);
+  });
+
+  it('allows editing when candidate status is unset/undefined and vote is within 24 hours', () => {
     const record: ReviewHistoryRecord = {
       candidateId: 'cand-2',
       candidate: {
@@ -57,7 +73,7 @@ describe('isVoteEditable Business Rule', () => {
       vote: 2,
     };
 
-    expect(isVoteEditable(record, today)).toBe(true);
+    expect(isVoteEditable(record, referenceTime)).toBe(true);
   });
 
   it('forbids editing when candidate status is already published/approved', () => {
@@ -73,10 +89,10 @@ describe('isVoteEditable Business Rule', () => {
       vote: 1,
     };
 
-    expect(isVoteEditable(record, today)).toBe(false);
+    expect(isVoteEditable(record, referenceTime)).toBe(false);
   });
 
-  it('forbids editing when candidate was voted on a previous day (outside today time limit)', () => {
+  it('forbids editing when candidate was voted more than 24 hours ago (outside 24h time limit)', () => {
     const record: ReviewHistoryRecord = {
       candidateId: 'cand-4',
       candidate: {
@@ -89,7 +105,7 @@ describe('isVoteEditable Business Rule', () => {
       vote: 1,
     };
 
-    expect(isVoteEditable(record, today)).toBe(false);
+    expect(isVoteEditable(record, referenceTime)).toBe(false);
   });
 });
 

@@ -19,6 +19,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useBackButton } from '@/hooks/use-back-button';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { useDebounce } from '@/hooks/use-debounce';
 import { SearchSuggestionSkeleton } from '@/components/skeleton';
 import { searchPlaces, type ApiPlace } from '@/api/navigation/places';
@@ -66,6 +68,8 @@ export function RevalidationMapScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<RevalidationMapParams>();
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   // Pre-parse signJson if supplied for instant first-frame snapping & display
   const initialSign = useMemo<RouteSign | null>(() => {
@@ -460,7 +464,7 @@ export function RevalidationMapScreen() {
       ? undefined
       : allRevalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id) ||
       revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
-    const resolvedTaskId = sign.taskId || matchedTask?.id || '';
+    const resolvedTaskId = sign.taskId || matchedTask?.id || sign.id || '';
 
     router.replace({
       pathname: '/work/inspect-revalidate',
@@ -508,7 +512,7 @@ export function RevalidationMapScreen() {
             accessibilityLabel="Quay lại Công việc"
             accessibilityRole="button"
             hitSlop={8}
-            onPress={() => router.back()}
+            onPress={() => router.replace(surveyorWorkRoute)}
             style={[
               styles.backCircleButton,
               {

@@ -56,19 +56,23 @@ jest.mock('@/api/spatial/spatial', () => ({
   resolveLocation: jest.fn(),
 }));
 
-jest.mock('@/api/survey-submission/survey-submission', () => ({
-  createSurveySubmission: jest.fn().mockResolvedValue({ id: 'sub-created-1' }),
-  submitSurveySubmission: jest.fn().mockResolvedValue({ success: true }),
-  updateSurveySubmission: jest.fn().mockResolvedValue({ success: true }),
-  initializeSurveyUpload: jest.fn().mockResolvedValue({ sessionId: 'session-1' }),
-  uploadSurveyChunk: jest.fn().mockResolvedValue({ success: true }),
-  completeSurveyUpload: jest.fn().mockResolvedValue({ success: true }),
-  getMySubmissions: jest.fn().mockResolvedValue({ items: [], total: 0 }),
-  getMyPendingSubmissions: jest.fn().mockResolvedValue([]),
-  getMySurveyStats: jest.fn().mockResolvedValue({ totalSubmissions: 5 }),
-  getSurveySubmissionStatus: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
-  getSurveyUploadSession: jest.fn().mockResolvedValue({ sessionId: 'sess-1' }),
-}));
+jest.mock('@/api/survey-submission/survey-submission', () => {
+  const actual = jest.requireActual('@/api/survey-submission/survey-submission');
+  return {
+    ...actual,
+    createSurveySubmission: jest.fn().mockResolvedValue({ id: 'sub-created-1' }),
+    submitSurveySubmission: jest.fn().mockResolvedValue({ success: true }),
+    updateSurveySubmission: jest.fn().mockResolvedValue({ success: true }),
+    initializeSurveyUpload: jest.fn().mockResolvedValue({ sessionId: 'session-1' }),
+    uploadSurveyChunk: jest.fn().mockResolvedValue({ success: true }),
+    completeSurveyUpload: jest.fn().mockResolvedValue({ success: true }),
+    getMySubmissions: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+    getMyPendingSubmissions: jest.fn().mockResolvedValue([]),
+    getMySurveyStats: jest.fn().mockResolvedValue({ totalSubmissions: 5 }),
+    getSurveySubmissionStatus: jest.fn().mockResolvedValue({ status: 'COMPLETED' }),
+    getSurveyUploadSession: jest.fn().mockResolvedValue({ sessionId: 'sess-1' }),
+  };
+});
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');

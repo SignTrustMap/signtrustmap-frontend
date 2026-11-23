@@ -8,7 +8,9 @@ import { AppButton } from '@/components/button';
 import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { VirtualList } from '@/components/virtual-list';
 import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { useGetMyRawReviewHistory } from '@/feature/review/hooks/use-review';
 import { useReviewWorkflow } from '@/feature/review/context/review-workflow-provider';
 import {
@@ -20,6 +22,8 @@ import {
 export function ReviewerHistoryScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const reviewerWorkRoute = useWorkRoute('/work', { currentRole: 'reviewer' });
+  useBackButton(reviewerWorkRoute);
   const { data: historyData, isLoading, refetch } = useGetMyRawReviewHistory(true);
   const { loadSubmissionForEdit } = useReviewWorkflow();
 
@@ -48,19 +52,22 @@ export function ReviewerHistoryScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: theme.background }]}>
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.screen, { backgroundColor: theme.background }]}
+    >
       {/* Top Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <AppButton
           accessibilityHint="Quay lại màn hình làm việc"
           accessibilityLabel="Quay lại"
           hitSlop={Spacing.one}
-          onPress={() => router.back()}
+          onPress={() => router.replace(reviewerWorkRoute)}
           style={styles.backButton}
           testID="btn-back-reviewer-history"
           variant="ghost"
         >
-          <Ionicons color={theme.text} name="arrow-back" size={24} />
+          <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
         </AppButton>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Lịch sử thẩm định</Text>
         <AppButton
@@ -72,48 +79,50 @@ export function ReviewerHistoryScreen() {
           testID="btn-refresh-reviewer-history"
           variant="ghost"
         >
-          <Ionicons color={theme.text} name="reload" size={20} />
+          <MaterialCommunityIcons color={theme.text} name="reload" size={20} />
         </AppButton>
       </View>
 
       {/* Info Notice Banner */}
-      <View style={[styles.noticeBanner, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.noticeBanner,
+          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        ]}
+      >
         <MaterialCommunityIcons color={theme.primary} name="information-outline" size={18} />
         <Text style={[styles.noticeText, { color: theme.textSecondary }]}>
-          Chỉ cho phép sửa vote đối với biển báo <Text style={{ fontWeight: '700', color: theme.text }}>chưa công bố (Pending)</Text> và được vote trong <Text style={{ fontWeight: '700', color: theme.text }}>ngày hôm nay</Text>.
+          Chỉ cho phép sửa vote đối với biển báo{' '}
+          <Text style={{ fontWeight: '700', color: theme.text }}>chưa công bố</Text> và trong thời
+          hạn <Text style={{ fontWeight: '700', color: theme.text }}>24 giờ</Text>.
         </Text>
       </View>
 
       {/* Date Filter & Virtual List */}
-      <DateFilterSortList<ReviewHistoryRecord>
-        getDate={(record) => record.reviewedAt}
-        headerTitle="Lọc theo ngày vote"
-        items={rawRecords}
-      >
-        {({ filteredCount, items: filteredRecords }) => (
-          <View style={styles.listContainer}>
-            <View style={styles.listSubheader}>
-              <Text style={[styles.countText, { color: theme.textSecondary }]}>
-                Hiển thị {filteredCount} bản ghi
-                {editableTodayCount > 0 ? ` (${editableTodayCount} có thể sửa hôm nay)` : ''}
-              </Text>
+      <View style={{ paddingHorizontal: Spacing.two, flex: 1 }}>
+        <DateFilterSortList<ReviewHistoryRecord>
+          getDate={(record) => record.reviewedAt}
+          headerTitle="Lọc theo ngày vote"
+          items={rawRecords}
+        >
+          {({ filteredCount, items: filteredRecords }) => (
+            <View style={styles.listContainer}>
+              <VirtualList<ReviewHistoryRecord>
+                contentContainerStyle={styles.listContent}
+                data={filteredRecords}
+                emptyDescription="Không tìm thấy bản ghi thẩm định nào trong khoảng thời gian đã chọn."
+                emptyTitle="Chưa có dữ liệu"
+                estimatedItemSize={120}
+                isLoading={isLoading}
+                keyExtractor={(item) => item.candidateId}
+                renderItem={({ item }) => (
+                  <ReviewHistoryItemCard onEdit={handleEditRecord} record={item} />
+                )}
+              />
             </View>
-
-            <VirtualList<ReviewHistoryRecord>
-              contentContainerStyle={styles.listContent}
-              data={filteredRecords}
-              emptyDescription="Không tìm thấy bản ghi thẩm định nào trong khoảng thời gian đã chọn."
-              emptyTitle="Chưa có dữ liệu"
-              estimatedItemSize={120}
-              isLoading={isLoading}
-              keyExtractor={(item) => item.candidateId}
-              renderItem={({ item }) => (
-                <ReviewHistoryItemCard onEdit={handleEditRecord} record={item} />
-              )}
-            />
-          </View>
-        )}
-      </DateFilterSortList>
+          )}
+        </DateFilterSortList>
+      </View>
     </SafeAreaView>
   );
 }
@@ -177,7 +186,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
-    paddingHorizontal: Spacing.two,
     paddingBottom: Spacing.four,
   },
 });

@@ -237,6 +237,7 @@ describe('useReviewerSignNavigation & extractCoordinateFromCandidate', () => {
           destinationTitle: 'Biển báo P.102',
           destinationSubtitle: 'Đường Nguyễn Huệ',
           isFreeNavigation: 'true',
+          returnToReviewer: 'true',
         },
       });
     });
@@ -277,6 +278,7 @@ describe('useReviewerSignNavigation & extractCoordinateFromCandidate', () => {
           destinationTitle: 'Biển báo P.102',
           destinationSubtitle: 'Vị trí biển báo khảo sát',
           isFreeNavigation: 'false',
+          returnToReviewer: 'true',
         },
       });
     });

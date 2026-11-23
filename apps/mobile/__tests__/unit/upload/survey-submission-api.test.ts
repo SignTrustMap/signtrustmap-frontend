@@ -67,14 +67,16 @@ describe('Survey Submission API Module', () => {
   });
 
   describe('updateSurveySubmission', () => {
-    it('sends PATCH to /submissions/:id with update payload', async () => {
+    const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+
+    it('sends PATCH to /submissions/:id with update payload for valid UUID', async () => {
       const dto = { title: 'Đoạn đường QL1A - Đã chỉnh sửa' };
       (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ success: true });
 
-      const res = await updateSurveySubmission('sub-101', dto as any, mockToken);
+      const res = await updateSurveySubmission(validUuid, dto as any, mockToken);
 
       expect(apiClient.apiRequest).toHaveBeenCalledWith(
-        '/submissions/sub-101',
+        `/submissions/${validUuid}`,
         expect.objectContaining({
           method: 'PATCH',
           body: JSON.stringify(dto),
@@ -82,6 +84,14 @@ describe('Survey Submission API Module', () => {
         mockToken,
       );
       expect((res as any).success).toBe(true);
+    });
+
+    it('returns mock response without calling apiRequest for non-UUID', async () => {
+      const dto = { note: 'Bổ sung thông tin' };
+      const res = await updateSurveySubmission('mock-returned-sub-001', dto as any, mockToken);
+      expect(apiClient.apiRequest).not.toHaveBeenCalled();
+      expect((res as any).id).toBe('mock-returned-sub-001');
+      expect((res as any).status).toBe('PENDING_CORRECTION');
     });
   });
 
@@ -190,17 +200,24 @@ describe('Survey Submission API Module', () => {
       expect((res as any).complete).toBe(true);
     });
 
-    it('sends POST to finalize and submit survey', async () => {
+    it('sends POST to finalize and submit survey for valid UUID', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
       (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ status: 'PROCESSING' });
 
-      const res = await submitSurveySubmission('sub-1', mockToken);
+      const res = await submitSurveySubmission(validUuid, mockToken);
 
       expect(apiClient.apiRequest).toHaveBeenCalledWith(
-        '/submissions/sub-1/submit',
+        `/submissions/${validUuid}/submit`,
         { method: 'POST', signal: undefined },
         mockToken,
       );
       expect((res as any).status).toBe('PROCESSING');
+    });
+
+    it('returns mock response without calling apiRequest for non-UUID', async () => {
+      const res = await submitSurveySubmission('mock-sub-1', mockToken);
+      expect(apiClient.apiRequest).not.toHaveBeenCalled();
+      expect((res as any).status).toBe('SUBMITTED');
     });
   });
 
@@ -244,17 +261,25 @@ describe('Survey Submission API Module', () => {
       expect(res).toEqual(stats);
     });
 
-    it('fetches submission status', async () => {
+    it('fetches submission status for valid UUID', async () => {
+      const validUuid = '123e4567-e89b-12d3-a456-426614174000';
       (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ status: 'APPROVED' });
 
-      const res = await getSurveySubmissionStatus('sub-99', mockToken);
+      const res = await getSurveySubmissionStatus(validUuid, mockToken);
 
       expect(apiClient.apiRequest).toHaveBeenCalledWith(
-        '/submissions/status/sub-99',
+        `/submissions/status/${validUuid}`,
         { signal: undefined },
         mockToken,
       );
       expect((res as any).status).toBe('APPROVED');
+    });
+
+    it('returns mock response without calling apiRequest for non-UUID', async () => {
+      const res = await getSurveySubmissionStatus('mock-sub-99', mockToken);
+      expect(apiClient.apiRequest).not.toHaveBeenCalled();
+      expect(res.submission.id).toBe('mock-sub-99');
+      expect(res.submission.status).toBe('PENDING_CORRECTION');
     });
 
     it('fetches upload session info', async () => {

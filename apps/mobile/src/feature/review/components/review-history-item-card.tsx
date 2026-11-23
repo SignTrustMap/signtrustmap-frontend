@@ -18,19 +18,23 @@ export interface ReviewHistoryRecord {
   vote: number; // 1 = approved, 2 = declined, 3 = reported, 4 = skipped
 }
 
+/**
+ * Review vote retract/edit time limit constant matching Backend Consensus Settlement:
+ * 24 hours (86,400,000 ms) from the time the review was cast.
+ */
+export const REVIEW_VOTE_TIME_LIMIT_MS = 24 * 60 * 60 * 1000;
+
 export function isVoteEditable(record: ReviewHistoryRecord, referenceDate = new Date()): boolean {
   if (!record.reviewedAt) return false;
 
   const reviewDate = new Date(record.reviewedAt);
   if (Number.isNaN(reviewDate.getTime())) return false;
 
-  // 1. Time limit: Must be same day as referenceDate
-  const isToday =
-    reviewDate.getFullYear() === referenceDate.getFullYear() &&
-    reviewDate.getMonth() === referenceDate.getMonth() &&
-    reviewDate.getDate() === referenceDate.getDate();
-
-  if (!isToday) return false;
+  // 1. Time limit: Must be within 24 hours from review timestamp
+  const diffMs = referenceDate.getTime() - reviewDate.getTime();
+  if (diffMs < -60000 || diffMs > REVIEW_VOTE_TIME_LIMIT_MS) {
+    return false;
+  }
 
   // 2. Candidate must NOT be published / finalized (status must be PENDING or unset)
   const status = record.candidate?.status?.toUpperCase();

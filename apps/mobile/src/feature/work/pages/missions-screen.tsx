@@ -25,7 +25,9 @@ import {
   useGetMyMissions,
   useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import type {
   DailyTask,
   DailyTaskCompletion,
@@ -68,6 +70,8 @@ interface MissionsScreenProps {
 export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) {
   const router = useRouter();
   const theme = useTheme();
+  const targetWorkRoute = useWorkRoute('/work', { currentRole: initialRole });
+  useBackButton(targetWorkRoute);
 
   const [activeTab, setActiveTab] = useState<MissionTabType>('daily');
 
@@ -315,7 +319,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
         <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
           <AppButton
             accessibilityLabel="Quay lại trang Công việc"
-            onPress={() => router.back()}
+            onPress={() => router.replace(targetWorkRoute)}
             pressedOpacity={0.6}
             style={styles.backButton}
             variant="ghost"

@@ -30,7 +30,8 @@ jest.mock('@/feature/upload/utils/survey-image', () => ({
 }));
 
 jest.mock('expo-image-picker', () => ({
-  requestCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+  getCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true })),
+  requestCameraPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true })),
   launchCameraAsync: jest.fn(() =>
     Promise.resolve({
       canceled: false,
@@ -121,6 +122,7 @@ jest.mock('@/hooks/use-theme', () => ({
 
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
   useSubmitRevalidation: jest.fn(),
+  useGetAllRevalidationTasks: jest.fn().mockReturnValue({ data: [] }),
 }));
 
 jest.mock('@/feature/navigation/utils/gps', () => ({

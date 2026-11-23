@@ -20,7 +20,9 @@ import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useGetCatalog, useRefreshCatalog } from '@/feature/review/hooks/use-review';
 import { ReviewBottomTabs } from '@/feature/review/components/review-bottom-tabs';
 import { type CatalogSign } from '@/api/reviews/catalog';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 
 type CatalogFilter = 'all' | number;
 
@@ -111,6 +113,9 @@ export function SignCatalogScreen() {
   const router = useRouter();
   const theme = useTheme();
   const { role } = useLocalSearchParams<{ role?: string }>();
+  const targetRole = role === 'surveyor' || role === 'reviewer' ? role : 'driver';
+  const targetWorkRoute = useWorkRoute('/work', { currentRole: targetRole });
+  useBackButton(targetWorkRoute);
 
   const [activeCategory, setActiveCategory] = useState<CatalogFilter>('all');
   const [search, setSearch] = useState('');
@@ -158,7 +163,7 @@ export function SignCatalogScreen() {
           <AppButton
             accessibilityLabel="Quay lại"
             hitSlop={Spacing.one}
-            onPress={() => router.back()}
+            onPress={() => router.replace(targetWorkRoute)}
             style={styles.backButton}
             variant="ghost"
           >

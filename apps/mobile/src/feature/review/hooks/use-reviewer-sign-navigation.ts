@@ -23,6 +23,22 @@ export function isWithinReviewerRadius(
   return calculateDistanceMeters(userCoord, signCoord) <= radiusMeters;
 }
 
+function showAlert(
+  title: string,
+  message?: string,
+  buttons?: Parameters<typeof Alert.alert>[2],
+) {
+  if (typeof Alert !== 'undefined' && Alert && typeof Alert.alert === 'function') {
+    if (buttons) {
+      Alert.alert(title, message, buttons);
+    } else {
+      Alert.alert(title, message);
+    }
+  } else {
+    console.warn(`[Alert] ${title}: ${message}`);
+  }
+}
+
 export function useReviewerSignNavigation() {
   const router = useRouter();
   const [isNavigatingToSign, setIsNavigatingToSign] = useState(false);
@@ -33,13 +49,13 @@ export function useReviewerSignNavigation() {
       const lon = target.longitude != null ? Number(target.longitude) : null;
 
       if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) {
-        Alert.alert('Không có tọa độ', 'Không có thông tin vị trí biển báo để điều hướng.');
+        showAlert('Không có tọa độ', 'Không có thông tin vị trí biển báo để điều hướng.');
         return;
       }
 
       const signCoordinate: MapCoordinate = [lon, lat];
       if (!isValidCoordinate(signCoordinate)) {
-        Alert.alert('Thông báo', 'Tọa độ của biển báo không hợp lệ.');
+        showAlert('Thông báo', 'Tọa độ của biển báo không hợp lệ.');
         return;
       }
 
@@ -48,7 +64,7 @@ export function useReviewerSignNavigation() {
       try {
         const hasPermission = await ensureLocationPermission();
         if (!hasPermission) {
-          Alert.alert(
+          showAlert(
             'Quyền truy cập vị trí',
             'Vui lòng cấp quyền truy cập vị trí để hệ thống xác định khoảng cách và chỉ đường tới biển báo.',
           );
@@ -57,7 +73,7 @@ export function useReviewerSignNavigation() {
 
         const userGps = await fetchFreshGpsPosition(4000);
         if (!userGps || !isValidCoordinate(userGps)) {
-          Alert.alert(
+          showAlert(
             'Không thể định vị',
             'Không thể lấy vị trí GPS hiện tại của bạn. Vui lòng bật định vị và thử lại.',
           );
@@ -76,11 +92,13 @@ export function useReviewerSignNavigation() {
               destinationTitle: target.title || 'Biển báo cần thẩm định',
               destinationSubtitle: target.subtitle || 'Vị trí biển báo khảo sát',
               isFreeNavigation: 'true',
+              returnToReviewer: 'true',
+              ...(target.signId ? { reviewerSubmissionId: target.signId } : {}),
             },
           });
         } else {
           const distanceKm = (distanceMeters / 1000).toFixed(1);
-          Alert.alert(
+          showAlert(
             'Ngoài bán kính miễn phí 5km',
             `Bạn đang ở cách biển báo này khoảng ${distanceKm} km. Chế độ điều hướng miễn phí chỉ áp dụng trong phạm vi 5km.\n\nBạn có muốn xem lộ trình tới biển báo này không?`,
             [
@@ -96,6 +114,8 @@ export function useReviewerSignNavigation() {
                       destinationTitle: target.title || 'Biển báo cần thẩm định',
                       destinationSubtitle: target.subtitle || 'Vị trí biển báo khảo sát',
                       isFreeNavigation: 'false',
+                      returnToReviewer: 'true',
+                      ...(target.signId ? { reviewerSubmissionId: target.signId } : {}),
                     },
                   });
                 },
@@ -105,7 +125,7 @@ export function useReviewerSignNavigation() {
         }
       } catch (err: any) {
         console.error('[useReviewerSignNavigation] Error:', err);
-        Alert.alert('Lỗi', 'Đã xảy ra lỗi khi kiểm tra vị trí. Vui lòng thử lại.');
+        showAlert('Lỗi', 'Đã xảy ra lỗi khi kiểm tra vị trí. Vui lòng thử lại.');
       } finally {
         setIsNavigatingToSign(false);
       }

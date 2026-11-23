@@ -8,12 +8,13 @@ import {
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
-    replace: jest.fn(),
+    replace: mockReplace,
   }),
 }));
 
@@ -133,6 +134,9 @@ describe('ReviewerHistoryScreen', () => {
     );
 
     fireEvent.press(getByTestId('btn-back-reviewer-history'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/work',
+      params: { currentRole: 'reviewer' },
+    });
   });
 });

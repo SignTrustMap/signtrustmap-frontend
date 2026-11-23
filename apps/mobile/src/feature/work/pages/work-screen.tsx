@@ -111,7 +111,12 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                   key={role}
-                  onPress={() => setActiveRole(role)}
+                  onPress={() => {
+                    setActiveRole(role);
+                    if (typeof router.setParams === 'function') {
+                      router.setParams({ currentRole: role });
+                    }
+                  }}
                   style={({ pressed }) => [
                     styles.roleTab,
                     isActive && { backgroundColor: theme.primary },

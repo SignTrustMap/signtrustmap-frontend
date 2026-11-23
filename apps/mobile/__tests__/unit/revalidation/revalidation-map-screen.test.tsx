@@ -167,7 +167,10 @@ describe('RevalidationMapScreen', () => {
       fireEvent.press(backBtn);
     });
 
-    expect(mockRouter.back).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/work',
+      params: { currentRole: 'surveyor' },
+    });
   });
 
   it('allows user to enter place search query', async () => {

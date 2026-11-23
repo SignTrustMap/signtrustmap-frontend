@@ -249,26 +249,28 @@ export function NavigationBottomSheet({
                         : 'Ô tô'}
                 </Text>
               </Pressable>
-              <AppButton
-                accessibilityLabel={
-                  isRouteBookmarked ? 'Chỉnh sửa lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
-                }
-                onPress={onOpenBookmarkModal}
-                style={[
-                  styles.sheetCloseButton,
-                  {
-                    backgroundColor: theme.backgroundSelected,
-                    marginRight: Spacing.half,
-                  },
-                ]}
-                variant="ghost"
-              >
-                <MaterialCommunityIcons
-                  name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
-                  size={20}
-                  color={isRouteBookmarked ? theme.primary : theme.text}
-                />
-              </AppButton>
+              {!isFreeNavigation && (
+                <AppButton
+                  accessibilityLabel={
+                    isRouteBookmarked ? 'Chỉnh sửa lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
+                  }
+                  onPress={onOpenBookmarkModal}
+                  style={[
+                    styles.sheetCloseButton,
+                    {
+                      backgroundColor: theme.backgroundSelected,
+                      marginRight: Spacing.half,
+                    },
+                  ]}
+                  variant="ghost"
+                >
+                  <MaterialCommunityIcons
+                    name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color={isRouteBookmarked ? theme.primary : theme.text}
+                  />
+                </AppButton>
+              )}
               <AppButton
                 accessibilityLabel="Thu nhỏ xem trước lộ trình"
                 onPress={() => onSnapTo(0)}
@@ -763,67 +765,51 @@ export function NavigationBottomSheet({
           {/* Bottom Button Row */}
           {!isNavigating ? (
             <View style={{ width: '100%' }}>
-              {isFreeNavigation ? (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    paddingVertical: 4,
-                    paddingHorizontal: 8,
-                    marginBottom: 6,
-                    backgroundColor: 'rgba(22, 163, 74, 0.12)',
-                    borderRadius: 8,
-                  }}
-                >
-                  <MaterialCommunityIcons name="shield-check" size={16} color="#16A34A" />
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>
-                    Thẩm định viên • Điều hướng miễn phí (0 credits)
-                  </Text>
-                </View>
-              ) : null}
               <View style={[styles.sheetBottomButtonRow, { borderTopColor: theme.border }]}>
-              <AppButton
-                accessibilityLabel={
-                  isStartDisabled
-                    ? 'Không đủ credits để bắt đầu điều hướng'
-                    : isStartingNavigation
-                      ? 'Bắt đầu di chuyển...'
-                      : 'Bắt đầu di chuyển'
-                }
-                testID="btn-start-navigation"
-                disabled={isStartingNavigation || isStartDisabled}
-                onPress={onBeginNavigation}
-                style={styles.bottomGoButton}
-              >
-                <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
-                  {isStartingNavigation ? 'Đang bắt đầu...' : 'Bắt đầu'}
-                </Text>
-              </AppButton>
+                <AppButton
+                  accessibilityLabel={
+                    isStartDisabled
+                      ? 'Không đủ credits để bắt đầu điều hướng'
+                      : isStartingNavigation
+                        ? 'Bắt đầu di chuyển...'
+                        : 'Bắt đầu di chuyển'
+                  }
+                  testID="btn-start-navigation"
+                  disabled={isStartingNavigation || isStartDisabled}
+                  onPress={onBeginNavigation}
+                  style={styles.bottomGoButton}
+                >
+                  <Text style={[styles.goButtonLabel, { color: theme.onPrimary }]}>
+                    {isStartingNavigation
+                      ? 'Đang bắt đầu...'
+                      : `Bắt đầu ${isFreeNavigation ? '(không tốn credits)' : ''}`}
+                  </Text>
+                </AppButton>
 
-              <AppButton
-                accessibilityLabel={
-                  isRouteBookmarked ? 'Lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
-                }
-                testID="btn-bookmark-route"
-                onPress={onOpenBookmarkModal}
-                style={[
-                  styles.bottomBookmarkButton,
-                  {
-                    borderColor: '#666666',
-                    backgroundColor: theme.backgroundElement,
-                  },
-                ]}
-                variant="surface"
-              >
-                <MaterialCommunityIcons
-                  name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
-                  size={24}
-                  color={isRouteBookmarked ? theme.primary : '#666666'}
-                />
-              </AppButton>
-            </View>
+                {!isFreeNavigation && (
+                  <AppButton
+                    accessibilityLabel={
+                      isRouteBookmarked ? 'Lộ trình đã lưu' : 'Lưu lộ trình yêu thích'
+                    }
+                    testID="btn-bookmark-route"
+                    onPress={onOpenBookmarkModal}
+                    style={[
+                      styles.bottomBookmarkButton,
+                      {
+                        borderColor: '#666666',
+                        backgroundColor: theme.backgroundElement,
+                      },
+                    ]}
+                    variant="surface"
+                  >
+                    <MaterialCommunityIcons
+                      name={isRouteBookmarked ? 'bookmark' : 'bookmark-outline'}
+                      size={24}
+                      color={isRouteBookmarked ? theme.primary : '#666666'}
+                    />
+                  </AppButton>
+                )}
+              </View>
             </View>
           ) : (
             <SafeAreaView

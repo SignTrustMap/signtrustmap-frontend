@@ -9,7 +9,9 @@ import { AppButton } from '@/components/button';
 import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types/surveySubmissionType';
 
 const submissionLabels: Record<SubmissionType, string> = {
@@ -172,6 +174,8 @@ export function SurveyHistoryScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>(initialTab);
   const [page, setPage] = useState(1);
   const listRef = useRef<FlatList<SurveySubmission>>(null);
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   const { data, isLoading, isFetching, isRefetching, error, refetch } = useGetMySubmissions({
     page: String(page),

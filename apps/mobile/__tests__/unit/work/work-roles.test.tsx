@@ -115,9 +115,11 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
 
 const mockUseGetMyPendingSubmissions = jest.fn();
 const mockUseGetMySurveyStats = jest.fn();
+const mockUseGetMySubmissions = jest.fn();
 jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
   useGetMyPendingSubmissions: (...args: any[]) => mockUseGetMyPendingSubmissions(...args),
   useGetMySurveyStats: (...args: any[]) => mockUseGetMySurveyStats(...args),
+  useGetMySubmissions: (...args: any[]) => mockUseGetMySubmissions(...args),
 }));
 
 const mockUseGetMyRecaptures = jest.fn();
@@ -188,6 +190,10 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
     mockUseGetMyPendingSubmissions.mockReturnValue({
       data: { pending: 5, countsByStatus: { DRAFT: 2 } },
+    });
+    mockUseGetMySubmissions.mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
     });
     mockUseGetMySurveyStats.mockReturnValue({
       data: { revalidationAvailable: 8 },
@@ -437,6 +443,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       const fab = getByLabelText('Tạo bản ghi khảo sát mới');
       fireEvent.press(fab);
       expect(mockPush).toHaveBeenCalledWith('/work/new-survey');
+    });
+
+    it('renders returned submissions badge with count and navigates to returned submissions list', async () => {
+      const { getByText } = await render(<SurveyorWork returnedSubmissionsCount={3} />);
+
+      expect(getByText('Ảnh bị trả về')).toBeTruthy();
+      expect(getByText('3')).toBeTruthy();
+
+      fireEvent.press(getByText('Ảnh bị trả về'));
+      expect(mockPush).toHaveBeenCalledWith('/work/returned-submissions-list');
     });
 
     it('guards surveyor queries with isSurveyor check', async () => {

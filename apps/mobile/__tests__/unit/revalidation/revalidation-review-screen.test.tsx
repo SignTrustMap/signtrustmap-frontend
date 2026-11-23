@@ -183,15 +183,18 @@ describe('RevalidationReviewScreen', () => {
       fireEvent.press(returnBtn);
     });
 
-    expect(mockRouter.back).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/work',
+      params: { currentRole: 'reviewer' },
+    });
   });
 
   it('renders active evidence item details with sign name, comparison telemetry, and reward credits', async () => {
     const { getByText } = await render(<RevalidationReviewScreen />);
 
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
-    expect(getByText('Cách vị trí cũ 12m')).toBeTruthy();
-    expect(getByText('+10 Credits thưởng')).toBeTruthy();
+    expect(getByText('MINH CHỨNG MỚI')).toBeTruthy();
+    expect(getByText('BIỂN BÁO GỐC')).toBeTruthy();
     expect(getByText('Biển báo vẫn còn hoạt động')).toBeTruthy();
   });
 
@@ -264,17 +267,19 @@ describe('RevalidationReviewScreen', () => {
 
     const { getByText } = await render(<RevalidationReviewScreen />);
 
-    expect(getByText('Tổng kết tái thẩm định')).toBeTruthy();
-    expect(getByText(/Đã đánh giá 1 biển báo/)).toBeTruthy();
+    expect(getByText('Đã đánh giá tất cả minh chứng')).toBeTruthy();
+    expect(
+      getByText('Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.'),
+    ).toBeTruthy();
 
-    const finishBtn = getByText('Hoàn tất');
+    const returnBtn = getByText('Quay lại công việc');
     await act(async () => {
-      fireEvent.press(finishBtn);
+      fireEvent.press(returnBtn);
     });
 
     expect(mockRouter.replace).toHaveBeenCalledWith({
-      pathname: '/work/submission-complete',
-      params: { type: 'review_revalidation', count: '1' },
+      pathname: '/work',
+      params: { currentRole: 'reviewer' },
     });
   });
 
@@ -348,14 +353,13 @@ describe('RevalidationReviewScreen', () => {
     // 4 voting buttons are hidden
     expect(queryByLabelText('Đồng ý với kết luận của điều tra viên')).toBeNull();
 
-    // Verify "Giữ nguyên" button calls keepCurrentEvidenceAndNext and navigates when completed
+    // Verify "Giữ nguyên" button calls keepCurrentEvidenceAndNext
     const keepBtn = getByTestId('reval-keep-result-button');
     await act(async () => {
       fireEvent.press(keepBtn);
     });
 
     expect(mockKeepCurrentEvidenceAndNext).toHaveBeenCalled();
-    expect(mockRouter.replace).toHaveBeenCalledWith('/work/revalidation-summary');
   });
 
   it('keeps current evidence and advances to next when more recheck items exist', async () => {
@@ -379,12 +383,9 @@ describe('RevalidationReviewScreen', () => {
     });
 
     expect(mockKeepCurrentEvidenceAndNext).toHaveBeenCalled();
-    // Since completes is false, router.replace to summary should NOT be called
-    expect(mockRouter.replace).not.toHaveBeenCalledWith('/work/revalidation-summary');
   });
 
-  it('navigates to summary when skip-to-summary button is pressed', async () => {
-    const mockCancelEvidenceCheck = jest.fn();
+  it('navigates to sign location on map when location button is pressed', async () => {
     const mockWorkflow = createMockWorkflow({
       reviewHistory: [
         {
@@ -393,19 +394,17 @@ describe('RevalidationReviewScreen', () => {
           userVerdict: 'AGREE',
         },
       ],
-      cancelEvidenceCheck: mockCancelEvidenceCheck,
     });
     (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
 
     const { getByTestId } = await render(<RevalidationReviewScreen />);
 
-    const skipToSummaryBtn = getByTestId('reval-skip-to-summary-button');
+    const locationBtn = getByTestId('reval-move-to-sign-location-button');
     await act(async () => {
-      fireEvent.press(skipToSummaryBtn);
+      fireEvent.press(locationBtn);
     });
 
-    expect(mockCancelEvidenceCheck).toHaveBeenCalled();
-    expect(mockRouter.replace).toHaveBeenCalledWith('/work/revalidation-summary');
+    expect(mockNavigateToSign).toHaveBeenCalled();
   });
 
   it('opens report modal when pressing Report button and submits report', async () => {

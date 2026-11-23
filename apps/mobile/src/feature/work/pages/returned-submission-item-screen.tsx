@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -23,6 +24,11 @@ import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
 import { VirtualList } from '@/components/virtual-list';
 import { loadCatalogFromStorage } from '@/api/reviews/catalog-storage';
+import { resolveS3Url } from '@/api/reviews/review-workflow';
+import {
+  useGetSurveySubmissionStatus,
+  useResubmitFalseNegativeMutation,
+} from '@/feature/upload/hooks/use-survey-submission';
 import { SIGN_CATEGORIES, getSignCategory, type SignCategory } from '@/constants/sign-categories';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -522,8 +528,43 @@ export function ReturnedSubmissionItemScreen({
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string; imageUrl?: string }>();
 
-  const id = propId || params.id || 'SUB-2026-001';
-  const imageUrl = initialImageUrl || params.imageUrl || DEFAULT_SAMPLE_IMAGE;
+  const id = propId || params.id || 'mock-returned-sub-001';
+
+  const { data: statusData, isLoading: isStatusLoading } = useGetSurveySubmissionStatus(id);
+  const resubmitMutation = useResubmitFalseNegativeMutation();
+
+  const imageUrl = useMemo(() => {
+    if (initialImageUrl) return initialImageUrl;
+    if (params.imageUrl) return params.imageUrl;
+
+    if (Array.isArray(statusData?.mediaFiles) && statusData.mediaFiles.length > 0) {
+      const imgFile: any =
+        statusData.mediaFiles.find(
+          (m: any) => (m.mediaType || m.media_type || '').toUpperCase() === 'IMAGE',
+        ) || statusData.mediaFiles[0];
+      const rawUrl =
+        (imgFile?.fileUrl as string | undefined) ||
+        (imgFile?.file_url as string | undefined) ||
+        (imgFile?.storageKey as string | undefined) ||
+        (imgFile?.url as string | undefined);
+      if (rawUrl && typeof rawUrl === 'string') return resolveS3Url(rawUrl);
+    }
+
+    if (Array.isArray(statusData?.sessions) && statusData.sessions.length > 0) {
+      const imgSession: any =
+        statusData.sessions.find(
+          (s: any) => (s.mediaType || s.media_type || '').toUpperCase() === 'IMAGE',
+        ) || statusData.sessions[0];
+      const rawUrl =
+        (imgSession?.storageKey as string | undefined) ||
+        (imgSession?.storage_key as string | undefined) ||
+        (imgSession?.fileUrl as string | undefined) ||
+        (imgSession?.url as string | undefined);
+      if (rawUrl && typeof rawUrl === 'string') return resolveS3Url(rawUrl);
+    }
+
+    return DEFAULT_SAMPLE_IMAGE;
+  }, [initialImageUrl, params.imageUrl, statusData]);
 
   const [isZoomed, setIsZoomed] = useState(false);
   const [boxes, setBoxes] = useState<BoundingBox[]>([]);
@@ -698,6 +739,14 @@ export function ReturnedSubmissionItemScreen({
 
   // Handle OK / confirmation action
   const handleConfirm = useCallback(() => {
+    if (boxes.length === 0) {
+      Alert.alert(
+        'Chưa có biển báo',
+        'Vui lòng chạm vào ảnh để khoanh vùng ít nhất một vị trí có biển báo bị bỏ sót trước khi gửi duyệt lại.',
+      );
+      return;
+    }
+
     Alert.alert(
       'Bạn chắc chắn chứ?',
       `Bạn đang xác nhận ${boxes.length} vị trí khoanh vùng có biển báo giao thông hợp lệ.`,
@@ -709,13 +758,34 @@ export function ReturnedSubmissionItemScreen({
         {
           text: 'Đồng ý',
           style: 'default',
-          onPress: () => {
-            router.back();
+          onPress: async () => {
+            try {
+              await resubmitMutation.mutateAsync({
+                submissionId: id,
+                boxes,
+                imageDimensions: imageLayout,
+              });
+              Alert.alert(
+                'Thành công',
+                'Đã gửi lại khảo sát kèm vị trí khoanh vùng bổ sung. Hồ sơ sẽ được đưa vào hàng đợi kiểm duyệt lại.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => router.back(),
+                  },
+                ],
+              );
+            } catch (err: any) {
+              Alert.alert(
+                'Lỗi gửi duyệt lại',
+                err?.message || 'Không thể gửi lại hồ sơ khảo sát. Vui lòng thử lại sau.',
+              );
+            }
           },
         },
       ],
     );
-  }, [boxes.length, router]);
+  }, [boxes, id, imageLayout, resubmitMutation, router]);
 
   const activeBox =
     boxes.find((b) => b.id === activeBoxId) || (boxes.length > 0 ? boxes[boxes.length - 1] : null);
@@ -801,6 +871,15 @@ export function ReturnedSubmissionItemScreen({
                 source={{ uri: imageUrl }}
                 style={styles.centerImage}
               />
+
+              {isStatusLoading && !initialImageUrl && !params.imageUrl ? (
+                <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+                  <ActivityIndicator color={theme.primary} size="large" />
+                  <Text style={[styles.loadingText, { color: '#FFFFFF' }]}>
+                    Đang tải ảnh khảo sát...
+                  </Text>
+                </View>
+              ) : null}
 
               {/* Background Tap Surface behind boxes */}
               <Pressable
@@ -1026,14 +1105,23 @@ export function ReturnedSubmissionItemScreen({
           {/* Bottom Button (Span hết container): Confirm (Xác nhận) */}
           <AppButton
             accessibilityLabel="Xác nhận vị trí biển báo"
-            disabled={boxes.length === 0}
+            disabled={boxes.length === 0 || resubmitMutation.isPending}
             onPress={handleConfirm}
-            style={[styles.confirmBtnFullWidth, boxes.length === 0 && styles.btnDisabled]}
+            style={[
+              styles.confirmBtnFullWidth,
+              (boxes.length === 0 || resubmitMutation.isPending) && styles.btnDisabled,
+            ]}
             testID="confirm-btn"
             variant="primary"
           >
-            <MaterialCommunityIcons color="#FFFFFF" name="check" size={20} />
-            <Text style={styles.confirmBtnText}>Xác nhận</Text>
+            {resubmitMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" style={{ marginRight: 8 }} />
+            ) : (
+              <MaterialCommunityIcons color="#FFFFFF" name="check" size={20} />
+            )}
+            <Text style={styles.confirmBtnText}>
+              {resubmitMutation.isPending ? 'Đang gửi duyệt lại...' : 'Xác nhận'}
+            </Text>
           </AppButton>
 
           {/* Notice text below the confirmation button */}
@@ -1914,6 +2002,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: Fonts.body,
     fontSize: 12,
+    fontWeight: '500',
+  },
+  loadingOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    zIndex: 5,
+  },
+  loadingText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
     fontWeight: '500',
   },
 });

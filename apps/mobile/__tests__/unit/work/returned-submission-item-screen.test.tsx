@@ -12,6 +12,21 @@ import {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 
+const mockMutateAsync = jest.fn();
+let mockStatusData: any = undefined;
+let mockIsStatusLoading = false;
+
+jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
+  useGetSurveySubmissionStatus: () => ({
+    data: mockStatusData,
+    isLoading: mockIsStatusLoading,
+  }),
+  useResubmitFalseNegativeMutation: () => ({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+  }),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -32,6 +47,9 @@ jest.mock('react-native-safe-area-context', () => {
 describe('ReturnedSubmissionItemScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockStatusData = undefined;
+    mockIsStatusLoading = false;
+    mockMutateAsync.mockClear().mockResolvedValue({ success: true });
     jest.spyOn(Alert, 'alert');
   });
 
@@ -242,11 +260,61 @@ describe('ReturnedSubmissionItemScreen', () => {
       expect.any(Array)
     );
 
-    // Press 'Đồng ý' in Alert to trigger navigation back
+    // Press 'Đồng ý' in Alert to trigger mutation and navigation back
     const alertButtons = (Alert.alert as jest.Mock).mock.calls[0][2];
     const confirmAction = alertButtons.find((b: any) => b.text === 'Đồng ý');
-    confirmAction?.onPress?.();
+    await act(async () => {
+      await confirmAction?.onPress?.();
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submissionId: 'test-item-999',
+        boxes: expect.arrayContaining([expect.objectContaining({ id: expect.any(String) })]),
+      })
+    );
+
+    // Press 'OK' in success alert
+    const successButtons = (Alert.alert as jest.Mock).mock.calls[1]?.[2];
+    const okAction = successButtons?.find((b: any) => b.text === 'OK');
+    okAction?.onPress?.();
     expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('shows error alert if resubmit mutation fails', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('Network submission error'));
+    const { getByTestId } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    const addBoxBtn = getByTestId('add-box-btn');
+    await act(async () => {
+      fireEvent.press(addBoxBtn);
+    });
+
+    const confirmBtn = getByTestId('confirm-btn');
+    await act(async () => {
+      fireEvent.press(confirmBtn);
+    });
+
+    const alertButtons = (Alert.alert as jest.Mock).mock.calls[0][2];
+    const confirmAction = alertButtons.find((b: any) => b.text === 'Đồng ý');
+    await act(async () => {
+      await confirmAction?.onPress?.();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Lỗi gửi duyệt lại',
+      'Network submission error'
+    );
+  });
+
+  it('renders loading overlay when status is loading', async () => {
+    mockIsStatusLoading = true;
+    const { getByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+    expect(getByText('Đang tải ảnh khảo sát...')).toBeTruthy();
   });
 
   it('allows switching active box and closes catalog modal when close button is pressed', async () => {

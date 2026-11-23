@@ -465,6 +465,16 @@ export async function submitRevalidationEvidence(
   accessToken?: string,
   signal?: AbortSignal,
 ): Promise<SubmitRevalidationEvidenceResponse> {
+  if (
+    !taskIdOrSignId ||
+    taskIdOrSignId === 'undefined' ||
+    taskIdOrSignId === 'null' ||
+    taskIdOrSignId === 'sign-target' ||
+    taskIdOrSignId.trim() === ''
+  ) {
+    throw new ApiError('Mã nhiệm vụ tái thẩm định (taskId/signId) không hợp lệ.', 400);
+  }
+
   // Resolve token: caller may pass one in, otherwise read from storage
   const token = accessToken ?? (await getStoredAccessToken());
   let evidenceType: RevalidationEvidenceType = 'STILL_ACTIVE';

@@ -51,7 +51,7 @@ describe('survey-image utils', () => {
   });
 
   describe('compressAndResizeSurveyImage', () => {
-    it('directly resizes to MAX_IMAGE_DIMENSION and compresses to JPEG with quality 0.7 in a single pass', async () => {
+    it('directly resizes to MAX_IMAGE_DIMENSION and compresses to JPEG in a single pass', async () => {
       (FileSystem.getInfoAsync as jest.Mock).mockResolvedValueOnce({
         exists: true,
         size: 5 * 1024 * 1024, // 5MB

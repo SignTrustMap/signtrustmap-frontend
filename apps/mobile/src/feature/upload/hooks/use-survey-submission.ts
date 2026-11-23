@@ -2,6 +2,7 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   completeSurveyUpload,
+  createMockSubmissionStatus,
   createSurveySubmission,
   updateSurveySubmission,
   submitSurveySubmission,
@@ -11,6 +12,7 @@ import {
   getSurveySubmissionStatus,
   getSurveyUploadSession,
   initializeSurveyUpload,
+  isUuid,
   uploadSurveyChunk,
 } from '@/api/survey-submission/survey-submission';
 import { useSession } from '@/context/session-provider';
@@ -25,6 +27,7 @@ import type {
   CreateSubmissionDto,
   UpdateSubmissionDto,
   ListMySubmissionsParams,
+  SubmissionStatusResponse,
   UploadChunkRequest,
 } from '@/types/surveySubmissionType';
 
@@ -101,6 +104,117 @@ export function useSubmitSurveySubmission() {
       return submitSurveySubmission(submissionId, session.accessToken, signal);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: surveySubmissionKeys.all(session?.account.id) }),
+  });
+}
+
+export type FalseNegativeBoundingBox = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  signCode?: string;
+  signName?: string;
+  category?: string;
+};
+
+export type ResubmitFalseNegativeVariables = {
+  submissionId: string;
+  boxes: FalseNegativeBoundingBox[];
+  imageDimensions: { width: number; height: number };
+  note?: string;
+  signal?: AbortSignal;
+};
+
+export function useResubmitFalseNegativeMutation() {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      submissionId,
+      boxes,
+      imageDimensions,
+      note,
+      signal,
+    }: ResubmitFalseNegativeVariables) => {
+      if (!session) throw new Error(SIGN_IN_TO_UPDATE_SURVEY_MESSAGE);
+
+      const normalizedBoxes = boxes.map((box, index) => {
+        const xNorm =
+          imageDimensions.width > 0
+            ? Number((box.x / imageDimensions.width).toFixed(4))
+            : 0;
+        const yNorm =
+          imageDimensions.height > 0
+            ? Number((box.y / imageDimensions.height).toFixed(4))
+            : 0;
+        const wNorm =
+          imageDimensions.width > 0
+            ? Number((box.width / imageDimensions.width).toFixed(4))
+            : 0;
+        const hNorm =
+          imageDimensions.height > 0
+            ? Number((box.height / imageDimensions.height).toFixed(4))
+            : 0;
+
+        return {
+          boxIndex: index + 1,
+          signCode: box.signCode || 'UNKNOWN',
+          signName: box.signName || 'Biển báo giao thông',
+          category: box.category,
+          pixelCoordinates: {
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+          },
+          normalizedCoordinates: {
+            x: xNorm,
+            y: yNorm,
+            width: wNorm,
+            height: hNorm,
+          },
+        };
+      });
+
+      const annotationPayload = {
+        correctionType: 'FALSE_NEGATIVE_ANNOTATION',
+        totalBoxes: boxes.length,
+        annotatedBoxes: normalizedBoxes,
+        userNote: note,
+        annotatedAt: new Date().toISOString(),
+      };
+
+      const signNamesSummary = boxes
+        .map((b) => b.signCode || b.signName)
+        .filter(Boolean)
+        .join(', ');
+      const updateNote = `[Khoanh vùng bổ sung ${boxes.length} biển báo: ${signNamesSummary || 'Chưa phân loại'}] ${JSON.stringify(annotationPayload)}`;
+
+      if (!isUuid(submissionId)) {
+        return {
+          submissionId,
+          status: 'SUBMITTED' as const,
+          message: 'Đã gửi lại khảo sát thành công (Mock)',
+        };
+      }
+
+      // 1. Update submission note with bounding box metadata
+      await updateSurveySubmission(
+        submissionId,
+        { note: updateNote },
+        session.accessToken,
+        signal,
+      );
+
+      // 2. Trigger resubmission pipeline
+      return await submitSurveySubmission(submissionId, session.accessToken, signal);
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: surveySubmissionKeys.all(session?.account.id),
+      }),
   });
 }
 
@@ -188,12 +302,18 @@ export function useGetMySurveyStats(enabled = true) {
 
 export function useGetSurveySubmissionStatus(submissionId: string | undefined, enabled = true) {
   const { session } = useSession();
-  return useQuery({
+  const isValid = Boolean(submissionId && isUuid(submissionId));
+  return useQuery<SubmissionStatusResponse>({
     queryKey: surveySubmissionKeys.status(session?.account.id, submissionId),
     queryFn: session && submissionId
-      ? ({ signal }) => getSurveySubmissionStatus(submissionId, session.accessToken, signal)
+      ? ({ signal }) => {
+          if (!isValid) {
+            return Promise.resolve(createMockSubmissionStatus(submissionId));
+          }
+          return getSurveySubmissionStatus(submissionId, session.accessToken, signal);
+        }
       : skipToken,
-    enabled,
+    enabled: Boolean(enabled && submissionId),
   });
 }
 

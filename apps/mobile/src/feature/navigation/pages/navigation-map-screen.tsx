@@ -93,6 +93,8 @@ export function NavigationMapScreen() {
     destinationSubtitle,
     destinationTitle,
     isFreeNavigation,
+    reviewerSubmissionId,
+    returnToReviewer,
     savedRouteId: paramSavedRouteId,
     startId,
     startLat,
@@ -106,6 +108,8 @@ export function NavigationMapScreen() {
     destinationSubtitle?: string;
     destinationTitle?: string;
     isFreeNavigation?: string;
+    reviewerSubmissionId?: string;
+    returnToReviewer?: string;
     savedRouteId?: string;
     startId?: string;
     startLat?: string;
@@ -115,6 +119,18 @@ export function NavigationMapScreen() {
   }>();
 
   const isFreeReviewerNavigation = isFreeNavigation === 'true';
+  const isReturnToReviewer = returnToReviewer === 'true';
+
+  const handleReturnToReviewer = useCallback(() => {
+    setSwappedRoute(null);
+    setNavigationSession(undefined);
+    setActiveSavedRouteId(undefined);
+    resetReroute();
+    router.replace({
+      pathname: '/work/submission-review',
+      params: reviewerSubmissionId ? { targetSubmissionId: reviewerSubmissionId } : {},
+    });
+  }, [reviewerSubmissionId, router]);
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
@@ -510,7 +526,8 @@ export function NavigationMapScreen() {
     selectedDestination &&
     activeRouteResult?.coordinates?.length,
   );
-  const hasInsufficientCredits = !isFreeReviewerNavigation && isRoutePreviewReady && userCredits < 5;
+  const hasInsufficientCredits =
+    !isFreeReviewerNavigation && isRoutePreviewReady && userCredits < 5;
 
   useEffect(() => {
     if (activeRouteResult?.coordinates?.length && !isNavigating) {
@@ -1079,11 +1096,19 @@ export function NavigationMapScreen() {
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
   const handleDismissCompleteModal = () => {
     setIsCompleteModalVisible(false);
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
@@ -1267,6 +1292,16 @@ export function NavigationMapScreen() {
         {/* Non-navigating Overlay: Top controls, Home filter, and floating map action buttons */}
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
+            {isReturnToReviewer ? (
+              <Pressable
+                accessibilityLabel="Quay lại thẩm định"
+                onPress={handleReturnToReviewer}
+                style={[styles.returnToReviewerPill, { top: insets.top + Spacing.one }]}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={16} />
+                <Text style={styles.returnToReviewerText}>Quay lại thẩm định</Text>
+              </Pressable>
+            ) : null}
             <NavigationTopControls
               selectedDestination={selectedDestination}
               plannedRouteOrigin={plannedRouteOrigin}

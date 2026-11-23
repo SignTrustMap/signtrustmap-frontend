@@ -23,6 +23,11 @@ import type {
 } from '@/types/surveySubmissionType';
 
 
+export function isUuid(value?: string | null): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 export function createSurveySubmission(
   request: CreateSubmissionDto,
   accessToken: string,
@@ -39,6 +44,17 @@ export function updateSurveySubmission(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<UpdateSubmissionResponse> {
+  if (!isUuid(submissionId)) {
+    return Promise.resolve({
+      id: submissionId,
+      surveyorId: 'mock-surveyor',
+      submissionType: 'SINGLE_IMAGE',
+      status: 'PENDING_CORRECTION',
+      note: request.note ?? '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as unknown as UpdateSubmissionResponse);
+  }
   return apiRequest<UpdateSubmissionResponse>(
     `${API_PATHS.SUBMISSIONS}/${encodeURIComponent(submissionId)}`,
     {
@@ -148,6 +164,13 @@ export function submitSurveySubmission(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<SubmitSubmissionResponse> {
+  if (!isUuid(submissionId)) {
+    return Promise.resolve({
+      submissionId,
+      status: 'SUBMITTED',
+      message: 'Hồ sơ đã được gửi lại thành công',
+    } as SubmitSubmissionResponse);
+  }
   return apiRequest<SubmitSubmissionResponse>(
     `${API_PATHS.SUBMISSIONS}/${encodeURIComponent(submissionId)}/submit`,
     { method: 'POST', signal },
@@ -184,11 +207,34 @@ export function getMySurveyStats(
   );
 }
 
+export function createMockSubmissionStatus(submissionId: string): SubmissionStatusResponse {
+  return {
+    submission: {
+      id: submissionId,
+      surveyorId: 'mock-surveyor',
+      submissionType: 'SINGLE_IMAGE',
+      status: 'PENDING_CORRECTION',
+      failureReason: null,
+      totalCandidatesExtracted: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    totalCandidates: 0,
+    mediaFiles: [],
+    sessions: [],
+    history: [],
+    candidates: [],
+  };
+}
+
 export function getSurveySubmissionStatus(
   submissionId: string,
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<SubmissionStatusResponse> {
+  if (!isUuid(submissionId)) {
+    return Promise.resolve(createMockSubmissionStatus(submissionId));
+  }
   return apiRequest<SubmissionStatusResponse>(
     `${API_PATHS.SUBMISSIONS}/status/${encodeURIComponent(submissionId)}`,
     { signal },

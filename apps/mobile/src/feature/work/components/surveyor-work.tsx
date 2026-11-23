@@ -10,6 +10,7 @@ import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import {
   useGetMyPendingSubmissions,
+  useGetMySubmissions,
   useGetMySurveyStats,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
@@ -27,6 +28,7 @@ export interface SurveyorWorkProps {
   pendingSurveyCount?: number;
   revalidationTaskCount?: number;
   recapturesCount?: number;
+  returnedSubmissionsCount?: number;
   firstRevalSign?: RouteSign | null;
   userCoordinate?: MapCoordinate;
   onOpenOfflineMap?: () => void;
@@ -38,6 +40,7 @@ export function SurveyorWork({
   pendingSurveyCount: propPendingSurveyCount,
   revalidationTaskCount: propRevalidationTaskCount,
   recapturesCount: propRecapturesCount,
+  returnedSubmissionsCount: propReturnedSubmissionsCount,
   firstRevalSign: propFirstRevalSign,
   userCoordinate: propUserCoordinate,
   onOpenOfflineMap,
@@ -86,6 +89,10 @@ export function SurveyorWork({
 
   // Surveyor queries live directly within the Surveyor component
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyor);
+  const { data: mySubmissionsData } = useGetMySubmissions(
+    { page: '1', pageSize: '50' },
+    isSurveyor && propReturnedSubmissionsCount === undefined,
+  );
   const { data: surveyStats } = useGetMySurveyStats(isSurveyor);
   const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyor);
   const { data: firstRevalSignData } = useGetFirstRevalidationSign(
@@ -98,6 +105,25 @@ export function SurveyorWork({
     propRevalidationTaskCount ?? surveyStats?.revalidationAvailable ?? 0;
   const recapturesCount = propRecapturesCount ?? recapturesData?.total ?? 0;
   const firstRevalSign = propFirstRevalSign !== undefined ? propFirstRevalSign : firstRevalSignData;
+
+  const returnedSubmissionsCount = useMemo(() => {
+    if (propReturnedSubmissionsCount !== undefined) return propReturnedSubmissionsCount;
+
+    if (pendingData?.countsByStatus) {
+      const counts = pendingData.countsByStatus;
+      const totalFromCounts =
+        (counts.NO_SIGN_DETECTED ?? 0) +
+        (counts.PENDING_CORRECTION ?? 0) +
+        (counts.REJECTED ?? 0) +
+        (counts.FAILED ?? 0);
+      if (totalFromCounts > 0) return totalFromCounts;
+    }
+
+    const items = mySubmissionsData?.items ?? [];
+    return items.filter((item) =>
+      ['PENDING_CORRECTION', 'REJECTED', 'FAILED', 'NO_SIGN_DETECTED'].includes(item.status),
+    ).length;
+  }, [propReturnedSubmissionsCount, pendingData?.countsByStatus, mySubmissionsData?.items]);
 
   const { data: completionsData } = useGetMyTaskCompletions(
     undefined,
@@ -192,6 +218,7 @@ export function SurveyorWork({
 
           <WorkActionBadge
             accentColor={theme.primary}
+            count={returnedSubmissionsCount > 0 ? returnedSubmissionsCount : undefined}
             icon="camera-document-off"
             label="Ảnh bị trả về"
             onPress={handleOpenReturnedSubmissions}

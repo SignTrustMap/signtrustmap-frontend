@@ -358,12 +358,15 @@ describe('Upload Flow: Comprehensive Unit Test Suite', () => {
   // CASE 2: Upload Screen Navigation
   // =========================================================================
   describe('Case 2: Upload Screen Navigation', () => {
-    it('triggers router.back() when back button is pressed', async () => {
+    it('triggers navigation back to surveyor role when back button is pressed', async () => {
       const { getByLabelText } = await render(<NewSurveyRecordScreen />);
       const backButton = getByLabelText('Quay lại công việc khảo sát');
 
       fireEvent.press(backButton);
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/work',
+        params: { currentRole: 'surveyor' },
+      });
     });
 
     it('navigates to /work/survey-history when "Hồ sơ đang xử lý" is pressed on SurveyorWorkPanel', async () => {

@@ -88,7 +88,7 @@ export function ReviewerWork({
 
           {/* Action Badge: Review History & Edit Votes */}
           <WorkActionBadge
-            accessibilityLabel="Lịch sử thẩm định và sửa vote trong ngày"
+            accessibilityLabel="Lịch sử thẩm định và sửa vote trong vòng 24 giờ"
             accentColor={theme.primary}
             icon="clipboard-edit-outline"
             label="Lịch sử thẩm định"
