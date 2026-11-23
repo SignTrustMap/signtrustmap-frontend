@@ -97,9 +97,9 @@ export function WorkDailyTipCard({
       {/* Bottom Row: Card Branding / Watermark */}
       <View style={styles.footerRow}>
         <View style={styles.footerBrandGroup}>
-          <Text style={styles.footerBrandText}>SIGNTRUSTMAP</Text>
+          <Text style={styles.footerBrandText}>SIGNTRUST MAP</Text>
         </View>
-        <Text style={styles.footerCategoryText}>TIPS</Text>
+        <Text style={styles.footerCategoryText}>MẸO HÀNG NGÀY</Text>
       </View>
     </View>
   );
