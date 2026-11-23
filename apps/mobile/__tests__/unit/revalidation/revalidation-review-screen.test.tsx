@@ -193,8 +193,8 @@ describe('RevalidationReviewScreen', () => {
     const { getByText } = await render(<RevalidationReviewScreen />);
 
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
-    expect(getByText('MINH CHỨNG MỚI')).toBeTruthy();
-    expect(getByText('BIỂN BÁO GỐC')).toBeTruthy();
+    expect(getByText('P.102')).toBeTruthy();
+    expect(getByText('Báo cáo thực địa:')).toBeTruthy();
     expect(getByText('Biển báo vẫn còn hoạt động')).toBeTruthy();
   });
 

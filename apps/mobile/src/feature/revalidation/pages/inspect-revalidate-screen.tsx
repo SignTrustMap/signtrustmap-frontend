@@ -50,7 +50,10 @@ import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { resolveS3Url } from '@/api/revalidation/revalidation';
-import { useGetAllRevalidationTasks, useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  useGetAllRevalidationTasks,
+  useSubmitRevalidation,
+} from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
@@ -1200,16 +1203,6 @@ export function InspectRevalidateScreen() {
               <Text accessibilityRole="alert" style={styles.errorAlertText}>
                 {submitError}
               </Text>
-            ) : null}
-
-            {/* Success Banner */}
-            {submitSuccess ? (
-              <View style={styles.successBanner}>
-                <MaterialCommunityIcons color="#059669" name="check-circle" size={20} />
-                <Text style={styles.successBannerText}>
-                  Đã gửi bằng chứng! Đang quay lại bản đồ tái thẩm định…
-                </Text>
-              </View>
             ) : null}
 
             {/* =============================================================== */}

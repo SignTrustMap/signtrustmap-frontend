@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-23 05:14:49 UTC  
+> **Generated:** 2026-11-23 06:41:47 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 4.62s  
+> **Execution Duration:** 4.76s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,8 +11,8 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 11 | 11 | 0 | 0 | 100.0% |
-| **Tests** | 175 | 175 | 0 | 0 | 100.0% |
+| **Test Suites** | 3 | 3 | 0 | 0 | 100.0% |
+| **Tests** | 45 | 45 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
@@ -228,15 +228,7 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 9 / 9 | 1.49s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 38 / 38 | 1.55s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-routes.test.tsx` | 30 / 30 | 1.58s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 1.76s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 1.97s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 2.06s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-sign-details-card.test.tsx` | 22 / 22 | 2.22s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 17 / 17 | 2.41s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 11 / 11 | 2.52s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 10 / 10 | 3.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 22 / 22 | 3.42s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/work-daily-tip-card.test.tsx` | 3 / 3 | 2.40s | ✅ Pass |
+| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 17 / 17 | 2.90s | ✅ Pass |
+| `apps/mobile/__tests__/unit/work/work-roles.test.tsx` | 25 / 25 | 3.56s | ✅ Pass |
 

@@ -369,9 +369,9 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
     it('renders reviewer action cards with queue count badge and navigates to submission review', async () => {
       const { getByText, getByLabelText } = await render(<WorkScreen currentRole="reviewer" />);
 
-      expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
+      expect(getByText('Duyệt khảo sát')).toBeTruthy();
       expect(getByText('3 MỚI')).toBeTruthy();
-      expect(getByText('Tái thẩm định cần duyệt')).toBeTruthy();
+      expect(getByText('Duyệt tái thẩm định')).toBeTruthy();
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
 
       const heroButton = getByLabelText('Thẩm định các hồ sơ chờ xử lý');

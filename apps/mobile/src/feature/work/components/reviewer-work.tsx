@@ -73,7 +73,7 @@ export function ReviewerWork({
             badgeLabel={reviewQueueTotal > 0 ? `${reviewQueueTotal} MỚI` : undefined}
             count={reviewQueueTotal}
             icon="shield-check"
-            label="Khảo sát cần duyệt"
+            label="Duyệt khảo sát"
             onPress={() => router.push('/work/submission-review')}
           />
 
@@ -82,7 +82,7 @@ export function ReviewerWork({
             accentColor={theme.primary}
             count={revalEvidenceCount}
             icon="clipboard-check-outline"
-            label="Tái thẩm định cần duyệt"
+            label="Duyệt tái thẩm định"
             onPress={() => router.push('/work/revalidation-review')}
           />
 

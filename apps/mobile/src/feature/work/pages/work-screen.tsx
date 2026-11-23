@@ -10,6 +10,7 @@ import { ReviewerWork } from '@/feature/work/components/reviewer-work';
 import { SurveyorWork, SurveyorFab } from '@/feature/work/components/surveyor-work';
 import { OfflineMapModal } from '@/components/offline-map-modal';
 import { CreditBalanceCard } from '@/components/credit-balance-card';
+import { WorkDailyTipCard } from '@/feature/work/components/work-daily-tip-card';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
@@ -151,6 +152,9 @@ export function WorkScreen({ currentRole }: { currentRole: CurrentRole }) {
 
           {/* Credit Balance Card */}
           <CreditBalanceCard />
+
+          {/* Daily Tip Card (Credit-Card Style) */}
+          <WorkDailyTipCard />
         </ScrollView>
 
         {/* Surveyor Floating Action Button */}

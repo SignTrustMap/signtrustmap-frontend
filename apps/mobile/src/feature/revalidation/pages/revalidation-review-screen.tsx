@@ -672,7 +672,7 @@ export function RevalidationReviewScreen() {
 
     setToast({
       id: Date.now(),
-      message: 'Đã đồng ý với kết luận của điều tra viên',
+      message: 'Đồng ý',
       tone: 'success',
     });
 
@@ -696,7 +696,7 @@ export function RevalidationReviewScreen() {
 
     setToast({
       id: Date.now(),
-      message: 'Đã bỏ qua minh chứng',
+      message: 'Đã bỏ qua',
       tone: 'default',
     });
 
@@ -1076,7 +1076,7 @@ export function RevalidationReviewScreen() {
               </Animated.View>
             </View>
 
-            {/* Comparison Section: New Sign vs Old Sign, New Timestamp vs Old Timestamp, and Conclusion */}
+            {/* Comparison Section (Option 1: Target Sign + Surveyor Verdict + Timestamps) */}
             <View
               style={[
                 styles.comparisonBox,
@@ -1086,84 +1086,146 @@ export function RevalidationReviewScreen() {
                 },
               ]}
             >
-              <View style={styles.comparisonColumnsRow}>
-                {/* LEFT COLUMN: MINH CHỨNG MỚI */}
-                <View style={styles.comparisonColumn}>
-                  <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
-                    MINH CHỨNG MỚI
-                  </Text>
-                  <Text style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Ghi nhận: Đã thay thế'
-                      : currentItem.evidence.evidenceType === 'REMOVED'
-                        ? 'Ghi nhận: Đã gỡ bỏ'
-                        : 'Ghi nhận: Vẫn còn'}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.telemetryText, { color: theme.placeholder }]}
+              {/* Row 1: Target Sign Name & Code Badge */}
+              <View style={styles.comparisonHeaderRow}>
+                {currentItem.verifiedSign.signCode ? (
+                  <View
+                    style={[
+                      styles.signCodeBadge,
+                      {
+                        backgroundColor: `${theme.primary}15`,
+                        borderColor: theme.primary,
+                      },
+                    ]}
                   >
-                    {formatDate(currentItem.evidence.submittedAt)}
+                    <Text style={[styles.signCodeText, { color: theme.primary }]}>
+                      {currentItem.verifiedSign.signCode}
+                    </Text>
+                  </View>
+                ) : null}
+                <Text numberOfLines={1} style={[styles.comparisonSignName, { color: theme.text }]}>
+                  {currentItem.verifiedSign.nameVi ||
+                    currentItem.verifiedSign.nameEn ||
+                    currentItem.verifiedSign.signCode ||
+                    'Biển báo gốc'}
+                </Text>
+              </View>
+
+              {/* Row 2: Surveyor Verdict Chip */}
+              <View style={styles.surveyorVerdictRow}>
+                <Text style={[styles.surveyorVerdictLabel, { color: theme.textSecondary }]}>
+                  Báo cáo thực địa:
+                </Text>
+                <View
+                  style={[
+                    styles.surveyorVerdictBadge,
+                    currentItem.evidence.evidenceType === 'REMOVED'
+                      ? styles.surveyorStatusRemoved
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? styles.surveyorStatusChanged
+                        : styles.surveyorStatusActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.surveyorVerdictText,
+                      {
+                        color:
+                          currentItem.evidence.evidenceType === 'REMOVED'
+                            ? '#DC2626'
+                            : currentItem.evidence.evidenceType === 'CHANGED'
+                              ? '#D97706'
+                              : '#16A34A',
+                      },
+                    ]}
+                  >
+                    {currentItem.evidence.evidenceType === 'REMOVED'
+                      ? 'Biển báo đã gỡ bỏ'
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? 'Biển báo đã thay đổi'
+                        : 'Biển báo vẫn còn hoạt động'}
                   </Text>
                 </View>
+              </View>
 
-                {/* CENTER DIVIDER */}
-                <View style={[styles.columnDivider, { backgroundColor: theme.border }]} />
-
-                {/* RIGHT COLUMN: BIỂN BÁO GỐC */}
-                <View style={styles.comparisonColumn}>
-                  <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
-                    BIỂN BÁO GỐC
+              {/* Row 3: Timestamps Comparison (Old vs New, without distance) */}
+              <View style={styles.timestampsRow}>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons
+                    color={theme.placeholder}
+                    name="camera-outline"
+                    size={13}
+                  />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Chụp mới: {formatDate(currentItem.evidence.submittedAt)}
                   </Text>
-                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.verifiedSign.nameVi ||
-                      currentItem.verifiedSign.nameEn ||
-                      currentItem.verifiedSign.signCode ||
-                      'Biển báo gốc'}
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.baselineLastVerified, { color: theme.placeholder }]}
-                  >
+                </View>
+                <Text style={[styles.timestampDivider, { color: theme.placeholder }]}>•</Text>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="history" size={13} />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Lần cuối:{' '}
                     {currentItem.verifiedSign.lastVerifiedAt
                       ? formatDate(currentItem.verifiedSign.lastVerifiedAt)
                       : 'Chưa có dữ liệu'}
                   </Text>
                 </View>
               </View>
+            </View>
 
-              {/* Conclusion Section (Surveyor Report Conclusion) with Location Button */}
-              <View
+            {/* Action button right below comparison box: Location button */}
+            <View style={styles.skipToSummaryRow}>
+              <AppButton
+                accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
+                accessibilityLabel="Di chuyển đến vị trí biển báo"
+                disabled={isNavigatingToSign}
+                onPress={() => {
+                  const coord =
+                    (currentItem.evidence as any)?.location ??
+                    (currentItem.verifiedSign as any)?.location ??
+                    {};
+                  const lat =
+                    coord.latitude ??
+                    currentItem.evidence?.latitude ??
+                    (currentItem.verifiedSign as any)?.latitude ??
+                    (currentItem as any)?.latitude;
+                  const lng =
+                    coord.longitude ??
+                    currentItem.evidence?.longitude ??
+                    (currentItem.verifiedSign as any)?.longitude ??
+                    (currentItem as any)?.longitude;
+
+                  void navigateToSign({
+                    latitude: lat,
+                    longitude: lng,
+                    title:
+                      currentItem.verifiedSign?.nameVi ||
+                      currentItem.verifiedSign?.signCode ||
+                      'Biển báo tái xác thực',
+                    subtitle: currentItem.verifiedSign?.signCode,
+                    signId: currentItem.evidenceId || currentItem.taskId,
+                  });
+                }}
                 style={[
-                  styles.conclusionBanner,
-                  currentItem.evidence.evidenceType === 'REMOVED'
-                    ? styles.surveyorStatusRemoved
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? styles.surveyorStatusChanged
-                      : styles.surveyorStatusActive,
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: theme.border,
+                  },
                 ]}
+                testID="reval-move-to-sign-location-button"
+                variant="surface"
               >
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.conclusionText,
-                    {
-                      color:
-                        currentItem.evidence.evidenceType === 'REMOVED'
-                          ? '#DC2626'
-                          : currentItem.evidence.evidenceType === 'CHANGED'
-                            ? '#D97706'
-                            : '#16A34A',
-                    },
-                  ]}
-                >
-                  {currentItem.evidence.evidenceType === 'REMOVED'
-                    ? 'Biển báo đã gỡ bỏ'
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Biển báo đã thay đổi'
-                      : 'Biển báo vẫn còn hoạt động'}
-                </Text>
-              </View>
+                <View style={styles.locationButtonContent}>
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="map-marker-outline"
+                    size={15}
+                  />
+                  <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
+                  </Text>
+                </View>
+              </AppButton>
             </View>
 
             {/* Bottom Actions: Separate Revalidation Decision Badge Component */}
@@ -1741,52 +1803,65 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   comparisonBox: {
-    width: '92%',
-    maxWidth: 348,
+    width: '90%',
+    maxWidth: 340,
     alignSelf: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    marginVertical: Spacing.two,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginVertical: Spacing.one,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 5,
     elevation: 2,
   },
-  comparisonColumnsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.two,
-  },
-  comparisonColumn: {
-    flex: 1,
-    paddingHorizontal: 3,
-    justifyContent: 'flex-start',
-  },
-  columnHeaderRow: {
+  comparisonHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 6,
   },
-  columnLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  evidenceStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 3,
+  signCodeBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 5,
     borderWidth: 1,
-    marginBottom: 4,
+  },
+  signCodeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  comparisonSignName: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  surveyorVerdictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  surveyorVerdictLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  surveyorVerdictBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  surveyorVerdictText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   surveyorStatusActive: {
     backgroundColor: '#F0FDF4',
@@ -1800,114 +1875,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     borderColor: '#F59E0B',
   },
-  surveyorStatusText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  conclusionBanner: {
+  timestampsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: Spacing.one,
-    borderRadius: 8,
-    borderWidth: 1.2,
-    marginBottom: Spacing.two,
-    alignSelf: 'stretch',
-    overflow: 'hidden',
   },
-  conclusionText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  baselineCodeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  baselineCodeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  comparisonTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  columnTelemetryList: {
-    gap: 2,
-  },
-  telemetryItem: {
+  timestampItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  telemetryText: {
+  timestampDivider: {
     fontSize: 10,
+  },
+  timestampText: {
+    fontSize: 10.5,
     fontWeight: '500',
-  },
-  columnDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: 8,
-    marginVertical: 2,
-  },
-  baselineMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  baselineMiniCrop: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  baselineMiniCropPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  baselineScoreContainer: {
-    flex: 1,
-  },
-  baselineScoreLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  baselineLastVerified: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  comparisonBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    paddingTop: 8,
-    paddingHorizontal: 2,
-  },
-  bottomBarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  bottomBarText: {
-    fontSize: 10,
-    fontWeight: '600',
   },
   actionsFooter: {
     alignItems: 'center',
@@ -2632,10 +2616,12 @@ const styles = StyleSheet.create({
   },
   skipToSummaryRow: {
     width: '100%',
+    maxWidth: 340,
+    alignSelf: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: -2,
+    marginTop: 2,
     marginBottom: 4,
   },
   locationButtonContent: {
