@@ -46,8 +46,8 @@ import type {
 } from '@/types/surveySubmissionType';
 
 const submissionTypeLabels: Record<SubmissionType, string> = {
-  SINGLE_IMAGE: 'Khảo sát hình ảnh',
-  VIDEO_GPX: 'Khảo sát Video & GPX',
+  SINGLE_IMAGE: 'Hình ảnh',
+  VIDEO_GPX: 'Video & GPX',
 };
 
 const statusLabels: Record<SubmissionStatus, string> = {
@@ -574,18 +574,6 @@ export function SurveySubmissionDetailsScreen({
               </View>
             </View>
 
-            {/* Media Section: Review the image or video again */}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Phương tiện ghi nhận khảo sát
-              </Text>
-              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
-                {isVideoSubmission
-                  ? 'Bản ghi video & dữ liệu đo đạc'
-                  : 'Ảnh khảo sát độ phân giải cao'}
-              </Text>
-            </View>
-
             {/* If Single Image: Display image with full-screen zoom */}
             {!isVideoSubmission ? (
               <View
@@ -785,7 +773,7 @@ export function SurveySubmissionDetailsScreen({
 
                 <View style={styles.statBox}>
                   <Text style={[styles.statValue, { color: theme.text }]}>
-                    {submission.coordinateSource || 'DEVICE_GPS'}
+                    {submissionTypeLabels[submission.submissionType] ?? submission.submissionType}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Nguồn dữ liệu GPS
@@ -805,11 +793,6 @@ export function SurveySubmissionDetailsScreen({
               ]}
             >
               <View style={styles.cardHeader}>
-                <MaterialCommunityIcons
-                  color={theme.primary}
-                  name="information-outline"
-                  size={20}
-                />
                 <Text style={[styles.cardTitle, { color: theme.text }]}>
                   Thông tin hồ sơ khảo sát
                 </Text>
@@ -873,21 +856,8 @@ export function SurveySubmissionDetailsScreen({
                 {submission.latitude != null && submission.longitude != null ? (
                   <>
                     <View style={styles.metaRow}>
-                      <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Tọa độ</Text>
-                      <View style={styles.metaValueContainer}>
-                        <Text
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                          style={[styles.metaValueMono, { color: theme.text }]}
-                        >
-                          {submission.latitude.toFixed(6)}, {submission.longitude.toFixed(6)}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.metaRow}>
                       <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>
-                        Địa chỉ / Vị trí
+                        Địa chỉ
                       </Text>
                       <View style={styles.metaValueContainer}>
                         <Text
@@ -934,11 +904,6 @@ export function SurveySubmissionDetailsScreen({
                 ]}
               >
                 <View style={styles.cardHeader}>
-                  <MaterialCommunityIcons
-                    color={theme.primary}
-                    name="map-marker-distance"
-                    size={20}
-                  />
                   <Text style={[styles.cardTitle, { color: theme.text }]}>Vị trí</Text>
                 </View>
                 <View
@@ -1050,7 +1015,6 @@ export function SurveySubmissionDetailsScreen({
                 ]}
               >
                 <View style={styles.cardHeader}>
-                  <MaterialCommunityIcons color={theme.primary} name="sign-direction" size={20} />
                   <Text style={[styles.cardTitle, { color: theme.text }]}>
                     Biển báo giao thông phát hiện ({statusData.candidates.length})
                   </Text>

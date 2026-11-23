@@ -92,6 +92,9 @@ export function NavigationMapScreen() {
     destinationLng,
     destinationSubtitle,
     destinationTitle,
+    isFreeNavigation,
+    reviewerSubmissionId,
+    returnToReviewer,
     savedRouteId: paramSavedRouteId,
     startId,
     startLat,
@@ -104,6 +107,9 @@ export function NavigationMapScreen() {
     destinationLng?: string;
     destinationSubtitle?: string;
     destinationTitle?: string;
+    isFreeNavigation?: string;
+    reviewerSubmissionId?: string;
+    returnToReviewer?: string;
     savedRouteId?: string;
     startId?: string;
     startLat?: string;
@@ -111,6 +117,20 @@ export function NavigationMapScreen() {
     startTitle?: string;
     vehicleMode?: string;
   }>();
+
+  const isFreeReviewerNavigation = isFreeNavigation === 'true';
+  const isReturnToReviewer = returnToReviewer === 'true';
+
+  const handleReturnToReviewer = useCallback(() => {
+    setSwappedRoute(null);
+    setNavigationSession(undefined);
+    setActiveSavedRouteId(undefined);
+    resetReroute();
+    router.replace({
+      pathname: '/work/submission-review',
+      params: reviewerSubmissionId ? { targetSubmissionId: reviewerSubmissionId } : {},
+    });
+  }, [reviewerSubmissionId, router]);
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
@@ -506,17 +526,18 @@ export function NavigationMapScreen() {
     selectedDestination &&
     activeRouteResult?.coordinates?.length,
   );
-  const hasInsufficientCredits = isRoutePreviewReady && userCredits < 5;
+  const hasInsufficientCredits =
+    !isFreeReviewerNavigation && isRoutePreviewReady && userCredits < 5;
 
   useEffect(() => {
     if (activeRouteResult?.coordinates?.length && !isNavigating) {
-      if (userCredits < 5) {
+      if (!isFreeReviewerNavigation && userCredits < 5) {
         setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       } else {
         setNavigationError(undefined);
       }
     }
-  }, [activeRouteResult?.coordinates, isNavigating, userCredits]);
+  }, [activeRouteResult?.coordinates, isFreeReviewerNavigation, isNavigating, userCredits]);
 
   useEffect(() => {
     setNavigationActive(isNavigating);
@@ -910,7 +931,7 @@ export function NavigationMapScreen() {
       return;
     }
 
-    if (userCredits < 5) {
+    if (!isFreeReviewerNavigation && userCredits < 5) {
       setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       setLocationToast({
         id: Date.now(),
@@ -933,7 +954,7 @@ export function NavigationMapScreen() {
         return;
       }
 
-      if (session?.accessToken) {
+      if (session?.accessToken && !isFreeReviewerNavigation) {
         try {
           await initiateSessionMutation.mutateAsync({
             origin: {
@@ -1075,11 +1096,19 @@ export function NavigationMapScreen() {
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
   const handleDismissCompleteModal = () => {
     setIsCompleteModalVisible(false);
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
@@ -1263,6 +1292,16 @@ export function NavigationMapScreen() {
         {/* Non-navigating Overlay: Top controls, Home filter, and floating map action buttons */}
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
+            {isReturnToReviewer ? (
+              <Pressable
+                accessibilityLabel="Quay lại thẩm định"
+                onPress={handleReturnToReviewer}
+                style={[styles.returnToReviewerPill, { top: insets.top + Spacing.one }]}
+              >
+                <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={16} />
+                <Text style={styles.returnToReviewerText}>Quay lại thẩm định</Text>
+              </Pressable>
+            ) : null}
             <NavigationTopControls
               selectedDestination={selectedDestination}
               plannedRouteOrigin={plannedRouteOrigin}
@@ -1406,6 +1445,7 @@ export function NavigationMapScreen() {
         visibleSigns={visibleSigns}
         isStartingNavigation={isStartingNavigation}
         isStartDisabled={hasInsufficientCredits}
+        isFreeNavigation={isFreeReviewerNavigation}
         isRouteBookmarked={isRouteBookmarked}
         onBeginNavigation={handleBeginNavigation}
         onOpenBookmarkModal={() => setIsBookmarkModalOpen(true)}

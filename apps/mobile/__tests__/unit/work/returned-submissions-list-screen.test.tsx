@@ -9,11 +9,13 @@ import type { SurveySubmission } from '@/types/surveySubmissionType';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
@@ -59,7 +61,10 @@ describe('ReturnedSubmissionsListScreen', () => {
 
     // Test back button
     fireEvent.press(getByLabelText('Quay lại công việc'));
-    expect(mockBack).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/work',
+      params: { currentRole: 'surveyor' },
+    });
   });
 
   it('navigates to return item screen with ID when item is clicked', async () => {
@@ -90,5 +95,32 @@ describe('ReturnedSubmissionsListScreen', () => {
     const { getByLabelText } = await render(<ReturnedSubmissionsListScreen />);
     fireEvent.press(getByLabelText('Làm mới danh sách'));
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('renders real backend submissions when available and navigates with real ID', async () => {
+    const realItem: SurveySubmission = {
+      id: 'sub-real-fn-001',
+      surveyorId: 'surveyor-123',
+      submissionType: 'SINGLE_IMAGE',
+      status: 'NO_SIGN_DETECTED',
+      failureReason: 'Không phát hiện biển báo nào trong ảnh chụp',
+      totalCandidatesExtracted: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    mockSubmissionsData = { items: [realItem] };
+
+    const { getByText } = await render(<ReturnedSubmissionsListScreen />);
+
+    expect(getByText('Không có biển báo')).toBeTruthy();
+    expect(getByText('Không phát hiện biển báo nào trong ảnh chụp')).toBeTruthy();
+
+    const actionBtn = getByText('Xem & Khoanh vùng');
+    fireEvent.press(actionBtn);
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/work/returned-submission-item',
+      params: { id: 'sub-real-fn-001' },
+    });
   });
 });

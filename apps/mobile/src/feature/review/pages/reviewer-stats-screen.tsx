@@ -149,9 +149,6 @@ export function ReviewerStatsScreen() {
             <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
               Thống kê thẩm định
             </Text>
-            <Text style={[styles.subtitle, { color: theme.grey }]}>
-              Độ tin cậy & lịch sử biểu quyết cộng đồng
-            </Text>
           </View>
 
           <AppButton
@@ -358,7 +355,7 @@ export function ReviewerStatsScreen() {
                 <View style={styles.historyHeaderRow}>
                   <View style={styles.historyTitleWrap}>
                     <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                      Lịch sử biểu quyết gần đây
+                      Lịch sử thẩm định gần đây
                     </Text>
                     {isHistoryFetching ? (
                       <ActivityIndicator

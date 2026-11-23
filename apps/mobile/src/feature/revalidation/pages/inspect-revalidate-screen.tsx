@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -19,6 +21,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,7 +50,10 @@ import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { resolveS3Url } from '@/api/revalidation/revalidation';
-import { useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
+import {
+  useGetAllRevalidationTasks,
+  useSubmitRevalidation,
+} from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalidationEvidenceType } from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
@@ -79,6 +85,7 @@ type SelectedMedia = {
   duration?: number;
   assetId?: string;
   isLiveCapture?: boolean;
+  isCompressed?: boolean;
 };
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
@@ -197,8 +204,15 @@ export function InspectRevalidateScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Carried target sign metadata
-  const signId = params.signId || 'sign-target';
+  const signId = params.signId || '';
   const taskId = params.taskId;
+  const { data: allRevalTasks = [] } = useGetAllRevalidationTasks(!taskId && Boolean(signId));
+  const resolvedTaskId = useMemo(() => {
+    if (taskId && taskId !== 'sign-target') return taskId;
+    if (!signId) return taskId || '';
+    const matched = allRevalTasks.find((t) => t.verifiedSignId === signId || t.id === signId);
+    return matched?.id || taskId || signId;
+  }, [taskId, signId, allRevalTasks]);
   const signCode = params.signCode || 'Biển báo giao thông';
   const signName = params.name || params.nameVi || params.nameEn || 'Kiểm tra biển báo';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
@@ -437,6 +451,7 @@ export function InspectRevalidateScreen() {
             asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
           assetId: asset.id,
           isLiveCapture: false,
+          isCompressed: true,
         });
         setDetectedGps(gpsCoordinates ?? null);
       }
@@ -454,7 +469,6 @@ export function InspectRevalidateScreen() {
   const handleLaunchCamera = async () => {
     setPickerError(undefined);
     try {
-      const ImagePicker = await import('expo-image-picker');
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
         setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
@@ -463,7 +477,7 @@ export function InspectRevalidateScreen() {
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.9,
+        quality: 0.65,
         exif: true,
       });
 
@@ -495,6 +509,7 @@ export function InspectRevalidateScreen() {
           mimeType: 'image/jpeg',
           capturedAt: new Date().toISOString(),
           isLiveCapture: true,
+          isCompressed: true,
         });
 
         if (gps) {
@@ -521,12 +536,11 @@ export function InspectRevalidateScreen() {
         return;
       }
 
-      const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
         exif: true,
         mediaTypes: ['images', 'videos'],
-        quality: 0.9,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -564,6 +578,7 @@ export function InspectRevalidateScreen() {
           duration: asset.duration ? asset.duration / 1000 : undefined,
           capturedAt: new Date().toISOString(),
           isLiveCapture: false,
+          isCompressed: !isVideo,
         });
         setDetectedGps(gps ?? null);
       }
@@ -583,7 +598,13 @@ export function InspectRevalidateScreen() {
 
     const lat = detectedGps?.latitude;
     const lon = detectedGps?.longitude;
-    const targetTaskId = taskId || signId;
+    const targetTaskId = resolvedTaskId || taskId || signId;
+
+    if (!targetTaskId || targetTaskId === 'sign-target') {
+      setSubmitError('Mã nhiệm vụ tái thẩm định hoặc ID biển báo không hợp lệ.');
+      setIsSubmitting(false);
+      return;
+    }
 
     if (!lat || !lon) {
       setSubmitError(COORDINATES_REQUIRED_EVIDENCE_MESSAGE);
@@ -597,7 +618,12 @@ export function InspectRevalidateScreen() {
 
     try {
       let uploadMedia = selectedMedia;
-      if (selectedMedia && selectedMedia.type === 'image' && selectedMedia.uri) {
+      if (
+        selectedMedia &&
+        selectedMedia.type === 'image' &&
+        selectedMedia.uri &&
+        !selectedMedia.isCompressed
+      ) {
         try {
           const compressed = await compressAndResizeSurveyImage(selectedMedia.uri);
           if (compressed.uri && compressed.uri !== selectedMedia.uri) {
@@ -605,6 +631,7 @@ export function InspectRevalidateScreen() {
               ...selectedMedia,
               uri: compressed.uri,
               mimeType: 'image/jpeg',
+              isCompressed: true,
             };
           }
         } catch (compErr) {
@@ -638,7 +665,12 @@ export function InspectRevalidateScreen() {
       setSubmitSuccess(true);
       setTimeout(() => {
         router.replace({
-          pathname: '/work/revalidation-map',
+          pathname: '/work/submission-complete',
+          params: {
+            type: 'upload_revalidation',
+            taskId: targetTaskId,
+            signCode,
+          },
         });
       }, 1000);
     } catch (err) {
@@ -1171,16 +1203,6 @@ export function InspectRevalidateScreen() {
               <Text accessibilityRole="alert" style={styles.errorAlertText}>
                 {submitError}
               </Text>
-            ) : null}
-
-            {/* Success Banner */}
-            {submitSuccess ? (
-              <View style={styles.successBanner}>
-                <MaterialCommunityIcons color="#059669" name="check-circle" size={20} />
-                <Text style={styles.successBannerText}>
-                  Đã gửi bằng chứng! Đang quay lại bản đồ tái thẩm định…
-                </Text>
-              </View>
             ) : null}
 
             {/* =============================================================== */}

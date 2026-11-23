@@ -26,8 +26,15 @@ import {
 } from '@/feature/review/context/review-workflow-provider';
 import { ReportNewSignTypeModal } from '../components/report-new-sign-type-modal';
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
-import { useGetCatalog } from '@/feature/review/hooks/use-review';
-import { resolveS3Url, type RemedySign, type ReviewSubmission } from '@/api/reviews/review-workflow';
+import { useGetCatalog, useGetCandidateSignDetails } from '@/feature/review/hooks/use-review';
+import { getCandidateSignDetails } from '@/api/reviews/review';
+import { useReviewerSignNavigation } from '@/feature/review/hooks/use-reviewer-sign-navigation';
+import {
+  extractCoordinateFromCandidate,
+  resolveS3Url,
+  type RemedySign,
+  type ReviewSubmission,
+} from '@/api/reviews/review-workflow';
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
@@ -38,6 +45,7 @@ import {
 import { RevalidationSignPickerModal } from '@/feature/revalidation/components/revalidation-sign-picker-modal';
 import { useTheme } from '@/hooks/use-theme';
 import { useResponsive } from '@/utils/responsive';
+import { useBackButton } from '@/hooks/use-back-button';
 
 export type SubmissionReviewState = 'loading' | 'ready' | 'reviewed';
 
@@ -95,9 +103,7 @@ const declineReasons = [
 
 type DeclineReason = (typeof declineReasons)[number]['value'];
 
-export type ReportIssueType =
-  | 'missing_type'
-  | 'other';
+export type ReportIssueType = 'missing_type' | 'other';
 
 export const REPORT_ISSUE_OPTIONS: Array<{
   id: ReportIssueType;
@@ -175,9 +181,9 @@ function ReviewBottomSheet({
   const canConfirm = isDecline
     ? Boolean(
         selectedRemedySign ||
-        (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim())))
+        (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim()))),
       )
-    : (isMissingType || !isReportOther || Boolean(reportNote.trim()));
+    : isMissingType || !isReportOther || Boolean(reportNote.trim());
 
   const confirmLabel = isDecline
     ? selectedRemedySign
@@ -196,9 +202,15 @@ function ReviewBottomSheet({
       visible={Boolean(type)}
     >
       <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel="Đóng tùy chọn thẩm định" onPress={onClose} style={styles.backdrop} />
+        <Pressable
+          accessibilityLabel="Đóng tùy chọn thẩm định"
+          onPress={onClose}
+          style={styles.backdrop}
+        />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          behavior={
+            Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined
+          }
           enabled={Platform.OS !== 'web'}
           pointerEvents="box-none"
           style={styles.sheetPositioner}
@@ -230,7 +242,8 @@ function ReviewBottomSheet({
                 style={styles.sheetBodyScroll}
               >
                 {/* Active selection banner if chosen from Catalog outside top remedies */}
-                {selectedRemedySign && !remedySigns.slice(0, 4).some((s) => s.id === selectedRemedySign.id) ? (
+                {selectedRemedySign &&
+                !remedySigns.slice(0, 4).some((s) => s.id === selectedRemedySign.id) ? (
                   <View
                     style={[
                       styles.catalogSelectedCard,
@@ -246,7 +259,11 @@ function ReviewBottomSheet({
                           style={styles.remedyImage}
                         />
                       ) : (
-                        <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={32} />
+                        <MaterialCommunityIcons
+                          color={theme.placeholder}
+                          name="traffic-light"
+                          size={32}
+                        />
                       )}
                       <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
                         <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
@@ -259,7 +276,10 @@ function ReviewBottomSheet({
                       <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
                         {selectedRemedySign.signCode}
                       </Text>
-                      <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.remedyName, { color: theme.textSecondary }]}
+                      >
                         {selectedRemedySign.nameVi || selectedRemedySign.nameEn}
                       </Text>
                     </View>
@@ -269,7 +289,9 @@ function ReviewBottomSheet({
                       onPress={onOpenCatalog}
                       style={styles.catalogChangeButton}
                     >
-                      <Text style={[styles.catalogChangeButtonText, { color: theme.primary }]}>Đổi biển</Text>
+                      <Text style={[styles.catalogChangeButtonText, { color: theme.primary }]}>
+                        Đổi biển
+                      </Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -280,59 +302,66 @@ function ReviewBottomSheet({
 
                 <View style={styles.remediesGrid} testID="remedies-grid">
                   {remedySigns.slice(0, 4).map((sign) => {
-                      const selected = selectedRemedySign?.id === sign.id;
+                    const selected = selectedRemedySign?.id === sign.id;
 
-                      return (
-                        <Pressable
-                          accessibilityLabel={`Chọn biển báo ${sign.signCode} - ${sign.nameVi || sign.nameEn}`}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          key={sign.id}
-                          onPress={() => {
-                            onSelectRemedySign?.(sign);
-                            onChangeDeclineReason?.(undefined);
-                          }}
-                          style={({ pressed }) => [
-                            styles.remedyCard,
-                            {
-                              backgroundColor: selected ? theme.backgroundSelected : theme.surface,
-                              borderColor: selected ? theme.primary : theme.border,
-                              opacity: pressed ? 0.85 : 1,
-                              transform: [{ scale: pressed ? 0.98 : 1 }],
-                            },
-                          ]}
+                    return (
+                      <Pressable
+                        accessibilityLabel={`Chọn biển báo ${sign.signCode} - ${sign.nameVi || sign.nameEn}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        key={sign.id}
+                        onPress={() => {
+                          onSelectRemedySign?.(sign);
+                          onChangeDeclineReason?.(undefined);
+                        }}
+                        style={({ pressed }) => [
+                          styles.remedyCard,
+                          {
+                            backgroundColor: selected ? theme.backgroundSelected : theme.surface,
+                            borderColor: selected ? theme.primary : theme.border,
+                            opacity: pressed ? 0.85 : 1,
+                            transform: [{ scale: pressed ? 0.98 : 1 }],
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}
                         >
-                          <View style={[styles.remedyImageWrapper, { backgroundColor: theme.neutral }]}>
-                            {sign.imageUrl ? (
-                              <Image
-                                accessibilityLabel={sign.signCode}
-                                contentFit="contain"
-                                source={{ uri: resolveS3Url(sign.imageUrl) }}
-                                style={styles.remedyImage}
-                              />
-                            ) : (
-                              <MaterialCommunityIcons
-                                color={theme.placeholder}
-                                name="traffic-light"
-                                size={32}
-                              />
-                            )}
-                            {selected ? (
-                              <View style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}>
-                                <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
-                              </View>
-                            ) : null}
-                          </View>
-                          <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
-                            {sign.signCode}
-                          </Text>
-                          <Text numberOfLines={2} style={[styles.remedyName, { color: theme.textSecondary }]}>
-                            {sign.nameVi || sign.nameEn}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                          {sign.imageUrl ? (
+                            <Image
+                              accessibilityLabel={sign.signCode}
+                              contentFit="contain"
+                              source={{ uri: resolveS3Url(sign.imageUrl) }}
+                              style={styles.remedyImage}
+                            />
+                          ) : (
+                            <MaterialCommunityIcons
+                              color={theme.placeholder}
+                              name="traffic-light"
+                              size={32}
+                            />
+                          )}
+                          {selected ? (
+                            <View
+                              style={[styles.remedyCheckBadge, { backgroundColor: theme.primary }]}
+                            >
+                              <MaterialCommunityIcons color="#FFFFFF" name="check" size={12} />
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text numberOfLines={1} style={[styles.remedyCode, { color: theme.text }]}>
+                          {sign.signCode}
+                        </Text>
+                        <Text
+                          numberOfLines={2}
+                          style={[styles.remedyName, { color: theme.textSecondary }]}
+                        >
+                          {sign.nameVi || sign.nameEn}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
                 {/* Below the grid: actions when none of the top 4 is right */}
                 <View style={styles.noOptionContainer}>
@@ -406,7 +435,11 @@ function ReviewBottomSheet({
                         placeholderTextColor={theme.placeholder}
                         style={[
                           styles.reasonDetailInput,
-                          { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                          {
+                            backgroundColor: theme.background,
+                            borderColor: theme.border,
+                            color: theme.text,
+                          },
                         ]}
                         value={declineReasonDetail}
                       />
@@ -453,10 +486,16 @@ function ReviewBottomSheet({
                           },
                         ]}
                       >
-                        <Text style={[styles.reasonLabel, { color: theme.text }]}>{option.label}</Text>
+                        <Text style={[styles.reasonLabel, { color: theme.text }]}>
+                          {option.label}
+                        </Text>
                         {option.badge ? (
-                          <View style={[styles.inlineBadge, { backgroundColor: `${theme.primary}18` }]}>
-                            <Text style={[styles.inlineBadgeText, { color: theme.primary }]}>{option.badge}</Text>
+                          <View
+                            style={[styles.inlineBadge, { backgroundColor: `${theme.primary}18` }]}
+                          >
+                            <Text style={[styles.inlineBadgeText, { color: theme.primary }]}>
+                              {option.badge}
+                            </Text>
                           </View>
                         ) : null}
                         <View
@@ -465,7 +504,9 @@ function ReviewBottomSheet({
                             { borderColor: selected ? theme.primary : theme.placeholder },
                           ]}
                         >
-                          {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
+                          {selected ? (
+                            <View style={[styles.radioDot, { backgroundColor: theme.primary }]} />
+                          ) : null}
                         </View>
                       </Pressable>
                     );
@@ -485,7 +526,11 @@ function ReviewBottomSheet({
                       placeholderTextColor={theme.placeholder}
                       style={[
                         styles.reasonInput,
-                        { backgroundColor: theme.background, borderColor: theme.border, color: theme.text },
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.border,
+                          color: theme.text,
+                        },
                       ]}
                       textAlignVertical="top"
                       value={reportNote}
@@ -512,12 +557,21 @@ function ReviewBottomSheet({
                     backgroundColor: !canConfirm
                       ? theme.placeholder
                       : isDecline
-                        ? (declineReason ? Colors.danger : theme.primary)
+                        ? declineReason
+                          ? Colors.danger
+                          : theme.primary
                         : theme.primary,
                   },
                 ]}
               >
-                <Text style={{ color: '#FFFFFF', fontFamily: Fonts.body, fontSize: 14, fontWeight: '700' }}>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontFamily: Fonts.body,
+                    fontSize: 14,
+                    fontWeight: '700',
+                  }}
+                >
                   {confirmLabel}
                 </Text>
                 {!isDecline ? <Text style={styles.srOnlyText}>Submit Report</Text> : null}
@@ -533,8 +587,9 @@ function ReviewBottomSheet({
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ resumeIndex?: string }>();
+  const params = useLocalSearchParams<{ resumeIndex?: string; targetSubmissionId?: string }>();
   const resumeIndexParam = params?.resumeIndex;
+  const targetSubmissionIdParam = params?.targetSubmissionId;
   const theme = useTheme();
   const { isSmallDevice, height: windowHeight } = useResponsive();
   const {
@@ -551,6 +606,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     undoLastReview,
   } = useReviewWorkflow();
 
+  const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+
   useEffect(() => {
     if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
       const idx = parseInt(resumeIndexParam, 10);
@@ -560,23 +617,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     }
   }, [resumeIndexParam, jumpToSubmissionIndex]);
 
-  const handleSkipToSummary = useCallback(() => {
-    cancelSubmissionCheck?.();
-    router.replace({
-      pathname: '/work/submission-summary',
-      params: { resumeIndex: String(reviewHistory.length) },
-    });
-  }, [cancelSubmissionCheck, reviewHistory.length, router]);
+  useEffect(() => {
+    if (targetSubmissionIdParam && pendingSubmissions.length > 0) {
+      const idx = pendingSubmissions.findIndex((s) => s.id === targetSubmissionIdParam);
+      if (idx !== -1) {
+        jumpToSubmissionIndex?.(idx);
+      }
+    }
+  }, [targetSubmissionIdParam, pendingSubmissions, jumpToSubmissionIndex]);
 
   const handleKeepCurrentReview = useCallback(() => {
     const completes = keepCurrentReviewAndNext?.() ?? true;
     if (completes) {
-      router.replace({
-        pathname: '/work/submission-summary',
-        params: { resumeIndex: String(reviewHistory.length) },
-      });
+      router.replace('/work/reviewer-history');
     }
-  }, [keepCurrentReviewAndNext, reviewHistory.length, router]);
+  }, [keepCurrentReviewAndNext, router]);
 
   const [activeSheet, setActiveSheet] = useState<ReviewSheet>();
   const [selectedRemedySign, setSelectedRemedySign] = useState<RemedySign>();
@@ -604,11 +659,35 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const session = optionalSession?.session;
   const [resolvedAddress, setResolvedAddress] = useState<string>();
 
+  const candidateDetailsResult = useGetCandidateSignDetails(
+    submission?.id ? { candidateId: submission.id } : undefined,
+    Boolean(submission?.id),
+  );
+  const candidateDetails = candidateDetailsResult?.data;
+
+  const currentCoordinate = useMemo(() => {
+    if (!submission) return { latitude: null, longitude: null };
+    const fromSubmission = extractCoordinateFromCandidate(submission);
+    if (fromSubmission.latitude != null && fromSubmission.longitude != null) {
+      return fromSubmission;
+    }
+    const fromDetails = extractCoordinateFromCandidate(candidateDetails);
+    if (fromDetails.latitude != null && fromDetails.longitude != null) {
+      return fromDetails;
+    }
+    return { latitude: null, longitude: null };
+  }, [submission, candidateDetails]);
+
   const displayedReviewAction =
-    (submission as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+    (submission as ReviewSubmission & { previousAction?: ReviewActionType })?.previousAction ??
     recheckingPreviousAction;
   const isRecheckMode = Boolean(recheckingSubmission && displayedReviewAction);
   const [isEditingVote, setIsEditingVote] = useState(false);
+
+  useBackButton({
+    pathname: '/work',
+    params: { currentRole: 'reviewer' },
+  });
 
   useEffect(() => {
     setIsEditingVote(false);
@@ -625,8 +704,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       return;
     }
 
-    const lat = submission.latitude;
-    const lon = submission.longitude;
+    const detailsLocation = (candidateDetails as any)?.locationContext?.displayLocation;
+    if (detailsLocation && detailsLocation !== 'Estimated GPS coordinates available') {
+      setResolvedAddress(detailsLocation.replace(/^[•\s,.-]+/, '').trim());
+      return;
+    }
+
+    const lat = currentCoordinate.latitude;
+    const lon = currentCoordinate.longitude;
     if (lat == null || lon == null) {
       setResolvedAddress(undefined);
       return;
@@ -652,25 +737,80 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     return () => {
       isMounted = false;
     };
-  }, [submission?.id, submission?.location, submission?.latitude, submission?.longitude, session?.accessToken]);
+  }, [
+    submission?.id,
+    submission?.location,
+    candidateDetails,
+    currentCoordinate.latitude,
+    currentCoordinate.longitude,
+    session?.accessToken,
+  ]);
 
   const displayLocation = useMemo(() => {
     if (resolvedAddress) return resolvedAddress;
+    const detailsLoc = (candidateDetails as any)?.locationContext?.displayLocation;
+    if (detailsLoc && detailsLoc !== 'Estimated GPS coordinates available') {
+      return detailsLoc;
+    }
     if (submission?.location && submission.location !== 'Estimated GPS coordinates available') {
       return submission.location;
     }
+    if (currentCoordinate.latitude != null && currentCoordinate.longitude != null) {
+      return `${currentCoordinate.latitude.toFixed(4)}, ${currentCoordinate.longitude.toFixed(4)}`;
+    }
     return '';
-  }, [resolvedAddress, submission?.location]);
+  }, [
+    resolvedAddress,
+    candidateDetails,
+    submission?.location,
+    currentCoordinate.latitude,
+    currentCoordinate.longitude,
+  ]);
+
+  const handleNavigateToSignLocation = useCallback(async () => {
+    if (!submission) return;
+
+    let lat = currentCoordinate.latitude;
+    let lon = currentCoordinate.longitude;
+
+    if ((lat == null || lon == null) && session?.accessToken && submission.id) {
+      try {
+        const freshDetails = await getCandidateSignDetails(
+          { candidateId: submission.id },
+          session.accessToken,
+        );
+        const fromFresh = extractCoordinateFromCandidate(freshDetails);
+        if (fromFresh.latitude != null && fromFresh.longitude != null) {
+          lat = fromFresh.latitude;
+          lon = fromFresh.longitude;
+        }
+      } catch {
+        // ignore and fallback to Alert
+      }
+    }
+
+    void navigateToSign({
+      latitude: lat,
+      longitude: lon,
+      title: submission.title,
+      subtitle: displayLocation,
+      signId: submission.id,
+    });
+  }, [
+    submission,
+    currentCoordinate.latitude,
+    currentCoordinate.longitude,
+    session?.accessToken,
+    displayLocation,
+    navigateToSign,
+  ]);
 
   const totalInQueue = Math.max(
     totalSubmissions,
     reviewHistory.length + pendingSubmissions.length,
     1,
   );
-  const reviewPosition = Math.min(
-    reviewHistory.length + (submission ? 1 : 0),
-    totalInQueue,
-  );
+  const reviewPosition = Math.min(reviewHistory.length + (submission ? 1 : 0), totalInQueue);
 
   const activeRemedySigns: RemedySign[] = useMemo(() => {
     const candidateSignId = (submission as any)?.predictedSignTypeId;
@@ -705,7 +845,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       // If fewer than 4 non-duplicate signs remain, supplement with catalog signs to always display 4
       const needed = 4 - remedies.length;
       const additionalFromCatalog = catalogSigns
-        .filter((s) => !isCandidateSign(s) && !remedies.some((r) => r.id === s.id || r.signCode.toLowerCase() === s.signCode.toLowerCase()))
+        .filter(
+          (s) =>
+            !isCandidateSign(s) &&
+            !remedies.some(
+              (r) => r.id === s.id || r.signCode.toLowerCase() === s.signCode.toLowerCase(),
+            ),
+        )
         .slice(0, needed)
         .map((s) => ({
           id: s.id,
@@ -745,7 +891,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       },
     ) => {
       if (!submission) return;
-      const completesReviewQueue = pendingSubmissions.length === 1;
 
       completeCurrentReview(action, details);
 
@@ -763,11 +908,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         tone: action === 'approved' || action === 'reported_new_sign' ? 'success' : 'default',
       }));
 
-      if (completesReviewQueue) {
-        router.replace('/work/submission-summary');
+      if (isRecheckMode) {
+        router.replace('/work/reviewer-history');
       }
     },
-    [completeCurrentReview, pendingSubmissions.length, router, submission],
+    [completeCurrentReview, isRecheckMode, pendingSubmissions.length, router, submission],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -807,9 +952,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     if (reportIssueType === 'missing_type') {
       if (submission?.id) {
         const autoProposedName =
-          reportNote.trim() ||
-          submission.title ||
-          `Biển lạ tại ${resolvedAddress || 'thực địa'}`;
+          reportNote.trim() || submission.title || `Biển lạ tại ${resolvedAddress || 'thực địa'}`;
 
         completeReview('reported_new_sign', {
           newSignReport: {
@@ -983,12 +1126,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               accessibilityLabel="Go back"
               hitSlop={Spacing.one}
               onPress={() => {
-                if (isRecheckMode) {
-                  cancelSubmissionCheck?.();
-                }
-                router.back();
+                if (isRecheckMode) cancelSubmissionCheck?.();
+                router.navigate({
+                  pathname: '/work',
+                  params: { currentRole: 'reviewer' },
+                });
               }}
               style={styles.backButton}
+              testID="submission-review-back-button"
             >
               <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
             </Pressable>
@@ -1011,8 +1156,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
           <View style={styles.progressCounterRow}>
             <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
-              {submission ? 'REVIEWING' : 'REVIEWED'}{' '}
-              {reviewPosition} OF {totalInQueue}
+              {submission ? 'REVIEWING' : 'REVIEWED'} {reviewPosition} OF {totalInQueue}
             </Text>
           </View>
         </View>
@@ -1057,11 +1201,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   {
                     backgroundColor: theme.backgroundElement,
                     borderColor: theme.border,
-                    transform: [
-                      { translateX: pan.x },
-                      { translateY: pan.y },
-                      { rotate },
-                    ],
+                    transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
                   },
                 ]}
               >
@@ -1072,12 +1212,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 >
                   <Image
                     accessibilityLabel={submission.title}
-                    contentFit={isSignFocused ? "contain" : "cover"}
+                    contentFit={isSignFocused ? 'contain' : 'cover'}
                     source={submission.image}
-                    style={[
-                      styles.cardImage,
-                      isSignFocused && { transform: [{ scale: 1.15 }] },
-                    ]}
+                    style={[styles.cardImage, isSignFocused && { transform: [{ scale: 1.15 }] }]}
                     transition={180}
                   />
 
@@ -1094,11 +1231,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   >
                     <MaterialCommunityIcons
                       color="#FFFFFF"
-                      name={isSignFocused ? "target" : "image-filter-center-focus"}
+                      name={isSignFocused ? 'target' : 'image-filter-center-focus'}
                       size={13}
                     />
                     <Text style={styles.focusToggleText}>
-                      {isSignFocused ? "Focus Biển báo" : "Toàn cảnh"}
+                      {isSignFocused ? 'Focus Biển báo' : 'Toàn cảnh'}
                     </Text>
                   </Pressable>
 
@@ -1126,11 +1263,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       </Animated.View>
 
                       <Animated.View
-                        style={[
-                          styles.swipeBadge,
-                          styles.skipBadge,
-                          { opacity: skipBadgeOpacity },
-                        ]}
+                        style={[styles.swipeBadge, styles.skipBadge, { opacity: skipBadgeOpacity }]}
                       >
                         <Text style={[styles.swipeBadgeText, { color: '#FFFFFF' }]}>BỎ QUA</Text>
                       </Animated.View>
@@ -1157,7 +1290,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                               ? 'rgba(22, 128, 58, 0.9)'
                               : displayedReviewAction === 'declined'
                                 ? 'rgba(239, 68, 68, 0.9)'
-                                : displayedReviewAction === 'reported' || displayedReviewAction === 'reported_new_sign'
+                                : displayedReviewAction === 'reported' ||
+                                    displayedReviewAction === 'reported_new_sign'
                                   ? 'rgba(249, 115, 22, 0.9)'
                                   : 'rgba(100, 116, 139, 0.9)',
                         },
@@ -1168,7 +1302,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           ? 'ĐÃ PHÊ DUYỆT'
                           : displayedReviewAction === 'declined'
                             ? 'ĐÃ TỪ CHỐI'
-                            : displayedReviewAction === 'reported' || displayedReviewAction === 'reported_new_sign'
+                            : displayedReviewAction === 'reported' ||
+                                displayedReviewAction === 'reported_new_sign'
                               ? 'ĐÃ BÁO CÁO'
                               : 'ĐÃ BỎ QUA'}
                       </Text>
@@ -1197,19 +1332,21 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 {submission.title}
               </Text>
               <Text style={styles.srOnlyText}>Sign detected</Text>
-              <Text numberOfLines={1} style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.infoBoxSubtitle, { color: theme.placeholder }]}
+              >
                 {[submission.captured, displayLocation].filter(Boolean).join(', ')}
               </Text>
             </View>
 
-            {/* Action buttons right below the name, location button on the left and summary on the right */}
+            {/* Action button right below the name: location button */}
             <View style={styles.skipToSummaryRow}>
               <AppButton
                 accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
                 accessibilityLabel="Di chuyển đến vị trí biển báo"
-                onPress={() => {
-                  // Placeholder: di chuyển đến vị trí biển báo (sẽ implement sau)
-                }}
+                disabled={isNavigatingToSign}
+                onPress={handleNavigateToSignLocation}
                 style={[
                   styles.summaryShortcutButton,
                   {
@@ -1220,29 +1357,16 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                 variant="surface"
               >
                 <View style={styles.locationButtonContent}>
-                  <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={15} />
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="map-marker-outline"
+                    size={15}
+                  />
                   <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
-                    Vị trí biển báo
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
                   </Text>
                 </View>
               </AppButton>
-
-              <AppButton
-                accessibilityHint="Bỏ qua các biển báo còn lại và chuyển đến màn hình tổng kết"
-                accessibilityLabel="Chuyển đến màn hình tổng kết"
-                disabled={reviewHistory.length === 0}
-                label="Tổng kết"
-                onPress={handleSkipToSummary}
-                style={[
-                  styles.summaryShortcutButton,
-                  {
-                    borderColor: reviewHistory.length > 0 ? theme.primary : theme.border,
-                  },
-                ]}
-                testID="skip-to-summary-button"
-                textStyle={styles.summaryShortcutButtonText}
-                variant={reviewHistory.length > 0 ? 'primary' : 'surface'}
-              />
             </View>
 
             {/* Bottom Section: Approve (Heart) & Reject (X) Buttons */}
@@ -1259,9 +1383,17 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                     <SubmissionEditingBanner onCancel={() => setIsEditingVote(false)} />
                   ) : null}
 
-                  <View style={[styles.diamondContainer, isSmallDevice && styles.diamondContainerSmall]}>
+                  <View
+                    style={[styles.diamondContainer, isSmallDevice && styles.diamondContainerSmall]}
+                  >
                     {/* Top Button: Arrow pointing up -> Skip (Cannot Identify) */}
-                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondTopSmall : styles.diamondTop]}>
+                    <View
+                      style={[
+                        styles.diamondItem,
+                        isSmallDevice ? styles.diamondItemSmall : null,
+                        isSmallDevice ? styles.diamondTopSmall : styles.diamondTop,
+                      ]}
+                    >
                       <Pressable
                         accessibilityLabel="Skip submission (cannot identify)"
                         accessibilityRole="button"
@@ -1274,15 +1406,31 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={theme.text} name="arrow-up" size={isSmallDevice ? 20 : 24} />
+                        <MaterialCommunityIcons
+                          color={theme.text}
+                          name="arrow-up"
+                          size={isSmallDevice ? 20 : 24}
+                        />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
+                      <Text
+                        style={[
+                          styles.diamondLabel,
+                          isSmallDevice && styles.diamondLabelSmall,
+                          { color: theme.text },
+                        ]}
+                      >
                         Bỏ qua
                       </Text>
                     </View>
 
                     {/* Left Button: Decline (X) */}
-                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondLeftSmall : styles.diamondLeft]}>
+                    <View
+                      style={[
+                        styles.diamondItem,
+                        isSmallDevice ? styles.diamondItemSmall : null,
+                        isSmallDevice ? styles.diamondLeftSmall : styles.diamondLeft,
+                      ]}
+                    >
                       <Pressable
                         accessibilityLabel="Decline submission"
                         accessibilityRole="button"
@@ -1295,15 +1443,31 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={Colors.danger} name="close" size={isSmallDevice ? 22 : 28} />
+                        <MaterialCommunityIcons
+                          color={Colors.danger}
+                          name="close"
+                          size={isSmallDevice ? 22 : 28}
+                        />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
+                      <Text
+                        style={[
+                          styles.diamondLabel,
+                          isSmallDevice && styles.diamondLabelSmall,
+                          { color: theme.text },
+                        ]}
+                      >
                         Từ chối
                       </Text>
                     </View>
 
                     {/* Right Button: Approve (Heart) */}
-                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondRightSmall : styles.diamondRight]}>
+                    <View
+                      style={[
+                        styles.diamondItem,
+                        isSmallDevice ? styles.diamondItemSmall : null,
+                        isSmallDevice ? styles.diamondRightSmall : styles.diamondRight,
+                      ]}
+                    >
                       <Pressable
                         accessibilityLabel="Approve submission"
                         accessibilityRole="button"
@@ -1315,15 +1479,31 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color="#FFFFFF" name="heart" size={isSmallDevice ? 22 : 28} />
+                        <MaterialCommunityIcons
+                          color="#FFFFFF"
+                          name="heart"
+                          size={isSmallDevice ? 22 : 28}
+                        />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
+                      <Text
+                        style={[
+                          styles.diamondLabel,
+                          isSmallDevice && styles.diamondLabelSmall,
+                          { color: theme.text },
+                        ]}
+                      >
                         Đồng ý
                       </Text>
                     </View>
 
                     {/* Bottom Button: Report */}
-                    <View style={[styles.diamondItem, isSmallDevice ? styles.diamondItemSmall : null, isSmallDevice ? styles.diamondBottomSmall : styles.diamondBottom]}>
+                    <View
+                      style={[
+                        styles.diamondItem,
+                        isSmallDevice ? styles.diamondItemSmall : null,
+                        isSmallDevice ? styles.diamondBottomSmall : styles.diamondBottom,
+                      ]}
+                    >
                       <Pressable
                         accessibilityLabel="Report submission"
                         accessibilityRole="button"
@@ -1336,9 +1516,19 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           pressed && styles.circleButtonPressed,
                         ]}
                       >
-                        <MaterialCommunityIcons color={theme.textSecondary} name="flag-outline" size={isSmallDevice ? 18 : 22} />
+                        <MaterialCommunityIcons
+                          color={theme.textSecondary}
+                          name="flag-outline"
+                          size={isSmallDevice ? 18 : 22}
+                        />
                       </Pressable>
-                      <Text style={[styles.diamondLabel, isSmallDevice && styles.diamondLabelSmall, { color: theme.text }]}>
+                      <Text
+                        style={[
+                          styles.diamondLabel,
+                          isSmallDevice && styles.diamondLabelSmall,
+                          { color: theme.text },
+                        ]}
+                      >
                         Báo cáo
                       </Text>
                     </View>
@@ -1383,19 +1573,32 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
-            <Text accessibilityLabel="All reviews completed" style={[styles.completeTitle, { color: theme.text }]}>
+            <Text
+              accessibilityLabel="All reviews completed"
+              style={[styles.completeTitle, { color: theme.text }]}
+            >
               All reviews completed
             </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
               Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.
             </Text>
-            {reviewHistory.length > 0 ? (
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <AppButton
-                label="Xem tổng kết"
-                onPress={() => router.replace('/work/submission-summary')}
-                style={styles.completeSummaryButton}
+                label="Lịch sử thẩm định"
+                onPress={() => router.replace('/work/reviewer-history')}
+                variant="primary"
               />
-            ) : null}
+              <AppButton
+                label="Trang làm việc"
+                onPress={() =>
+                  router.replace({
+                    pathname: '/work',
+                    params: { currentRole: 'reviewer' },
+                  })
+                }
+                variant="surface"
+              />
+            </View>
           </View>
         )}
       </SafeAreaView>
@@ -1418,21 +1621,15 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               accessibilityLabel="Đóng xem phóng to"
               hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
               onPress={() => setIsImageZoomed(false)}
-              style={[
-                styles.zoomCloseBtn,
-                { top: Math.max(insets.top, 16) + 12 },
-              ]}
+              style={[styles.zoomCloseBtn, { top: Math.max(insets.top, 16) + 12 }]}
             >
               <MaterialCommunityIcons color="#FFFFFF" name="close" size={26} />
             </Pressable>
             {submission ? (
               <Image
-                contentFit={isSignFocused ? "contain" : "cover"}
+                contentFit={isSignFocused ? 'contain' : 'cover'}
                 source={submission.image}
-                style={[
-                  styles.zoomedImage,
-                  isSignFocused && { transform: [{ scale: 1.25 }] },
-                ]}
+                style={[styles.zoomedImage, isSignFocused && { transform: [{ scale: 1.25 }] }]}
               />
             ) : null}
             <Pressable
@@ -1447,11 +1644,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
             >
               <MaterialCommunityIcons
                 color="#FFFFFF"
-                name={isSignFocused ? "target" : "image-filter-center-focus"}
+                name={isSignFocused ? 'target' : 'image-filter-center-focus'}
                 size={16}
               />
               <Text style={styles.zoomFocusToggleText}>
-                {isSignFocused ? "Chế độ: Focus Biển báo" : "Chế độ: Toàn cảnh"}
+                {isSignFocused ? 'Chế độ: Focus Biển báo' : 'Chế độ: Toàn cảnh'}
               </Text>
             </Pressable>
           </SafeAreaView>

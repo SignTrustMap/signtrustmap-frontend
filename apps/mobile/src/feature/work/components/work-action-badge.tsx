@@ -20,6 +20,7 @@ export type WorkActionBadgeProps = {
   onPress?: () => void;
   subtitle?: string;
   symbol?: SymbolName;
+  testID?: string;
   urgent?: boolean;
 };
 
@@ -33,6 +34,7 @@ export function WorkActionBadge({
   onPress,
   subtitle,
   symbol,
+  testID,
   urgent = false,
 }: WorkActionBadgeProps) {
   const theme = useTheme();
@@ -47,6 +49,7 @@ export function WorkActionBadge({
         }
         accessibilityRole="button"
         onPress={onPress}
+        testID={testID}
         style={({ pressed }) => [
           styles.actionItem,
           pressed && { opacity: 0.75, transform: [{ scale: 0.95 }] },

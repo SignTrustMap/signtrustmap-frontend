@@ -130,8 +130,15 @@ jest.mock('expo-media-library/legacy', () => ({
 }));
 
 const mockFetchFreshGpsPosition = jest.fn();
+const mockFetchFreshGpsLocation = jest.fn().mockResolvedValue({
+  latitude: 10.7769,
+  longitude: 106.6955,
+  accuracy: 5,
+  heading: 90,
+});
 jest.mock('@/feature/navigation/utils/gps', () => ({
   fetchFreshGpsPosition: () => mockFetchFreshGpsPosition(),
+  fetchFreshGpsLocation: () => mockFetchFreshGpsLocation(),
 }));
 
 jest.mock('@/hooks/use-theme', () => ({

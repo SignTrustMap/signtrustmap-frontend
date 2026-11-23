@@ -10,7 +10,8 @@
     "ios": {
       "icon": "./assets/images/app-logo.png",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route."
+        "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route.",
+        "NSCameraUsageDescription": "SignTrustMap uses your camera to capture traffic signs."
       }
     },
     "android": {
@@ -60,7 +61,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow SignTrustMap to access photos and videos for survey records.",
-          "cameraPermission": false,
+          "cameraPermission": "Allow SignTrustMap to access your camera to capture traffic signs.",
           "microphonePermission": false
         }
       ],

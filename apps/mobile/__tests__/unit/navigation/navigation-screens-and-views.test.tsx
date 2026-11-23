@@ -45,6 +45,8 @@ jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
   return {
     MaterialCommunityIcons: (props: any) => <View testID={`mc-icon-${props.name}`} {...props} />,
+    Ionicons: (props: any) => <View testID={`ion-icon-${props.name}`} {...props} />,
+    Feather: (props: any) => <View testID={`feather-icon-${props.name}`} {...props} />,
   };
 });
 

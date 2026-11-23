@@ -132,6 +132,10 @@ jest.mock('expo-blob', () => ({
   Blob: class {},
 }));
 
+jest.mock('@/hooks/use-back-button', () => ({
+  useBackButton: jest.fn(),
+}));
+
 try {
   require('@shopify/flash-list/jestSetup');
 } catch {

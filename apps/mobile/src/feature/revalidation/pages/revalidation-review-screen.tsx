@@ -23,14 +23,16 @@ import { AppButton } from '@/components/button';
 import { AppToast } from '@/components/toast';
 import { CANNOT_RECORD_VOTE_MESSAGE } from '@/constants/message';
 import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { formatDate } from '@/utils/format-date';
 import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
 import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
-import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { extractCoordinateFromCandidate, resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
@@ -47,6 +49,7 @@ import {
   useRevalidationWorkflow,
 } from '../context/revalidation-workflow-provider';
 import { useResponsive } from '@/utils/responsive';
+import { useReviewerSignNavigation } from '@/feature/review/hooks/use-reviewer-sign-navigation';
 
 export type RevalidationReviewAction =
   | 'STILL_ACTIVE'
@@ -243,7 +246,7 @@ const DECLINE_COUNTER_CHOICES: Array<{
   id: string;
   label: string;
   desc: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   color: string;
 }> = [
   {
@@ -264,7 +267,6 @@ const DECLINE_COUNTER_CHOICES: Array<{
     id: 'CHANGED',
     label: 'Biển báo đã thay đổi',
     desc: 'Biển báo đã được thay thế hoặc đổi sang mã biển khác.',
-    icon: 'swap-horizontal',
     color: '#D97706',
   },
 ];
@@ -569,7 +571,11 @@ export function RevalidationReviewScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const reviewerWorkRoute = useWorkRoute('/work', { currentRole: 'reviewer' });
+  useBackButton(reviewerWorkRoute);
   const { isSmallDevice, height: windowHeight } = useResponsive();
+
+  const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -592,8 +598,11 @@ export function RevalidationReviewScreen() {
   } = workflow;
 
   const displayedPreviousReview =
-    (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))?.previousReview ??
-    recheckingPreviousReview;
+    (
+      currentItem as RevalidationQueueEvidenceItem & {
+        previousReview?: CompletedRevalidationReview;
+      }
+    )?.previousReview ?? recheckingPreviousReview;
   const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
   const [isEditingVote, setIsEditingVote] = useState(false);
 
@@ -602,11 +611,8 @@ export function RevalidationReviewScreen() {
   }, [currentItem?.evidenceId, isCheckingEvidence]);
 
   const handleKeepPreviousReview = useCallback(() => {
-    const completes = keepCurrentEvidenceAndNext?.() ?? true;
-    if (completes) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [keepCurrentEvidenceAndNext, router]);
+    keepCurrentEvidenceAndNext?.();
+  }, [keepCurrentEvidenceAndNext]);
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -622,13 +628,6 @@ export function RevalidationReviewScreen() {
     message: string;
     tone: 'default' | 'success';
   }>();
-
-  // If reviews completed, automatically navigate to Recheck voted evidence screen
-  useEffect(() => {
-    if (!currentItem && history.length > 0 && !isLoading) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [currentItem, history.length, isLoading, router]);
 
   // ---------------------------------------------------------------------------
   // Action Handler: calls workflow vote API upon swipe or action confirmation
@@ -656,14 +655,10 @@ export function RevalidationReviewScreen() {
         tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
       });
 
-      const completesQueue = await workflowVote(action, note, suggestedSignTypeId, verdict);
+      await workflowVote(action, note, suggestedSignTypeId, verdict);
       setViewMode('evidence');
-
-      if (completesQueue) {
-        router.replace('/work/revalidation-summary');
-      }
     },
-    [currentItem, router, workflowVote],
+    [currentItem, workflowVote],
   );
 
   // Reviewer agrees with surveyor conclusion
@@ -677,22 +672,18 @@ export function RevalidationReviewScreen() {
 
     setToast({
       id: Date.now(),
-      message: 'Đã đồng ý với kết luận của điều tra viên',
+      message: 'Đồng ý',
       tone: 'success',
     });
 
-    const completesQueue = await workflowVote(
+    await workflowVote(
       decision,
       undefined,
       currentItem.evidence.suggestedSignTypeId ?? undefined,
       'AGREE',
     );
     setViewMode('evidence');
-
-    if (completesQueue) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [currentItem, router, workflowVote]);
+  }, [currentItem, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion
   const handleDecline = useCallback(() => {
@@ -705,17 +696,13 @@ export function RevalidationReviewScreen() {
 
     setToast({
       id: Date.now(),
-      message: 'Đã bỏ qua minh chứng',
+      message: 'Đã bỏ qua',
       tone: 'default',
     });
 
-    const completesQueue = workflowSkip();
+    workflowSkip();
     setViewMode('evidence');
-
-    if (completesQueue) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [currentItem, router, workflowSkip]);
+  }, [currentItem, workflowSkip]);
 
   // Reviewer reports invalid / bad evidence
   const handleReport = useCallback(() => {
@@ -915,7 +902,7 @@ export function RevalidationReviewScreen() {
                   if (isRecheckMode) {
                     cancelEvidenceCheck?.();
                   }
-                  router.back();
+                  router.replace(reviewerWorkRoute);
                 }}
                 style={styles.backButton}
               >
@@ -936,19 +923,7 @@ export function RevalidationReviewScreen() {
                 </View>
               </View>
 
-              <Pressable
-                accessibilityLabel="Xem tổng kết đánh giá"
-                hitSlop={Spacing.one}
-                onPress={() => {
-                  if (isRecheckMode) {
-                    cancelEvidenceCheck?.();
-                  }
-                  router.replace('/work/revalidation-summary');
-                }}
-                style={styles.summaryTopButton}
-              >
-                <MaterialCommunityIcons color={theme.text} name="format-list-checks" size={22} />
-              </Pressable>
+              <View style={styles.topBarSpacer} />
             </View>
             <View style={styles.progressCounterRow}>
               <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
@@ -1040,7 +1015,8 @@ export function RevalidationReviewScreen() {
                       ]}
                     >
                       <Text style={styles.statusBadgeLabel}>
-                        {revalActionDetails[displayedPreviousReview.action]?.title ?? 'ĐÃ THẨM ĐỊNH'}
+                        {revalActionDetails[displayedPreviousReview.action]?.title ??
+                          'ĐÃ THẨM ĐỊNH'}
                       </Text>
                     </View>
                   ) : null}
@@ -1098,13 +1074,9 @@ export function RevalidationReviewScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
-              <Text style={[styles.zoomHintText, { color: theme.placeholder }]}>
-                Nhấn để phóng to nếu chưa nhìn rõ biển báo
-              </Text>
             </View>
-            {/* =============================================================== */}
-            {/* 2. COMPARISON SECTION: NEW EVIDENCE (LEFT) VS BASELINE (RIGHT)  */}
-            {/* =============================================================== */}
+
+            {/* Comparison Section (Option 1: Target Sign + Surveyor Verdict + Timestamps) */}
             <View
               style={[
                 styles.comparisonBox,
@@ -1114,162 +1086,125 @@ export function RevalidationReviewScreen() {
                 },
               ]}
             >
-              <View style={styles.comparisonColumnsRow}>
-                {/* ----------------------------------------------------------- */}
-                {/* LEFT COLUMN: NEW EVIDENCE (ON-SITE SUBMISSION)               */}
-                {/* ----------------------------------------------------------- */}
-                <View style={styles.comparisonColumn}>
-                  <Text
-                    style={[styles.columnLabel, { color: theme.textSecondary, marginBottom: 4 }]}
+              {/* Row 1: Target Sign Name & Code Badge */}
+              <View style={styles.comparisonHeaderRow}>
+                {currentItem.verifiedSign.signCode ? (
+                  <View
+                    style={[
+                      styles.signCodeBadge,
+                      {
+                        backgroundColor: `${theme.primary}15`,
+                        borderColor: theme.primary,
+                      },
+                    ]}
                   >
-                    MINH CHỨNG MỚI
-                  </Text>
-
-                  {/* Condition Title */}
-                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Ghi nhận: Đã thay thế'
-                      : currentItem.evidence.evidenceType === 'REMOVED'
-                        ? 'Ghi nhận: Đã gỡ bỏ'
-                        : 'Ghi nhận: Vẫn còn'}
-                  </Text>
-
-                  {/* Distance & Timestamp Telemetry */}
-                  <View style={styles.columnTelemetryList}>
-                    {currentItem.evidence.distanceMeters != null ? (
-                      <View style={styles.telemetryItem}>
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.telemetryText, { color: theme.placeholder }]}
-                        >
-                          Cách vị trí cũ {Math.round(currentItem.evidence.distanceMeters)}m
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.telemetryItem}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.telemetryText, { color: theme.placeholder }]}
-                      >
-                        Thời gian chụp: {formatDate(currentItem.evidence.submittedAt)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* ----------------------------------------------------------- */}
-                {/* CENTER DIVIDER LINE                                         */}
-                {/* ----------------------------------------------------------- */}
-                <View style={[styles.columnDivider, { backgroundColor: theme.border }]} />
-
-                {/* ----------------------------------------------------------- */}
-                {/* RIGHT COLUMN: BASELINE RECORD (HISTORICAL SIGN)             */}
-                {/* ----------------------------------------------------------- */}
-                <View style={styles.comparisonColumn}>
-                  <View style={styles.columnHeaderRow}>
-                    <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
-                      BIỂN BÁO GỐC
+                    <Text style={[styles.signCodeText, { color: theme.primary }]}>
+                      {currentItem.verifiedSign.signCode}
                     </Text>
                   </View>
-
-                  {/* Baseline Sign Name */}
-                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.verifiedSign.nameVi ||
-                      currentItem.verifiedSign.nameEn ||
-                      currentItem.verifiedSign.signCode ||
-                      'Biển báo giao thông'}
-                  </Text>
-
-                  {/* Thumbnail & Freshness Score Row */}
-                  <View style={styles.baselineMetaRow}>
-                    <View style={styles.baselineScoreContainer}>
-                      {currentItem.verifiedSign.lastVerifiedAt ? (
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.baselineLastVerified, { color: theme.placeholder }]}
-                        >
-                          Lần cuối xác minh {formatDate(currentItem.verifiedSign.lastVerifiedAt)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Conclusion Section (Surveyor Report Conclusion) */}
-              <View
-                style={[
-                  styles.conclusionBanner,
-                  currentItem.evidence.evidenceType === 'REMOVED'
-                    ? styles.surveyorStatusRemoved
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? styles.surveyorStatusChanged
-                      : styles.surveyorStatusActive,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={
-                    currentItem.evidence.evidenceType === 'REMOVED'
-                      ? '#DC2626'
-                      : currentItem.evidence.evidenceType === 'CHANGED'
-                        ? '#D97706'
-                        : '#16A34A'
-                  }
-                  name={
-                    currentItem.evidence.evidenceType === 'REMOVED'
-                      ? 'alert-circle-outline'
-                      : currentItem.evidence.evidenceType === 'CHANGED'
-                        ? 'swap-horizontal'
-                        : 'check-circle-outline'
-                  }
-                  size={12}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.conclusionText,
-                    {
-                      color:
-                        currentItem.evidence.evidenceType === 'REMOVED'
-                          ? '#DC2626'
-                          : currentItem.evidence.evidenceType === 'CHANGED'
-                            ? '#D97706'
-                            : '#16A34A',
-                    },
-                  ]}
-                >
-                  {currentItem.evidence.evidenceType === 'REMOVED'
-                    ? 'Biển báo đã gỡ bỏ'
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Biển báo đã thay đổi'
-                      : 'Biển báo vẫn còn hoạt động'}
+                ) : null}
+                <Text numberOfLines={1} style={[styles.comparisonSignName, { color: theme.text }]}>
+                  {currentItem.verifiedSign.nameVi ||
+                    currentItem.verifiedSign.nameEn ||
+                    currentItem.verifiedSign.signCode ||
+                    'Biển báo gốc'}
                 </Text>
               </View>
 
-              {/* Bottom Summary Bar */}
-              <View style={[styles.comparisonBottomBar, { borderTopColor: theme.border }]}>
-                <View style={styles.bottomBarItem}>
-                  <MaterialCommunityIcons color={theme.placeholder} name="vote-outline" size={12} />
-                  <Text style={[styles.bottomBarText, { color: theme.placeholder }]}>
-                    Đã có {currentItem.currentVoteCount} người bình chọn trước bạn
+              {/* Row 2: Surveyor Verdict Chip */}
+              <View style={styles.surveyorVerdictRow}>
+                <Text style={[styles.surveyorVerdictLabel, { color: theme.textSecondary }]}>
+                  Báo cáo thực địa:
+                </Text>
+                <View
+                  style={[
+                    styles.surveyorVerdictBadge,
+                    currentItem.evidence.evidenceType === 'REMOVED'
+                      ? styles.surveyorStatusRemoved
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? styles.surveyorStatusChanged
+                        : styles.surveyorStatusActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.surveyorVerdictText,
+                      {
+                        color:
+                          currentItem.evidence.evidenceType === 'REMOVED'
+                            ? '#DC2626'
+                            : currentItem.evidence.evidenceType === 'CHANGED'
+                              ? '#D97706'
+                              : '#16A34A',
+                      },
+                    ]}
+                  >
+                    {currentItem.evidence.evidenceType === 'REMOVED'
+                      ? 'Biển báo đã gỡ bỏ'
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? 'Biển báo đã thay đổi'
+                        : 'Biển báo vẫn còn hoạt động'}
                   </Text>
                 </View>
-                <View style={styles.bottomBarItem}>
-                  <MaterialCommunityIcons color="#16A34A" name="gift-outline" size={12} />
-                  <Text style={[styles.bottomBarText, { color: '#16A34A' }]}>
-                    +{currentItem.rewardCredits} Credits thưởng
+              </View>
+
+              {/* Row 3: Timestamps Comparison (Old vs New, without distance) */}
+              <View style={styles.timestampsRow}>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons
+                    color={theme.placeholder}
+                    name="camera-outline"
+                    size={13}
+                  />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Chụp mới: {formatDate(currentItem.evidence.submittedAt)}
+                  </Text>
+                </View>
+                <Text style={[styles.timestampDivider, { color: theme.placeholder }]}>•</Text>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="history" size={13} />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Lần cuối:{' '}
+                    {currentItem.verifiedSign.lastVerifiedAt
+                      ? formatDate(currentItem.verifiedSign.lastVerifiedAt)
+                      : 'Chưa có dữ liệu'}
                   </Text>
                 </View>
               </View>
             </View>
 
-            {/* Action buttons right below the comparison box, location on the left, summary on the right */}
+            {/* Action button right below comparison box: Location button */}
             <View style={styles.skipToSummaryRow}>
               <AppButton
                 accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
                 accessibilityLabel="Di chuyển đến vị trí biển báo"
+                disabled={isNavigatingToSign}
                 onPress={() => {
-                  // Placeholder: di chuyển đến vị trí biển báo (sẽ implement sau)
+                  const coord =
+                    (currentItem.evidence as any)?.location ??
+                    (currentItem.verifiedSign as any)?.location ??
+                    {};
+                  const lat =
+                    coord.latitude ??
+                    currentItem.evidence?.latitude ??
+                    (currentItem.verifiedSign as any)?.latitude ??
+                    (currentItem as any)?.latitude;
+                  const lng =
+                    coord.longitude ??
+                    currentItem.evidence?.longitude ??
+                    (currentItem.verifiedSign as any)?.longitude ??
+                    (currentItem as any)?.longitude;
+
+                  void navigateToSign({
+                    latitude: lat,
+                    longitude: lng,
+                    title:
+                      currentItem.verifiedSign?.nameVi ||
+                      currentItem.verifiedSign?.signCode ||
+                      'Biển báo tái xác thực',
+                    subtitle: currentItem.verifiedSign?.signCode,
+                    signId: currentItem.evidenceId || currentItem.taskId,
+                  });
                 }}
                 style={[
                   styles.summaryShortcutButton,
@@ -1281,32 +1216,16 @@ export function RevalidationReviewScreen() {
                 variant="surface"
               >
                 <View style={styles.locationButtonContent}>
-                  <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={15} />
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="map-marker-outline"
+                    size={15}
+                  />
                   <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
-                    Vị trí biển báo
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
                   </Text>
                 </View>
               </AppButton>
-
-              <AppButton
-                accessibilityHint="Bỏ qua các minh chứng còn lại và chuyển đến màn hình tổng kết"
-                accessibilityLabel="Chuyển đến màn hình tổng kết"
-                disabled={history.length === 0}
-                label="Tổng kết"
-                onPress={() => {
-                  cancelEvidenceCheck?.();
-                  router.replace('/work/revalidation-summary');
-                }}
-                style={[
-                  styles.summaryShortcutButton,
-                  {
-                    borderColor: history.length > 0 ? theme.primary : theme.border,
-                  },
-                ]}
-                testID="reval-skip-to-summary-button"
-                textStyle={styles.summaryShortcutButtonText}
-                variant={history.length > 0 ? 'primary' : 'surface'}
-              />
             </View>
 
             {/* Bottom Actions: Separate Revalidation Decision Badge Component */}
@@ -1334,50 +1253,6 @@ export function RevalidationReviewScreen() {
               </>
             )}
           </View>
-        ) : history.length > 0 ? (
-          /* Revalidation Summary Screen (mirrors reviewer flow) */
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryHeading}>
-              <Text style={[styles.summaryTitle, { color: theme.text }]}>
-                Tổng kết tái thẩm định
-              </Text>
-              <Text style={[styles.summarySubtitle, { color: theme.textSecondary }]}>
-                Hôm nay • Đã đánh giá {history.length} biển báo
-              </Text>
-            </View>
-
-            <View style={styles.summaryMetrics}>
-              <RevalSummaryMetric action="STILL_ACTIVE" count={counts.STILL_ACTIVE} />
-              <RevalSummaryMetric action="REMOVED" count={counts.REMOVED} />
-              <RevalSummaryMetric action="CHANGED" count={counts.CHANGED} />
-              <RevalSummaryMetric action="UNCLEAR" count={counts.UNCLEAR} />
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.summaryReviewListContent}
-              showsVerticalScrollIndicator={false}
-              style={styles.summaryReviewList}
-            >
-              {history.map((record, index) => (
-                <RevalReviewedSignRow key={`${record.item.evidenceId}-${index}`} record={record} />
-              ))}
-            </ScrollView>
-
-            <View style={styles.summaryFooterActions}>
-              <AppButton
-                label="Quay lại công việc"
-                onPress={() => router.back()}
-                style={[styles.summaryCheckButton, { borderColor: theme.border }]}
-                textStyle={{ color: theme.textSecondary }}
-                variant="surface"
-              />
-              <AppButton
-                label="Hoàn tất"
-                onPress={handleFinishReviews}
-                style={styles.summarySubmitButton}
-              />
-            </View>
-          </View>
         ) : (
           <View style={styles.completeState}>
             <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
@@ -1391,7 +1266,7 @@ export function RevalidationReviewScreen() {
             </Text>
             <AppButton
               label="Quay lại công việc"
-              onPress={() => router.back()}
+              onPress={() => router.replace(reviewerWorkRoute)}
               style={styles.completeSummaryButton}
             />
           </View>
@@ -1702,8 +1577,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: Spacing.two,
+    marginVertical: Spacing.one,
     position: 'relative',
+    minHeight: 280,
   },
   zoomHintText: {
     marginTop: Spacing.two,
@@ -1712,8 +1588,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   mainCard: {
-    width: '88%',
-    maxWidth: 324,
+    width: '90%',
+    maxWidth: 340,
     height: '100%',
     maxHeight: 380,
     borderRadius: 24,
@@ -1732,8 +1608,8 @@ const styles = StyleSheet.create({
   },
   peekCard: {
     position: 'absolute',
-    width: '88%',
-    maxWidth: 324,
+    width: '90%',
+    maxWidth: 340,
     height: '100%',
     maxHeight: 380,
     borderRadius: 24,
@@ -1747,6 +1623,75 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
+  },
+  signInfoContainer: {
+    width: '90%',
+    maxWidth: 340,
+    alignSelf: 'center',
+    marginVertical: Spacing.one,
+    gap: 6,
+  },
+  signTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  signTitleText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: Fonts.title,
+    lineHeight: 22,
+  },
+  evidenceTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  evidenceTypeBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Fonts.body,
+  },
+  metaChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+  },
+  metaChipText: {
+    fontSize: 11,
+    fontFamily: Fonts.body,
+  },
+  locationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Rounded.sm,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+    marginLeft: 'auto',
+  },
+  locationChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: Fonts.body,
   },
   peekDimOverlay: {
     ...StyleSheet.absoluteFill,
@@ -1858,52 +1803,65 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   comparisonBox: {
-    width: '92%',
-    maxWidth: 348,
+    width: '90%',
+    maxWidth: 340,
     alignSelf: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    marginVertical: Spacing.two,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginVertical: Spacing.one,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 5,
     elevation: 2,
   },
-  comparisonColumnsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.two,
-  },
-  comparisonColumn: {
-    flex: 1,
-    paddingHorizontal: 3,
-    justifyContent: 'flex-start',
-  },
-  columnHeaderRow: {
+  comparisonHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 6,
   },
-  columnLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  evidenceStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 3,
+  signCodeBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 5,
     borderWidth: 1,
-    marginBottom: 4,
+  },
+  signCodeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  comparisonSignName: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  surveyorVerdictRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  surveyorVerdictLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  surveyorVerdictBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  surveyorVerdictText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   surveyorStatusActive: {
     backgroundColor: '#F0FDF4',
@@ -1917,114 +1875,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     borderColor: '#F59E0B',
   },
-  surveyorStatusText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  conclusionBanner: {
+  timestampsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: Spacing.one,
-    borderRadius: 8,
-    borderWidth: 1.2,
-    marginBottom: Spacing.two,
-    alignSelf: 'stretch',
-    overflow: 'hidden',
   },
-  conclusionText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  baselineCodeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  baselineCodeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  comparisonTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  columnTelemetryList: {
-    gap: 2,
-  },
-  telemetryItem: {
+  timestampItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
-  telemetryText: {
+  timestampDivider: {
     fontSize: 10,
+  },
+  timestampText: {
+    fontSize: 10.5,
     fontWeight: '500',
-  },
-  columnDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: 8,
-    marginVertical: 2,
-  },
-  baselineMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  baselineMiniCrop: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  baselineMiniCropPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  baselineScoreContainer: {
-    flex: 1,
-  },
-  baselineScoreLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  baselineLastVerified: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  comparisonBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    paddingTop: 8,
-    paddingHorizontal: 2,
-  },
-  bottomBarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  bottomBarText: {
-    fontSize: 10,
-    fontWeight: '600',
   },
   actionsFooter: {
     alignItems: 'center',
@@ -2749,10 +2616,12 @@ const styles = StyleSheet.create({
   },
   skipToSummaryRow: {
     width: '100%',
+    maxWidth: 340,
+    alignSelf: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: -2,
+    marginTop: 2,
     marginBottom: 4,
   },
   locationButtonContent: {

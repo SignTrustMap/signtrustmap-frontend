@@ -3,6 +3,7 @@ import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
 import { SignFiltersScreen } from '@/feature/profile/pages/sign-filters-screen';
+import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -251,7 +252,188 @@ describe('SignFiltersScreen Unit Tests', () => {
     expect(getByLabelText('Lưu danh sách lọc')).toBeTruthy();
   });
 
-  it('filters presets based on search query', async () => {
+  it('validates missing start and destination points in create editor', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Tạo lộ trình & bộ lọc mới'));
+    });
+
+    // Try saving without startPoint
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+    expect(getByText('Vui lòng chọn Điểm bắt đầu (nhập tìm kiếm hoặc chọn Vị trí hiện tại).')).toBeTruthy();
+
+    // Fill start point via GPS
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chọn vị trí hiện tại cho điểm bắt đầu'));
+    });
+
+    // Try saving without destPoint
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+    expect(getByText('Vui lòng chọn Điểm đến (nhập tìm kiếm hoặc chọn Vị trí hiện tại).')).toBeTruthy();
+  });
+
+  it('handles GPS errors when selecting current location for start and dest', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    // GPS returns null
+    (fetchFreshGpsPosition as jest.Mock).mockResolvedValueOnce(null);
+
+    const { getByLabelText } = await render(<SignFiltersScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Tạo lộ trình & bộ lọc mới'));
+    });
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chọn vị trí hiện tại cho điểm bắt đầu'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Không thể xác định vị trí', expect.any(String));
+
+    // GPS throws error
+    (fetchFreshGpsPosition as jest.Mock).mockRejectedValueOnce(new Error('GPS timeout'));
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chọn vị trí hiện tại cho điểm đến'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Lỗi GPS', expect.any(String));
+
+    alertSpy.mockRestore();
+  });
+
+  it('allows selecting suggestions, vehicle modes, and creates preset', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Tạo lộ trình & bộ lọc mới'));
+    });
+
+    // Focus and type in start query to show suggestions
+    const startInput = getByLabelText('Nhập điểm bắt đầu');
+    await act(async () => {
+      fireEvent(startInput, 'focus');
+      fireEvent.changeText(startInput, 'Địa điểm');
+    });
+
+    // Select start suggestion
+    const startSuggestions = getByText('Địa điểm Test');
+    await act(async () => {
+      fireEvent.press(startSuggestions);
+    });
+
+    // Focus and type in dest query to show suggestions
+    const destInput = getByLabelText('Nhập điểm đến');
+    await act(async () => {
+      fireEvent(destInput, 'focus');
+      fireEvent.changeText(destInput, 'Địa điểm');
+    });
+
+    // Select dest suggestion
+    const destSuggestions = getByText('Địa điểm Test');
+    await act(async () => {
+      fireEvent.press(destSuggestions);
+    });
+
+    // Switch vehicle mode to Ô tô
+    await act(async () => {
+      fireEvent.press(getByText('Ô tô'));
+    });
+
+    // Custom preset name
+    await act(async () => {
+      fireEvent.changeText(getByLabelText('Tên lộ trình tùy chọn'), 'Lộ trình mới đi làm');
+    });
+
+    // Save
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+
+    expect(mockCreatePreset).toHaveBeenCalledWith(
+      'Lộ trình mới đi làm',
+      expect.any(Array),
+      expect.objectContaining({
+        originName: 'Địa điểm Test',
+        destinationName: 'Địa điểm Test',
+        vehicleMode: 'CAR',
+      }),
+    );
+  });
+
+  it('opens edit modal for existing preset, toggles categories, and saves updates', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    const editBtn = getByLabelText('Chỉnh sửa bộ lọc cho Tuyến đường đi làm');
+    await act(async () => {
+      fireEvent.press(editBtn);
+    });
+
+    expect(getByText('Chỉnh sửa lộ trình & bộ lọc')).toBeTruthy();
+
+    // Toggle a category
+    const mandatoryCat = getByLabelText('Biển Biển hiệu lệnh, đã bao gồm');
+    await act(async () => {
+      fireEvent.press(mandatoryCat);
+    });
+
+    // Save changes
+    await act(async () => {
+      fireEvent.press(getByLabelText('Lưu danh sách lọc'));
+    });
+
+    expect(mockUpdatePreset).toHaveBeenCalledWith(
+      'preset-1',
+      expect.objectContaining({
+        name: 'Tuyến đường đi làm',
+        onlyFixedSigns: true,
+      }),
+    );
+  });
+
+  it('prevents deselecting the last remaining category in editor', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Chỉnh sửa bộ lọc cho Tuyến đường đi làm'));
+    });
+
+    // samplePresets[0] has 'MANDATORY' and 'WARNING'. Deselect MANDATORY
+    await act(async () => {
+      fireEvent.press(getByLabelText('Biển Biển hiệu lệnh, đã bao gồm'));
+    });
+
+    // Now only WARNING remains. Deselect WARNING
+    await act(async () => {
+      fireEvent.press(getByLabelText('Biển Biển cảnh báo, đã bao gồm'));
+    });
+
+    expect(getByText('Danh sách phải bao gồm ít nhất một danh mục biển báo.')).toBeTruthy();
+  });
+
+  it('shows error when renaming to an empty string', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByLabelText('Đổi tên Tuyến đường đi làm'));
+    });
+
+    const input = getByLabelText('Nhập tên lộ trình mới');
+    await act(async () => {
+      fireEvent.changeText(input, '   ');
+    });
+
+    await act(async () => {
+      fireEvent.press(getByText('Lưu'));
+    });
+
+    expect(getByText('Tên danh sách không được để trống.')).toBeTruthy();
+    expect(mockRenamePreset).not.toHaveBeenCalled();
+  });
+
+  it('filters presets based on search query and clears search', async () => {
     const { getByLabelText, getByText, queryByText } = await render(<SignFiltersScreen />);
 
     const searchInput = getByLabelText('Tìm kiếm lộ trình hoặc địa điểm');
@@ -263,5 +445,35 @@ describe('SignFiltersScreen Unit Tests', () => {
       expect(getByText('Phường Tân Mỹ ➔ Hẻm 62C Bà Hom')).toBeTruthy();
       expect(queryByText('Tất cả biển báo khu vực')).toBeNull();
     });
+
+    // Clear search using clear button
+    const clearBtn = getByLabelText('Xóa tìm kiếm');
+    await act(async () => {
+      fireEvent.press(clearBtn);
+    });
+
+    await waitFor(() => {
+      expect(getByText('Tất cả biển báo khu vực')).toBeTruthy();
+    });
+  });
+
+  it('shows empty state when no presets match search and allows creating new preset', async () => {
+    const { getByLabelText, getByText } = await render(<SignFiltersScreen />);
+
+    const searchInput = getByLabelText('Tìm kiếm lộ trình hoặc địa điểm');
+    await act(async () => {
+      fireEvent.changeText(searchInput, 'Từ khóa không tồn tại xyz');
+    });
+
+    await waitFor(() => {
+      expect(getByText('Không tìm thấy lộ trình nào')).toBeTruthy();
+    });
+
+    const emptyAddBtn = getByLabelText('Tạo lộ trình & bộ lọc đầu tiên');
+    await act(async () => {
+      fireEvent.press(emptyAddBtn);
+    });
+
+    expect(getByText('Lộ trình & bộ lọc mới')).toBeTruthy();
   });
 });

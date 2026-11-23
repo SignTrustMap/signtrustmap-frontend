@@ -38,9 +38,9 @@ export type SurveyGpx = {
   uri: string;
 };
 
-export const MAX_IMAGE_DIMENSION = 1280;
-export const JPEG_COMPRESSION_QUALITY = 0.55;
-const SKIP_COMPRESSION_SIZE_BYTES = 300 * 1024; // 300 KB
+export const MAX_IMAGE_DIMENSION = 1024;
+export const JPEG_COMPRESSION_QUALITY = 0.5;
+const SKIP_COMPRESSION_SIZE_BYTES = 450 * 1024; // 450 KB
 
 /**
  * Fast single-pass resize to max 1280px and compress to JPEG with quality 0.7.

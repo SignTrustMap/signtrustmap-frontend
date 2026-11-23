@@ -12,6 +12,21 @@ import {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 
+const mockMutateAsync = jest.fn();
+let mockStatusData: any = undefined;
+let mockIsStatusLoading = false;
+
+jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
+  useGetSurveySubmissionStatus: () => ({
+    data: mockStatusData,
+    isLoading: mockIsStatusLoading,
+  }),
+  useResubmitFalseNegativeMutation: () => ({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+  }),
+}));
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -32,6 +47,9 @@ jest.mock('react-native-safe-area-context', () => {
 describe('ReturnedSubmissionItemScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockStatusData = undefined;
+    mockIsStatusLoading = false;
+    mockMutateAsync.mockClear().mockResolvedValue({ success: true });
     jest.spyOn(Alert, 'alert');
   });
 
@@ -241,6 +259,146 @@ describe('ReturnedSubmissionItemScreen', () => {
       expect.stringContaining('Bạn đang xác nhận 1 vị trí khoanh vùng có biển báo giao thông hợp lệ.'),
       expect.any(Array)
     );
+
+    // Press 'Đồng ý' in Alert to trigger mutation and navigation back
+    const alertButtons = (Alert.alert as jest.Mock).mock.calls[0][2];
+    const confirmAction = alertButtons.find((b: any) => b.text === 'Đồng ý');
+    await act(async () => {
+      await confirmAction?.onPress?.();
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submissionId: 'test-item-999',
+        boxes: expect.arrayContaining([expect.objectContaining({ id: expect.any(String) })]),
+      })
+    );
+
+    // Press 'OK' in success alert
+    const successButtons = (Alert.alert as jest.Mock).mock.calls[1]?.[2];
+    const okAction = successButtons?.find((b: any) => b.text === 'OK');
+    okAction?.onPress?.();
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('shows error alert if resubmit mutation fails', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('Network submission error'));
+    const { getByTestId } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    const addBoxBtn = getByTestId('add-box-btn');
+    await act(async () => {
+      fireEvent.press(addBoxBtn);
+    });
+
+    const confirmBtn = getByTestId('confirm-btn');
+    await act(async () => {
+      fireEvent.press(confirmBtn);
+    });
+
+    const alertButtons = (Alert.alert as jest.Mock).mock.calls[0][2];
+    const confirmAction = alertButtons.find((b: any) => b.text === 'Đồng ý');
+    await act(async () => {
+      await confirmAction?.onPress?.();
+    });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Lỗi gửi duyệt lại',
+      'Network submission error'
+    );
+  });
+
+  it('renders loading overlay when status is loading', async () => {
+    mockIsStatusLoading = true;
+    const { getByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+    expect(getByText('Đang tải ảnh khảo sát...')).toBeTruthy();
+  });
+
+  it('allows switching active box and closes catalog modal when close button is pressed', async () => {
+    const { getByTestId, queryByTestId, getByLabelText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    const addBoxBtn = getByTestId('add-box-btn');
+    await act(async () => {
+      fireEvent.press(addBoxBtn); // Box 1
+      fireEvent.press(addBoxBtn); // Box 2
+    });
+
+    // Select Box 1
+    const box1Badge = getByLabelText('Chọn Box 1');
+    await act(async () => {
+      fireEvent.press(box1Badge);
+    });
+
+    // Open catalog for Box 1
+    const catalogTrigger = getByTestId('box-catalog-trigger-0');
+    await act(async () => {
+      fireEvent.press(catalogTrigger);
+    });
+
+    expect(getByTestId('catalog-bottom-sheet')).toBeTruthy();
+
+    // Close catalog modal
+    const closeBtn = getByTestId('close-catalog-btn');
+    await act(async () => {
+      fireEvent.press(closeBtn);
+    });
+
+    expect(queryByTestId('catalog-bottom-sheet')).toBeNull();
+  });
+
+  it('filters catalog signs by all category tabs (P, W, R, I, T, ALL)', async () => {
+    const { getByTestId, getByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-999" />
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('add-box-btn'));
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('box-catalog-trigger-0'));
+    });
+
+    // Tap P tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-p'));
+    });
+    expect(getByText('P.101')).toBeTruthy();
+
+    // Tap W tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-w'));
+    });
+    expect(getByText('W.244')).toBeTruthy();
+
+    // Tap R tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-r'));
+    });
+    expect(getByText('R.301a')).toBeTruthy();
+
+    // Tap I tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-i'));
+    });
+    expect(getByText('I.445g')).toBeTruthy();
+
+    // Tap T tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-t'));
+    });
+    expect(getByText('T.501')).toBeTruthy();
+
+    // Tap ALL tab
+    await act(async () => {
+      fireEvent.press(getByTestId('catalog-filter-all'));
+    });
+    expect(getByTestId('catalog-filter-all')).toBeTruthy();
   });
 
   it('displays the required warning text below the confirmation button', async () => {

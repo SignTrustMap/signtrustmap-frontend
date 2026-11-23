@@ -102,6 +102,7 @@ export type ReviewCandidate = {
     };
     latitude?: number | null;
     longitude?: number | null;
+    status?: string;
 };
 
 export type ReviewQueueResponse = {

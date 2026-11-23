@@ -9,7 +9,9 @@ import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { VirtualList } from '@/components/virtual-list';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import type {
   SubmissionStatus,
   SubmissionType,
@@ -83,6 +85,8 @@ function formatDate(value?: string) {
 export function ReturnedSubmissionsListScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   const { data, isLoading, refetch, isRefetching } = useGetMySubmissions({
     page: '1',
@@ -93,10 +97,10 @@ export function ReturnedSubmissionsListScreen() {
     const rawItems = data?.items ?? [];
     const backendReturned = rawItems.filter((item) => RETURNED_STATUSES.includes(item.status));
 
-    // Ensure at least one mock item exists in the list
-    const hasMock = backendReturned.some((i) => i.id === MOCK_RETURNED_SUBMISSION.id);
-    if (!hasMock) {
-      return [MOCK_RETURNED_SUBMISSION, ...backendReturned];
+    // If backend returned items exist, display real items.
+    // Fallback to MOCK_RETURNED_SUBMISSION only if empty (for demo / offline test mode)
+    if (backendReturned.length === 0) {
+      return [MOCK_RETURNED_SUBMISSION];
     }
     return backendReturned;
   }, [data?.items]);
@@ -213,7 +217,7 @@ export function ReturnedSubmissionsListScreen() {
         >
           <AppButton
             accessibilityLabel="Quay lại công việc"
-            onPress={() => router.back()}
+            onPress={() => router.replace(surveyorWorkRoute)}
             pressedOpacity={0.6}
             style={styles.backButton}
             variant="ghost"

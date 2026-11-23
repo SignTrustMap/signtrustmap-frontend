@@ -18,6 +18,7 @@ jest.mock('expo-router', () => ({
   }),
   useSegments: () => mockSegments,
   useLocalSearchParams: () => ({}),
+  useFocusEffect: jest.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -115,9 +116,11 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
 
 const mockUseGetMyPendingSubmissions = jest.fn();
 const mockUseGetMySurveyStats = jest.fn();
+const mockUseGetMySubmissions = jest.fn();
 jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
   useGetMyPendingSubmissions: (...args: any[]) => mockUseGetMyPendingSubmissions(...args),
   useGetMySurveyStats: (...args: any[]) => mockUseGetMySurveyStats(...args),
+  useGetMySubmissions: (...args: any[]) => mockUseGetMySubmissions(...args),
 }));
 
 const mockUseGetMyRecaptures = jest.fn();
@@ -188,6 +191,10 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
     mockUseGetMyPendingSubmissions.mockReturnValue({
       data: { pending: 5, countsByStatus: { DRAFT: 2 } },
+    });
+    mockUseGetMySubmissions.mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
     });
     mockUseGetMySurveyStats.mockReturnValue({
       data: { revalidationAvailable: 8 },
@@ -284,9 +291,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       const { getByText, getByLabelText } = await render(<ReviewerWork />);
 
       expect(getByText('Nhiệm vụ và tiện ích')).toBeTruthy();
-      expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
+      expect(getByText('Duyệt khảo sát')).toBeTruthy();
       expect(getByText('7 MỚI')).toBeTruthy();
-      expect(getByText('Tái thẩm định cần duyệt')).toBeTruthy();
+      expect(getByText('Duyệt tái thẩm định')).toBeTruthy();
       expect(getByText('3')).toBeTruthy();
       expect(getByText('Thống kê của bạn')).toBeTruthy();
       expect(getByText('Nhiệm vụ')).toBeTruthy();
@@ -299,7 +306,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('navigates to revalidation-review when pressing revalidation evidence badge', async () => {
       const { getByText } = await render(<ReviewerWork />);
 
-      fireEvent.press(getByText('Tái thẩm định cần duyệt'));
+      fireEvent.press(getByText('Duyệt tái thẩm định'));
       expect(mockPush).toHaveBeenCalledWith('/work/revalidation-review');
     });
 
@@ -328,6 +335,13 @@ describe('Work Roles & Component Architecture Test Suite', () => {
         pathname: '/work/missions',
         params: { role: 'reviewer' },
       });
+    });
+
+    it('navigates to reviewer-history when pressing history badge', async () => {
+      const { getByText } = await render(<ReviewerWork />);
+
+      fireEvent.press(getByText('Lịch sử thẩm định'));
+      expect(mockPush).toHaveBeenCalledWith('/work/reviewer-history');
     });
 
     it('guards reviewer queries with isReviewer check', async () => {
@@ -432,6 +446,16 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(mockPush).toHaveBeenCalledWith('/work/new-survey');
     });
 
+    it('renders returned submissions badge with count and navigates to returned submissions list', async () => {
+      const { getByText } = await render(<SurveyorWork returnedSubmissionsCount={3} />);
+
+      expect(getByText('Ảnh bị trả về')).toBeTruthy();
+      expect(getByText('3')).toBeTruthy();
+
+      fireEvent.press(getByText('Ảnh bị trả về'));
+      expect(mockPush).toHaveBeenCalledWith('/work/returned-submissions-list');
+    });
+
     it('guards surveyor queries with isSurveyor check', async () => {
       mockSessionUser = { id: 'driver-only', roles: ['driver'] };
       await render(<SurveyorWork />);
@@ -453,7 +477,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
   // =========================================================================
   describe('4. WorkScreen Integration & Role Switching', () => {
     it('mounts DriverWork by default when driver is the initial role and displays role name in header', async () => {
-      const { getByText, getByTestId, queryByText } = await render(<WorkScreen currentRole="driver" />);
+      const { getByText, getByTestId, queryByText } = await render(
+        <WorkScreen currentRole="driver" />,
+      );
 
       expect(getByTestId('work-screen-title').props.children).toBe('Tài xế');
       expect(getByTestId('credit-balance-card')).toBeTruthy();
@@ -466,7 +492,9 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
 
     it('switches to SurveyorWork, updates header title to Khảo sát, and renders SurveyorFab when surveyor tab is selected', async () => {
-      const { getByText, getByTestId, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
+      const { getByText, getByTestId, getByLabelText } = await render(
+        <WorkScreen currentRole="driver" />,
+      );
 
       fireEvent.press(getByLabelText('Vai trò Khảo sát'));
 
@@ -479,13 +507,15 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
 
     it('switches to ReviewerWork, updates header title to Thẩm định, when reviewer tab is selected', async () => {
-      const { getByText, getByTestId, getByLabelText } = await render(<WorkScreen currentRole="driver" />);
+      const { getByText, getByTestId, getByLabelText } = await render(
+        <WorkScreen currentRole="driver" />,
+      );
 
       fireEvent.press(getByLabelText('Vai trò Thẩm định'));
 
       await waitFor(() => {
         expect(getByTestId('work-screen-title').props.children).toBe('Thẩm định');
-        expect(getByText('Khảo sát cần duyệt')).toBeTruthy();
+        expect(getByText('Duyệt khảo sát')).toBeTruthy();
         expect(getByText('7 MỚI')).toBeTruthy();
       });
     });

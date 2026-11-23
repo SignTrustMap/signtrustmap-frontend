@@ -16,6 +16,7 @@ import type { ReviewSubmission } from '@/api/reviews/review-workflow';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockNavigate = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
@@ -23,6 +24,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     replace: mockReplace,
     back: mockBack,
+    navigate: mockNavigate,
   }),
   useSegments: () => ['(authenticated)', 'work', 'submission-review'],
   useLocalSearchParams: () => mockSearchParams,
@@ -37,6 +39,18 @@ jest.mock('react-native-safe-area-context', () => ({
     return <View {...props}>{children}</View>;
   },
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+const mockNavigateToSign = jest.fn().mockResolvedValue(undefined);
+jest.mock('@/feature/review/hooks/use-reviewer-sign-navigation', () => ({
+  useReviewerSignNavigation: () => ({
+    isNavigatingToSign: false,
+    navigateToSign: mockNavigateToSign,
+  }),
+}));
+
+jest.mock('@/api/reviews/review', () => ({
+  getCandidateSignDetails: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -121,6 +135,7 @@ jest.mock('@/feature/review/hooks/use-review', () => ({
   useCastVoteOnSignCandidate: () => ({
     mutateAsync: mockCastVote,
   }),
+  useGetCandidateSignDetails: () => ({ data: undefined }),
   useReportSignCandidate: () => ({
     mutateAsync: mockReportCandidate,
   }),
@@ -180,10 +195,10 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
   });
 
   // =========================================================================
-  // Requirement 1 & 2: Button right below the name, enabled with >= 1 vote
+  // Requirement 1: Location button rendered, skip-to-summary removed, and back button returns to reviewer role
   // =========================================================================
-  describe('Requirement 1: Small AppButton below the name to right edge, enabled with >= 1 vote', () => {
-    it('renders the skip-to-summary AppButton as disabled when reviewHistory is empty (0 votes)', async () => {
+  describe('Requirement 1: Action buttons & back navigation to reviewer role', () => {
+    it('renders the location button, does not render skip-to-summary button, and pressing back navigates to /work with reviewer role', async () => {
       const mockWorkflowValue: ReviewWorkflowContextValue = {
         beginSubmissionCheck: jest.fn(),
         checkedReviewIndex: 0,
@@ -211,28 +226,31 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
         undoLastReview: jest.fn().mockResolvedValue(true),
       };
 
-      const { getByTestId, getByText } = await render(
+      const { getByTestId, queryByTestId, getByText } = await render(
         <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
           <SubmissionReviewScreen />
         </ReviewWorkflowContext.Provider>
       );
 
-      const skipButton = getByTestId('skip-to-summary-button');
-      expect(skipButton).toBeTruthy();
-      expect(getByText('Tổng kết')).toBeTruthy();
-      expect(skipButton.props.accessibilityState?.disabled).toBe(true);
+      // Skip to summary button is removed
+      expect(queryByTestId('skip-to-summary-button')).toBeNull();
 
+      // Location button is present
       const locationButton = getByTestId('move-to-sign-location-button');
       expect(locationButton).toBeTruthy();
       expect(getByText('Vị trí biển báo')).toBeTruthy();
-      fireEvent.press(locationButton);
 
-      // Pressing it while disabled does not navigate
-      fireEvent.press(skipButton);
-      expect(mockReplace).not.toHaveBeenCalled();
+      // Back button navigates to /work with currentRole: 'reviewer'
+      const backButton = getByTestId('submission-review-back-button');
+      expect(backButton).toBeTruthy();
+      fireEvent.press(backButton);
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/work',
+        params: { currentRole: 'reviewer' },
+      });
     });
 
-    it('enables the skip-to-summary button when >= 1 vote has been cast and navigates with resumeIndex param', async () => {
+    it('navigates to /work with reviewer role even when votes have been cast', async () => {
       const mockWorkflowValue: ReviewWorkflowContextValue = {
         beginSubmissionCheck: jest.fn(),
         checkedReviewIndex: 0,
@@ -260,21 +278,21 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
         undoLastReview: jest.fn().mockResolvedValue(true),
       };
 
-      const { getByTestId } = await render(
+      const { getByTestId, queryByTestId } = await render(
         <ReviewWorkflowContext.Provider value={mockWorkflowValue}>
           <SubmissionReviewScreen />
         </ReviewWorkflowContext.Provider>
       );
 
-      const skipButton = getByTestId('skip-to-summary-button');
-      expect(skipButton).toBeTruthy();
-      expect(skipButton.props.accessibilityState?.disabled).toBe(false);
+      expect(queryByTestId('skip-to-summary-button')).toBeNull();
 
-      // Pressing it navigates to summary screen with resumeIndex = '1'
-      fireEvent.press(skipButton);
-      expect(mockReplace).toHaveBeenCalledWith({
-        pathname: '/work/submission-summary',
-        params: { resumeIndex: '1' },
+      // Pressing back button navigates to /work with reviewer role
+      const backButton = getByTestId('submission-review-back-button');
+      expect(backButton).toBeTruthy();
+      fireEvent.press(backButton);
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/work',
+        params: { currentRole: 'reviewer' },
       });
     });
   });
@@ -729,9 +747,7 @@ describe('Reviewer Screen: Skip to Summary & Re-vote Only Voted Submissions', ()
       });
 
       expect(mockKeepCurrentReviewAndNext).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ pathname: '/work/submission-summary' }),
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/work/reviewer-history');
     });
   });
 });

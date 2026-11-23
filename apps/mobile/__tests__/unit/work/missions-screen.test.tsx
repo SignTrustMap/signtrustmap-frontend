@@ -7,11 +7,13 @@ import { MissionsScreen } from '@/feature/work/pages/missions-screen';
 // ---------------------------------------------------------------------------
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
@@ -278,7 +280,10 @@ describe('MissionsScreen Unit Test Suite', () => {
       const { getByLabelText } = await render(<MissionsScreen initialRole="driver" />);
 
       fireEvent.press(getByLabelText('Quay lại trang Công việc'));
-      expect(mockBack).toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/work',
+        params: { currentRole: 'driver' },
+      });
     });
   });
 });

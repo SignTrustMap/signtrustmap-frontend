@@ -21,6 +21,11 @@ jest.mock('expo-router', () => ({
     const { View, Text } = require('react-native');
     return React.createElement(View, { testID: 'slot' }, React.createElement(Text, null, 'Slot Content'));
   },
+  Redirect: ({ href }: any) => {
+    const React = require('react');
+    const { Text } = require('react-native');
+    return React.createElement(Text, { testID: 'redirect' }, `Redirect to ${href}`);
+  },
 }));
 
 jest.mock('@/feature/review/pages/sign-catalog-screen', () => ({
@@ -120,14 +125,6 @@ jest.mock('@/feature/revalidation/pages/revalidation-review-screen', () => ({
     const React = require('react');
     const { Text } = require('react-native');
     return React.createElement(Text, { testID: 'revalidation-review-screen' }, 'Revalidation Review Screen');
-  },
-}));
-
-jest.mock('@/feature/revalidation/pages/recheck-evidence-screen', () => ({
-  RecheckEvidenceScreen: () => {
-    const React = require('react');
-    const { Text } = require('react-native');
-    return React.createElement(Text, { testID: 'recheck-evidence-screen' }, 'Recheck Evidence Screen');
   },
 }));
 
@@ -291,8 +288,8 @@ describe('Work Tab Route Components', () => {
 
     it('renders submission-summary.tsx correctly', async () => {
       const { getByTestId, getByText } = await render(<SubmissionSummaryRoute />);
-      expect(getByTestId('submission-summary-screen')).toBeTruthy();
-      expect(getByText('Submission Summary Screen')).toBeTruthy();
+      expect(getByTestId('redirect')).toBeTruthy();
+      expect(getByText('Redirect to /work/reviewer-history')).toBeTruthy();
     });
 
     it('renders survey-finish.tsx correctly with upload_submission type', async () => {
@@ -373,9 +370,9 @@ describe('Work Tab Route Components', () => {
       expect(getByTestId('revalidation-review-screen')).toBeTruthy();
     });
 
-    it('renders revalidation-summary.tsx correctly', async () => {
+    it('renders revalidation-summary.tsx correctly as a redirect', async () => {
       const { getByTestId } = await render(<RevalidationSummaryRoute />);
-      expect(getByTestId('recheck-evidence-screen')).toBeTruthy();
+      expect(getByTestId('redirect')).toBeTruthy();
     });
 
     it('renders recapture-camera.tsx correctly', async () => {

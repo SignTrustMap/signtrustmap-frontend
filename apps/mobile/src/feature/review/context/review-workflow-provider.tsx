@@ -13,9 +13,11 @@ import {
 } from '@/feature/review/hooks/use-review';
 import { useSession } from '@/context/session-provider';
 import {
+  toSubmission,
   type ReviewDecision,
   type ReviewSubmission,
 } from '@/api/reviews/review-workflow';
+import type { ReviewHistoryRecord } from '@/feature/review/components/review-history-item-card';
 import type { CreateMissingTypeReportDto } from '@/types/reviewsType';
 import {
   REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
@@ -51,6 +53,7 @@ export type ReviewWorkflowContextValue = {
   isLoading: boolean;
   jumpToSubmissionIndex?: (index: number) => void;
   keepCurrentReviewAndNext?: () => boolean;
+  loadSubmissionForEdit?: (record: ReviewHistoryRecord) => void;
   pendingSubmissions: ReviewSubmission[];
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
@@ -244,6 +247,20 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     setRecheckingPreviousAction(undefined);
   }, [pendingSubmissions, recheckingPreviousAction]);
 
+  const loadSubmissionForEdit = useCallback((record: ReviewHistoryRecord) => {
+    const sub = toSubmission(record.candidate);
+    const prevAction: ReviewActionType =
+      record.vote === 1 ? 'approved' : record.vote === 2 ? 'declined' : 'reported';
+    const submissionWithPrev = { ...sub, previousAction: prevAction };
+    setPendingSubmissions([submissionWithPrev]);
+    setTotalSubmissions(1);
+    setIsRecheckingSubmission(true);
+    setRecheckingReviewIndex(0);
+    setRecheckingPreviousAction(prevAction);
+    setCheckedReviewIndex(0);
+    setIsCheckingSubmission(false);
+  }, []);
+
   const keepCurrentReviewAndNext = useCallback((): boolean => {
     if (pendingSubmissions.length === 0) return true;
     const current = pendingSubmissions[0];
@@ -377,6 +394,13 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           params,
         });
       } else {
+        if (completedRecheckIndex !== undefined) {
+          try {
+            await undoVote({ params });
+          } catch (undoErr) {
+            console.warn('[ReviewWorkflow] Non-fatal undo error before recasting vote:', undoErr);
+          }
+        }
         await castVote({
           params,
           request: {
@@ -441,6 +465,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         isLoading,
         jumpToSubmissionIndex,
         keepCurrentReviewAndNext,
+        loadSubmissionForEdit,
         pendingSubmissions,
         refresh,
         recheckingPreviousAction,
