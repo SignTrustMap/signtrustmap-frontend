@@ -675,7 +675,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
             params: { candidateId: 'cand-1' },
           }),
         );
-        expect(getByText('Đã bỏ qua biển báo (không thể nhận diện)')).toBeTruthy();
+        expect(getByText('Đã bỏ qua biển báo')).toBeTruthy();
         expect(getByText('No Parking (P.130)')).toBeTruthy();
       });
     });

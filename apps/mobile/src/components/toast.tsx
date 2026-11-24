@@ -55,7 +55,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     paddingHorizontal: Spacing.four,
-    zIndex: 20,
+    zIndex: 99,
+    elevation: 20,
   },
   centerPositioner: {
     top: 0,

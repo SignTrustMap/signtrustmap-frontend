@@ -101,6 +101,7 @@ export function NavigationMapScreen() {
     destinationTitle,
     isFreeNavigation,
     reviewerSubmissionId,
+    reviewerReturnPath,
     returnToReviewer,
     savedRouteId: paramSavedRouteId,
     startId,
@@ -116,6 +117,7 @@ export function NavigationMapScreen() {
     destinationTitle?: string;
     isFreeNavigation?: string;
     reviewerSubmissionId?: string;
+    reviewerReturnPath?: string;
     returnToReviewer?: string;
     savedRouteId?: string;
     startId?: string;
@@ -133,11 +135,12 @@ export function NavigationMapScreen() {
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
+    const targetPath = reviewerReturnPath || '/work/submission-review';
     router.replace({
-      pathname: '/work/submission-review',
+      pathname: targetPath as any,
       params: reviewerSubmissionId ? { targetSubmissionId: reviewerSubmissionId } : {},
     });
-  }, [reviewerSubmissionId, router]);
+  }, [reviewerReturnPath, reviewerSubmissionId, router]);
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
@@ -1343,16 +1346,6 @@ export function NavigationMapScreen() {
         {/* Non-navigating Overlay: Top controls, Home filter, and floating map action buttons */}
         {!isNavigating ? (
           <SafeAreaView pointerEvents="box-none" style={styles.overlay}>
-            {isReturnToReviewer ? (
-              <Pressable
-                accessibilityLabel="Quay lại thẩm định"
-                onPress={handleReturnToReviewer}
-                style={[styles.returnToReviewerPill, { top: insets.top + Spacing.one }]}
-              >
-                <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={16} />
-                <Text style={styles.returnToReviewerText}>Quay lại thẩm định</Text>
-              </Pressable>
-            ) : null}
             <NavigationTopControls
               selectedDestination={selectedDestination}
               plannedRouteOrigin={plannedRouteOrigin}
@@ -1364,6 +1357,22 @@ export function NavigationMapScreen() {
               onChangeDestinationPress={handleChangeDestination}
               onSwapRoutePress={handleSwapRoute}
             />
+
+            {isReturnToReviewer ? (
+              <View pointerEvents="box-none" style={styles.returnToReviewerContainer}>
+                <Pressable
+                  accessibilityLabel="Quay lại thẩm định"
+                  onPress={handleReturnToReviewer}
+                  style={({ pressed }) => [
+                    styles.returnToReviewerPill,
+                    { opacity: pressed ? 0.8 : 1 },
+                  ]}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={16} />
+                  <Text style={styles.returnToReviewerText}>Quay lại thẩm định</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <HomeSignFilterCard
               isOpen={isHomeSignFilterOpen && !selectedDestination}

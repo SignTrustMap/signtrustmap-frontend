@@ -13,6 +13,7 @@ export interface ReviewerSignTarget {
   title: string;
   subtitle?: string;
   signId?: string;
+  returnPath?: string;
 }
 
 export function isWithinReviewerRadius(
@@ -94,6 +95,7 @@ export function useReviewerSignNavigation() {
               isFreeNavigation: 'true',
               returnToReviewer: 'true',
               ...(target.signId ? { reviewerSubmissionId: target.signId } : {}),
+              ...(target.returnPath ? { reviewerReturnPath: target.returnPath } : {}),
             },
           });
         } else {
@@ -116,6 +118,7 @@ export function useReviewerSignNavigation() {
                       isFreeNavigation: 'false',
                       returnToReviewer: 'true',
                       ...(target.signId ? { reviewerSubmissionId: target.signId } : {}),
+                      ...(target.returnPath ? { reviewerReturnPath: target.returnPath } : {}),
                     },
                   });
                 },

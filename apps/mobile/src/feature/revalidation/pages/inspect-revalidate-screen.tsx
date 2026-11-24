@@ -729,16 +729,14 @@ export function InspectRevalidateScreen() {
       });
 
       setSubmitSuccess(true);
-      setTimeout(() => {
-        router.replace({
-          pathname: '/work/submission-complete',
-          params: {
-            type: 'upload_revalidation',
-            taskId: targetTaskId,
-            signCode,
-          },
-        });
-      }, 1000);
+      router.replace({
+        pathname: '/work/submission-complete',
+        params: {
+          type: 'upload_revalidation',
+          taskId: targetTaskId,
+          signCode,
+        },
+      });
     } catch (err: any) {
       console.error('[InspectRevalidate] Submission failed:', err);
       const errData = err?.data;

@@ -795,6 +795,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       title: submission.title,
       subtitle: displayLocation,
       signId: submission.id,
+      returnPath: '/work/submission-review',
     });
   }, [
     submission,
@@ -898,7 +899,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         approved: 'Đã phê duyệt biển báo',
         declined: 'Đã từ chối biển báo',
         reported: 'Đã báo cáo biển báo',
-        skipped: 'Đã bỏ qua biển báo (không thể nhận diện)',
+        skipped: 'Đã bỏ qua biển báo',
         reported_new_sign: 'Đã báo cáo loại biển mới chờ thẩm định catalog',
       };
 
@@ -1662,7 +1663,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           key={toast.id}
           message={toast.message}
           onDismiss={() => setToast(undefined)}
-          placement="center"
+          placement="bottom"
           tone={toast.tone}
         />
       ) : null}

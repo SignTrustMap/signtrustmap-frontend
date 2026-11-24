@@ -251,7 +251,7 @@ export function SurveyorWork({
             accentColor={theme.primary}
             count={pendingSurveyCount}
             icon="cloud-upload-outline"
-            label="Lịch sử vote"
+            label="Lịch sử xác nhận"
             onPress={() => router.push('/work/survey-history')}
           />
 

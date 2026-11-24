@@ -255,7 +255,7 @@ function extractGpsFromTiff(buf: Uint8Array, tiffStart: number): ImageGpsCoordin
 function scanBufferTextForHeading(buf: Uint8Array): number | null {
   try {
     let text = '';
-    const end = Math.min(buf.length, 65536);
+    const end = Math.min(buf.length, 262144);
     for (let i = 0; i < end; i++) {
       const c = buf[i];
       if (c >= 32 && c <= 126) {
@@ -265,10 +265,17 @@ function scanBufferTextForHeading(buf: Uint8Array): number | null {
       }
     }
     const match = text.match(
-      /(?:GPSImgDirection|GPSTrack|GPSDestBearing|PoseHeadingDegrees|FlightYawDegree|Yaw|Camera:Yaw|heading|bearing|direction)[="':>\s]+([-\d.]+)/i,
+      /(?:GPSImgDirection|GPSTrack|GPSDestBearing|GPSBearing|GPSHeading|GPSDirection|GPSCourse|GPSAzimuth|PoseHeadingDegrees|FlightYawDegree|Yaw|Camera:Yaw|heading|bearing|direction|azimuth|course|track)[="':>\s]+([-\d./]+)/i,
     );
     if (match && match[1]) {
-      const val = Number(match[1]);
+      const raw = match[1];
+      let val: number;
+      if (raw.includes('/')) {
+        const [n, d] = raw.split('/').map(Number);
+        val = d ? n / d : n;
+      } else {
+        val = Number(raw);
+      }
       if (Number.isFinite(val)) {
         return ((val % 360) + 360) % 360;
       }

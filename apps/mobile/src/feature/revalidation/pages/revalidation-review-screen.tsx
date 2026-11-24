@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -673,6 +673,8 @@ export function RevalidationReviewScreen() {
   const { isSmallDevice, height: windowHeight } = useResponsive();
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+  const searchParams = useLocalSearchParams<{ targetSubmissionId?: string }>();
+  const targetId = searchParams?.targetSubmissionId;
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -706,6 +708,17 @@ export function RevalidationReviewScreen() {
   useEffect(() => {
     setIsEditingVote(false);
   }, [currentItem?.evidenceId, isCheckingEvidence]);
+
+  useEffect(() => {
+    if (targetId && items.length > 0) {
+      const idx = items.findIndex(
+        (it) => it.evidenceId === targetId || it.taskId === targetId,
+      );
+      if (idx !== -1 && workflow.beginEvidenceCheck) {
+        workflow.beginEvidenceCheck(idx);
+      }
+    }
+  }, [targetId, items, workflow]);
 
   const handleKeepPreviousReview = useCallback(() => {
     keepCurrentEvidenceAndNext?.();
@@ -1339,6 +1352,7 @@ export function RevalidationReviewScreen() {
                       'Biển báo tái xác thực',
                     subtitle: currentItem.verifiedSign?.signCode,
                     signId: currentItem.evidenceId || currentItem.taskId,
+                    returnPath: '/work/revalidation-review',
                   });
                 }}
                 style={[
@@ -1688,7 +1702,7 @@ export function RevalidationReviewScreen() {
           key={toast.id}
           message={toast.message}
           onDismiss={() => setToast(undefined)}
-          placement="center"
+          placement="bottom"
           tone={toast.tone}
         />
       ) : null}

@@ -61,8 +61,34 @@ function extractHeadingFromGenericObject(obj: any): number | undefined {
     obj.azimuth,
     obj.trueHeading,
     obj.magneticHeading,
+    obj.compass,
+    obj.compassBearing,
     obj.yaw,
     obj.rotation,
+    obj.GPSImgDirection,
+    obj.gpsImgDirection,
+    obj.GPSTrack,
+    obj.gpsTrack,
+    obj.GPSDestBearing,
+    obj.gpsDestBearing,
+    obj.GPSBearing,
+    obj.gpsBearing,
+    obj.GPSHeading,
+    obj.gpsHeading,
+    obj.GPSDirection,
+    obj.gpsDirection,
+    obj.GPSCourse,
+    obj.gpsCourse,
+    obj.GPSAzimuth,
+    obj.gpsAzimuth,
+    obj.PoseHeadingDegrees,
+    obj.poseHeadingDegrees,
+    obj.FlightYawDegree,
+    obj.flightYawDegree,
+    obj.CameraHeading,
+    obj.cameraHeading,
+    obj.DeviceHeading,
+    obj.deviceHeading,
   ];
   for (const c of candidates) {
     if (typeof c === 'number' && Number.isFinite(c)) {
@@ -78,9 +104,9 @@ function extractHeadingFromGenericObject(obj: any): number | undefined {
   return undefined;
 }
 
-function extractHeadingFromFileName(fileName?: string): number | undefined {
+function extractHeadingFromFileName(fileName?: string | null): number | undefined {
   if (!fileName) return undefined;
-  const match = fileName.match(/(?:heading|bearing|direction|dir|track|yaw)[_-]?([-\d.]+)(?:deg)?/i);
+  const match = fileName.match(/(?:heading|bearing|direction|dir|track|azimuth|course|yaw)[_-]?([-\d.]+)(?:deg)?/i);
   if (match && match[1]) {
     const val = Number(match[1]);
     if (Number.isFinite(val)) {
@@ -100,9 +126,43 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
     uri: asset.uri,
   });
 
-  const exifCoordinates = extractImageGpsCoordinates(asset.exif);
+  let exifCoordinates = extractImageGpsCoordinates(asset.exif);
 
+  // If exif coordinates already have heading, return immediately
+  if (exifCoordinates && exifCoordinates.heading !== undefined) {
+    console.log('[Surveyor] Extracted image GPS data:', {
+      ...exifCoordinates,
+      source: 'image-picker-exif',
+    });
+    return exifCoordinates;
+  }
+
+  // If exif has lat/long but lacks heading, try extracting heading from raw image file, filename, or asset object
   if (exifCoordinates) {
+    if (exifCoordinates.heading === undefined && asset.type === 'image' && asset.uri) {
+      try {
+        const fileGps = await extractGpsFromImageFile(asset.uri);
+        if (fileGps?.heading !== undefined) {
+          exifCoordinates = {
+            ...exifCoordinates,
+            heading: fileGps.heading,
+          };
+        }
+      } catch {}
+    }
+
+    if (exifCoordinates.heading === undefined) {
+      const heading =
+        extractHeadingFromGenericObject(asset) ??
+        extractHeadingFromFileName(asset.fileName);
+      if (heading !== undefined) {
+        exifCoordinates = {
+          ...exifCoordinates,
+          heading,
+        };
+      }
+    }
+
     console.log('[Surveyor] Extracted image GPS data:', {
       ...exifCoordinates,
       source: 'image-picker-exif',
@@ -111,6 +171,7 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
   }
 
   if (Platform.OS === 'web') {
+    if (exifCoordinates) return exifCoordinates;
     console.log('[Surveyor] Extracted GPS data:', null);
     return null;
   }
@@ -124,6 +185,7 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
     });
 
     if (permission.status !== 'granted') {
+      if (exifCoordinates) return exifCoordinates;
       console.log('[Surveyor] Extracted GPS data:', null);
       return null;
     }
@@ -187,7 +249,12 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
     }
 
     if (mediaLibraryExifCoordinates) {
-      let heading = mediaLibraryExifCoordinates.heading ?? extractHeadingFromGenericObject(originalExif);
+      let heading =
+        mediaLibraryExifCoordinates.heading ??
+        extractHeadingFromGenericObject(originalExif) ??
+        extractHeadingFromGenericObject(location) ??
+        extractHeadingFromGenericObject(asset);
+
       if (heading === undefined && asset.type === 'image') {
         const fileGps = await extractGpsFromImageFile(asset.uri);
         if (fileGps?.heading !== undefined) {
