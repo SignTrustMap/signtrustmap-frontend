@@ -49,12 +49,16 @@ import {
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
-import { resolveS3Url } from '@/api/revalidation/revalidation';
+import { checkInRevalidationTask, resolveS3Url } from '@/api/revalidation/revalidation';
 import {
   useGetAllRevalidationTasks,
   useSubmitRevalidation,
 } from '@/feature/revalidation/hooks/use-revalidation';
-import type { RevalidationEvidenceType } from '@/types/revalidationType';
+import type {
+  AmbiguousSignCandidate,
+  RevalidationCheckInResponse,
+  RevalidationEvidenceType,
+} from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
 
@@ -213,6 +217,7 @@ export function InspectRevalidateScreen() {
     const matched = allRevalTasks.find((t) => t.verifiedSignId === signId || t.id === signId);
     return matched?.id || taskId || signId;
   }, [taskId, signId, allRevalTasks]);
+  const targetTaskId = resolvedTaskId || taskId || signId;
   const signCode = params.signCode || 'Biển báo giao thông';
   const signName = params.name || params.nameVi || params.nameEn || 'Kiểm tra biển báo';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
@@ -256,6 +261,13 @@ export function InspectRevalidateScreen() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
 
+  // Real-time server check-in & ambiguous candidate resolution
+  const [checkInResult, setCheckInResult] = useState<RevalidationCheckInResponse | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [ambiguousCandidates, setAmbiguousCandidates] = useState<AmbiguousSignCandidate[]>([]);
+  const [isAmbiguousModalVisible, setIsAmbiguousModalVisible] = useState(false);
+  const [confirmedSignId, setConfirmedSignId] = useState<string | undefined>(signId);
+
   // Android custom gallery modal state
   const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
   const [androidGalleryAssets, setAndroidGalleryAssets] = useState<MediaLibraryAsset[]>([]);
@@ -266,24 +278,40 @@ export function InspectRevalidateScreen() {
   const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
   const isLoadingAndroidGallery = useRef(false);
 
-  // Proximity Calculation
+  // Proximity Calculation (prioritize server check-in distance if available)
   const distanceFromTarget =
-    detectedGps && targetLat !== undefined && targetLon !== undefined
+    checkInResult?.distanceMeters ??
+    (detectedGps && targetLat !== undefined && targetLon !== undefined
       ? calculateDistanceMeters(detectedGps.latitude, detectedGps.longitude, targetLat, targetLon)
-      : null;
+      : null);
 
   const isWithinProximity =
-    distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
+    checkInResult !== null
+      ? checkInResult.isWithinProximity
+      : distanceFromTarget !== null
+        ? distanceFromTarget <= MAX_PROXIMITY_METERS
+        : null;
+
+  const isDailyLimitReached = Boolean(checkInResult?.dailyLimitReached);
 
   // Validation rules: Location, media, and selected evidence status are required
-  const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
+  const isLocationValid = Boolean(
+    detectedGps && isWithinProximity === true && !isDailyLimitReached,
+  );
   const isSubmitDisabled =
-    !selectedMedia || !isLocationValid || !evidenceType || isSubmitting || isOpeningGallery;
+    !selectedMedia ||
+    !isLocationValid ||
+    !evidenceType ||
+    isSubmitting ||
+    isOpeningGallery ||
+    isDailyLimitReached;
 
   // Dynamic submit button label based on current validation state
   let submitButtonLabel = 'Gửi bằng chứng tái thẩm định';
   if (isSubmitting) {
     submitButtonLabel = 'Đang gửi bằng chứng…';
+  } else if (isDailyLimitReached) {
+    submitButtonLabel = 'Đã đạt giới hạn 3 lượt nộp/24h';
   } else if (!selectedMedia) {
     submitButtonLabel = 'Tải lên ảnh hoặc video bằng chứng';
   } else if (!detectedGps) {
@@ -293,6 +321,36 @@ export function InspectRevalidateScreen() {
   } else if (!evidenceType) {
     submitButtonLabel = 'Vui lòng chọn kết luận.';
   }
+
+  // Trigger GPS eligibility check-in when coordinates become available
+  useEffect(() => {
+    if (detectedGps && targetTaskId && session?.accessToken) {
+      let isCurrent = true;
+      setIsCheckingIn(true);
+      checkInRevalidationTask(
+        targetTaskId,
+        {
+          latitude: detectedGps.latitude,
+          longitude: detectedGps.longitude,
+          accuracyMeters: detectedGps.accuracy,
+        },
+        undefined,
+        session.accessToken,
+      )
+        .then((res) => {
+          if (isCurrent) setCheckInResult(res);
+        })
+        .catch((err) => {
+          console.warn('[InspectRevalidate] Check-in call notice:', err);
+        })
+        .finally(() => {
+          if (isCurrent) setIsCheckingIn(false);
+        });
+      return () => {
+        isCurrent = false;
+      };
+    }
+  }, [detectedGps?.latitude, detectedGps?.longitude, targetTaskId, session?.accessToken]);
 
   /**
    * Top navigation Back button:
@@ -590,9 +648,9 @@ export function InspectRevalidateScreen() {
     }
   };
 
-  // Submit Evidence Action
-  const handleSubmitEvidence = async () => {
-    if (isSubmitDisabled) return;
+  // Submit Evidence Action (supports ambiguous candidate resolution override)
+  const handleSubmitEvidence = async (overrideConfirmedSignId?: string) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(undefined);
 
@@ -608,13 +666,20 @@ export function InspectRevalidateScreen() {
 
     if (!lat || !lon) {
       setSubmitError(COORDINATES_REQUIRED_EVIDENCE_MESSAGE);
+      setIsSubmitting(false);
       return;
     }
 
     if (!evidenceType) {
       setSubmitError('Vui lòng chọn kết luận tái thẩm định.');
+      setIsSubmitting(false);
       return;
     }
+
+    const effectiveConfirmedSignId =
+      (typeof overrideConfirmedSignId === 'string' ? overrideConfirmedSignId : undefined) ||
+      confirmedSignId ||
+      signId;
 
     try {
       let uploadMedia = selectedMedia;
@@ -647,7 +712,7 @@ export function InspectRevalidateScreen() {
           accuracyMeters: detectedGps?.accuracy,
           headingDegrees: detectedGps?.heading,
           isLiveCapture: uploadMedia?.isLiveCapture ?? uploadMedia?.type === 'image',
-          confirmedSignId: signId,
+          confirmedSignId: effectiveConfirmedSignId,
           capturedAt: uploadMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
@@ -673,8 +738,31 @@ export function InspectRevalidateScreen() {
           },
         });
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('[InspectRevalidate] Submission failed:', err);
+      const errData = err?.data;
+      if (
+        (err?.status === 409 && errData?.error === 'AMBIGUOUS_TARGET_SIGN') ||
+        (typeof err?.message === 'string' && err.message.includes('AMBIGUOUS_TARGET_SIGN'))
+      ) {
+        const candidates = errData?.candidates || [];
+        setAmbiguousCandidates(candidates);
+        setIsAmbiguousModalVisible(true);
+        setSubmitError(
+          'Phát hiện nhiều biển báo cùng loại trong bán kính 50m. Vui lòng xác nhận đúng vị trí biển báo bạn vừa chụp.',
+        );
+        return;
+      }
+      if (err?.status === 409) {
+        setSubmitError('Bạn đã nộp bằng chứng cho nhiệm vụ này rồi (đang chờ thẩm định).');
+        return;
+      }
+      if (err?.status === 429) {
+        setSubmitError(
+          'Nhiệm vụ này đã đạt giới hạn 3 lượt nộp trong 24 giờ. Vui lòng thử lại sau.',
+        );
+        return;
+      }
       setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
     } finally {
       setIsSubmitting(false);
@@ -812,6 +900,112 @@ export function InspectRevalidateScreen() {
               }}
             />
           </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* 409 AMBIGUOUS TARGET SIGN RESOLUTION MODAL                          */}
+      {/* =================================================================== */}
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsAmbiguousModalVisible(false)}
+        transparent
+        visible={isAmbiguousModalVisible}
+      >
+        <View style={styles.ambiguousModalBackdrop}>
+          <View
+            style={[
+              styles.ambiguousModalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.ambiguousModalHeader}>
+              <View style={[styles.ambiguousIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialCommunityIcons
+                  color="#D97706"
+                  name="map-marker-multiple-outline"
+                  size={24}
+                />
+              </View>
+              <View style={styles.ambiguousHeadingCol}>
+                <Text style={[styles.ambiguousTitle, { color: theme.text }]}>
+                  Xác nhận biển báo mục tiêu
+                </Text>
+                <Text style={[styles.ambiguousSubtitle, { color: theme.textSecondary }]}>
+                  Có nhiều biển báo cùng loại trong bán kính 50m. Vui lòng chọn đúng biển bạn vừa
+                  kiểm tra:
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView style={styles.ambiguousCandidateList}>
+              {ambiguousCandidates.map((c, idx) => (
+                <Pressable
+                  key={c.id || String(idx)}
+                  onPress={() => {
+                    setIsAmbiguousModalVisible(false);
+                    setConfirmedSignId(c.id);
+                    void handleSubmitEvidence(c.id);
+                  }}
+                  style={({ pressed }) => [
+                    styles.ambiguousCandidateCard,
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: confirmedSignId === c.id ? theme.primary : theme.border,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}
+                >
+                  {c.signCropUrl ? (
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: resolveS3Url(c.signCropUrl) }}
+                      style={styles.ambiguousCropImage}
+                    />
+                  ) : (
+                    <View
+                      style={[styles.ambiguousCropFallback, { backgroundColor: theme.neutral }]}
+                    >
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="traffic-light"
+                        size={20}
+                      />
+                    </View>
+                  )}
+                  <View style={styles.ambiguousCandidateInfo}>
+                    <View style={styles.ambiguousCandidateCodeRow}>
+                      <Text style={[styles.ambiguousCandidateCode, { color: theme.primary }]}>
+                        {c.signCode || signCode}
+                      </Text>
+                      {c.distanceMeters != null ? (
+                        <Text
+                          style={[styles.ambiguousCandidateDist, { color: theme.textSecondary }]}
+                        >
+                          cách {Math.round(c.distanceMeters)}m
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.ambiguousCandidateName, { color: theme.text }]}
+                    >
+                      {c.nameVi || c.nameEn || 'Biển báo giao thông'}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons color={theme.primary} name="chevron-right" size={20} />
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <View style={styles.ambiguousFooter}>
+              <AppButton
+                label="Hủy bỏ"
+                onPress={() => setIsAmbiguousModalVisible(false)}
+                variant="ghost"
+              />
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -1067,6 +1261,26 @@ export function InspectRevalidateScreen() {
                 </Text>
               ) : null}
 
+              {checkInResult ? (
+                <View style={styles.checkInStatusBadge}>
+                  <MaterialCommunityIcons
+                    color={checkInResult.dailyLimitReached ? '#EF4444' : '#10B981'}
+                    name={checkInResult.dailyLimitReached ? 'alert-octagon' : 'check-decagram'}
+                    size={16}
+                  />
+                  <Text
+                    style={[
+                      styles.checkInStatusText,
+                      { color: checkInResult.dailyLimitReached ? '#EF4444' : '#10B981' },
+                    ]}
+                  >
+                    {checkInResult.dailyLimitReached
+                      ? 'Nhiệm vụ đã đủ lượt nộp hôm nay (3/3).'
+                      : `Còn ${checkInResult.remainingSubmissionsToday} lượt hôm nay`}
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Stamp Live GPS Fallback Button */}
               {!detectedGps || isWithinProximity === false ? (
                 <AppButton
@@ -1211,7 +1425,9 @@ export function InspectRevalidateScreen() {
             <AppButton
               accessibilityLabel={submitButtonLabel}
               disabled={isSubmitDisabled}
-              onPress={handleSubmitEvidence}
+              onPress={() => {
+                void handleSubmitEvidence();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -1724,5 +1940,113 @@ const styles = StyleSheet.create({
   },
   galleryFooterLoader: {
     padding: Spacing.three,
+  },
+  checkInStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Rounded.sm,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    alignSelf: 'flex-start',
+  },
+  checkInStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ambiguousModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.four,
+  },
+  ambiguousModalCard: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: Rounded.lg,
+    borderWidth: 1,
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  ambiguousModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+    marginBottom: Spacing.three,
+  },
+  ambiguousIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ambiguousHeadingCol: {
+    flex: 1,
+  },
+  ambiguousTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  ambiguousSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  ambiguousCandidateList: {
+    maxHeight: 280,
+    marginVertical: Spacing.two,
+  },
+  ambiguousCandidateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.three,
+    borderRadius: Rounded.md,
+    borderWidth: 1.5,
+    marginBottom: Spacing.two,
+    gap: Spacing.three,
+  },
+  ambiguousCropImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+  },
+  ambiguousCropFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ambiguousCandidateInfo: {
+    flex: 1,
+  },
+  ambiguousCandidateCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  ambiguousCandidateCode: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  ambiguousCandidateDist: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  ambiguousCandidateName: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  ambiguousFooter: {
+    marginTop: Spacing.three,
   },
 });

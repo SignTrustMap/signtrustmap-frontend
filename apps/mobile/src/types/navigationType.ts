@@ -161,12 +161,26 @@ export type NearbySignsQuery = {
   headingDegrees?: number;
 };
 
+export type SignReportType = 'MISSING' | 'OUTDATED' | 'WRONG_INFO';
+
 export type ConfirmSignDto = {
   isPresent: boolean;
+  reportType?: SignReportType;
   latitude?: number;
   longitude?: number;
   photoEvidenceUrl?: string;
   note?: string;
+};
+
+export type ConfirmSignResponse = {
+  success: boolean;
+  signId: string;
+  isPresent: boolean;
+  reportType?: SignReportType;
+  creditsAwarded?: number;
+  cooldownActive?: boolean;
+  revalidationTaskId?: string;
+  message?: string;
 };
 
 // ── Offline PMTiles Map Packs ───────────────────────────────────────────────

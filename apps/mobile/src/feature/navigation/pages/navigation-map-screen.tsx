@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Camera } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -37,8 +38,8 @@ import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import { speechService } from '@/services/speech';
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
-import { getRouteProgressMeters } from '../utils/route-progress';
-import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from '../utils/signs';
+import { getRouteProgressInfo, getRouteProgressMeters } from '../utils/route-progress';
+import { resolveImageUrl, TARGET_SIGN_IMAGE_URL, deduplicateRouteSigns } from '../utils/signs';
 import { applyDemoRouteSigns } from '../utils/demo-route-signs';
 import { getMapLibre } from '@/services/maplibre';
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
@@ -80,6 +81,12 @@ export { SIGN_CATEGORIES, type SignCategory, getSignCategory };
 export function NavigationMapScreen() {
   const router = useRouter();
   const theme = useTheme();
+  let queryClient: any;
+  try {
+    queryClient = useQueryClient();
+  } catch {
+    queryClient = undefined;
+  }
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bottomInset =
@@ -564,24 +571,38 @@ export function NavigationMapScreen() {
     const rawSigns =
       corridorSigns && corridorSigns.length > 0
         ? corridorSigns
-        : hasSelectedRoute
+        : hasSelectedRoute || isNavigating
           ? plannedSigns
           : mapSigns;
-    const resolvedSigns = rawSigns.map((sign) => ({
-      ...sign,
-      imageUrl:
+    const resolvedSigns = rawSigns.map((sign) => {
+      const resolvedCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : undefined;
+      const resolvedFrame = (sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
+        ? resolveImageUrl(sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
+        : undefined;
+      const resolvedImage =
         sign.imageUrl && !sign.imageUrl.includes('mock/')
           ? resolveImageUrl(sign.imageUrl)
-          : TARGET_SIGN_IMAGE_URL,
-    }));
+          : (resolvedCrop || resolvedFrame || TARGET_SIGN_IMAGE_URL);
+
+      return {
+        ...sign,
+        imageUrl: resolvedImage,
+        actualCropUrl: resolvedCrop,
+        actualFrameUrl: resolvedFrame,
+        actualFrameURl: resolvedFrame,
+        frameUrl: resolvedFrame,
+      };
+    });
+    const deduplicated = deduplicateRouteSigns(resolvedSigns);
     return applyDemoRouteSigns(
-      resolvedSigns,
+      deduplicated,
       activeRouteOrigin,
       selectedDestination?.coordinate,
       vehicleMode,
     );
   }, [
     hasSelectedRoute,
+    isNavigating,
     mapSigns,
     plannedSigns,
     savedRouteSignsData?.signs,
@@ -885,16 +906,29 @@ export function NavigationMapScreen() {
     if (!navigationCoordinate) return [];
     const userProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
     const signsAhead = filteredSigns
-      .filter((sign) => sign.coordinate)
+      .filter((sign) => Array.isArray(sign.coordinate) && sign.coordinate.length >= 2)
       .map((sign) => {
-        const signProgress = getRouteProgressMeters(
+        const { progress: signProgress, distanceToRoute } = getRouteProgressInfo(
           sign.coordinate as [number, number],
           routeCoordinates,
         );
         const distanceMeters = Math.max(0, signProgress - userProgress);
-        return { ...sign, distanceMeters };
+        return { ...sign, distanceMeters, distanceToRoute };
       })
+      // 1. Must be strictly within the route corridor (<= 35m from the polyline)
+      .filter((sign) => sign.distanceToRoute <= 35)
+      // 2. Must be ahead of user (at least 5m)
       .filter((sign) => sign.distanceMeters > 5)
+      // 3. Deduplicate along route if any multiple records remain within 25m of each other
+      .filter((sign, idx, arr) => {
+        const firstIdx = arr.findIndex(
+          (other) =>
+            Math.abs(other.distanceMeters - sign.distanceMeters) <= 25 &&
+            ((sign.signCode && other.signCode && sign.signCode.toUpperCase() === other.signCode.toUpperCase()) ||
+              (sign.name && other.name && sign.name.toLowerCase() === other.name.toLowerCase())),
+        );
+        return firstIdx === idx;
+      })
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
       .slice(0, 3)
       .reverse();
@@ -1212,10 +1246,11 @@ export function NavigationMapScreen() {
               try {
                 const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
                 const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
-                await confirmSignPresence(
+                const res = await confirmSignPresence(
                   sign.id,
                   {
                     isPresent,
+                    reportType: isPresent ? undefined : 'MISSING',
                     latitude: lat,
                     longitude: lon,
                     note: isPresent
@@ -1224,11 +1259,27 @@ export function NavigationMapScreen() {
                   },
                   session?.accessToken || '',
                 );
+
+                if (isPresent) {
+                  if (res?.creditsAwarded && res.creditsAwarded > 0) {
+                    void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+                  }
+                  void queryClient.invalidateQueries({ queryKey: ['signs', sign.id] });
+                } else {
+                  void queryClient.invalidateQueries({
+                    queryKey: ['revalidation-tasks-in-bounds'],
+                  });
+                  void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+                  void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+                }
+
                 setLocationToast({
                   id: Date.now(),
                   message: isPresent
                     ? 'Đã ghi nhận xác nhận biển báo thành công!'
-                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                    : res?.revalidationTaskId
+                      ? 'Đã ghi nhận báo cáo! Nhiệm vụ tái thẩm định ưu tiên cao đã được tạo.'
+                      : 'Đã ghi nhận báo cáo không thấy biển báo!',
                 });
               } catch (e: any) {
                 console.warn('[Navigation] Confirm sign error:', e?.message);
@@ -1326,10 +1377,7 @@ export function NavigationMapScreen() {
               onToggleManualCategory={handleToggleManualCategory}
               onNavigateToProfileFilter={() => {
                 setIsHomeSignFilterOpen(false);
-                router.push({
-                  pathname: '/(authenticated)/(tabs)/profile',
-                  params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                });
+                router.push('/profile/sign-filters');
               }}
             />
 

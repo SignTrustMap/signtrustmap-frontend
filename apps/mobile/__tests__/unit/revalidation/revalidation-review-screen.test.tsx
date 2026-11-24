@@ -45,6 +45,11 @@ jest.mock('@tanstack/react-query', () => {
       data: { categories: [], signs: [] },
       isLoading: false,
     })),
+    useMutation: jest.fn(() => ({
+      mutate: jest.fn(),
+      mutateAsync: jest.fn().mockResolvedValue({}),
+      isPending: false,
+    })),
   };
 });
 

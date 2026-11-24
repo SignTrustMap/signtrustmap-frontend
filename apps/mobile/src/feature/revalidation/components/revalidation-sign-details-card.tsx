@@ -200,7 +200,7 @@ export function RevalidationSignDetailsCard({
     };
   } else if (isModerate || displayScore >= 50) {
     statusConfig = {
-      label: 'Độ tươi mới trung bình',
+      label: 'Cần chú ý',
       bg: '#FFF7ED',
       border: '#FDBA74',
       text: '#C2410C',
@@ -246,7 +246,11 @@ export function RevalidationSignDetailsCard({
       ]}
     >
       {/* Draggable Top Handle */}
-      <View testID="revalidation-drag-handle" {...panResponder.panHandlers} style={styles.dragHandleBar}>
+      <View
+        testID="revalidation-drag-handle"
+        {...panResponder.panHandlers}
+        style={styles.dragHandleBar}
+      >
         <View style={styles.dragPill} />
       </View>
 

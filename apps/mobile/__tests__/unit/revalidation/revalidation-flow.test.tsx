@@ -290,7 +290,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       // Check sign metadata
       expect(getAllByText('Cấm đi ngược chiều').length).toBeGreaterThan(0);
       expect(getAllByText('Đường Nguyễn Huệ, Quận 1').length).toBeGreaterThan(0);
-      expect(getByText(/Độ (tươi )?mới trung bình|Moderate Freshness/)).toBeTruthy();
+      expect(getByText(/Độ mới của biển báo:|Độ (tươi )?mới trung bình|Moderate Freshness/)).toBeTruthy();
       expect(getByText('55%')).toBeTruthy();
 
       // Find and click Inspect button
