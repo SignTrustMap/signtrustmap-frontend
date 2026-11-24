@@ -88,6 +88,67 @@ export interface AssignRoleDto {
   isActive?: boolean
 }
 
+export interface LowReliabilityUserItem {
+  id: string
+  email: string
+  fullName: string
+  status: string
+  reliabilityScore: number
+  totalReviews: number
+  consecutiveErrors: number
+  isProvisional: boolean
+  createdAt: string
+}
+
+export interface LowReliabilityUsersResponse {
+  threshold: number
+  includeProvisional: boolean
+  minReviews: number
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+  items: LowReliabilityUserItem[]
+}
+
+export interface GetLowReliabilityUsersQuery {
+  threshold?: number
+  includeProvisional?: boolean
+  minReviews?: number
+  page?: number
+  pageSize?: number
+}
+
+export interface BanWaveDto {
+  reliabilityThreshold: number
+  minReviews?: number
+  reason?: string
+  includeProvisional?: boolean
+  userIds?: string[]
+  dryRun?: boolean
+}
+
+export interface BanWaveResponse {
+  dryRun: boolean
+  threshold: number
+  includeProvisional: boolean
+  minReviews: number
+  reason: string
+  matchedCount: number
+  bannedCount: number
+  bannedUsers: Array<{
+    id: string
+    email: string
+    fullName: string
+    oldStatus: string
+    newStatus: string
+    reliabilityScore: number
+    totalReviews: number
+    consecutiveErrors: number
+    isProvisional: boolean
+  }>
+}
+
 // Backwards compatibility types
 export interface UpdateRoleDto {
   role: string
@@ -175,6 +236,20 @@ export const userService = {
         isActive: data.isActive !== undefined ? data.isActive : true,
       }
     )
+  },
+
+  /**
+   * List low-reliability users for warning UI and ban-wave preview via /api/v1/admin/users/low-reliability
+   */
+  getLowReliabilityUsers: async (query?: GetLowReliabilityUsersQuery): Promise<LowReliabilityUsersResponse> => {
+    return http.get<LowReliabilityUsersResponse>(API_ENDPOINTS.USERS.LOW_RELIABILITY, { params: query })
+  },
+
+  /**
+   * Execute or preview ban wave for accounts below threshold via /api/v1/admin/users/ban-wave
+   */
+  executeBanWave: async (data: BanWaveDto): Promise<BanWaveResponse> => {
+    return http.post<BanWaveResponse>(API_ENDPOINTS.USERS.BAN_WAVE, data)
   },
 
   // ── Backward Compatibility Helpers ──────────────────────────────

@@ -130,6 +130,9 @@ const DEFAULT_CONSENSUS_VALUES = {
   minReliabilityThreshold: 50,
   consecutiveErrorLimit: 3,
   suspensionCooldownDays: 7,
+  provisionalMinReliabilityThreshold: 40,
+  provisionalConsecutiveErrorLimit: 2,
+  provisionalAutoBanEnabled: true,
 }
 
 function getCategoryDisplayName(
@@ -341,9 +344,8 @@ function ParamTreeItem({
       <div className="relative">
         {/* Sibling vertical trunk line */}
         <span
-          className={`absolute left-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${
-            isLast ? 'top-0 h-[14px]' : 'top-0 bottom-0'
-          }`}
+          className={`absolute left-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${isLast ? 'top-0 h-[14px]' : 'top-0 bottom-0'
+            }`}
         />
 
         {/* Horizontal branch line from sibling trunk to this folder toggle */}
@@ -406,9 +408,8 @@ function ParamTreeItem({
     <div className="relative">
       {/* Sibling vertical trunk line */}
       <span
-        className={`absolute left-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${
-          isLast ? 'top-0 h-[14px]' : 'top-0 bottom-0'
-        }`}
+        className={`absolute left-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${isLast ? 'top-0 h-[14px]' : 'top-0 bottom-0'
+          }`}
       />
 
       {/* Horizontal branch line from sibling trunk to this leaf */}
@@ -491,6 +492,9 @@ export default function SystemSettingsPage() {
   const [minReliabilityThreshold, setMinReliabilityThreshold] = useState(50)
   const [consecutiveErrorLimit, setConsecutiveErrorLimit] = useState(3)
   const [suspensionCooldownDays, setSuspensionCooldownDays] = useState(7)
+  const [provisionalMinReliabilityThreshold, setProvisionalMinReliabilityThreshold] = useState(40)
+  const [provisionalConsecutiveErrorLimit, setProvisionalConsecutiveErrorLimit] = useState(2)
+  const [provisionalAutoBanEnabled, setProvisionalAutoBanEnabled] = useState(true)
   const [consensusReason, setConsensusReason] = useState('')
   const [isSavingConsensus, setIsSavingConsensus] = useState(false)
   const [consensusLoaded, setConsensusLoaded] = useState(false)
@@ -564,6 +568,9 @@ export default function SystemSettingsPage() {
         if (c.minReliabilityThreshold !== undefined) setMinReliabilityThreshold(Number(c.minReliabilityThreshold))
         if (c.consecutiveErrorLimit !== undefined) setConsecutiveErrorLimit(Number(c.consecutiveErrorLimit))
         if (c.suspensionCooldownDays !== undefined) setSuspensionCooldownDays(Number(c.suspensionCooldownDays))
+        if (c.provisionalMinReliabilityThreshold !== undefined) setProvisionalMinReliabilityThreshold(Number(c.provisionalMinReliabilityThreshold))
+        if (c.provisionalConsecutiveErrorLimit !== undefined) setProvisionalConsecutiveErrorLimit(Number(c.provisionalConsecutiveErrorLimit))
+        if (c.provisionalAutoBanEnabled !== undefined) setProvisionalAutoBanEnabled(Boolean(c.provisionalAutoBanEnabled))
         setConsensusLoaded(true)
         setConsensusError(null)
       } else if (consensusRes.status === 'rejected') {
@@ -632,6 +639,9 @@ export default function SystemSettingsPage() {
         minReliabilityThreshold,
         consecutiveErrorLimit,
         suspensionCooldownDays,
+        provisionalMinReliabilityThreshold,
+        provisionalConsecutiveErrorLimit,
+        provisionalAutoBanEnabled,
         reason: consensusReason.trim() || undefined,
       })
       setConsensusReason('')
@@ -657,6 +667,9 @@ export default function SystemSettingsPage() {
     setMinReliabilityThreshold(DEFAULT_CONSENSUS_VALUES.minReliabilityThreshold)
     setConsecutiveErrorLimit(DEFAULT_CONSENSUS_VALUES.consecutiveErrorLimit)
     setSuspensionCooldownDays(DEFAULT_CONSENSUS_VALUES.suspensionCooldownDays)
+    setProvisionalMinReliabilityThreshold(DEFAULT_CONSENSUS_VALUES.provisionalMinReliabilityThreshold)
+    setProvisionalConsecutiveErrorLimit(DEFAULT_CONSENSUS_VALUES.provisionalConsecutiveErrorLimit)
+    setProvisionalAutoBanEnabled(DEFAULT_CONSENSUS_VALUES.provisionalAutoBanEnabled)
     toast.info(isEn ? 'Loaded recommended baseline values' : 'Đã nạp bộ giá trị chuẩn khuyến nghị')
   }
 
@@ -678,6 +691,9 @@ export default function SystemSettingsPage() {
         if (c.minReliabilityThreshold !== undefined) setMinReliabilityThreshold(Number(c.minReliabilityThreshold))
         if (c.consecutiveErrorLimit !== undefined) setConsecutiveErrorLimit(Number(c.consecutiveErrorLimit))
         if (c.suspensionCooldownDays !== undefined) setSuspensionCooldownDays(Number(c.suspensionCooldownDays))
+        if (c.provisionalMinReliabilityThreshold !== undefined) setProvisionalMinReliabilityThreshold(Number(c.provisionalMinReliabilityThreshold))
+        if (c.provisionalConsecutiveErrorLimit !== undefined) setProvisionalConsecutiveErrorLimit(Number(c.provisionalConsecutiveErrorLimit))
+        if (c.provisionalAutoBanEnabled !== undefined) setProvisionalAutoBanEnabled(Boolean(c.provisionalAutoBanEnabled))
         setConsensusLoaded(true)
         setConsensusError(null)
       }
@@ -763,9 +779,9 @@ export default function SystemSettingsPage() {
             defaultLifetimeDays: Number(item.defaultLifetimeDays ?? item.default_lifetime_days ?? 180),
             revalidationThresholdDays: Number(
               item.revalidationThresholdDays ??
-                item.revalidation_threshold_days ??
-                item.revalThresholdDays ??
-                30
+              item.revalidation_threshold_days ??
+              item.revalThresholdDays ??
+              30
             ),
             spatialBufferMeters: Number(item.spatialBufferMeters ?? item.spatial_buffer_meters ?? 15),
             reason: routeReason.trim() || undefined,
@@ -1056,11 +1072,10 @@ export default function SystemSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('consensus')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'consensus'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'consensus'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>{isEn ? 'Consensus rules' : 'Độ đồng thuận'}</span>
         </button>
@@ -1069,11 +1084,10 @@ export default function SystemSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('freshness')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'freshness'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'freshness'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>{isEn ? 'Sign category lifetime' : 'Thời hạn theo loại biển'}</span>
         </button>
@@ -1082,11 +1096,10 @@ export default function SystemSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('routes')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'routes'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'routes'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>{isEn ? 'Road type lifetime' : 'Thời hạn theo loại đường'}</span>
         </button>
@@ -1095,11 +1108,10 @@ export default function SystemSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('parameters')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'parameters'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'parameters'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>{isEn ? 'System parameters' : 'Tham số hệ thống'}</span>
         </button>
@@ -1108,11 +1120,10 @@ export default function SystemSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab('demo_mode')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'demo_mode'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'demo_mode'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>{isEn ? 'Demo mode' : 'Chế độ demo'}</span>
           {isAnyDemoActive && (
@@ -1124,93 +1135,93 @@ export default function SystemSettingsPage() {
       {/* Main Content */}
       <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-6">
         {/* TAB 1: Consensus Configuration */}
-          {activeTab === 'consensus' && (
-            isLoading && !consensusLoaded && !consensusError ? (
-              <div className="space-y-6 animate-pulse">
-                <div className="space-y-2">
-                  <div className="h-5 w-52 bg-gray-200 dark:bg-white/10 rounded-lg" />
-                  <div className="h-3 w-96 bg-gray-100 dark:bg-white/5 rounded-lg" />
-                </div>
+        {activeTab === 'consensus' && (
+          isLoading && !consensusLoaded && !consensusError ? (
+            <div className="space-y-6 animate-pulse">
+              <div className="space-y-2">
+                <div className="h-5 w-52 bg-gray-200 dark:bg-white/10 rounded-lg" />
+                <div className="h-3 w-96 bg-gray-100 dark:bg-white/5 rounded-lg" />
+              </div>
 
-                <div className="space-y-3">
-                  <div className="h-3.5 w-48 bg-gray-200 dark:bg-white/10 rounded" />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5 border border-gray-200/60 dark:border-white/5">
-                        <div className="h-3.5 w-32 bg-gray-200 dark:bg-white/10 rounded" />
-                        <div className="h-9 w-full bg-gray-200/60 dark:bg-white/10 rounded-lg" />
-                        <div className="h-2.5 w-48 bg-gray-100 dark:bg-white/5 rounded" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="h-3.5 w-56 bg-gray-200 dark:bg-white/10 rounded" />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div key={i} className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2 border border-gray-200/60 dark:border-white/5">
-                        <div className="h-3 w-36 bg-gray-200 dark:bg-white/10 rounded" />
-                        <div className="h-9 w-full bg-gray-200/60 dark:bg-white/10 rounded-lg" />
-                      </div>
-                    ))}
-                  </div>
+              <div className="space-y-3">
+                <div className="h-3.5 w-48 bg-gray-200 dark:bg-white/10 rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2.5 border border-gray-200/60 dark:border-white/5">
+                      <div className="h-3.5 w-32 bg-gray-200 dark:bg-white/10 rounded" />
+                      <div className="h-9 w-full bg-gray-200/60 dark:bg-white/10 rounded-lg" />
+                      <div className="h-2.5 w-48 bg-gray-100 dark:bg-white/5 rounded" />
+                    </div>
+                  ))}
                 </div>
               </div>
-            ) : !consensusLoaded && consensusError ? (
-              <div className="p-8 text-center space-y-3 max-w-md mx-auto my-12 bg-red-50/50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl">
-                <div className="w-10 h-10 mx-auto rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-base">
-                  !
-                </div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  {isEn ? 'Failed to load consensus configuration' : 'Không thể tải cấu hình độ đồng thuận'}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {consensusError}
-                </p>
-                <div className="pt-2 flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={reloadConsensus}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white transition-colors cursor-pointer"
-                  >
-                    {isEn ? 'Retry' : 'Thử lại'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleResetConsensusDefaults()
-                      setConsensusLoaded(true)
-                      setConsensusError(null)
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                  >
-                    {isEn ? 'Use recommended defaults' : 'Dùng giá trị chuẩn'}
-                  </button>
+
+              <div className="space-y-3">
+                <div className="h-3.5 w-56 bg-gray-200 dark:bg-white/10 rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2 border border-gray-200/60 dark:border-white/5">
+                      <div className="h-3 w-36 bg-gray-200 dark:bg-white/10 rounded" />
+                      <div className="h-9 w-full bg-gray-200/60 dark:bg-white/10 rounded-lg" />
+                    </div>
+                  ))}
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleSaveConsensus} className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                      {isEn ? 'Consensus configuration' : 'Cấu hình độ đồng thuận'}
-                    </h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {isEn
-                        ? 'Adjust vote thresholds, reviewer weights, and reliability penalties.'
-                        : 'Cấu hình ngưỡng điểm duyệt, số lượng phiếu đánh giá và cơ chế tính điểm uy tín cho reviewer.'}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleResetConsensusDefaults}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                  >
-                    <span>{isEn ? 'Standard defaults' : 'Giá trị chuẩn khuyến nghị'}</span>
-                  </button>
+            </div>
+          ) : !consensusLoaded && consensusError ? (
+            <div className="p-8 text-center space-y-3 max-w-md mx-auto my-12 bg-red-50/50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl">
+              <div className="w-10 h-10 mx-auto rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-base">
+                !
+              </div>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                {isEn ? 'Failed to load consensus configuration' : 'Không thể tải cấu hình độ đồng thuận'}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {consensusError}
+              </p>
+              <div className="pt-2 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={reloadConsensus}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#007b8b] hover:bg-[#00606d] text-white transition-colors cursor-pointer"
+                >
+                  {isEn ? 'Retry' : 'Thử lại'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleResetConsensusDefaults()
+                    setConsensusLoaded(true)
+                    setConsensusError(null)
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  {isEn ? 'Use recommended defaults' : 'Dùng giá trị chuẩn'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSaveConsensus} className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                    {isEn ? 'Consensus configuration' : 'Cấu hình độ đồng thuận'}
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {isEn
+                      ? 'Adjust vote thresholds, reviewer weights, and reliability penalties.'
+                      : 'Cấu hình ngưỡng điểm duyệt, số lượng phiếu đánh giá và cơ chế tính điểm uy tín cho reviewer.'}
+                  </p>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleResetConsensusDefaults}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                >
+                  <span>{isEn ? 'Standard defaults' : 'Giá trị chuẩn khuyến nghị'}</span>
+                </button>
+              </div>
 
               {/* Group 1: Approval & Vote Quorums */}
               <div className="space-y-3">
@@ -1418,6 +1429,91 @@ export default function SystemSettingsPage() {
                 </div>
               </div>
 
+              {/* Group 3: Provisional Reviewer Autoban Governance */}
+              <div className="pt-4 border-t border-gray-200 dark:border-white/10 space-y-3">
+                <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                  {isEn ? 'Provisional account rules' : 'Quy định tài khoản mới'}
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  {/* Toggle: Tự động cấm tài khoản mới */}
+                  <div className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2 border border-gray-200/60 dark:border-white/5 flex flex-col justify-between">
+                    <div>
+                      <label className="block font-semibold text-gray-700 dark:text-gray-300">
+                        {isEn ? 'Automatic ban for new accounts' : 'Tự động cấm tài khoản mới'}
+                      </label>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {isEn ? 'Automatically ban new accounts when thresholds are exceeded.' : 'Tự động cấm tài khoản mới khi vi phạm ngưỡng uy tín hoặc chuỗi sai.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setProvisionalAutoBanEnabled(true)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          provisionalAutoBanEnabled
+                            ? 'bg-[#007b8b] text-white'
+                            : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                        }`}
+                      >
+                        {isEn ? 'On' : 'Bật'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProvisionalAutoBanEnabled(false)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          !provisionalAutoBanEnabled
+                            ? 'bg-red-600 text-white'
+                            : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                        }`}
+                      >
+                        {isEn ? 'Off' : 'Tắt'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Input: Ngưỡng uy tín tối thiểu tài khoản mới */}
+                  <div className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1.5 border border-gray-200/60 dark:border-white/5">
+                    <label className="block font-semibold text-gray-700 dark:text-gray-300">
+                      {isEn ? 'Minimum reliability for new accounts' : 'Ngưỡng uy tín tối thiểu tài khoản mới'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={provisionalMinReliabilityThreshold}
+                        onChange={(e) => setProvisionalMinReliabilityThreshold(Number(e.target.value))}
+                        className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:border-[#007b8b]"
+                      />
+                      <span className="absolute right-3 top-2 text-xs text-gray-400 font-bold">%</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      {isEn ? 'Score threshold below which new accounts are banned.' : 'Tài khoản mới có điểm uy tín dưới mức này sẽ bị cấm.'}
+                    </p>
+                  </div>
+
+                  {/* Input: Giới hạn đánh giá sai liên tiếp */}
+                  <div className="p-3.5 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1.5 border border-gray-200/60 dark:border-white/5">
+                    <label className="block font-semibold text-gray-700 dark:text-gray-300">
+                      {isEn ? 'Consecutive wrong votes limit' : 'Giới hạn đánh giá sai liên tiếp'}
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={provisionalConsecutiveErrorLimit}
+                      onChange={(e) => setProvisionalConsecutiveErrorLimit(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-sm font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:border-[#007b8b]"
+                    />
+                    <p className="text-[11px] text-gray-400">
+                      {isEn ? 'Number of wrong votes in a row before automatic ban.' : 'Số lần đánh giá sai liên tiếp dẫn đến tự động cấm.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Save Footer */}
               <div className="pt-4 border-t border-gray-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <input
@@ -1441,514 +1537,507 @@ export default function SystemSettingsPage() {
             </form>
           ))}
 
-          {/* TAB 2: Freshness Rules */}
-          {activeTab === 'freshness' && (
-            <div className="space-y-4">
+        {/* TAB 2: Freshness Rules */}
+        {activeTab === 'freshness' && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                {isEn ? 'Sign category lifetime' : 'Thời hạn theo loại biển'}
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {isEn
+                  ? 'Configure recapture cycle, priority, distance, and daily limit per sign category.'
+                  : 'Quy định thời gian chụp lại, mức ưu tiên, bán kính vị trí và giới hạn nộp mỗi ngày cho từng loại biển báo.'}
+              </p>
+            </div>
+
+            {/* Freshness Rules Table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-100 dark:bg-white/5 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="px-3.5 py-2.5">{isEn ? 'Sign category' : 'Loại biển báo'}</th>
+                    <th className="px-3.5 py-2.5">{isEn ? 'Recapture cycle' : 'Hạn chụp lại'}</th>
+                    <th className="px-3.5 py-2.5">{isEn ? 'Priority' : 'Mức ưu tiên'}</th>
+                    <th className="px-3.5 py-2.5">{isEn ? 'Radius' : 'Bán kính'}</th>
+                    <th className="px-3.5 py-2.5">{isEn ? 'Daily limit' : 'Giới hạn ngày'}</th>
+                    <th className="px-3.5 py-2.5 text-center">{isEn ? 'Status' : 'Trạng thái'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                  {freshnessRules.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                        {isEn ? 'No sign categories found.' : 'Chưa có cấu hình loại biển báo nào.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    freshnessRules.map((rule) => {
+                      const pri = PRIORITY_LABELS[String(rule.defaultPriority).toUpperCase()] || PRIORITY_LABELS.MEDIUM
+                      return (
+                        <tr
+                          key={rule.id}
+                          onClick={() => openEditRuleForm(rule)}
+                          className="hover:bg-teal-50/50 dark:hover:bg-white/5 cursor-pointer transition-colors group"
+                          title={isEn ? 'Click to edit' : 'Bấm để chỉnh sửa'}
+                        >
+                          <td className="px-3.5 py-3 font-semibold text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de]">
+                            {getCategoryDisplayName(rule, categories, isEn)}
+                          </td>
+                          <td className="px-3.5 py-3 font-mono font-medium">
+                            {rule.freshnessPeriodDays} {isEn ? 'days' : 'ngày'}
+                          </td>
+                          <td className="px-3.5 py-3">
+                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${pri.className}`}>
+                              {isEn ? pri.en : pri.vi}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-3 font-mono">{rule.maxProximityMeters}m</td>
+                          <td className="px-3.5 py-3 font-mono">{rule.dailySubmissionLimit}</td>
+                          <td className="px-3.5 py-3 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              disabled={togglingRuleId === rule.id}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleRuleActive(rule)
+                              }}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 ${rule.isActive
+                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-400'
+                                }`}
+                              title={rule.isActive ? (isEn ? 'Click to disable' : 'Bấm để tắt') : (isEn ? 'Click to enable' : 'Bấm để bật')}
+                            >
+                              {rule.isActive ? (isEn ? 'Active' : 'Đang bật') : (isEn ? 'Inactive' : 'Đã tắt')}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Route Matrix */}
+        {activeTab === 'routes' && (
+          <form onSubmit={handleSaveRoutes} className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                  {isEn ? 'Sign category lifetime' : 'Thời hạn theo loại biển'}
-                </h2>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                  {isEn ? 'Road type lifetime' : 'Thời hạn theo loại đường'}
+                </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {isEn
-                    ? 'Configure recapture cycle, priority, distance, and daily limit per sign category.'
-                    : 'Quy định thời gian chụp lại, mức ưu tiên, bán kính vị trí và giới hạn nộp mỗi ngày cho từng loại biển báo.'}
+                    ? 'Configure sign lifetime, recapture trigger threshold, and GPS buffer applied specifically to each road type.'
+                    : 'Quy định thời hạn hiệu lực của biển báo, số ngày kích hoạt yêu cầu chụp lại và vùng đệm áp dụng cho từng loại đường.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-100 dark:bg-white/5 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                  <tr>
+                    <th className="px-4 py-3">{isEn ? 'Road' : 'Tên tuyến đường'}</th>
+                    <th className="px-4 py-3 text-center">{isEn ? 'Type code' : 'Mã loại'}</th>
+                    <th className="px-4 py-3 text-center">{isEn ? 'Lifetime' : 'Thời hạn hiệu lực'}</th>
+                    <th className="px-4 py-3 text-center">{isEn ? 'Recapture trigger' : 'Hạn chụp lại'}</th>
+                    <th className="px-4 py-3 text-center">{isEn ? 'Buffer' : 'Khoảng cách'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                  {routeMatrix.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center font-sans text-gray-400">
+                        {isEn ? 'No road types found.' : 'Chưa có dữ liệu loại đường từ máy chủ.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    routeMatrix.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
+                        <td className="px-4 py-3 font-sans font-bold text-gray-900 dark:text-white">
+                          {getRouteDisplayName(item, isEn)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="text"
+                            value={item.roadType ?? item.road_type ?? ''}
+                            onChange={(e) => handleRouteFieldChange(item.id, 'roadType', e.target.value)}
+                            className="w-32 px-2.5 py-1.5 text-center uppercase font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            max="2000"
+                            value={item.defaultLifetimeDays ?? item.default_lifetime_days ?? 180}
+                            onChange={(e) =>
+                              handleRouteFieldChange(item.id, 'defaultLifetimeDays', Number(e.target.value))
+                            }
+                            className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            max="365"
+                            value={
+                              item.revalidationThresholdDays ??
+                              item.revalidation_threshold_days ??
+                              item.revalThresholdDays ??
+                              30
+                            }
+                            onChange={(e) =>
+                              handleRouteFieldChange(item.id, 'revalidationThresholdDays', Number(e.target.value))
+                            }
+                            className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            min="1"
+                            max="500"
+                            value={item.spatialBufferMeters ?? item.spatial_buffer_meters ?? 15}
+                            onChange={(e) =>
+                              handleRouteFieldChange(item.id, 'spatialBufferMeters', Number(e.target.value))
+                            }
+                            className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {routeMatrix.length > 0 && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <input
+                  type="text"
+                  value={routeReason}
+                  onChange={(e) => setRouteReason(e.target.value)}
+                  placeholder={isEn ? 'Reason for update' : 'Lý do thay đổi'}
+                  className="flex-1 px-3.5 py-2 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:border-[#007b8b]"
+                />
+                <button
+                  type="submit"
+                  disabled={isSavingRoutes}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-sm transition-colors duration-150 cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {isSavingRoutes && (
+                    <CircleNotch size={15} className="animate-spin" />
+                  )}
+                  <span>{isSavingRoutes ? (isEn ? 'Saving...' : 'Đang lưu...') : isEn ? 'Save road types' : 'Lưu cấu hình loại đường'}</span>
+                </button>
+              </div>
+            )}
+          </form>
+        )}
+
+        {/* TAB 3: Global System Parameters */}
+        {activeTab === 'parameters' && (
+          <div className="space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  {isEn ? 'System parameters' : 'Tham số hệ thống'}
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {isEn
+                    ? 'Global configuration parameters grouped by domain'
+                    : 'Danh sách tham số vận hành phân nhóm theo domain'}
                 </p>
               </div>
 
-              {/* Freshness Rules Table */}
-              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 dark:bg-white/5 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400">
-                    <tr>
-                      <th className="px-3.5 py-2.5">{isEn ? 'Sign category' : 'Loại biển báo'}</th>
-                      <th className="px-3.5 py-2.5">{isEn ? 'Recapture cycle' : 'Hạn chụp lại'}</th>
-                      <th className="px-3.5 py-2.5">{isEn ? 'Priority' : 'Mức ưu tiên'}</th>
-                      <th className="px-3.5 py-2.5">{isEn ? 'Radius' : 'Bán kính'}</th>
-                      <th className="px-3.5 py-2.5">{isEn ? 'Daily limit' : 'Giới hạn ngày'}</th>
-                      <th className="px-3.5 py-2.5 text-center">{isEn ? 'Status' : 'Trạng thái'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                    {freshnessRules.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                          {isEn ? 'No sign categories found.' : 'Chưa có cấu hình loại biển báo nào.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      freshnessRules.map((rule) => {
-                        const pri = PRIORITY_LABELS[String(rule.defaultPriority).toUpperCase()] || PRIORITY_LABELS.MEDIUM
-                        return (
-                          <tr
-                            key={rule.id}
-                            onClick={() => openEditRuleForm(rule)}
-                            className="hover:bg-teal-50/50 dark:hover:bg-white/5 cursor-pointer transition-colors group"
-                            title={isEn ? 'Click to edit' : 'Bấm để chỉnh sửa'}
-                          >
-                            <td className="px-3.5 py-3 font-semibold text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de]">
-                              {getCategoryDisplayName(rule, categories, isEn)}
-                            </td>
-                            <td className="px-3.5 py-3 font-mono font-medium">
-                              {rule.freshnessPeriodDays} {isEn ? 'days' : 'ngày'}
-                            </td>
-                            <td className="px-3.5 py-3">
-                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${pri.className}`}>
-                                {isEn ? pri.en : pri.vi}
-                              </span>
-                            </td>
-                            <td className="px-3.5 py-3 font-mono">{rule.maxProximityMeters}m</td>
-                            <td className="px-3.5 py-3 font-mono">{rule.dailySubmissionLimit}</td>
-                            <td className="px-3.5 py-3 text-center whitespace-nowrap">
-                              <button
-                                type="button"
-                                disabled={togglingRuleId === rule.id}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleToggleRuleActive(rule)
-                                }}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
-                                  rule.isActive
-                                    ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
-                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-400'
-                                }`}
-                                title={rule.isActive ? (isEn ? 'Click to disable' : 'Bấm để tắt') : (isEn ? 'Click to enable' : 'Bấm để bật')}
-                              >
-                                {rule.isActive ? (isEn ? 'Active' : 'Đang bật') : (isEn ? 'Inactive' : 'Đã tắt')}
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+              <div className="flex items-center flex-wrap sm:flex-nowrap gap-2">
+                <button
+                  type="button"
+                  onClick={expandAllKeys}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                >
+                  {isEn ? 'Expand all' : 'Mở rộng tất cả'}
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAllKeys}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                >
+                  {isEn ? 'Collapse all' : 'Thu gọn tất cả'}
+                </button>
 
-          {/* TAB 3: Route Matrix */}
-          {activeTab === 'routes' && (
-            <form onSubmit={handleSaveRoutes} className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                    {isEn ? 'Road type lifetime' : 'Thời hạn theo loại đường'}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {isEn
-                      ? 'Configure sign lifetime, recapture trigger threshold, and GPS buffer applied specifically to each road type.'
-                      : 'Quy định thời hạn hiệu lực của biển báo, số ngày kích hoạt yêu cầu chụp lại và vùng đệm áp dụng cho từng loại đường.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 dark:bg-white/5 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400">
-                    <tr>
-                      <th className="px-4 py-3">{isEn ? 'Road' : 'Tên tuyến đường'}</th>
-                      <th className="px-4 py-3 text-center">{isEn ? 'Type code' : 'Mã loại'}</th>
-                      <th className="px-4 py-3 text-center">{isEn ? 'Lifetime' : 'Thời hạn hiệu lực'}</th>
-                      <th className="px-4 py-3 text-center">{isEn ? 'Recapture trigger' : 'Hạn chụp lại'}</th>
-                      <th className="px-4 py-3 text-center">{isEn ? 'Buffer' : 'Khoảng cách'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                    {routeMatrix.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center font-sans text-gray-400">
-                          {isEn ? 'No road types found.' : 'Chưa có dữ liệu loại đường từ máy chủ.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      routeMatrix.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
-                          <td className="px-4 py-3 font-sans font-bold text-gray-900 dark:text-white">
-                            {getRouteDisplayName(item, isEn)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="text"
-                              value={item.roadType ?? item.road_type ?? ''}
-                              onChange={(e) => handleRouteFieldChange(item.id, 'roadType', e.target.value)}
-                              className="w-32 px-2.5 py-1.5 text-center uppercase font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              min="1"
-                              max="2000"
-                              value={item.defaultLifetimeDays ?? item.default_lifetime_days ?? 180}
-                              onChange={(e) =>
-                                handleRouteFieldChange(item.id, 'defaultLifetimeDays', Number(e.target.value))
-                              }
-                              className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              min="1"
-                              max="365"
-                              value={
-                                item.revalidationThresholdDays ??
-                                item.revalidation_threshold_days ??
-                                item.revalThresholdDays ??
-                                30
-                              }
-                              onChange={(e) =>
-                                handleRouteFieldChange(item.id, 'revalidationThresholdDays', Number(e.target.value))
-                              }
-                              className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              min="1"
-                              max="500"
-                              value={item.spatialBufferMeters ?? item.spatial_buffer_meters ?? 15}
-                              onChange={(e) =>
-                                handleRouteFieldChange(item.id, 'spatialBufferMeters', Number(e.target.value))
-                              }
-                              className="w-24 px-2.5 py-1.5 text-center font-mono font-bold bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b]"
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {routeMatrix.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                {/* Thanh tìm kiếm đặt ngay sau 2 nút mở rộng và thu gọn */}
+                <div className="relative flex items-center min-w-[220px] sm:w-64">
                   <input
                     type="text"
-                    value={routeReason}
-                    onChange={(e) => setRouteReason(e.target.value)}
-                    placeholder={isEn ? 'Reason for update' : 'Lý do thay đổi'}
-                    className="flex-1 px-3.5 py-2 bg-gray-50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:border-[#007b8b]"
+                    placeholder={isEn ? 'Search parameters...' : 'Tìm kiếm tham số...'}
+                    value={paramSearch}
+                    onChange={(e) => setParamSearch(e.target.value)}
+                    className="w-full pl-3 pr-7 py-1.5 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b] transition-colors"
                   />
-                  <button
-                    type="submit"
-                    disabled={isSavingRoutes}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold rounded-xl shadow-sm transition-colors duration-150 cursor-pointer disabled:opacity-50 shrink-0"
-                  >
-                    {isSavingRoutes && (
-                      <CircleNotch size={15} className="animate-spin" />
-                    )}
-                    <span>{isSavingRoutes ? (isEn ? 'Saving...' : 'Đang lưu...') : isEn ? 'Save road types' : 'Lưu cấu hình loại đường'}</span>
-                  </button>
-                </div>
-              )}
-            </form>
-          )}
-
-          {/* TAB 3: Global System Parameters */}
-          {activeTab === 'parameters' && (
-            <div className="space-y-4">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                    {isEn ? 'System parameters' : 'Tham số hệ thống'}
-                  </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {isEn
-                      ? 'Global configuration parameters grouped by domain'
-                      : 'Danh sách tham số vận hành phân nhóm theo domain'}
-                  </p>
-                </div>
-
-                <div className="flex items-center flex-wrap sm:flex-nowrap gap-2">
-                  <button
-                    type="button"
-                    onClick={expandAllKeys}
-                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                  >
-                    {isEn ? 'Expand all' : 'Mở rộng tất cả'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={collapseAllKeys}
-                    className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                  >
-                    {isEn ? 'Collapse all' : 'Thu gọn tất cả'}
-                  </button>
-
-                  {/* Thanh tìm kiếm đặt ngay sau 2 nút mở rộng và thu gọn */}
-                  <div className="relative flex items-center min-w-[220px] sm:w-64">
-                    <input
-                      type="text"
-                      placeholder={isEn ? 'Search parameters...' : 'Tìm kiếm tham số...'}
-                      value={paramSearch}
-                      onChange={(e) => setParamSearch(e.target.value)}
-                      className="w-full pl-3 pr-7 py-1.5 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#007b8b] transition-colors"
-                    />
-                    {paramSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setParamSearch('')}
-                        className="absolute right-2 text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
-                        aria-label={isEn ? 'Clear' : 'Xóa'}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
+                  {paramSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setParamSearch('')}
+                      className="absolute right-2 text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                      aria-label={isEn ? 'Clear' : 'Xóa'}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Tree View */}
-              <div className="bg-white dark:bg-[#061115] rounded-xl border border-gray-200 dark:border-white/10 p-4 font-sans select-none">
-                {domainGroups.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-gray-400">
-                    {isEn ? 'No parameters found.' : 'Không tìm thấy tham số nào.'}
-                  </div>
-                ) : (
-                  <div className="relative pl-1">
-                    {domainGroups.map((group, groupIdx) => {
-                      const isFirstGroup = groupIdx === 0
-                      const isLastGroup = groupIdx === domainGroups.length - 1
-                      const isExpanded = expandedKeys.has(group.domainKey)
+            {/* Tree View */}
+            <div className="bg-white dark:bg-[#061115] rounded-xl border border-gray-200 dark:border-white/10 p-4 font-sans select-none">
+              {domainGroups.length === 0 ? (
+                <div className="py-12 text-center text-xs text-gray-400">
+                  {isEn ? 'No parameters found.' : 'Không tìm thấy tham số nào.'}
+                </div>
+              ) : (
+                <div className="relative pl-1">
+                  {domainGroups.map((group, groupIdx) => {
+                    const isFirstGroup = groupIdx === 0
+                    const isLastGroup = groupIdx === domainGroups.length - 1
+                    const isExpanded = expandedKeys.has(group.domainKey)
 
-                      return (
-                        <div key={group.domainKey} className="relative">
-                          {/* Vertical trunk line connecting domain to domain */}
-                          <span
-                            className={`absolute left-[7px] w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${
-                              isFirstGroup && isLastGroup
-                                ? 'hidden'
-                                : isFirstGroup
-                                ? 'top-[14px] bottom-0'
-                                : isLastGroup
+                    return (
+                      <div key={group.domainKey} className="relative">
+                        {/* Vertical trunk line connecting domain to domain */}
+                        <span
+                          className={`absolute left-[7px] w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none ${isFirstGroup && isLastGroup
+                            ? 'hidden'
+                            : isFirstGroup
+                              ? 'top-[14px] bottom-0'
+                              : isLastGroup
                                 ? 'top-0 h-[14px]'
                                 : 'top-0 bottom-0'
                             }`}
-                          />
+                        />
 
-                          {/* Horizontal branch line from trunk to domain toggle */}
-                          <span className="absolute left-[7px] top-[14px] w-[13px] h-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none" />
+                        {/* Horizontal branch line from trunk to domain toggle */}
+                        <span className="absolute left-[7px] top-[14px] w-[13px] h-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none" />
 
-                          {/* Domain Header Row */}
-                          <div
-                            onClick={() => toggleKey(group.domainKey)}
-                            className="relative ml-[20px] flex items-center justify-between py-1 pl-0 pr-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group cursor-pointer"
-                          >
-                            {/* Drop line from domain toggle button down to children */}
-                            {isExpanded && (
-                              <span className="absolute left-[8px] top-[22px] bottom-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none" />
-                            )}
-                            <div className="flex items-center gap-2 min-w-0">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleKey(group.domainKey)
-                                }}
-                                className="w-4 h-4 shrink-0 flex items-center justify-center border border-gray-400 dark:border-white/30 rounded-xs bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-200 font-mono text-[10px] font-bold select-none cursor-pointer hover:border-gray-600 transition-colors"
-                                aria-label={isExpanded ? 'Thu gọn' : 'Mở rộng'}
-                              >
-                                {isExpanded ? '−' : '+'}
-                              </button>
-                              <span className="text-left font-semibold text-xs text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors truncate">
-                                {group.domainName}
-                              </span>
-                              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-normal">
-                                {group.items.length} {isEn ? 'parameters' : 'tham số'}
-                              </span>
-                            </div>
+                        {/* Domain Header Row */}
+                        <div
+                          onClick={() => toggleKey(group.domainKey)}
+                          className="relative ml-[20px] flex items-center justify-between py-1 pl-0 pr-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group cursor-pointer"
+                        >
+                          {/* Drop line from domain toggle button down to children */}
+                          {isExpanded && (
+                            <span className="absolute left-[8px] top-[22px] bottom-0 w-px bg-gray-300 dark:bg-white/20 z-10 pointer-events-none" />
+                          )}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleKey(group.domainKey)
+                              }}
+                              className="w-4 h-4 shrink-0 flex items-center justify-center border border-gray-400 dark:border-white/30 rounded-xs bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-200 font-mono text-[10px] font-bold select-none cursor-pointer hover:border-gray-600 transition-colors"
+                              aria-label={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                            >
+                              {isExpanded ? '−' : '+'}
+                            </button>
+                            <span className="text-left font-semibold text-xs text-gray-900 dark:text-white group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] transition-colors truncate">
+                              {group.domainName}
+                            </span>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 font-normal">
+                              {group.items.length} {isEn ? 'parameters' : 'tham số'}
+                            </span>
                           </div>
+                        </div>
 
-                          {/* Expanded child parameters and sub-folders */}
-                          {isExpanded && group.treeNodes && group.treeNodes.length > 0 && (
-                            <div className="relative space-y-0.5 mt-0 mb-0.5" style={{ marginLeft: '28px' }}>
-                              {group.treeNodes.map((child, idx) => (
-                                <ParamTreeItem
-                                  key={child.id}
-                                  node={child}
-                                  isLast={idx === group.treeNodes.length - 1}
-                                  domainKey={group.domainKey}
-                                  expandedKeys={expandedKeys}
-                                  onToggle={toggleKey}
-                                  onSelectParam={handleOpenUpdateModal}
-                                  isEn={isEn}
-                                />
-                              ))}
-                            </div>
+                        {/* Expanded child parameters and sub-folders */}
+                        {isExpanded && group.treeNodes && group.treeNodes.length > 0 && (
+                          <div className="relative space-y-0.5 mt-0 mb-0.5" style={{ marginLeft: '28px' }}>
+                            {group.treeNodes.map((child, idx) => (
+                              <ParamTreeItem
+                                key={child.id}
+                                node={child}
+                                isLast={idx === group.treeNodes.length - 1}
+                                domainKey={group.domainKey}
+                                expandedKeys={expandedKeys}
+                                onToggle={toggleKey}
+                                onSelectParam={handleOpenUpdateModal}
+                                isEn={isEn}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: Dynamic Demo Switchboard */}
+        {activeTab === 'demo_mode' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                  {isEn ? 'Demo mode control panel' : 'Bảng điều khiển chế độ demo'}
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {isEn
+                    ? 'Turn on presentation shortcuts quickly or restore standard production rules.'
+                    : 'Kích hoạt nhanh các tùy chọn rút gọn khi demo thuyết trình hoặc khôi phục quy tắc vận hành chuẩn.'}
+                </p>
+              </div>
+
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${isAnyDemoActive
+                  ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                  : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                  }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${isAnyDemoActive ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
+                    }`}
+                />
+                <span>
+                  {isAnyDemoActive
+                    ? isEn
+                      ? 'Demo mode active'
+                      : 'Đang bật chế độ demo'
+                    : isEn
+                      ? 'Standard production mode'
+                      : 'Đang chạy chế độ tiêu chuẩn'}
+                </span>
+              </span>
+            </div>
+
+            {/* Master Controls Card */}
+            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200/80 dark:border-white/10 space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block font-semibold text-gray-700 dark:text-gray-300">
+                    {isEn ? 'Default demo surveyor email' : 'Email nhận việc chụp lại khi demo'}
+                  </label>
+                  <input
+                    type="email"
+                    value={demoTargetEmail}
+                    onChange={(e) => setDemoTargetEmail(e.target.value)}
+                    placeholder="demo@stm.dev"
+                    className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-semibold text-gray-700 dark:text-gray-300">
+                    {isEn ? 'Change reason' : 'Lý do thay đổi'}
+                  </label>
+                  <input
+                    type="text"
+                    value={switchReason}
+                    onChange={(e) => setSwitchReason(e.target.value)}
+                    placeholder={isEn ? 'Reason for update' : 'Lý do thay đổi'}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  disabled={isBulkTogglingDemo}
+                  onClick={handleEnableDemoMode}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50"
+                >
+                  {isBulkTogglingDemo && <CircleNotch size={14} className="animate-spin" />}
+                  <span>{isEn ? 'Enable all demo switches' : 'Bật toàn bộ tính năng demo'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isBulkTogglingDemo}
+                  onClick={handleDisableDemoMode}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50"
+                >
+                  {isBulkTogglingDemo && <CircleNotch size={14} className="animate-spin" />}
+                  <span>{isEn ? 'Restore standard mode' : 'Khôi phục chế độ tiêu chuẩn'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Granular Switches List */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                {isEn ? 'Individual demo features' : 'Tùy chọn chi tiết từng tính năng demo'}
+              </h3>
+
+              {isLoading && systemSwitches.length === 0 ? (
+                <div className="py-10 flex items-center justify-center gap-2 text-xs text-gray-400">
+                  <CircleNotch size={16} className="animate-spin text-[#007b8b]" />
+                  <span>{isEn ? 'Loading switches...' : 'Đang tải danh sách tính năng...'}</span>
+                </div>
+              ) : systemSwitches.length === 0 ? (
+                <div className="p-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-xs text-gray-500 dark:text-gray-400">
+                  {isEn ? 'No system switches found from server.' : 'Chưa có tính năng nào từ máy chủ.'}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {systemSwitches.map((flag) => {
+                    const meta = DEMO_SWITCH_LABELS[flag.key]
+                    const title = meta ? (isEn ? meta.titleEn : meta.titleVi) : flag.name || flag.key
+                    const desc = meta ? (isEn ? meta.descEn : meta.descVi) : flag.description || ''
+                    const isRowLoading = togglingSwitchKey === flag.key || isBulkTogglingDemo
+
+                    return (
+                      <div
+                        key={flag.key}
+                        className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${flag.isEnabled
+                          ? 'bg-amber-50/50 dark:bg-amber-500/5 border-amber-200/80 dark:border-amber-500/20'
+                          : 'bg-gray-50/70 dark:bg-white/[0.02] border-gray-200/70 dark:border-white/10'
+                          }`}
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                              {title}
+                            </span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-200/70 dark:bg-white/10 text-gray-600 dark:text-gray-400">
+                              {flag.key}
+                            </span>
+                          </div>
+                          {desc && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{desc}</p>
                           )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* TAB 4: Dynamic Demo Switchboard */}
-          {activeTab === 'demo_mode' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                    {isEn ? 'Demo mode control panel' : 'Bảng điều khiển chế độ demo'}
-                  </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {isEn
-                      ? 'Turn on presentation shortcuts quickly or restore standard production rules.'
-                      : 'Kích hoạt nhanh các tùy chọn rút gọn khi demo thuyết trình hoặc khôi phục quy tắc vận hành chuẩn.'}
-                  </p>
-                </div>
-
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                    isAnyDemoActive
-                      ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-                      : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      isAnyDemoActive ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
-                    }`}
-                  />
-                  <span>
-                    {isAnyDemoActive
-                      ? isEn
-                        ? 'Demo mode active'
-                        : 'Đang bật chế độ demo'
-                      : isEn
-                        ? 'Standard production mode'
-                        : 'Đang chạy chế độ tiêu chuẩn'}
-                  </span>
-                </span>
-              </div>
-
-              {/* Master Controls Card */}
-              <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200/80 dark:border-white/10 space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="block font-semibold text-gray-700 dark:text-gray-300">
-                      {isEn ? 'Default demo surveyor email' : 'Email nhận việc chụp lại khi demo'}
-                    </label>
-                    <input
-                      type="email"
-                      value={demoTargetEmail}
-                      onChange={(e) => setDemoTargetEmail(e.target.value)}
-                      placeholder="demo@stm.dev"
-                      className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block font-semibold text-gray-700 dark:text-gray-300">
-                      {isEn ? 'Change reason' : 'Lý do thay đổi'}
-                    </label>
-                    <input
-                      type="text"
-                      value={switchReason}
-                      onChange={(e) => setSwitchReason(e.target.value)}
-                      placeholder={isEn ? 'Reason for update' : 'Lý do thay đổi'}
-                      className="w-full px-3 py-2 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    disabled={isBulkTogglingDemo}
-                    onClick={handleEnableDemoMode}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50"
-                  >
-                    {isBulkTogglingDemo && <CircleNotch size={14} className="animate-spin" />}
-                    <span>{isEn ? 'Enable all demo switches' : 'Bật toàn bộ tính năng demo'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isBulkTogglingDemo}
-                    onClick={handleDisableDemoMode}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#007b8b] hover:bg-[#00606d] text-white text-xs font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50"
-                  >
-                    {isBulkTogglingDemo && <CircleNotch size={14} className="animate-spin" />}
-                    <span>{isEn ? 'Restore standard mode' : 'Khôi phục chế độ tiêu chuẩn'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Granular Switches List */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                  {isEn ? 'Individual demo features' : 'Tùy chọn chi tiết từng tính năng demo'}
-                </h3>
-
-                {isLoading && systemSwitches.length === 0 ? (
-                  <div className="py-10 flex items-center justify-center gap-2 text-xs text-gray-400">
-                    <CircleNotch size={16} className="animate-spin text-[#007b8b]" />
-                    <span>{isEn ? 'Loading switches...' : 'Đang tải danh sách tính năng...'}</span>
-                  </div>
-                ) : systemSwitches.length === 0 ? (
-                  <div className="p-4 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-center text-xs text-gray-500 dark:text-gray-400">
-                    {isEn ? 'No system switches found from server.' : 'Chưa có tính năng nào từ máy chủ.'}
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {systemSwitches.map((flag) => {
-                      const meta = DEMO_SWITCH_LABELS[flag.key]
-                      const title = meta ? (isEn ? meta.titleEn : meta.titleVi) : flag.name || flag.key
-                      const desc = meta ? (isEn ? meta.descEn : meta.descVi) : flag.description || ''
-                      const isRowLoading = togglingSwitchKey === flag.key || isBulkTogglingDemo
-
-                      return (
-                        <div
-                          key={flag.key}
-                          className={`p-4 rounded-xl border transition-colors flex items-center justify-between gap-4 ${
-                            flag.isEnabled
-                              ? 'bg-amber-50/50 dark:bg-amber-500/5 border-amber-200/80 dark:border-amber-500/20'
-                              : 'bg-gray-50/70 dark:bg-white/[0.02] border-gray-200/70 dark:border-white/10'
-                          }`}
-                        >
-                          <div className="min-w-0 space-y-0.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                {title}
-                              </span>
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-200/70 dark:bg-white/10 text-gray-600 dark:text-gray-400">
-                                {flag.key}
-                              </span>
-                            </div>
-                            {desc && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{desc}</p>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={flag.isEnabled}
-                            disabled={isRowLoading}
-                            onClick={() => handleToggleSwitch(flag)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${
-                              flag.isEnabled ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={flag.isEnabled}
+                          disabled={isRowLoading}
+                          onClick={() => handleToggleSwitch(flag)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${flag.isEnabled ? 'bg-amber-500' : 'bg-gray-300 dark:bg-white/20'
                             }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform ${
-                                flag.isEnabled ? 'translate-x-6' : 'translate-x-1'
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-xs transition-transform ${flag.isEnabled ? 'translate-x-6' : 'translate-x-1'
                               }`}
-                            />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+                          />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          </div>
+        )}
       </div>
 
       {/* ─── Modal: Cập nhật tham số ─── */}
@@ -2031,22 +2120,20 @@ export default function SystemSettingsPage() {
                       <button
                         type="button"
                         onClick={() => setEditValue('true')}
-                        className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-colors cursor-pointer ${
-                          editValue === 'true'
-                            ? 'bg-[#007b8b] text-white border-[#007b8b]'
-                            : 'bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50'
-                        }`}
+                        className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-colors cursor-pointer ${editValue === 'true'
+                          ? 'bg-[#007b8b] text-white border-[#007b8b]'
+                          : 'bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                          }`}
                       >
                         true
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditValue('false')}
-                        className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-colors cursor-pointer ${
-                          editValue === 'false'
-                            ? 'bg-[#007b8b] text-white border-[#007b8b]'
-                            : 'bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50'
-                        }`}
+                        className={`px-4 py-2 rounded-lg font-mono text-xs font-bold border transition-colors cursor-pointer ${editValue === 'false'
+                          ? 'bg-[#007b8b] text-white border-[#007b8b]'
+                          : 'bg-white dark:bg-[#061115] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                          }`}
                       >
                         false
                       </button>
@@ -2233,11 +2320,10 @@ export default function SystemSettingsPage() {
                       </span>
                     </div>
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${
-                        editingRule.isActive
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
-                          : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'
-                      }`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold shrink-0 ${editingRule.isActive
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'
+                        }`}
                     >
                       {editingRule.isActive ? (isEn ? 'Active' : 'Đang bật') : (isEn ? 'Inactive' : 'Đã tắt')}
                     </span>
