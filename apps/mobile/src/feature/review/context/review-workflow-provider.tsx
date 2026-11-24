@@ -51,7 +51,9 @@ export type ReviewWorkflowContextValue = {
   goToNextCheckedReview: () => void;
   goToPreviousCheckedReview: () => void;
   isLoading: boolean;
+  isSubmittingReview?: boolean;
   jumpToSubmissionIndex?: (index: number) => void;
+  jumpToSubmissionById?: (id: string) => void;
   keepCurrentReviewAndNext?: () => boolean;
   loadSubmissionForEdit?: (record: ReviewHistoryRecord) => void;
   pendingSubmissions: ReviewSubmission[];
@@ -95,6 +97,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [recheckingReviewIndex, setRecheckingReviewIndex] = useState<number>();
   const [recheckingPreviousAction, setRecheckingPreviousAction] = useState<ReviewActionType>();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const inFlightVotesRef = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
@@ -168,7 +172,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const jumpToSubmissionIndex = useCallback(
     (targetIndex: number) => {
       if (initialQueueSubmissions.length === 0) return;
-      const clampedIndex = Math.max(0, Math.min(targetIndex, initialQueueSubmissions.length));
+      // Never slice earlier than reviewHistory.length to prevent resurrecting already-voted items
+      const effectiveIndex = Math.max(reviewHistory.length, targetIndex);
+      const clampedIndex = Math.max(0, Math.min(effectiveIndex, initialQueueSubmissions.length));
       if (clampedIndex >= initialQueueSubmissions.length) {
         setPendingSubmissions([]);
         return;
@@ -187,6 +193,36 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setRecheckingPreviousAction(undefined);
     },
     [initialQueueSubmissions, reviewHistory.length, pendingSubmissions],
+  );
+
+  const jumpToSubmissionById = useCallback(
+    (targetId: string) => {
+      if (!targetId) return;
+
+      // 1. If already the current pending submission, nothing to do
+      if (pendingSubmissions[0]?.id === targetId) return;
+
+      // 2. If it exists in remaining pending submissions, bring it to the front
+      const pendingIdx = pendingSubmissions.findIndex((s) => s.id === targetId);
+      if (pendingIdx > 0) {
+        setPendingSubmissions((prev) => {
+          const target = prev[pendingIdx];
+          return [target, ...prev.slice(0, pendingIdx), ...prev.slice(pendingIdx + 1)];
+        });
+        setIsCheckingSubmission(false);
+        setIsRecheckingSubmission(false);
+        setRecheckingReviewIndex(undefined);
+        setRecheckingPreviousAction(undefined);
+        return;
+      }
+
+      // 3. If it is already in reviewHistory, enter recheck mode for it (which safely undos vote before re-casting)
+      const historyIdx = reviewHistory.findIndex((h) => h.submission.id === targetId);
+      if (historyIdx !== -1) {
+        beginSubmissionCheck(historyIdx);
+      }
+    },
+    [pendingSubmissions, reviewHistory],
   );
 
   const beginSubmissionCheck = (targetSubmissionIndex?: number) => {
@@ -302,6 +338,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   };
 
   const resetReviewWorkflow = async () => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingReview(false);
     setIsCheckingSubmission(false);
     setCheckedReviewIndex(0);
     setIsRecheckingSubmission(false);
@@ -334,6 +372,15 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
+
+    // Concurrency guard: avoid duplicate vote calls for the same submission
+    if (inFlightVotesRef.current.has(submission.id)) {
+      console.warn('[ReviewWorkflow] Blocked duplicate review action in flight for:', submission.id);
+      return false;
+    }
+    inFlightVotesRef.current.add(submission.id);
+    setIsSubmittingReview(true);
+
     const completedRecheckIndex = isRecheckingSubmission ? recheckingReviewIndex : undefined;
 
     const action: ReviewActionType = typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
@@ -413,6 +460,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.warn('Failed to submit review action:', err);
+    } finally {
+      inFlightVotesRef.current.delete(submission.id);
+      setIsSubmittingReview(false);
     }
 
     return true;
@@ -421,6 +471,12 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const undoLastReview = async (): Promise<boolean> => {
     const lastReview = reviewHistory[reviewHistory.length - 1];
     if (!lastReview) return false;
+
+    if (inFlightVotesRef.current.has(lastReview.submission.id)) {
+      return false;
+    }
+    inFlightVotesRef.current.add(lastReview.submission.id);
+    setIsSubmittingReview(true);
 
     setReviewHistory((history) => history.slice(0, -1));
     setPendingSubmissions((pending) => [lastReview.submission, ...pending]);
@@ -432,6 +488,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.warn('Failed to undo vote:', err);
+    } finally {
+      inFlightVotesRef.current.delete(lastReview.submission.id);
+      setIsSubmittingReview(false);
     }
 
     return true;
@@ -463,7 +522,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         goToNextCheckedReview,
         goToPreviousCheckedReview,
         isLoading,
+        isSubmittingReview,
         jumpToSubmissionIndex,
+        jumpToSubmissionById,
         keepCurrentReviewAndNext,
         loadSubmissionForEdit,
         pendingSubmissions,

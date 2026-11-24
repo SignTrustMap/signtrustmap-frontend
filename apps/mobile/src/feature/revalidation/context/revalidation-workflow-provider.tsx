@@ -47,6 +47,8 @@ export type RevalidationWorkflowContextValue = {
   handleSkip: () => boolean;
   isCheckingEvidence: boolean;
   isLoading: boolean;
+  isSubmittingVote?: boolean;
+  jumpToEvidenceById?: (targetId: string) => void;
   keepCurrentEvidenceAndNext?: () => boolean;
   nextItem?: RevalidationQueueEvidenceItem;
   progressPercent: number;
@@ -93,6 +95,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const [isCheckingEvidence, setIsCheckingEvidence] = useState(false);
   const [recheckingIndex, setRecheckingIndex] = useState<number | undefined>(undefined);
   const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<CompletedRevalidationReview | undefined>(undefined);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+  const inFlightVotesRef = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef(false);
 
   // Sync with incoming queue response initially
@@ -136,6 +140,14 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       userVerdict: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT' = 'AGREE',
     ): Promise<boolean> => {
       if (!currentItem) return false;
+
+      // Concurrency guard: avoid duplicate vote calls for the same evidence
+      if (inFlightVotesRef.current.has(currentItem.evidenceId)) {
+        console.warn('[RevalidationWorkflow] Blocked duplicate vote in flight for:', currentItem.evidenceId);
+        return false;
+      }
+      inFlightVotesRef.current.add(currentItem.evidenceId);
+      setIsSubmittingVote(true);
 
       const itemToVote = currentItem;
       const completesQueue = queueItems.length <= 1;
@@ -188,6 +200,9 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
         });
       } catch (err) {
         console.warn('[RevalidationWorkflow] vote mutation error:', err);
+      } finally {
+        inFlightVotesRef.current.delete(itemToVote.evidenceId);
+        setIsSubmittingVote(false);
       }
 
       return completesQueue;
@@ -260,6 +275,39 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     [reviewHistory],
   );
 
+  const jumpToEvidenceById = useCallback(
+    (targetId: string) => {
+      if (!targetId) return;
+
+      // 1. If already the current item, do nothing
+      if (queueItems[0]?.evidenceId === targetId || queueItems[0]?.taskId === targetId) return;
+
+      // 2. If present in remaining queue items, bring it to the front
+      const queueIdx = queueItems.findIndex(
+        (it) => it.evidenceId === targetId || it.taskId === targetId,
+      );
+      if (queueIdx > 0) {
+        setQueueItems((prev) => {
+          const target = prev[queueIdx];
+          return [target, ...prev.slice(0, queueIdx), ...prev.slice(queueIdx + 1)];
+        });
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+        return;
+      }
+
+      // 3. If present in reviewHistory, start rechecking that history item
+      const historyIdx = reviewHistory.findIndex(
+        (h) => h.item.evidenceId === targetId || h.item.taskId === targetId,
+      );
+      if (historyIdx !== -1) {
+        beginEvidenceCheck(historyIdx);
+      }
+    },
+    [queueItems, reviewHistory, beginEvidenceCheck],
+  );
+
   const keepCurrentEvidenceAndNext = useCallback((): boolean => {
     if (!currentItem) return true;
 
@@ -309,6 +357,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [recheckingPreviousReview, recheckingIndex]);
 
   const finishReviews = useCallback((): number => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     const count = reviewHistory.length;
     void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
     void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
@@ -326,6 +376,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [invalidateWalletAndStats, queryClient, reviewHistory.length]);
 
   const resetWorkflow = useCallback(() => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     setReviewHistory([]);
     setQueueItems([]);
     setIsCheckingEvidence(false);
@@ -354,6 +406,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -376,6 +430,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -407,6 +463,8 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   handleSkip: () => false,
   isCheckingEvidence: false,
   isLoading: false,
+  isSubmittingVote: false,
+  jumpToEvidenceById: () => {},
   keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,

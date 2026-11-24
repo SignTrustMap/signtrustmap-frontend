@@ -691,6 +691,8 @@ export function RevalidationReviewScreen() {
     finishReviews: workflowFinish,
     isLoading,
     isCheckingEvidence,
+    isSubmittingVote = false,
+    jumpToEvidenceById,
     keepCurrentEvidenceAndNext,
     recheckingPreviousReview,
     cancelEvidenceCheck,
@@ -704,21 +706,23 @@ export function RevalidationReviewScreen() {
     )?.previousReview ?? recheckingPreviousReview;
   const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
   const [isEditingVote, setIsEditingVote] = useState(false);
+  const handledTargetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsEditingVote(false);
   }, [currentItem?.evidenceId, isCheckingEvidence]);
 
   useEffect(() => {
-    if (targetId && items.length > 0) {
-      const idx = items.findIndex(
-        (it) => it.evidenceId === targetId || it.taskId === targetId,
-      );
-      if (idx !== -1 && workflow.beginEvidenceCheck) {
-        workflow.beginEvidenceCheck(idx);
+    if (targetId) {
+      if (handledTargetIdRef.current !== targetId) {
+        handledTargetIdRef.current = targetId;
+        jumpToEvidenceById?.(targetId);
+        router.setParams({ targetSubmissionId: undefined });
       }
+    } else {
+      handledTargetIdRef.current = null;
     }
-  }, [targetId, items, workflow]);
+  }, [targetId, jumpToEvidenceById, router]);
 
   const handleKeepPreviousReview = useCallback(() => {
     keepCurrentEvidenceAndNext?.();
@@ -787,7 +791,7 @@ export function RevalidationReviewScreen() {
       suggestedSignTypeId?: number,
       verdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
     ) => {
-      if (!currentItem) return;
+      if (!currentItem || isSubmittingVote) return;
 
       const messages: Record<RevalidationReviewAction, string> = {
         STILL_ACTIVE: 'Đã xác nhận: Biển báo vẫn hoạt động',
@@ -806,12 +810,12 @@ export function RevalidationReviewScreen() {
       await workflowVote(action, note, suggestedSignTypeId, verdict);
       setViewMode('evidence');
     },
-    [currentItem, workflowVote],
+    [currentItem, isSubmittingVote, workflowVote],
   );
 
   // Reviewer agrees with surveyor conclusion
   const handleAgree = useCallback(async () => {
-    if (!currentItem) return;
+    if (!currentItem || isSubmittingVote) return;
 
     // Follow surveyor's concluded evidenceType directly
     const rawVerdict = currentItem.evidence.evidenceType;
@@ -831,7 +835,7 @@ export function RevalidationReviewScreen() {
       'AGREE',
     );
     setViewMode('evidence');
-  }, [currentItem, workflowVote]);
+  }, [currentItem, isSubmittingVote, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion
   const handleDecline = useCallback(() => {
@@ -936,7 +940,7 @@ export function RevalidationReviewScreen() {
           }
         },
         onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
-          if (isRecheckMode && !isEditingVote) {
+          if ((isRecheckMode && !isEditingVote) || isSubmittingVote) {
             gestureAxis.current = 'none';
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
@@ -1019,7 +1023,7 @@ export function RevalidationReviewScreen() {
           }).start();
         },
       }),
-    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, pan],
+    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, isSubmittingVote, pan],
   );
 
   // Active displayed image URI

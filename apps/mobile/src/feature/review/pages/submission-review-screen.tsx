@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -153,11 +153,13 @@ type ReviewBottomSheetProps = {
   reportNote: string;
   selectedRemedySign?: RemedySign;
   type?: ReviewSheet;
+  isSubmitting?: boolean;
 };
 
 function ReviewBottomSheet({
   declineReason,
   declineReasonDetail,
+  isSubmitting = false,
   onChangeDeclineReason,
   onChangeDeclineReasonDetail,
   onChangeReportIssueType,
@@ -178,12 +180,14 @@ function ReviewBottomSheet({
   const isMissingType = reportIssueType === 'missing_type';
   const isReportOther = reportIssueType === 'other';
 
-  const canConfirm = isDecline
-    ? Boolean(
-        selectedRemedySign ||
-        (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim()))),
-      )
-    : isMissingType || !isReportOther || Boolean(reportNote.trim());
+  const canConfirm =
+    !isSubmitting &&
+    (isDecline
+      ? Boolean(
+          selectedRemedySign ||
+          (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim()))),
+        )
+      : isMissingType || !isReportOther || Boolean(reportNote.trim()));
 
   const confirmLabel = isDecline
     ? selectedRemedySign
@@ -596,7 +600,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     cancelSubmissionCheck,
     completeCurrentReview,
     isLoading,
+    isSubmittingReview = false,
     jumpToSubmissionIndex,
+    jumpToSubmissionById,
     keepCurrentReviewAndNext,
     pendingSubmissions,
     recheckingPreviousAction,
@@ -607,6 +613,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   } = useReviewWorkflow();
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+  const handledTargetSubmissionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
@@ -618,13 +625,16 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [resumeIndexParam, jumpToSubmissionIndex]);
 
   useEffect(() => {
-    if (targetSubmissionIdParam && pendingSubmissions.length > 0) {
-      const idx = pendingSubmissions.findIndex((s) => s.id === targetSubmissionIdParam);
-      if (idx !== -1) {
-        jumpToSubmissionIndex?.(idx);
+    if (targetSubmissionIdParam) {
+      if (handledTargetSubmissionIdRef.current !== targetSubmissionIdParam) {
+        handledTargetSubmissionIdRef.current = targetSubmissionIdParam;
+        jumpToSubmissionById?.(targetSubmissionIdParam);
+        router.setParams({ targetSubmissionId: undefined });
       }
+    } else {
+      handledTargetSubmissionIdRef.current = null;
     }
-  }, [targetSubmissionIdParam, pendingSubmissions, jumpToSubmissionIndex]);
+  }, [targetSubmissionIdParam, jumpToSubmissionById, router]);
 
   const handleKeepCurrentReview = useCallback(() => {
     const completes = keepCurrentReviewAndNext?.() ?? true;
@@ -891,7 +901,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         newSignReport?: CreateMissingTypeReportDto;
       },
     ) => {
-      if (!submission) return;
+      if (!submission || isSubmittingReview) return;
 
       completeCurrentReview(action, details);
 
@@ -913,7 +923,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         router.replace('/work/reviewer-history');
       }
     },
-    [completeCurrentReview, isRecheckMode, pendingSubmissions.length, router, submission],
+    [
+      completeCurrentReview,
+      isRecheckMode,
+      isSubmittingReview,
+      pendingSubmissions.length,
+      router,
+      submission,
+    ],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -1048,7 +1065,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           const absDy = Math.abs(dy);
           const SWIPE_THRESHOLD = 85;
 
-          if (isRecheckMode && !isEditingVote) {
+          if ((isRecheckMode && !isEditingVote) || isSubmittingReview) {
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
               friction: 6,
@@ -1114,7 +1131,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           }).start();
         },
       }),
-    [completeReview, pan, isRecheckMode, isEditingVote],
+    [completeReview, pan, isRecheckMode, isEditingVote, isSubmittingReview],
   );
 
   return (
@@ -1398,6 +1415,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Skip submission (cannot identify)"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => completeReview('skipped')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1405,6 +1423,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1435,6 +1454,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Decline submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => setActiveSheet('decline')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1442,6 +1462,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.declineButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1472,12 +1493,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Approve submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => completeReview('approved')}
                         style={({ pressed }) => [
                           styles.diamondButton,
                           isSmallDevice && styles.diamondButtonSmall,
                           styles.approveButton,
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1508,6 +1531,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Report submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => setActiveSheet('report')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1515,6 +1539,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1545,9 +1570,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   style={styles.undoRow}
                 >
                   <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
-                  <Text style={[styles.undoText, { color: theme.placeholder }]}>
-                    Undo last action
-                  </Text>
+                  <Text style={[styles.undoText, { color: theme.placeholder }]}>Hoàn tác</Text>
                 </Pressable>
               ) : (
                 <View style={styles.undoSpacer} />
@@ -1672,6 +1695,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       <ReviewBottomSheet
         declineReason={declineReason}
         declineReasonDetail={declineReasonDetail}
+        isSubmitting={isSubmittingReview}
         onChangeDeclineReason={setDeclineReason}
         onChangeDeclineReasonDetail={setDeclineReasonDetail}
         onChangeReportIssueType={setReportIssueType}
@@ -1767,6 +1791,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: -2,
     marginBottom: 4,
+    paddingLeft: 18,
   },
   locationButtonContent: {
     flexDirection: 'row',
