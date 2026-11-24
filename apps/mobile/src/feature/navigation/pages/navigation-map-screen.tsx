@@ -81,12 +81,7 @@ export { SIGN_CATEGORIES, type SignCategory, getSignCategory };
 export function NavigationMapScreen() {
   const router = useRouter();
   const theme = useTheme();
-  let queryClient: any;
-  try {
-    queryClient = useQueryClient();
-  } catch {
-    queryClient = undefined;
-  }
+  const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const bottomInset =

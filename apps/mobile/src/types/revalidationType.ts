@@ -191,6 +191,8 @@ export interface EvidenceVoteDto {
   decision: RevalDecision | string;
   suggestedSignTypeId?: number;
   note?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface EvidenceVoteResponse {

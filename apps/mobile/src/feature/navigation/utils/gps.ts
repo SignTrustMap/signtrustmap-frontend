@@ -97,6 +97,27 @@ export type FreshGpsLocationResult = {
  * and heading metadata from MapLibre.LocationManager with a reasonable timeout.
  */
 export async function fetchFreshGpsLocation(timeoutMs = 3500): Promise<FreshGpsLocationResult | null> {
+  if (Platform.OS === 'web') {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      return null;
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          resolve({
+            coordinate: [coords.longitude, coords.latitude],
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            heading: coords.heading ?? undefined,
+          });
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 10_000 },
+      );
+    });
+  }
+
   const mapLibre = getMapLibre();
   if (!mapLibre) {
     console.warn('[GPS] MapLibre module not available for getCurrentPosition');

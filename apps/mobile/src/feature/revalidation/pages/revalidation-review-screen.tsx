@@ -38,6 +38,7 @@ import { extractCoordinateFromCandidate, resolveS3Url } from '@/api/reviews/revi
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
+import { checkAndRequireLocationPermission } from '@/services/location-permission';
 import {
   RevalidationDecisionBadge,
   RevalidationSwipeBadges,
@@ -724,6 +725,10 @@ export function RevalidationReviewScreen() {
     }
   }, [targetId, jumpToEvidenceById, router]);
 
+  useEffect(() => {
+    checkAndRequireLocationPermission().catch(() => {});
+  }, []);
+
   const handleKeepPreviousReview = useCallback(() => {
     keepCurrentEvidenceAndNext?.();
   }, [keepCurrentEvidenceAndNext]);
@@ -737,6 +742,21 @@ export function RevalidationReviewScreen() {
     (currentItem.evidence.userId === currentUserId ||
       currentItem.evidence.surveyorId === currentUserId),
   );
+
+  // Active view toggle between surveyor evidence photo and baseline catalog sign
+  const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
+
+  // Modal, picker, and toast states
+  const [activeSheet, setActiveSheet] = useState<SheetType>();
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
+  const [isCatalogBrowserOpen, setIsCatalogBrowserOpen] = useState(false);
+  const [selectedCatalogSign, setSelectedCatalogSign] = useState<CatalogSign | null>(null);
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    tone: 'default' | 'success' | 'danger';
+  }>();
 
   const handleConfirmRecapture = useCallback(
     async (reason: string, note?: string) => {
@@ -766,21 +786,6 @@ export function RevalidationReviewScreen() {
     [currentItem, requestRecaptureMutation, session?.accessToken, workflowSkip],
   );
 
-  // Active view toggle between surveyor evidence photo and baseline catalog sign
-  const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
-
-  // Modal, picker, and toast states
-  const [activeSheet, setActiveSheet] = useState<SheetType>();
-  const [isImageZoomed, setIsImageZoomed] = useState(false);
-  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
-  const [isCatalogBrowserOpen, setIsCatalogBrowserOpen] = useState(false);
-  const [selectedCatalogSign, setSelectedCatalogSign] = useState<CatalogSign | null>(null);
-  const [toast, setToast] = useState<{
-    id: number;
-    message: string;
-    tone: 'default' | 'success';
-  }>();
-
   // ---------------------------------------------------------------------------
   // Action Handler: calls workflow vote API upon swipe or action confirmation
   // ---------------------------------------------------------------------------
@@ -801,14 +806,21 @@ export function RevalidationReviewScreen() {
         INVALID: 'Đã báo cáo minh chứng không hợp lệ',
       };
 
-      setToast({
-        id: Date.now(),
-        message: messages[action],
-        tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
-      });
-
-      await workflowVote(action, note, suggestedSignTypeId, verdict);
-      setViewMode('evidence');
+      try {
+        await workflowVote(action, note, suggestedSignTypeId, verdict);
+        setToast({
+          id: Date.now(),
+          message: messages[action],
+          tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
+        });
+        setViewMode('evidence');
+      } catch (err) {
+        setToast({
+          id: Date.now(),
+          message: 'Đã xảy ra lỗi, vui lòng thử lại',
+          tone: 'danger',
+        });
+      }
     },
     [currentItem, isSubmittingVote, workflowVote],
   );
@@ -822,19 +834,26 @@ export function RevalidationReviewScreen() {
     const decision: RevalidationReviewAction =
       rawVerdict === 'REMOVED' ? 'REMOVED' : rawVerdict === 'CHANGED' ? 'CHANGED' : 'STILL_ACTIVE';
 
-    setToast({
-      id: Date.now(),
-      message: 'Đồng ý',
-      tone: 'success',
-    });
-
-    await workflowVote(
-      decision,
-      undefined,
-      currentItem.evidence.suggestedSignTypeId ?? undefined,
-      'AGREE',
-    );
-    setViewMode('evidence');
+    try {
+      await workflowVote(
+        decision,
+        undefined,
+        currentItem.evidence.suggestedSignTypeId ?? undefined,
+        'AGREE',
+      );
+      setToast({
+        id: Date.now(),
+        message: 'Đồng ý',
+        tone: 'success',
+      });
+      setViewMode('evidence');
+    } catch (err) {
+      setToast({
+        id: Date.now(),
+        message: 'Đã xảy ra lỗi, vui lòng thử lại',
+        tone: 'danger',
+      });
+    }
   }, [currentItem, isSubmittingVote, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion

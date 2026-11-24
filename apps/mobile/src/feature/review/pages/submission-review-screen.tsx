@@ -38,6 +38,7 @@ import {
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
+import { checkAndRequireLocationPermission } from '@/services/location-permission';
 import {
   SubmissionVotedResultCard,
   SubmissionEditingBanner,
@@ -636,6 +637,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     }
   }, [targetSubmissionIdParam, jumpToSubmissionById, router]);
 
+  useEffect(() => {
+    checkAndRequireLocationPermission().catch(() => {});
+  }, []);
+
   const handleKeepCurrentReview = useCallback(() => {
     const completes = keepCurrentReviewAndNext?.() ?? true;
     if (completes) {
@@ -657,7 +662,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [toast, setToast] = useState<{
     id: number;
     message: string;
-    tone: 'default' | 'success';
+    tone: 'default' | 'success' | 'danger';
   }>();
 
   const { data: catalog } = useGetCatalog();
@@ -892,7 +897,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [catalogSigns, submission]);
 
   const completeReview = useCallback(
-    (
+    async (
       action: ReviewActionType,
       details?: {
         declineReason?: string;
@@ -903,14 +908,23 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     ) => {
       if (!submission || isSubmittingReview) return;
 
-      completeCurrentReview(action, details);
+      const success = await completeCurrentReview(action, details);
+
+      if (!success) {
+        setToast((current) => ({
+          id: (current?.id ?? 0) + 1,
+          message: 'Đã xảy ra lỗi, vui lòng thử lại',
+          tone: 'danger',
+        }));
+        return;
+      }
 
       const toastMessages: Record<ReviewActionType, string> = {
         approved: 'Đã phê duyệt biển báo',
         declined: 'Đã từ chối biển báo',
         reported: 'Đã báo cáo biển báo',
         skipped: 'Đã bỏ qua biển báo',
-        reported_new_sign: 'Đã báo cáo loại biển mới chờ thẩm định catalog',
+        reported_new_sign: 'Đã gửi báo cáo biển mới thành công!',
       };
 
       setToast((current) => ({
@@ -927,7 +941,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       completeCurrentReview,
       isRecheckMode,
       isSubmittingReview,
-      pendingSubmissions.length,
       router,
       submission,
     ],
@@ -980,11 +993,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               reportNote.trim() ||
               'Báo cáo biển báo thực tế chưa có trong danh mục chuẩn QCVN 41:2019',
           },
-        });
-        setToast({
-          id: Date.now(),
-          message: 'Đã gửi báo cáo biển mới thành công!',
-          tone: 'success',
         });
       }
       setReportNote('');

@@ -23,6 +23,7 @@ import {
   REVIEW_WORKFLOW_PROVIDER_REQUIRED_MESSAGE,
   UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
 } from '@/constants/message';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
 export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped' | 'reported_new_sign';
 
@@ -195,6 +196,44 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     [initialQueueSubmissions, reviewHistory.length, pendingSubmissions],
   );
 
+  const beginSubmissionCheck = useCallback(
+    (targetSubmissionIndex?: number) => {
+      if (targetSubmissionIndex !== undefined && reviewHistory[targetSubmissionIndex]) {
+        const priorHistory = reviewHistory.slice(0, targetSubmissionIndex);
+        const recheckItems = reviewHistory.slice(targetSubmissionIndex).map(
+          (target) =>
+            ({
+              ...target.submission,
+              previousAction: target.action,
+            }) as ReviewSubmission,
+        );
+        setReviewHistory(priorHistory);
+        setPendingSubmissions(recheckItems);
+        setTotalSubmissions(reviewHistory.length);
+        setIsRecheckingSubmission(true);
+        setRecheckingReviewIndex(targetSubmissionIndex);
+        setRecheckingPreviousAction((recheckItems[0] as any)?.previousAction);
+        setCheckedReviewIndex(0);
+        setIsCheckingSubmission(false);
+        return;
+      }
+
+      const votedSubmissions = reviewHistory.map((item) => ({
+        ...item.submission,
+        previousAction: item.action,
+      }));
+      setPendingSubmissions(votedSubmissions as ReviewSubmission[]);
+      setTotalSubmissions(votedSubmissions.length);
+      setReviewHistory([]);
+      setCheckedReviewIndex(0);
+      setIsCheckingSubmission(false);
+      setIsRecheckingSubmission(true);
+      setRecheckingReviewIndex(undefined);
+      setRecheckingPreviousAction(reviewHistory[0]?.action);
+    },
+    [reviewHistory],
+  );
+
   const jumpToSubmissionById = useCallback(
     (targetId: string) => {
       if (!targetId) return;
@@ -222,43 +261,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         beginSubmissionCheck(historyIdx);
       }
     },
-    [pendingSubmissions, reviewHistory],
+    [beginSubmissionCheck, pendingSubmissions, reviewHistory],
   );
-
-  const beginSubmissionCheck = (targetSubmissionIndex?: number) => {
-    if (targetSubmissionIndex !== undefined && reviewHistory[targetSubmissionIndex]) {
-      const priorHistory = reviewHistory.slice(0, targetSubmissionIndex);
-      const recheckItems = reviewHistory.slice(targetSubmissionIndex).map(
-        (target) =>
-          ({
-            ...target.submission,
-            previousAction: target.action,
-          }) as ReviewSubmission,
-      );
-      setReviewHistory(priorHistory);
-      setPendingSubmissions(recheckItems);
-      setTotalSubmissions(reviewHistory.length);
-      setIsRecheckingSubmission(true);
-      setRecheckingReviewIndex(targetSubmissionIndex);
-      setRecheckingPreviousAction((recheckItems[0] as any)?.previousAction);
-      setCheckedReviewIndex(0);
-      setIsCheckingSubmission(false);
-      return;
-    }
-
-    const votedSubmissions = reviewHistory.map((item) => ({
-      ...item.submission,
-      previousAction: item.action,
-    }));
-    setPendingSubmissions(votedSubmissions as ReviewSubmission[]);
-    setTotalSubmissions(votedSubmissions.length);
-    setReviewHistory([]);
-    setCheckedReviewIndex(0);
-    setIsCheckingSubmission(false);
-    setIsRecheckingSubmission(true);
-    setRecheckingReviewIndex(undefined);
-    setRecheckingPreviousAction(reviewHistory[0]?.action);
-  };
 
   const cancelSubmissionCheck = useCallback(() => {
     if (pendingSubmissions.length > 0) {
@@ -388,30 +392,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
     const suggestedSignTypeId = (details as any)?.suggestedSignTypeId ?? (typeof actionOrDecision === 'object' ? (actionOrDecision as any).suggestedSignTypeId : undefined);
 
-    // 1. Immediately update UI state optimistically so review cards advance with zero lag
-    setReviewHistory((history) => {
-      const completedReview = { action, submission };
-      return [...history, completedReview];
-    });
-
-    const completes = pendingSubmissions.length <= 1;
-    setPendingSubmissions((pending) => pending.slice(1));
-    if (completes) {
-      setIsCheckingSubmission(false);
-      setIsRecheckingSubmission(false);
-      setRecheckingReviewIndex(undefined);
-      setRecheckingPreviousAction(undefined);
-    } else {
-      const nextItem = pendingSubmissions[1];
-      setRecheckingPreviousAction(
-        (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
-      );
-    }
-    setSessionReviewCount((count) => count + 1);
-
-    // 2. Dispatch backend network call in background without blocking state progression
     const params = { candidateId: submission.id };
+
     try {
+      // 1. Dispatch backend network call first and await response before modifying state
       if (action === 'reported_new_sign') {
         if (details?.newSignReport) {
           const proposedName =
@@ -448,6 +432,18 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
             console.warn('[ReviewWorkflow] Non-fatal undo error before recasting vote:', undoErr);
           }
         }
+
+        // Include GPS data if available, omit if GPS is disabled or unavailable
+        let gpsCoords: { latitude: number; longitude: number } | null = null;
+        try {
+          const freshLoc = await fetchFreshGpsLocation(2500);
+          if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+            gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
+          }
+        } catch (e) {
+          console.warn('[ReviewWorkflow] Could not obtain GPS coordinates:', e);
+        }
+
         await castVote({
           params,
           request: {
@@ -455,17 +451,40 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
             ...(suggestedSignTypeId != null ? { suggestedSignTypeId: Number(suggestedSignTypeId) } : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
+            ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
       }
+
+      // 2. Only on successful API execution: update review history and advance pending queue
+      setReviewHistory((history) => {
+        const completedReview = { action, submission };
+        return [...history, completedReview];
+      });
+
+      const completes = pendingSubmissions.length <= 1;
+      setPendingSubmissions((pending) => pending.slice(1));
+      if (completes) {
+        setIsCheckingSubmission(false);
+        setIsRecheckingSubmission(false);
+        setRecheckingReviewIndex(undefined);
+        setRecheckingPreviousAction(undefined);
+      } else {
+        const nextItem = pendingSubmissions[1];
+        setRecheckingPreviousAction(
+          (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
+        );
+      }
+      setSessionReviewCount((count) => count + 1);
+
+      return true;
     } catch (err) {
       console.warn('Failed to submit review action:', err);
+      return false;
     } finally {
       inFlightVotesRef.current.delete(submission.id);
       setIsSubmittingReview(false);
     }
-
-    return true;
   };
 
   const undoLastReview = async (): Promise<boolean> => {

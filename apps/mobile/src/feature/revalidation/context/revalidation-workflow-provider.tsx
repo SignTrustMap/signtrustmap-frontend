@@ -21,6 +21,7 @@ import type {
   RevalDecision,
   RevalidationQueueEvidenceItem,
 } from '@/types/revalidationType';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
 
@@ -152,34 +153,17 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       const itemToVote = currentItem;
       const completesQueue = queueItems.length <= 1;
 
-      // 1. Advance queue state
-      setQueueItems((prev) => prev.slice(1));
-      setReviewHistory((prev) => {
-        const next = [...prev];
-        const newReview: CompletedRevalidationReview = {
-          item: itemToVote,
-          action,
-          note,
-          suggestedSignTypeId,
-          userVerdict,
-        };
-        next.push(newReview);
-        return next;
-      });
-
-      if (completesQueue) {
-        setIsCheckingEvidence(false);
-        setRecheckingIndex(undefined);
-        setRecheckingPreviousReview(undefined);
-      } else {
-        const nextItem = queueItems[1];
-        setRecheckingPreviousReview(
-          (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-            ?.previousReview,
-        );
+      // Include GPS data if available, omit if GPS is disabled or unavailable
+      let gpsCoords: { latitude: number; longitude: number } | null = null;
+      try {
+        const freshLoc = await fetchFreshGpsLocation(2500);
+        if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
+        }
+      } catch (e) {
+        console.warn('[RevalidationWorkflow] Could not obtain GPS coordinates:', e);
       }
 
-      // 2. Dispatch vote API
       const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
         STILL_ACTIVE: 'STILL_ACTIVE',
         REMOVED: 'REMOVED',
@@ -196,16 +180,45 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
             note: note?.trim() || undefined,
             suggestedSignTypeId:
               action === 'CHANGED' && suggestedSignTypeId ? suggestedSignTypeId : undefined,
+            ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
+
+        // Only on successful API execution: advance queue state
+        setQueueItems((prev) => prev.slice(1));
+        setReviewHistory((prev) => {
+          const next = [...prev];
+          const newReview: CompletedRevalidationReview = {
+            item: itemToVote,
+            action,
+            note,
+            suggestedSignTypeId,
+            userVerdict,
+          };
+          next.push(newReview);
+          return next;
+        });
+
+        if (completesQueue) {
+          setIsCheckingEvidence(false);
+          setRecheckingIndex(undefined);
+          setRecheckingPreviousReview(undefined);
+        } else {
+          const nextItem = queueItems[1];
+          setRecheckingPreviousReview(
+            (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+              ?.previousReview,
+          );
+        }
+
+        return completesQueue;
       } catch (err) {
         console.warn('[RevalidationWorkflow] vote mutation error:', err);
+        throw err;
       } finally {
         inFlightVotesRef.current.delete(itemToVote.evidenceId);
         setIsSubmittingVote(false);
       }
-
-      return completesQueue;
     },
     [currentItem, queueItems, voteMutation],
   );
