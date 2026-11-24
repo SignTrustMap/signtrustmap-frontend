@@ -35,6 +35,11 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // Delete Content-Type when sending FormData so Axios & browser automatically supply multipart boundary
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type']
+      delete (config.headers as any)['content-type']
+    }
     return config
   },
   (error) => Promise.reject(error)
@@ -85,6 +90,17 @@ apiClient.interceptors.response.use(
     return Promise.reject(error.response?.data || error)
   }
 )
+
+/**
+ * Extracts a readable message string from unwrapped NestJS/Axios error payloads.
+ */
+export function extractApiErrorMessage(err: any): string {
+  const rawMessage = err?.response?.data?.message ?? err?.message
+  if (Array.isArray(rawMessage)) {
+    return rawMessage.filter(Boolean).join('; ')
+  }
+  return typeof rawMessage === 'string' ? rawMessage : ''
+}
 
 /**
  * Helper request wrapper for typing

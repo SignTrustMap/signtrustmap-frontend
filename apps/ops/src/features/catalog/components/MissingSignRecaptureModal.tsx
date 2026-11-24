@@ -96,6 +96,12 @@ export function MissingSignRecaptureModal({
               />
             </div>
 
+            {/* Auto-assignment hint */}
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-500/10 px-3 py-2 rounded-xl">
+              <Camera size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>Hệ thống sẽ tự động gán Surveyor ngẫu nhiên đang hoạt động để thực hiện chụp lại.</span>
+            </div>
+
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-white/10">
               <button

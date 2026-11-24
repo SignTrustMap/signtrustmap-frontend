@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Info } from '@phosphor-icons/react'
+import { ArrowRight } from '@phosphor-icons/react'
 import type { BackendCatalogSignType } from '@/api/services/catalog.service'
 import { TrafficSignGraphic } from './TrafficSignGraphic'
 import type { CategoryMeta } from './CatalogDetailModal'
@@ -43,6 +43,9 @@ export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
             ? sign.category.nameEn
             : sign.category.nameVi
           : meta.label
+        const isActive = sign.isActive !== false
+        const primaryName = getSignPrimaryName(sign)
+        const secondaryName = getSignSecondaryName(sign)
 
         return (
           <div
@@ -69,8 +72,8 @@ export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
                 </div>
 
                 <div
-                  className={`w-14 h-14 p-1.5 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-200 ${
-                    isDark ? 'bg-black/40 border-white/10' : 'bg-gray-50 border-gray-200 shadow-xs'
+                  className={`w-16 h-16 p-2 rounded-xl border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 duration-200 ${
+                    isDark ? 'bg-black/40 border-white/10' : 'bg-gray-50 border-gray-200 shadow-2xs'
                   }`}
                 >
                   <TrafficSignGraphic
@@ -80,42 +83,36 @@ export const CatalogGridView: React.FC<CatalogGridViewProps> = ({
                       nameVi: sign.nameVi,
                       name: sign.nameEn,
                     }}
-                    className="w-full h-full object-contain drop-shadow-sm"
+                    className="w-full h-full object-contain drop-shadow-xs"
                   />
                 </div>
               </div>
 
-              <h3 className="font-extrabold text-base sm:text-lg text-gray-900 dark:text-white transition-colors group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] line-clamp-1">
-                {getSignPrimaryName(sign)}
+              <h3 className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white transition-colors group-hover:text-[#007b8b] dark:group-hover:text-[#00c4de] line-clamp-2 leading-snug">
+                {primaryName}
               </h3>
-              <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
-                {getSignSecondaryName(sign)}
-              </p>
-
-              {sign.description && (
-                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-2 line-clamp-2 leading-relaxed font-normal">
-                  {sign.description}
+              {secondaryName && secondaryName !== primaryName && (
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
+                  {secondaryName}
                 </p>
               )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-gray-100 dark:border-white/10 flex items-center justify-between text-xs">
-              {sign.category?.description ? (
-                <span
-                  className="font-mono font-bold text-[11px] text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-white/5 px-2 py-0.5 rounded border border-gray-200 dark:border-white/10 truncate max-w-[190px]"
-                  title={sign.category.description}
-                >
-                  {sign.category.code}
-                </span>
-              ) : (
-                <span className="font-mono text-[11px] text-gray-500">
-                  ID #{sign.id}
-                </span>
-              )}
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                  isActive
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                    : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400 border border-gray-200 dark:border-white/10'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                {isActive ? t('catalog.status_active', 'Hoạt động') : t('catalog.status_deprecated', 'Ngừng áp dụng')}
+              </span>
 
-              <span className="text-[#007b8b] dark:text-[#00c4de] font-bold flex items-center gap-1 group-hover:underline">
-                <Info size={15} weight="bold" />
-                <span>{t('catalog.inspect')}</span>
+              <span className="text-[#007b8b] dark:text-[#00c4de] text-xs font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                <span>{t('catalog.inspect', 'Xem chi tiết')}</span>
+                <ArrowRight size={14} weight="bold" />
               </span>
             </div>
           </div>

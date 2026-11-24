@@ -41,7 +41,24 @@ export function ReviewerCatalogModal({
   const { t } = useTranslation('common')
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [isDebouncing, setIsDebouncing] = useState(false)
   const [selectedCatId, setSelectedCatId] = useState<number | 'all'>('all')
+
+  useEffect(() => {
+    const trimmed = search.trim()
+    if (!trimmed) {
+      setDebouncedSearch('')
+      setIsDebouncing(false)
+      return
+    }
+    setIsDebouncing(true)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed)
+      setIsDebouncing(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   // Live Catalog State from Backend API
   const [signTypes, setSignTypes] = useState<BackendCatalogSignType[]>([])
@@ -139,7 +156,7 @@ export function ReviewerCatalogModal({
 
   // Filtered Sign Types based on Category and Search Query
   const filteredSigns = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
 
     return signTypes.filter((sign) => {
       // 1. Category Filter
@@ -160,7 +177,7 @@ export function ReviewerCatalogModal({
 
       return matchCode || matchNameVi || matchNameEn || matchDesc
     })
-  }, [signTypes, selectedCatId, search])
+  }, [signTypes, selectedCatId, debouncedSearch])
 
   if (!isOpen) return null
 
@@ -327,6 +344,11 @@ export function ReviewerCatalogModal({
                 )
               })}
             </div>
+          ) : isDebouncing ? (
+            <div className="py-16 text-center space-y-3">
+              <CircleNotch size={24} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+              <p className="text-xs text-gray-500">{t('common.searching', 'Đang tìm kiếm...')}</p>
+            </div>
           ) : (
             <div className="py-16 text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 mx-auto flex items-center justify-center">
@@ -346,6 +368,7 @@ export function ReviewerCatalogModal({
                   type="button"
                   onClick={() => {
                     setSearch('')
+                    setDebouncedSearch('')
                     setSelectedCatId('all')
                   }}
                   className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer"

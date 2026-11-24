@@ -41,8 +41,25 @@ export function MissingSignMergeModal({
   const { t } = useTranslation('ops')
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [isDebouncing, setIsDebouncing] = useState(false)
   const [selectedCatId, setSelectedCatId] = useState<number | 'all'>('all')
   const [note, setNote] = useState(initialNote)
+
+  useEffect(() => {
+    const trimmed = search.trim()
+    if (!trimmed) {
+      setDebouncedSearch('')
+      setIsDebouncing(false)
+      return
+    }
+    setIsDebouncing(true)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed)
+      setIsDebouncing(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     if (isOpen) {
@@ -116,7 +133,7 @@ export function MissingSignMergeModal({
 
   // Filtered signs based on search & category
   const filteredSigns = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = debouncedSearch.trim().toLowerCase()
 
     return signTypes.filter((sign) => {
       // 1. Category Filter
@@ -137,7 +154,7 @@ export function MissingSignMergeModal({
 
       return matchCode || matchNameVi || matchNameEn || matchDesc
     })
-  }, [signTypes, selectedCatId, search])
+  }, [signTypes, selectedCatId, debouncedSearch])
 
   const handleSelectSign = (sign: CatalogSignTypeItem) => {
     onSelectCatalogCode?.(sign.signCode, sign.id)
@@ -298,6 +315,11 @@ export function MissingSignMergeModal({
                   )
                 })}
               </div>
+            ) : isDebouncing ? (
+              <div className="py-16 text-center space-y-3">
+                <CircleNotch size={24} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+                <p className="text-xs text-gray-500">Đang tìm kiếm biển báo...</p>
+              </div>
             ) : (
               <div className="py-16 text-center space-y-3">
                 <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 mx-auto flex items-center justify-center">
@@ -317,6 +339,7 @@ export function MissingSignMergeModal({
                     type="button"
                     onClick={() => {
                       setSearch('')
+                      setDebouncedSearch('')
                       setSelectedCatId('all')
                     }}
                     className="text-xs font-bold text-[#007b8b] dark:text-[#00c4de] hover:underline cursor-pointer pt-1"

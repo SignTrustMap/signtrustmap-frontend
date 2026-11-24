@@ -3,6 +3,8 @@ import {
   TrafficSignal,
   WarningCircle,
   ArrowClockwise,
+  CircleNotch,
+  Plus,
 } from '@phosphor-icons/react'
 import { useTheme } from '@/context/ThemeContext'
 import { useTranslation } from 'react-i18next'
@@ -17,6 +19,7 @@ import { PageHeader } from '@/components/common/PageHeader'
 import { CatalogDetailModal, type CategoryMeta } from './components/CatalogDetailModal'
 import { ProposeSignModal } from './components/ProposeSignModal'
 import { CatalogGridView } from './components/CatalogGridView'
+import { resolveImageUrl } from '@/features/product/utils/signUrlHelpers'
 
 /**
  * Resolves visual badge styling for standard category codes.
@@ -93,6 +96,8 @@ export default function CatalogPage() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [isDebouncing, setIsDebouncing] = useState(false)
   const [sortBy, setSortBy] = useState<'code' | 'name'>('code')
   const [selectedSign, setSelectedSign] = useState<BackendCatalogSignType | null>(null)
 
@@ -100,6 +105,23 @@ export default function CatalogPage() {
   const [pageSize, setPageSize] = useState(6)
 
   const [showProposalModal, setShowProposalModal] = useState(false)
+
+  // Debounce search query to prevent jarring empty-state flicker during typing (especially with Vietnamese IME)
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!trimmed) {
+      setDebouncedSearch('')
+      setIsDebouncing(false)
+      return
+    }
+    setIsDebouncing(true)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(trimmed)
+      setIsDebouncing(false)
+      setCurrentPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const isEnglish = i18n.language.startsWith('en')
 
@@ -116,7 +138,12 @@ export default function CatalogPage() {
     ])
       .then(([cats, signsRes]) => {
         setCategories(cats || [])
-        setSigns(signsRes.items || [])
+        const rawItems = signsRes?.items || []
+        const normalized = rawItems.map((s) => ({
+          ...s,
+          representativeImageKey: resolveImageUrl(s.representativeImageKey, s.signCode),
+        }))
+        setSigns(normalized)
       })
       .catch((err: any) => {
         console.error('[CatalogPage] Failed to fetch catalog data:', err)
@@ -176,7 +203,7 @@ export default function CatalogPage() {
       const matchesCategory =
         selectedCategory === 'all' || sign.categoryId === Number(selectedCategory)
 
-      const q = searchQuery.toLowerCase().trim()
+      const q = debouncedSearch.toLowerCase().trim()
       const matchesQuery =
         !q ||
         sign.signCode.toLowerCase().includes(q) ||
@@ -193,7 +220,7 @@ export default function CatalogPage() {
       }
       return a.signCode.localeCompare(b.signCode)
     })
-  }, [signs, selectedCategory, searchQuery, sortBy, getSignPrimaryName])
+  }, [signs, selectedCategory, debouncedSearch, sortBy, getSignPrimaryName])
 
   const paginatedSigns = useMemo(() => {
     const start = (currentPage - 1) * pageSize
@@ -212,38 +239,32 @@ export default function CatalogPage() {
           subtitle={t('catalog.subtitle')}
           bordered
           actions={
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setShowProposalModal(true)}
-                className={`hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  isDark
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white shadow-xs'
-                    : 'bg-white border-[#E8E4E3] hover:bg-gray-50 text-gray-900 shadow-xs'
-                }`}
+                className="h-10 inline-flex items-center gap-2 px-4 rounded-xl text-xs sm:text-sm font-bold bg-[#007b8b] hover:bg-[#00606d] text-white shadow-xs transition-all cursor-pointer shrink-0"
               >
+                <Plus size={16} weight="bold" />
                 <span>{t('catalog.btn_propose')}</span>
               </button>
 
               <div
-                className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border transition-colors ${
+                className={`h-10 flex items-center gap-2 px-3.5 rounded-xl border text-xs shadow-xs transition-colors ${
                   isDark
-                    ? 'bg-[#071317] border-white/10 shadow-md shadow-black/40'
-                    : 'bg-white border-[#E8E4E3] shadow-xs'
+                    ? 'bg-[#071317] border-white/10 text-gray-200'
+                    : 'bg-white border-[#E8E4E3] text-gray-700'
                 }`}
               >
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <div className="flex flex-col text-left">
-                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    SignTrustMap
-                  </span>
-                  <span className="text-sm font-extrabold text-gray-900 dark:text-white font-mono">
-                    {filteredSigns.length} / {signs.length}{' '}
-                    <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-                      {t('catalog.sign_types_unit')}
-                    </span>
-                  </span>
-                </div>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span className="font-bold text-gray-900 dark:text-white font-mono">
+                  {filteredSigns.length === signs.length
+                    ? signs.length
+                    : `${filteredSigns.length} / ${signs.length}`}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400 font-medium">
+                  {t('catalog.sign_types_unit')}
+                </span>
               </div>
             </div>
           }
@@ -254,7 +275,6 @@ export default function CatalogPage() {
           searchQuery={searchQuery}
           onSearchChange={(q) => {
             setSearchQuery(q)
-            setCurrentPage(1)
           }}
           searchPlaceholder={t('catalog.search_placeholder')}
           categoryFilterMode="select"
@@ -331,6 +351,15 @@ export default function CatalogPage() {
               <span>{t('catalog.retry')}</span>
             </button>
           </div>
+        ) : isDebouncing && filteredSigns.length === 0 ? (
+          <div
+            className={`py-16 px-6 text-center space-y-3 rounded-2xl border ${
+              isDark ? 'bg-[#071317] border-white/10' : 'bg-white border-[#E8E4E3]'
+            }`}
+          >
+            <CircleNotch size={28} className="animate-spin text-[#007b8b] dark:text-[#00c4de] mx-auto" />
+            <p className="text-xs text-gray-500 font-medium">{t('common.searching', 'Đang tìm kiếm biển báo...')}</p>
+          </div>
         ) : filteredSigns.length === 0 ? (
           /* Empty State: No search results */
           <div
@@ -352,6 +381,7 @@ export default function CatalogPage() {
               onClick={() => {
                 setSelectedCategory('all')
                 setSearchQuery('')
+                setDebouncedSearch('')
                 setCurrentPage(1)
               }}
               className="px-4 py-2 rounded-xl text-xs font-bold bg-[#007b8b] text-white dark:bg-[#00c4de] dark:text-black hover:opacity-90 transition-opacity cursor-pointer inline-block mt-2"

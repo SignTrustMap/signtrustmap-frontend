@@ -19,6 +19,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const USER_STORAGE_KEY = 'stm_web_user'
 const TOKEN_STORAGE_KEY = 'stm_access_token'
+const AVATAR_STORAGE_KEY_PREFIX = 'stm_avatar_'
 
 function sanitizeName(name: string): string {
   return name ? name.replace(/\s*\([^)]*\)/g, '').trim() : name
@@ -44,6 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (parsed && parsed.name) {
             parsed.name = sanitizeName(parsed.name)
           }
+          if (parsed && parsed.id) {
+            const cachedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + parsed.id) || sessionStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + parsed.id)
+            if (cachedAvatar) {
+              parsed.avatar = cachedAvatar
+            }
+          }
           setUser(parsed)
         }
 
@@ -51,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const profile = await authService.getMe()
             const primaryRole = normalizeBackendRole(profile.roles)
+            const cachedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + profile.id) || sessionStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + profile.id)
             const refreshedUser: DemoUserAccount = {
               id: profile.id,
               email: profile.email,
@@ -59,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role: primaryRole,
               label: primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1),
               icon: primaryRole === 'surveyor' ? '📹' : primaryRole === 'reviewer' ? '⚖️' : '🚗',
-              avatar: profile.avatarUrl || undefined,
+              avatar: cachedAvatar || profile.avatarUrl || undefined,
               credits: profile.walletBalance ?? 0,
               trustScore: 90,
               joinDate: new Date().toLocaleDateString('vi-VN'),
@@ -141,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       const primaryRole = normalizeBackendRole(res.user.roles)
+      const cachedAvatar = localStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + res.user.id) || sessionStorage.getItem(AVATAR_STORAGE_KEY_PREFIX + res.user.id)
       const authenticatedUser: DemoUserAccount = {
         id: res.user.id,
         role: primaryRole,
@@ -148,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         icon: primaryRole === 'surveyor' ? '📹' : primaryRole === 'reviewer' ? '⚖️' : '🚗',
         email: res.user.email,
         name: res.user.fullName || res.user.email.split('@')[0],
-        avatar: (res.user as any).avatarUrl || undefined,
+        avatar: cachedAvatar || (res.user as any).avatarUrl || undefined,
         credits: 0,
         trustScore: 90,
         joinDate: new Date().toLocaleDateString('vi-VN'),
@@ -216,23 +225,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = useCallback(async (updatedData: Partial<DemoUserAccount>): Promise<void> => {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY) || sessionStorage.getItem(TOKEN_STORAGE_KEY)
+    const isLocal = !!localStorage.getItem(TOKEN_STORAGE_KEY)
+    const storage = isLocal ? localStorage : sessionStorage
+
+    if (updatedData.avatar) {
+      const currentId = user?.id || (storage.getItem(USER_STORAGE_KEY) ? JSON.parse(storage.getItem(USER_STORAGE_KEY)!).id : undefined)
+      if (currentId) {
+        try {
+          localStorage.setItem(AVATAR_STORAGE_KEY_PREFIX + currentId, updatedData.avatar)
+        } catch (e) {
+          console.warn('Failed to cache avatar in localStorage', e)
+        }
+      }
+    }
+
     if (token && (updatedData.name !== undefined || updatedData.phone !== undefined || updatedData.avatar !== undefined)) {
+      const safeAvatarUrl =
+        updatedData.avatar && updatedData.avatar.length <= 500 && !updatedData.avatar.startsWith('data:')
+          ? updatedData.avatar
+          : undefined
+
       await authService.updateMe({
         fullName: updatedData.name,
         phone: updatedData.phone,
-        avatarUrl: updatedData.avatar,
+        ...(safeAvatarUrl !== undefined ? { avatarUrl: safeAvatarUrl } : {}),
       })
     }
 
     setUser((prev) => {
       if (!prev) return null
       const updated = { ...prev, ...updatedData }
-      const isLocal = !!localStorage.getItem(TOKEN_STORAGE_KEY)
-      const storage = isLocal ? localStorage : sessionStorage
       storage.setItem(USER_STORAGE_KEY, JSON.stringify(updated))
       return updated
     })
-  }, [])
+  }, [user?.id])
 
   const claimDailyBonus = useCallback((amount: number = 25): number => {
     let newCredits = 0

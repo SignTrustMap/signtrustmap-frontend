@@ -44,13 +44,19 @@ export interface RevalidationEvidenceItem {
   distance_meters?: number
   distanceMeters?: number
   surveyor_name?: string
+  surveyorName?: string
   surveyor_email?: string
+  surveyorEmail?: string
+  surveyor?: { id?: string; fullName?: string; email?: string | null } | null
 }
 
 export interface RevalidationDecisionItem {
   id: string
   evidenceId: string
   reviewerId: string
+  reviewerName?: string
+  reviewerEmail?: string | null
+  reviewer?: { id?: string; fullName?: string; email?: string | null } | null
   decision: 'UNCHANGED' | 'STILL_ACTIVE' | 'CHANGED' | 'MISSING' | 'REMOVED' | 'UNCLEAR' | 'INVALID' | string
   suggestedSignTypeId?: number | null
   note?: string | null
@@ -106,6 +112,9 @@ export interface RevalidationTaskItem {
   sign?: any
   evidences?: RevalidationEvidenceItem[]
   evidence_count?: number
+  assignedSurveyor?: string | null
+  surveyorName?: string | null
+  surveyor?: { id?: string; fullName?: string; email?: string | null } | null
 }
 
 export interface PaginatedRevalidationTasksResponse {

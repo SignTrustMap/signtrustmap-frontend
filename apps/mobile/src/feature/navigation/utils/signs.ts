@@ -5,12 +5,12 @@ import { calculateDistanceMeters } from './geo';
 
 const S3_BASE = env.storageUrl;
 
-export const TARGET_SIGN_IMAGE_URL =
-  `${S3_BASE}/stm-sign-crops/uploads/eaa2eac3-be4f-4a51-a822-6a8757978d58/f0f86c63-e05b-4baa-bae8-ae81e01a4e7d/a8a881f2-c218-4394-8b8d-7de40de1388f/uk-20mph-speed-limit-sign.jpg`;
+export const TARGET_SIGN_IMAGE_URL = `${S3_BASE}/stm-sign-crops/uploads/eaa2eac3-be4f-4a51-a822-6a8757978d58/f0f86c63-e05b-4baa-bae8-ae81e01a4e7d/a8a881f2-c218-4394-8b8d-7de40de1388f/uk-20mph-speed-limit-sign.jpg`;
 
 export function resolveRepresentativeSignUrl(nameEn?: string, signCode?: string): string {
-  if (signCode) {
-    return `${S3_BASE}/stm-sign-crops/representative/${signCode.toUpperCase().trim()}.png`;
+  const code = (signCode || '').trim();
+  if (code) {
+    return `${S3_BASE}/stm-catalog-images/representative/${code}.svg`;
   }
   if (nameEn) {
     const slug = nameEn
@@ -19,14 +19,19 @@ export function resolveRepresentativeSignUrl(nameEn?: string, signCode?: string)
       .replace(/[^A-Z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '');
     if (slug) {
-      return `${S3_BASE}/stm-sign-crops/representative/${slug}.png`;
+      return `${S3_BASE}/stm-catalog-images/representative/${slug}.svg`;
     }
   }
   return '';
 }
 
 export function resolveImageUrl(signCropUrl?: string): string {
-  if (!signCropUrl || typeof signCropUrl !== 'string' || signCropUrl.includes('mock/') || signCropUrl.startsWith('mock')) {
+  if (
+    !signCropUrl ||
+    typeof signCropUrl !== 'string' ||
+    signCropUrl.includes('mock/') ||
+    signCropUrl.startsWith('mock')
+  ) {
     return '';
   }
   let cleanUrl = signCropUrl.trim();
@@ -40,20 +45,25 @@ export function resolveImageUrl(signCropUrl?: string): string {
   }
   if (cleanUrl.startsWith('https://cdn.signmap.site/')) {
     const rawPath = cleanUrl.slice('https://cdn.signmap.site/'.length).replace(/^\/+/, '');
-    const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => rawPath.startsWith(b + '/'));
+    const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) =>
+      rawPath.startsWith(b + '/'),
+    );
     return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${rawPath}`;
   }
   if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
     return cleanUrl;
   }
   const clean = cleanUrl.replace(/^\/+/, '');
-  const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) => clean.startsWith(b + '/'));
+  const hasBucket = ['stm-sign-crops', 'stm-raw-videos', 'stm-gpx-logs'].some((b) =>
+    clean.startsWith(b + '/'),
+  );
   return `${S3_BASE}/${hasBucket ? '' : 'stm-sign-crops/'}${clean}`;
 }
 
 export function toRouteSign(sign: any): RouteSign {
   const signType = sign.signType ?? sign.sign_type;
-  const signCode = signType?.signCode ?? signType?.sign_code ?? sign.signCode ?? sign.sign_code ?? '';
+  const signCode =
+    signType?.signCode ?? signType?.sign_code ?? sign.signCode ?? sign.sign_code ?? '';
   const nameEn = signType?.nameEn ?? signType?.name_en ?? sign.nameEn ?? sign.name_en ?? '';
   const nameVi = signType?.nameVi ?? signType?.name_vi ?? sign.nameVi ?? sign.name_vi ?? '';
 

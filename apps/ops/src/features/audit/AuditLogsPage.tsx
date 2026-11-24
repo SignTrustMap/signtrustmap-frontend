@@ -16,7 +16,9 @@ import {
 import {
   auditService,
   type AuditLogRecord,
+  type AdminTaskHistoryListItem,
 } from '@/api/services/audit.service'
+import { TaskHistoryTimelineModal } from './components/TaskHistoryTimelineModal'
 
 /** Format Date string cleanly to HH:mm • DD/MM/YYYY */
 function formatDate(dateStr?: string | Date): string {
@@ -105,6 +107,30 @@ function getActionConfig(action?: string): ActionConfig {
     }
   }
 
+  if (a === 'UPDATE_SYSTEM_FLAG' || a.includes('SYSTEM_FLAG')) {
+    return {
+      labelVi: 'Thay đổi công tắc hệ thống',
+      labelEn: 'Update system switch',
+      textColor: 'text-amber-700 dark:text-amber-400',
+    }
+  }
+
+  if (a.includes('FRESHNESS_RULE')) {
+    let vi = 'Cập nhật quy tắc độ tươi'
+    let en = 'Update freshness rule'
+    let color = 'text-sky-700 dark:text-sky-400'
+    if (a.includes('CREATE')) {
+      vi = 'Tạo quy tắc độ tươi'
+      en = 'Create freshness rule'
+      color = 'text-emerald-700 dark:text-emerald-400'
+    } else if (a.includes('DEACTIVATE')) {
+      vi = 'Tắt quy tắc độ tươi'
+      en = 'Disable freshness rule'
+      color = 'text-red-700 dark:text-red-400'
+    }
+    return { labelVi: vi, labelEn: en, textColor: color }
+  }
+
   if (a.includes('CONFIG') || a.includes('SETTINGS') || a.includes('MATRIX')) {
     let vi = 'Cập nhật cài đặt'
     let en = 'Update settings'
@@ -155,6 +181,8 @@ function formatResourceName(resourceName?: string, isEn?: boolean): string {
   if (r === 'model_training_jobs') return isEn ? 'Training Job' : 'Tác vụ huấn luyện'
   if (r === 'ai_model_versions') return isEn ? 'AI Model' : 'Mô hình AI'
   if (r === 'system_parameters' || r === 'settings') return isEn ? 'System Parameter' : 'Tham số hệ thống'
+  if (r === 'system_feature_flags') return isEn ? 'System Switch' : 'Công tắc hệ thống'
+  if (r === 'freshness_rules') return isEn ? 'Freshness Rule' : 'Quy tắc độ tươi'
   if (r === 'moderation_cases' || r === 'escalations') return isEn ? 'Escalation Case' : 'Ca chuyển tiếp'
   return resourceName || (isEn ? 'Resource' : 'Đối tượng')
 }
@@ -265,10 +293,22 @@ export default function AuditLogsPage() {
   const { error } = useToast()
   const isEn = i18n.language?.startsWith('en')
 
+  const [activeTab, setActiveTab] = useState<'audit_logs' | 'task_history'>('audit_logs')
+
   // Pure API State, Zero mock data
   const [logs, setLogs] = useState<AuditLogRecord[]>([])
   const [totalCount, setTotalCount] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  // Task History State
+  const [taskHistoryItems, setTaskHistoryItems] = useState<AdminTaskHistoryListItem[]>([])
+  const [taskHistoryTotal, setTaskHistoryTotal] = useState<number>(0)
+  const [isLoadingTasks, setIsLoadingTasks] = useState<boolean>(false)
+  const [taskPage, setTaskPage] = useState<number>(1)
+  const [taskPageSize, setTaskPageSize] = useState<number>(10)
+  const [taskSearch, setTaskSearch] = useState('')
+  const [taskTypeFilter, setTaskTypeFilter] = useState('all')
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -315,9 +355,61 @@ export default function AuditLogsPage() {
     }
   }, [currentPage, pageSize, actionFilter, resourceFilter, error, isEn])
 
+  const fetchTaskHistory = useCallback(async () => {
+    setIsLoadingTasks(true)
+    try {
+      const response = await auditService.getTaskHistoryList({
+        page: taskPage,
+        pageSize: taskPageSize,
+      })
+      if (response && Array.isArray(response.items)) {
+        setTaskHistoryItems(response.items)
+        setTaskHistoryTotal(response.total ?? response.items.length)
+      } else {
+        setTaskHistoryItems([])
+        setTaskHistoryTotal(0)
+      }
+    } catch (err: any) {
+      console.error('Failed to load task history from API:', err)
+      error(
+        err?.message ||
+          (isEn ? 'Failed to fetch task history' : 'Không thể tải lịch sử tác vụ từ máy chủ')
+      )
+      setTaskHistoryItems([])
+      setTaskHistoryTotal(0)
+    } finally {
+      setIsLoadingTasks(false)
+    }
+  }, [taskPage, taskPageSize, error, isEn])
+
   useEffect(() => {
-    fetchAuditLogs()
-  }, [fetchAuditLogs])
+    if (activeTab === 'audit_logs') {
+      fetchAuditLogs()
+    } else {
+      fetchTaskHistory()
+    }
+  }, [activeTab, fetchAuditLogs, fetchTaskHistory])
+
+  const filteredTaskItems = taskHistoryItems.filter((item) => {
+    if (taskTypeFilter !== 'all' && item.activityType !== taskTypeFilter) {
+      return false
+    }
+    const q = taskSearch.trim().toLowerCase()
+    if (!q) return true
+    const fields = [
+      item.taskId,
+      item.requestId,
+      item.surveyorName,
+      item.surveyor?.fullName,
+      item.surveyor?.email,
+      item.reviewerName,
+      item.reviewer?.fullName,
+      item.reviewer?.email,
+      item.reason,
+      item.note,
+    ]
+    return fields.some((f) => String(f || '').toLowerCase().includes(q))
+  })
 
   // Client Search Filter
   const filteredLogs = logs.filter((log) => {
@@ -357,22 +449,52 @@ export default function AuditLogsPage() {
       <PageHeader
         title={t('audit.title', isEn ? 'Activity audit logs' : 'Nhật ký hoạt động')}
         actions={
-          <button
-            type="button"
-            onClick={fetchAuditLogs}
-            disabled={isLoading}
-            className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-            title={isEn ? 'Refresh audit logs' : 'Làm mới nhật ký'}
-          >
-            <ArrowsClockwise
-              size={16}
-              weight="bold"
-              className={isLoading ? 'animate-spin' : ''}
-            />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Simple 2-tab switcher */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setActiveTab('audit_logs')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'audit_logs'
+                    ? 'bg-white dark:bg-[#0A171C] text-[#007b8b] dark:text-[#00c4de] shadow-2xs font-bold'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {isEn ? 'System logs' : 'Nhật ký hệ thống'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('task_history')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  activeTab === 'task_history'
+                    ? 'bg-white dark:bg-[#0A171C] text-[#007b8b] dark:text-[#00c4de] shadow-2xs font-bold'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                {isEn ? 'Task history' : 'Lịch sử tác vụ'}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={activeTab === 'audit_logs' ? fetchAuditLogs : fetchTaskHistory}
+              disabled={activeTab === 'audit_logs' ? isLoading : isLoadingTasks}
+              className="p-2 border border-neutral-200 dark:border-white/15 bg-white dark:bg-white/5 hover:bg-neutral-50 dark:hover:bg-white/10 text-neutral-700 dark:text-neutral-200 rounded-xl transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+              title={isEn ? 'Refresh' : 'Làm mới'}
+            >
+              <ArrowsClockwise
+                size={16}
+                weight="bold"
+                className={(activeTab === 'audit_logs' ? isLoading : isLoadingTasks) ? 'animate-spin' : ''}
+              />
+            </button>
+          </div>
         }
       />
 
+      {activeTab === 'audit_logs' ? (
+        <>
       {/* ─── DATA FILTER BAR (Only real backend-supported filters) ───────── */}
       <DataFilterBar
         searchQuery={searchTerm}
@@ -397,6 +519,10 @@ export default function AuditLogsPage() {
             {
               value: 'UPDATE_USER_STATUS',
               label: isEn ? 'User status change' : 'Cập nhật trạng thái người dùng',
+            },
+            {
+              value: 'UPDATE_SYSTEM_FLAG',
+              label: isEn ? 'Update system switch' : 'Thay đổi công tắc hệ thống',
             },
             {
               value: 'UPDATE_CONSENSUS_CONFIG',
@@ -442,10 +568,12 @@ export default function AuditLogsPage() {
             { value: 'user_roles', label: isEn ? 'User roles' : 'Vai trò người dùng' },
             { value: 'users', label: isEn ? 'Users' : 'Người dùng' },
             { value: 'consensus_configs', label: isEn ? 'Consensus' : 'Cấu hình đồng thuận' },
+            { value: 'freshness_rules', label: isEn ? 'Freshness rules' : 'Quy tắc độ tươi' },
             { value: 'route_classifications', label: isEn ? 'Routes' : 'Tuyến đường' },
             { value: 'model_training_jobs', label: isEn ? 'AI Training' : 'Tác vụ huấn luyện' },
             { value: 'ai_model_versions', label: isEn ? 'AI Models' : 'Mô hình AI' },
             { value: 'system_parameters', label: isEn ? 'System params' : 'Tham số hệ thống' },
+            { value: 'system_feature_flags', label: isEn ? 'System switches' : 'Công tắc hệ thống' },
           ]}
           className="w-full sm:w-48"
         />
@@ -578,6 +706,192 @@ export default function AuditLogsPage() {
           />
         </div>
       </div>
+        </>
+      ) : (
+        <>
+          {/* ─── TASK HISTORY FILTER BAR ─────────────────────────────────── */}
+          <DataFilterBar
+            searchQuery={taskSearch}
+            onSearchChange={setTaskSearch}
+            searchPlaceholder={
+              isEn
+                ? 'Search by task ID, surveyor, reviewer, note...'
+                : 'Tìm theo mã tác vụ, người chụp, người duyệt, lý do...'
+            }
+          >
+            <CustomSelect
+              value={taskTypeFilter}
+              onChange={(val) => setTaskTypeFilter(val)}
+              size="sm"
+              options={[
+                { value: 'all', label: isEn ? 'All activities' : 'Tất cả hoạt động' },
+                {
+                  value: 'CANDIDATE_RECAPTURE',
+                  label: isEn ? 'Recapture request' : 'Yêu cầu chụp lại ảnh',
+                },
+                {
+                  value: 'REVALIDATION_EVIDENCE',
+                  label: isEn ? 'Periodic photo check' : 'Ảnh kiểm tra định kỳ',
+                },
+              ]}
+              className="w-full sm:w-56"
+            />
+          </DataFilterBar>
+
+          {/* ─── TASK HISTORY TABLE ──────────────────────────────────────── */}
+          <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl shadow-xs overflow-hidden w-full">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50/80 dark:bg-white/5 text-gray-500 dark:text-gray-400 font-mono border-b border-gray-200 dark:border-white/10">
+                  <tr>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Activity' : 'Loại hoạt động'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Task ID' : 'Mã tác vụ'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Surveyor' : 'Người khảo sát'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Reviewer' : 'Người đánh giá'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Details' : 'Lý do hoặc ghi chú'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Status' : 'Trạng thái'}</th>
+                    <th className="py-3 px-4 font-semibold">{isEn ? 'Time' : 'Thời gian'}</th>
+                    <th className="py-3 px-4 font-semibold text-center">{isEn ? 'Action' : 'Thao tác'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                  {isLoadingTasks ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
+                        <div className="inline-flex items-center gap-2">
+                          <CircleNotch size={16} className="animate-spin text-[#007b8b]" />
+                          <span>{isEn ? 'Loading task history...' : 'Đang tải lịch sử tác vụ...'}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredTaskItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-gray-400">
+                        {isEn ? 'No matching activity records found.' : 'Không có dữ liệu lịch sử tác vụ phù hợp.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTaskItems.map((item) => {
+                      const isRecapture = item.activityType === 'CANDIDATE_RECAPTURE'
+                      const surveyorDisplay =
+                        item.surveyor?.fullName || item.surveyorName || (isEn ? 'Unassigned' : 'Chưa có')
+                      const surveyorSub = item.surveyor?.email || ''
+                      const reviewerDisplay =
+                        item.reviewer?.fullName || item.reviewerName || (isEn ? 'None' : 'Chưa có')
+                      const reviewerSub = item.reviewer?.email || ''
+
+                      return (
+                        <tr
+                          key={`${item.activityType}-${item.requestId}`}
+                          onClick={() => setSelectedTaskId(item.taskId)}
+                          className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors cursor-pointer"
+                        >
+                          <td className="py-3 px-4 whitespace-nowrap font-semibold">
+                            <span
+                              className={
+                                isRecapture
+                                  ? 'text-amber-700 dark:text-amber-400'
+                                  : 'text-sky-700 dark:text-sky-400'
+                              }
+                            >
+                              {isRecapture
+                                ? isEn
+                                  ? 'Recapture request'
+                                  : 'Yêu cầu chụp lại'
+                                : isEn
+                                  ? 'Periodic photo'
+                                  : 'Ảnh kiểm tra định kỳ'}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap font-mono text-gray-700 dark:text-gray-300">
+                            #{item.taskId?.slice(0, 8)}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-gray-900 dark:text-white">
+                              {surveyorDisplay}
+                            </div>
+                            {surveyorSub && (
+                              <div className="text-[11px] font-mono text-gray-400">{surveyorSub}</div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-gray-800 dark:text-gray-200">
+                              {reviewerDisplay}
+                            </div>
+                            {reviewerSub && (
+                              <div className="text-[11px] font-mono text-gray-400">{reviewerSub}</div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 max-w-[240px] truncate text-gray-600 dark:text-gray-300">
+                            {item.reason || item.note || '—'}
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            <span
+                              className={`text-xs font-semibold ${
+                                item.isCompleted
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-amber-600 dark:text-amber-400'
+                              }`}
+                            >
+                              {item.isCompleted
+                                ? isEn
+                                  ? 'Completed'
+                                  : 'Đã hoàn tất'
+                                : isEn
+                                  ? 'Pending'
+                                  : 'Đang chờ'}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                            {formatDate(item.occurredAt)}
+                          </td>
+
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedTaskId(item.taskId)
+                              }}
+                              className="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-[#007b8b] hover:text-white dark:bg-white/10 dark:hover:bg-[#00c4de] dark:hover:text-black transition-all cursor-pointer"
+                            >
+                              {isEn ? 'Details' : 'Chi tiết'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
+              <Pagination
+                currentPage={taskPage}
+                totalItems={
+                  taskTypeFilter === 'all' && !taskSearch.trim()
+                    ? taskHistoryTotal
+                    : filteredTaskItems.length
+                }
+                pageSize={taskPageSize}
+                onPageChange={setTaskPage}
+                onPageSizeChange={(newSize) => {
+                  setTaskPageSize(newSize)
+                  setTaskPage(1)
+                }}
+                pageSizeOptions={[10, 20, 50]}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── AUDIT LOG DETAIL MODAL (Identical styling to Escalations) ─── */}
       {selectedLog && (
@@ -782,6 +1096,13 @@ export default function AuditLogsPage() {
           </div>
         </ModalPortal>
       )}
+
+      {/* ─── TASK EXECUTION TIMELINE MODAL ─────────────────────────────────── */}
+      <TaskHistoryTimelineModal
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        isEn={isEn}
+      />
     </div>
   )
 }

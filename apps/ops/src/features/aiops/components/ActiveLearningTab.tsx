@@ -1,12 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  SlidersHorizontal,
-  CaretDown,
-  Check,
-  Sparkle,
-  FloppyDisk,
-} from '@phosphor-icons/react'
+import { CircleNotch } from '@phosphor-icons/react'
 import type { ActiveLearningStrategiesResponse } from '@/api/services/aiops.service'
 
 interface ActiveLearningTabProps {
@@ -20,6 +13,7 @@ interface ActiveLearningTabProps {
   uncertaintyMargin: string
   setUncertaintyMargin: React.Dispatch<React.SetStateAction<string>>
   onSave: () => void
+  isSaving?: boolean
 }
 
 export function ActiveLearningTab({
@@ -33,172 +27,113 @@ export function ActiveLearningTab({
   uncertaintyMargin,
   setUncertaintyMargin,
   onSave,
+  isSaving = false,
 }: ActiveLearningTabProps) {
-  const { t } = useTranslation('ops')
+  const { i18n } = useTranslation('ops')
+  const isEn = i18n.language?.startsWith('en')
 
-  const [strategyDropdownOpen, setStrategyDropdownOpen] = useState(false)
-  const [aggDropdownOpen, setAggDropdownOpen] = useState(false)
-  const strategyRef = useRef<HTMLDivElement>(null)
-  const aggRef = useRef<HTMLDivElement>(null)
+  const availableStrategies = Array.from(
+    new Set(
+      [
+        ...(strategiesData?.strategies || []),
+        strategiesData?.default_strategy,
+        'least_confidence',
+        'r3_cec',
+        'margin',
+        'entropy',
+      ].filter(Boolean) as string[]
+    )
+  )
 
-  // Click outside listener for custom dropdowns
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (strategyRef.current && !strategyRef.current.contains(event.target as Node)) {
-        setStrategyDropdownOpen(false)
-      }
-      if (aggRef.current && !aggRef.current.contains(event.target as Node)) {
-        setAggDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const availableAggregations = strategiesData?.aggregation_methods?.length
+    ? strategiesData.aggregation_methods
+    : ['avg', 'max', 'min', 'sum']
+
+  const strategyDescriptions: Record<string, string> = {
+    least_confidence: isEn
+      ? 'Selects bounding boxes with lowest prediction confidence score.'
+      : 'Ưu tiên trích xuất các khung nhận diện có điểm tin cậy thấp nhất.',
+    r3_cec: isEn
+      ? 'Diversity-aware sampling combining uncertainty with sample representativeness.'
+      : 'Cân bằng giữa độ bất định và tính đa dạng phân bổ hình ảnh trong cụm dữ liệu.',
+    margin: isEn
+      ? 'Calculates difference between top two predicted class probabilities.'
+      : 'Đo lường độ chênh lệch xác suất giữa nhãn cao nhất và nhãn kế tiếp.',
+    entropy: isEn
+      ? 'Measures prediction entropy across all classes to find highly uncertain samples.'
+      : 'Tính toán độ hỗn loạn entropy trên toàn bộ 100 lớp biển báo.',
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-2xl p-6 shadow-xs space-y-6">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#007b8b] dark:text-[#00c4de] uppercase tracking-wider mb-1">
-            <SlidersHorizontal size={16} weight="bold" />
-            <span>{t('mlops.tab_active_learning')}</span>
-          </div>
-          <h2 className="text-base font-bold text-gray-900 dark:text-white">
-            {t('mlops.al_sec_sampling')}
-          </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('mlops.al_desc')}
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-[#0A171C] border border-[#E8E4E3] dark:border-white/10 rounded-xl p-5 shadow-xs space-y-6">
+        {/* Header Description */}
+        <div className="border-b border-gray-100 dark:border-white/10 pb-4">
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+            {isEn ? 'Active Learning Sampling Configuration' : 'Cấu hình lấy mẫu & Active learning'}
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-3xl">
+            {isEn
+              ? 'Active learning prioritizes low-confidence, borderline detections from reviewers for automated retraining cycles.'
+              : 'Thuật toán Active learning tự động sàng lọc những phát hiện có độ tin cậy thấp hoặc có sự bất đồng từ reviewer để đưa vào chu trình huấn luyện lại.'}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
-          {/* Strategy Algorithm Custom Dropdown */}
-          <div className="space-y-1.5" ref={strategyRef}>
-            <label className="block text-xs font-mono font-bold text-gray-500 uppercase tracking-wide">
-              {t('mlops.al_lbl_strategy')}
+        {/* 2-Column Clean Form Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+          {/* 1. Strategy Algorithm Selection */}
+          <div className="space-y-1.5">
+            <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 text-[11px] uppercase">
+              {isEn ? 'Sampling Strategy' : 'Chiến lược lấy mẫu'}
             </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setStrategyDropdownOpen(!strategyDropdownOpen)
-                  setAggDropdownOpen(false)
-                }}
-                className={`w-full px-3.5 py-2.5 text-xs font-mono bg-white dark:bg-[#061115] border rounded-xl cursor-pointer flex items-center justify-between transition-all ${
-                  strategyDropdownOpen
-                    ? 'border-[#007b8b] ring-2 ring-[#007b8b]/20 dark:border-[#00c4de] dark:ring-[#00c4de]/20'
-                    : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
-                }`}
-              >
-                <span className="font-bold text-gray-900 dark:text-white">
-                  {selectedStrategy === 'least_confidence' ? 'Least Confidence' : selectedStrategy}
-                </span>
-                <CaretDown
-                  size={14}
-                  weight="bold"
-                  className={`text-gray-400 transition-transform duration-200 ${
-                    strategyDropdownOpen ? 'rotate-180 text-[#007b8b] dark:text-[#00c4de]' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Dropdown Menu */}
-              {strategyDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 w-full bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-xl shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-                  {(strategiesData?.strategies || ['least_confidence']).map((s) => {
-                    const isSelected = selectedStrategy === s
-                    return (
-                      <div
-                        key={s}
-                        onClick={() => {
-                          setSelectedStrategy(s)
-                          setStrategyDropdownOpen(false)
-                        }}
-                        className={`px-3.5 py-2.5 flex items-center justify-between text-xs font-mono transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] font-bold'
-                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
-                        }`}
-                      >
-                        <span>{s === 'least_confidence' ? 'Least Confidence' : s}</span>
-                        {isSelected && <Check size={14} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <span className="text-[11px] text-gray-400 block">{t('mlops.al_strategy_least_confidence_desc')}</span>
+            <select
+              value={selectedStrategy}
+              onChange={(e) => setSelectedStrategy(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50/50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-[#007b8b] cursor-pointer"
+            >
+              {availableStrategies.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-400">
+              {strategyDescriptions[selectedStrategy] || strategyDescriptions.least_confidence}
+            </p>
           </div>
 
-          {/* Aggregation Method Custom Dropdown */}
-          <div className="space-y-1.5" ref={aggRef}>
-            <label className="block text-xs font-mono font-bold text-gray-500 uppercase tracking-wide">
-              {t('mlops.al_lbl_aggregation')}
+          {/* 2. Aggregation Method */}
+          <div className="space-y-1.5">
+            <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 text-[11px] uppercase">
+              {isEn ? 'Aggregation Method' : 'Phương thức gộp điểm'}
             </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setAggDropdownOpen(!aggDropdownOpen)
-                  setStrategyDropdownOpen(false)
-                }}
-                className={`w-full px-3.5 py-2.5 text-xs font-mono bg-white dark:bg-[#061115] border rounded-xl cursor-pointer flex items-center justify-between transition-all ${
-                  aggDropdownOpen
-                    ? 'border-[#007b8b] ring-2 ring-[#007b8b]/20 dark:border-[#00c4de] dark:ring-[#00c4de]/20'
-                    : 'border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
-                }`}
-              >
-                <span className="font-bold text-gray-900 dark:text-white uppercase">
-                  {selectedAggregation}
-                </span>
-                <CaretDown
-                  size={14}
-                  weight="bold"
-                  className={`text-gray-400 transition-transform duration-200 ${
-                    aggDropdownOpen ? 'rotate-180 text-[#007b8b] dark:text-[#00c4de]' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Dropdown Menu */}
-              {aggDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 w-full bg-white dark:bg-[#0A171C] border border-gray-200 dark:border-white/15 rounded-xl shadow-xl z-50 overflow-hidden py-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-                  {(strategiesData?.aggregation_methods || ['avg', 'max', 'min', 'sum']).map((m) => {
-                    const isSelected = selectedAggregation === m
-                    return (
-                      <div
-                        key={m}
-                        onClick={() => {
-                          setSelectedAggregation(m)
-                          setAggDropdownOpen(false)
-                        }}
-                        className={`px-3.5 py-2.5 flex items-center justify-between text-xs font-mono transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#007b8b]/10 dark:bg-[#00c4de]/15 text-[#007b8b] dark:text-[#00c4de] font-bold'
-                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
-                        }`}
-                      >
-                        <span className="uppercase">{m}</span>
-                        {isSelected && <Check size={14} weight="bold" className="text-[#007b8b] dark:text-[#00c4de]" />}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <span className="text-[11px] text-gray-400 block">{t('mlops.al_agg_desc')}</span>
+            <select
+              value={selectedAggregation}
+              onChange={(e) => setSelectedAggregation(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50/50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg font-mono text-xs text-gray-900 dark:text-white focus:outline-none focus:border-[#007b8b] cursor-pointer uppercase"
+            >
+              {availableAggregations.map((m) => (
+                <option key={m} value={m}>
+                  {m.toUpperCase()}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-400">
+              {isEn ? 'Combines box confidence scores across multiple detections.' : 'Cách gộp điểm tin cậy khi một ảnh chứa nhiều khung phát hiện.'}
+            </p>
           </div>
 
-          {/* Top-K Slider */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center font-mono">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">{t('mlops.al_lbl_top_k')}</label>
-              <span className="font-bold text-[#007b8b] dark:text-[#00c4de] text-sm tabular-nums">
-                {topK} {t('mlops.al_samples_unit')}
+          {/* 3. Top-K Sampling Slider & Number */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between font-mono text-[11px]">
+              <label className="font-bold text-gray-700 dark:text-gray-300 uppercase">
+                {isEn ? 'Top-K Sample Budget' : 'Ngân sách mẫu Top-K'}
+              </label>
+              <span className="font-bold text-[#007b8b] dark:text-[#00c4de]">
+                {topK} {isEn ? 'samples' : 'mẫu'}
               </span>
             </div>
-            <div className="pt-2">
+            <div className="flex items-center gap-3 pt-1">
               <input
                 type="range"
                 min={10}
@@ -208,44 +143,56 @@ export function ActiveLearningTab({
                 onChange={(e) => setTopK(Number(e.target.value))}
                 className="w-full accent-[#007b8b] cursor-pointer"
               />
+              <input
+                type="number"
+                min={10}
+                max={500}
+                value={topK}
+                onChange={(e) => setTopK(Number(e.target.value))}
+                className="w-20 px-2 py-1 rounded border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#061115] font-mono font-bold text-right text-xs"
+              />
             </div>
-            <span className="text-[11px] text-gray-400 block pt-0.5">{t('mlops.al_top_k_desc')}</span>
+            <p className="text-[11px] text-gray-400">
+              {isEn ? 'Number of uncertain instances extracted per batch.' : 'Số lượng mẫu bất định nhiều nhất được gom lại trong mỗi mẻ gán nhãn.'}
+            </p>
+          </div>
+
+          {/* 4. Uncertainty Criteria / Threshold Formula */}
+          <div className="space-y-1.5">
+            <label className="block font-mono font-bold text-gray-700 dark:text-gray-300 text-[11px] uppercase">
+              {isEn ? 'Uncertainty Criterion / Margin' : 'Ngưỡng margin bất định'}
+            </label>
+            <input
+              type="text"
+              value={uncertaintyMargin}
+              onChange={(e) => setUncertaintyMargin(e.target.value)}
+              placeholder="Top-1 Conf - Top-2 Conf < 0.15"
+              className="w-full px-3 py-2 font-mono text-xs bg-gray-50/50 dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-purple-600 dark:text-purple-400 font-bold focus:outline-none focus:border-[#007b8b]"
+            />
+            <p className="text-[11px] text-gray-400">
+              {isEn ? 'Triggers sampling when prediction margin falls below this rule.' : 'Kích hoạt lấy mẫu khi độ lệch xác suất thỏa mãn điều kiện này.'}
+            </p>
           </div>
         </div>
 
-        {/* Uncertainty Formula & Threshold */}
-        <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200/60 dark:border-white/10 space-y-2.5">
-          <label className="block font-mono font-bold text-gray-500 uppercase text-xs tracking-wide">
-            {t('mlops.al_lbl_uncertainty')}
-          </label>
-          <input
-            type="text"
-            value={uncertaintyMargin}
-            onChange={(e) => setUncertaintyMargin(e.target.value)}
-            className="w-full px-3.5 py-2.5 font-mono text-xs bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-lg text-purple-600 dark:text-purple-400 font-bold focus:outline-none focus:ring-2 focus:ring-[#007b8b]/30 focus:border-[#007b8b]"
-          />
-          <p className="text-[11px] text-gray-400 pt-0.5">
-            {t('mlops.al_uncertainty_desc')}
-          </p>
-        </div>
-
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-white/10">
-          <span className="text-xs font-mono text-emerald-600 flex items-center gap-1.5">
-            <Sparkle size={14} weight="fill" />
-            {t('mlops.al_active_strategy_prefix')} {selectedStrategy} ({selectedAggregation}) • Top {topK}
-          </span>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onSave}
-              className="px-5 py-2.5 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <FloppyDisk size={16} weight="bold" />
-              <span>{t('mlops.al_btn_save')}</span>
-            </button>
+        {/* Action & Summary Footer */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-gray-100 dark:border-white/10">
+          <div className="text-xs font-mono text-gray-500 dark:text-gray-400">
+            <span>{isEn ? 'Current configuration:' : 'Cấu hình hiện hành:'} </span>
+            <strong className="text-emerald-600 dark:text-emerald-400">
+              {selectedStrategy} • {selectedAggregation} • Top {topK}
+            </strong>
           </div>
+
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={onSave}
+            className="px-5 py-2 bg-[#007b8b] hover:bg-[#00606d] text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {isSaving && <CircleNotch size={14} className="animate-spin" />}
+            <span>{isSaving ? (isEn ? 'Saving...' : 'Đang lưu...') : (isEn ? 'Save configuration' : 'Lưu cấu hình Active learning')}</span>
+          </button>
         </div>
       </div>
     </div>
