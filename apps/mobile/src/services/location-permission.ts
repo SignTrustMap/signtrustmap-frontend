@@ -3,9 +3,9 @@ import { Alert, Linking, Platform } from 'react-native';
 import { getMapLibre } from '@/services/maplibre';
 import { ensureLocationPermission } from '@/feature/navigation/utils/gps';
 
-let initialPermissionRequest: Promise<boolean> | undefined;
+let initialPermissionRequest: Promise<void> | undefined;
 
-export function requestLocationPermissionOnFirstLaunch(): Promise<boolean> {
+export function requestLocationPermissionOnFirstLaunch(): Promise<void> {
   initialPermissionRequest ??= requestInitialLocationPermission();
   return initialPermissionRequest;
 }
@@ -49,7 +49,14 @@ export async function checkAndRequireLocationPermission(): Promise<boolean> {
   }
 }
 
-async function requestInitialLocationPermission(): Promise<boolean> {
-  return checkAndRequireLocationPermission();
+async function requestInitialLocationPermission(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  try {
+    const mapLibre = getMapLibre();
+    if (!mapLibre) return;
+    await mapLibre.LocationManager.requestPermissions();
+  } catch {
+  }
 }
 
