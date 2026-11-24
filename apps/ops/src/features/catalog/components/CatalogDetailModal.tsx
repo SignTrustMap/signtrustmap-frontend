@@ -916,14 +916,11 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                     Chưa có ảnh thực tế nào được lưu
                   </div>
                 ) : (
-                  <div
-                    className="flex items-stretch gap-3 overflow-x-auto scroll-smooth py-1 px-0.5 select-none"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  >
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 py-1 select-none">
                     {supportShots.map((shot, idx) => (
                       <div
                         key={shot.id || idx}
-                        className="group relative w-32 min-w-[128px] rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-md hover:border-gray-300 dark:hover:border-white/25 transition-all shrink-0"
+                        className="group relative w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-black/30 overflow-hidden flex flex-col justify-between shadow-2xs hover:shadow-md hover:border-gray-300 dark:hover:border-white/25 transition-all"
                       >
                         {/* Khung ảnh */}
                         <div
@@ -1004,7 +1001,7 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={handleOpenAddShot}
-                        className="w-32 min-w-[128px] min-h-[160px] rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 hover:border-[#007b8b] dark:hover:border-[#00c4de] bg-gray-50/40 dark:bg-white/[0.01] hover:bg-[#007b8b]/5 dark:hover:bg-[#00c4de]/5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:text-[#007b8b] dark:hover:text-[#00c4de] transition-all cursor-pointer shrink-0"
+                        className="w-full min-h-[160px] rounded-xl border-2 border-dashed border-gray-200 dark:border-white/15 hover:border-[#007b8b] dark:hover:border-[#00c4de] bg-gray-50/40 dark:bg-white/[0.01] hover:bg-[#007b8b]/5 dark:hover:bg-[#00c4de]/5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:text-[#007b8b] dark:hover:text-[#00c4de] transition-all cursor-pointer"
                       >
                         <Plus size={20} weight="bold" />
                         <span className="text-[11px] font-bold">Thêm ảnh</span>
@@ -1155,22 +1152,20 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShotShowUrlInput(false)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      !shotShowUrlInput
-                        ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                    }`}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${!shotShowUrlInput
+                      ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
+                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                      }`}
                   >
                     Tải tệp từ máy
                   </button>
                   <button
                     type="button"
                     onClick={() => setShotShowUrlInput(true)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      shotShowUrlInput
-                        ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
-                        : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                    }`}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${shotShowUrlInput
+                      ? 'bg-white dark:bg-[#007b8b] text-gray-900 dark:text-white shadow-xs'
+                      : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                      }`}
                   >
                     Đường dẫn URL
                   </button>
@@ -1253,11 +1248,10 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShotRole('MEDOID')}
-                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${
-                        shotRole === 'MEDOID'
-                          ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
-                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
-                      }`}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${shotRole === 'MEDOID'
+                        ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
+                        : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                        }`}
                     >
                       <div className="text-xs">Biến thể</div>
                     </button>
@@ -1265,11 +1259,10 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShotRole('ANCHOR')}
-                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${
-                        shotRole === 'ANCHOR'
-                          ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
-                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
-                      }`}
+                      className={`py-2.5 px-3 rounded-xl border text-center transition-all cursor-pointer ${shotRole === 'ANCHOR'
+                        ? 'border-[#007b8b] bg-[#007b8b]/10 text-[#007b8b] dark:border-[#00c4de] dark:bg-[#00c4de]/15 dark:text-[#00c4de] font-bold shadow-2xs'
+                        : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                        }`}
                     >
                       <div className="text-xs">Mẫu chuẩn</div>
                     </button>

@@ -6,8 +6,16 @@ export interface SystemParameterItem {
   key: string
   value: any
   description?: string | null
+  category?: string
+  domain?: string
+  domainLabel?: string
+  dataType?: string
+  range?: string
+  validationRules?: Record<string, any>
+  requiresRestart?: boolean
   updated_at?: string
   updatedAt?: string
+  updatedBy?: string | null
 }
 
 export interface ConsensusConfigItem {
@@ -113,10 +121,14 @@ export const systemService = {
     return http.get<SystemParameterItem>(API_ENDPOINTS.SETTINGS.SYSTEM_PARAMETER_KEY(key))
   },
 
-  upsertParameter: async (key: string, data: { value: any; description?: string }): Promise<SystemParameterItem> => {
+  upsertParameter: async (
+    key: string,
+    data: { value: any; description?: string; changeReason?: string }
+  ): Promise<SystemParameterItem> => {
     const payload = {
       value: typeof data.value === 'string' ? data.value : JSON.stringify(data.value),
       description: data.description,
+      changeReason: data.changeReason?.trim() || 'Cập nhật tham số hệ thống',
     }
     return http.put<SystemParameterItem>(API_ENDPOINTS.SETTINGS.SYSTEM_PARAMETER_KEY(key), payload)
   },

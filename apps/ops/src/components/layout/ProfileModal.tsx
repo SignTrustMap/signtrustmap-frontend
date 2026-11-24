@@ -271,9 +271,6 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   <AvatarImage src={avatarPreview || user.avatar} alt={user.name} />
                   <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
-                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                  <Camera size={18} weight="bold" />
-                </div>
                 <button
                   type="button"
                   onClick={(e) => {
