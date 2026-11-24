@@ -253,6 +253,79 @@ describe('image-file-gps', () => {
       // 106 + 37/60 + 49.5216/3600 ≈ 106.63042
       expect(result?.longitude).toBeCloseTo(106.630, 2);
     });
+
+    it('correctly parses GPSImgDirection heading if present', () => {
+      const TIFF_BASE = 6;
+      const IFD0_OFFSET = 8;
+      const GPS_IFD_OFFSET = 24;
+      const DATA_OFFSET = 90;
+      const latDmsDataOffset = DATA_OFFSET;
+      const lonDmsDataOffset = DATA_OFFSET + 24;
+      const dirDataOffset = DATA_OFFSET + 48;
+      const totalTiff = DATA_OFFSET + 56;
+      const buf = new Uint8Array(TIFF_BASE + totalTiff);
+
+      buf[0] = 0x45; buf[1] = 0x78; buf[2] = 0x69; buf[3] = 0x66; buf[4] = 0; buf[5] = 0;
+
+      buf[TIFF_BASE + 0] = 0x49; buf[TIFF_BASE + 1] = 0x49;
+      w16le(buf, TIFF_BASE + 2, 42);
+      w32le(buf, TIFF_BASE + 4, IFD0_OFFSET);
+
+      w16le(buf, TIFF_BASE + IFD0_OFFSET, 1);
+      w16le(buf, TIFF_BASE + IFD0_OFFSET + 2, 0x8825);
+      w16le(buf, TIFF_BASE + IFD0_OFFSET + 4, 4);
+      w32le(buf, TIFF_BASE + IFD0_OFFSET + 6, 1);
+      w32le(buf, TIFF_BASE + IFD0_OFFSET + 10, GPS_IFD_OFFSET);
+      w32le(buf, TIFF_BASE + IFD0_OFFSET + 14, 0);
+
+      w16le(buf, TIFF_BASE + GPS_IFD_OFFSET, 5);
+
+      const writeGpsEntry = (idx: number, tag: number, type: number, count: number, val: number) => {
+        const base = TIFF_BASE + GPS_IFD_OFFSET + 2 + idx * 12;
+        w16le(buf, base, tag);
+        w16le(buf, base + 2, type);
+        w32le(buf, base + 4, count);
+        w32le(buf, base + 8, val);
+      };
+
+      writeGpsEntry(0, 0x0001, 2, 2, 'N'.charCodeAt(0));
+      writeGpsEntry(1, 0x0002, 5, 3, latDmsDataOffset);
+      writeGpsEntry(2, 0x0003, 2, 2, 'E'.charCodeAt(0));
+      writeGpsEntry(3, 0x0004, 5, 3, lonDmsDataOffset);
+      writeGpsEntry(4, 0x0011, 5, 1, dirDataOffset);
+
+      buf[TIFF_BASE + GPS_IFD_OFFSET + 2 + 0 * 12 + 8] = 'N'.charCodeAt(0);
+      buf[TIFF_BASE + GPS_IFD_OFFSET + 2 + 0 * 12 + 9] = 0;
+      buf[TIFF_BASE + GPS_IFD_OFFSET + 2 + 2 * 12 + 8] = 'E'.charCodeAt(0);
+      buf[TIFF_BASE + GPS_IFD_OFFSET + 2 + 2 * 12 + 9] = 0;
+
+      w32le(buf, TIFF_BASE + GPS_IFD_OFFSET + 2 + 5 * 12, 0);
+
+      w32le(buf, TIFF_BASE + latDmsDataOffset, 10);
+      w32le(buf, TIFF_BASE + latDmsDataOffset + 4, 1);
+      w32le(buf, TIFF_BASE + latDmsDataOffset + 8, 45);
+      w32le(buf, TIFF_BASE + latDmsDataOffset + 12, 1);
+      w32le(buf, TIFF_BASE + latDmsDataOffset + 16, 0);
+      w32le(buf, TIFF_BASE + latDmsDataOffset + 20, 1);
+
+      w32le(buf, TIFF_BASE + lonDmsDataOffset, 106);
+      w32le(buf, TIFF_BASE + lonDmsDataOffset + 4, 1);
+      w32le(buf, TIFF_BASE + lonDmsDataOffset + 8, 37);
+      w32le(buf, TIFF_BASE + lonDmsDataOffset + 12, 1);
+      w32le(buf, TIFF_BASE + lonDmsDataOffset + 16, 0);
+      w32le(buf, TIFF_BASE + lonDmsDataOffset + 20, 1);
+
+      w32le(buf, TIFF_BASE + dirDataOffset, 1805);
+      w32le(buf, TIFF_BASE + dirDataOffset + 4, 10);
+
+      const jpeg = buildJpegWithExif(buf);
+      const result = extractGpsFromJpegBuffer(jpeg);
+
+      expect(result).not.toBeNull();
+      expect(result?.latitude).toBeCloseTo(10.75, 2);
+      expect(result?.longitude).toBeCloseTo(106.616, 2);
+      expect(result?.heading).toBe(180.5);
+    });
   });
 
   describe('extractGpsFromImageFile', () => {

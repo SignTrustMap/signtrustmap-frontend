@@ -327,13 +327,13 @@ describe('SurveyRecordDetailsScreen - Map Zoom Behavior for Video with GPX vs Im
       startLon: 106.7009,
     });
 
-    const { getByLabelText, getByTestId } = await render(<SurveyRecordDetailsScreen />);
+    const { getByLabelText, getByTestId, getAllByTestId } = await render(<SurveyRecordDetailsScreen />);
 
     await waitFor(() => {
       expect(getByLabelText('Phóng to bản đồ xem trước')).toBeTruthy();
       expect(lastMapProps.locationPin).toEqual([106.7009, 10.7769]);
       expect(lastMapProps.showFocusPin).toBe(true);
-      expect(getByTestId('map-preview-location-pin')).toHaveTextContent('106.7009,10.7769');
+      expect(getAllByTestId('map-preview-location-pin')[0]).toHaveTextContent('106.7009,10.7769');
     });
 
     const zoomBtn = getByLabelText('Phóng to bản đồ xem trước');

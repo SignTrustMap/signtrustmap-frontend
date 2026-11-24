@@ -49,6 +49,7 @@ import {
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { ensureCameraPermission } from '@/services/camera-permission';
 import { checkInRevalidationTask, resolveS3Url } from '@/api/revalidation/revalidation';
 import {
   useGetAllRevalidationTasks,
@@ -527,8 +528,8 @@ export function InspectRevalidateScreen() {
   const handleLaunchCamera = async () => {
     setPickerError(undefined);
     try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
+      const hasPermission = await ensureCameraPermission();
+      if (!hasPermission) {
         setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
         return;
       }

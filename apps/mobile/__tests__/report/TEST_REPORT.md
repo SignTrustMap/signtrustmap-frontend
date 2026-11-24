@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-24 06:12:54 UTC  
+> **Generated:** 2026-11-24 10:37:40 UTC  
 > **Overall Status:** ✅ PASSED  
-> **Execution Duration:** 7.94s  
+> **Execution Duration:** 10.76s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,8 +11,8 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 10 | 10 | 0 | 0 | 100.0% |
-| **Tests** | 149 | 149 | 0 | 0 | 100.0% |
+| **Test Suites** | 24 | 24 | 0 | 0 | 100.0% |
+| **Tests** | 274 | 274 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
@@ -229,14 +229,28 @@
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 42 / 42 | 2.75s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 9 / 9 | 2.79s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 2.98s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 3.29s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-sign-details-card.test.tsx` | 22 / 22 | 3.67s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 3.63s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 11 / 11 | 4.33s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 17 / 17 | 4.70s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 10 / 10 | 4.98s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 22 / 22 | 6.00s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-submission-api.test.ts` | 16 / 16 | 2.25s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/image-gps.test.ts` | 15 / 15 | 0.26s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/crop-sync-manager.test.ts` | 15 / 15 | 2.44s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/video-gps.test.ts` | 7 / 7 | 2.45s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/video-file-gps.test.ts` | 22 / 22 | 2.46s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/video-processor.test.ts` | 9 / 9 | 2.48s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-image.test.ts` | 7 / 7 | 2.56s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/video-gpx-detection.test.ts` | 10 / 10 | 0.25s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/selected-asset-gps.test.ts` | 14 / 14 | 0.29s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-record-schema.test.ts` | 9 / 9 | 0.30s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts` | 13 / 13 | 2.85s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/image-file-gps.test.ts` | 11 / 11 | 0.35s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-route-map.test.tsx` | 5 / 5 | 3.47s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/upload-hooks-and-utils.test.ts` | 13 / 13 | 4.12s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/surveyor-work-panel.test.tsx` | 5 / 5 | 3.83s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-submission-details-screen.test.tsx` | 10 / 10 | 5.14s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-history-screen.test.tsx` | 9 / 9 | 4.63s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-scan-modal.test.tsx` | 2 / 2 | 4.77s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/location-picker-modal.test.tsx` | 10 / 10 | 4.96s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/android-gallery-modal.test.tsx` | 10 / 10 | 5.28s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx` | 12 / 12 | 6.01s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/chunk-upload-manager.test.ts` | 10 / 10 | 6.40s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/survey-sign-direction.test.ts` | 9 / 9 | 6.97s | ✅ Pass |
+| `apps/mobile/__tests__/unit/upload/upload-flow.test.tsx` | 31 / 31 | 7.52s | ✅ Pass |
 

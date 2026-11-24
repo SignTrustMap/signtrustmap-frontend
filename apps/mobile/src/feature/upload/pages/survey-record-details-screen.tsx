@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -109,6 +109,31 @@ export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoo
   );
 }
 
+export function formatNoteWithDirection(baseNote: string, dir?: number): string {
+  const trimmed = baseNote.trim();
+  if (dir === undefined || dir === null || isNaN(dir)) {
+    return trimmed.replace(/\n?\[(?:TrafficDirection|Heading|Bearing):\s*[-\d.]+°?\]/gi, '').trim();
+  }
+  const dirTag = `[TrafficDirection: ${dir}°]`;
+  if (/\[(?:TrafficDirection|Heading|Bearing):\s*[-\d.]+°?\]/i.test(trimmed)) {
+    return trimmed.replace(/\[(?:TrafficDirection|Heading|Bearing):\s*[-\d.]+°?\]/i, dirTag);
+  }
+  return trimmed ? `${trimmed}\n${dirTag}` : dirTag;
+}
+
+export function getCardinalDirectionLabel(deg?: number): string {
+  if (deg === undefined || deg === null || isNaN(deg)) return 'Chưa chọn';
+  const normalized = ((deg % 360) + 360) % 360;
+  if (normalized >= 337.5 || normalized < 22.5) return 'Bắc';
+  if (normalized >= 22.5 && normalized < 67.5) return 'Đông Bắc';
+  if (normalized >= 67.5 && normalized < 112.5) return 'Đông';
+  if (normalized >= 112.5 && normalized < 157.5) return 'Đông Nam';
+  if (normalized >= 157.5 && normalized < 202.5) return 'Nam';
+  if (normalized >= 202.5 && normalized < 247.5) return 'Tây Nam';
+  if (normalized >= 247.5 && normalized < 292.5) return 'Tây';
+  return 'Tây Bắc';
+}
+
 async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
   if (Platform.OS === 'web') {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
@@ -200,6 +225,7 @@ export function SurveyRecordDetailsScreen() {
     duration,
     assetId,
     capturedAt: paramCapturedAt,
+    heading: paramHeading,
   } = useLocalSearchParams<{
     submissionId?: string;
     batchSubmissionIds?: string;
@@ -217,6 +243,7 @@ export function SurveyRecordDetailsScreen() {
     duration?: string;
     assetId?: string;
     capturedAt?: string;
+    heading?: string;
   }>();
 
   type LocalBatchAsset = {
@@ -225,7 +252,7 @@ export function SurveyRecordDetailsScreen() {
     mimeType?: string;
     type?: string;
     capturedAt?: string;
-    gps?: { latitude: number; longitude: number } | null;
+    gps?: { latitude: number; longitude: number; heading?: number } | null;
     duration?: number;
     assetId?: string;
   };
@@ -240,6 +267,7 @@ export function SurveyRecordDetailsScreen() {
     if (paramImageUri) {
       const lat = paramLatitude ? Number(paramLatitude) : startLat ? Number(startLat) : undefined;
       const lon = paramLongitude ? Number(paramLongitude) : startLon ? Number(startLon) : undefined;
+      const heading = paramHeading ? Number(paramHeading) : undefined;
       return [
         {
           uri: paramImageUri,
@@ -247,7 +275,10 @@ export function SurveyRecordDetailsScreen() {
           mimeType: paramImageMimeType,
           type: paramImageType,
           capturedAt: paramCapturedAt,
-          gps: lat != null && lon != null ? { latitude: lat, longitude: lon } : null,
+          gps:
+            lat != null && lon != null
+              ? { latitude: lat, longitude: lon, heading }
+              : null,
           duration: duration ? Number(duration) : undefined,
           assetId,
         },
@@ -265,6 +296,7 @@ export function SurveyRecordDetailsScreen() {
     startLat,
     startLon,
     paramCapturedAt,
+    paramHeading,
     duration,
     assetId,
   ]);
@@ -353,6 +385,80 @@ export function SurveyRecordDetailsScreen() {
 
   const [batchNotes, setBatchNotes] = useState<Record<string, string>>({});
   const [batchCapturedAts, setBatchCapturedAts] = useState<Record<string, string>>({});
+
+  // Sign direction (traffic direction) state in degrees [0..359] or undefined if not set.
+  // Default is the heading extracted from photo GPS/EXIF if available; otherwise left undefined (chưa chọn / để trống).
+  const initialDefaultHeading = useMemo<number | undefined>(() => {
+    const assetHeading = parsedAssets[0]?.gps?.heading;
+    if (assetHeading != null && Number.isFinite(assetHeading)) {
+      return Math.round(((assetHeading % 360) + 360) % 360);
+    }
+    if (paramHeading != null && !isNaN(Number(paramHeading)) && paramHeading.trim() !== '') {
+      return Math.round(((Number(paramHeading) % 360) + 360) % 360);
+    }
+    return undefined;
+  }, [parsedAssets, paramHeading]);
+
+  const [batchDirections, setBatchDirections] = useState<Record<string, number | undefined>>(() => {
+    const initial: Record<string, number | undefined> = {};
+    parsedAssets.forEach((asset, idx) => {
+      const id = batchIds[idx] ?? `local-${idx}`;
+      const h = asset.gps?.heading;
+      initial[id] = h != null && Number.isFinite(h) ? Math.round(((h % 360) + 360) % 360) : undefined;
+    });
+    return initial;
+  });
+
+  const [singleSignDirection, setSingleSignDirection] = useState<number | undefined>(initialDefaultHeading);
+
+  // Synchronize directions whenever parsedAssets or paramHeading arrives with heading data
+  useEffect(() => {
+    if (parsedAssets.length > 0) {
+      setBatchDirections((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        parsedAssets.forEach((asset, idx) => {
+          const id = batchIds[idx] ?? `local-${idx}`;
+          const h = asset.gps?.heading;
+          if (h != null && Number.isFinite(h) && next[id] === undefined) {
+            next[id] = Math.round(((h % 360) + 360) % 360);
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+    if (initialDefaultHeading !== undefined) {
+      setSingleSignDirection((prev) => (prev === undefined ? initialDefaultHeading : prev));
+    }
+  }, [parsedAssets, batchIds, initialDefaultHeading]);
+
+  const activeSignDirection = useMemo<number | undefined>(() => {
+    const currentId = batchIds[currentBatchIndex];
+    if (currentId && batchDirections[currentId] !== undefined) {
+      return batchDirections[currentId];
+    }
+    const assetHeading = parsedAssets[currentBatchIndex]?.gps?.heading;
+    if (assetHeading != null && Number.isFinite(assetHeading)) {
+      return Math.round(((assetHeading % 360) + 360) % 360);
+    }
+    return singleSignDirection;
+  }, [batchIds, currentBatchIndex, batchDirections, parsedAssets, singleSignDirection]);
+
+  const setSignDirection = useCallback(
+    (degrees: number | undefined) => {
+      const normalized =
+        degrees !== undefined
+          ? Math.round(((degrees % 360) + 360) % 360)
+          : undefined;
+      const currentId = batchIds[currentBatchIndex];
+      if (currentId) {
+        setBatchDirections((prev) => ({ ...prev, [currentId]: normalized }));
+      }
+      setSingleSignDirection(normalized);
+    },
+    [batchIds, currentBatchIndex],
+  );
 
   useEffect(() => {
     if (!session || batchIds.length <= 1 || !submissionId) return;
@@ -1054,7 +1160,7 @@ export function SurveyRecordDetailsScreen() {
             coordinateSource: 'FILE_GPX',
             latitude: effectiveStart[1],
             longitude: effectiveStart[0],
-            note: note.trim(),
+            note: formatNoteWithDirection(note, activeSignDirection),
           };
           const createRes = await createSubmission({ request: createPayload });
           targetSubmissionId = readSubmissionId(createRes);
@@ -1094,7 +1200,7 @@ export function SurveyRecordDetailsScreen() {
             coordinateSource: 'FILE_GPX',
             latitude: effectiveStart[1],
             longitude: effectiveStart[0],
-            note: note.trim(),
+            note: formatNoteWithDirection(note, activeSignDirection),
           },
         });
         console.log('[Surveyor] Submission metadata updated successfully.');
@@ -1126,6 +1232,7 @@ export function SurveyRecordDetailsScreen() {
                   (asset.gps ? [asset.gps.longitude, asset.gps.latitude] : effectiveStart));
             const itemNote =
               i === currentBatchIndex ? note.trim() : (batchNotes[batchIds[i]] ?? '');
+            const itemDirection = batchDirections[batchIds[i]] ?? activeSignDirection;
             const itemCapturedAt = asset.capturedAt
               ? new Date(asset.capturedAt).toISOString()
               : formattedCapturedAt;
@@ -1136,7 +1243,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: coord[1],
               longitude: coord[0],
-              note: itemNote,
+              note: formatNoteWithDirection(itemNote, itemDirection),
             };
             const createRes = await createSubmission({ request: createPayload });
             const subId = readSubmissionId(createRes);
@@ -1187,7 +1294,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: effectiveStart[1],
               longitude: effectiveStart[0],
-              note: note.trim(),
+              note: formatNoteWithDirection(note, activeSignDirection),
             };
             const createRes = await createSubmission({ request: createPayload });
             targetSubmissionId = readSubmissionId(createRes);
@@ -1199,7 +1306,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: effectiveStart[1],
               longitude: effectiveStart[0],
-              note: note.trim(),
+              note: formatNoteWithDirection(note, activeSignDirection),
             };
             const { submissionType: _submissionType, ...updates } = request;
             await updateSubmission({ submissionId: targetSubmissionId, request: updates });
@@ -1936,6 +2043,183 @@ export function SurveyRecordDetailsScreen() {
             ) : null}
           </View>
 
+          {/* Sign Direction Selector Section (for Image Submissions) */}
+          {isImageSubmission ? (
+            <View style={styles.section}>
+              <View style={styles.directionHeaderRow}>
+                <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
+                  Hướng biển báo
+                </Text>
+                {activeSignDirection !== undefined ? (
+                  <View style={[styles.directionBadge, { backgroundColor: '#E0F2FE' }]}>
+                    <MaterialCommunityIcons name="compass-outline" size={16} color="#0284C7" />
+                    <Text style={styles.directionBadgeText}>
+                      {activeSignDirection}° ({getCardinalDirectionLabel(activeSignDirection)})
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                Hướng luồng giao thông mà biển báo áp dụng (mặc định là hướng phía sau biển báo / chiều xe chạy qua biển).
+              </Text>
+
+              {/* Map Preview with Interactive Direction Indicator */}
+              <View
+                accessibilityLabel={
+                  activeSignDirection !== undefined
+                    ? `Bản đồ chọn hướng biển báo: hiện tại ${activeSignDirection} độ, hướng ${getCardinalDirectionLabel(activeSignDirection)}`
+                    : 'Bản đồ chọn hướng biển báo: chưa chọn hướng'
+                }
+                style={[
+                  styles.mapPlaceholder,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                {effectiveStartCoord ? (
+                  <View style={StyleSheet.absoluteFill}>
+                    <NavigationMapView
+                      focusCoordinate={effectiveStartCoord}
+                      focusRequestId={focusRequestId}
+                      locationPin={effectiveStartCoord}
+                      showFocusPin={true}
+                      showCurrentLocation={false}
+                      isNavigatingFeature={false}
+                    />
+
+                    {/* Direction Indicator Overlay in Center of Map */}
+                    <View pointerEvents="none" style={styles.directionOverlayCenter}>
+                      {activeSignDirection !== undefined ? (
+                        /* Direction pointer pointing along activeSignDirection */
+                        <View
+                          style={[
+                            styles.directionConeContainer,
+                            { transform: [{ rotate: `${activeSignDirection}deg` }] },
+                          ]}
+                        >
+                          <View style={styles.directionBeam} />
+                          <View style={styles.directionArrowHead} />
+                        </View>
+                      ) : null}
+
+                      {/* Center Marker Pin */}
+                      <View style={styles.centerCompassHub}>
+                        <MaterialCommunityIcons name="traffic-light" size={18} color="#FFFFFF" />
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.mapEmptyState}>
+                    <MaterialCommunityIcons name="compass-off" size={28} color={theme.placeholder} />
+                    <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
+                      Chưa có tọa độ GPS để hiển thị bản đồ hướng biển báo.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Angle floating badge on map - only show when a direction is selected */}
+                {activeSignDirection !== undefined ? (
+                  <View style={[styles.floatingAngleBadge, { backgroundColor: 'rgba(15, 23, 42, 0.85)' }]}>
+                    <Text style={styles.floatingAngleText}>
+                      {activeSignDirection}° {getCardinalDirectionLabel(activeSignDirection)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Controls to adjust direction */}
+              <View style={styles.directionControlsContainer}>
+                {/* Quick Cardinal Direction Buttons */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardinalScrollContent}
+                >
+                  {[
+                    { label: 'Bắc (0°)', deg: 0 },
+                    { label: 'ĐB (45°)', deg: 45 },
+                    { label: 'Đông (90°)', deg: 90 },
+                    { label: 'ĐN (135°)', deg: 135 },
+                    { label: 'Nam (180°)', deg: 180 },
+                    { label: 'TN (225°)', deg: 225 },
+                    { label: 'Tây (270°)', deg: 270 },
+                    { label: 'TB (315°)', deg: 315 },
+                  ].map(({ label, deg }) => {
+                    const isSelected =
+                      activeSignDirection !== undefined &&
+                      (Math.abs(activeSignDirection - deg) < 10 || (deg === 0 && activeSignDirection > 350));
+                    return (
+                      <Pressable
+                        key={deg}
+                        accessibilityLabel={`Chọn hướng ${label}`}
+                        onPress={() => {
+                          if (isSelected) {
+                            setSignDirection(undefined);
+                          } else {
+                            setSignDirection(deg);
+                          }
+                        }}
+                        style={[
+                          styles.cardinalChip,
+                          {
+                            backgroundColor: isSelected ? '#0671EB' : theme.backgroundElement,
+                            borderColor: isSelected ? '#0671EB' : theme.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.cardinalChipText,
+                            { color: isSelected ? '#FFFFFF' : theme.text },
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Fine-tuning & Reset row */}
+                <View style={styles.fineTuneRow}>
+                  <Pressable
+                    accessibilityLabel="Quay ngược chiều kim đồng hồ 15 độ"
+                    onPress={() => setSignDirection(((activeSignDirection ?? 0) - 15 + 360) % 360)}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="rotate-left" size={18} color={theme.text} />
+                    <Text style={[styles.stepBtnText, { color: theme.text }]}>-15°</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityLabel="Quay cùng chiều kim đồng hồ 15 độ"
+                    onPress={() => setSignDirection(((activeSignDirection ?? 0) + 15) % 360)}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="rotate-right" size={18} color={theme.text} />
+                    <Text style={[styles.stepBtnText, { color: theme.text }]}>+15°</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityLabel="Đặt lại hướng mặc định"
+                    onPress={() => {
+                      const defaultH =
+                        parsedAssets[currentBatchIndex]?.gps?.heading ?? initialDefaultHeading;
+                      setSignDirection(defaultH);
+                    }}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="restore" size={18} color={theme.textSecondary} />
+                    <Text style={[styles.stepBtnText, { color: theme.textSecondary }]}>Mặc định</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.section}>
             <Controller
               control={control}
@@ -2194,6 +2478,149 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  directionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  directionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  directionBadgeText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  sectionSubtitle: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  directionOverlayCenter: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  directionConeContainer: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  directionBeam: {
+    width: 6,
+    height: 48,
+    backgroundColor: '#0284C7',
+    borderRadius: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  directionArrowHead: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 14,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#0284C7',
+    transform: [{ rotate: '180deg' }],
+    marginTop: -2,
+  },
+  centerCompassHub: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0284C7',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  floatingAngleBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 20,
+  },
+  floatingAngleText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  directionControlsContainer: {
+    marginTop: 10,
+    gap: 8,
+  },
+  cardinalScrollContent: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  cardinalChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardinalChipText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fineTuneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 2,
+  },
+  stepBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  stepBtnText: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    fontWeight: '600',
   },
   coordinateText: {
     fontFamily: Fonts.mono,
