@@ -6,12 +6,18 @@ import type {
   OfflineMapPackDownloadProgress,
   OfflineMapStorageMetadata,
 } from '@/types/navigationType';
+import {
+  OFFLINE_MAPS_SERVICE_UNAVAILABLE_MESSAGE,
+  UNIVERSAL_ERROR_MESSAGE,
+} from '@/constants/message';
 
 export function useOfflineMaps(accessToken?: string) {
   const [availablePacks, setAvailablePacks] = useState<OfflineMapPack[]>([]);
   const [installedPacks, setInstalledPacks] = useState<Record<string, InstalledOfflineMapPack>>({});
   const [activePackId, setActivePackId] = useState<string | null>(null);
-  const [progressMap, setProgressMap] = useState<Record<string, OfflineMapPackDownloadProgress>>({});
+  const [progressMap, setProgressMap] = useState<Record<string, OfflineMapPackDownloadProgress>>(
+    {},
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,8 +40,9 @@ export function useOfflineMaps(accessToken?: string) {
       const packs = await offlineMapService.fetchAvailablePacks(accessToken);
       setAvailablePacks(packs);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải danh sách gói bản đồ ngoại tuyến';
-      setError(msg);
+      const msg =
+        err instanceof Error ? err.message : 'Không thể tải danh sách gói bản đồ ngoại tuyến';
+      setError(OFFLINE_MAPS_SERVICE_UNAVAILABLE_MESSAGE);
     } finally {
       setIsLoading(false);
     }
@@ -70,8 +77,7 @@ export function useOfflineMaps(accessToken?: string) {
       try {
         await offlineMapService.startDownload(pack, accessToken);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Tải gói bản đồ thất bại';
-        setError(msg);
+        setError(OFFLINE_MAPS_SERVICE_UNAVAILABLE_MESSAGE);
       }
     },
     [accessToken],
@@ -93,8 +99,7 @@ export function useOfflineMaps(accessToken?: string) {
     try {
       await offlineMapService.deleteInstalledPack(packId);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Xóa gói bản đồ thất bại';
-      setError(msg);
+      setError(UNIVERSAL_ERROR_MESSAGE);
     }
   }, []);
 
@@ -104,8 +109,7 @@ export function useOfflineMaps(accessToken?: string) {
         const nextPackId = activePackId === packId ? null : packId;
         await offlineMapService.setActiveOfflinePack(nextPackId);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Chuyển đổi trạng thái bản đồ thất bại';
-        setError(msg);
+        setError(UNIVERSAL_ERROR_MESSAGE);
       }
     },
     [activePackId],

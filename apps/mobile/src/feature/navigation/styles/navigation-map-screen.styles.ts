@@ -1286,15 +1286,18 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  returnToReviewerPill: {
-    position: 'absolute',
-    left: Spacing.two,
+  returnToReviewerContainer: {
+    paddingHorizontal: Spacing.four,
+    marginTop: Spacing.one,
+    alignItems: 'flex-start',
     zIndex: 25,
+  },
+  returnToReviewerPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#0F172A',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     shadowColor: '#000',

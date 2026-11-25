@@ -76,7 +76,6 @@ jest.mock('expo-image', () => {
   };
 });
 
-
 jest.mock('@/hooks/use-theme', () => ({
   useTheme: () => ({
     background: '#FFFFFF',
@@ -183,7 +182,9 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
       expect(resolveS3Url(cdnUrl)).toBe('https://s3.signmap.site/stm-sign-crops/crop-legacy.jpg');
 
       const cdnNoBucket = 'https://cdn.signmap.site/crop-legacy.jpg';
-      expect(resolveS3Url(cdnNoBucket)).toBe('https://s3.signmap.site/stm-sign-crops/crop-legacy.jpg');
+      expect(resolveS3Url(cdnNoBucket)).toBe(
+        'https://s3.signmap.site/stm-sign-crops/crop-legacy.jpg',
+      );
     });
   });
 
@@ -204,7 +205,9 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
       // Verify first candidate image received direct S3 url without unwanted conversion
       expect(mockRenderedImageSources).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ uri: 'https://s3.signmap.site/stm-sign-crops/crop-s3-direct.jpg' }),
+          expect.objectContaining({
+            uri: 'https://s3.signmap.site/stm-sign-crops/crop-s3-direct.jpg',
+          }),
         ]),
       );
     });
@@ -218,7 +221,7 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
 
       const { findByText } = await renderReviewFlow();
 
-      const completeMsg = await findByText(/All reviews completed/i);
+      const completeMsg = await findByText(/Hoàn tất thẩm định/i);
       expect(completeMsg).toBeTruthy();
     });
   });
@@ -329,7 +332,10 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
 
       // 2. Type note into report text input
       const noteInput = getByLabelText('Report Note, required');
-      await fireEvent.changeText(noteInput, 'Signs in this submission appear duplicate and spoofed');
+      await fireEvent.changeText(
+        noteInput,
+        'Signs in this submission appear duplicate and spoofed',
+      );
 
       // 3. Confirm Report
       const submitButton = getByText('Submit Report');
@@ -449,4 +455,3 @@ describe('Frontend Review Flow Integration Tests (MSW)', () => {
     });
   });
 });
-

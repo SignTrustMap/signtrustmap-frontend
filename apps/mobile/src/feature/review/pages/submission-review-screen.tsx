@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
@@ -38,6 +38,7 @@ import {
 import { resolveLocation, formatResolvedLocationTitle } from '@/api/spatial/spatial';
 import { useOptionalSession } from '@/context/session-provider';
 import { ReviewInstructionModal } from '@/feature/review/components/review-instruction-modal';
+import { checkAndRequireLocationPermission } from '@/services/location-permission';
 import {
   SubmissionVotedResultCard,
   SubmissionEditingBanner,
@@ -153,11 +154,13 @@ type ReviewBottomSheetProps = {
   reportNote: string;
   selectedRemedySign?: RemedySign;
   type?: ReviewSheet;
+  isSubmitting?: boolean;
 };
 
 function ReviewBottomSheet({
   declineReason,
   declineReasonDetail,
+  isSubmitting = false,
   onChangeDeclineReason,
   onChangeDeclineReasonDetail,
   onChangeReportIssueType,
@@ -178,12 +181,14 @@ function ReviewBottomSheet({
   const isMissingType = reportIssueType === 'missing_type';
   const isReportOther = reportIssueType === 'other';
 
-  const canConfirm = isDecline
-    ? Boolean(
-        selectedRemedySign ||
-        (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim()))),
-      )
-    : isMissingType || !isReportOther || Boolean(reportNote.trim());
+  const canConfirm =
+    !isSubmitting &&
+    (isDecline
+      ? Boolean(
+          selectedRemedySign ||
+          (declineReason && (declineReason !== 'Other' || Boolean(declineReasonDetail?.trim()))),
+        )
+      : isMissingType || !isReportOther || Boolean(reportNote.trim()));
 
   const confirmLabel = isDecline
     ? selectedRemedySign
@@ -596,7 +601,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     cancelSubmissionCheck,
     completeCurrentReview,
     isLoading,
+    isSubmittingReview = false,
     jumpToSubmissionIndex,
+    jumpToSubmissionById,
     keepCurrentReviewAndNext,
     pendingSubmissions,
     recheckingPreviousAction,
@@ -607,6 +614,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   } = useReviewWorkflow();
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+  const handledTargetSubmissionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
@@ -618,13 +626,20 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [resumeIndexParam, jumpToSubmissionIndex]);
 
   useEffect(() => {
-    if (targetSubmissionIdParam && pendingSubmissions.length > 0) {
-      const idx = pendingSubmissions.findIndex((s) => s.id === targetSubmissionIdParam);
-      if (idx !== -1) {
-        jumpToSubmissionIndex?.(idx);
+    if (targetSubmissionIdParam) {
+      if (handledTargetSubmissionIdRef.current !== targetSubmissionIdParam) {
+        handledTargetSubmissionIdRef.current = targetSubmissionIdParam;
+        jumpToSubmissionById?.(targetSubmissionIdParam);
+        router.setParams({ targetSubmissionId: undefined });
       }
+    } else {
+      handledTargetSubmissionIdRef.current = null;
     }
-  }, [targetSubmissionIdParam, pendingSubmissions, jumpToSubmissionIndex]);
+  }, [targetSubmissionIdParam, jumpToSubmissionById, router]);
+
+  useEffect(() => {
+    checkAndRequireLocationPermission().catch(() => {});
+  }, []);
 
   const handleKeepCurrentReview = useCallback(() => {
     const completes = keepCurrentReviewAndNext?.() ?? true;
@@ -647,7 +662,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [toast, setToast] = useState<{
     id: number;
     message: string;
-    tone: 'default' | 'success';
+    tone: 'default' | 'success' | 'danger';
   }>();
 
   const { data: catalog } = useGetCatalog();
@@ -795,6 +810,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       title: submission.title,
       subtitle: displayLocation,
       signId: submission.id,
+      returnPath: '/work/submission-review',
     });
   }, [
     submission,
@@ -881,7 +897,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [catalogSigns, submission]);
 
   const completeReview = useCallback(
-    (
+    async (
       action: ReviewActionType,
       details?: {
         declineReason?: string;
@@ -890,16 +906,25 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         newSignReport?: CreateMissingTypeReportDto;
       },
     ) => {
-      if (!submission) return;
+      if (!submission || isSubmittingReview) return;
 
-      completeCurrentReview(action, details);
+      const success = await completeCurrentReview(action, details);
+
+      if (!success) {
+        setToast((current) => ({
+          id: (current?.id ?? 0) + 1,
+          message: 'Đã xảy ra lỗi, vui lòng thử lại',
+          tone: 'danger',
+        }));
+        return;
+      }
 
       const toastMessages: Record<ReviewActionType, string> = {
         approved: 'Đã phê duyệt biển báo',
         declined: 'Đã từ chối biển báo',
         reported: 'Đã báo cáo biển báo',
-        skipped: 'Đã bỏ qua biển báo (không thể nhận diện)',
-        reported_new_sign: 'Đã báo cáo loại biển mới chờ thẩm định catalog',
+        skipped: 'Đã bỏ qua biển báo',
+        reported_new_sign: 'Đã gửi báo cáo biển mới thành công!',
       };
 
       setToast((current) => ({
@@ -912,7 +937,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         router.replace('/work/reviewer-history');
       }
     },
-    [completeCurrentReview, isRecheckMode, pendingSubmissions.length, router, submission],
+    [completeCurrentReview, isRecheckMode, isSubmittingReview, router, submission],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -962,11 +987,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               reportNote.trim() ||
               'Báo cáo biển báo thực tế chưa có trong danh mục chuẩn QCVN 41:2019',
           },
-        });
-        setToast({
-          id: Date.now(),
-          message: 'Đã gửi báo cáo biển mới thành công!',
-          tone: 'success',
         });
       }
       setReportNote('');
@@ -1047,7 +1067,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           const absDy = Math.abs(dy);
           const SWIPE_THRESHOLD = 85;
 
-          if (isRecheckMode && !isEditingVote) {
+          if ((isRecheckMode && !isEditingVote) || isSubmittingReview) {
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
               friction: 6,
@@ -1113,7 +1133,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           }).start();
         },
       }),
-    [completeReview, pan, isRecheckMode, isEditingVote],
+    [completeReview, pan, isRecheckMode, isEditingVote, isSubmittingReview],
   );
 
   return (
@@ -1397,6 +1417,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Skip submission (cannot identify)"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => completeReview('skipped')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1404,6 +1425,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1434,6 +1456,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Decline submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => setActiveSheet('decline')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1441,6 +1464,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.declineButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1471,12 +1495,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Approve submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => completeReview('approved')}
                         style={({ pressed }) => [
                           styles.diamondButton,
                           isSmallDevice && styles.diamondButtonSmall,
                           styles.approveButton,
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1507,6 +1533,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                       <Pressable
                         accessibilityLabel="Report submission"
                         accessibilityRole="button"
+                        disabled={isSubmittingReview}
                         onPress={() => setActiveSheet('report')}
                         style={({ pressed }) => [
                           styles.diamondButton,
@@ -1514,6 +1541,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                           styles.neutralDiamondButton,
                           { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                           pressed && styles.circleButtonPressed,
+                          isSubmittingReview && { opacity: 0.5 },
                         ]}
                       >
                         <MaterialCommunityIcons
@@ -1544,9 +1572,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
                   style={styles.undoRow}
                 >
                   <MaterialCommunityIcons color={theme.placeholder} name="undo-variant" size={14} />
-                  <Text style={[styles.undoText, { color: theme.placeholder }]}>
-                    Undo last action
-                  </Text>
+                  <Text style={[styles.undoText, { color: theme.placeholder }]}>Hoàn tác</Text>
                 </Pressable>
               ) : (
                 <View style={styles.undoSpacer} />
@@ -1574,10 +1600,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
             <Text
-              accessibilityLabel="All reviews completed"
+              accessibilityLabel="Không còn biển báo nào để thẩm định"
               style={[styles.completeTitle, { color: theme.text }]}
             >
-              All reviews completed
+              Hoàn tất thẩm định
             </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
               Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.
@@ -1662,7 +1688,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           key={toast.id}
           message={toast.message}
           onDismiss={() => setToast(undefined)}
-          placement="center"
+          placement="bottom"
           tone={toast.tone}
         />
       ) : null}
@@ -1671,6 +1697,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
       <ReviewBottomSheet
         declineReason={declineReason}
         declineReasonDetail={declineReasonDetail}
+        isSubmitting={isSubmittingReview}
         onChangeDeclineReason={setDeclineReason}
         onChangeDeclineReasonDetail={setDeclineReasonDetail}
         onChangeReportIssueType={setReportIssueType}
@@ -1766,6 +1793,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: -2,
     marginBottom: 4,
+    paddingLeft: 18,
   },
   locationButtonContent: {
     flexDirection: 'row',

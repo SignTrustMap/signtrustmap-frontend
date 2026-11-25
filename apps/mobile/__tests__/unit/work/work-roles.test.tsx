@@ -370,7 +370,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       const { getByText } = await render(<SurveyorWork />);
 
       expect(getByText('Nhiệm vụ và tiện ích')).toBeTruthy();
-      expect(getByText('Lịch sử vote')).toBeTruthy();
+      expect(getByText('Lịch sử xác nhận')).toBeTruthy();
       expect(getByText('5')).toBeTruthy();
       expect(getByText('Tái xác nhận biển báo')).toBeTruthy();
       expect(getByText('8')).toBeTruthy();
@@ -387,7 +387,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     it('navigates to survey-history when pressing vote history badge', async () => {
       const { getByText } = await render(<SurveyorWork />);
 
-      fireEvent.press(getByText('Lịch sử vote'));
+      fireEvent.press(getByText('Lịch sử xác nhận'));
       expect(mockPush).toHaveBeenCalledWith('/work/survey-history');
     });
 
@@ -500,7 +500,7 @@ describe('Work Roles & Component Architecture Test Suite', () => {
 
       await waitFor(() => {
         expect(getByTestId('work-screen-title').props.children).toBe('Khảo sát');
-        expect(getByText('Lịch sử vote')).toBeTruthy();
+        expect(getByText('Lịch sử xác nhận')).toBeTruthy();
         expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
         expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
       });

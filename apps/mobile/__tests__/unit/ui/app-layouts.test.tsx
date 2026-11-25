@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, act } from '@testing-library/react-native';
+import { AppState } from 'react-native';
+import { render, act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,8 +58,22 @@ jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(),
 }));
 
+jest.mock('@/constants/const', () => ({
+  MINIMUM_SPLASH_DURATION_MS: 10,
+  SPLASH_PROGRESS_DURATION_MS: 10,
+  EXIT_ANIMATION_DURATION_MS: 10,
+  NAVIGATION_COMPLETE_MODAL_AUTO_DISMISS_MS: 10,
+}));
+
+const mockCheckMandatoryGpsStatus = jest
+  .fn()
+  .mockResolvedValue({ status: 'granted', reason: null });
+const mockOpenLocationSettings = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('@/services/location-permission', () => ({
-  requestLocationPermissionOnFirstLaunch: jest.fn().mockResolvedValue(true),
+  requestLocationPermissionOnFirstLaunch: jest.fn().mockResolvedValue(undefined),
+  checkMandatoryGpsStatus: (...args: any[]) => mockCheckMandatoryGpsStatus(...args),
+  openLocationSettings: (...args: any[]) => mockOpenLocationSettings(...args),
 }));
 
 jest.mock('@/feature/upload/utils/crop-sync-manager', () => ({
@@ -73,9 +88,20 @@ jest.mock('@/api/saved-routes/saved-routes', () => ({
 }));
 
 jest.mock('@/feature/splash/pages/splash-screen', () => {
-  const { View } = require('react-native');
+  const { Pressable, Text, View } = require('react-native');
   return {
-    AppSplashScreen: () => <View testID="app-splash-screen" />,
+    AppSplashScreen: ({ gpsStatus, gpsDenialReason, onRetryGps, onOpenSettings }: any) => (
+      <View testID="app-splash-screen">
+        <Text testID="splash-gps-status">{gpsStatus ?? 'checking'}</Text>
+        <Text testID="splash-gps-reason">{gpsDenialReason ?? 'none'}</Text>
+        {gpsStatus === 'denied' ? (
+          <View>
+            <Pressable testID="mock-splash-retry" onPress={onRetryGps} />
+            <Pressable testID="mock-splash-settings" onPress={onOpenSettings} />
+          </View>
+        ) : null}
+      </View>
+    ),
   };
 });
 
@@ -127,9 +153,77 @@ describe('App Layouts & Navigation Roots', () => {
   });
 
   describe('Root TabLayout (_layout.tsx)', () => {
-    it('renders root TabLayout successfully', async () => {
-      const { getByTestId } = await render(<TabLayout />);
-      expect(getByTestId('stack')).toBeTruthy();
+    beforeEach(() => {
+      mockCheckMandatoryGpsStatus.mockResolvedValue({ status: 'granted', reason: null });
+    });
+
+    it('renders root TabLayout successfully and hides splash once timer elapsed and GPS granted', async () => {
+      await render(<TabLayout />);
+      expect(screen.getByTestId('stack')).toBeTruthy();
+      expect(mockCheckMandatoryGpsStatus).toHaveBeenCalledWith({ promptPermission: true });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+    });
+
+    it('keeps splash screen visible with GPS prompt when device GPS is turned off, and hides after retry enables it', async () => {
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'denied', reason: 'service' });
+
+      await render(<TabLayout />);
+
+      await waitFor(() => {
+        expect(screen.getByText('denied')).toBeTruthy();
+        expect(screen.getByText('service')).toBeTruthy();
+      });
+
+      // Wait longer than SPLASH_PROGRESS_DURATION_MS (10ms) to confirm splash still blocks
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+      expect(screen.getByTestId('app-splash-screen')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('mock-splash-settings'));
+      expect(mockOpenLocationSettings).toHaveBeenCalledWith('service');
+
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'granted', reason: null });
+      await fireEvent.press(screen.getByTestId('mock-splash-retry'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+    });
+
+    it('dismisses splash screen when returning from Settings with GPS enabled', async () => {
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'denied', reason: 'permission' });
+      let appStateListener: ((state: any) => void) | undefined;
+      const removeMock = jest.fn();
+      const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, cb) => {
+        appStateListener = cb;
+        return { remove: removeMock } as any;
+      });
+
+      await render(<TabLayout />);
+
+      await waitFor(() => {
+        expect(screen.getByText('denied')).toBeTruthy();
+      });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'granted', reason: null });
+      await act(async () => {
+        appStateListener?.('active');
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+      expect(mockCheckMandatoryGpsStatus).toHaveBeenLastCalledWith({ promptPermission: false });
+      expect(removeMock).toHaveBeenCalled();
+      spy.mockRestore();
     });
   });
 

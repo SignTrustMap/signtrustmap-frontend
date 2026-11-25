@@ -8,7 +8,9 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -28,9 +30,11 @@ import {
   VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
-import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
+import { extractImageGpsCoordinates, type ImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { captureTimeFromExif } from '@/feature/upload/utils/selected-asset-gps';
+import { ensureCameraPermission } from '@/services/camera-permission';
 import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
 import {
@@ -161,11 +165,14 @@ export function AndroidGalleryModal({
   const handleLaunchCamera = async () => {
     if (isProcessing) return;
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (permission.status !== 'granted') {
+      const hasPermission = await ensureCameraPermission();
+      if (!hasPermission) {
         setError('Ứng dụng cần quyền camera để chụp ảnh.');
         return;
       }
+
+      // Fetch device live location concurrently so that if camera EXIF lacks GPS/heading, device GPS can be attached
+      const freshGpsPromise = fetchFreshGpsLocation(5000);
 
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
@@ -178,6 +185,8 @@ export function AndroidGalleryModal({
       }
 
       const captured = result.assets[0];
+      const freshGps = await freshGpsPromise;
+
       let newAsset: MediaLibraryAsset | null = null;
       try {
         newAsset = await LegacyMediaLibrary.createAssetAsync(captured.uri);
@@ -187,6 +196,20 @@ export function AndroidGalleryModal({
 
       const assetId = newAsset?.id || `camera-${Date.now()}`;
       const exifCoords = extractImageGpsCoordinates(captured.exif as Record<string, unknown> | undefined);
+
+      const effectiveCoords: ImageGpsCoordinates | undefined = exifCoords
+        ? {
+            ...exifCoords,
+            heading: exifCoords.heading ?? freshGps?.heading,
+          }
+        : freshGps
+          ? {
+              latitude: freshGps.latitude,
+              longitude: freshGps.longitude,
+              accuracy: freshGps.accuracy,
+              heading: freshGps.heading,
+            }
+          : undefined;
 
       const cameraAsset: MediaLibraryAsset = newAsset ?? {
         id: assetId,
@@ -200,8 +223,8 @@ export function AndroidGalleryModal({
         height: captured.height,
       };
 
-      if (exifCoords) {
-        (cameraAsset as any).location = exifCoords;
+      if (effectiveCoords) {
+        (cameraAsset as any).location = effectiveCoords;
       }
 
       setAssets((current) => [cameraAsset, ...current]);
@@ -298,20 +321,59 @@ export function AndroidGalleryModal({
 
           const exif = assetInfo?.exif as Record<string, unknown> | undefined;
           const exifCoordinates = extractImageGpsCoordinates(exif);
-          let gpsCoordinates = isValidGpsCoordinates(assetInfo?.location)
+
+          const locObj = assetInfo?.location ?? (asset as any)?.location;
+          let candidateHeading: number | undefined =
+            typeof locObj?.heading === 'number' && Number.isFinite(locObj.heading)
+              ? locObj.heading
+              : typeof locObj?.bearing === 'number' && Number.isFinite(locObj.bearing)
+                ? locObj.bearing
+                : typeof locObj?.direction === 'number' && Number.isFinite(locObj.direction)
+                  ? locObj.direction
+                  : typeof locObj?.course === 'number' && Number.isFinite(locObj.course)
+                    ? locObj.course
+                    : typeof locObj?.track === 'number' && Number.isFinite(locObj.track)
+                      ? locObj.track
+                      : typeof locObj?.azimuth === 'number' && Number.isFinite(locObj.azimuth)
+                        ? locObj.azimuth
+                        : typeof assetInfo?.heading === 'number' && Number.isFinite(assetInfo.heading)
+                          ? assetInfo.heading
+                          : typeof (asset as any)?.heading === 'number' && Number.isFinite((asset as any).heading)
+                            ? (asset as any).heading
+                            : exifCoordinates?.heading;
+
+          let gpsCoordinates: ImageGpsCoordinates | null = isValidGpsCoordinates(assetInfo?.location)
             ? {
-              latitude: assetInfo.location.latitude,
-              longitude: assetInfo.location.longitude,
-            }
+                latitude: assetInfo.location.latitude,
+                longitude: assetInfo.location.longitude,
+                ...(candidateHeading !== undefined ? { heading: candidateHeading } : {}),
+              }
             : exifCoordinates;
 
-          if (!gpsCoordinates && assetType === 'image' && targetUri) {
-            try {
-              const fileGps = await extractGpsFromImageFile(targetUri);
-              if (fileGps) {
-                gpsCoordinates = fileGps;
+          if (assetType === 'image' && targetUri) {
+            if (!gpsCoordinates || gpsCoordinates.heading === undefined) {
+              try {
+                const fileGps = await extractGpsFromImageFile(targetUri);
+                if (fileGps) {
+                  gpsCoordinates = gpsCoordinates
+                    ? {
+                        ...gpsCoordinates,
+                        heading: gpsCoordinates.heading ?? fileGps.heading,
+                      }
+                    : fileGps;
+                }
+              } catch { }
+            }
+          }
+
+          if (gpsCoordinates && gpsCoordinates.heading === undefined && asset.filename) {
+            const match = asset.filename.match(/(?:heading|bearing|direction|dir|track|yaw)[_-]?([-\d.]+)(?:deg)?/i);
+            if (match && match[1]) {
+              const num = Number(match[1]);
+              if (Number.isFinite(num)) {
+                gpsCoordinates.heading = ((num % 360) + 360) % 360;
               }
-            } catch { }
+            }
           }
 
           const capturedTimestamp =

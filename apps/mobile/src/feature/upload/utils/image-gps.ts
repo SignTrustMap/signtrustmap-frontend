@@ -17,14 +17,24 @@ function parseRational(value: string) {
   return numerator / denominator;
 }
 
-function parseScalar(value: unknown) {
+function parseScalar(value: unknown): number | undefined {
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (Array.isArray(value)) {
+    if (value.length === 2 && typeof value[0] === 'number' && typeof value[1] === 'number' && value[1] !== 0) {
+      return value[0] / value[1];
+    }
+    if (value.length > 0) return parseScalar(value[0]);
+  }
   if (typeof value !== 'string') return undefined;
 
   const normalized = value.trim();
-  const decimal = Number(normalized);
+  const direct = Number(normalized);
+  if (Number.isFinite(direct)) return direct;
 
-  return Number.isFinite(decimal) ? decimal : parseRational(normalized);
+  const cleaned = normalized.replace(/[^\d./+-]/g, '');
+  const decimal = Number(cleaned);
+
+  return Number.isFinite(decimal) ? decimal : parseRational(cleaned);
 }
 
 function parseCoordinatePart(value: unknown): number | undefined {
@@ -69,11 +79,77 @@ function parseCoordinatePart(value: unknown): number | undefined {
   return undefined;
 }
 
+function normalizeExifKey(k: string): string {
+  return k.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function findExifValue(exif: ExifRecord, keys: string[]) {
-  const normalizedKeys = new Set(keys.map((key) => key.toLowerCase()));
-  const entry = Object.entries(exif).find(([key]) => normalizedKeys.has(key.toLowerCase()));
+  const normalizedTargets = new Set(keys.map(normalizeExifKey));
+  const entry = Object.entries(exif).find(([key]) => normalizedTargets.has(normalizeExifKey(key)));
 
   return entry?.[1];
+}
+
+const HEADING_KEYS = [
+  'GPSImgDirection',
+  'ImgDirection',
+  'imgDirection',
+  'GPSTrack',
+  'GpsTrack',
+  'Track',
+  'track',
+  'GPSDestBearing',
+  'DestBearing',
+  'destBearing',
+  'GPSBearing',
+  'Bearing',
+  'bearing',
+  'GPSHeading',
+  'Heading',
+  'heading',
+  'GPSDirection',
+  'Direction',
+  'direction',
+  'GPSCourse',
+  'Course',
+  'course',
+  'GPSAzimuth',
+  'Azimuth',
+  'azimuth',
+  'Compass',
+  'compass',
+  'CompassBearing',
+  'compassBearing',
+  'PoseHeadingDegrees',
+  'poseHeadingDegrees',
+  'FlightYawDegree',
+  'flightYawDegree',
+  'Yaw',
+  'yaw',
+  'CameraHeading',
+  'cameraHeading',
+  'DeviceHeading',
+  'deviceHeading',
+  'TrueHeading',
+  'MagneticHeading',
+  'Rotation',
+];
+
+function extractHeadingFromComments(exif: ExifRecord): number | undefined {
+  const commentFields = ['UserComment', 'ImageDescription', 'Description', 'XPComment', 'Comments'];
+  for (const field of commentFields) {
+    const val = findExifValue(exif, [field]);
+    if (typeof val === 'string' && val.length > 0) {
+      const match = val.match(/(?:heading|bearing|direction|dir|track|azimuth|yaw)[:= ]\s*([-\d.]+)/i);
+      if (match && match[1]) {
+        const num = Number(match[1]);
+        if (Number.isFinite(num)) {
+          return ((num % 360) + 360) % 360;
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 function getGpsRecord(exif: ExifRecord) {
@@ -135,16 +211,25 @@ export function extractImageGpsCoordinates(exif: ExifRecord | null | undefined) 
     findExifValue(exif, ['GPSHPositioningError', 'hPositioningError', 'accuracy']) ??
     (gpsRecord ? findExifValue(gpsRecord, ['GPSHPositioningError', 'HPositioningError', 'accuracy']) : undefined);
   const headingValue =
-    findExifValue(exif, ['GPSImgDirection', 'imgDirection', 'GPSDestBearing', 'heading']) ??
-    (gpsRecord ? findExifValue(gpsRecord, ['GPSImgDirection', 'ImgDirection', 'heading']) : undefined);
+    findExifValue(exif, HEADING_KEYS) ??
+    (gpsRecord ? findExifValue(gpsRecord, HEADING_KEYS) : undefined);
 
   const accuracy = parseScalar(accuracyValue);
-  const heading = parseScalar(headingValue);
+  let heading = parseScalar(headingValue);
+
+  if (heading === undefined) {
+    heading = extractHeadingFromComments(exif) ?? (gpsRecord ? extractHeadingFromComments(gpsRecord) : undefined);
+  }
+
+  let normalizedHeading: number | undefined;
+  if (typeof heading === 'number' && Number.isFinite(heading)) {
+    normalizedHeading = ((heading % 360) + 360) % 360;
+  }
 
   return {
     latitude,
     longitude,
     ...(typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0 ? { accuracy } : {}),
-    ...(typeof heading === 'number' && Number.isFinite(heading) && heading >= 0 && heading <= 360 ? { heading } : {}),
+    ...(normalizedHeading !== undefined ? { heading: Math.round(normalizedHeading * 100) / 100 } : {}),
   } satisfies ImageGpsCoordinates;
 }

@@ -21,6 +21,7 @@ import type {
   RevalDecision,
   RevalidationQueueEvidenceItem,
 } from '@/types/revalidationType';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
 export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
 
@@ -47,6 +48,8 @@ export type RevalidationWorkflowContextValue = {
   handleSkip: () => boolean;
   isCheckingEvidence: boolean;
   isLoading: boolean;
+  isSubmittingVote?: boolean;
+  jumpToEvidenceById?: (targetId: string) => void;
   keepCurrentEvidenceAndNext?: () => boolean;
   nextItem?: RevalidationQueueEvidenceItem;
   progressPercent: number;
@@ -93,6 +96,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const [isCheckingEvidence, setIsCheckingEvidence] = useState(false);
   const [recheckingIndex, setRecheckingIndex] = useState<number | undefined>(undefined);
   const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<CompletedRevalidationReview | undefined>(undefined);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+  const inFlightVotesRef = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef(false);
 
   // Sync with incoming queue response initially
@@ -137,37 +142,28 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     ): Promise<boolean> => {
       if (!currentItem) return false;
 
+      // Concurrency guard: avoid duplicate vote calls for the same evidence
+      if (inFlightVotesRef.current.has(currentItem.evidenceId)) {
+        console.warn('[RevalidationWorkflow] Blocked duplicate vote in flight for:', currentItem.evidenceId);
+        return false;
+      }
+      inFlightVotesRef.current.add(currentItem.evidenceId);
+      setIsSubmittingVote(true);
+
       const itemToVote = currentItem;
       const completesQueue = queueItems.length <= 1;
 
-      // 1. Advance queue state
-      setQueueItems((prev) => prev.slice(1));
-      setReviewHistory((prev) => {
-        const next = [...prev];
-        const newReview: CompletedRevalidationReview = {
-          item: itemToVote,
-          action,
-          note,
-          suggestedSignTypeId,
-          userVerdict,
-        };
-        next.push(newReview);
-        return next;
-      });
-
-      if (completesQueue) {
-        setIsCheckingEvidence(false);
-        setRecheckingIndex(undefined);
-        setRecheckingPreviousReview(undefined);
-      } else {
-        const nextItem = queueItems[1];
-        setRecheckingPreviousReview(
-          (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-            ?.previousReview,
-        );
+      // Include GPS data if available, omit if GPS is disabled or unavailable
+      let gpsCoords: { latitude: number; longitude: number } | null = null;
+      try {
+        const freshLoc = await fetchFreshGpsLocation(2500);
+        if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
+        }
+      } catch (e) {
+        console.warn('[RevalidationWorkflow] Could not obtain GPS coordinates:', e);
       }
 
-      // 2. Dispatch vote API
       const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
         STILL_ACTIVE: 'STILL_ACTIVE',
         REMOVED: 'REMOVED',
@@ -184,13 +180,45 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
             note: note?.trim() || undefined,
             suggestedSignTypeId:
               action === 'CHANGED' && suggestedSignTypeId ? suggestedSignTypeId : undefined,
+            ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
+
+        // Only on successful API execution: advance queue state
+        setQueueItems((prev) => prev.slice(1));
+        setReviewHistory((prev) => {
+          const next = [...prev];
+          const newReview: CompletedRevalidationReview = {
+            item: itemToVote,
+            action,
+            note,
+            suggestedSignTypeId,
+            userVerdict,
+          };
+          next.push(newReview);
+          return next;
+        });
+
+        if (completesQueue) {
+          setIsCheckingEvidence(false);
+          setRecheckingIndex(undefined);
+          setRecheckingPreviousReview(undefined);
+        } else {
+          const nextItem = queueItems[1];
+          setRecheckingPreviousReview(
+            (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
+              ?.previousReview,
+          );
+        }
+
+        return completesQueue;
       } catch (err) {
         console.warn('[RevalidationWorkflow] vote mutation error:', err);
+        throw err;
+      } finally {
+        inFlightVotesRef.current.delete(itemToVote.evidenceId);
+        setIsSubmittingVote(false);
       }
-
-      return completesQueue;
     },
     [currentItem, queueItems, voteMutation],
   );
@@ -260,6 +288,39 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     [reviewHistory],
   );
 
+  const jumpToEvidenceById = useCallback(
+    (targetId: string) => {
+      if (!targetId) return;
+
+      // 1. If already the current item, do nothing
+      if (queueItems[0]?.evidenceId === targetId || queueItems[0]?.taskId === targetId) return;
+
+      // 2. If present in remaining queue items, bring it to the front
+      const queueIdx = queueItems.findIndex(
+        (it) => it.evidenceId === targetId || it.taskId === targetId,
+      );
+      if (queueIdx > 0) {
+        setQueueItems((prev) => {
+          const target = prev[queueIdx];
+          return [target, ...prev.slice(0, queueIdx), ...prev.slice(queueIdx + 1)];
+        });
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+        return;
+      }
+
+      // 3. If present in reviewHistory, start rechecking that history item
+      const historyIdx = reviewHistory.findIndex(
+        (h) => h.item.evidenceId === targetId || h.item.taskId === targetId,
+      );
+      if (historyIdx !== -1) {
+        beginEvidenceCheck(historyIdx);
+      }
+    },
+    [queueItems, reviewHistory, beginEvidenceCheck],
+  );
+
   const keepCurrentEvidenceAndNext = useCallback((): boolean => {
     if (!currentItem) return true;
 
@@ -309,6 +370,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [recheckingPreviousReview, recheckingIndex]);
 
   const finishReviews = useCallback((): number => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     const count = reviewHistory.length;
     void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
     void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
@@ -326,6 +389,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [invalidateWalletAndStats, queryClient, reviewHistory.length]);
 
   const resetWorkflow = useCallback(() => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     setReviewHistory([]);
     setQueueItems([]);
     setIsCheckingEvidence(false);
@@ -354,6 +419,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -376,6 +443,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -407,6 +476,8 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   handleSkip: () => false,
   isCheckingEvidence: false,
   isLoading: false,
+  isSubmittingVote: false,
+  jumpToEvidenceById: () => {},
   keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,

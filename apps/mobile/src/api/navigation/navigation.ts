@@ -34,6 +34,8 @@ export type RouteSign = {
     id: string;
     imageUrl: string;
     actualCropUrl?: string;
+    actualFrameUrl?: string;
+    actualFrameURl?: string;
     frameUrl?: string;
     name: string;
     nameVi?: string;

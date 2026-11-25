@@ -12,10 +12,12 @@ import * as FileSystem from 'expo-file-system/legacy';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import type {
+  CheckInEligibilityDto,
   EvidenceVoteDto,
   EvidenceVoteResponse,
   FindTasksInBoundsParams,
   GetRevalidationTasksParams,
+  RevalidationCheckInResponse,
   RevalidationDecisionItem,
   RevalidationEvidenceDetailItem,
   RevalidationEvidenceQueueResponse,
@@ -24,18 +26,28 @@ import type {
   RevalidationTaskDetail,
   RevalidationTaskItem,
   RevalidationTasksInBoundsResponse,
+  RequestEvidenceRecaptureDto,
+  RequestEvidenceRecaptureResponse,
+  SignHistoryResponse,
   SubmitRevalidationEvidenceDto,
   SubmitRevalidationEvidenceResponse,
   TaskPriority,
   TaskStatus,
 } from '@/types/revalidationType';
 
+export { getSignHistory } from '@/api/sign-map/sign-map';
+
 export type {
+  CheckInEligibilityDto,
   GetRevalidationTasksParams,
+  RevalidationCheckInResponse,
   RevalidationDecisionItem,
   RevalidationEvidenceDetailItem,
   RevalidationEvidenceType,
   RevalidationTaskDetail,
+  RequestEvidenceRecaptureDto,
+  RequestEvidenceRecaptureResponse,
+  SignHistoryResponse,
   SubmitRevalidationEvidenceDto,
   SubmitRevalidationEvidenceResponse,
 };
@@ -147,7 +159,7 @@ export function toRevalidationTaskItem(
     lastVerifiedDate: raw.created_at || raw.createdAt,
     currentTrustScore: raw.freshness_score ?? raw.freshnessScore ?? 75,
     reason: raw.reason || 'Sign exceeds staleness threshold and requires on-site re-evaluation.',
-    rewardCredits: raw.reward_credits ?? raw.rewardCredits ?? 30,
+    rewardCredits: raw.reward_credits ?? raw.rewardCredits ?? (raw as any).bounty ?? 30,
   };
 }
 
@@ -599,7 +611,7 @@ export async function submitRevalidationEvidence(
               ? (body as any).message.join(', ')
               : String((body as any).message)
             : `Tải minh chứng lên thất bại với mã trạng thái ${result.status}`;
-        throw new ApiError(message, result.status);
+        throw new ApiError(message, result.status, body);
       } catch (uploadAsyncErr: any) {
         if (uploadAsyncErr instanceof ApiError) {
           throw uploadAsyncErr;
@@ -913,3 +925,114 @@ export async function getEvidenceDecisions(
     return [];
   }
 }
+
+/**
+ * Checks in on-site GPS location before capturing live evidence (POST /api/v1/revalidation/tasks/:taskId/check-in).
+ * Validates proximity (< 50m) and 24-hour daily task submission limits.
+ */
+export async function checkInRevalidationTask(
+  taskId: string,
+  dto: CheckInEligibilityDto,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationCheckInResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest<RevalidationCheckInResponse>(
+    `/revalidation/tasks/${encodeURIComponent(taskId)}/check-in`,
+    {
+      method: 'POST',
+      body: JSON.stringify(dto),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal,
+    },
+    token,
+  );
+}
+
+/**
+ * Polls GPS eligibility for a task via GET /api/v1/revalidation/tasks/:taskId/check-in?lat=&lon=&accuracyMeters=
+ */
+export async function getCheckInEligibility(
+  taskId: string,
+  lat: number,
+  lon: number,
+  accuracyMeters?: number,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RevalidationCheckInResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+  });
+  if (accuracyMeters != null) params.append('accuracyMeters', String(accuracyMeters));
+
+  return apiRequest<RevalidationCheckInResponse>(
+    `/revalidation/tasks/${encodeURIComponent(taskId)}/check-in?${params.toString()}`,
+    { signal },
+    token,
+  );
+}
+
+/**
+ * Request surveyor to recapture evidence photo due to blurriness or obstruction.
+ * POST /api/v1/revalidation/evidence/:evidenceId/request-recapture
+ */
+export async function requestEvidenceRecapture(
+  evidenceId: string,
+  dto: RequestEvidenceRecaptureDto,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<RequestEvidenceRecaptureResponse> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest<RequestEvidenceRecaptureResponse>(
+    `/revalidation/evidence/${encodeURIComponent(evidenceId)}/request-recapture`,
+    {
+      method: 'POST',
+      body: JSON.stringify(dto),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal,
+    },
+    token,
+  );
+}
+
+/**
+ * Trigger AI early classification on task evidence photo.
+ * POST /api/v1/revalidation/tasks/:taskId/early-classify
+ */
+export async function earlyClassifyRevalidationTask(
+  taskId: string,
+  mediaUrl?: string,
+  signal?: AbortSignal,
+  accessToken?: string,
+): Promise<{
+  success: boolean;
+  earlyClassification?: {
+    className?: string;
+    standardCode?: string;
+    confidence?: number;
+    boundingBox?: any;
+    trafficSignTypeId?: number;
+  };
+  resolvedSignTypeId?: number | null;
+}> {
+  const token = accessToken ?? (await getStoredAccessToken());
+  return apiRequest(
+    `/revalidation/tasks/${encodeURIComponent(taskId)}/early-classify`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ mediaUrl }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal,
+    },
+    token,
+  );
+}
+

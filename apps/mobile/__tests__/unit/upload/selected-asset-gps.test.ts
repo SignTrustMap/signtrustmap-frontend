@@ -167,7 +167,7 @@ describe('selected-asset-gps', () => {
         status: 'granted',
       });
       (LegacyMediaLibrary.getAssetInfoAsync as jest.Mock).mockResolvedValue({
-        location: { latitude: 10.8231, longitude: 106.6297 },
+        location: { latitude: 10.8231, longitude: 106.6297, heading: 90 },
       });
 
       const result = await extractSelectedAssetGps({
@@ -176,7 +176,30 @@ describe('selected-asset-gps', () => {
         type: 'image',
       } as any);
 
-      expect(result).toEqual({ latitude: 10.8231, longitude: 106.6297 });
+      expect(result).toEqual({ latitude: 10.8231, longitude: 106.6297, heading: 90 });
+    });
+
+    it('recovers heading from extractGpsFromImageFile when MediaLibrary location lacks heading', async () => {
+      (extractImageGpsCoordinates as jest.Mock).mockReturnValue(null);
+      (MediaLibrary.requestPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+      (LegacyMediaLibrary.getAssetInfoAsync as jest.Mock).mockResolvedValue({
+        location: { latitude: 10.8231, longitude: 106.6297 },
+      });
+      (extractGpsFromImageFile as jest.Mock).mockResolvedValue({
+        latitude: 10.8231,
+        longitude: 106.6297,
+        heading: 270,
+      });
+
+      const result = await extractSelectedAssetGps({
+        uri: 'file:///image.jpg',
+        assetId: '12345',
+        type: 'image',
+      } as any);
+
+      expect(result).toEqual({ latitude: 10.8231, longitude: 106.6297, heading: 270 });
     });
 
     it('falls back to extractGpsFromImageFile when MediaLibrary has no location', async () => {

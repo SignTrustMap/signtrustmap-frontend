@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -30,12 +30,15 @@ import { formatDate } from '@/utils/format-date';
 import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
 import {
   useGetRevalidationEvidenceQueue,
+  useRequestEvidenceRecapture,
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
+import { useSession } from '@/context/session-provider';
 import { extractCoordinateFromCandidate, resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
+import { checkAndRequireLocationPermission } from '@/services/location-permission';
 import {
   RevalidationDecisionBadge,
   RevalidationSwipeBadges,
@@ -58,7 +61,7 @@ export type RevalidationReviewAction =
   | 'UNCLEAR'
   | 'INVALID';
 
-type SheetType = 'decline' | 'report';
+type SheetType = 'decline' | 'report' | 'recapture';
 
 export const revalActionDetails: Record<
   RevalidationReviewAction,
@@ -240,6 +243,7 @@ type RevalidationBottomSheetProps = {
   onClose: () => void;
   onConfirmDecline: (decision: string, note?: string, suggestedSignTypeId?: number) => void;
   onConfirmReport: (reason: string, note?: string) => void;
+  onConfirmRecapture?: (reason: string, note?: string) => void;
 };
 
 const DECLINE_COUNTER_CHOICES: Array<{
@@ -279,6 +283,33 @@ const REPORT_ISSUE_CHOICES = [
   'Vi phạm quy tắc / Ảnh không hợp lệ',
 ];
 
+const RECAPTURE_REASONS: Array<{
+  id: string;
+  label: string;
+  desc: string;
+}> = [
+  {
+    id: 'BLURRY',
+    label: 'Ảnh bị mờ / Lóa sáng / Mất nét',
+    desc: 'Không nhìn rõ được biểu tượng hoặc chữ trên biển báo.',
+  },
+  {
+    id: 'OBSTRUCTED',
+    label: 'Biển báo bị che khuất',
+    desc: 'Cây cối, công trình hoặc phương tiện che khuất biển.',
+  },
+  {
+    id: 'WRONG_SIGN',
+    label: 'Chụp sai biển báo hoặc góc quá xa',
+    desc: 'Khoảng cách chụp quá xa hoặc không đúng đối tượng mục tiêu.',
+  },
+  {
+    id: 'OTHER',
+    label: 'Lý do khác',
+    desc: 'Cần chụp lại với góc nhìn trực diện và rõ ràng hơn.',
+  },
+];
+
 function RevalidationBottomSheet({
   type,
   surveyorVerdict,
@@ -288,21 +319,32 @@ function RevalidationBottomSheet({
   onClose,
   onConfirmDecline,
   onConfirmReport,
+  onConfirmRecapture,
 }: RevalidationBottomSheetProps) {
   const theme = useTheme();
   const [selectedDeclineAction, setSelectedDeclineAction] = useState<string>('STILL_ACTIVE');
   const [selectedReportReason, setSelectedReportReason] = useState<string>(REPORT_ISSUE_CHOICES[0]);
+  const [selectedRecaptureReason, setSelectedRecaptureReason] = useState<string>(
+    RECAPTURE_REASONS[0].id,
+  );
   const [note, setNote] = useState('');
 
   const title =
-    type === 'decline' ? 'Từ chối kết luận của điều tra viên' : 'Báo cáo sự cố minh chứng';
+    type === 'decline'
+      ? 'Từ chối kết luận của điều tra viên'
+      : type === 'recapture'
+        ? 'Yêu cầu điều tra viên chụp lại ảnh'
+        : 'Báo cáo sự cố minh chứng';
 
   const helperText =
     type === 'decline'
       ? `Điều tra viên kết luận: "${surveyorVerdict || 'Chưa rõ'}". Hãy chọn tình trạng đúng theo quan sát của bạn:`
-      : 'Chọn lý do minh chứng không hợp lệ hoặc khó nhận diện:';
+      : type === 'recapture'
+        ? 'Chọn lý do ảnh không đạt chuẩn để gửi thông báo yêu cầu chụp lại tại hiện trường cho Surveyor:'
+        : 'Chọn lý do minh chứng không hợp lệ hoặc khó nhận diện:';
 
-  const confirmColor = type === 'decline' ? Colors.danger : '#EA580C';
+  const confirmColor =
+    type === 'decline' ? Colors.danger : type === 'recapture' ? '#D97706' : '#EA580C';
 
   const handleConfirm = () => {
     if (type === 'decline') {
@@ -315,6 +357,8 @@ function RevalidationBottomSheet({
       );
     } else if (type === 'report') {
       onConfirmReport(selectedReportReason, note.trim() || undefined);
+    } else if (type === 'recapture') {
+      onConfirmRecapture?.(selectedRecaptureReason, note.trim() || undefined);
     }
     setNote('');
     onClose();
@@ -522,6 +566,54 @@ function RevalidationBottomSheet({
                 </View>
               ) : null}
 
+              {/* Recapture reasons */}
+              {type === 'recapture' ? (
+                <View style={{ gap: 6, marginBottom: 14 }}>
+                  {RECAPTURE_REASONS.map((choice) => {
+                    const isSelected = selectedRecaptureReason === choice.id;
+                    return (
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected }}
+                        key={choice.id}
+                        onPress={() => setSelectedRecaptureReason(choice.id)}
+                        style={[
+                          styles.reasonOption,
+                          {
+                            backgroundColor: isSelected ? theme.backgroundSelected : theme.surface,
+                            borderColor: isSelected ? '#D97706' : theme.border,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          color="#D97706"
+                          name="camera-retake-outline"
+                          size={20}
+                        />
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={[styles.reasonLabel, { color: theme.text }]}>
+                            {choice.label}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 1 }}>
+                            {choice.desc}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.radio,
+                            { borderColor: isSelected ? '#D97706' : theme.placeholder },
+                          ]}
+                        >
+                          {isSelected ? (
+                            <View style={[styles.radioDot, { backgroundColor: '#D97706' }]} />
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
               {/* Notes Input Group */}
               <View style={styles.reasonInputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>
@@ -555,7 +647,13 @@ function RevalidationBottomSheet({
                 variant="surface"
               />
               <AppButton
-                label={type === 'decline' ? 'Xác nhận từ chối' : 'Gửi báo cáo'}
+                label={
+                  type === 'decline'
+                    ? 'Xác nhận từ chối'
+                    : type === 'recapture'
+                      ? 'Gửi yêu cầu chụp lại'
+                      : 'Gửi báo cáo'
+                }
                 onPress={handleConfirm}
                 style={[styles.sheetFooterButton, { backgroundColor: confirmColor }]}
               />
@@ -576,6 +674,8 @@ export function RevalidationReviewScreen() {
   const { isSmallDevice, height: windowHeight } = useResponsive();
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+  const searchParams = useLocalSearchParams<{ targetSubmissionId?: string }>();
+  const targetId = searchParams?.targetSubmissionId;
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -592,6 +692,8 @@ export function RevalidationReviewScreen() {
     finishReviews: workflowFinish,
     isLoading,
     isCheckingEvidence,
+    isSubmittingVote = false,
+    jumpToEvidenceById,
     keepCurrentEvidenceAndNext,
     recheckingPreviousReview,
     cancelEvidenceCheck,
@@ -605,14 +707,41 @@ export function RevalidationReviewScreen() {
     )?.previousReview ?? recheckingPreviousReview;
   const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
   const [isEditingVote, setIsEditingVote] = useState(false);
+  const handledTargetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsEditingVote(false);
   }, [currentItem?.evidenceId, isCheckingEvidence]);
 
+  useEffect(() => {
+    if (targetId) {
+      if (handledTargetIdRef.current !== targetId) {
+        handledTargetIdRef.current = targetId;
+        jumpToEvidenceById?.(targetId);
+        router.setParams({ targetSubmissionId: undefined });
+      }
+    } else {
+      handledTargetIdRef.current = null;
+    }
+  }, [targetId, jumpToEvidenceById, router]);
+
+  useEffect(() => {
+    checkAndRequireLocationPermission().catch(() => {});
+  }, []);
+
   const handleKeepPreviousReview = useCallback(() => {
     keepCurrentEvidenceAndNext?.();
   }, [keepCurrentEvidenceAndNext]);
+
+  const { session } = useSession();
+  const requestRecaptureMutation = useRequestEvidenceRecapture();
+  const currentUserId = session?.account?.id || (session as any)?.userId;
+  const isSelfEvidence = Boolean(
+    currentUserId &&
+    currentItem &&
+    (currentItem.evidence.userId === currentUserId ||
+      currentItem.evidence.surveyorId === currentUserId),
+  );
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -626,8 +755,36 @@ export function RevalidationReviewScreen() {
   const [toast, setToast] = useState<{
     id: number;
     message: string;
-    tone: 'default' | 'success';
+    tone: 'default' | 'success' | 'danger';
   }>();
+
+  const handleConfirmRecapture = useCallback(
+    async (reason: string, note?: string) => {
+      if (!currentItem) return;
+      try {
+        await requestRecaptureMutation.mutateAsync({
+          evidenceId: currentItem.evidenceId,
+          dto: { reason, note },
+          accessToken: session?.accessToken,
+        });
+        setToast({
+          id: Date.now(),
+          message: 'Đã gửi yêu cầu chụp lại ảnh cho điều tra viên',
+          tone: 'success',
+        });
+        workflowSkip();
+      } catch (err: any) {
+        console.warn('[RevalidationReview] Request recapture error:', err);
+        setToast({
+          id: Date.now(),
+          message: err?.message || 'Không thể gửi yêu cầu chụp lại',
+          tone: 'default',
+        });
+      }
+      setActiveSheet(undefined);
+    },
+    [currentItem, requestRecaptureMutation, session?.accessToken, workflowSkip],
+  );
 
   // ---------------------------------------------------------------------------
   // Action Handler: calls workflow vote API upon swipe or action confirmation
@@ -639,7 +796,7 @@ export function RevalidationReviewScreen() {
       suggestedSignTypeId?: number,
       verdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
     ) => {
-      if (!currentItem) return;
+      if (!currentItem || isSubmittingVote) return;
 
       const messages: Record<RevalidationReviewAction, string> = {
         STILL_ACTIVE: 'Đã xác nhận: Biển báo vẫn hoạt động',
@@ -649,41 +806,55 @@ export function RevalidationReviewScreen() {
         INVALID: 'Đã báo cáo minh chứng không hợp lệ',
       };
 
-      setToast({
-        id: Date.now(),
-        message: messages[action],
-        tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
-      });
-
-      await workflowVote(action, note, suggestedSignTypeId, verdict);
-      setViewMode('evidence');
+      try {
+        await workflowVote(action, note, suggestedSignTypeId, verdict);
+        setToast({
+          id: Date.now(),
+          message: messages[action],
+          tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
+        });
+        setViewMode('evidence');
+      } catch (err) {
+        setToast({
+          id: Date.now(),
+          message: 'Đã xảy ra lỗi, vui lòng thử lại',
+          tone: 'danger',
+        });
+      }
     },
-    [currentItem, workflowVote],
+    [currentItem, isSubmittingVote, workflowVote],
   );
 
   // Reviewer agrees with surveyor conclusion
   const handleAgree = useCallback(async () => {
-    if (!currentItem) return;
+    if (!currentItem || isSubmittingVote) return;
 
     // Follow surveyor's concluded evidenceType directly
     const rawVerdict = currentItem.evidence.evidenceType;
     const decision: RevalidationReviewAction =
       rawVerdict === 'REMOVED' ? 'REMOVED' : rawVerdict === 'CHANGED' ? 'CHANGED' : 'STILL_ACTIVE';
 
-    setToast({
-      id: Date.now(),
-      message: 'Đồng ý',
-      tone: 'success',
-    });
-
-    await workflowVote(
-      decision,
-      undefined,
-      currentItem.evidence.suggestedSignTypeId ?? undefined,
-      'AGREE',
-    );
-    setViewMode('evidence');
-  }, [currentItem, workflowVote]);
+    try {
+      await workflowVote(
+        decision,
+        undefined,
+        currentItem.evidence.suggestedSignTypeId ?? undefined,
+        'AGREE',
+      );
+      setToast({
+        id: Date.now(),
+        message: 'Đồng ý',
+        tone: 'success',
+      });
+      setViewMode('evidence');
+    } catch (err) {
+      setToast({
+        id: Date.now(),
+        message: 'Đã xảy ra lỗi, vui lòng thử lại',
+        tone: 'danger',
+      });
+    }
+  }, [currentItem, isSubmittingVote, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion
   const handleDecline = useCallback(() => {
@@ -788,7 +959,7 @@ export function RevalidationReviewScreen() {
           }
         },
         onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
-          if (isRecheckMode && !isEditingVote) {
+          if ((isRecheckMode && !isEditingVote) || isSubmittingVote) {
             gestureAxis.current = 'none';
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
@@ -871,7 +1042,7 @@ export function RevalidationReviewScreen() {
           }).start();
         },
       }),
-    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, pan],
+    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, isSubmittingVote, pan],
   );
 
   // Active displayed image URI
@@ -1204,6 +1375,7 @@ export function RevalidationReviewScreen() {
                       'Biển báo tái xác thực',
                     subtitle: currentItem.verifiedSign?.signCode,
                     signId: currentItem.evidenceId || currentItem.taskId,
+                    returnPath: '/work/revalidation-review',
                   });
                 }}
                 style={[
@@ -1226,6 +1398,27 @@ export function RevalidationReviewScreen() {
                   </Text>
                 </View>
               </AppButton>
+
+              <AppButton
+                accessibilityLabel="Yêu cầu chụp lại ảnh"
+                disabled={Boolean(isSelfEvidence || isLoading)}
+                onPress={() => setActiveSheet('recapture')}
+                style={[
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: '#D97706',
+                    marginLeft: 8,
+                  },
+                ]}
+                variant="surface"
+              >
+                <View style={styles.locationButtonContent}>
+                  <MaterialCommunityIcons color="#D97706" name="camera-retake-outline" size={15} />
+                  <Text style={[styles.summaryShortcutButtonText, { color: '#D97706' }]}>
+                    Chụp lại
+                  </Text>
+                </View>
+              </AppButton>
             </View>
 
             {/* Bottom Actions: Separate Revalidation Decision Badge Component */}
@@ -1241,15 +1434,46 @@ export function RevalidationReviewScreen() {
                   <RevalidationEditingBanner onCancel={() => setIsEditingVote(false)} />
                 ) : null}
 
-                <RevalidationDecisionBadge
-                  disabled={isLoading}
-                  handleAgree={handleAgree}
-                  handleDecline={handleDecline}
-                  handleReport={handleReport}
-                  handleSkip={handleSkip}
-                  onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
-                  onOpenHelp={() => setIsHelpModalVisible(true)}
-                />
+                {isSelfEvidence ? (
+                  <View
+                    style={{
+                      padding: 14,
+                      marginHorizontal: 16,
+                      borderRadius: 12,
+                      backgroundColor: 'rgba(217, 119, 6, 0.08)',
+                      borderColor: '#D97706',
+                      borderWidth: 1,
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <MaterialCommunityIcons
+                        color="#D97706"
+                        name="shield-alert-outline"
+                        size={20}
+                      />
+                      <Text style={{ fontWeight: '700', fontSize: 14, color: '#D97706' }}>
+                        Tự thẩm định bị chặn
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary, textAlign: 'center' }}>
+                      Bạn là người nộp minh chứng này. Theo quy chế tự thẩm định (Self-review), bạn
+                      không thể bỏ phiếu hoặc yêu cầu chụp lại bài nộp của chính mình.
+                    </Text>
+                    <AppButton label="Bỏ qua minh chứng này" onPress={handleSkip} variant="ghost" />
+                  </View>
+                ) : (
+                  <RevalidationDecisionBadge
+                    disabled={isLoading}
+                    handleAgree={handleAgree}
+                    handleDecline={handleDecline}
+                    handleReport={handleReport}
+                    handleSkip={handleSkip}
+                    onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
+                    onOpenHelp={() => setIsHelpModalVisible(true)}
+                  />
+                )}
               </>
             )}
           </View>
@@ -1286,6 +1510,7 @@ export function RevalidationReviewScreen() {
           handleVote('UNCLEAR', fullNote, undefined, 'REPORT');
           setActiveSheet(undefined);
         }}
+        onConfirmRecapture={handleConfirmRecapture}
         onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
         selectedCatalogSign={selectedCatalogSign}
         surveyorVerdict={
@@ -1500,7 +1725,7 @@ export function RevalidationReviewScreen() {
           key={toast.id}
           message={toast.message}
           onDismiss={() => setToast(undefined)}
-          placement="center"
+          placement="bottom"
           tone={toast.tone}
         />
       ) : null}
@@ -2619,7 +2844,7 @@ const styles = StyleSheet.create({
     maxWidth: 340,
     alignSelf: 'center',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 2,
     marginBottom: 4,

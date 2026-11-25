@@ -28,6 +28,7 @@ import { getMapLibre } from '@/services/maplibre';
 import {
   ALLOW_LOCATION_ACCESS_MESSAGE,
   ENABLE_LOCATION_SERVICE_MESSAGE,
+  GPS_UNAVAILABLE_MESSAGE,
   LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE,
   LOCATION_NOT_AVAILABLE_IN_BROWSER_MESSAGE,
 } from '@/constants/message';
@@ -169,7 +170,7 @@ export function LocationPickerModal({
       setCameraFocusCoord(coord);
       setFocusRequestId((prev) => prev + 1);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Không thể lấy vị trí hiện tại');
+      setErrorMessage(err instanceof Error ? err.message : GPS_UNAVAILABLE_MESSAGE);
     } finally {
       setIsLocating(false);
     }
