@@ -14,6 +14,7 @@ export type VoteDto = {
     declineNote?: string;
     latitude?: number;
     longitude?: number;
+    questClaimId?: string;
 }
 
 export type CreateMissingTypeReportDto = {

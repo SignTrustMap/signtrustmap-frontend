@@ -27,6 +27,11 @@ const mockReportCandidate = jest.fn().mockResolvedValue({});
 const mockReportMissingType = jest.fn().mockResolvedValue({});
 const mockSkipSign = jest.fn().mockResolvedValue({});
 const mockUndoVote = jest.fn().mockResolvedValue({});
+const mockGetCandidateSignDetails = jest.fn();
+
+jest.mock('@/api/reviews/review', () => ({
+  getCandidateSignDetails: (...args: any[]) => mockGetCandidateSignDetails(...args),
+}));
 
 const getMockSubmissions = () => [
   { id: 'sub-1', title: 'Biển cấm 101', latitude: 10.7, longitude: 106.7 },
@@ -384,5 +389,60 @@ describe('ReviewWorkflowProvider and useReviewWorkflow', () => {
     });
     expect(recheckResult).toBe(true);
     expect(result.current.isRecheckingSubmission).toBe(true);
+  });
+
+  it('fetches claimed candidate via ensureCandidateInQueue when missing from queue and forwards questClaimId on vote', async () => {
+    mockGetCandidateSignDetails.mockResolvedValue({
+      candidate: {
+        id: 'cand-claimed-99',
+        submissionId: 'sub-99',
+        status: 'PENDING_REVIEW',
+        createdAt: '2026-11-25T10:00:00Z',
+        predictedSignType: {
+          id: 12,
+          signCode: 'P.102',
+          nameVi: 'Cấm đi ngược chiều',
+          nameEn: 'No Entry',
+        },
+      },
+      locationContext: {
+        coordinates: { latitude: 10.77, longitude: 106.7 },
+        displayLocation: 'Đường Nguyễn Huệ, Quận 1',
+      },
+    });
+
+    const { result } = await renderHook(() => useReviewWorkflow(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    let found = false;
+    await act(async () => {
+      found = (await result.current.ensureCandidateInQueue?.('cand-claimed-99')) ?? false;
+    });
+
+    expect(found).toBe(true);
+    expect(mockGetCandidateSignDetails).toHaveBeenCalledWith(
+      { candidateId: 'cand-claimed-99' },
+      'valid-reviewer-token',
+    );
+    expect(result.current.pendingSubmissions[0].id).toBe('cand-claimed-99');
+
+    await act(async () => {
+      await result.current.completeCurrentReview('approved', {
+        questClaimId: 'claim-cand-99',
+      });
+    });
+
+    expect(mockCastVote).toHaveBeenCalledWith({
+      params: { candidateId: 'cand-claimed-99' },
+      request: {
+        vote: 1,
+        questClaimId: 'claim-cand-99',
+      },
+    });
   });
 });

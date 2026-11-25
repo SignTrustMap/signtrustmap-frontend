@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 
 import { useSession } from '@/context/session-provider';
+import { getRevalidationTask } from '@/api/revalidation/revalidation';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import {
   useGetRevalidationEvidenceQueue,
@@ -38,12 +39,14 @@ export type RevalidationWorkflowContextValue = {
   cancelEvidenceCheck?: () => void;
   counts: Record<RevalidationReviewAction, number>;
   currentItem?: RevalidationQueueEvidenceItem;
+  ensureTaskEvidenceInQueue?: (taskId: string) => Promise<'found' | 'no_evidence' | 'not_found'>;
   finishReviews: () => number;
   handleVote: (
     action: RevalidationReviewAction,
     note?: string,
     suggestedSignTypeId?: number,
     userVerdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
+    questClaimId?: string,
   ) => Promise<boolean>;
   handleSkip: () => boolean;
   isCheckingEvidence: boolean;
@@ -139,6 +142,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       note?: string,
       suggestedSignTypeId?: number,
       userVerdict: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT' = 'AGREE',
+      questClaimId?: string,
     ): Promise<boolean> => {
       if (!currentItem) return false;
 
@@ -180,6 +184,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
             note: note?.trim() || undefined,
             suggestedSignTypeId:
               action === 'CHANGED' && suggestedSignTypeId ? suggestedSignTypeId : undefined,
+            ...(questClaimId ? { questClaimId } : {}),
             ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
@@ -321,6 +326,84 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     [queueItems, reviewHistory, beginEvidenceCheck],
   );
 
+  const ensureTaskEvidenceInQueue = useCallback(
+    async (taskId: string): Promise<'found' | 'no_evidence' | 'not_found'> => {
+      if (!taskId) return 'not_found';
+
+      const inQueueOrHistory =
+        queueItems.some((it) => it.taskId === taskId || it.evidenceId === taskId) ||
+        reviewHistory.some((h) => h.item.taskId === taskId || h.item.evidenceId === taskId);
+
+      if (inQueueOrHistory) {
+        jumpToEvidenceById(taskId);
+        return 'found';
+      }
+
+      if (!session?.accessToken) return 'not_found';
+
+      try {
+        const task = await getRevalidationTask(taskId, undefined, session.accessToken);
+        if (!task) return 'not_found';
+
+        const currentUserId = session.account?.id || (session as any)?.userId;
+        const evidences = Array.isArray(task.evidences) ? task.evidences : [];
+        if (evidences.length === 0) return 'no_evidence';
+
+        const candidateEvidence =
+          evidences.find((ev) => !currentUserId || ev.surveyorId !== currentUserId) ??
+          evidences[0];
+
+        if (!candidateEvidence) return 'no_evidence';
+
+        const hydratedItem: RevalidationQueueEvidenceItem = {
+          evidenceId: candidateEvidence.id,
+          taskId: task.id,
+          verifiedSign: {
+            id: task.verifiedSignId,
+            signCode: task.code || '',
+            nameVi: task.name,
+            signCropUrl: task.signCropUrl || task.historicalCropUrl,
+            lastVerifiedAt: task.lastVerifiedDate,
+            freshnessScore: task.currentTrustScore,
+          },
+          evidence: {
+            id: candidateEvidence.id,
+            surveyorId: candidateEvidence.surveyorId,
+            mediaUrl: candidateEvidence.mediaUrl,
+            evidenceType: candidateEvidence.evidenceType,
+            submittedAt: candidateEvidence.submittedAt,
+            latitude: task.latitude ?? task.location?.lat ?? 0,
+            longitude: task.longitude ?? task.location?.lon ?? 0,
+            distanceMeters: candidateEvidence.distanceMeters ?? null,
+            suggestedSignTypeId: candidateEvidence.suggestedSignTypeId ?? undefined,
+          },
+          currentVoteCount: 0,
+          taskStatus: String(task.status || 'EVALUATING'),
+          rewardCredits: task.rewardCredits ?? task.bounty ?? 0,
+        };
+
+        setQueueItems((prev) => {
+          if (prev.some((it) => it.evidenceId === hydratedItem.evidenceId)) {
+            const idx = prev.findIndex((it) => it.evidenceId === hydratedItem.evidenceId);
+            return idx > 0
+              ? [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)]
+              : prev;
+          }
+          return [hydratedItem, ...prev];
+        });
+        setTotalCount((prev) => Math.max(prev, queueItems.length + 1));
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+        return 'found';
+      } catch (err) {
+        console.warn('[RevalidationWorkflow] Failed to load claimed task detail:', err);
+        return 'not_found';
+      }
+    },
+    [beginEvidenceCheck, jumpToEvidenceById, queueItems, reviewHistory, session],
+  );
+
   const keepCurrentEvidenceAndNext = useCallback((): boolean => {
     if (!currentItem) return true;
 
@@ -414,6 +497,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       cancelEvidenceCheck,
       counts,
       currentItem,
+      ensureTaskEvidenceInQueue,
       finishReviews,
       handleVote,
       handleSkip,
@@ -438,6 +522,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       cancelEvidenceCheck,
       counts,
       currentItem,
+      ensureTaskEvidenceInQueue,
       finishReviews,
       handleVote,
       handleSkip,
@@ -467,8 +552,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 }
 
 const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
-  beginEvidenceCheck: () => {},
-  cancelEvidenceCheck: () => {},
+  beginEvidenceCheck: () => { },
+  cancelEvidenceCheck: () => { },
   counts: { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
   currentItem: undefined,
   finishReviews: () => 0,
@@ -477,15 +562,15 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   isCheckingEvidence: false,
   isLoading: false,
   isSubmittingVote: false,
-  jumpToEvidenceById: () => {},
+  jumpToEvidenceById: () => { },
   keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,
   queueItems: [],
   recheckingIndex: undefined,
   recheckingPreviousReview: undefined,
-  refetchQueue: async () => {},
-  resetWorkflow: () => {},
+  refetchQueue: async () => { },
+  resetWorkflow: () => { },
   reviewHistory: [],
   reviewPosition: 0,
   totalCount: 0,

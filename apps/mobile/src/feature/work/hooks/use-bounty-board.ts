@@ -10,13 +10,15 @@ import { useSession } from '@/context/session-provider';
 import type {
   ClaimQuestDto,
   QueryAvailableQuestsParams,
+  QueryMyClaimsParams,
 } from '@/types/bountyBoardType';
 
 export const bountyKeys = {
   all: (accountId?: string) => ['bounty-board', accountId] as const,
   available: (accountId: string | undefined, params: QueryAvailableQuestsParams) =>
     [...bountyKeys.all(accountId), 'available', params] as const,
-  myClaims: (accountId?: string) => [...bountyKeys.all(accountId), 'my-claims'] as const,
+  myClaims: (accountId?: string, params?: QueryMyClaimsParams) =>
+    [...bountyKeys.all(accountId), 'my-claims', params] as const,
 };
 
 export function useAvailableBountyQuests(
@@ -34,12 +36,18 @@ export function useAvailableBountyQuests(
   });
 }
 
-export function useMyBountyClaims(enabled = true) {
+export function useMyBountyClaims(
+  paramsOrEnabled?: QueryMyClaimsParams | boolean,
+  enabledParam = true,
+) {
   const { session } = useSession();
+  const params = typeof paramsOrEnabled === 'object' ? paramsOrEnabled : undefined;
+  const enabled = typeof paramsOrEnabled === 'boolean' ? paramsOrEnabled : enabledParam;
+
   return useQuery({
-    queryKey: bountyKeys.myClaims(session?.account.id),
+    queryKey: bountyKeys.myClaims(session?.account.id, params),
     queryFn: session
-      ? ({ signal }) => getMyClaims(session.accessToken, signal)
+      ? ({ signal }) => getMyClaims(session.accessToken, params, signal)
       : skipToken,
     enabled: Boolean(session) && enabled,
     refetchInterval: 30_000,

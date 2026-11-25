@@ -56,6 +56,12 @@ export function ActiveQuestBanner() {
       ? '#D97706'
       : theme.primary;
 
+  const totalReward =
+    activeClaim.totalRewardCredits ??
+    activeClaim.baseRewardCredits + (activeClaim.escalatedBonusCredits || 0);
+  const signLabel = [activeClaim.signCode, activeClaim.signName].filter(Boolean).join(' - ');
+  const locationLabel = activeClaim.displayAddress?.trim() || activeClaim.roadName?.trim();
+
   const handlePress = () => {
     if (activeClaim.targetType === 'CANDIDATE_VALIDATION') {
       router.push({
@@ -67,7 +73,7 @@ export function ActiveQuestBanner() {
       });
     } else {
       router.push({
-        pathname: '/work/inspect-revalidate',
+        pathname: '/work/revalidation-review',
         params: {
           taskId: activeClaim.targetId,
           questClaimId: activeClaim.id,
@@ -98,20 +104,26 @@ export function ActiveQuestBanner() {
             </Text>
           </View>
           <Text style={[styles.reward, { color: theme.primary }]}>
-            +{activeClaim.baseRewardCredits + (activeClaim.escalatedBonusCredits || 0)} điểm
+            +{totalReward} điểm
           </Text>
         </View>
 
+        {signLabel ? (
+          <Text numberOfLines={1} style={[styles.signTitle, { color: theme.text }]}>
+            {signLabel}
+          </Text>
+        ) : null}
+
+        {locationLabel ? (
+          <Text numberOfLines={1} style={[styles.addressText, { color: theme.textSecondary }]}>
+            {locationLabel}
+          </Text>
+        ) : null}
+
         <View style={styles.bottomRow}>
-          <View style={styles.timerRow}>
-            <MaterialCommunityIcons color={timerColor} name="clock-outline" size={16} />
-            <Text style={[styles.timerLabel, { color: theme.placeholder }]}>
-              Thời gian còn lại:
-            </Text>
-            <Text style={[styles.timerValue, { color: timerColor }]}>
-              {countdown.text}
-            </Text>
-          </View>
+          <Text style={[styles.timerValue, { color: timerColor }]}>
+            {countdown.isExpired ? countdown.text : `Còn lại ${countdown.text}`}
+          </Text>
 
           <View style={styles.actionPrompt}>
             <Text style={[styles.actionPromptText, { color: theme.primary }]}>
@@ -133,7 +145,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   content: {
-    gap: Spacing.two,
+    gap: 4,
   },
   topRow: {
     flexDirection: 'row',
@@ -141,7 +153,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   badge: {
-    paddingHorizontal: Spacing.one,
     paddingVertical: 2,
     borderRadius: Rounded.sm,
   },
@@ -155,23 +166,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  signTitle: {
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  addressText: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+  },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  timerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timerLabel: {
-    fontFamily: Fonts.sans,
-    fontSize: 13,
+    marginTop: 4,
   },
   timerValue: {
     fontFamily: Fonts.sans,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   actionPrompt: {

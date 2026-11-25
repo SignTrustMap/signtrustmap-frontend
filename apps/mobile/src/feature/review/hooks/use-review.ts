@@ -64,9 +64,12 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
       if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
       return mutation(variables, session.accessToken);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       // Refresh the reviewer credit score / stats without invalidating the active review queue prematurely
       queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
+      if ((variables as any)?.request?.questClaimId) {
+        queryClient.invalidateQueries({ queryKey: ['bounty-board'] });
+      }
     },
   });
 }

@@ -5,6 +5,7 @@ import type {
   CandidateCheckInResponse,
   ClaimQuestDto,
   QueryAvailableQuestsParams,
+  QueryMyClaimsParams,
   ReviewerQuestClaim,
 } from '@/types/bountyBoardType';
 
@@ -27,9 +28,20 @@ export function getAvailableQuests(
   );
 }
 
-export function getMyClaims(accessToken: string, signal?: AbortSignal) {
+export function getMyClaims(
+  accessToken: string,
+  params?: QueryMyClaimsParams,
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams();
+  if (params?.status) query.set('status', params.status);
+  if (params?.targetType) query.set('targetType', params.targetType);
+  if (params?.latitude != null) query.set('latitude', String(params.latitude));
+  if (params?.longitude != null) query.set('longitude', String(params.longitude));
+
+  const qs = query.toString();
   return apiRequest<ReviewerQuestClaim[]>(
-    `${API_PATHS.REVIEWS}/bounty-board/my-claims`,
+    `${API_PATHS.REVIEWS}/bounty-board/my-claims${qs ? `?${qs}` : ''}`,
     { signal },
     accessToken,
   );

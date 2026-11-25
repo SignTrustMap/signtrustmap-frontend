@@ -120,6 +120,8 @@ export interface RevalidationTaskDetail {
   longitude?: number;
   signCropUrl?: string;
   historicalCropUrl?: string;
+  lastVerifiedDate?: string;
+  currentTrustScore?: number;
 }
 
 export type RevalidationFilterPriority = 'ALL' | TaskPriority;
