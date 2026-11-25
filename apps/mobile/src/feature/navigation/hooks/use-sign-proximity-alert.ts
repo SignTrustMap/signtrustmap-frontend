@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { RouteSign } from '@/api/navigation/navigation';
 import type { MapCoordinate } from '@/types/navigationType';
 import { speechService } from '@/services/speech';
@@ -64,8 +64,15 @@ export function useSignProximityAlert({
     return null;
   }, [alertDistanceMeters, isNavigating, signs, userCoordinate]);
 
-  // Handle external synchronization (TTS audio playback & reset)
+  // Pre-warm native TTS engine as soon as navigation starts so alerts trigger without cold-start delay
   useEffect(() => {
+    if (isNavigating && ttsEnabled) {
+      void speechService.warmup?.();
+    }
+  }, [isNavigating, ttsEnabled]);
+
+  // Synchronize TTS playback with popup mount commit frame so voice plays alongside the verify card
+  useLayoutEffect(() => {
     if (!isNavigating) {
       announcedSignIdsRef.current.clear();
       speechService.stop();

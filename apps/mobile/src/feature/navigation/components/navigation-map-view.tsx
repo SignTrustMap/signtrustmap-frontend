@@ -2,7 +2,6 @@ import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-r
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -28,6 +27,7 @@ import { offlineMapService } from '@/services/offline-map-service';
 import { MAP_BUILD_REQUIRED_DESCRIPTION, MAP_BUILD_REQUIRED_TITLE } from '@/constants/message';
 import {
   calculateDistanceMeters,
+  getRemainingRouteCoordinates,
   getRouteForwardBearing,
   getSmallestAngleDiffDegrees,
   isValidCoordinate,
@@ -118,11 +118,11 @@ function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: strin
   if (!imageUrl || hasError) return null;
 
   return (
-    <Image
+    <ExpoImage
       accessibilityLabel={title}
       source={{ uri: imageUrl }}
       onError={() => setHasError(true)}
-      resizeMode="contain"
+      contentFit="contain"
       style={styles.calloutImage}
     />
   );
@@ -158,7 +158,7 @@ function SignMarkerIcon({
   }
 
   return (
-    <Image
+    <ExpoImage
       accessibilityLabel={name || signCode}
       key={activeUrl}
       source={{ uri: activeUrl }}
@@ -169,7 +169,7 @@ function SignMarkerIcon({
           setHasError(true);
         }
       }}
-      resizeMode="contain"
+      contentFit="contain"
       style={styles.stopSignImage}
     />
   );
@@ -207,11 +207,11 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
           </View>
         </View>
         {sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl ? (
-          <Image
+          <ExpoImage
             accessibilityLabel="Ảnh thực địa camera"
             source={{ uri: sign.actualCropUrl }}
             style={styles.calloutActualCrop}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : null}
       </View>
@@ -743,17 +743,23 @@ export function NavigationMapView({
     }
     return destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
   }, [destination, routeCoordinates, routeStart]);
+  const displayedRouteCoordinates = useMemo(() => {
+    if (!routeCoordinates?.length) return undefined;
+    if (!navigationActive || !userCoordinate) return routeCoordinates;
+    return getRemainingRouteCoordinates(routeCoordinates, userCoordinate);
+  }, [navigationActive, routeCoordinates, userCoordinate]);
+
   const routeGeoJson = useMemo(() => {
-    if (!routeCoordinates?.length) return null;
+    if (!displayedRouteCoordinates || displayedRouteCoordinates.length < 2) return null;
     return {
       type: 'Feature' as const,
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: routeCoordinates,
+        coordinates: displayedRouteCoordinates,
       },
     };
-  }, [routeCoordinates]);
+  }, [displayedRouteCoordinates]);
 
   // Initial forward bearing aligned with the route ahead when navigation begins
   const initialForwardBearing = useMemo(() => {

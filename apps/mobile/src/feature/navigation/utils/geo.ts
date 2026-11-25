@@ -149,6 +149,63 @@ export function getRouteForwardBearing(
   return 0;
 }
 
+interface RouteProjectionResult {
+  bestSegmentIndex: number;
+  minDistMeters: number;
+  snappedCoordinate: MapCoordinate;
+  t: number;
+}
+
+/**
+ * Projects a coordinate onto the nearest polyline segment, returning the segment index (1-based),
+ * clamped segment ratio `t`, closest snapped coordinate on the route, and perpendicular distance in meters.
+ */
+function projectCoordinateOntoRoute(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
+): RouteProjectionResult {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const [pLon, pLat] = coordinate;
+  const cosLat = Math.cos(toRad(pLat));
+  const scale = EARTH_RADIUS_METERS * toRad(1);
+
+  let minDistMeters = Number.POSITIVE_INFINITY;
+  let bestSegmentIndex = 1;
+  let bestT = 0;
+  let bestSnapped: MapCoordinate = routeCoordinates[0];
+
+  for (let i = 1; i < routeCoordinates.length; i++) {
+    const [aLon, aLat] = routeCoordinates[i - 1];
+    const [bLon, bLat] = routeCoordinates[i];
+
+    const ax = (aLon - pLon) * cosLat * scale;
+    const ay = (aLat - pLat) * scale;
+    const bx = (bLon - pLon) * cosLat * scale;
+    const by = (bLat - pLat) * scale;
+
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+
+    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+    const dist = lenSq === 0 ? Math.hypot(ax, ay) : Math.hypot(ax + t * dx, ay + t * dy);
+
+    if (dist < minDistMeters) {
+      minDistMeters = dist;
+      bestSegmentIndex = i;
+      bestT = t;
+      bestSnapped = [aLon + (bLon - aLon) * t, aLat + (bLat - aLat) * t];
+    }
+  }
+
+  return {
+    bestSegmentIndex,
+    minDistMeters,
+    snappedCoordinate: bestSnapped,
+    t: bestT,
+  };
+}
+
 /**
  * Returns the minimum perpendicular distance (in meters) from a coordinate
  * to the nearest segment of a route polyline. Used for off-route detection.
@@ -162,37 +219,34 @@ export function getDistanceToRouteMeters(
     return calculateDistanceMeters(coordinate, routeCoordinates[0]);
   }
 
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const [pLon, pLat] = coordinate;
-  const cosLat = Math.cos(toRad(pLat));
+  return projectCoordinateOntoRoute(coordinate, routeCoordinates).minDistMeters;
+}
 
-  let minDistMeters = Number.POSITIVE_INFINITY;
-
-  for (let i = 1; i < routeCoordinates.length; i++) {
-    const [aLon, aLat] = routeCoordinates[i - 1];
-    const [bLon, bLat] = routeCoordinates[i];
-
-    // Project to a flat metre-space centred on segment midpoint
-    const scale = EARTH_RADIUS_METERS * toRad(1);
-    const ax = (aLon - pLon) * cosLat * scale;
-    const ay = (aLat - pLat) * scale;
-    const bx = (bLon - pLon) * cosLat * scale;
-    const by = (bLat - pLat) * scale;
-
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lenSq = dx * dx + dy * dy;
-
-    let dist: number;
-    if (lenSq === 0) {
-      dist = Math.hypot(ax, ay);
-    } else {
-      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
-      dist = Math.hypot(ax + t * dx, ay + t * dy);
-    }
-
-    if (dist < minDistMeters) minDistMeters = dist;
+/**
+ * Trims already-traversed portions of the route behind `userCoordinate` during active navigation,
+ * starting the visible polyline cleanly at the snapped position on the active segment.
+ */
+export function getRemainingRouteCoordinates(
+  routeCoordinates: MapCoordinate[] | undefined,
+  userCoordinate: MapCoordinate | undefined,
+): MapCoordinate[] {
+  if (!routeCoordinates || routeCoordinates.length < 2 || !userCoordinate) {
+    return routeCoordinates ?? [];
   }
 
-  return minDistMeters;
+  const { bestSegmentIndex, snappedCoordinate, t } = projectCoordinateOntoRoute(
+    userCoordinate,
+    routeCoordinates,
+  );
+
+  // Completed the entire route: hide the remaining colored line
+  if (bestSegmentIndex === routeCoordinates.length - 1 && t >= 0.999) {
+    return [];
+  }
+
+  if (bestSegmentIndex === 1 && t <= 0.001) {
+    return routeCoordinates;
+  }
+
+  return [snappedCoordinate, ...routeCoordinates.slice(bestSegmentIndex)];
 }

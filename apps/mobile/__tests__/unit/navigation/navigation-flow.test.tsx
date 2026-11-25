@@ -514,9 +514,24 @@ describe('Navigation Flow: Destination Selection and GPS Start Route', () => {
         expect(mockInitiateSession).toHaveBeenCalled();
         expect(getByTestId('btn-stop-navigation')).toBeTruthy();
         expect(getByTestId('btn-recenter-map')).toBeTruthy();
+        expect(getByTestId('btn-toggle-tts-nav')).toBeTruthy();
       });
 
-      // 2. Press Re-center button
+      // 2. Press Voice toggle button during live navigation
+      const navTtsBtn = getByTestId('btn-toggle-tts-nav');
+      const initialTtsLabel = navTtsBtn.props.accessibilityLabel;
+      const expectedToggledLabel =
+        initialTtsLabel === 'Tắt thông báo giọng nói'
+          ? 'Bật thông báo giọng nói'
+          : 'Tắt thông báo giọng nói';
+      await fireEvent.press(navTtsBtn);
+      expect(getByTestId('btn-toggle-tts-nav').props.accessibilityLabel).toBe(
+        expectedToggledLabel,
+      );
+      await fireEvent.press(getByTestId('btn-toggle-tts-nav'));
+      expect(getByTestId('btn-toggle-tts-nav').props.accessibilityLabel).toBe(initialTtsLabel);
+
+      // 3. Press Re-center button
       const recenterBtn = getByTestId('btn-recenter-map');
       await act(async () => {
         fireEvent.press(recenterBtn);

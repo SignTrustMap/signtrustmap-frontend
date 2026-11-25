@@ -394,6 +394,11 @@ describe('NavigationMapView Component with Native MapLibre', () => {
 
     expect(mockSetStop).toHaveBeenCalled();
     expect(mockSetStop.mock.calls[mockSetStop.mock.calls.length - 1][0].bearing).toBe(initialBearing);
+
+    // Passed route coordinates before [106.70008, 10.7705] should be stripped from GeoJSON
+    const trimmedCoords = screen.getByTestId('maplibre-geojson-source').props.data.geometry.coordinates;
+    expect(trimmedCoords[0][1]).toBeCloseTo(10.7705, 4);
+    expect(trimmedCoords).not.toContainEqual([106.7000, 10.7700]);
     mockSetStop.mockClear();
 
     // Turn corner onto Eastbound segment (~90 deg) -> rotates camera bearing

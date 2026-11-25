@@ -9,6 +9,7 @@ import type { MapCoordinate } from '@/types/navigationType';
 // Mock speechService
 jest.mock('@/services/speech', () => ({
   speechService: {
+    warmup: jest.fn(),
     speak: jest.fn(),
     stop: jest.fn(),
     isEnabled: jest.fn().mockReturnValue(true),

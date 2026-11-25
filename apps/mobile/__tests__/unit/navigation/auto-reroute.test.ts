@@ -3,6 +3,7 @@ import {
   calculateDistanceMeters,
   calculateBearing,
   getDistanceToRouteMeters,
+  getRemainingRouteCoordinates,
   getRouteForwardBearing,
   getSmallestAngleDiffDegrees,
   isValidCoordinate,
@@ -82,6 +83,23 @@ describe('Navigation Geo & Auto-Reroute Unit Test Suite', () => {
       ];
       const bearing = getRouteForwardBearing([106.7000, 10.7700], route);
       expect(getSmallestAngleDiffDegrees(bearing, 0)).toBeLessThan(10);
+    });
+
+    it('trims passed route segments ahead of current user position', () => {
+      const route: MapCoordinate[] = [
+        [106.7000, 10.7700],
+        [106.7000, 10.7710],
+        [106.7000, 10.7720],
+      ];
+
+      // Halfway between segment 2 ([10.7710] -> [10.7720])
+      const remaining = getRemainingRouteCoordinates(route, [106.7000, 10.7715]);
+      expect(remaining).toHaveLength(2);
+      expect(remaining[0][1]).toBeCloseTo(10.7715, 4);
+      expect(remaining[1]).toEqual([106.7000, 10.7720]);
+
+      // Reached end of route -> no colored segments left
+      expect(getRemainingRouteCoordinates(route, [106.7000, 10.7725])).toEqual([]);
     });
   });
 

@@ -202,28 +202,26 @@ export function RevalidationReviewSkeleton() {
 const DECLINE_COUNTER_CHOICES: Array<{
   id: string;
   label: string;
-  desc: string;
+  desc?: string;
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   color: string;
 }> = [
   {
     id: 'STILL_ACTIVE',
     label: 'Biển báo vẫn còn hoạt động',
-    desc: 'Biển báo thực tế vẫn đang đứng vững và hoạt động bình thường.',
     icon: 'check-circle-outline',
     color: '#16A34A',
   },
   {
     id: 'REMOVED',
     label: 'Biển báo đã bị gỡ bỏ',
-    desc: 'Không còn thấy biển báo tại vị trí chỉ định.',
     icon: 'close-circle-outline',
     color: '#DC2626',
   },
   {
     id: 'CHANGED',
     label: 'Biển báo đã thay đổi',
-    desc: 'Biển báo đã được thay thế hoặc đổi sang mã biển khác.',
+    icon: 'cached',
     color: '#D97706',
   },
 ];

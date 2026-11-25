@@ -418,17 +418,35 @@ export function NavigationMapScreen() {
   }, []);
 
   const handleToggleTts = useCallback(() => {
-    setIsTtsEnabled((prev) => {
-      const next = !prev;
-      speechService.setEnabled(next);
-      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
-      setLocationToast({
-        id: Date.now(),
-        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
-      });
-      return next;
+    const next = !isTtsEnabled;
+    setIsTtsEnabled(next);
+    speechService.setEnabled(next);
+    void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
+    setLocationToast({
+      id: Date.now(),
+      message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
     });
-  }, []);
+  }, [isTtsEnabled]);
+
+  const renderTtsToggleButton = (testID?: string) => (
+    <AppButton
+      accessibilityLabel={isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'}
+      onPress={handleToggleTts}
+      style={[
+        styles.mapActionButton,
+        styles.locationActionButton,
+        styles.ttsActionButton,
+      ]}
+      testID={testID}
+      variant="surface"
+    >
+      <MaterialCommunityIcons
+        name={isTtsEnabled ? 'volume-high' : 'volume-off'}
+        size={22}
+        color="#000000"
+      />
+    </AppButton>
+  );
 
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
 
@@ -894,7 +912,7 @@ export function NavigationMapScreen() {
   }, [activeDuration, routeDistance, isNavigating, remainingNavDistance]);
 
   const { activeAlert: activeSignAlert } = useSignProximityAlert({
-    alertDistanceMeters: 50,
+    alertDistanceMeters: 75,
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
@@ -1304,16 +1322,20 @@ export function NavigationMapScreen() {
 
         <NavigationUpcomingSigns signs={upcomingSignsOnRoute} />
 
-        {/* Floating Re-center button during navigation */}
+        {/* Floating Re-center and Voice toggle buttons during navigation */}
         {isNavigating ? (
           <Animated.View
             pointerEvents="box-none"
             style={{
               position: 'absolute',
               left: 16,
+              right: 16,
               bottom: floatingButtonBottom,
               opacity: floatingButtonOpacity,
               zIndex: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
             <Pressable
@@ -1342,6 +1364,7 @@ export function NavigationMapScreen() {
               <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
               <Text style={[styles.navRecenterText, { color: theme.primary }]}>Căn giữa</Text>
             </Pressable>
+            {renderTtsToggleButton('btn-toggle-tts-nav')}
           </Animated.View>
         ) : null}
 
@@ -1424,24 +1447,7 @@ export function NavigationMapScreen() {
                     <View style={[styles.filterActiveBadge, { backgroundColor: theme.primary }]} />
                   ) : null}
                 </AppButton>
-                <AppButton
-                  accessibilityLabel={
-                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
-                  }
-                  onPress={handleToggleTts}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <MaterialCommunityIcons
-                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
-                    size={22}
-                    color="#000000"
-                  />
-                </AppButton>
+                {renderTtsToggleButton()}
 
                 <AppButton
                   accessibilityLabel={isLocating ? 'Đang xác định vị trí' : 'Về vị trí hiện tại'}
