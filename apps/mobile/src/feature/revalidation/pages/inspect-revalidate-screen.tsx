@@ -79,6 +79,7 @@ export type InspectRevalidateParams = {
   roadName?: string;
   displayAddress?: string;
   lastVerifiedAt?: string;
+  questClaimId?: string;
 };
 
 type SelectedMedia = {
@@ -717,6 +718,7 @@ export function InspectRevalidateScreen() {
           capturedAt: uploadMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
+          questClaimId: params.questClaimId,
         },
         mediaFile: uploadMedia
           ? {

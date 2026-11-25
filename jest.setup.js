@@ -136,6 +136,19 @@ jest.mock('@/hooks/use-back-button', () => ({
   useBackButton: jest.fn(),
 }));
 
+jest.mock('@/feature/work/hooks/use-bounty-board', () => ({
+  bountyKeys: {
+    all: (accountId) => ['bounty-board', accountId],
+    available: (accountId, params) => ['bounty-board', accountId, 'available', params],
+    myClaims: (accountId) => ['bounty-board', accountId, 'my-claims'],
+  },
+  useMyBountyClaims: () => ({ data: [], isLoading: false }),
+  useAvailableBountyQuests: () => ({ data: [], isLoading: false }),
+  useClaimBountyQuest: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useAbandonBountyQuest: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useCheckInCandidate: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+
 try {
   require('@shopify/flash-list/jestSetup');
 } catch {

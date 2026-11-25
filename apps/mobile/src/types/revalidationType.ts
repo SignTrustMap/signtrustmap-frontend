@@ -163,6 +163,7 @@ export interface RevalidationQueueEvidenceItem {
     longitude: number;
     distanceMeters: number | null;
     suggestedSignTypeId?: number;
+  questClaimId?: string;
   };
   currentVoteCount: number;
   taskStatus: string;
@@ -190,6 +191,7 @@ export interface RevalidationDecisionItem {
 export interface EvidenceVoteDto {
   decision: RevalDecision | string;
   suggestedSignTypeId?: number;
+  questClaimId?: string;
   note?: string;
 }
 
@@ -230,6 +232,7 @@ export type SubmitRevalidationEvidenceDto = {
   isLiveCapture?: boolean;
   mediaUrl?: string;
   suggestedSignTypeId?: number;
+  questClaimId?: string;
   // UI-only helper fields (omitted from outgoing payload)
   note?: string;
   condition?: string;

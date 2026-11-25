@@ -302,7 +302,9 @@ export async function submitRevalidationEvidence(
     if (isLocalFile && uploadMediaFile?.uri) {
       try {
         const url = `${apiBaseUrl()}/revalidation/tasks/${encodeURIComponent(taskIdOrSignId)}/evidence`;
-        console.log(`[Revalidation] Native uploadAsync -> POST ${url} (file=${uploadMediaFile.uri})`);
+        console.log(
+          `[Revalidation] Native uploadAsync -> POST ${url} (file=${uploadMediaFile.uri})`,
+        );
 
         const result = await FileSystem.uploadAsync(url, uploadMediaFile.uri, {
           fieldName: 'file',
@@ -447,7 +449,8 @@ export async function getRevalidationTasks(
   if (params?.sort) searchParams.append('sort', params.sort);
   if (params?.lat != null) searchParams.append('lat', String(params.lat));
   if (params?.lon != null) searchParams.append('lon', String(params.lon));
-  if (params?.radiusMeters != null) searchParams.append('radiusMeters', String(params.radiusMeters));
+  if (params?.radiusMeters != null)
+    searchParams.append('radiusMeters', String(params.radiusMeters));
 
   const qs = searchParams.toString();
   const url = `${API_PATHS.REVALIDATION_TASKS}${qs ? `?${qs}` : ''}`;

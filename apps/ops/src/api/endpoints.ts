@@ -30,6 +30,8 @@ export const API_ENDPOINTS = {
     ASSIGN_ROLE: (userId: string) => `/api/v1/admin/users/${userId}/roles`,
     TOGGLE_STATUS: (userId: string) => `/api/v1/admin/users/${userId}/status`,
     UPDATE_STATUS: (userId: string) => `/api/v1/admin/users/${userId}/status`,
+    LOW_RELIABILITY: '/api/v1/admin/users/low-reliability',
+    BAN_WAVE: '/api/v1/admin/users/ban-wave',
   },
 
   ROLES: {

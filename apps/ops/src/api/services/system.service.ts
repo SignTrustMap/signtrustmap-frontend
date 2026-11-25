@@ -32,6 +32,9 @@ export interface ConsensusConfigItem {
   consecutiveErrorLimit?: number
   suspensionCooldownDays?: number
   provisionalVoteWeight?: number
+  provisionalMinReliabilityThreshold?: number
+  provisionalConsecutiveErrorLimit?: number
+  provisionalAutoBanEnabled?: boolean
   reason?: string
   isActive?: boolean
 }
