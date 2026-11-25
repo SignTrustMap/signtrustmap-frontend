@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Dimensions, Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
     cancelAnimation,
@@ -49,6 +49,7 @@ export function AppSplashScreen({
 }: AppSplashScreenProps = {}) {
     const progress = useSharedValue(0);
     const shouldReduceMotion = useReducedMotion();
+    const hasHiddenNativeSplashRef = useRef(false);
     const exitKeyframe = new Keyframe({
         0: {
             transform: [{ translateY: 0 }],
@@ -61,9 +62,13 @@ export function AppSplashScreen({
         },
     });
 
-    useEffect(() => {
+    const handleOverlayLayout = useCallback(() => {
+        if (hasHiddenNativeSplashRef.current) return;
+        hasHiddenNativeSplashRef.current = true;
         void SplashScreen.hideAsync();
+    }, []);
 
+    useEffect(() => {
         progress.value = withTiming(1, {
             duration: shouldReduceMotion ? 0 : SPLASH_PROGRESS_DURATION_MS,
             easing: Easing.linear,
@@ -84,7 +89,9 @@ export function AppSplashScreen({
     return (
         <Animated.View
             exiting={exitKeyframe.duration(EXIT_ANIMATION_DURATION_MS)}
+            onLayout={handleOverlayLayout}
             style={styles.splashOverlay}
+            testID="app-splash-overlay"
         >
             <Image
                 accessibilityLabel="Logo SignTrustMap"

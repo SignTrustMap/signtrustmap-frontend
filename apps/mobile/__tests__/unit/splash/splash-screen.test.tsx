@@ -62,8 +62,17 @@ describe('AppSplashScreen Unit Test Suite', () => {
     expect(progressTrack.props.accessibilityRole).toBe('progressbar');
   });
 
-  it('hides native splash screen upon mounting', async () => {
+  it('hides native splash screen once overlay finishes initial layout', async () => {
     await render(<AppSplashScreen />);
+
+    expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
+
+    await fireEvent(screen.getByTestId('app-splash-overlay'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 812 } },
+    });
+    await fireEvent(screen.getByTestId('app-splash-overlay'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 375, height: 812 } },
+    });
 
     expect(SplashScreen.hideAsync).toHaveBeenCalledTimes(1);
   });
