@@ -170,7 +170,7 @@ export function LocationPickerModal({
       setCameraFocusCoord(coord);
       setFocusRequestId((prev) => prev + 1);
     } catch (err) {
-      setErrorMessage(GPS_UNAVAILABLE_MESSAGE);
+      setErrorMessage(err instanceof Error ? err.message : GPS_UNAVAILABLE_MESSAGE);
     } finally {
       setIsLocating(false);
     }

@@ -24,10 +24,10 @@ export const GPS_SERVICE_DISABLED_MESSAGE =
 export const UNABLE_TO_GET_CURRENT_LOCATION_MESSAGE = 'Không thể lấy vị trí hiện tại của bạn.';
 export const GPS_NATIVE_BUILD_REQUIRED_MESSAGE = 'Vị trí GPS hiện tại yêu cầu bản build native.';
 export const LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE =
-  'Tính năng tìm vị trí yêu cầu bản build native.';
+  'Tính năng tìm vị trí yêu cầu bản build native';
 export const ALLOW_LOCATION_ACCESS_MESSAGE =
-  'Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn.';
-export const ENABLE_LOCATION_SERVICE_MESSAGE = 'Bật dịch vụ định vị và thử lại.';
+  'Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn';
+export const ENABLE_LOCATION_SERVICE_MESSAGE = 'Bật dịch vụ định vị và thử lại';
 export const ROUTE_LOADING_MESSAGE = 'Đang tải tuyến đường. Vui lòng thử lại sau giây lát.';
 export const LOCATION_PERMISSION_REQUIRED_NAVIGATION_MESSAGE =
   'Cần cấp quyền truy cập vị trí để bắt đầu điều hướng.';
