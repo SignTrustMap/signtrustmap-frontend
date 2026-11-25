@@ -658,6 +658,9 @@ export async function submitRevalidationEvidence(
     if (data.suggestedSignTypeId != null && !Number.isNaN(Number(data.suggestedSignTypeId))) {
       formData.append('suggestedSignTypeId', String(Math.round(Number(data.suggestedSignTypeId))));
     }
+    if (data.questClaimId) {
+      formData.append('questClaimId', data.questClaimId);
+    }
 
     if (uploadMediaFile) {
       if (typeof File !== 'undefined' && (uploadMediaFile as unknown) instanceof File) {

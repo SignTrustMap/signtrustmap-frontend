@@ -1450,22 +1450,20 @@ export default function SystemSettingsPage() {
                       <button
                         type="button"
                         onClick={() => setProvisionalAutoBanEnabled(true)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                          provisionalAutoBanEnabled
-                            ? 'bg-[#007b8b] text-white'
-                            : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${provisionalAutoBanEnabled
+                          ? 'bg-[#007b8b] text-white'
+                          : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                          }`}
                       >
                         {isEn ? 'On' : 'Bật'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setProvisionalAutoBanEnabled(false)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                          !provisionalAutoBanEnabled
-                            ? 'bg-red-600 text-white'
-                            : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${!provisionalAutoBanEnabled
+                          ? 'bg-red-600 text-white'
+                          : 'bg-white dark:bg-[#061115] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-50'
+                          }`}
                       >
                         {isEn ? 'Off' : 'Tắt'}
                       </button>

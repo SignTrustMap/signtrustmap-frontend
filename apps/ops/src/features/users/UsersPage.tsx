@@ -459,11 +459,10 @@ export default function UsersPage() {
         <button
           type="button"
           onClick={() => handleTabChange('all')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'all'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'all'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>Danh sách người dùng</span>
         </button>
@@ -471,11 +470,10 @@ export default function UsersPage() {
         <button
           type="button"
           onClick={() => handleTabChange('low_reliability')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${
-            activeTab === 'low_reliability'
-              ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors duration-150 whitespace-nowrap flex items-center gap-1.5 cursor-pointer shrink-0 ${activeTab === 'low_reliability'
+            ? 'bg-white dark:bg-[#0A171C] text-neutral-900 dark:text-white shadow-xs border border-neutral-200/60 dark:border-white/10'
+            : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5 border border-transparent'
+            }`}
         >
           <span>Tài khoản uy tín thấp</span>
         </button>

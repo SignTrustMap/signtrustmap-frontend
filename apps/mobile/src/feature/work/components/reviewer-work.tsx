@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 import { useGetMyReviewerStats, useGetReviewQueue } from '@/feature/review/hooks/use-review';
@@ -14,6 +14,7 @@ import {
 } from '@/feature/work/hooks/use-daily-tasks';
 import type { ReviewerStatsResponse } from '@/types/reviewsType';
 import { WorkActionBadge } from './work-action-badge';
+import { ActiveQuestBanner } from './active-quest-banner';
 
 export interface ReviewerWorkProps {
   reviewQueueTotal?: number;
@@ -61,11 +62,22 @@ export function ReviewerWork({
 
   return (
     <View style={styles.container}>
+      <ActiveQuestBanner />
+
       <View style={styles.sectionContainer}>
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng</Text>
         </View>
         <View style={styles.gridRow}>
+          {/* Standout Action: Bounty Board */}
+          <WorkActionBadge
+            accessibilityLabel="Nhận nhiệm vụ thẩm định tại chỗ"
+            accentColor={theme.primary}
+            icon="compass-outline"
+            label="Nhiệm vụ thẩm định"
+            onPress={() => router.push('/work/bounty-board')}
+          />
+
           {/* Standout Action for Reviewer: Pending Reviews */}
           <WorkActionBadge
             accessibilityLabel="Thẩm định các hồ sơ chờ xử lý"
