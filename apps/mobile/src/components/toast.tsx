@@ -9,7 +9,7 @@ type AppToastProps = {
   message: string;
   onDismiss?: () => void;
   placement?: 'bottom' | 'center';
-  tone?: 'default' | 'success' | 'danger';
+  tone?: 'default' | 'success' | 'danger' | 'neutral';
 };
 
 export function AppToast({
@@ -42,6 +42,7 @@ export function AppToast({
           styles.toast,
           tone === 'success' ? styles.successToast : undefined,
           tone === 'danger' ? styles.dangerToast : undefined,
+          tone === 'neutral' ? styles.neutralToast : undefined,
         ]}
       >
         <Text numberOfLines={2} style={styles.message}>
@@ -87,6 +88,9 @@ const styles = StyleSheet.create({
   },
   dangerToast: {
     backgroundColor: '#DC2626',
+  },
+  neutralToast: {
+    backgroundColor: '#6B7280',
   },
   message: {
     color: '#FFFFFF',

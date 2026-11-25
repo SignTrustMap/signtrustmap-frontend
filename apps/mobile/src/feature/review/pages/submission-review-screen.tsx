@@ -937,13 +937,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         router.replace('/work/reviewer-history');
       }
     },
-    [
-      completeCurrentReview,
-      isRecheckMode,
-      isSubmittingReview,
-      router,
-      submission,
-    ],
+    [completeCurrentReview, isRecheckMode, isSubmittingReview, router, submission],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -1606,10 +1600,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
               <MaterialCommunityIcons color="#16803A" name="check" size={36} />
             </View>
             <Text
-              accessibilityLabel="All reviews completed"
+              accessibilityLabel="Không còn biển báo nào để thẩm định"
               style={[styles.completeTitle, { color: theme.text }]}
             >
-              All reviews completed
+              Hoàn tất thẩm định
             </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
               Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.

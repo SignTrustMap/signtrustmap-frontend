@@ -1,8 +1,15 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import * as Reanimated from 'react-native-reanimated';
+
+jest.mock('@expo/vector-icons', () => {
+  const { View } = require('react-native');
+  return {
+    MaterialIcons: (props: any) => <View testID={`icon-${props.name}`} />,
+  };
+});
 
 // Mock expo-splash-screen
 jest.mock('expo-splash-screen', () => ({
@@ -92,5 +99,75 @@ describe('AppSplashScreen Unit Test Suite', () => {
     await unmount();
 
     expect(Reanimated.cancelAnimation).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show GPS required prompt while checking or granted', async () => {
+    const { rerender } = await render(<AppSplashScreen gpsStatus="checking" />);
+    expect(screen.queryByTestId('splash-gps-required-prompt')).toBeNull();
+
+    await rerender(<AppSplashScreen gpsStatus="granted" />);
+    expect(screen.queryByTestId('splash-gps-required-prompt')).toBeNull();
+  });
+
+  it('renders mandatory GPS prompt with retry and settings actions when denied', async () => {
+    const onRetryGps = jest.fn();
+    const onOpenSettings = jest.fn();
+
+    await render(
+      <AppSplashScreen
+        gpsStatus="denied"
+        onRetryGps={onRetryGps}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+
+    expect(screen.getByTestId('splash-gps-required-prompt')).toBeTruthy();
+    expect(screen.getByText('Yêu cầu bật định vị (GPS)')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('splash-gps-retry-button'));
+    expect(onRetryGps).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getByTestId('splash-gps-settings-button'));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables retry button while retrying GPS permission', async () => {
+    const onRetryGps = jest.fn();
+
+    await render(
+      <AppSplashScreen
+        gpsStatus="denied"
+        isRetryingGps
+        onRetryGps={onRetryGps}
+      />,
+    );
+
+    expect(screen.getByText('Đang kiểm tra...')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('splash-gps-retry-button'));
+    expect(onRetryGps).not.toHaveBeenCalled();
+  });
+
+  it('renders device GPS disabled copy and location settings button when reason is service', async () => {
+    const onRetryGps = jest.fn();
+    const onOpenSettings = jest.fn();
+
+    await render(
+      <AppSplashScreen
+        gpsStatus="denied"
+        gpsDenialReason="service"
+        onRetryGps={onRetryGps}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+
+    expect(screen.getByText('Định vị GPS đang tắt')).toBeTruthy();
+    expect(screen.getByText('Thử lại')).toBeTruthy();
+    expect(screen.getByText('Mở Cài đặt vị trí')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('splash-gps-retry-button'));
+    expect(onRetryGps).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getByTestId('splash-gps-settings-button'));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,12 @@
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 import {
@@ -25,7 +33,12 @@ import {
 } from '@/constants/message';
 import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
-export type ReviewActionType = 'approved' | 'declined' | 'reported' | 'skipped' | 'reported_new_sign';
+export type ReviewActionType =
+  | 'approved'
+  | 'declined'
+  | 'reported'
+  | 'skipped'
+  | 'reported_new_sign';
 
 export type CompletedReview = {
   action: ReviewActionType;
@@ -45,7 +58,7 @@ export type ReviewWorkflowContextValue = {
       declineNote?: string;
       suggestedSignTypeId?: number | string;
       newSignReport?: CreateMissingTypeReportDto;
-    }
+    },
   ) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
@@ -72,7 +85,9 @@ export type ReviewWorkflowContextValue = {
   undoLastReview: () => Promise<boolean>;
 };
 
-export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(undefined);
+export const ReviewWorkflowContext = createContext<ReviewWorkflowContextValue | undefined>(
+  undefined,
+);
 
 export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const queryClient = useContext(QueryClientContext);
@@ -107,7 +122,8 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
   const segments = useSegments();
   const rawSegments = segments as string[];
-  const isReviewActive = rawSegments.includes('submission-review') || rawSegments.includes('submission-summary');
+  const isReviewActive =
+    rawSegments.includes('submission-review') || rawSegments.includes('submission-summary');
 
   const refetchWorkflow = useCallback(async () => {
     const [queueResult, historyResult] = await Promise.all([
@@ -131,7 +147,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       setInitialQueueSubmissions(data.queue.submissions);
       setTotalSubmissions(data.queue.total);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
+      setError(UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +176,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         setError(undefined);
       })
       .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE);
+        if (active)
+          setError(
+            cause instanceof Error ? cause.message : UNABLE_TO_LOAD_REVIEW_SUBMISSIONS_MESSAGE,
+          );
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -269,7 +288,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       const remainingReviews: CompletedReview[] = pendingSubmissions
         .map((sub) => {
           const action =
-            (sub as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+            (sub as ReviewSubmission & { previousAction?: ReviewActionType })?.previousAction ??
             recheckingPreviousAction;
           if (!action) return null;
           return { action, submission: sub };
@@ -305,7 +324,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     if (pendingSubmissions.length === 0) return true;
     const current = pendingSubmissions[0];
     const prevAction =
-      (current as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction ??
+      (current as ReviewSubmission & { previousAction?: ReviewActionType })?.previousAction ??
       recheckingPreviousAction ??
       'skipped';
     const completes = pendingSubmissions.length <= 1;
@@ -329,7 +348,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     } else {
       const nextItem = pendingSubmissions[1];
       setRecheckingPreviousAction(
-        (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
+        (nextItem as ReviewSubmission & { previousAction?: ReviewActionType })?.previousAction,
       );
     }
 
@@ -372,14 +391,17 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       declineNote?: string;
       suggestedSignTypeId?: number | string;
       newSignReport?: CreateMissingTypeReportDto;
-    }
+    },
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
     if (!submission) return false;
 
     // Concurrency guard: avoid duplicate vote calls for the same submission
     if (inFlightVotesRef.current.has(submission.id)) {
-      console.warn('[ReviewWorkflow] Blocked duplicate review action in flight for:', submission.id);
+      console.warn(
+        '[ReviewWorkflow] Blocked duplicate review action in flight for:',
+        submission.id,
+      );
       return false;
     }
     inFlightVotesRef.current.add(submission.id);
@@ -387,10 +409,19 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
 
     const completedRecheckIndex = isRecheckingSubmission ? recheckingReviewIndex : undefined;
 
-    const action: ReviewActionType = typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
-    const reason = details?.declineReason || (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
-    const note = details?.declineNote || (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
-    const suggestedSignTypeId = (details as any)?.suggestedSignTypeId ?? (typeof actionOrDecision === 'object' ? (actionOrDecision as any).suggestedSignTypeId : undefined);
+    const action: ReviewActionType =
+      typeof actionOrDecision === 'string' ? actionOrDecision : actionOrDecision.action;
+    const reason =
+      details?.declineReason ||
+      (typeof actionOrDecision === 'object' ? actionOrDecision.declineReason : undefined);
+    const note =
+      details?.declineNote ||
+      (typeof actionOrDecision === 'object' ? actionOrDecision.declineNote : undefined);
+    const suggestedSignTypeId =
+      (details as any)?.suggestedSignTypeId ??
+      (typeof actionOrDecision === 'object'
+        ? (actionOrDecision as any).suggestedSignTypeId
+        : undefined);
 
     const params = { candidateId: submission.id };
 
@@ -399,9 +430,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       if (action === 'reported_new_sign') {
         if (details?.newSignReport) {
           const proposedName =
-            details.newSignReport.proposedName?.trim() ||
-            submission.title ||
-            'Biển mới đề xuất';
+            details.newSignReport.proposedName?.trim() || submission.title || 'Biển mới đề xuất';
           await reportMissingTypeMutation({
             ...details.newSignReport,
             candidateId: submission.id,
@@ -437,7 +466,11 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         let gpsCoords: { latitude: number; longitude: number } | null = null;
         try {
           const freshLoc = await fetchFreshGpsLocation(2500);
-          if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          if (
+            freshLoc &&
+            typeof freshLoc.latitude === 'number' &&
+            typeof freshLoc.longitude === 'number'
+          ) {
             gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
           }
         } catch (e) {
@@ -448,7 +481,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           params,
           request: {
             vote: action === 'approved' ? 1 : -1,
-            ...(suggestedSignTypeId != null ? { suggestedSignTypeId: Number(suggestedSignTypeId) } : {}),
+            ...(suggestedSignTypeId != null
+              ? { suggestedSignTypeId: Number(suggestedSignTypeId) }
+              : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
             ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
@@ -472,7 +507,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       } else {
         const nextItem = pendingSubmissions[1];
         setRecheckingPreviousAction(
-          (nextItem as (ReviewSubmission & { previousAction?: ReviewActionType }))?.previousAction,
+          (nextItem as ReviewSubmission & { previousAction?: ReviewActionType })?.previousAction,
         );
       }
       setSessionReviewCount((count) => count + 1);

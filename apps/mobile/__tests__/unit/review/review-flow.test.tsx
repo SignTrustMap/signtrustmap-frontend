@@ -775,14 +775,14 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       await fireEvent.press(getByLabelText('Approve submission'));
 
       await waitFor(() => {
-        expect(getByText('All reviews completed')).toBeTruthy();
+        expect(getByText('Hoàn tất thẩm định')).toBeTruthy();
       });
 
       fireEvent.press(getByText('Lịch sử thẩm định'));
       expect(mockReplace).toHaveBeenCalledWith('/work/reviewer-history');
     });
 
-    it('renders "All reviews completed" with a "View Summary" button when queue is finished', async () => {
+    it('renders "Hoàn tất thẩm định" with a "View Summary" button when queue is finished', async () => {
       mockQueueSubmissions = [];
       mockQueueTotal = 0;
 
@@ -793,7 +793,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('All reviews completed')).toBeTruthy();
+        expect(getByText('Hoàn tất thẩm định')).toBeTruthy();
         expect(getByText('Bạn đã xem xét toàn bộ các biển báo trong hàng đợi.')).toBeTruthy();
       });
     });
@@ -1107,7 +1107,7 @@ describe('Review Flow: Comprehensive Unit Test Suite', () => {
 
       await waitFor(() => {
         // Displays empty or complete state gracefully
-        expect(getByText('All reviews completed')).toBeTruthy();
+        expect(getByText('Hoàn tất thẩm định')).toBeTruthy();
       });
     });
 

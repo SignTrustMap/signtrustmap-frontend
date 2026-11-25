@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PermissionsAndroid, Platform, TurboModuleRegistry } from 'react-native';
+import { Alert, Linking, NativeModules, PermissionsAndroid, Platform, TurboModuleRegistry } from 'react-native';
 import Constants from 'expo-constants';
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,15 @@ import {
   fetchFreshGpsPosition,
 } from '@/feature/navigation/utils/gps';
 import { areSameLocation } from '@/feature/navigation/utils/location';
-import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
+import {
+  checkAndRequireLocationPermission,
+  checkMandatoryGpsStatus,
+  hasLocationPermission,
+  isDeviceLocationEnabled,
+  openLocationSettings,
+  requestAppLocationPermission,
+  requestLocationPermissionOnFirstLaunch,
+} from '@/services/location-permission';
 import { isMapLibreAvailable, getMapLibre } from '@/services/maplibre';
 
 import {
@@ -225,6 +233,66 @@ describe('Navigation Utils, Services, and Hooks', () => {
 
       Platform.OS = 'android';
       await expect(requestLocationPermissionOnFirstLaunch()).resolves.toBeUndefined();
+    });
+
+    it('checks and requests app location permission across platforms', async () => {
+      Platform.OS = 'web';
+      await expect(hasLocationPermission()).resolves.toBe(true);
+      await expect(requestAppLocationPermission()).resolves.toBe(true);
+
+      Platform.OS = 'android';
+      jest.spyOn(PermissionsAndroid, 'check').mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+      await expect(hasLocationPermission()).resolves.toBe(false);
+
+      jest.spyOn(PermissionsAndroid, 'check').mockResolvedValueOnce(true);
+      await expect(hasLocationPermission()).resolves.toBe(true);
+
+      jest.spyOn(PermissionsAndroid, 'check').mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+      jest.spyOn(PermissionsAndroid, 'requestMultiple').mockResolvedValueOnce({
+        [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION]: PermissionsAndroid.RESULTS.DENIED,
+        [PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION]: PermissionsAndroid.RESULTS.DENIED,
+      } as any);
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+      await expect(checkAndRequireLocationPermission()).resolves.toBe(false);
+      expect(alertSpy).toHaveBeenCalledTimes(1);
+      alertSpy.mockRestore();
+
+      const linkingSpy = jest.spyOn(Linking, 'openSettings').mockResolvedValueOnce(undefined as any);
+      await openLocationSettings('permission');
+      expect(linkingSpy).toHaveBeenCalledTimes(1);
+      linkingSpy.mockRestore();
+    });
+
+    it('detects when device GPS service is disabled via native module or MapLibre fallback', async () => {
+      Platform.OS = 'android';
+      NativeModules.GpsStatusModule = {
+        isLocationEnabled: jest.fn().mockResolvedValue(false),
+      };
+
+      jest.spyOn(PermissionsAndroid, 'check').mockResolvedValueOnce(true);
+      await expect(checkMandatoryGpsStatus({ promptPermission: true })).resolves.toEqual({
+        status: 'denied',
+        reason: 'service',
+      });
+
+      NativeModules.GpsStatusModule.isLocationEnabled.mockResolvedValueOnce(true);
+      jest.spyOn(PermissionsAndroid, 'check').mockResolvedValueOnce(true);
+      await expect(checkMandatoryGpsStatus({ promptPermission: true })).resolves.toEqual({
+        status: 'granted',
+        reason: null,
+      });
+
+      // Fallback when GpsStatusModule is not compiled into current binary
+      delete NativeModules.GpsStatusModule;
+      const mockModule = (getMapLibre as jest.Mock)();
+      mockModule.LocationManager.getCurrentPosition.mockResolvedValueOnce(undefined);
+      await expect(isDeviceLocationEnabled(10)).resolves.toBe(false);
+
+      mockModule.LocationManager.getCurrentPosition.mockResolvedValueOnce({
+        coords: { latitude: 10.7769, longitude: 106.7009, accuracy: 10 },
+        timestamp: Date.now(),
+      });
+      await expect(isDeviceLocationEnabled(10)).resolves.toBe(true);
     });
   });
 

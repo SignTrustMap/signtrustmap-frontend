@@ -3,7 +3,6 @@ import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from '
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Camera } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { AppButton } from '@/components/button';
 import { AppToast } from '@/components/toast';
@@ -574,13 +573,14 @@ export function NavigationMapScreen() {
           : mapSigns;
     const resolvedSigns = rawSigns.map((sign) => {
       const resolvedCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : undefined;
-      const resolvedFrame = (sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
-        ? resolveImageUrl(sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
-        : undefined;
+      const resolvedFrame =
+        sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl
+          ? resolveImageUrl(sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
+          : undefined;
       const resolvedImage =
         sign.imageUrl && !sign.imageUrl.includes('mock/')
           ? resolveImageUrl(sign.imageUrl)
-          : (resolvedCrop || resolvedFrame || TARGET_SIGN_IMAGE_URL);
+          : resolvedCrop || resolvedFrame || TARGET_SIGN_IMAGE_URL;
 
       return {
         ...sign,
@@ -922,7 +922,9 @@ export function NavigationMapScreen() {
         const firstIdx = arr.findIndex(
           (other) =>
             Math.abs(other.distanceMeters - sign.distanceMeters) <= 25 &&
-            ((sign.signCode && other.signCode && sign.signCode.toUpperCase() === other.signCode.toUpperCase()) ||
+            ((sign.signCode &&
+              other.signCode &&
+              sign.signCode.toUpperCase() === other.signCode.toUpperCase()) ||
               (sign.name && other.name && sign.name.toLowerCase() === other.name.toLowerCase())),
         );
         return firstIdx === idx;
