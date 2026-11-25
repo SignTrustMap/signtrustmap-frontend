@@ -50,6 +50,72 @@ export async function findOriginalAssetByFileName(
   return undefined;
 }
 
+function extractHeadingFromGenericObject(obj: any): number | undefined {
+  if (!obj || typeof obj !== 'object') return undefined;
+  const candidates = [
+    obj.heading,
+    obj.bearing,
+    obj.direction,
+    obj.course,
+    obj.track,
+    obj.azimuth,
+    obj.trueHeading,
+    obj.magneticHeading,
+    obj.compass,
+    obj.compassBearing,
+    obj.yaw,
+    obj.rotation,
+    obj.GPSImgDirection,
+    obj.gpsImgDirection,
+    obj.GPSTrack,
+    obj.gpsTrack,
+    obj.GPSDestBearing,
+    obj.gpsDestBearing,
+    obj.GPSBearing,
+    obj.gpsBearing,
+    obj.GPSHeading,
+    obj.gpsHeading,
+    obj.GPSDirection,
+    obj.gpsDirection,
+    obj.GPSCourse,
+    obj.gpsCourse,
+    obj.GPSAzimuth,
+    obj.gpsAzimuth,
+    obj.PoseHeadingDegrees,
+    obj.poseHeadingDegrees,
+    obj.FlightYawDegree,
+    obj.flightYawDegree,
+    obj.CameraHeading,
+    obj.cameraHeading,
+    obj.DeviceHeading,
+    obj.deviceHeading,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'number' && Number.isFinite(c)) {
+      return ((c % 360) + 360) % 360;
+    }
+    if (typeof c === 'string') {
+      const parsed = parseFloat(c.replace(/[^\d./+-]/g, ''));
+      if (Number.isFinite(parsed)) {
+        return ((parsed % 360) + 360) % 360;
+      }
+    }
+  }
+  return undefined;
+}
+
+function extractHeadingFromFileName(fileName?: string | null): number | undefined {
+  if (!fileName) return undefined;
+  const match = fileName.match(/(?:heading|bearing|direction|dir|track|azimuth|course|yaw)[_-]?([-\d.]+)(?:deg)?/i);
+  if (match && match[1]) {
+    const val = Number(match[1]);
+    if (Number.isFinite(val)) {
+      return ((val % 360) + 360) % 360;
+    }
+  }
+  return undefined;
+}
+
 export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<ImageGpsCoordinates | null> {
   console.log('[Surveyor] Picker asset metadata:', {
     assetId: asset.assetId,
@@ -60,9 +126,43 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
     uri: asset.uri,
   });
 
-  const exifCoordinates = extractImageGpsCoordinates(asset.exif);
+  let exifCoordinates = extractImageGpsCoordinates(asset.exif);
 
+  // If exif coordinates already have heading, return immediately
+  if (exifCoordinates && exifCoordinates.heading !== undefined) {
+    console.log('[Surveyor] Extracted image GPS data:', {
+      ...exifCoordinates,
+      source: 'image-picker-exif',
+    });
+    return exifCoordinates;
+  }
+
+  // If exif has lat/long but lacks heading, try extracting heading from raw image file, filename, or asset object
   if (exifCoordinates) {
+    if (exifCoordinates.heading === undefined && asset.type === 'image' && asset.uri) {
+      try {
+        const fileGps = await extractGpsFromImageFile(asset.uri);
+        if (fileGps?.heading !== undefined) {
+          exifCoordinates = {
+            ...exifCoordinates,
+            heading: fileGps.heading,
+          };
+        }
+      } catch {}
+    }
+
+    if (exifCoordinates.heading === undefined) {
+      const heading =
+        extractHeadingFromGenericObject(asset) ??
+        extractHeadingFromFileName(asset.fileName);
+      if (heading !== undefined) {
+        exifCoordinates = {
+          ...exifCoordinates,
+          heading,
+        };
+      }
+    }
+
     console.log('[Surveyor] Extracted image GPS data:', {
       ...exifCoordinates,
       source: 'image-picker-exif',
@@ -71,6 +171,7 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
   }
 
   if (Platform.OS === 'web') {
+    if (exifCoordinates) return exifCoordinates;
     console.log('[Surveyor] Extracted GPS data:', null);
     return null;
   }
@@ -84,6 +185,7 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
     });
 
     if (permission.status !== 'granted') {
+      if (exifCoordinates) return exifCoordinates;
       console.log('[Surveyor] Extracted GPS data:', null);
       return null;
     }
@@ -113,10 +215,30 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
       }
     }
 
+    const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
+
     if (isValidGpsCoordinates(location)) {
+      let heading: number | undefined =
+        extractHeadingFromGenericObject(location) ??
+        extractHeadingFromGenericObject(asset) ??
+        extractHeadingFromGenericObject(originalExif) ??
+        mediaLibraryExifCoordinates?.heading;
+
+      if (heading === undefined && asset.type === 'image') {
+        const fileGps = await extractGpsFromImageFile(asset.uri);
+        if (fileGps?.heading !== undefined) {
+          heading = fileGps.heading;
+        }
+      }
+
+      if (heading === undefined && asset.fileName) {
+        heading = extractHeadingFromFileName(asset.fileName);
+      }
+
       const coordinates = {
         latitude: location.latitude,
         longitude: location.longitude,
+        ...(heading !== undefined ? { heading } : {}),
       } satisfies ImageGpsCoordinates;
 
       console.log('[Surveyor] Extracted GPS data:', {
@@ -126,8 +248,27 @@ export async function extractSelectedAssetGps(asset: ImagePickerAsset): Promise<
       return coordinates;
     }
 
-    const mediaLibraryExifCoordinates = extractImageGpsCoordinates(originalExif);
-    if (mediaLibraryExifCoordinates) return mediaLibraryExifCoordinates;
+    if (mediaLibraryExifCoordinates) {
+      let heading =
+        mediaLibraryExifCoordinates.heading ??
+        extractHeadingFromGenericObject(originalExif) ??
+        extractHeadingFromGenericObject(location) ??
+        extractHeadingFromGenericObject(asset);
+
+      if (heading === undefined && asset.type === 'image') {
+        const fileGps = await extractGpsFromImageFile(asset.uri);
+        if (fileGps?.heading !== undefined) {
+          heading = fileGps.heading;
+        }
+      }
+      if (heading === undefined && asset.fileName) {
+        heading = extractHeadingFromFileName(asset.fileName);
+      }
+      return {
+        ...mediaLibraryExifCoordinates,
+        ...(heading !== undefined ? { heading } : {}),
+      };
+    }
 
     if (asset.type === 'image') {
       // Android scoped storage can strip GPS from the EXIF object returned by

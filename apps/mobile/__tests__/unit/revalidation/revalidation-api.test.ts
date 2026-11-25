@@ -10,6 +10,10 @@ import {
   getRevalidationTask,
   finalizeRevalidationTask,
   getEvidenceDecisions,
+  checkInRevalidationTask,
+  getCheckInEligibility,
+  requestEvidenceRecapture,
+  getSignHistory,
 } from '@/api/revalidation/revalidation';
 import type { RevalidationTaskItem } from '@/types/revalidationType';
 import * as apiClient from '@/api/api-client';
@@ -969,6 +973,135 @@ describe('Revalidation API Module', () => {
 
       const res = await getEvidenceDecisions('ev-error');
       expect(res).toEqual([]);
+    });
+  });
+
+  describe('checkInRevalidationTask & getCheckInEligibility', () => {
+    it('calls POST /revalidation/tasks/:taskId/check-in with GPS coordinates', async () => {
+      const mockCheckInRes = {
+        eligible: true,
+        canCaptureLive: true,
+        taskId: 'task-100',
+        signId: 'sign-100',
+        taskStatus: 'OPEN',
+        distanceMeters: 12.5,
+        maxProximityMeters: 50,
+        isWithinProximity: true,
+        remainingDistanceMeters: 0,
+        dailyLimitReached: false,
+        recentSubmissionsCount: 0,
+        dailySubmissionLimit: 3,
+        remainingSubmissionsToday: 3,
+        targetLocation: { lat: 10.7769, lon: 106.7009 },
+        surveyorLocation: { lat: 10.777, lon: 106.7009 },
+        message: 'Vị trí hợp lệ để chụp ảnh tại hiện trường (cách biển báo 12.5m <= 50m).',
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockCheckInRes);
+
+      const res = await checkInRevalidationTask('task-100', {
+        latitude: 10.777,
+        longitude: 106.7009,
+        accuracyMeters: 4.5,
+      });
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-100/check-in',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            latitude: 10.777,
+            longitude: 106.7009,
+            accuracyMeters: 4.5,
+          }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockCheckInRes);
+      expect(res.eligible).toBe(true);
+      expect(res.isWithinProximity).toBe(true);
+      expect(res.dailyLimitReached).toBe(false);
+    });
+
+    it('calls GET /revalidation/tasks/:taskId/check-in with query params', async () => {
+      const mockRes = { eligible: true, isWithinProximity: true };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRes);
+
+      const res = await getCheckInEligibility('task-101', 10.7769, 106.7009, 5);
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks/task-101/check-in?lat=10.7769&lon=106.7009&accuracyMeters=5'),
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockRes);
+    });
+  });
+
+  describe('requestEvidenceRecapture', () => {
+    it('calls POST /revalidation/evidence/:evidenceId/request-recapture with reason and note', async () => {
+      const mockRecaptureRes = {
+        success: true,
+        evidenceId: 'ev-rec-1',
+        taskId: 'task-rec-1',
+        surveyorId: 'surv-1',
+        reason: 'BLURRY',
+        note: 'Ảnh bị lóa sáng',
+        notificationSent: true,
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRecaptureRes);
+
+      const res = await requestEvidenceRecapture('ev-rec-1', {
+        reason: 'BLURRY',
+        note: 'Ảnh bị lóa sáng',
+      });
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/evidence/ev-rec-1/request-recapture',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ reason: 'BLURRY', note: 'Ảnh bị lóa sáng' }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res.success).toBe(true);
+      expect(res.notificationSent).toBe(true);
+    });
+  });
+
+  describe('getSignHistory (Public)', () => {
+    it('fetches sign history without requiring Authorization header', async () => {
+      const mockHistory = {
+        signId: 'sign-hist-1',
+        currentSign: { signCode: 'P.102' },
+        history: [
+          {
+            id: 'h-1',
+            signId: 'sign-hist-1',
+            previousSignCode: 'P.101',
+            changeReason: 'Updated sign in 2026',
+            changedAt: '2026-09-01T00:00:00Z',
+          },
+        ],
+        lifecycleEvents: [
+          {
+            id: 'le-1',
+            signId: 'sign-hist-1',
+            eventType: 'REVALIDATED',
+            eventAt: '2026-10-01T00:00:00Z',
+          },
+        ],
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockHistory);
+
+      const res = await getSignHistory('sign-hist-1');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/signs/sign-hist-1/history',
+        { signal: undefined },
+      );
+      expect(res.signId).toBe('sign-hist-1');
+      expect(res.history).toHaveLength(1);
+      expect(res.lifecycleEvents[0].eventType).toBe('REVALIDATED');
     });
   });
 });

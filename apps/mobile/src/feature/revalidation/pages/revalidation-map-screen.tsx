@@ -45,10 +45,38 @@ type FreshnessFilter = 'ALL' | 'NEEDS_REVALIDATION' | 'MODERATE' | 'FRESH';
 const FILTER_PANEL_WIDTH = 200;
 
 const ZOOM_THRESHOLDS = [
-  { id: 'detail', label: '17.5x', name: 'Chi tiết', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Cột & biển báo' },
-  { id: 'street', label: '16.5x', name: 'Đường phố', zoom: 16.5, icon: 'road-variant', desc: 'Cấp đường phố' },
-  { id: 'area', label: '14.5x', name: 'Khu vực', zoom: 14.5, icon: 'home-city-outline', desc: 'Khu dân cư' },
-  { id: 'city', label: '12.0x', name: 'Toàn cảnh', zoom: 12.0, icon: 'city-variant-outline', desc: 'Toàn thành phố' },
+  {
+    id: 'detail',
+    label: '17.5x',
+    name: 'Chi tiết',
+    zoom: 17.5,
+    icon: 'magnify-plus-outline',
+    desc: 'Cột & biển báo',
+  },
+  {
+    id: 'street',
+    label: '16.5x',
+    name: 'Đường phố',
+    zoom: 16.5,
+    icon: 'road-variant',
+    desc: 'Cấp đường phố',
+  },
+  {
+    id: 'area',
+    label: '14.5x',
+    name: 'Khu vực',
+    zoom: 14.5,
+    icon: 'home-city-outline',
+    desc: 'Khu dân cư',
+  },
+  {
+    id: 'city',
+    label: '12.0x',
+    name: 'Toàn cảnh',
+    zoom: 12.0,
+    icon: 'city-variant-outline',
+    desc: 'Toàn thành phố',
+  },
 ] as const;
 
 type ZoomThresholdId = (typeof ZOOM_THRESHOLDS)[number]['id'];
@@ -101,23 +129,21 @@ export function RevalidationMapScreen() {
     return undefined;
   }, [params.snapLon, params.snapLat, initialSign]);
 
-  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate | undefined>(initialFocusCoord);
+  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate | undefined>(
+    initialFocusCoord,
+  );
   const [focusRequestId, setFocusRequestId] = useState(initialFocusCoord ? 1 : 0);
   const [activeFilter, setActiveFilter] = useState<FreshnessFilter>(() => {
     if (params.filter) return params.filter;
-    if (initialSign) {
-      const info = getFreshnessInfo(initialSign);
-      if (info.isFresh) return 'FRESH';
-      if (info.isModerate) return 'MODERATE';
-      return 'NEEDS_REVALIDATION';
-    }
     return 'ALL';
   });
 
   // Zoom control state
   const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 16.5);
   const [zoomRequestId, setZoomRequestId] = useState(0);
-  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(initialFocusCoord ? 'detail' : 'street');
+  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(
+    initialFocusCoord ? 'detail' : 'street',
+  );
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSignListOpen, setIsSignListOpen] = useState(false);
@@ -141,18 +167,21 @@ export function RevalidationMapScreen() {
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const filterSlideAnim = useRef(new Animated.Value(0)).current; // 0 = collapsed/hidden, 1 = expanded
 
-  const toggleFilter = useCallback((forceState?: boolean) => {
-    setIsFilterExpanded((current) => {
-      const nextState = forceState !== undefined ? forceState : !current;
-      Animated.spring(filterSlideAnim, {
-        toValue: nextState ? 1 : 0,
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 16,
-      }).start();
-      return nextState;
-    });
-  }, [filterSlideAnim]);
+  const toggleFilter = useCallback(
+    (forceState?: boolean) => {
+      setIsFilterExpanded((current) => {
+        const nextState = forceState !== undefined ? forceState : !current;
+        Animated.spring(filterSlideAnim, {
+          toValue: nextState ? 1 : 0,
+          useNativeDriver: true,
+          bounciness: 4,
+          speed: 16,
+        }).start();
+        return nextState;
+      });
+    },
+    [filterSlideAnim],
+  );
 
   const filterTranslateX = filterSlideAnim.interpolate({
     inputRange: [0, 1],
@@ -165,7 +194,8 @@ export function RevalidationMapScreen() {
   const [buttonsTranslateY] = useState(() => new Animated.Value(0));
 
   // Fetch all revalidation tasks from backend (global, independent of viewport)
-  const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } = useGetAllRevalidationTasks(true);
+  const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } =
+    useGetAllRevalidationTasks(true);
 
   // Fetch verified signs within current map bounds
   const { data: boundsSigns = [] } = useGetSignsInBounds(bounds, true);
@@ -339,16 +369,19 @@ export function RevalidationMapScreen() {
 
   const lastSignPressTimeRef = useRef(0);
 
-  const handleSignPress = useCallback((sign: RouteSign) => {
-    lastSignPressTimeRef.current = Date.now();
-    setOverrideSign((prev) => {
-      const current = prev !== undefined ? prev : selectedSign;
-      return current?.id === sign.id ? null : sign;
-    });
-    setFocusCoordinate(sign.coordinate);
-    setFocusRequestId((prev) => prev + 1);
-    setIsZoomMenuOpen(false);
-  }, [selectedSign]);
+  const handleSignPress = useCallback(
+    (sign: RouteSign) => {
+      lastSignPressTimeRef.current = Date.now();
+      setOverrideSign((prev) => {
+        const current = prev !== undefined ? prev : selectedSign;
+        return current?.id === sign.id ? null : sign;
+      });
+      setFocusCoordinate(sign.coordinate);
+      setFocusRequestId((prev) => prev + 1);
+      setIsZoomMenuOpen(false);
+    },
+    [selectedSign],
+  );
 
   const handleMapPress = useCallback(() => {
     if (Date.now() - lastSignPressTimeRef.current < 300) {
@@ -463,7 +496,7 @@ export function RevalidationMapScreen() {
     const matchedTask = sign.taskId
       ? undefined
       : allRevalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id) ||
-      revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
+        revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
     const resolvedTaskId = sign.taskId || matchedTask?.id || sign.id || '';
 
     router.replace({
@@ -617,20 +650,41 @@ export function RevalidationMapScreen() {
                             pressed && { backgroundColor: theme.backgroundSelected },
                           ]}
                         >
-                          <View style={[styles.dropdownItemIcon, { backgroundColor: 'rgba(6, 113, 235, 0.1)' }]}>
-                            <MaterialCommunityIcons color={theme.primary} name="sign-caution" size={18} />
+                          <View
+                            style={[
+                              styles.dropdownItemIcon,
+                              { backgroundColor: 'rgba(6, 113, 235, 0.1)' },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.primary}
+                              name="sign-caution"
+                              size={18}
+                            />
                           </View>
                           <View style={styles.dropdownItemTextCol}>
-                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
-                              {sign.signCode ? `${sign.signCode} - ${sign.name || ''}` : sign.name || 'Biển báo'}
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.dropdownItemTitle, { color: theme.text }]}
+                            >
+                              {sign.signCode
+                                ? `${sign.signCode} - ${sign.name || ''}`
+                                : sign.name || 'Biển báo'}
                             </Text>
                             {sign.roadName ? (
-                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}
+                              >
                                 {sign.roadName}
                               </Text>
                             ) : null}
                           </View>
-                          <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={16} />
+                          <MaterialCommunityIcons
+                            color={theme.placeholder}
+                            name="chevron-right"
+                            size={16}
+                          />
                         </Pressable>
                       ))}
                     </View>
@@ -653,15 +707,30 @@ export function RevalidationMapScreen() {
                             pressed && { backgroundColor: theme.backgroundSelected },
                           ]}
                         >
-                          <View style={[styles.dropdownItemIcon, { backgroundColor: `${theme.grey}15` }]}>
-                            <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={18} />
+                          <View
+                            style={[
+                              styles.dropdownItemIcon,
+                              { backgroundColor: `${theme.grey}15` },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.primary}
+                              name="map-marker-outline"
+                              size={18}
+                            />
                           </View>
                           <View style={styles.dropdownItemTextCol}>
-                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.dropdownItemTitle, { color: theme.text }]}
+                            >
                               {place.title}
                             </Text>
                             {place.address ? (
-                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}
+                              >
                                 {place.address}
                               </Text>
                             ) : null}
@@ -674,7 +743,11 @@ export function RevalidationMapScreen() {
                   {/* Empty State */}
                   {!isSearchLoading && searchResults.length === 0 && matchingSigns.length === 0 ? (
                     <View style={styles.dropdownEmptyRow}>
-                      <MaterialCommunityIcons color={theme.placeholder} name="map-marker-off-outline" size={20} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="map-marker-off-outline"
+                        size={20}
+                      />
                       <Text style={[styles.dropdownEmptyText, { color: theme.placeholder }]}>
                         Không tìm thấy địa điểm nào
                       </Text>
@@ -734,7 +807,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('ALL')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'ALL' && [styles.filterOptionItemActive, { backgroundColor: `${theme.primary}16`, borderColor: theme.primary }],
+                activeFilter === 'ALL' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: `${theme.primary}16`, borderColor: theme.primary },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -751,7 +827,12 @@ export function RevalidationMapScreen() {
                 </Text>
               </View>
               <View style={[styles.filterOptionBadge, { backgroundColor: `${theme.grey}20` }]}>
-                <Text style={[styles.filterOptionBadgeText, { color: activeFilter === 'ALL' ? theme.primary : theme.text }]}>
+                <Text
+                  style={[
+                    styles.filterOptionBadgeText,
+                    { color: activeFilter === 'ALL' ? theme.primary : theme.text },
+                  ]}
+                >
                   {rawSigns.length}
                 </Text>
               </View>
@@ -764,7 +845,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('NEEDS_REVALIDATION')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'NEEDS_REVALIDATION' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(225, 29, 72, 0.12)', borderColor: '#E11D48' }],
+                activeFilter === 'NEEDS_REVALIDATION' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(225, 29, 72, 0.12)', borderColor: '#E11D48' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -780,7 +864,9 @@ export function RevalidationMapScreen() {
                   Cần kiểm tra
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(225, 29, 72, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(225, 29, 72, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#E11D48' }]}>
                   {staleCount}
                 </Text>
@@ -794,7 +880,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('MODERATE')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'MODERATE' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' }],
+                activeFilter === 'MODERATE' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -810,7 +899,9 @@ export function RevalidationMapScreen() {
                   Trung bình
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#D97706' }]}>
                   {moderateCount}
                 </Text>
@@ -824,7 +915,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('FRESH')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'FRESH' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }],
+                activeFilter === 'FRESH' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -840,7 +934,9 @@ export function RevalidationMapScreen() {
                   Tươi mới
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#059669' }]}>
                   {freshCount}
                 </Text>
@@ -851,7 +947,9 @@ export function RevalidationMapScreen() {
 
         {/* Protruding Handle on the Right of the Filter Drawer */}
         <Pressable
-          accessibilityLabel={isFilterExpanded ? 'Ẩn bộ lọc mức độ khẩn cấp' : 'Hiển thị bộ lọc mức độ khẩn cấp'}
+          accessibilityLabel={
+            isFilterExpanded ? 'Ẩn bộ lọc mức độ khẩn cấp' : 'Hiển thị bộ lọc mức độ khẩn cấp'
+          }
           accessibilityRole="button"
           hitSlop={8}
           onPress={() => toggleFilter()}
@@ -920,7 +1018,10 @@ export function RevalidationMapScreen() {
                   onPress={() => handleSelectZoomThreshold(item.id, item.zoom)}
                   style={[
                     styles.zoomMenuItem,
-                    isSelected && [styles.zoomMenuItemActive, { backgroundColor: `${theme.primary}14` }],
+                    isSelected && [
+                      styles.zoomMenuItemActive,
+                      { backgroundColor: `${theme.primary}14` },
+                    ],
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -929,7 +1030,12 @@ export function RevalidationMapScreen() {
                     size={18}
                   />
                   <View style={styles.zoomMenuItemText}>
-                    <Text style={[styles.zoomItemName, { color: isSelected ? theme.primary : theme.text }]}>
+                    <Text
+                      style={[
+                        styles.zoomItemName,
+                        { color: isSelected ? theme.primary : theme.text },
+                      ]}
+                    >
                       {item.name}
                     </Text>
                     <Text style={[styles.zoomItemDesc, { color: theme.placeholder }]}>
@@ -967,7 +1073,10 @@ export function RevalidationMapScreen() {
           }}
           style={[
             styles.floatingCircleButton,
-            isSignListOpen && { borderColor: '#E11D48', backgroundColor: 'rgba(225, 29, 72, 0.08)' },
+            isSignListOpen && {
+              borderColor: '#E11D48',
+              backgroundColor: 'rgba(225, 29, 72, 0.08)',
+            },
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
@@ -997,7 +1106,10 @@ export function RevalidationMapScreen() {
           }}
           style={[
             styles.floatingCircleButton,
-            isZoomMenuOpen && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
+            isZoomMenuOpen && {
+              borderColor: theme.primary,
+              backgroundColor: theme.backgroundSelected,
+            },
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
@@ -1059,7 +1171,9 @@ export function RevalidationMapScreen() {
           {/* Panel Header */}
           <View style={styles.signListHeader}>
             <View style={styles.signListHeaderLeft}>
-              <View style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+              <View
+                style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}
+              >
                 <MaterialCommunityIcons color="#E11D48" name="alert-decagram-outline" size={18} />
               </View>
               <View>
@@ -1140,27 +1254,45 @@ export function RevalidationMapScreen() {
                     {/* Sign info */}
                     <View style={styles.signListRowInfo}>
                       <View style={styles.signListRowTop}>
-                        <Text numberOfLines={1} style={[styles.signListRowName, { color: theme.text }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.signListRowName, { color: theme.text }]}
+                        >
                           {item.signCode || 'Biển báo'}
                         </Text>
                         {info.scorePercent !== undefined ? (
-                          <View style={[styles.signListScoreBadge, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+                          <View
+                            style={[
+                              styles.signListScoreBadge,
+                              { backgroundColor: 'rgba(239, 68, 68, 0.10)' },
+                            ]}
+                          >
                             <Text style={styles.signListScoreText}>{info.scorePercent}%</Text>
                           </View>
                         ) : null}
                       </View>
-                      <Text numberOfLines={1} style={[styles.signListRowLabel, { color: theme.text }]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.signListRowLabel, { color: theme.text }]}
+                      >
                         {item.name || item.signCode || 'Biển báo chưa xác định'}
                       </Text>
                       {item.roadName ? (
-                        <Text numberOfLines={1} style={[styles.signListRowRoad, { color: theme.placeholder }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.signListRowRoad, { color: theme.placeholder }]}
+                        >
                           {item.roadName}
                         </Text>
                       ) : null}
                     </View>
 
                     {/* Chevron */}
-                    <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={18} />
+                    <MaterialCommunityIcons
+                      color={theme.placeholder}
+                      name="chevron-right"
+                      size={18}
+                    />
                   </Pressable>
                 );
               }}
@@ -1183,9 +1315,8 @@ export function RevalidationMapScreen() {
             allRevalTasks.find(
               (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
             )?.id ||
-            revalTasks.find(
-              (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
-            )?.id
+            revalTasks.find((t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id)
+              ?.id
           }
         />
       ) : null}

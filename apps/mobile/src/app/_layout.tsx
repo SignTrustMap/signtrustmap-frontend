@@ -3,8 +3,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
-import { LogBox, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, LogBox, View } from 'react-native';
 import { NavigationBar } from 'expo-navigation-bar';
 
 // Complete incoming OAuth redirect loops if running in a popup/browser session
@@ -14,7 +14,12 @@ import { Colors } from '@/constants/theme';
 import { SPLASH_PROGRESS_DURATION_MS } from '@/constants/const';
 import { AppSplashScreen } from '@/feature/splash/pages/splash-screen';
 import { SessionProvider, useSession } from '@/context/session-provider';
-import { requestLocationPermissionOnFirstLaunch } from '@/services/location-permission';
+import {
+  type GpsDenialReason,
+  type GpsPermissionStatus,
+  checkMandatoryGpsStatus,
+  openLocationSettings,
+} from '@/services/location-permission';
 import { queryClient } from '@/api/query-client';
 import { authExpiredEmitter } from '@/api/api-client';
 import { reconcilePendingCrops } from '@/feature/upload/utils/crop-sync-manager';
@@ -48,8 +53,12 @@ export { RouteErrorBoundary as ErrorBoundary };
 function RootNavigation() {
   const { isInitializing, logOut, session } = useSession();
   const [hasSplashProgressElapsed, setHasSplashProgressElapsed] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<GpsPermissionStatus>('checking');
+  const [gpsDenialReason, setGpsDenialReason] = useState<GpsDenialReason>(null);
+  const [isRetryingGps, setIsRetryingGps] = useState(false);
   const hasValidSession = Boolean(session?.accessToken);
-  const shouldShowSplash = isInitializing || !hasSplashProgressElapsed;
+  const shouldShowSplash =
+    isInitializing || !hasSplashProgressElapsed || gpsStatus !== 'granted';
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -59,12 +68,70 @@ function RootNavigation() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Verify mandatory GPS permission & device GPS status while the splash screen is loading.
+  useEffect(() => {
+    let isMounted = true;
+
+    checkMandatoryGpsStatus({ promptPermission: true })
+      .then((result) => {
+        if (isMounted) {
+          setGpsStatus(result.status);
+          setGpsDenialReason(result.reason);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setGpsStatus('denied');
+          setGpsDenialReason('permission');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Re-check silently when returning from Settings / Quick Settings if GPS was denied or off.
+  useEffect(() => {
+    if (gpsStatus !== 'denied') return;
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      void checkMandatoryGpsStatus({ promptPermission: false })
+        .then((result) => {
+          setGpsStatus(result.status);
+          setGpsDenialReason(result.reason);
+        })
+        .catch(() => {
+          // Keep prompt visible when check fails.
+        });
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [gpsStatus]);
+
+  const handleRetryGps = useCallback(async () => {
+    setIsRetryingGps(true);
+    try {
+      const result = await checkMandatoryGpsStatus({ promptPermission: true });
+      setGpsStatus(result.status);
+      setGpsDenialReason(result.reason);
+    } catch {
+      setGpsStatus('denied');
+      setGpsDenialReason('permission');
+    } finally {
+      setIsRetryingGps(false);
+    }
+  }, []);
+
+  const handleOpenGpsSettings = useCallback(() => {
+    void openLocationSettings(gpsDenialReason);
+  }, [gpsDenialReason]);
+
   useEffect(() => {
     if (shouldShowSplash) return;
-
-    requestLocationPermissionOnFirstLaunch().catch(() => {
-      // Permission storage failures should not prevent the app from opening.
-    });
 
     if (hasValidSession && session?.accessToken) {
       void reconcilePendingCrops(session.accessToken);
@@ -105,7 +172,15 @@ function RootNavigation() {
           <Stack.Screen name="(authenticated)" />
         </Stack.Protected>
       </Stack>
-      {shouldShowSplash ? <AppSplashScreen /> : null}
+      {shouldShowSplash ? (
+        <AppSplashScreen
+          gpsStatus={gpsStatus}
+          gpsDenialReason={gpsDenialReason}
+          isRetryingGps={isRetryingGps}
+          onRetryGps={handleRetryGps}
+          onOpenSettings={handleOpenGpsSettings}
+        />
+      ) : null}
     </View>
   );
 }

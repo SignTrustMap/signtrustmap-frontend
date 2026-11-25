@@ -34,6 +34,7 @@ export class ApiError extends Error {
     constructor(
         message: string,
         readonly status: number,
+        readonly data?: any,
     ) {
         super(message);
         this.name = "ApiError";
@@ -101,7 +102,7 @@ export async function apiRequest<T>(
             message,
             body,
         });
-        const err = new ApiError(message, response.status);
+        const err = new ApiError(message, response.status, body);
         // Notify the app that the token is no longer valid so it can redirect
         // to the login screen. Only trigger if auth credentials were provided.
         const hadAuth = Boolean(accessToken) || headers.has("Authorization");

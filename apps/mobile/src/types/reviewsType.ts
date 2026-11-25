@@ -12,6 +12,8 @@ export type VoteDto = {
     suggestedSignTypeId?: string | number;
     declineReason?: string;
     declineNote?: string;
+    latitude?: number;
+    longitude?: number;
 }
 
 export type CreateMissingTypeReportDto = {

@@ -2,11 +2,18 @@ import type { MapCoordinate } from '@/types/navigationType';
 
 const METERS_PER_DEGREE = 111_320;
 
-export function getRouteProgressMeters(
+export interface RouteProgressInfo {
+  progress: number;
+  distanceToRoute: number;
+}
+
+export function getRouteProgressInfo(
   coordinate: MapCoordinate,
   routeCoordinates: MapCoordinate[],
-) {
-  if (routeCoordinates.length < 2) return 0;
+): RouteProgressInfo {
+  if (routeCoordinates.length < 2) {
+    return { progress: 0, distanceToRoute: Number.POSITIVE_INFINITY };
+  }
 
   let bestDistanceToRoute = Number.POSITIVE_INFINITY;
   let bestProgress = 0;
@@ -39,5 +46,12 @@ export function getRouteProgressMeters(
     travelledDistance += segmentLength;
   }
 
-  return bestProgress;
+  return { progress: bestProgress, distanceToRoute: bestDistanceToRoute };
+}
+
+export function getRouteProgressMeters(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
+): number {
+  return getRouteProgressInfo(coordinate, routeCoordinates).progress;
 }

@@ -24,10 +24,17 @@ jest.mock('@/feature/navigation/components/navigation-map-view', () => {
 let mockSuggestions: any[] = [];
 let mockIsSearching = false;
 jest.mock('@/feature/navigation/hooks/use-places', () => ({
-  usePlaceSuggestions: () => ({ suggestions: mockSuggestions, data: mockSuggestions, isLoading: mockIsSearching }),
+  usePlaceSuggestions: () => ({
+    suggestions: mockSuggestions,
+    data: mockSuggestions,
+    isLoading: mockIsSearching,
+  }),
 }));
 
-let mockReverseGeocodeData: any = { displayAddress: 'Nguyen Hue, Ben Nghe, District 1, HCMC', roadName: 'Nguyen Hue' };
+let mockReverseGeocodeData: any = {
+  displayAddress: 'Nguyen Hue, Ben Nghe, District 1, HCMC',
+  roadName: 'Nguyen Hue',
+};
 jest.mock('@/feature/upload/hooks/use-reverse-geocode', () => ({
   useReverseGeocode: () => ({
     data: mockReverseGeocodeData,
@@ -72,7 +79,10 @@ describe('LocationPickerModal', () => {
     });
     mockSuggestions = [];
     mockIsSearching = false;
-    mockReverseGeocodeData = { displayAddress: 'Nguyen Hue, Ben Nghe, District 1, HCMC', roadName: 'Nguyen Hue' };
+    mockReverseGeocodeData = {
+      displayAddress: 'Nguyen Hue, Ben Nghe, District 1, HCMC',
+      roadName: 'Nguyen Hue',
+    };
     mockMapLibreInstance = {
       LocationManager: {
         requestPermissions: mockRequestPermissions,
@@ -98,7 +108,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7009, 10.7769]}
         onConfirm={mockConfirm}
         onClose={mockClose}
-      />
+      />,
     );
 
     expect(screen.getByPlaceholderText('Tìm kiếm vị trí, địa chỉ...')).toBeTruthy();
@@ -115,7 +125,10 @@ describe('LocationPickerModal', () => {
     await act(async () => {
       fireEvent.press(confirmBtn);
     });
-    expect(mockConfirm).toHaveBeenCalledWith([106.7009, 10.7769], 'Nguyen Hue, Ben Nghe, District 1, HCMC');
+    expect(mockConfirm).toHaveBeenCalledWith(
+      [106.7009, 10.7769],
+      'Nguyen Hue, Ben Nghe, District 1, HCMC',
+    );
   });
 
   it('fetches current device location automatically when initialCoordinate is not provided', async () => {
@@ -127,11 +140,7 @@ describe('LocationPickerModal', () => {
     });
 
     const screen = await render(
-      <LocationPickerModal
-        visible={true}
-        onConfirm={mockConfirm}
-        onClose={mockClose}
-      />
+      <LocationPickerModal visible={true} onConfirm={mockConfirm} onClose={mockClose} />,
     );
 
     await act(async () => {
@@ -159,7 +168,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const gpsBtn = screen.getByLabelText('Đến vị trí hiện tại');
@@ -179,7 +188,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const gpsBtn = screen.getByLabelText('Đến vị trí hiện tại');
@@ -187,7 +196,9 @@ describe('LocationPickerModal', () => {
       fireEvent.press(gpsBtn);
     });
 
-    const errorMsg = await screen.findByText(/Vui lòng cấp quyền truy cập vị trí/i);
+    const errorMsg = await screen.findByText(
+      /Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn/i,
+    );
     expect(errorMsg).toBeTruthy();
   });
 
@@ -200,7 +211,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const gpsBtn = screen.getByLabelText('Đến vị trí hiện tại');
@@ -221,7 +232,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const gpsBtn = screen.getByLabelText('Đến vị trí hiện tại');
@@ -235,7 +246,13 @@ describe('LocationPickerModal', () => {
 
   it('allows searching and selecting a place suggestion', async () => {
     mockSuggestions = [
-      { id: 'place-1', title: 'Chợ Bến Thành', address: 'Quận 1, TP.HCM', longitude: 106.6983, latitude: 10.7725 },
+      {
+        id: 'place-1',
+        title: 'Chợ Bến Thành',
+        address: 'Quận 1, TP.HCM',
+        longitude: 106.6983,
+        latitude: 10.7725,
+      },
     ];
 
     const screen = await render(
@@ -244,7 +261,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const searchInput = screen.getByPlaceholderText('Tìm kiếm vị trí, địa chỉ...');
@@ -271,7 +288,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     const searchInput = screen.getByPlaceholderText('Tìm kiếm vị trí, địa chỉ...');
@@ -296,7 +313,7 @@ describe('LocationPickerModal', () => {
         initialCoordinate={[106.7, 10.7]}
         onConfirm={jest.fn()}
         onClose={jest.fn()}
-      />
+      />,
     );
 
     expect(capturedOnBoundsChange).toBeDefined();
@@ -322,7 +339,7 @@ describe('LocationPickerModal', () => {
         getCurrentPosition: jest.fn((success) =>
           success({
             coords: { longitude: 106.71, latitude: 10.79 },
-          })
+          }),
         ),
       },
     };
@@ -334,7 +351,7 @@ describe('LocationPickerModal', () => {
           initialCoordinate={[106.7, 10.7]}
           onConfirm={jest.fn()}
           onClose={jest.fn()}
-        />
+        />,
       );
 
       const gpsBtn = screen.getByLabelText('Đến vị trí hiện tại');

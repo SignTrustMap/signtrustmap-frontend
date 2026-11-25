@@ -73,10 +73,12 @@ describe('NavigationUpcomingSigns Component', () => {
     expect(getByText('Biển cấm đỗ xe')).toBeTruthy();
     expect(getByText('80 m')).toBeTruthy();
 
-    // First sign has imageUrl so renders ExpoImage
+    // First sign has imageUrl, second sign has actualCropUrl - both render ExpoImage via fallback
     const images = getAllByTestId('expo-image');
-    expect(images.length).toBe(1);
+    expect(images.length).toBe(2);
     expect(images[0].props.accessibilityLabel).toBe('Biển báo tốc độ 60');
+    expect(images[1].props.accessibilityLabel).toBe('Biển cấm đỗ xe');
+    expect(images[1].props.source.uri).toBe('https://example.com/crop.jpg');
   });
 
   it('renders kilometer distances (>= 1000m) and default name fallback', async () => {

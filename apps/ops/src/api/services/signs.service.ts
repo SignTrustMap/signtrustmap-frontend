@@ -10,6 +10,39 @@ import {
 } from '@shared/types'
 import { toRouteSign } from '@/features/map/utils/signUrlHelpers'
 
+export interface VerifiedSignHistoryItem {
+  id: string
+  signId: string
+  previousSignCode?: string
+  previousSignNameVi?: string
+  previousCropUrl?: string
+  changeReason?: string
+  changedAt: string
+  changedBy?: string
+}
+
+export interface SignLifecycleEventItem {
+  id: string
+  signId: string
+  eventType:
+    | 'CONFIRMED'
+    | 'DISPUTED'
+    | 'REVALIDATED'
+    | 'REVALIDATION_CHANGED'
+    | 'DECOMMISSIONED'
+    | 'AUTO_DELISTED'
+    | string
+  eventAt: string
+  metadata?: Record<string, any>
+}
+
+export interface SignHistoryResponse {
+  signId: string
+  currentSign?: any
+  history: VerifiedSignHistoryItem[]
+  lifecycleEvents: SignLifecycleEventItem[]
+}
+
 export interface TrafficSignItem {
   id: string
   code: string
@@ -108,5 +141,12 @@ export const signsService = {
    */
   reportIssue: (id: string, payload: { issueType: string; description: string; imageUrl?: string }) => {
     return http.post<ApiResponse<{ reportId: string }>>(API_ENDPOINTS.SIGNS.REPORT_ISSUE(id), payload)
+  },
+
+  /**
+   * Fetch snapshot history and lifecycle events of a traffic sign (public endpoint)
+   */
+  getSignHistory: (id: string) => {
+    return http.get<SignHistoryResponse>(API_ENDPOINTS.SIGNS.HISTORY(id))
   },
 }

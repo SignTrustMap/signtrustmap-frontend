@@ -35,6 +35,10 @@ import {
   type RevalidationEvidenceItem,
   type EarlyClassificationResult,
 } from '@/api/services/revalidation.service';
+import {
+  signsService,
+  type SignHistoryResponse,
+} from '@/api/services/signs.service';
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers';
 
 export interface ExtendedRevalidationTask extends RevalidationTask {
@@ -149,6 +153,10 @@ export default function TasksPage() {
   const [recaptureReason, setRecaptureReason] = useState<string>('Ảnh bị mờ hoặc bị che khuất');
   const [isSubmittingRecapture, setIsSubmittingRecapture] = useState<boolean>(false);
 
+  // Sign Lifecycle History State
+  const [signHistory, setSignHistory] = useState<SignHistoryResponse | null>(null);
+  const [showSignHistory, setShowSignHistory] = useState<boolean>(false);
+
   // Sign Change Dialog State
   const [isChangeModalOpen, setIsChangeModalOpen] = useState<boolean>(false);
   const [selectedChangeCode, setSelectedChangeCode] = useState<string>('P.102');
@@ -228,6 +236,8 @@ export default function TasksPage() {
     if (!selectedTask) {
       setTaskDetail(null);
       setEarlyClassifyResult(null);
+      setSignHistory(null);
+      setShowSignHistory(false);
       setIsRecaptureOpen(false);
       setIsChangeModalOpen(false);
       return;
@@ -236,6 +246,7 @@ export default function TasksPage() {
     let isMounted = true;
     setIsLoadingDetail(true);
     setEarlyClassifyResult(null);
+    setSignHistory(null);
 
     revalidationService
       .getTaskById(selectedTask.id)
@@ -249,6 +260,25 @@ export default function TasksPage() {
       .finally(() => {
         if (isMounted) setIsLoadingDetail(false);
       });
+
+    const targetSignId =
+      selectedTask.verifiedSignId ||
+      (selectedTask as any).signId ||
+      (selectedTask.rawBackendItem as any)?.signId ||
+      selectedTask.rawBackendItem?.sign?.id ||
+      selectedTask.rawBackendItem?.verified_sign_id;
+
+    if (targetSignId) {
+      signsService
+        .getSignHistory(targetSignId)
+        .then((hist) => {
+          if (!isMounted) return;
+          setSignHistory(hist);
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch sign history for task:', err);
+        });
+    }
 
     return () => {
       isMounted = false;
@@ -1157,6 +1187,64 @@ export default function TasksPage() {
                   )}
                 </div>
               </div>
+
+              {/* Sign Lifecycle History Timeline */}
+              {signHistory && (signHistory.lifecycleEvents?.length > 0 || signHistory.history?.length > 0) && (
+                <div className="border border-gray-200 dark:border-white/10 rounded-xl p-3 bg-gray-50/50 dark:bg-white/[0.02] space-y-2">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => setShowSignHistory(!showSignHistory)}
+                  >
+                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <Clock size={14} className="text-[#007b8b] dark:text-[#00c4de]" />
+                      <span>
+                        Lịch sử vòng đời biển báo ({signHistory.lifecycleEvents?.length || 0} sự kiện)
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs text-[#007b8b] dark:text-[#00c4de] font-medium hover:underline"
+                    >
+                      {showSignHistory ? 'Thu gọn' : 'Xem chi tiết'}
+                    </button>
+                  </div>
+
+                  {showSignHistory && (
+                    <div className="pt-2 border-t border-gray-200/60 dark:border-white/10 space-y-2 max-h-48 overflow-y-auto">
+                      {signHistory.lifecycleEvents?.map((evt, idx) => (
+                        <div
+                          key={evt.id || idx}
+                          className="flex items-start justify-between text-[11px] py-1 border-b border-gray-100 dark:border-white/5 last:border-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${
+                                evt.eventType === 'CONFIRMED'
+                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                  : evt.eventType === 'DISPUTED'
+                                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                                    : evt.eventType === 'REVALIDATED'
+                                      ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                                      : evt.eventType === 'REVALIDATION_CHANGED'
+                                        ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                                        : 'bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              {evt.eventType}
+                            </span>
+                            <span className="text-gray-600 dark:text-gray-300">
+                              {evt.metadata?.note || evt.metadata?.reason || 'Cập nhật trạng thái vòng đời'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-mono shrink-0">
+                            {new Date(evt.eventAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Inline Recapture Form (if opened) */}
               {isRecaptureOpen && (

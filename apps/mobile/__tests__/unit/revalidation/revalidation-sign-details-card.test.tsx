@@ -49,7 +49,7 @@ jest.mock('@/components/image-inspection-modal', () => ({
       View,
       { testID: 'image-inspection-modal' },
       React.createElement(Text, null, title),
-      React.createElement(TouchableOpacity, { testID: 'close-inspect-modal', onPress: onClose })
+      React.createElement(TouchableOpacity, { testID: 'close-inspect-modal', onPress: onClose }),
     );
   },
 }));
@@ -99,7 +99,7 @@ describe('RevalidationSignDetailsCard Component', () => {
         onClose={mockOnClose}
         onRevalidate={mockOnRevalidate}
         sign={mockBaseSign}
-      />
+      />,
     );
 
     // Title and address
@@ -124,7 +124,7 @@ describe('RevalidationSignDetailsCard Component', () => {
         onCardHeightChange={mockOnCardHeightChange}
         onClose={mockOnClose}
         sign={mockBaseSign}
-      />
+      />,
     );
 
     const card = getByTestId('revalidation-sign-details-card');
@@ -143,10 +143,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={retiredSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={retiredSign} />,
     );
 
     expect(getByText('Đã thu hồi')).toBeTruthy();
@@ -160,13 +157,10 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={moderateSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={moderateSign} />,
     );
 
-    expect(getByText('Độ tươi mới trung bình')).toBeTruthy();
+    expect(getByText('Cần chú ý')).toBeTruthy();
     expect(getByText('65%')).toBeTruthy();
   });
 
@@ -178,10 +172,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={staleSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={staleSign} />,
     );
 
     expect(getByText('Cần tái thẩm định')).toBeTruthy();
@@ -190,10 +181,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
   it('supports toggling expand and collapse via collapse button and collapsed card', async () => {
     const { getByLabelText, getByText, queryByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     // Collapse it
@@ -218,10 +206,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
   it('calls onClose when close button is pressed', async () => {
     const { getByLabelText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     const closeBtn = getByLabelText('Đóng chi tiết');
@@ -236,7 +221,7 @@ describe('RevalidationSignDetailsCard Component', () => {
         onClose={mockOnClose}
         onRevalidate={mockOnRevalidate}
         sign={mockBaseSign}
-      />
+      />,
     );
 
     const actionBtn = getByLabelText('Kiểm tra thực địa');
@@ -247,10 +232,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
   it('copies coordinates to clipboard on pressing coordinates button', async () => {
     const { getByLabelText, getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     const copyBtn = getByLabelText('Sao chép tọa độ vào bộ nhớ tạm');
@@ -268,7 +250,7 @@ describe('RevalidationSignDetailsCard Component', () => {
         onClose={mockOnClose}
         taskId="task-custom-999"
         sign={mockBaseSign}
-      />
+      />,
     );
 
     const copyTaskBtn = getByLabelText('Sao chép mã nhiệm vụ vào bộ nhớ tạm');
@@ -282,10 +264,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
   it('opens and closes image inspection modal for standard and submitted crops', async () => {
     const { getByLabelText, getByTestId, queryByTestId } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     // Inspect official standard sign
@@ -319,10 +298,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     });
 
     const { getByText, rerender } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     expect(getByText('Đang kiểm tra đánh giá...')).toBeTruthy();
@@ -334,16 +310,11 @@ describe('RevalidationSignDetailsCard Component', () => {
       isLoading: false,
     });
 
-    await rerender(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
-    );
+    await rerender(<RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />);
 
     expect(getByText('Chưa có lượt khảo sát nào')).toBeTruthy();
     expect(
-      getByText('Hãy là khảo sát viên đầu tiên kiểm tra vị trí này để nhận thưởng')
+      getByText('Hãy là khảo sát viên đầu tiên kiểm tra vị trí này để nhận thưởng'),
     ).toBeTruthy();
   });
 
@@ -360,10 +331,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     });
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={noCropSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={noCropSign} />,
     );
 
     expect(getByText('Chưa có ảnh khảo sát')).toBeTruthy();
@@ -371,10 +339,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
   it('handles image loading error by falling back to "Chưa có ảnh khảo sát"', async () => {
     const { getAllByTestId, getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     // Find the Image components and trigger onError on the crop image
@@ -402,10 +367,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     });
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={signWithMockMedia}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={signWithMockMedia} />,
     );
 
     expect(getByText('Chưa có ảnh khảo sát')).toBeTruthy();
@@ -416,10 +378,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     (Clipboard.setStringAsync as jest.Mock).mockRejectedValueOnce(new Error('Clipboard error'));
 
     const { getByLabelText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     const copyBtn = getByLabelText('Sao chép tọa độ vào bộ nhớ tạm');
@@ -429,7 +388,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
     expect(spyWarn).toHaveBeenCalledWith(
       expect.stringContaining('[RevalidationSignDetailsCard] Failed to copy coordinates:'),
-      expect.any(Error)
+      expect.any(Error),
     );
 
     spyWarn.mockRestore();
@@ -444,7 +403,7 @@ describe('RevalidationSignDetailsCard Component', () => {
         onClose={mockOnClose}
         taskId="task-fail-123"
         sign={mockBaseSign}
-      />
+      />,
     );
 
     const copyTaskBtn = getByLabelText('Sao chép mã nhiệm vụ vào bộ nhớ tạm');
@@ -454,7 +413,7 @@ describe('RevalidationSignDetailsCard Component', () => {
 
     expect(spyWarn).toHaveBeenCalledWith(
       expect.stringContaining('[RevalidationSignDetailsCard] Failed to copy Task ID:'),
-      expect.any(Error)
+      expect.any(Error),
     );
 
     spyWarn.mockRestore();
@@ -467,10 +426,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByLabelText, getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={signNoCoords}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={signNoCoords} />,
     );
 
     expect(getByText(/Sao chép Vĩ độ\/Kinh độ \(\?, \?\)/)).toBeTruthy();
@@ -490,12 +446,7 @@ describe('RevalidationSignDetailsCard Component', () => {
       taskId: undefined,
     };
 
-    await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={revalSign}
-      />
-    );
+    await render(<RevalidationSignDetailsCard onClose={mockOnClose} sign={revalSign} />);
 
     expect(revalidationHooks.useGetTaskEvidences).toHaveBeenCalledWith('reval-task-555');
   });
@@ -507,10 +458,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     });
 
     const { getByText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={mockBaseSign}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={mockBaseSign} />,
     );
 
     expect(getByText('Bằng chứng thực địa đang chờ đồng thuận')).toBeTruthy();
@@ -525,10 +473,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByText, getByLabelText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={signNoAddr}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={signNoAddr} />,
     );
 
     // Collapse it
@@ -548,10 +493,7 @@ describe('RevalidationSignDetailsCard Component', () => {
     };
 
     const { getByLabelText } = await render(
-      <RevalidationSignDetailsCard
-        onClose={mockOnClose}
-        sign={signWithFrame}
-      />
+      <RevalidationSignDetailsCard onClose={mockOnClose} sign={signWithFrame} />,
     );
 
     expect(getByLabelText('Inspect submitted sign photo')).toBeTruthy();

@@ -79,6 +79,16 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
+jest.mock('@tanstack/react-query', () => {
+  const actual = jest.requireActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: jest.fn(),
+    }),
+  };
+});
+
 // 4. Mock navigation hooks & wallet
 const mockInitiateSession = jest.fn().mockResolvedValue({ sessionId: 'mock-session-1' });
 jest.mock('@/feature/navigation/hooks/use-navigation', () => ({

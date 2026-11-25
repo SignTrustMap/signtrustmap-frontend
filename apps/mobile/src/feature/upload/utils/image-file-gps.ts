@@ -25,7 +25,7 @@ import type { ImageGpsCoordinates } from './image-gps';
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Maximum bytes to read from the start of the JPEG to find the EXIF APP1 segment. */
-const JPEG_HEADER_READ_SIZE = 65536; // 64 KB — covers any reasonable EXIF block
+const JPEG_HEADER_READ_SIZE = 262144; // 256 KB — covers large smartphone EXIF blocks with embedded previews
 
 const JPEG_SOI = 0xffd8; // Start Of Image marker
 const JPEG_APP1 = 0xffe1; // APP1 marker (EXIF)
@@ -40,6 +40,12 @@ const GPS_TAG_LAT_REF = 0x0001;
 const GPS_TAG_LAT = 0x0002;
 const GPS_TAG_LON_REF = 0x0003;
 const GPS_TAG_LON = 0x0004;
+const GPS_TAG_TRACK_REF = 0x000E;
+const GPS_TAG_TRACK = 0x000F; // GPSTrack (direction of movement)
+const GPS_TAG_IMG_DIRECTION_REF = 0x0010;
+const GPS_TAG_IMG_DIRECTION = 0x0011;
+const GPS_TAG_DEST_BEARING_REF = 0x0017;
+const GPS_TAG_DEST_BEARING = 0x0018;
 
 // TIFF field types
 const TIFF_TYPE_ASCII = 2;
@@ -157,6 +163,9 @@ function extractGpsFromTiff(buf: Uint8Array, tiffStart: number): ImageGpsCoordin
   let lonRef: string | null = null;
   let latDms: [number, number, number] | null = null;
   let lonDms: [number, number, number] | null = null;
+  let imgDirection: number | null = null;
+  let trackDirection: number | null = null;
+  let destBearing: number | null = null;
 
   for (let i = 0; i < gpsCount; i++) {
     const entryOffset = gpsIfdOffset + 2 + i * 12;
@@ -195,6 +204,24 @@ function extractGpsFromTiff(buf: Uint8Array, tiffStart: number): ImageGpsCoordin
         else lonDms = dms;
       }
     }
+
+    if (tag === GPS_TAG_IMG_DIRECTION || tag === GPS_TAG_TRACK || tag === GPS_TAG_DEST_BEARING) {
+      let val: number | null = null;
+      if (type === TIFF_TYPE_RATIONAL || type === 10) { // unsigned or signed rational
+        const ratOffset = read32(valueField);
+        val = readRational(ratOffset);
+      } else if (type === 3) { // SHORT (16-bit int)
+        val = read16(valueField);
+      } else if (type === 4) { // LONG (32-bit int)
+        val = read32(valueField);
+      }
+      if (val !== null && Number.isFinite(val)) {
+        const normalized = ((val % 360) + 360) % 360;
+        if (tag === GPS_TAG_IMG_DIRECTION) imgDirection = normalized;
+        else if (tag === GPS_TAG_TRACK) trackDirection = normalized;
+        else destBearing = normalized;
+      }
+    }
   }
 
   if (!latDms || !lonDms) return null;
@@ -210,7 +237,13 @@ function extractGpsFromTiff(buf: Uint8Array, tiffStart: number): ImageGpsCoordin
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
 
-  return { latitude, longitude };
+  const heading = imgDirection ?? trackDirection ?? destBearing;
+
+  return {
+    latitude,
+    longitude,
+    ...(heading !== null ? { heading: Math.round(heading * 100) / 100 } : {}),
+  };
 }
 
 /**
@@ -219,6 +252,38 @@ function extractGpsFromTiff(buf: Uint8Array, tiffStart: number): ImageGpsCoordin
  *
  * Exported for unit testing.
  */
+function scanBufferTextForHeading(buf: Uint8Array): number | null {
+  try {
+    let text = '';
+    const end = Math.min(buf.length, 262144);
+    for (let i = 0; i < end; i++) {
+      const c = buf[i];
+      if (c >= 32 && c <= 126) {
+        text += String.fromCharCode(c);
+      } else if (c === 10 || c === 13) {
+        text += ' ';
+      }
+    }
+    const match = text.match(
+      /(?:GPSImgDirection|GPSTrack|GPSDestBearing|GPSBearing|GPSHeading|GPSDirection|GPSCourse|GPSAzimuth|PoseHeadingDegrees|FlightYawDegree|Yaw|Camera:Yaw|heading|bearing|direction|azimuth|course|track)[="':>\s]+([-\d./]+)/i,
+    );
+    if (match && match[1]) {
+      const raw = match[1];
+      let val: number;
+      if (raw.includes('/')) {
+        const [n, d] = raw.split('/').map(Number);
+        val = d ? n / d : n;
+      } else {
+        val = Number(raw);
+      }
+      if (Number.isFinite(val)) {
+        return ((val % 360) + 360) % 360;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export function extractGpsFromJpegBuffer(buf: Uint8Array): ImageGpsCoordinates | null {
   if (buf.length < 4) return null;
 
@@ -241,7 +306,18 @@ export function extractGpsFromJpegBuffer(buf: Uint8Array): ImageGpsCoordinates |
         // TIFF data starts 6 bytes after the length field: offset+4 ('E','x','i','f') + '\0\0'
         const tiffStart = offset + 4 + 6;
         const gps = extractGpsFromTiff(buf, tiffStart);
-        if (gps) return gps;
+        if (gps) {
+          if (gps.heading === undefined) {
+            const fallbackHeading = scanBufferTextForHeading(buf);
+            if (fallbackHeading !== null) {
+              return {
+                ...gps,
+                heading: Math.round(fallbackHeading * 100) / 100,
+              };
+            }
+          }
+          return gps;
+        }
       }
     }
 

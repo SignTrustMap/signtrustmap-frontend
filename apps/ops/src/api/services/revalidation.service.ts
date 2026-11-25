@@ -1,6 +1,31 @@
 import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
 
+export interface CheckInEligibilityDto {
+  latitude: number
+  longitude: number
+  accuracyMeters?: number
+}
+
+export interface RevalidationCheckInResponse {
+  eligible: boolean
+  canCaptureLive: boolean
+  taskId: string
+  signId: string
+  taskStatus: string
+  distanceMeters: number
+  maxProximityMeters: number
+  isWithinProximity: boolean
+  remainingDistanceMeters: number
+  dailyLimitReached: boolean
+  recentSubmissionsCount: number
+  dailySubmissionLimit: number
+  remainingSubmissionsToday: number
+  targetLocation: { lat: number; lon: number }
+  surveyorLocation: { lat: number; lon: number }
+  message: string
+}
+
 export interface RevalidationEvidenceItem {
   id: string
   task_id?: string
@@ -132,26 +157,81 @@ export interface RequestRecapturePayload {
   note?: string
 }
 
+export function normalizeRevalidationTask(raw: any): RevalidationTaskItem {
+  if (!raw || typeof raw !== 'object') return raw
+  const lat = raw.latitude ?? raw.lat ?? raw.location?.lat
+  const lon = raw.longitude ?? raw.lon ?? raw.location?.lon
+  const reward = raw.rewardCredits ?? raw.reward_credits ?? raw.bounty ?? 25
+  const signId = raw.verifiedSignId ?? raw.verified_sign_id ?? raw.signId
+
+  return {
+    ...raw,
+    id: raw.id,
+    verifiedSignId: signId,
+    verified_sign_id: signId,
+    latitude: lat,
+    longitude: lon,
+    location: lat != null && lon != null ? { lat, lon } : (raw.location ?? null),
+    rewardCredits: reward,
+    reward_credits: reward,
+    bounty: reward,
+    priority: raw.priority ?? 'MEDIUM',
+    status: raw.status ?? 'OPEN',
+    signCode: raw.signCode ?? raw.sign_code,
+    sign_code: raw.signCode ?? raw.sign_code,
+    nameVi: raw.nameVi ?? raw.name_vi,
+    name_vi: raw.nameVi ?? raw.name_vi,
+    nameEn: raw.nameEn ?? raw.name_en,
+    name_en: raw.nameEn ?? raw.name_en,
+    signCropUrl: raw.signCropUrl ?? raw.sign_crop_url,
+    sign_crop_url: raw.signCropUrl ?? raw.sign_crop_url,
+    freshnessScore: raw.freshnessScore ?? raw.freshness_score,
+    freshness_score: raw.freshnessScore ?? raw.freshness_score,
+  }
+}
+
 export const revalidationService = {
   /**
    * List revalidation verification tasks with filters (status, sort, spatial radius)
    */
   getTasks: async (params?: ListTasksParams, config?: Record<string, any>): Promise<PaginatedRevalidationTasksResponse> => {
-    return http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASKS, { params, ...config })
+    const res = await http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASKS, { params, ...config })
+    if (res?.items && Array.isArray(res.items)) {
+      return {
+        ...res,
+        items: res.items.map(normalizeRevalidationTask),
+      }
+    }
+    return res
   },
 
   /**
    * List revalidation tasks inside a geographic bounding box
    */
   getTasksInBbox: async (params: BboxTasksParams, config?: Record<string, any>): Promise<PaginatedRevalidationTasksResponse> => {
-    return http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASK_MAP, { params, ...config })
+    const res = await http.get<PaginatedRevalidationTasksResponse>(API_ENDPOINTS.REVALIDATION.TASK_MAP, { params, ...config })
+    if (res?.items && Array.isArray(res.items)) {
+      return {
+        ...res,
+        items: res.items.map(normalizeRevalidationTask),
+      }
+    }
+    return res
+  },
+
+  /**
+   * Check in surveyor GPS coordinates before capturing live evidence
+   */
+  checkIn: async (taskId: string, dto: CheckInEligibilityDto): Promise<RevalidationCheckInResponse> => {
+    return http.post<RevalidationCheckInResponse>(API_ENDPOINTS.REVALIDATION.TASK_CHECK_IN(taskId), dto)
   },
 
   /**
    * Get single task detail with coordinates and evidences
    */
   getTaskById: async (taskId: string): Promise<RevalidationTaskItem> => {
-    return http.get<RevalidationTaskItem>(API_ENDPOINTS.REVALIDATION.TASK_DETAIL(taskId))
+    const res = await http.get<RevalidationTaskItem>(API_ENDPOINTS.REVALIDATION.TASK_DETAIL(taskId))
+    return normalizeRevalidationTask(res)
   },
 
   /**

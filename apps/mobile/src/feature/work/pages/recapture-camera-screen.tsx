@@ -27,6 +27,7 @@ import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
 import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import { extractImageGpsCoordinates } from '@/feature/upload/utils/image-gps';
 import { extractGpsFromImageFile } from '@/feature/upload/utils/image-file-gps';
+import { ensureCameraPermission } from '@/services/camera-permission';
 
 function formatDistance(meters: number): string {
   if (meters < 1000) return `${Math.round(meters)}m`;
@@ -167,8 +168,8 @@ export function RecaptureCameraScreen() {
   // 1. Chụp ảnh trực tiếp tại hiện trường (bắt buộc mở app chụp để đính kèm GPS thiết bị)
   const handleLaunchCamera = async () => {
     try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
+      const hasPermission = await ensureCameraPermission();
+      if (!hasPermission) {
         Alert.alert('Cần quyền máy ảnh', 'Vui lòng cấp quyền truy cập máy ảnh để chụp lại biển báo.');
         return;
       }

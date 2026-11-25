@@ -22,6 +22,17 @@ module.exports = defineConfig([
       '**/?(*.)+(spec|test).[jt]s?(x)',
     ],
     ...testingLibrary.configs['flat/react'],
+    rules: {
+      ...testingLibrary.configs['flat/react'].rules,
+      // RNTL v14 render/fireEvent are async in React 19; flat/react assumes sync React DOM APIs
+      'testing-library/no-await-sync-events': 'off',
+      'testing-library/no-unnecessary-act': 'off',
+      'testing-library/prefer-screen-queries': 'warn',
+      'testing-library/render-result-naming-convention': 'warn',
+      'testing-library/prefer-find-by': 'warn',
+      'testing-library/no-wait-for-multiple-assertions': 'warn',
+      'react/display-name': 'off',
+    },
   },
 
 ]);

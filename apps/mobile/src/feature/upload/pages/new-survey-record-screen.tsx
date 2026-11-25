@@ -88,6 +88,7 @@ export function NewSurveyRecordScreen() {
               startLon: String(initialGps.longitude),
               latitude: String(initialGps.latitude),
               longitude: String(initialGps.longitude),
+              ...(initialGps.heading != null ? { heading: String(initialGps.heading) } : {}),
             }
           : {}),
         ...(initialAsset?.duration
