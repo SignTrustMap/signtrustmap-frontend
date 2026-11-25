@@ -3,6 +3,8 @@ import {
   calculateDistanceMeters,
   calculateBearing,
   getDistanceToRouteMeters,
+  getRouteForwardBearing,
+  getSmallestAngleDiffDegrees,
   isValidCoordinate,
 } from '@/feature/navigation/utils/geo';
 import { useAutoReroute } from '@/feature/navigation/hooks/use-auto-reroute';
@@ -62,6 +64,24 @@ describe('Navigation Geo & Auto-Reroute Unit Test Suite', () => {
       const dist = getDistanceToRouteMeters(offRoutePoint, route);
       expect(dist).toBeGreaterThan(90);
       expect(dist).toBeLessThan(120);
+    });
+
+    it('computes smallest wraparound angle difference correctly', () => {
+      expect(getSmallestAngleDiffDegrees(358, 2)).toBe(4);
+      expect(getSmallestAngleDiffDegrees(2, 358)).toBe(4);
+      expect(getSmallestAngleDiffDegrees(90, 270)).toBe(180);
+      expect(getSmallestAngleDiffDegrees(10, 25)).toBe(15);
+    });
+
+    it('smooths forward route bearing across short GPS jitter segments', () => {
+      // Northbound road (~0 deg) with a tiny 5m jitter kink in the middle
+      const route: MapCoordinate[] = [
+        [106.7000, 10.7700],
+        [106.70003, 10.77004],
+        [106.7000, 10.77040],
+      ];
+      const bearing = getRouteForwardBearing([106.7000, 10.7700], route);
+      expect(getSmallestAngleDiffDegrees(bearing, 0)).toBeLessThan(10);
     });
   });
 

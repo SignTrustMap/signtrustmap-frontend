@@ -74,27 +74,20 @@ export function calculateBearing(coord1: MapCoordinate, coord2: MapCoordinate): 
 }
 
 /**
- * Calculates the forward route bearing (azimuth in degrees [0, 360))
- * for the route segment at or ahead of the given coordinate.
+ * Returns the smallest unsigned angular difference [0, 180] between two bearings in degrees.
  */
-export function getRouteForwardBearing(
-  coordinate: MapCoordinate | undefined,
-  routeCoordinates: MapCoordinate[] | undefined,
+export function getSmallestAngleDiffDegrees(bearingA: number, bearingB: number): number {
+  const diff = (((bearingA - bearingB) % 360) + 540) % 360 - 180;
+  return Math.abs(diff);
+}
+
+/**
+ * Finds the closest segment index along a polyline relative to the given coordinate.
+ */
+function findClosestRoutePointIndex(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
 ): number {
-  if (!routeCoordinates || routeCoordinates.length < 2) return 0;
-
-  // If no coordinate provided, take initial segment
-  if (!coordinate) {
-    for (let i = 1; i < routeCoordinates.length; i++) {
-      const d = calculateDistanceMeters(routeCoordinates[0], routeCoordinates[i]);
-      if (d >= 8) {
-        return calculateBearing(routeCoordinates[0], routeCoordinates[i]);
-      }
-    }
-    return calculateBearing(routeCoordinates[0], routeCoordinates[1]);
-  }
-
-  // Find the closest point index on the route
   let closestIndex = 0;
   let minDistance = Number.POSITIVE_INFINITY;
 
@@ -105,22 +98,52 @@ export function getRouteForwardBearing(
       closestIndex = i;
     }
   }
+  return closestIndex;
+}
 
-  // Look ahead from closestIndex along the route (at least 8 meters)
+/**
+ * Calculates the forward route bearing (azimuth in degrees [0, 360))
+ * using a smooth lookahead (>= 25m) ahead of the closest route point to reduce GPS jitter.
+ */
+export function getRouteForwardBearing(
+  coordinate: MapCoordinate | undefined,
+  routeCoordinates: MapCoordinate[] | undefined,
+  lookaheadMeters = 25,
+): number {
+  if (!routeCoordinates || routeCoordinates.length < 2) return 0;
+
+  if (!coordinate) {
+    for (let i = 1; i < routeCoordinates.length; i++) {
+      const d = calculateDistanceMeters(routeCoordinates[0], routeCoordinates[i]);
+      if (d >= lookaheadMeters) {
+        return calculateBearing(routeCoordinates[0], routeCoordinates[i]);
+      }
+    }
+    return calculateBearing(routeCoordinates[0], routeCoordinates[1]);
+  }
+
+  const closestIndex = findClosestRoutePointIndex(coordinate, routeCoordinates);
+
   for (let i = closestIndex + 1; i < routeCoordinates.length; i++) {
     const d = calculateDistanceMeters(routeCoordinates[closestIndex], routeCoordinates[i]);
-    if (d >= 8) {
+    if (d >= lookaheadMeters) {
       return calculateBearing(routeCoordinates[closestIndex], routeCoordinates[i]);
     }
   }
 
   if (closestIndex < routeCoordinates.length - 1) {
-    return calculateBearing(routeCoordinates[closestIndex], routeCoordinates[closestIndex + 1]);
+    return calculateBearing(
+      routeCoordinates[closestIndex],
+      routeCoordinates[routeCoordinates.length - 1],
+    );
   }
 
-  // If near the end of the route, use the final segment's bearing
-  if (closestIndex > 0) {
-    return calculateBearing(routeCoordinates[closestIndex - 1], routeCoordinates[closestIndex]);
+  // Near the end of the route: anchor from ~25m behind the last point if possible
+  for (let i = routeCoordinates.length - 2; i >= 0; i--) {
+    const d = calculateDistanceMeters(routeCoordinates[i], routeCoordinates[closestIndex]);
+    if (d >= lookaheadMeters || i === 0) {
+      return calculateBearing(routeCoordinates[i], routeCoordinates[closestIndex]);
+    }
   }
 
   return 0;

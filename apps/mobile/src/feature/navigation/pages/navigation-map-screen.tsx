@@ -126,6 +126,7 @@ export function NavigationMapScreen() {
 
   const handleReturnToReviewer = useCallback(() => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
@@ -184,6 +185,7 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
   }, [destinationId, destinationLat, destinationLng, paramSavedRouteId, startLat, startLng]);
 
   const baseSelectedDestination = useMemo(() => {
@@ -512,7 +514,9 @@ export function NavigationMapScreen() {
       setRerouteOrigin(newOrigin);
     },
     onRerouteApplied: (newOrigin) => {
-      setRerouteOrigin(undefined);
+      // Keep active rerouteOrigin anchored so plannedRouteOrigin (from params or saved route)
+      // never reverts the map back to the stale pre-reroute geometry.
+      setRerouteOrigin(newOrigin);
       setInitialGpsOrigin(newOrigin);
     },
     onClearNavigationError: () => setNavigationError(undefined),
@@ -1120,6 +1124,7 @@ export function NavigationMapScreen() {
 
   const handleCloseRoute = () => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
     if (isNavigating) {
       setLastNavigatedDestinationTitle(selectedDestination?.title);
       setNavigationSession(undefined);
@@ -1213,7 +1218,7 @@ export function NavigationMapScreen() {
           hasLiveLocation={hasLiveLocation}
           isCustomStart={isCustomStart}
           routeCoordinates={routeCoordinates}
-          routeStart={plannedRouteOrigin}
+          routeStart={activeRouteOrigin}
           routeSigns={filteredSigns}
           signs={filteredSigns}
           showCurrentLocation={!isNavigating}

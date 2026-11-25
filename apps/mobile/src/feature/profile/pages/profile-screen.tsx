@@ -4,6 +4,7 @@ import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { PrimaryGradientBackdrop } from '@/components/primary-gradient-backdrop';
 import { UpdateModal } from '@/components/update-modal';
 import { OfflineMapModal } from '@/components/offline-map-modal';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
@@ -51,22 +52,6 @@ function getInitials(displayName?: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
-}
-
-// Continuous 256-step linear gradient from brand primary teal (#007B8B) to white (#FFFFFF)
-const GRADIENT_BASE64 =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAEACAYAAAByPhyYAAADQ0lEQVR4nH3EdVAWdgDH4e+6u5xzrru7u7t36936Vre6xc1AZ4K0dHdJg5QgJQiCtAiCSElIi4gSfna/lxcXt9vzxyMtWIP+vyP+1UJL9taO/I+O+qtFlhzQ0f/sGEuLZzt2sePfO86SzWzH2zhZO2HJbCfO5GztpKWznTyTCzrlj9lOnckVnbZsttNNZyxfa+3Mw521ws3a2aZzVlpyR+daWuWOzjPNWeWB5qz2QOeb5q72RHNtPdEFpnm2XmienRe60DTfzhvNX+ONLjJdbLrE3sfapQ4+6DIHX3S5JUc/dIXpSic/dJWTv7Wrnf3RNc4B6FqXAHTdTIHoetdAdINrELpxbRC6yXSzW7C1W9yD0a3uIeg20+0eoegO052eoeguzzB0t5elcHSPdzi61zsC3ecTge43PeAbiR40PeQXhR42PeIfjR41PRYQjR4PiEFPBMagJwPXoaeC1qGng2LRM8Gx6NngOPRcSBx6PiQevRAaj140vRSWgF42vRKeiF6NSESvRSSh1yOT0BuRyejNqGT0VlQKejs6Bb0TnYrejUlF761bj943fRCbhj40fRSXjj6OT0efxGegTxMy0GcJmejzxCz0RVIW+jJpA/oqeQP6OjkbfZOSjb5NzUHfmb5fvxH9kLYR/ZiWi35Kz0M/m37JyEe/Zuaj3zIL0O9ZBWjBhkK00LQoexOyySlCS0xLNxajZbnFaHnuZrQirwStzC9Bq/NLkW1BKbIr3ILsC8uQw6Yy5FhUjpxNLsVbkevmCuRmci+pRJ6llchrSxXy3lKNfMuqkV95DfIvr0WBW2tRUEUdCqnchkJNYVX1KKK6HkXWbEfRNQ0oprYBxdY1orhtO1C8KbG+CSVtb0YpDc0otWEnSmtsQek7WlBm0y6U1dSKsptbUc7ONpTb0o7ydrWjgl0dqLC1ExW17UbF7btRSXsXKu3oRmWd3Wjr7h5U0dWLqrp7UXX3HlTb04fqevtR/Z5+1NA3gBr7BlFT/xBqHhhCLYPDqHVoBLUNj6CO4b2oc2QUde3dh3pG96HefWOob2w/GhgbR4P7x9Hw+AG098BBNHpwAo1NTKDxyUl0YHIKTUxNo6npaTR96BAC+BN/8b+pDO2n3AAAAABJRU5ErkJggg==';
-
-function PrimaryToWhiteGradient() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Image
-        resizeMode="stretch"
-        source={{ uri: GRADIENT_BASE64 }}
-        style={StyleSheet.absoluteFill}
-      />
-    </View>
-  );
 }
 
 export function ProfileScreen() {
@@ -184,18 +169,17 @@ export function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View style={[styles.screen, { backgroundColor: theme.primary }]}>
+      <PrimaryGradientBackdrop testIDPrefix="profile" />
+
       <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Account Header Section with Theme Primary to White Gradient */}
+        {/* Account Header Section over Full-screen Primary Gradient */}
         <View style={styles.accountHeader}>
-          {/* Linear gradient from theme.primary to white */}
-          <PrimaryToWhiteGradient />
-
           <SafeAreaView edges={['top']} style={styles.headerSafeArea}>
             {/* Top Bar with Back Button */}
             <View style={styles.topBar}>
@@ -457,11 +441,7 @@ export function ProfileScreen() {
                   </Text>
                 </View>
               </View>
-              <MaterialCommunityIcons
-                color={theme.placeholder}
-                name="chevron-right"
-                size={22}
-              />
+              <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={22} />
             </Pressable>
           </View>
 
@@ -492,6 +472,30 @@ export function ProfileScreen() {
                 </View>
               </View>
               <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={22} />
+            </Pressable>
+          </View>
+
+          {/* Log out */}
+          <View
+            style={[
+              styles.collapsibleCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Đăng xuất"
+              accessibilityRole="button"
+              onPress={() => handleLogOut()}
+              style={styles.collapsibleHeader}
+            >
+              <View style={styles.headerLeft}>
+                <View style={[styles.sectionIconBadge]}>
+                  <MaterialCommunityIcons color={theme.danger} name="logout" size={20} />
+                </View>
+                <View style={styles.headerTitles}>
+                  <Text style={[styles.sectionTitle, { color: theme.danger }]}>Đăng xuất</Text>
+                </View>
+              </View>
             </Pressable>
           </View>
         </View>
@@ -612,16 +616,15 @@ export function ProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
   },
   scrollContent: {
     paddingBottom: 90,
   },
   accountHeader: {
     position: 'relative',
-    backgroundColor: '#FFFFFF',
-    paddingBottom: Spacing.four,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8E4E3',
+    paddingBottom: Spacing.three,
   },
   headerSafeArea: {
     width: '100%',
@@ -634,12 +637,12 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.one,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.16)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   profileInfoRow: {
     flexDirection: 'row',
@@ -740,15 +743,15 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   collapsibleCard: {
-    borderRadius: Rounded.lg,
+    borderRadius: 24,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.three,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
   collapsibleHeader: {
     flexDirection: 'row',

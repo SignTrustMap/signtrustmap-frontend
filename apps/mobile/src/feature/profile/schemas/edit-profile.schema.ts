@@ -9,9 +9,9 @@ export const editProfileSchema = z.object({
   phone: z
     .string()
     .trim()
-    .max(20, 'Số điện thoại không được quá 20 ký tự.')
+    .max(10, 'Số điện thoại không được quá 10 số.')
     .refine(
-      (val) => !val || /^[0-9+()\-.\s]{7,20}$/.test(val),
+      (val) => !val || /^[0-9]{7,10}$/.test(val),
       'Số điện thoại không hợp lệ.',
     )
     .optional()

@@ -142,6 +142,9 @@ describe('EditProfileScreen Address Autocomplete & Map Preview', () => {
   it('renders address field with mini map preview card, pin, and floating zoom button', async () => {
     const screen = await render(<EditProfileScreen />);
 
+    expect(screen.getByTestId('edit-profile-gradient-bg')).toBeTruthy();
+    expect(screen.getByTestId('edit-profile-decor-circle')).toBeTruthy();
+
     // Address input should be present
     expect(screen.getByLabelText('Địa chỉ')).toBeTruthy();
 
@@ -252,5 +255,18 @@ describe('EditProfileScreen Address Autocomplete & Map Preview', () => {
 
     expect(addressInput.props.value).toBe('');
     expect(screen.queryByTestId('address-suggestions-container')).toBeNull();
+  });
+
+  it('enforces max 10 digits on phone input and shows validation error when exceeded', async () => {
+    const screen = await render(<EditProfileScreen />);
+
+    const phoneInput = screen.getByLabelText('Số điện thoại');
+    expect(phoneInput.props.maxLength).toBe(10);
+
+    await act(async () => {
+      fireEvent.changeText(phoneInput, '09876543210');
+    });
+
+    expect(await screen.findByText('Số điện thoại không được quá 10 số.')).toBeTruthy();
   });
 });

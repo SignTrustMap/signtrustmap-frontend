@@ -1,8 +1,8 @@
 # Automated Test & Coverage Report
 
-> **Generated:** 2026-11-25 03:14:29 UTC  
-> **Overall Status:** ❌ FAILED  
-> **Execution Duration:** 87.31s  
+> **Generated:** 2026-11-25 12:16:50 UTC  
+> **Overall Status:** ✅ PASSED  
+> **Execution Duration:** 11.06s  
 > **Target Package:** `apps/mobile`  
 
 ---
@@ -11,30 +11,30 @@
 
 | Category | Total | Passed | Failed | Skipped | Pass Rate |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Test Suites** | 124 | 123 | 1 | 0 | 99.2% |
-| **Tests** | 1200 | 1197 | 3 | 0 | 99.8% |
+| **Test Suites** | 33 | 33 | 0 | 0 | 100.0% |
+| **Tests** | 247 | 247 | 0 | 0 | 100.0% |
 
 ## 2. Code Coverage Overview
 
 | Metric | Covered / Total | Percentage | Target Benchmark | Status |
 | :--- | :---: | :---: | :---: | :---: |
-| **Branches** | 8478 / 12767 | **66.40%** | 80.00% | 🟡 Moderate |
-| **Functions** | 2036 / 2583 | **78.82%** | 80.00% | 🟡 Moderate |
-| **Lines** | 9151 / 11430 | **80.06%** | 80.00% | 🟢 Pass |
-| **Statements** | 9598 / 12274 | **78.19%** | 80.00% | 🟡 Moderate |
+| **Branches** | 8542 / 12842 | **66.51%** | 80.00% | 🟡 Moderate |
+| **Functions** | 2046 / 2602 | **78.63%** | 80.00% | 🟡 Moderate |
+| **Lines** | 9211 / 11521 | **79.94%** | 80.00% | 🟡 Moderate |
+| **Statements** | 9660 / 12369 | **78.09%** | 80.00% | 🟡 Moderate |
 
 ### File-by-File Coverage
 
 | File | % Stmts | % Branch | % Funcs | % Lines | Uncovered Lines |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | `apps/mobile/src/hooks/use-back-button.ts` | 0.00% | 100.00% | 0.00% | 0.00% | - |
-| `apps/mobile/src/services/location-permission.ts` | 34.61% | 25.00% | 60.00% | 33.33% | - |
 | `apps/mobile/src/feature/navigation/utils/signs.ts` | 32.30% | 17.60% | 71.42% | 33.89% | - |
 | `apps/mobile/src/feature/navigation/hooks/use-native-gps.ts` | 34.09% | 27.77% | 80.00% | 35.89% | - |
 | `apps/mobile/src/feature/navigation/pages/navigation-start-screen.tsx` | 38.59% | 34.42% | 30.76% | 43.13% | - |
 | `apps/mobile/src/api/spatial/spatial.ts` | 46.66% | 51.56% | 75.00% | 47.50% | - |
 | `apps/mobile/src/feature/upload/utils/video-processor.ts` | 47.94% | 50.00% | 80.00% | 47.94% | - |
 | `apps/mobile/src/feature/navigation/components/navigation-bottom-sheet.tsx` | 51.85% | 62.56% | 45.00% | 50.00% | - |
+| `apps/mobile/src/services/location-permission.ts` | 50.00% | 53.24% | 52.17% | 51.48% | - |
 | `apps/mobile/src/feature/work/components/mission-card-item.tsx` | 54.00% | 52.43% | 100.00% | 54.00% | - |
 | `apps/mobile/src/feature/revalidation/pages/revalidation-review-screen.tsx` | 53.77% | 52.39% | 41.53% | 54.54% | - |
 | `apps/mobile/src/feature/notifications/hooks/use-notifications.ts` | 51.72% | 58.82% | 53.84% | 55.55% | - |
@@ -71,13 +71,13 @@
 | `apps/mobile/src/feature/navigation/components/navigation-map-view.tsx` | 73.46% | 61.09% | 74.00% | 75.00% | - |
 | `apps/mobile/src/feature/upload/hooks/use-survey-submission.ts` | 68.96% | 44.82% | 87.17% | 75.00% | - |
 | `apps/mobile/src/feature/upload/utils/selected-asset-gps.ts` | 74.80% | 66.40% | 100.00% | 75.00% | - |
-| `apps/mobile/src/feature/navigation/utils/gps.ts` | 76.11% | 70.76% | 63.63% | 75.80% | - |
+| `apps/mobile/src/feature/navigation/utils/gps.ts` | 76.11% | 72.30% | 63.63% | 75.80% | - |
 | `apps/mobile/src/feature/auth/pages/login.tsx` | 74.69% | 72.15% | 73.91% | 76.71% | - |
 | `apps/mobile/src/feature/revalidation/components/revalidation-map-view.tsx` | 77.77% | 70.96% | 50.00% | 76.92% | - |
-| `apps/mobile/src/feature/upload/utils/video-file-gps.ts` | 77.47% | 62.95% | 83.33% | 77.17% | - |
 | `apps/mobile/src/feature/revalidation/pages/revalidation-map-screen.tsx` | 75.97% | 62.99% | 66.26% | 77.43% | - |
 | `apps/mobile/src/api/navigation/places.ts` | 68.57% | 46.77% | 92.85% | 77.96% | - |
 | `apps/mobile/src/feature/upload/pages/survey-record-details-screen.tsx` | 77.64% | 70.62% | 72.72% | 77.97% | - |
+| `apps/mobile/src/feature/upload/utils/video-file-gps.ts` | 78.37% | 65.57% | 83.33% | 78.13% | - |
 | `apps/mobile/src/feature/navigation/hooks/use-navigation-sheet-gesture.ts` | 79.12% | 68.75% | 86.36% | 78.16% | - |
 | `apps/mobile/src/hooks/use-storage.ts` | 78.94% | 75.00% | 100.00% | 78.94% | - |
 | `apps/mobile/src/api/revalidation/revalidation.ts` | 77.28% | 70.29% | 75.00% | 79.40% | - |
@@ -90,8 +90,7 @@
 | `apps/mobile/src/components/badge.tsx` | 81.81% | 80.55% | 100.00% | 81.81% | - |
 | `apps/mobile/src/feature/revalidation/context/revalidation-workflow-provider.tsx` | 79.89% | 58.82% | 81.08% | 81.81% | - |
 | `apps/mobile/src/feature/work/pages/recaptures-screen.tsx` | 82.50% | 76.36% | 64.28% | 82.05% | - |
-| `apps/mobile/src/hooks/use-offline-maps.ts` | 82.81% | 30.00% | 94.44% | 82.25% | - |
-| `apps/mobile/src/feature/review/context/review-workflow-provider.tsx` | 79.58% | 54.47% | 87.80% | 82.75% | - |
+| `apps/mobile/src/feature/review/context/review-workflow-provider.tsx` | 79.58% | 55.30% | 87.80% | 82.82% | - |
 | `apps/mobile/src/feature/upload/utils/image-file-gps.ts` | 76.88% | 61.29% | 90.90% | 82.96% | - |
 | `apps/mobile/src/api/saved-routes/saved-routes.ts` | 76.19% | 61.90% | 100.00% | 83.33% | - |
 | `apps/mobile/src/components/offline-map-modal.tsx` | 83.33% | 82.85% | 90.90% | 83.33% | - |
@@ -101,6 +100,7 @@
 | `apps/mobile/src/feature/profile/pages/sign-filters-screen.tsx` | 82.87% | 75.10% | 84.74% | 84.52% | - |
 | `apps/mobile/src/feature/navigation/pages/navigation-history-screen.tsx` | 81.34% | 74.07% | 74.19% | 85.12% | - |
 | `apps/mobile/src/services/offline-map-service.ts` | 81.65% | 62.20% | 95.45% | 85.57% | - |
+| `apps/mobile/src/hooks/use-offline-maps.ts` | 86.88% | 42.85% | 94.44% | 86.44% | - |
 | `apps/mobile/src/feature/navigation/components/navigation-upcoming-signs.tsx` | 75.00% | 72.09% | 71.42% | 86.95% | - |
 | `apps/mobile/src/feature/auth/hooks/use-forgot-password.ts` | 87.50% | 100.00% | 87.50% | 87.50% | - |
 | `apps/mobile/src/feature/credits/pages/custom-amount-screen.tsx` | 82.35% | 50.00% | 71.42% | 87.50% | - |
@@ -132,8 +132,9 @@
 | `apps/mobile/src/hooks/use-date-filter-sort.ts` | 93.91% | 95.77% | 100.00% | 94.33% | - |
 | `apps/mobile/src/feature/credits/pages/top-up-screen.tsx` | 93.68% | 84.12% | 86.95% | 94.38% | - |
 | `apps/mobile/src/feature/work/components/work-missions-section.tsx` | 90.47% | 63.63% | 87.50% | 94.44% | - |
-| `apps/mobile/src/feature/upload/components/location-picker-modal.tsx` | 92.22% | 74.19% | 86.95% | 95.12% | - |
+| `apps/mobile/src/feature/upload/components/location-picker-modal.tsx` | 92.22% | 75.00% | 86.95% | 95.12% | - |
 | `apps/mobile/src/feature/auth/pages/register.tsx` | 92.00% | 84.00% | 78.57% | 95.55% | - |
+| `apps/mobile/src/constants/message.ts` | 95.72% | 100.00% | 44.44% | 95.72% | - |
 | `apps/mobile/src/feature/review/pages/reviewer-history-screen.tsx` | 92.59% | 50.00% | 91.66% | 95.83% | - |
 | `apps/mobile/src/feature/upload/pages/survey-history-screen.tsx` | 96.00% | 87.62% | 90.90% | 95.83% | - |
 | `apps/mobile/src/feature/navigation/hooks/use-auto-reroute.ts` | 94.23% | 89.47% | 100.00% | 95.91% | - |
@@ -142,7 +143,6 @@
 | `apps/mobile/src/feature/saved-routes/hooks/use-saved-routes.ts` | 88.23% | 62.50% | 94.11% | 96.77% | - |
 | `apps/mobile/src/feature/upload/hooks/use-save-survey-draft.ts` | 93.15% | 54.54% | 100.00% | 97.01% | - |
 | `apps/mobile/src/feature/upload/pages/survey-route-map-screen.tsx` | 93.50% | 88.34% | 94.11% | 97.10% | - |
-| `apps/mobile/src/constants/message.ts` | 95.45% | 100.00% | 44.44% | 97.22% | - |
 | `apps/mobile/src/feature/work/hooks/use-daily-tasks.ts` | 95.00% | 74.54% | 100.00% | 97.43% | - |
 | `apps/mobile/src/feature/review/hooks/use-reviewer-sign-navigation.ts` | 97.50% | 81.81% | 100.00% | 97.50% | - |
 | `apps/mobile/src/feature/upload/utils/crop-sync-manager.ts` | 98.48% | 93.33% | 100.00% | 98.48% | - |
@@ -172,7 +172,7 @@
 | `apps/mobile/src/components/skeleton.tsx` | 100.00% | 89.28% | 100.00% | 100.00% | - |
 | `apps/mobile/src/components/themed-text.tsx` | 100.00% | 95.23% | 100.00% | 100.00% | - |
 | `apps/mobile/src/components/themed-view.tsx` | 100.00% | 50.00% | 100.00% | 100.00% | - |
-| `apps/mobile/src/components/toast.tsx` | 100.00% | 63.63% | 100.00% | 100.00% | - |
+| `apps/mobile/src/components/toast.tsx` | 100.00% | 61.53% | 100.00% | 100.00% | - |
 | `apps/mobile/src/constants/const.ts` | 100.00% | 100.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/constants/revalidation.ts` | 100.00% | 100.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/constants/theme.ts` | 100.00% | 50.00% | 100.00% | 100.00% | - |
@@ -205,7 +205,7 @@
 | `apps/mobile/src/feature/review/pages/submission-finished-screen.tsx` | 100.00% | 100.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/feature/review/pages/submission-summary-screen.tsx` | 100.00% | 75.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/feature/saved-routes/utils/polyline.ts` | 100.00% | 58.33% | 100.00% | 100.00% | - |
-| `apps/mobile/src/feature/splash/pages/splash-screen.tsx` | 100.00% | 100.00% | 100.00% | 100.00% | - |
+| `apps/mobile/src/feature/splash/pages/splash-screen.tsx` | 100.00% | 95.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/feature/upload/components/surveyor-work-panel.tsx` | 100.00% | 83.33% | 100.00% | 100.00% | - |
 | `apps/mobile/src/feature/upload/hooks/use-reverse-geocode.ts` | 100.00% | 84.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/feature/upload/pages/survey-finish-screen.tsx` | 100.00% | 50.00% | 100.00% | 100.00% | - |
@@ -226,140 +226,41 @@
 | `apps/mobile/src/utils/freshness.ts` | 100.00% | 100.00% | 100.00% | 100.00% | - |
 | `apps/mobile/src/utils/responsive.ts` | 100.00% | 100.00% | 100.00% | 100.00% | - |
 
-## 3. Failed Tests Details
-
-| Test Suite | Test Case | Error Message |
-| :--- | :--- | :--- |
-| `apps/mobile/__tests__/unit/upload/location-picker-modal.test.tsx` | displays error message when GPS permission is denied or location fails | `Error: Unable to find an element with text: /Vui lòng cấp quyền truy cập vị trí để sử dụng vị trí hiện tại của bạn/i` |
-| `apps/mobile/__tests__/unit/upload/location-picker-modal.test.tsx` | displays error message when getMapLibre returns null on native | `Error: Unable to find an element with text: /Tính năng tìm vị trí yêu cầu bản build native/i` |
-| `apps/mobile/__tests__/unit/upload/location-picker-modal.test.tsx` | displays error message when position is null | `Error: Unable to find an element with text: /Bật dịch vụ định vị và thử lại/i` |
-
 ## 4. Test Suites Breakdown
 
 | Test Suite | Tests | Duration | Status |
 | :--- | :---: | :---: | :---: |
-| `apps/mobile/__tests__/unit/upload/chunk-upload-manager.test.ts` | 10 / 10 | 6.18s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-flow.test.tsx` | 27 / 27 | 5.89s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/upload-flow.test.tsx` | 31 / 31 | 2.93s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-utils-and-services.test.ts` | 15 / 15 | 1.51s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/app-layouts.test.tsx` | 13 / 13 | 0.74s | ✅ Pass |
-| `apps/mobile/__tests__/unit/splash/splash-screen.test.tsx` | 9 / 9 | 0.34s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-sign-direction.test.ts` | 9 / 9 | 2.17s | ✅ Pass |
-| `apps/mobile/__tests__/unit/auth/auth-flow.test.tsx` | 16 / 16 | 1.71s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/edit-profile-address-map.test.tsx` | 5 / 5 | 1.61s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx` | 12 / 12 | 1.36s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/returned-submission-item-screen.test.tsx` | 16 / 16 | 1.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-screen.test.tsx` | 10 / 10 | 1.24s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-flow.test.tsx` | 10 / 10 | 2.17s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/edit-profile-avatar.test.tsx` | 7 / 7 | 1.01s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/sign-filters-screen.test.tsx` | 16 / 16 | 0.95s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-review-screen.test.tsx` | 17 / 17 | 0.87s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/use-revalidation-hooks.test.ts` | 5 / 5 | 0.80s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-map-view.test.tsx` | 11 / 11 | 0.74s | ✅ Pass |
-| `apps/mobile/__tests__/unit/auth/forgot-password-flow.test.tsx` | 5 / 5 | 0.73s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/date-filter-sort-list.test.tsx` | 8 / 8 | 0.73s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/inspect-revalidate-screen.test.tsx` | 11 / 11 | 0.76s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/sign-filter-manager.test.tsx` | 13 / 13 | 0.73s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-flow.test.tsx` | 22 / 22 | 0.64s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-submission-details-screen.test.tsx` | 10 / 10 | 0.52s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-roles.test.tsx` | 25 / 25 | 0.61s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-skip-summary-flow.test.tsx` | 11 / 11 | 0.62s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/android-gallery-modal.test.tsx` | 10 / 10 | 1.45s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/top-up-screen.test.tsx` | 6 / 6 | 1.99s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/upload-hooks-and-utils.test.ts` | 13 / 13 | 1.38s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-bottom-sheet-and-gestures.test.tsx` | 9 / 9 | 2.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/reviewer-stats-screen.test.tsx` | 8 / 8 | 2.33s | ✅ Pass |
-| `apps/mobile/__tests__/unit/credits/wallet-flow.test.tsx` | 12 / 12 | 1.86s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/use-review-hooks.test.ts` | 5 / 5 | 1.06s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/profile-flow.test.tsx` | 11 / 11 | 1.75s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-sign-details-card.test.tsx` | 22 / 22 | 2.03s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/offline-map-modal.test.tsx` | 4 / 4 | 1.76s | ✅ Pass |
-| `apps/mobile/__tests__/unit/credits/credit-history-screen.test.tsx` | 4 / 4 | 1.29s | ✅ Pass |
-| `apps/mobile/__tests__/unit/credits/use-wallet.test.tsx` | 12 / 12 | 0.96s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/error-boundary.test.tsx` | 11 / 11 | 1.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/daily-tasks-and-mission-card.test.tsx` | 6 / 6 | 0.81s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-submission-address.test.tsx` | 3 / 3 | 1.52s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/missions-screen.test.tsx` | 9 / 9 | 1.25s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-features.test.tsx` | 8 / 8 | 1.57s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/returned-submissions-list-screen.test.tsx` | 5 / 5 | 1.48s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/location-picker-modal.test.tsx` | 7 / 10 | 4.45s | ❌ Fail |
-| `apps/mobile/__tests__/unit/ui/component.test.tsx` | 8 / 8 | 0.38s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-history-screen.test.tsx` | 9 / 9 | 0.36s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/recapture-camera-screen.test.tsx` | 7 / 7 | 0.31s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/reviewer-history-screen.test.tsx` | 3 / 3 | 0.30s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/bookmark-route-modal.test.tsx` | 6 / 6 | 0.29s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx` | 8 / 8 | 0.28s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-screens-and-views.test.tsx` | 10 / 10 | 0.34s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-map-views.test.tsx` | 3 / 3 | 0.25s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-map-view-web.test.tsx` | 7 / 7 | 0.26s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/input.test.tsx` | 7 / 7 | 0.19s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/use-recapture-and-instruction.test.tsx` | 5 / 5 | 0.31s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-api.test.ts` | 42 / 42 | 0.25s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx` | 5 / 5 | 0.23s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-history-item-card.test.tsx` | 8 / 8 | 0.23s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-upcoming-signs.test.tsx` | 3 / 3 | 0.22s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx` | 3 / 3 | 0.21s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/virtual-list.test.tsx` | 8 / 8 | 0.23s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-route-map.test.tsx` | 5 / 5 | 0.27s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx` | 9 / 9 | 0.21s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-workflow-provider.test.tsx` | 11 / 11 | 0.21s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-routes.test.tsx` | 30 / 30 | 0.21s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-sign-verify-card.test.tsx` | 7 / 7 | 0.19s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/update-service-and-storage.test.tsx` | 10 / 10 | 0.18s | ✅ Pass |
-| `apps/mobile/__tests__/unit/revalidation/revalidation-decision-badge.test.tsx` | 8 / 8 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx` | 7 / 7 | 0.16s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/skeleton.test.tsx` | 7 / 7 | 0.16s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-scan-modal.test.tsx` | 2 / 2 | 0.16s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/home-sign-filter-card.test.tsx` | 4 / 4 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/use-reviewer-sign-navigation.test.ts` | 14 / 14 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx` | 2 / 2 | 0.14s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/screen-container.test.tsx` | 3 / 3 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/sign-proximity-alert.test.tsx` | 18 / 18 | 0.16s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/offline-map-service.test.ts` | 15 / 15 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/responsive.test.ts` | 6 / 6 | 0.11s | ✅ Pass |
-| `apps/mobile/__tests__/unit/credits/credits-routes-and-flow-state.test.tsx` | 7 / 7 | 0.15s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts` | 13 / 13 | 0.14s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-action-badge.test.tsx` | 7 / 7 | 0.13s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/home-routes-and-active-provider.test.tsx` | 6 / 6 | 0.13s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/work-daily-tip-card.test.tsx` | 3 / 3 | 0.11s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx` | 4 / 4 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/surveyor-work-panel.test.tsx` | 5 / 5 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/image-file-gps.test.ts` | 11 / 11 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/use-date-filter-sort.test.ts` | 13 / 13 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/profile/profile-routes.test.tsx` | 2 / 2 | 0.11s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx` | 3 / 3 | 0.12s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/video-file-gps.test.ts` | 22 / 22 | 0.11s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/auto-reroute.test.ts` | 10 / 10 | 0.11s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/sign-map-api.test.ts` | 6 / 6 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-submission-api.test.ts` | 16 / 16 | 0.10s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/crop-sync-manager.test.ts` | 15 / 15 | 0.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/auth/api-client.test.ts` | 12 / 12 | 0.10s | ✅ Pass |
-| `apps/mobile/__tests__/unit/auth/use-authentication.test.ts` | 3 / 3 | 0.10s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/selected-asset-gps.test.ts` | 14 / 14 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/speech-service.test.ts` | 17 / 17 | 0.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/navigation-api.test.ts` | 11 / 11 | 0.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/catalog-api.test.ts` | 12 / 12 | 0.10s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-image.test.ts` | 7 / 7 | 0.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/credits/wallet-api.test.ts` | 10 / 10 | 0.09s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/places-api.test.ts` | 6 / 6 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx` | 11 / 11 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts` | 6 / 6 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts` | 10 / 10 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/video-processor.test.ts` | 9 / 9 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/offline-tiles-api.test.ts` | 5 / 5 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/hazards-api.test.ts` | 5 / 5 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/video-gps.test.ts` | 7 / 7 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/survey-record-schema.test.ts` | 9 / 9 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-workflow-api.test.ts` | 8 / 8 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/spatial.test.ts` | 7 / 7 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/image-gps.test.ts` | 15 / 15 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/auth/auth-api.test.ts` | 13 / 13 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/notifications-api.test.ts` | 5 / 5 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/review/review-api.test.ts` | 13 / 13 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/signs-api.test.ts` | 1 / 1 | 0.08s | ✅ Pass |
-| `apps/mobile/__tests__/unit/work/daily-tasks-api.test.ts` | 4 / 4 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/upload/video-gpx-detection.test.ts` | 10 / 10 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/saved-routes-standalone-api.test.ts` | 7 / 7 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/ui/freshness.test.ts` | 4 / 4 | 0.07s | ✅ Pass |
-| `apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts` | 4 / 4 | 0.07s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/offline-tiles-api.test.ts` | 5 / 5 | 2.45s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx` | 3 / 3 | 4.22s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx` | 4 / 4 | 4.26s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/home-routes-and-active-provider.test.tsx` | 6 / 6 | 4.63s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/speech-service.test.ts` | 17 / 17 | 0.38s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-api.test.ts` | 11 / 11 | 0.36s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/places-api.test.ts` | 6 / 6 | 0.35s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/signs-api.test.ts` | 1 / 1 | 0.29s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/notifications-api.test.ts` | 5 / 5 | 0.32s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/bookmark-route-modal.test.tsx` | 6 / 6 | 5.93s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx` | 7 / 7 | 5.81s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts` | 10 / 10 | 0.36s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts` | 6 / 6 | 0.36s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx` | 11 / 11 | 0.40s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-sign-verify-card.test.tsx` | 7 / 7 | 5.72s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/sign-map-api.test.ts` | 6 / 6 | 0.35s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx` | 2 / 2 | 6.00s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/spatial.test.ts` | 7 / 7 | 0.30s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts` | 4 / 4 | 0.31s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/saved-routes-standalone-api.test.ts` | 7 / 7 | 0.35s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-upcoming-signs.test.tsx` | 3 / 3 | 5.97s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/hazards-api.test.ts` | 5 / 5 | 0.36s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx` | 3 / 3 | 5.91s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/auto-reroute.test.ts` | 12 / 12 | 3.30s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-map-view-web.test.tsx` | 7 / 7 | 6.01s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/home-sign-filter-card.test.tsx` | 4 / 4 | 5.97s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx` | 8 / 8 | 6.15s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/sign-proximity-alert.test.tsx` | 18 / 18 | 6.14s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-screens-and-views.test.tsx` | 10 / 10 | 6.95s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-utils-and-services.test.ts` | 15 / 15 | 7.28s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-map-view.test.tsx` | 12 / 12 | 7.87s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-flow.test.tsx` | 10 / 10 | 8.26s | ✅ Pass |
+| `apps/mobile/__tests__/unit/navigation/navigation-bottom-sheet-and-gestures.test.tsx` | 9 / 9 | 8.72s | ✅ Pass |
 

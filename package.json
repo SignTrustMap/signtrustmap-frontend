@@ -85,7 +85,8 @@
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/__mocks__/styleMock.js",
       "^@/assets/(.*)$": "<rootDir>/apps/mobile/assets/$1",
-      "^@/(.*)$": "<rootDir>/apps/mobile/src/$1"
+      "^@/(.*)$": "<rootDir>/apps/mobile/src/$1",
+      "^@shared/types$": "<rootDir>/packages/types/src/index.ts"
     }
   },
   "homepage": "https://github.com/SignTrustMap/signtrustmap-frontend#readme",

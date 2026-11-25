@@ -168,7 +168,10 @@ describe('ProfileScreen Unit Test Suite', () => {
   // =========================================================================
   describe('Case 1: User Identity and Avatar Rendering', () => {
     it('renders the user full name, email, and initials avatar badge', async () => {
-      const { getByText, getByLabelText } = await render(<ProfileScreen />);
+      const { getByText, getByLabelText, getByTestId } = await render(<ProfileScreen />);
+
+      expect(getByTestId('profile-gradient-bg')).toBeTruthy();
+      expect(getByTestId('profile-decor-circle')).toBeTruthy();
 
       // Identity
       expect(getByText('Alex Rivera')).toBeTruthy();

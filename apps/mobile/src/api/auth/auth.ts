@@ -1,11 +1,21 @@
+import type {
+  AuthLoginPayload,
+  ForgotPasswordPayload,
+  ForgotPasswordResponse,
+  ResendOtpPayload,
+  ResendOtpResponse,
+  ResetPasswordPayload,
+  ResetPasswordResponse,
+  UpdateProfilePayload,
+  UserProfileResponse as SharedUserProfileResponse,
+  VerifyOtpPayload,
+  VerifyOtpResponse,
+} from '@shared/types';
 import { jsonApiRequest } from '@/api/api-client';
 import { API_PATHS } from '@/api/api';
 import type { AccountRole, AppSession } from '@/context/session-provider';
 
-export type LoginRequest = {
-  email: string;
-  password: string;
-};
+export type LoginRequest = AuthLoginPayload;
 
 export type GoogleLoginRequest = {
   token: string;
@@ -95,22 +105,17 @@ export async function register(request: RegisterRequest): Promise<RegisterRespon
   });
 }
 
-export type UpdateProfileRequest = {
-  fullName?: string;
-  phone?: string;
-  avatarUrl?: string;
-  address?: string;
-};
+export type UpdateProfileRequest = UpdateProfilePayload;
 
-export type UserProfileResponse = {
-  id: string;
-  email: string;
-  fullName: string;
-  phone?: string | null;
-  avatarUrl?: string | null;
-  address?: string | null;
-  roles?: string[];
-};
+export type UserProfileResponse = Pick<
+  SharedUserProfileResponse,
+  'id' | 'email' | 'fullName' | 'phone' | 'avatarUrl'
+> &
+  Partial<
+    Pick<SharedUserProfileResponse, 'status' | 'roles' | 'walletBalance' | 'profileStats'>
+  > & {
+    address?: string | null;
+  };
 
 export async function updateProfile(
   payload: UpdateProfileRequest,
@@ -153,47 +158,16 @@ export async function toggleRole(
   );
 }
 
-export type ForgotPasswordRequest = {
-  email: string;
-};
+export type ForgotPasswordRequest = ForgotPasswordPayload;
+export type VerifyOtpRequest = VerifyOtpPayload;
+export type ResendOtpRequest = ResendOtpPayload;
+export type ResetPasswordRequest = ResetPasswordPayload;
 
-export type ForgotPasswordResponse = {
-  sent: boolean;
-  message?: string;
-  otp?: string;
-  expiresAt?: string | Date;
-};
-
-export type VerifyOtpRequest = {
-  email: string;
-  otp: string;
-};
-
-export type VerifyOtpResponse = {
-  valid: boolean;
-  email: string;
-};
-
-export type ResendOtpRequest = {
-  email: string;
-};
-
-export type ResendOtpResponse = {
-  sent: boolean;
-  message?: string;
-  otp?: string;
-  expiresAt?: string | Date;
-};
-
-export type ResetPasswordRequest = {
-  email: string;
-  otp: string;
-  newPassword: string;
-};
-
-export type ResetPasswordResponse = {
-  reset: boolean;
-  message?: string;
+export type {
+  ForgotPasswordResponse,
+  ResendOtpResponse,
+  ResetPasswordResponse,
+  VerifyOtpResponse,
 };
 
 export async function forgotPassword(

@@ -55,19 +55,6 @@ const RETURNED_STATUSES: SubmissionStatus[] = [
   'NO_SIGN_DETECTED',
 ];
 
-export const MOCK_RETURNED_SUBMISSION: SurveySubmission = {
-  id: 'mock-returned-sub-001',
-  surveyorId: 'mock-surveyor',
-  submissionType: 'SINGLE_IMAGE',
-  status: 'PENDING_CORRECTION',
-  failureReason:
-    'AI không phát hiện được biển báo trong ảnh. Vui lòng khoanh vùng vị trí biển báo nếu bạn chắc chắn ảnh có biển báo hợp lệ.',
-  note: 'Ảnh bị trả về do nghi ngờ không có biển báo',
-  totalCandidatesExtracted: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
 function formatDate(value?: string) {
   if (!value) return '';
   const date = new Date(value);
@@ -95,14 +82,7 @@ export function ReturnedSubmissionsListScreen() {
 
   const allReturnedItems = useMemo(() => {
     const rawItems = data?.items ?? [];
-    const backendReturned = rawItems.filter((item) => RETURNED_STATUSES.includes(item.status));
-
-    // If backend returned items exist, display real items.
-    // Fallback to MOCK_RETURNED_SUBMISSION only if empty (for demo / offline test mode)
-    if (backendReturned.length === 0) {
-      return [MOCK_RETURNED_SUBMISSION];
-    }
-    return backendReturned;
+    return rawItems.filter((item) => RETURNED_STATUSES.includes(item.status));
   }, [data?.items]);
 
   const handleOpenItem = useCallback(
@@ -309,7 +289,9 @@ export function ReturnedSubmissionsListScreen() {
                         Không tìm thấy ảnh bị trả về
                       </Text>
                       <Text style={[styles.emptySubtitle, { color: theme.grey }]}>
-                        Không có bản ghi nào phù hợp với bộ lọc ngày đã chọn.
+                        {allReturnedItems.length === 0
+                          ? 'Hiện chưa có ảnh khảo sát nào bị trả về.'
+                          : 'Không có bản ghi nào phù hợp với bộ lọc ngày đã chọn.'}
                       </Text>
                     </View>
                   }

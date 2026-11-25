@@ -6,6 +6,7 @@ import {
   fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
+  voteOnRevalidationEvidence,
   getRevalidationTasks,
   getRevalidationTask,
   finalizeRevalidationTask,
@@ -1065,6 +1066,46 @@ describe('Revalidation API Module', () => {
       );
       expect(res.success).toBe(true);
       expect(res.notificationSent).toBe(true);
+    });
+  });
+
+  describe('voteOnRevalidationEvidence', () => {
+    it('sends only decision, suggestedSignTypeId, and note without extra GPS fields', async () => {
+      const mockVoteRes = {
+        vote: {
+          id: 'vote-1',
+          evidenceId: 'ev-vote-1',
+          reviewerId: 'rev-1',
+          decision: 'CHANGED',
+          suggestedSignTypeId: 42,
+          note: 'Biển mới thay',
+          decidedAt: '2026-11-25T10:00:00Z',
+        },
+        consensus: { evaluated: false },
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockVoteRes);
+
+      const res = await voteOnRevalidationEvidence('ev-vote-1', {
+        decision: 'CHANGED',
+        suggestedSignTypeId: 42,
+        note: 'Biển mới thay',
+        latitude: 10.77,
+        longitude: 106.7,
+      } as any);
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/evidence/ev-vote-1/vote',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            decision: 'CHANGED',
+            suggestedSignTypeId: 42,
+            note: 'Biển mới thay',
+          }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res.vote.decision).toBe('CHANGED');
     });
   });
 

@@ -3,7 +3,6 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 
 import {
   ReturnedSubmissionsListScreen,
-  MOCK_RETURNED_SUBMISSION,
 } from '@/feature/work/pages/returned-submissions-list-screen';
 import type { SurveySubmission } from '@/types/surveySubmissionType';
 
@@ -41,44 +40,24 @@ describe('ReturnedSubmissionsListScreen', () => {
     mockIsRefetching = false;
   });
 
-  it('renders header, back button, guideline banner, and mock item in virtual list', async () => {
+  it('renders header, back button, guideline banner, and empty state when backend returns no items', async () => {
     mockSubmissionsData = { items: [] };
 
-    const { getByText, getByLabelText } = await render(<ReturnedSubmissionsListScreen />);
+    const { getByText, getByLabelText, queryByText } = await render(<ReturnedSubmissionsListScreen />);
 
     expect(getByText('Ảnh bị trả về')).toBeTruthy();
     expect(getByLabelText('Quay lại công việc')).toBeTruthy();
     expect(getByText('Lọc theo ngày')).toBeTruthy();
-
-    // The mock item should be visible in the list
-    expect(getByText('Khảo sát hình ảnh')).toBeTruthy();
-    expect(getByText('Cần chỉnh sửa')).toBeTruthy();
-    expect(
-      getByText(
-        'AI không phát hiện được biển báo trong ảnh. Vui lòng khoanh vùng vị trí biển báo nếu bạn chắc chắn ảnh có biển báo hợp lệ.'
-      )
-    ).toBeTruthy();
+    expect(getByText('0 hồ sơ cần cập nhật hoặc khoanh vùng lại')).toBeTruthy();
+    expect(getByText('Không tìm thấy ảnh bị trả về')).toBeTruthy();
+    expect(getByText('Hiện chưa có ảnh khảo sát nào bị trả về.')).toBeTruthy();
+    expect(queryByText('Xem & Khoanh vùng')).toBeNull();
 
     // Test back button
     fireEvent.press(getByLabelText('Quay lại công việc'));
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/work',
       params: { currentRole: 'surveyor' },
-    });
-  });
-
-  it('navigates to return item screen with ID when item is clicked', async () => {
-    mockSubmissionsData = { items: [] };
-
-    const { getByText } = await render(<ReturnedSubmissionsListScreen />);
-
-    // Click on the action button or the mock item
-    const actionBtn = getByText('Xem & Khoanh vùng');
-    fireEvent.press(actionBtn);
-
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/work/returned-submission-item',
-      params: { id: MOCK_RETURNED_SUBMISSION.id },
     });
   });
 

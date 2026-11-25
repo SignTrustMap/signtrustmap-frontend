@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
@@ -12,31 +12,23 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getProfile, updateProfile } from '@/api/auth/auth';
-import { searchPlaces, type ApiPlace } from '@/api/navigation/places';
 import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { PrimaryGradientBackdrop } from '@/components/primary-gradient-backdrop';
 import { useSession } from '@/context/session-provider';
-import {
-  NavigationMapView,
-  MapLocationPin,
-} from '@/feature/navigation/components/navigation-map-view';
-import { LocationPickerModal } from '@/feature/upload/components/location-picker-modal';
-import { useDebounce } from '@/hooks/use-debounce';
 import { useTheme } from '@/hooks/use-theme';
-import type { MapCoordinate } from '@/types/navigationType';
 
+import { AddressAutocompleteField } from '../components/address-autocomplete-field';
 import { AvatarCropModal } from '../components/avatar-crop-modal';
+import { useAddressAutocomplete } from '../hooks/use-address-autocomplete';
 import { editProfileSchema, type EditProfileFormData } from '../schemas/edit-profile.schema';
-
-const DEFAULT_COORDINATE: MapCoordinate = [106.7009, 10.7769];
+import { styles } from '../styles/edit-profile-screen.styles';
 
 function getInitials(displayName?: string) {
   if (!displayName) return 'ST';
@@ -61,17 +53,6 @@ export function EditProfileScreen() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Address autocomplete and map states
-  const [addressInput, setAddressInput] = useState(session?.account.address ?? '');
-  const debouncedAddress = useDebounce(addressInput, 350);
-  const [addressSuggestions, setAddressSuggestions] = useState<ApiPlace[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
-  const [selectedCoordinate, setSelectedCoordinate] = useState<MapCoordinate>(DEFAULT_COORDINATE);
-  const [focusRequestId, setFocusRequestId] = useState(1);
-  const [isMapPickerOpen, setIsMapPickerOpen] = useState(false);
-  const isTypingAddressRef = useRef(false);
-
   const {
     control,
     handleSubmit,
@@ -89,6 +70,27 @@ export function EditProfileScreen() {
     },
   });
 
+  const {
+    addressInput,
+    addressSuggestions,
+    focusRequestId,
+    handleAddressTextChange,
+    handleClearAddress,
+    handleMapConfirm,
+    handleSelectPlace,
+    hydrateFromInitialAddress,
+    isLoadingSuggestions,
+    isMapPickerOpen,
+    isSuggestionsVisible,
+    selectedCoordinate,
+    setIsMapPickerOpen,
+    setIsSuggestionsVisible,
+  } = useAddressAutocomplete({
+    initialAddress: session?.account.address ?? '',
+    onSyncAddress: (addr) =>
+      setValue('address', addr, { shouldValidate: true, shouldDirty: true }),
+  });
+
   const fullName = watch('fullName');
 
   useEffect(() => {
@@ -103,7 +105,7 @@ export function EditProfileScreen() {
               phone: profile.phone || '',
               address: initialAddr,
             });
-            setAddressInput(initialAddr);
+            hydrateFromInitialAddress(initialAddr);
 
             if (profile.avatarUrl !== undefined) {
               setAvatarUrl(profile.avatarUrl ?? null);
@@ -113,24 +115,6 @@ export function EditProfileScreen() {
                   ...(profile.address ? { address: profile.address } : {}),
                 });
               }
-            }
-
-            // Attempt geocoding of initial address
-            if (initialAddr.trim().length >= 2) {
-              searchPlaces(initialAddr.trim())
-                .then((places) => {
-                  if (
-                    isMounted &&
-                    places &&
-                    places.length > 0 &&
-                    places[0].longitude != null &&
-                    places[0].latitude != null
-                  ) {
-                    setSelectedCoordinate([places[0].longitude, places[0].latitude]);
-                    setFocusRequestId((prev) => prev + 1);
-                  }
-                })
-                .catch(() => {});
             }
           }
         })
@@ -146,66 +130,7 @@ export function EditProfileScreen() {
     return () => {
       isMounted = false;
     };
-  }, [session?.accessToken, reset]);
-
-  // Debounced address search effect
-  useEffect(() => {
-    if (!isTypingAddressRef.current) return;
-    const trimmed = (debouncedAddress || '').trim();
-    if (trimmed.length < 2) {
-      setAddressSuggestions([]);
-      setIsLoadingSuggestions(false);
-      return;
-    }
-
-    let isMounted = true;
-    setIsLoadingSuggestions(true);
-    const abortCtrl = new AbortController();
-
-    searchPlaces(trimmed, abortCtrl.signal)
-      .then((places) => {
-        if (isMounted) {
-          setAddressSuggestions(places || []);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setAddressSuggestions([]);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoadingSuggestions(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-      abortCtrl.abort();
-    };
-  }, [debouncedAddress]);
-
-  const handleSelectPlace = useCallback(
-    (place: ApiPlace, onFormFieldChange?: (val: string) => void) => {
-      isTypingAddressRef.current = false;
-      const chosenAddress = place.address || place.title;
-      if (onFormFieldChange) {
-        onFormFieldChange(chosenAddress);
-      } else {
-        setValue('address', chosenAddress, { shouldValidate: true, shouldDirty: true });
-      }
-      setAddressInput(chosenAddress);
-      setIsSuggestionsVisible(false);
-      setAddressSuggestions([]);
-
-      if (place.longitude != null && place.latitude != null) {
-        const coord: MapCoordinate = [place.longitude, place.latitude];
-        setSelectedCoordinate(coord);
-        setFocusRequestId((prev) => prev + 1);
-      }
-    },
-    [setValue],
-  );
+  }, [session?.accessToken, reset, hydrateFromInitialAddress]);
 
   const handlePickAvatar = async () => {
     try {
@@ -295,20 +220,25 @@ export function EditProfileScreen() {
   const email = session?.account.email ?? '';
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View style={[styles.screen, { backgroundColor: theme.primary }]}>
+      <PrimaryGradientBackdrop testIDPrefix="edit-profile" />
+
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         {/* Top Header Bar */}
-        <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
+        <View style={styles.topBar}>
           <Pressable
             accessibilityLabel="Quay lại"
             accessibilityRole="button"
             hitSlop={8}
             onPress={() => router.back()}
-            style={styles.backButton}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && { opacity: 0.75 },
+            ]}
           >
-            <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
+            <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={22} />
           </Pressable>
-          <Text style={[styles.topBarTitle, { color: theme.text }]}>Chỉnh sửa hồ sơ</Text>
+          <Text style={styles.topBarTitle}>Chỉnh sửa hồ sơ</Text>
           <View style={styles.topBarRight} />
         </View>
 
@@ -317,11 +247,12 @@ export function EditProfileScreen() {
           style={styles.keyboardView}
         >
           <ScrollView
+            bounces={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Avatar Section */}
+            {/* Hero Avatar Section */}
             <View style={styles.avatarSection}>
               <Pressable
                 accessibilityHint="Chạm để chọn và điều chỉnh ảnh đại diện mới"
@@ -331,12 +262,7 @@ export function EditProfileScreen() {
                 onPress={handlePickAvatar}
                 style={styles.avatarWrapper}
               >
-                <View
-                  style={[
-                    styles.avatar,
-                    { backgroundColor: theme.secondary, borderColor: theme.primary },
-                  ]}
-                >
+                <View style={styles.avatar}>
                   {tempAvatarUri || avatarUrl ? (
                     <Image
                       resizeMode="cover"
@@ -356,7 +282,7 @@ export function EditProfileScreen() {
                 </View>
               </Pressable>
 
-              <Text style={[styles.avatarHint, { color: theme.grey }]}>
+              <Text style={styles.avatarHint}>
                 {tempAvatarUri
                   ? 'Ảnh mới (chưa lưu, nhấn Lưu thay đổi bên dưới)'
                   : 'Chạm vào ảnh để thay đổi ảnh đại diện'}
@@ -365,25 +291,23 @@ export function EditProfileScreen() {
 
             {isLoadingProfile ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator color={theme.primary} size="small" />
-                <Text style={[styles.loadingText, { color: theme.grey }]}>
-                  Đang tải thông tin...
-                </Text>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.loadingText}>Đang tải thông tin...</Text>
               </View>
             ) : null}
 
-            {/* Form Fields Card */}
-            <View
-              style={[
-                styles.formCard,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-            >
+            {/* Login-style Floating White Form Card */}
+            <View style={styles.formCard}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Thông tin cá nhân</Text>
+                <Text style={styles.cardSubtitle}>Cập nhật hồ sơ SignTrustMap của bạn</Text>
+              </View>
+
               {/* Full Name Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <MaterialCommunityIcons color={theme.grey} name="account-outline" size={20} />
-                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Họ và tên</Text>
+                  <MaterialCommunityIcons color="#64748B" name="account-outline" size={18} />
+                  <Text style={styles.fieldLabel}>Họ và tên</Text>
                   <Text style={[styles.requiredBadge, { color: theme.danger }]}>*</Text>
                 </View>
                 <Controller
@@ -396,7 +320,7 @@ export function EditProfileScreen() {
                       autoCapitalize="words"
                       containerStyle={[
                         styles.inputContainer,
-                        { borderColor: errors.fullName ? theme.danger : '#666', backgroundColor: theme.surface },
+                        errors.fullName ? styles.inputContainerError : null,
                       ]}
                       editable={!isSaving}
                       error={errors.fullName?.message}
@@ -404,7 +328,7 @@ export function EditProfileScreen() {
                       onBlur={onBlur}
                       onChangeText={onChange}
                       placeholder="Nhập họ và tên của bạn"
-                      placeholderTextColor={theme.placeholder}
+                      placeholderTextColor="#94A3B8"
                       value={value}
                     />
                   )}
@@ -414,8 +338,8 @@ export function EditProfileScreen() {
               {/* Phone Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <MaterialCommunityIcons color={theme.grey} name="phone-outline" size={20} />
-                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Số điện thoại</Text>
+                  <MaterialCommunityIcons color="#64748B" name="phone-outline" size={18} />
+                  <Text style={styles.fieldLabel}>Số điện thoại</Text>
                 </View>
                 <Controller
                   control={control}
@@ -425,16 +349,16 @@ export function EditProfileScreen() {
                       accessibilityLabel="Số điện thoại"
                       containerStyle={[
                         styles.inputContainer,
-                        { borderColor: errors.phone ? theme.danger : '#666', backgroundColor: theme.surface },
+                        errors.phone ? styles.inputContainerError : null,
                       ]}
                       editable={!isSaving}
                       error={errors.phone?.message}
                       keyboardType="phone-pad"
-                      maxLength={20}
+                      maxLength={10}
                       onBlur={onBlur}
                       onChangeText={onChange}
                       placeholder="Nhập số điện thoại liên hệ"
-                      placeholderTextColor={theme.placeholder}
+                      placeholderTextColor="#94A3B8"
                       type="phone"
                       value={value}
                     />
@@ -445,202 +369,35 @@ export function EditProfileScreen() {
               {/* Address Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <MaterialCommunityIcons color={theme.grey} name="map-marker-outline" size={20} />
-                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Địa chỉ</Text>
+                  <MaterialCommunityIcons color="#64748B" name="map-marker-outline" size={18} />
+                  <Text style={styles.fieldLabel}>Địa chỉ</Text>
                 </View>
                 <Controller
                   control={control}
                   name="address"
                   render={({ field: { onChange, onBlur, value } }) => (
-                    <View>
-                      <View style={styles.addressInputShell}>
-                        <AppInput
-                          accessibilityLabel="Địa chỉ"
-                          autoCapitalize="sentences"
-                          containerStyle={[
-                            styles.inputContainer,
-                            {
-                              borderColor: errors.address ? theme.danger : '#666',
-                              backgroundColor: theme.surface,
-                            },
-                          ]}
-                          editable={!isSaving}
-                          error={errors.address?.message}
-                          maxLength={200}
-                          onBlur={() => {
-                            onBlur();
-                            setTimeout(() => {
-                              setIsSuggestionsVisible(false);
-                            }, 250);
-                          }}
-                          onChangeText={(text) => {
-                            isTypingAddressRef.current = true;
-                            onChange(text);
-                            setAddressInput(text);
-                            setIsSuggestionsVisible(true);
-                          }}
-                          onFocus={() => {
-                            if (addressInput.trim().length >= 2) {
-                              setIsSuggestionsVisible(true);
-                            }
-                          }}
-                          placeholder="Nhập địa chỉ của bạn"
-                          placeholderTextColor={theme.placeholder}
-                          value={value}
-                        />
-                        {value ? (
-                          <Pressable
-                            accessibilityLabel="Xóa địa chỉ"
-                            hitSlop={8}
-                            onPress={() => {
-                              isTypingAddressRef.current = false;
-                              onChange('');
-                              setAddressInput('');
-                              setAddressSuggestions([]);
-                              setIsSuggestionsVisible(false);
-                            }}
-                            style={styles.addressClearBtn}
-                            testID="clear-address-btn"
-                          >
-                            <MaterialCommunityIcons
-                              color={theme.placeholder}
-                              name="close-circle"
-                              size={18}
-                            />
-                          </Pressable>
-                        ) : null}
-                      </View>
-
-                      {/* Autocomplete Suggestions Dropdown */}
-                      {isSuggestionsVisible &&
-                      (addressSuggestions.length > 0 || isLoadingSuggestions) ? (
-                        <View
-                          style={[
-                            styles.suggestionsContainer,
-                            {
-                              backgroundColor: theme.backgroundElement,
-                              borderColor: theme.border,
-                            },
-                          ]}
-                          testID="address-suggestions-container"
-                        >
-                          {isLoadingSuggestions ? (
-                            <View style={styles.suggestionLoadingRow}>
-                              <ActivityIndicator color={theme.primary} size="small" />
-                              <Text
-                                style={[
-                                  styles.suggestionLoadingText,
-                                  { color: theme.placeholder },
-                                ]}
-                              >
-                                Đang tìm địa chỉ...
-                              </Text>
-                            </View>
-                          ) : null}
-
-                          {addressSuggestions.slice(0, 5).map((place, idx) => (
-                            <Pressable
-                              key={place.id || `${place.title}-${idx}`}
-                              accessibilityLabel={`Chọn địa chỉ ${place.title}`}
-                              onPress={() => handleSelectPlace(place, onChange)}
-                              style={({ pressed }) => [
-                                styles.suggestionItem,
-                                {
-                                  borderBottomColor: theme.border,
-                                  backgroundColor: pressed ? `${theme.primary}12` : 'transparent',
-                                },
-                              ]}
-                              testID={`address-suggestion-${idx}`}
-                            >
-                              <MaterialCommunityIcons
-                                color={theme.primary}
-                                name="map-marker"
-                                size={18}
-                              />
-                              <View style={styles.suggestionTextCol}>
-                                <Text
-                                  numberOfLines={1}
-                                  style={[styles.suggestionTitle, { color: theme.text }]}
-                                >
-                                  {place.title}
-                                </Text>
-                                {place.address && place.address !== place.title ? (
-                                  <Text
-                                    numberOfLines={1}
-                                    style={[
-                                      styles.suggestionSubtitle,
-                                      { color: theme.placeholder },
-                                    ]}
-                                  >
-                                    {place.address}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
-
-                      {/* Mini Map Preview Card */}
-                      <View
-                        style={[
-                          styles.miniMapCard,
-                          {
-                            backgroundColor: theme.backgroundElement,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                        testID="profile-mini-map-card"
-                      >
-                        <View style={styles.miniMapWrapper}>
-                          <NavigationMapView
-                            focusCoordinate={selectedCoordinate}
-                            focusRequestId={focusRequestId}
-                            showCurrentLocation={false}
-                          />
-
-                          {/* Center Location Pin */}
-                          <View pointerEvents="none" style={styles.miniMapPinWrapper}>
-                            <MapLocationPin
-                              color={theme.primary}
-                              size={32}
-                              testID="profile-map-pin"
-                            />
-                          </View>
-
-                          {/* Floating Zoom Button at bottom-right corner */}
-                          <AppButton
-                            accessibilityHint="Mở bản đồ toàn màn hình để chọn vị trí chính xác"
-                            accessibilityLabel="Xem phóng to bản đồ"
-                            onPress={() => setIsMapPickerOpen(true)}
-                            pressedOpacity={0.7}
-                            style={styles.miniMapZoomButton}
-                            testID="mini-map-zoom-btn"
-                            variant="primary"
-                          >
-                            <MaterialCommunityIcons color="#FFFFFF" name="arrow-expand" size={18} />
-                          </AppButton>
-                        </View>
-
-                        {/* Caption / address label at bottom of card */}
-                        <View style={[styles.miniMapCaption, { borderTopColor: theme.border }]}>
-                          <MaterialCommunityIcons
-                            color={theme.primary}
-                            name="crosshairs-gps"
-                            size={14}
-                          />
-                          <Text
-                            numberOfLines={1}
-                            style={[
-                              styles.miniMapCaptionText,
-                              { color: theme.placeholder },
-                            ]}
-                          >
-                            {value || 'Chạm vào nút phóng to để chọn vị trí trên bản đồ'}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
+                    <AddressAutocompleteField
+                      addressInput={addressInput}
+                      addressSuggestions={addressSuggestions}
+                      editable={!isSaving}
+                      error={errors.address?.message}
+                      focusRequestId={focusRequestId}
+                      inputContainerStyle={styles.inputContainer}
+                      inputErrorStyle={styles.inputContainerError}
+                      isLoadingSuggestions={isLoadingSuggestions}
+                      isMapPickerOpen={isMapPickerOpen}
+                      isSuggestionsVisible={isSuggestionsVisible}
+                      onBlur={onBlur}
+                      onChangeText={(text) => handleAddressTextChange(text, onChange)}
+                      onClear={() => handleClearAddress(onChange)}
+                      onCloseMapPicker={() => setIsMapPickerOpen(false)}
+                      onConfirmMapPicker={handleMapConfirm}
+                      onOpenMapPicker={() => setIsMapPickerOpen(true)}
+                      onSelectPlace={(place) => handleSelectPlace(place, onChange)}
+                      onSuggestionsVisibilityChange={setIsSuggestionsVisible}
+                      selectedCoordinate={selectedCoordinate}
+                      value={value}
+                    />
                   )}
                 />
               </View>
@@ -648,64 +405,55 @@ export function EditProfileScreen() {
               {/* Email (Read-only) Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
-                  <MaterialCommunityIcons color={theme.grey} name="email-outline" size={20} />
-                  <Text style={[styles.fieldLabel, { color: theme.text }]}>Email</Text>
-                  <Text style={[styles.lockedBadge, { color: theme.grey }]}>
-                    (Không thể thay đổi)
-                  </Text>
+                  <MaterialCommunityIcons color="#64748B" name="email-outline" size={18} />
+                  <Text style={styles.fieldLabel}>Email</Text>
+                  <Text style={styles.lockedBadge}>(Không thể thay đổi)</Text>
                 </View>
                 <AppInput
                   accessibilityLabel="Email"
-                  containerStyle={[
-                    styles.inputContainer,
-                    styles.disabledInputContainer,
-                    { borderColor: theme.border, backgroundColor: theme.background },
-                  ]}
+                  containerStyle={[styles.inputContainer, styles.disabledInputContainer]}
                   editable={false}
                   keyboardType="email-address"
-                  style={{ color: theme.placeholder }}
+                  style={{ color: '#94A3B8' }}
                   trailingIcon={
-                    <MaterialCommunityIcons
-                      color={theme.placeholder}
-                      name="lock-outline"
-                      size={16}
-                    />
+                    <MaterialCommunityIcons color="#94A3B8" name="lock-outline" size={16} />
                   }
                   type="email"
                   value={email}
                 />
               </View>
-            </View>
 
-            {/* Save Button */}
-            <View style={styles.saveActionContainer}>
-              <AppButton
-                accessibilityLabel="Lưu thông tin hồ sơ"
-                disabled={isSaving || !fullName?.trim()}
-                onPress={handleSave}
-                style={[
-                  styles.saveButton,
-                  {
-                    backgroundColor: theme.primary,
-                    opacity: isSaving || !fullName?.trim() ? 0.6 : 1,
-                  },
-                ]}
-              >
-                {isSaving ? (
-                  <ActivityIndicator color={theme.onPrimary} size="small" />
-                ) : (
-                  <View style={styles.saveButtonContent}>
-                    <MaterialCommunityIcons
-                      color={theme.onPrimary}
-                      name="content-save-outline"
-                      size={20}
-                    />
-                    <Text style={[styles.saveButtonText, { color: theme.onPrimary }]}>
-                      Lưu thay đổi
-                    </Text>
-                  </View>
-                )}
-              </AppButton>
+              {/* Save Button inside Login-style Card */}
+              <View style={styles.saveActionContainer}>
+                <AppButton
+                  accessibilityLabel="Lưu thông tin hồ sơ"
+                  disabled={isSaving || !fullName?.trim()}
+                  onPress={handleSave}
+                  style={[
+                    styles.saveButton,
+                    {
+                      backgroundColor: theme.primary,
+                      shadowColor: theme.primary,
+                      opacity: isSaving || !fullName?.trim() ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator color={theme.onPrimary} size="small" />
+                  ) : (
+                    <View style={styles.saveButtonContent}>
+                      <MaterialCommunityIcons
+                        color={theme.onPrimary}
+                        name="content-save-outline"
+                        size={20}
+                      />
+                      <Text style={[styles.saveButtonText, { color: theme.onPrimary }]}>
+                        Lưu thay đổi
+                      </Text>
+                    </View>
+                  )}
+                </AppButton>
+              </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -716,311 +464,7 @@ export function EditProfileScreen() {
           onConfirm={handleCropConfirm}
           visible={isCropModalVisible}
         />
-
-        {/* Fullscreen Location Picker Modal */}
-        {isMapPickerOpen ? (
-          <LocationPickerModal
-            initialCoordinate={selectedCoordinate}
-            onClose={() => setIsMapPickerOpen(false)}
-            onConfirm={(coord, resolvedAddress) => {
-              setSelectedCoordinate(coord);
-              setFocusRequestId((prev) => prev + 1);
-              if (resolvedAddress) {
-                setValue('address', resolvedAddress, { shouldValidate: true, shouldDirty: true });
-                setAddressInput(resolvedAddress);
-              }
-              setIsMapPickerOpen(false);
-            }}
-            visible={isMapPickerOpen}
-          />
-        ) : null}
       </SafeAreaView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  topBarRight: {
-    width: 36,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.six,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: Spacing.four,
-  },
-  avatarWrapper: {
-    position: 'relative',
-    marginBottom: Spacing.two,
-    alignSelf: 'center',
-  },
-  avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 2.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  plusBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    elevation: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3,
-  },
-  avatarText: {
-    fontFamily: Fonts.title,
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  avatarHint: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-    marginBottom: Spacing.three,
-  },
-  loadingText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  formCard: {
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    padding: Spacing.four,
-    gap: Spacing.four,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: Spacing.four,
-  },
-  fieldGroup: {
-    gap: Spacing.one,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  fieldLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  requiredBadge: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  lockedBadge: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    paddingHorizontal: Spacing.three,
-    minHeight: 46,
-  },
-  disabledInputContainer: {
-    opacity: 0.8,
-  },
-  inputIcon: {
-    marginRight: Spacing.two,
-  },
-  input: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    paddingVertical: Spacing.two,
-  },
-  saveActionContainer: {
-    marginTop: Spacing.two,
-  },
-  saveButton: {
-    minHeight: 50,
-    borderRadius: Rounded.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-  },
-  saveButtonText: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  addressInputShell: {
-    position: 'relative',
-    width: '100%',
-  },
-  addressClearBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 14,
-    zIndex: 5,
-  },
-  // Address Suggestions Dropdown
-  suggestionsContainer: {
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    marginTop: 4,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 20,
-  },
-  suggestionLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.three,
-  },
-  suggestionLoadingText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    gap: Spacing.two,
-  },
-  suggestionTextCol: {
-    flex: 1,
-    minWidth: 0,
-  },
-  suggestionTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  suggestionSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  // Mini Map Preview Card
-  miniMapCard: {
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    marginTop: Spacing.two,
-    overflow: 'hidden',
-  },
-  miniMapWrapper: {
-    height: 160,
-    width: '100%',
-    position: 'relative',
-  },
-  miniMapPinWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 5,
-  },
-  miniMapZoomButton: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    width: 38,
-    height: 38,
-    minHeight: 38,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: Rounded.round,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  miniMapCaption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-  },
-  miniMapCaptionText: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-});
