@@ -624,6 +624,11 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
   const handledTargetSubmissionIdRef = useRef<string | null>(null);
   const [isResolvingClaimedCandidate, setIsResolvingClaimedCandidate] = useState(false);
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    tone: 'default' | 'success' | 'danger';
+  }>();
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -727,11 +732,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isSignFocused, setIsSignFocused] = useState(true);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
-  const [toast, setToast] = useState<{
-    id: number;
-    message: string;
-    tone: 'default' | 'success' | 'danger';
-  }>();
 
   const { data: catalog } = useGetCatalog();
   const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
