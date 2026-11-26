@@ -23,8 +23,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
 import { VirtualList } from '@/components/virtual-list';
+import { getCatalog, type CatalogSign } from '@/api/reviews/catalog';
 import { loadCatalogFromStorage } from '@/api/reviews/catalog-storage';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { useOptionalSession } from '@/context/session-provider';
 import {
   useGetSurveySubmissionStatus,
   useResubmitFalseNegativeMutation,
@@ -59,9 +61,6 @@ export interface ReturnedSubmissionItemScreenProps {
   signs?: CatalogSignItem[];
 }
 
-const DEFAULT_SAMPLE_IMAGE =
-  'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=1200&q=80';
-
 export const MAX_BOXES = 7;
 
 export const FILTER_TABS = [
@@ -73,90 +72,15 @@ export const FILTER_TABS = [
   { id: 'T', label: 'Biển phụ', color: '#F97316' },
 ] as const;
 
-export const STANDARD_SIGN_CATALOG: CatalogSignItem[] = [
-  // W - Featured in catalog top preview
-  { code: 'W.244', name: 'Đoạn đường hay xảy ra tai nạn', description: 'Báo trước đoạn đường thường hay xảy ra tai nạn giao thông', categoryName: 'Biển cảnh báo' },
-  { code: 'I.445g', name: 'Đoạn đường hay xảy ra tai nạn', description: 'Báo trước đoạn đường thường hay xảy ra tai nạn giao thông', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414a', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414b', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414c', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414d', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.418', name: 'Lối đi ở những vị trí cấm rẽ', description: 'Chỉ dẫn lối đi ở những đoạn đường cấm rẽ', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.415', name: 'Mũi tên chỉ hướng đi', description: 'Chỉ dẫn hướng đi tại nơi đường giao nhau', categoryName: 'Biển chỉ dẫn' },
-
-  // P - Biển báo cấm (Prohibitory)
-  { code: 'P.101', name: 'Đường cấm', description: 'Cấm tất cả các loại phương tiện đi lại cả hai hướng', categoryName: 'Biển báo cấm' },
-  { code: 'P.102', name: 'Cấm đi ngược chiều', description: 'Cấm tất cả các loại xe đi vào theo chiều đặt biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.103a', name: 'Cấm xe ô tô', description: 'Cấm tất cả các loại xe cơ giới kể cả mô tô 3 bánh có thùng', categoryName: 'Biển báo cấm' },
-  { code: 'P.103b', name: 'Cấm xe ô tô rẽ phải', description: 'Cấm các loại xe cơ giới từ 3 bánh trở lên rẽ sang phải', categoryName: 'Biển báo cấm' },
-  { code: 'P.103c', name: 'Cấm xe ô tô rẽ trái', description: 'Cấm các loại xe cơ giới từ 3 bánh trở lên rẽ sang trái', categoryName: 'Biển báo cấm' },
-  { code: 'P.104', name: 'Cấm xe máy', description: 'Cấm các loại xe mô tô hai bánh và ba bánh', categoryName: 'Biển báo cấm' },
-  { code: 'P.106a', name: 'Cấm xe tải', description: 'Cấm tất cả các loại ô tô tải có khối lượng chuyên chở', categoryName: 'Biển báo cấm' },
-  { code: 'P.112', name: 'Cấm người đi bộ', description: 'Cấm người đi bộ qua lại khu vực đặt biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.115', name: 'Hạn chế tải trọng xe', description: 'Cấm các loại xe có tải trọng toàn bộ vượt quá trị số', categoryName: 'Biển báo cấm' },
-  { code: 'P.117', name: 'Hạn chế chiều cao', description: 'Cấm xe có chiều cao vượt quá giá trị ghi trên biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.123a', name: 'Cấm rẽ trái', description: 'Cấm các loại xe cơ giới và thô sơ rẽ trái', categoryName: 'Biển báo cấm' },
-  { code: 'P.123b', name: 'Cấm rẽ phải', description: 'Cấm các loại xe cơ giới và thô sơ rẽ phải', categoryName: 'Biển báo cấm' },
-  { code: 'P.124a', name: 'Cấm quay đầu xe', description: 'Cấm các loại xe quay đầu theo kiểu chữ U', categoryName: 'Biển báo cấm' },
-  { code: 'P.124b', name: 'Cấm ô tô quay đầu xe', description: 'Cấm các loại ô tô quay đầu theo kiểu chữ U', categoryName: 'Biển báo cấm' },
-  { code: 'P.127', name: 'Tốc độ tối đa cho phép', description: 'Hạn chế tốc độ tối đa cho phép các xe cơ giới chạy', categoryName: 'Biển báo cấm' },
-  { code: 'P.130', name: 'Cấm dừng và đỗ xe', description: 'Cấm tất cả các loại xe cơ giới dừng và đỗ xe', categoryName: 'Biển báo cấm' },
-  { code: 'P.131a', name: 'Cấm đỗ xe', description: 'Cấm tất cả các loại xe cơ giới đỗ xe', categoryName: 'Biển báo cấm' },
-
-  // W - Biển cảnh báo (Warning)
-  { code: 'W.201a', name: 'Chỗ ngoặt nguy hiểm vòng bên trái', description: 'Báo trước sắp đến một chỗ ngoặt nguy hiểm vòng về phía bên trái', categoryName: 'Biển cảnh báo' },
-  { code: 'W.201b', name: 'Chỗ ngoặt nguy hiểm vòng bên phải', description: 'Báo trước sắp đến một chỗ ngoặt nguy hiểm vòng về phía bên phải', categoryName: 'Biển cảnh báo' },
-  { code: 'W.202a', name: 'Nhiều chỗ ngoặt nguy hiểm liên tiếp', description: 'Báo trước sắp đến các chỗ ngoặt nguy hiểm liên tiếp', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203a', name: 'Đường bị hẹp cả hai bên', description: 'Báo trước đoạn đường phía trước bị hẹp cả hai phía', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203b', name: 'Đường bị hẹp về phía trái', description: 'Báo trước đoạn đường phía trước bị thu hẹp về bên trái', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203c', name: 'Đường bị hẹp về phía phải', description: 'Báo trước đoạn đường phía trước bị thu hẹp về bên phải', categoryName: 'Biển cảnh báo' },
-  { code: 'W.205a', name: 'Đường giao nhau cùng mức', description: 'Báo trước nơi giao nhau cùng mức của các tuyến đường cùng cấp', categoryName: 'Biển cảnh báo' },
-  { code: 'W.207a', name: 'Giao nhau với đường không ưu tiên', description: 'Báo trước sắp đến nơi giao nhau với đường không ưu tiên', categoryName: 'Biển cảnh báo' },
-  { code: 'W.208', name: 'Giao nhau với đường ưu tiên', description: 'Báo trước sắp đến nơi giao nhau với tuyến đường ưu tiên', categoryName: 'Biển cảnh báo' },
-  { code: 'W.209', name: 'Giao nhau có tín hiệu đèn', description: 'Báo trước nơi giao nhau có đèn tín hiệu điều khiển giao thông', categoryName: 'Biển cảnh báo' },
-  { code: 'W.210', name: 'Giao nhau với đường sắt có rào chắn', description: 'Báo trước nơi giao nhau giữa đường bộ và đường sắt có rào chắn', categoryName: 'Biển cảnh báo' },
-  { code: 'W.211a', name: 'Giao nhau với đường sắt không rào chắn', description: 'Báo trước nơi giao nhau với đường sắt không có rào chắn', categoryName: 'Biển cảnh báo' },
-  { code: 'W.224', name: 'Đường người đi bộ cắt ngang', description: 'Báo trước sắp đến vị trí có người đi bộ qua đường', categoryName: 'Biển cảnh báo' },
-  { code: 'W.225', name: 'Trẻ em qua đường', description: 'Báo trước đoạn đường thường có trẻ em đi lại hoặc gần trường học', categoryName: 'Biển cảnh báo' },
-  { code: 'W.227', name: 'Công trường', description: 'Báo trước sắp đến đoạn đường đang tiến hành thi công, sửa chữa', categoryName: 'Biển cảnh báo' },
-  { code: 'W.233', name: 'Nguy hiểm khác', description: 'Báo trước các tình huống nguy hiểm bất ngờ trên đường', categoryName: 'Biển cảnh báo' },
-  { code: 'W.245a', name: 'Đi chậm', description: 'Nhắc nhở người điều khiển phương tiện giảm tốc độ', categoryName: 'Biển cảnh báo' },
-
-  // R - Biển hiệu lệnh (Mandatory)
-  { code: 'R.301a', name: 'Hướng đi phải theo - Đi thẳng', description: 'Bắt buộc các loại xe chỉ được đi thẳng ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301b', name: 'Hướng đi phải theo - Rẽ phải', description: 'Bắt buộc các loại xe chỉ được rẽ phải ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301c', name: 'Hướng đi phải theo - Rẽ trái', description: 'Bắt buộc các loại xe chỉ được rẽ trái ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301d', name: 'Hướng đi phải theo - Rẽ phải hoặc đi thẳng', description: 'Các xe chỉ được rẽ phải hoặc đi thẳng', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301e', name: 'Hướng đi phải theo - Rẽ trái hoặc đi thẳng', description: 'Các xe chỉ được rẽ trái hoặc đi thẳng', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.302a', name: 'Vòng chướng ngại vật sang phải', description: 'Báo cho các loại xe phải đi vòng sang phía bên phải', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.302b', name: 'Vòng chướng ngại vật sang trái', description: 'Báo cho các loại xe phải đi vòng sang phía bên trái', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.303', name: 'Nơi giao nhau chạy theo vòng xuyến', description: 'Báo trước nơi giao nhau phải chạy theo vòng xuyến', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.304', name: 'Đường dành cho người đi bộ', description: 'Đoạn đường dành riêng cho người đi bộ', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.305', name: 'Đường dành cho xe thô sơ', description: 'Đoạn đường dành riêng cho các loại xe thô sơ', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.306', name: 'Tốc độ tối thiểu cho phép', description: 'Quy định tốc độ tối thiểu cho phép các xe cơ giới chạy', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.403a', name: 'Đường dành cho xe ô tô', description: 'Chỉ dẫn đoạn đường dành riêng cho xe ô tô', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.407a', name: 'Đường một chiều', description: 'Chỉ dẫn đoạn đường chỉ được đi theo một chiều quy định', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.411', name: 'Hướng đi trên mỗi làn đường phải theo', description: 'Chỉ dẫn hướng đi bắt buộc trên từng làn xe', categoryName: 'Biển hiệu lệnh' },
-
-  // I - Biển chỉ dẫn (Information)
-  { code: 'I.401', name: 'Bắt đầu đường ưu tiên', description: 'Biểu thị bắt đầu đoạn đường được quyền ưu tiên', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.402', name: 'Hết đoạn đường ưu tiên', description: 'Biểu thị hết đoạn đường được quyền ưu tiên', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.405a', name: 'Đường cụt', description: 'Chỉ dẫn lối đi phía trước là đường cụt không có lối ra', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.407a', name: 'Đường một chiều', description: 'Chỉ dẫn những đoạn đường chỉ cho phép chạy một chiều', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.408', name: 'Nơi đỗ xe', description: 'Chỉ dẫn khu vực dành riêng cho việc đỗ xe', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.409', name: 'Chỗ quay xe', description: 'Chỉ dẫn vị trí được phép quay đầu xe ô tô', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.423a', name: 'Vị trí người đi bộ sang ngang', description: 'Chỉ dẫn vị trí người đi bộ qua đường', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.424a', name: 'Cầu vượt cho người đi bộ', description: 'Chỉ dẫn vị trí cầu vượt qua đường cho người đi bộ', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.434a', name: 'Bến xe buýt', description: 'Chỉ dẫn vị trí điểm dừng đỗ đón trả khách của xe buýt', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.443', name: 'Trạm xăng dầu', description: 'Chỉ dẫn vị trí trạm cung ứng nhiên liệu xăng dầu', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.444', name: 'Trạm sửa chữa xe', description: 'Chỉ dẫn nơi có cơ sở sửa chữa bảo dưỡng xe', categoryName: 'Biển chỉ dẫn' },
-
-  // T - Biển tạm thời (Temporary)
-  { code: 'T.501', name: 'Công trường đang thi công', description: 'Biển tạm thời cảnh báo đoạn đường đang sửa chữa', categoryName: 'Biển tạm thời' },
-  { code: 'T.502', name: 'Giảm tốc độ công trường', description: 'Biển tạm thời yêu cầu phương tiện giảm tốc độ', categoryName: 'Biển tạm thời' },
-  { code: 'T.503', name: 'Hướng rẽ tránh chướng ngại vật', description: 'Biển tạm thời chỉ dẫn hướng rẽ tránh chướng ngại vật', categoryName: 'Biển tạm thời' },
-  { code: 'T.504', name: 'Làn đường thu hẹp tạm thời', description: 'Biển tạm thời báo làn đường bị thu hẹp', categoryName: 'Biển tạm thời' },
-];
+function mapCatalogSignsToItems(signs: CatalogSign[]): CatalogSignItem[] {
+  return signs.map((s) => ({
+    code: s.signCode,
+    name: s.nameVi || s.nameEn,
+    description: s.description || s.signCode,
+    categoryName: (s.category as any)?.nameVi || s.category?.nameEn || '',
+    imageUrl: s.representativeImageKey ?? undefined,
+  }));
+}
 
 /**
  * Normalizes Vietnamese string for diacritic-insensitive, punctuation-insensitive search
@@ -202,7 +126,11 @@ export function getSignColorFromCode(signCode?: string, defaultColor = '#00838F'
 /**
  * Returns badge pill styling (background, text, and border) matching the sign category
  */
-export function getSignBadgeColors(signCode?: string): { bg: string; text: string; border: string } {
+export function getSignBadgeColors(signCode?: string): {
+  bg: string;
+  text: string;
+  border: string;
+} {
   if (!signCode) return { bg: '#F3F4F6', text: '#4B5563', border: '#E5E7EB' };
   const firstChar = signCode.trim().charAt(0).toUpperCase();
   switch (firstChar) {
@@ -464,7 +392,9 @@ function SignCatalogGridCard({
   const [imageError, setImageError] = useState(false);
   const badgeColors = getSignBadgeColors(item.code);
   const itemColor = getSignColorFromCode(item.code);
-  const hasValidUrl = Boolean(item.imageUrl && !item.imageUrl.includes('signtrustmap.vn') && !imageError);
+  const hasValidUrl = Boolean(
+    item.imageUrl && !item.imageUrl.includes('signtrustmap.vn') && !imageError,
+  );
 
   return (
     <Pressable
@@ -506,9 +436,7 @@ function SignCatalogGridCard({
           { backgroundColor: badgeColors.bg, borderColor: badgeColors.border },
         ]}
       >
-        <Text style={[styles.codeBadgeText, { color: badgeColors.text }]}>
-          {item.code}
-        </Text>
+        <Text style={[styles.codeBadgeText, { color: badgeColors.text }]}>{item.code}</Text>
       </View>
 
       {/* 3. Name Label */}
@@ -527,6 +455,7 @@ export function ReturnedSubmissionItemScreen({
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const session = useOptionalSession()?.session;
   const params = useLocalSearchParams<{ id?: string; imageUrl?: string }>();
 
   const id = propId || params.id || '';
@@ -564,7 +493,7 @@ export function ReturnedSubmissionItemScreen({
       if (rawUrl && typeof rawUrl === 'string') return resolveS3Url(rawUrl);
     }
 
-    return DEFAULT_SAMPLE_IMAGE;
+    return '';
   }, [initialImageUrl, params.imageUrl, statusData]);
 
   const [isZoomed, setIsZoomed] = useState(false);
@@ -574,34 +503,50 @@ export function ReturnedSubmissionItemScreen({
   // Catalog Bottom Sheet states
   const [activePickerBoxId, setActivePickerBoxId] = useState<string | null>(null);
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'ALL' | 'P' | 'W' | 'R' | 'I' | 'T'>('ALL');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<
+    'ALL' | 'P' | 'W' | 'R' | 'I' | 'T'
+  >('ALL');
   const [storedCatalogSigns, setStoredCatalogSigns] = useState<CatalogSignItem[]>([]);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
 
   useEffect(() => {
+    if (propSigns && propSigns.length > 0) return;
+
     let isMounted = true;
-    loadCatalogFromStorage()
-      .then((cached) => {
-        if (isMounted && cached?.data?.signs && cached.data.signs.length > 0) {
-          const mapped = cached.data.signs.map((s) => ({
-            code: s.signCode,
-            name: s.nameVi || s.nameEn,
-            description: s.description || s.signCode,
-            categoryName: (s.category as any)?.nameVi || s.category?.nameEn || '',
-            imageUrl: s.representativeImageKey ?? undefined,
-          }));
-          setStoredCatalogSigns(mapped);
+    const abortController = new AbortController();
+
+    void (async () => {
+      try {
+        const cached = await loadCatalogFromStorage();
+        if (cached?.data?.signs && cached.data.signs.length > 0) {
+          if (isMounted) {
+            setStoredCatalogSigns(mapCatalogSignsToItems(cached.data.signs));
+          }
+          return;
         }
-      })
-      .catch(() => {});
+
+        if (!session?.accessToken) return;
+        if (isMounted) setIsCatalogLoading(true);
+        const remote = await getCatalog(session.accessToken, { signal: abortController.signal });
+        if (isMounted && remote?.signs && remote.signs.length > 0) {
+          setStoredCatalogSigns(mapCatalogSignsToItems(remote.signs));
+        }
+      } catch {
+        // Gracefully keep empty list if both local cache and API fail
+      } finally {
+        if (isMounted) setIsCatalogLoading(false);
+      }
+    })();
+
     return () => {
       isMounted = false;
+      abortController.abort();
     };
-  }, []);
+  }, [propSigns, session?.accessToken]);
 
   const availableSigns = useMemo(() => {
     if (propSigns && propSigns.length > 0) return propSigns;
-    if (storedCatalogSigns.length > 0) return storedCatalogSigns;
-    return STANDARD_SIGN_CATALOG;
+    return storedCatalogSigns;
   }, [propSigns, storedCatalogSigns]);
 
   const filteredSigns = useMemo(() => {
@@ -790,8 +735,6 @@ export function ReturnedSubmissionItemScreen({
 
   const activeBox =
     boxes.find((b) => b.id === activeBoxId) || (boxes.length > 0 ? boxes[boxes.length - 1] : null);
-  const activeBoxIndex = activeBox ? boxes.findIndex((b) => b.id === activeBox.id) : -1;
-  const activeBoxColor = activeBox ? getBoxColor(activeBox, theme.primary) : theme.primary;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -1007,17 +950,25 @@ export function ReturnedSubmissionItemScreen({
                       >
                         {box.signCode ? (
                           <View style={styles.selectedSignDisplay}>
-                            <View style={[styles.inlineCodeBadge, { backgroundColor: `${boxColor}22` }]}>
+                            <View
+                              style={[styles.inlineCodeBadge, { backgroundColor: `${boxColor}22` }]}
+                            >
                               <Text style={[styles.inlineCodeText, { color: boxColor }]}>
                                 {box.signCode}
                               </Text>
                             </View>
-                            <Text numberOfLines={1} style={[styles.inlineSignName, { color: theme.text }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.inlineSignName, { color: theme.text }]}
+                            >
                               {box.signName || box.signCode}
                             </Text>
                           </View>
                         ) : (
-                          <Text numberOfLines={1} style={[styles.catalogPlaceholder, { color: theme.placeholder }]}>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.catalogPlaceholder, { color: theme.placeholder }]}
+                          >
                             Chọn biển báo từ danh mục...
                           </Text>
                         )}
@@ -1210,7 +1161,9 @@ export function ReturnedSubmissionItemScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 containerStyle={styles.sheetSearchInputContainer}
-                leadingIcon={<MaterialCommunityIcons color={theme.placeholder} name="magnify" size={20} />}
+                leadingIcon={
+                  <MaterialCommunityIcons color={theme.placeholder} name="magnify" size={20} />
+                }
                 onChangeText={setCatalogSearchQuery}
                 placeholder="Tìm theo mã (P.102...), tên biển..."
                 returnKeyType="search"
@@ -1223,7 +1176,11 @@ export function ReturnedSubmissionItemScreen({
                       onPress={() => setCatalogSearchQuery('')}
                       testID="clear-catalog-search-btn"
                     >
-                      <MaterialCommunityIcons color={theme.placeholder} name="close-circle" size={18} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="close-circle"
+                        size={18}
+                      />
                     </Pressable>
                   ) : undefined
                 }
@@ -1248,8 +1205,17 @@ export function ReturnedSubmissionItemScreen({
                       style={[
                         styles.filterChip,
                         isSelected
-                          ? [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
-                          : [styles.filterChipInactive, { backgroundColor: theme.backgroundElement, borderColor: theme.border }],
+                          ? [
+                              styles.filterChipActive,
+                              { backgroundColor: theme.primary, borderColor: theme.primary },
+                            ]
+                          : [
+                              styles.filterChipInactive,
+                              {
+                                backgroundColor: theme.backgroundElement,
+                                borderColor: theme.border,
+                              },
+                            ],
                       ]}
                       testID={`catalog-filter-${tab.id.toLowerCase()}`}
                     >
@@ -1273,25 +1239,34 @@ export function ReturnedSubmissionItemScreen({
 
             {/* VirtualList with 2-Column Grid */}
             <View style={styles.gridContainer}>
-              <VirtualList<CatalogSignItem>
-                contentContainerStyle={styles.signsGridContent}
-                data={filteredSigns}
-                emptyDescription='Thử tìm với từ khóa khác (ví dụ: "cấm", "nguy hiểm", "P.101")'
-                emptyTitle="Không tìm thấy biển báo"
-                estimatedItemSize={185}
-                keyExtractor={(item) => item.code}
-                keyboardShouldPersistTaps="handled"
-                numColumns={2}
-                renderItem={({ item }) => (
-                  <SignCatalogGridCard
-                    isSelected={activePickerBox?.signCode === item.code}
-                    item={item}
-                    onSelect={handleSelectCatalogSign}
-                    theme={theme}
-                  />
-                )}
-                testID="catalog-signs-list"
-              />
+              {isCatalogLoading && availableSigns.length === 0 ? (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator color={theme.primary} size="large" />
+                  <Text style={[styles.loadingText, { color: theme.placeholder }]}>
+                    Đang tải danh mục biển báo...
+                  </Text>
+                </View>
+              ) : (
+                <VirtualList<CatalogSignItem>
+                  contentContainerStyle={styles.signsGridContent}
+                  data={filteredSigns}
+                  emptyDescription='Thử tìm với từ khóa khác (ví dụ: "cấm", "nguy hiểm", "P.101")'
+                  emptyTitle="Không tìm thấy biển báo"
+                  estimatedItemSize={185}
+                  keyExtractor={(item) => item.code}
+                  keyboardShouldPersistTaps="handled"
+                  numColumns={2}
+                  renderItem={({ item }) => (
+                    <SignCatalogGridCard
+                      isSelected={activePickerBox?.signCode === item.code}
+                      item={item}
+                      onSelect={handleSelectCatalogSign}
+                      theme={theme}
+                    />
+                  )}
+                  testID="catalog-signs-list"
+                />
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>

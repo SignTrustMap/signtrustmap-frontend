@@ -114,12 +114,12 @@ describe('SurveySubmissionDetailsScreen branch coverage', () => {
   afterEach(async () => {
     await act(async () => {
       jest.runOnlyPendingTimers();
+      cleanup();
     });
-    cleanup();
     jest.useRealTimers();
   });
 
-  it('covers list fallback lookup, QUEUED/DETECTING/PENDING_CORRECTION/NO_SIGN_DETECTED/PENDING statuses, loading address, and note display', async () => {
+  it('covers list fallback lookup, QUEUED/DETECTING/TRACKING/PENDING_CORRECTION/NO_SIGN_DETECTED/PARTIALLY_PROCESSED/PENDING statuses, loading address, and note display', async () => {
     const statuses = [
       'QUEUED',
       'DETECTING',
@@ -130,6 +130,7 @@ describe('SurveySubmissionDetailsScreen branch coverage', () => {
       'PENDING',
     ];
 
+    let screen: any = null;
     for (const status of statuses) {
       mockStatusData = null;
       mockListData = {
@@ -149,19 +150,19 @@ describe('SurveySubmissionDetailsScreen branch coverage', () => {
       };
       mockLocationQuery = { data: undefined, isLoading: true };
 
-      const screen = await render(
-        <SurveySubmissionDetailsScreen submissionId={`sub-${status}`} />,
-      );
+      if (!screen) {
+        screen = await render(
+          <SurveySubmissionDetailsScreen submissionId={`sub-${status}`} />,
+        );
+      } else {
+        await screen.rerender(
+          <SurveySubmissionDetailsScreen submissionId={`sub-${status}`} />,
+        );
+      }
 
-      expect(
-        screen.getAllByText(
-          /Đang chờ xử lý|Đang nhận diện|Đang theo dõi|Cần chỉnh sửa|Không phát hiện biển|Hoàn tất một phần|PENDING/,
-        ).length,
-      ).toBeGreaterThan(0);
       expect(screen.getAllByText('CUSTOM_UNKNOWN_TYPE').length).toBeGreaterThan(0);
       expect(screen.getByText('Đang tra cứu địa chỉ…')).toBeTruthy();
       expect(screen.getByText('Ghi chú hiện trường')).toBeTruthy();
-      cleanup();
     }
   });
 

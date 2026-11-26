@@ -60,10 +60,14 @@ export const styles = StyleSheet.create({
   },
   // ── Sign marker ─────────────────────────────────────────────────────────────
   signMarkerRoot: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  selectedCalloutAnchorContainer: {
+    alignItems: 'center',
+    paddingBottom: 42,
   },
   stopSignMarker: {
     width: 36,

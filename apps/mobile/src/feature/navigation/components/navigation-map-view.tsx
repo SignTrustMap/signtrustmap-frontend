@@ -567,6 +567,11 @@ export function NavigationMapView({
     return unsub;
   }, []);
 
+  // Reset selected callout when route origin or destination changes (e.g. route swap)
+  useEffect(() => {
+    setSelectedSignId(null);
+  }, [destination?.id, routeStart?.[0], routeStart?.[1]]);
+
   // Auto-dismiss the callout after 4 seconds ONLY when a destination is selected
   useEffect(() => {
     if (!selectedSignId || !destination) return;
@@ -603,7 +608,8 @@ export function NavigationMapView({
   const sortedRouteSigns = useMemo(() => {
     const effectiveRouteSigns = routeSigns.length > 0 ? routeSigns : (signs ?? []);
     // 1. Deduplicate signs at identical coordinates with the same sign type/code,
-    // prioritizing the selected sign, then the one with the highest freshness score.
+    // prioritizing the one with the highest freshness score. Keep order stable across taps
+    // so native Marker views never reorder or shift when selected.
     const dedup: Record<string, RouteSign> = {};
     for (const sign of effectiveRouteSigns) {
       if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
@@ -612,26 +618,19 @@ export function NavigationMapView({
       if (!existing) {
         dedup[key] = sign;
       } else {
-        if (sign.id === selectedSignId) {
+        const existingScore = existing.freshnessScore ?? 0;
+        const currentScore = sign.freshnessScore ?? 0;
+        if (currentScore > existingScore) {
           dedup[key] = sign;
-        } else if (existing.id !== selectedSignId) {
-          const existingScore = existing.freshnessScore ?? 0;
-          const currentScore = sign.freshnessScore ?? 0;
-          if (currentScore > existingScore) {
-            dedup[key] = sign;
-          }
         }
       }
     }
 
-    // 2. Sort so lower freshness signs are drawn first, higher freshness signs
-    // are drawn on top, and any currently selected sign is drawn last (topmost).
+    // 2. Sort stably by freshness score so lower freshness signs are drawn first.
     return Object.values(dedup).sort((a: RouteSign, b: RouteSign) => {
-      if (a.id === selectedSignId) return 1;
-      if (b.id === selectedSignId) return -1;
       return (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0);
     });
-  }, [routeSigns, signs, selectedSignId]);
+  }, [routeSigns, signs]);
 
   const selectedSign = useMemo(
     () => (selectedSignId ? (sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null) : null),
@@ -1048,7 +1047,6 @@ export function NavigationMapView({
 
         {sortedRouteSigns.map((sign) => {
           const freshness = getSignFreshness(sign.freshnessScore, sign.status);
-          const isSelected = selectedSignId === sign.id;
           return (
             <Marker
               anchor="bottom"
@@ -1057,10 +1055,7 @@ export function NavigationMapView({
               lngLat={sign.coordinate}
               onPress={() => handleSignPress(sign)}
             >
-              <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
-                {isSelected && destination ? (
-                  <SignCallout freshness={freshness} sign={sign} />
-                ) : null}
+              <View style={styles.signMarkerRoot}>
                 <Pressable
                   accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
                   accessibilityRole="button"
@@ -1084,6 +1079,22 @@ export function NavigationMapView({
             </Marker>
           );
         })}
+
+        {selectedSign && destination ? (
+          <Marker
+            anchor="bottom"
+            id={`route-sign-callout-${selectedSign.id}`}
+            key={`route-sign-callout-${selectedSign.id}`}
+            lngLat={selectedSign.coordinate}
+          >
+            <View pointerEvents="box-none" style={styles.selectedCalloutAnchorContainer}>
+              <SignCallout
+                freshness={getSignFreshness(selectedSign.freshnessScore, selectedSign.status)}
+                sign={selectedSign}
+              />
+            </View>
+          </Marker>
+        ) : null}
 
         {navigationActive ? (
           <>

@@ -225,21 +225,21 @@ jest.mock('@/feature/navigation/components/navigation-map-view', () => {
 });
 
 jest.mock('@/feature/navigation/components/navigation-bottom-sheet', () => {
-  const { View: RNView, Pressable: RNPressable, Text: RNText } = require('react-native');
+  const { View: RNView, Text: RNText } = require('react-native');
   return {
     NavigationBottomSheet: (props: any) => {
       capturedBottomSheetProps = props;
       return (
         <RNView testID="nav-bottom-sheet">
-          <RNPressable testID="bs-begin-nav" onPress={() => void props.onBeginNavigation?.()}>
-            <RNText>Begin</RNText>
-          </RNPressable>
-          <RNPressable testID="bs-close-route" onPress={() => void props.onCloseRoute?.()}>
-            <RNText>Close</RNText>
-          </RNPressable>
-          <RNPressable testID="bs-go" onPress={() => void props.onGo?.()}>
-            <RNText>Go</RNText>
-          </RNPressable>
+          <RNText testID="bs-begin-nav" onPress={() => void props.onBeginNavigation?.()}>
+            bs-begin-nav
+          </RNText>
+          <RNText testID="bs-close-route" onPress={() => void props.onCloseRoute?.()}>
+            bs-close-route
+          </RNText>
+          <RNText testID="bs-go" onPress={() => void props.onGo?.()}>
+            bs-go
+          </RNText>
         </RNView>
       );
     },
@@ -339,8 +339,8 @@ describe('NavigationMapScreen branch coverage', () => {
     duration: 300,
     geometry: 'geom',
     steps: [
-      { maneuver: { type: 'depart', location: [106.7, 10.77] }, distance: 100, duration: 30 },
-      { maneuver: { type: 'turn', modifier: 'right', location: [106.702, 10.77] }, distance: 400, duration: 120 },
+      { maneuver: { type: 'depart', location: [106.7, 10.77] }, instruction: 'Khởi hành', distance: 100, duration: 30 },
+      { maneuver: { type: 'turn', modifier: 'right', location: [106.702, 10.77] }, instruction: 'Rẽ phải', distance: 400, duration: 120 },
     ],
   };
 
@@ -395,8 +395,10 @@ describe('NavigationMapScreen branch coverage', () => {
     mockConfirmSignPresence.mockResolvedValue({ creditsAwarded: 2, revalidationTaskId: 'rt-1' });
   });
 
-  afterEach(() => {
-    cleanup();
+  afterEach(async () => {
+    await act(async () => {
+      cleanup();
+    });
   });
 
   it('covers savedRoute hydration (CYCLING/WALKING/BIKE), preset matching, category filtering, bounds error toast, and handleCurrentLocation errors', async () => {
@@ -462,7 +464,9 @@ describe('NavigationMapScreen branch coverage', () => {
     });
 
     // Home location button when MapLibre unavailable, then permission denied, then GPS unavailable
-    cleanup();
+    await act(async () => {
+      await screen.unmount();
+    });
     mockParams = {};
     mockSavedRouteData = null;
     mockSavedRouteSignsData = null;
@@ -474,7 +478,7 @@ describe('NavigationMapScreen branch coverage', () => {
 
     await fireEvent.press(homeScreen.getByLabelText('Về vị trí hiện tại'));
     await waitFor(() => {
-      expect(homeScreen.getAllByText(/cần bản dựng gốc|MapLibre/i).length).toBeGreaterThan(0);
+      expect(homeScreen.getAllByText(/yêu cầu bản build native/i).length).toBeGreaterThan(0);
     });
 
     mockGetMapLibre.mockReturnValue({});
@@ -617,5 +621,39 @@ describe('NavigationMapScreen branch coverage', () => {
     mockEnsureLocationPermission.mockResolvedValueOnce(true);
     mockFetchFreshGpsPosition.mockResolvedValueOnce(null);
     await fireEvent.press(screen.getByTestId('bs-go'));
+  });
+
+  it('ignores placeholder route geometry for route signs and bypasses saved route signs when swapped', async () => {
+    mockParams = {
+      savedRouteId: 'sr-swap',
+      destinationId: 'dest-swap',
+      destinationLat: '10.775',
+      destinationLng: '106.705',
+      destinationTitle: 'Đích Swap',
+      startLat: '10.770',
+      startLng: '106.700',
+      startTitle: 'Xuất phát Swap',
+      isFreeNavigation: 'true',
+    };
+    mockSavedRouteSignsData = {
+      signs: [{ ...sampleSigns[0], id: 'saved-corridor-sign', name: 'Biển saved cũ' }],
+    };
+    mockPlannedSigns = [{ ...sampleSigns[1], id: 'swapped-planned-sign', name: 'Biển reverse mới' }];
+    mockRouteMap = {
+      DRIVING: { data: sampleRoute, isLoading: false, isPlaceholderData: true, error: null },
+    };
+
+    const screen = await render(<NavigationMapScreen />);
+    expect(capturedMapProps.routeSigns.map((s: any) => s.id)).toContain('saved-corridor-sign');
+
+    // Swap route -> saved corridor signs are bypassed and plannedSigns for swapped route are displayed
+    mockRouteMap = {
+      DRIVING: { data: sampleRoute, isLoading: false, isPlaceholderData: false, error: null },
+    };
+    await act(async () => {
+      capturedTopControlsProps.onSwapRoutePress();
+    });
+    expect(capturedMapProps.routeSigns.map((s: any) => s.id)).toContain('swapped-planned-sign');
+    expect(capturedMapProps.routeSigns.map((s: any) => s.id)).not.toContain('saved-corridor-sign');
   });
 });

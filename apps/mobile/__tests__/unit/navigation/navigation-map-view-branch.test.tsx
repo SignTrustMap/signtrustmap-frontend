@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { View } from 'react-native';
 
 const mockSetStop = jest.fn();
@@ -191,7 +191,6 @@ describe('NavigationMapView branch coverage', () => {
   });
 
   it('covers map pixel hit test, fallback geographic distance hit test, sign deduplication, and SignDetailsBottomSheet evidences', async () => {
-    jest.useFakeTimers();
     const signs: RouteSign[] = [
       {
         id: 's-low',
@@ -254,18 +253,42 @@ describe('NavigationMapView branch coverage', () => {
       fireEvent.press(screen.getByLabelText('Đóng xem ảnh'));
     });
 
-    // Advance past debounce and trigger project throw -> fallback geo hit test
-    jest.advanceTimersByTime(500);
+    // Press close button on bottom sheet to verify onClose clears selection
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Đóng thông tin biển báo'));
+    });
+    expect(onSignSelect).toHaveBeenLastCalledWith(null);
+  });
+
+  it('covers map pixel hit test miss and geographic distance fallback on project error', async () => {
+    const signs: RouteSign[] = [
+      {
+        id: 's-geo',
+        coordinate: [106.701, 10.777],
+        name: 'Biển Geo',
+        signCode: 'W.205',
+        freshnessScore: 0.7,
+        status: 'VERIFIED',
+        imageUrl: 'https://cdn.example.com/geo.jpg',
+      },
+    ];
+    const onSignSelect = jest.fn();
     mockProject.mockRejectedValueOnce(new Error('project fail'));
+
+    const screen = await render(
+      <NavigationMapView onSignSelect={onSignSelect} signs={signs} />,
+    );
+    const map = screen.getByTestId('maplibre-map');
+
     await act(async () => {
       await fireEvent(map, 'press', {
         nativeEvent: { point: [100, 100], lngLat: [106.701, 10.777] },
       });
     });
-    // Toggling same sign clears selection
-    expect(onSignSelect).toHaveBeenLastCalledWith(null);
 
-    jest.useRealTimers();
+    await waitFor(() => {
+      expect(onSignSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 's-geo' }));
+    });
   });
 
   it('covers auto-dismiss callout with destination and medium turn confirmation (2 updates >= 25 deg)', async () => {
@@ -353,5 +376,135 @@ describe('NavigationMapView branch coverage', () => {
     expect(getSignFreshness(null, 'NEED_VERIFY').label).toBeTruthy();
     expect(getSignFreshness(undefined, 'PENDING').label).toBeTruthy();
     expect(getSignFreshness(0.55, 'VERIFIED').label).toBeTruthy();
+  });
+
+  it('covers locationPin, routeStart+destination bounds fallback, destination-only camera, and navigationActive reroute signature change', async () => {
+    jest.useFakeTimers();
+
+    // 1. locationPin camera without focusCoordinate + pin suppression when matching destination
+    const screen = await render(
+      <NavigationMapView
+        locationPin={[106.705, 10.775]}
+        locationPinColor="#10B981"
+      />,
+    );
+    expect(screen.getByTestId('map-location-pin')).toBeTruthy();
+
+    // 2. routeBounds fallback from routeStart + destination (no routeCoordinates)
+    await screen.rerender(
+      <NavigationMapView
+        destination={{
+          id: 'd-bounds',
+          title: 'Đích',
+          subtitle: 'Sub',
+          category: 'recent',
+          coordinate: [106.705, 10.775],
+        }}
+        routeStart={[106.7, 10.77]}
+      />,
+    );
+    expect(screen.getByTestId('maplibre-camera').props.bounds).toBeTruthy();
+
+    // 3. destination-only cameraCenter
+    await screen.rerender(
+      <NavigationMapView
+        destination={{
+          id: 'd-only',
+          title: 'Đích',
+          subtitle: 'Sub',
+          category: 'recent',
+          coordinate: [106.705, 10.775],
+        }}
+      />,
+    );
+    expect(screen.getByTestId('maplibre-camera').props.center).toEqual([106.705, 10.775]);
+
+    // 4. navigationActive with no coords (initialViewState undefined) then reroute signature change
+    await screen.rerender(<NavigationMapView navigationActive />);
+    expect(screen.getByTestId('maplibre-camera').props.initialViewState).toBeUndefined();
+
+    await screen.rerender(
+      <NavigationMapView
+        navigationActive
+        routeCoordinates={[
+          [106.7, 10.77],
+          [106.702, 10.77],
+        ]}
+        userCoordinate={[106.7, 10.77]}
+      />,
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(350);
+    });
+    mockSetStop.mockClear();
+    await screen.rerender(
+      <NavigationMapView
+        navigationActive
+        routeCoordinates={[
+          [106.7, 10.77],
+          [106.705, 10.775],
+          [106.708, 10.778],
+        ]}
+        userCoordinate={[106.7, 10.77]}
+      />,
+    );
+    expect(mockSetStop).toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  it('keeps sign marker order and renders preview callout in a dedicated overlay marker when tapped', async () => {
+    const signs: RouteSign[] = [
+      {
+        id: 'sig-low',
+        coordinate: [106.701, 10.771],
+        name: 'Biển 1',
+        signCode: 'P.102',
+        freshnessScore: 0.4,
+        status: 'VERIFIED',
+        imageUrl: 'https://cdn.example.com/1.jpg',
+      },
+      {
+        id: 'sig-high',
+        coordinate: [106.702, 10.772],
+        name: 'Biển 2',
+        signCode: 'W.205',
+        freshnessScore: 0.9,
+        status: 'VERIFIED',
+        imageUrl: 'https://cdn.example.com/2.jpg',
+      },
+    ];
+
+    const screen = await render(
+      <NavigationMapView
+        destination={{
+          id: 'dest-1',
+          title: 'Đích',
+          subtitle: 'Sub',
+          category: 'recent',
+          coordinate: [106.705, 10.775],
+        }}
+        routeCoordinates={[
+          [106.7, 10.77],
+          [106.705, 10.775],
+        ]}
+        routeStart={[106.7, 10.77]}
+        signs={signs}
+      />,
+    );
+
+    const beforeMarkers = screen
+      .getAllByTestId(/^maplibre-marker-/)
+      .map((node) => node.props.id);
+    expect(beforeMarkers.slice(0, 2)).toEqual(['route-sign-sig-low', 'route-sign-sig-high']);
+
+    await fireEvent.press(screen.getByLabelText('Xem chi tiết cho Biển 1'));
+
+    const afterMarkers = screen
+      .getAllByTestId(/^maplibre-marker-/)
+      .map((node) => node.props.id);
+    // Marker order stays identical and callout renders as its own separate marker
+    expect(afterMarkers.slice(0, 2)).toEqual(['route-sign-sig-low', 'route-sign-sig-high']);
+    expect(afterMarkers).toContain('route-sign-callout-sig-low');
   });
 });

@@ -52,8 +52,15 @@ jest.mock('@/hooks/use-theme', () => ({
 }));
 
 const mockLoadCatalog = jest.fn();
+const mockGetCatalog = jest.fn();
 jest.mock('@/api/reviews/catalog-storage', () => ({
   loadCatalogFromStorage: (...args: any[]) => mockLoadCatalog(...args),
+}));
+jest.mock('@/api/reviews/catalog', () => ({
+  getCatalog: (...args: any[]) => mockGetCatalog(...args),
+}));
+jest.mock('@/context/session-provider', () => ({
+  useOptionalSession: () => ({ session: { accessToken: 'tok-branch', account: { id: 'u1' } } }),
 }));
 
 jest.mock('@/api/reviews/review-workflow', () => ({
@@ -84,6 +91,7 @@ describe('ReturnedSubmissionItemScreen Branch Coverage', () => {
     mockSearchParams = {};
     mockStatusQuery = { data: undefined, isLoading: false };
     mockLoadCatalog.mockResolvedValue(null);
+    mockGetCatalog.mockResolvedValue({ categories: [], signs: [] });
     jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
     jest.spyOn(PanResponder, 'create').mockImplementation((cfg: any) => {
       panConfigs.push(cfg);

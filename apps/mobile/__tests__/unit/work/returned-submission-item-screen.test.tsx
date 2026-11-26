@@ -15,6 +15,31 @@ const mockPush = jest.fn();
 const mockMutateAsync = jest.fn();
 let mockStatusData: any = undefined;
 let mockIsStatusLoading = false;
+let mockSession: any = { accessToken: 'tok-returned', account: { id: 'usr-1' } };
+
+const TEST_CATALOG_SIGNS = [
+  { signCode: 'W.244', nameVi: 'Đoạn đường hay xảy ra tai nạn', category: { nameVi: 'Biển cảnh báo' } },
+  { signCode: 'I.445g', nameVi: 'Đoạn đường hay xảy ra tai nạn', category: { nameVi: 'Biển chỉ dẫn' } },
+  { signCode: 'P.101', nameVi: 'Đường cấm', category: { nameVi: 'Biển báo cấm' } },
+  { signCode: 'W.201a', nameVi: 'Chỗ ngoặt nguy hiểm vòng bên trái', category: { nameVi: 'Biển cảnh báo' } },
+  { signCode: 'R.301a', nameVi: 'Hướng đi phải theo - Đi thẳng', category: { nameVi: 'Biển hiệu lệnh' } },
+  { signCode: 'T.501', nameVi: 'Công trường đang thi công', category: { nameVi: 'Biển tạm thời' } },
+];
+
+const mockLoadCatalogFromStorage = jest.fn();
+const mockGetCatalog = jest.fn();
+
+jest.mock('@/context/session-provider', () => ({
+  useOptionalSession: () => ({ session: mockSession }),
+}));
+
+jest.mock('@/api/reviews/catalog-storage', () => ({
+  loadCatalogFromStorage: (...args: any[]) => mockLoadCatalogFromStorage(...args),
+}));
+
+jest.mock('@/api/reviews/catalog', () => ({
+  getCatalog: (...args: any[]) => mockGetCatalog(...args),
+}));
 
 jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({
   useGetSurveySubmissionStatus: () => ({
@@ -49,6 +74,12 @@ describe('ReturnedSubmissionItemScreen', () => {
     jest.clearAllMocks();
     mockStatusData = undefined;
     mockIsStatusLoading = false;
+    mockSession = { accessToken: 'tok-returned', account: { id: 'usr-1' } };
+    mockLoadCatalogFromStorage.mockResolvedValue({
+      cachedAt: Date.now(),
+      data: { categories: [], signs: TEST_CATALOG_SIGNS },
+    });
+    mockGetCatalog.mockResolvedValue({ categories: [], signs: TEST_CATALOG_SIGNS });
     mockMutateAsync.mockClear().mockResolvedValue({ success: true });
     jest.spyOn(Alert, 'alert');
   });
@@ -146,8 +177,11 @@ describe('ReturnedSubmissionItemScreen', () => {
     });
 
     // Should find P.101 - Đường cấm
-    expect(getByText('Đường cấm')).toBeTruthy();
-    expect(getByText('P.101')).toBeTruthy();
+    await waitFor(() => {
+      expect(getByText('Đường cấm')).toBeTruthy();
+      expect(getByText('P.101')).toBeTruthy();
+    });
+    expect(mockGetCatalog).not.toHaveBeenCalled();
 
     // Select the sign P.101
     const signItem = getByTestId('catalog-sign-item-P.101');
@@ -399,6 +433,33 @@ describe('ReturnedSubmissionItemScreen', () => {
       fireEvent.press(getByTestId('catalog-filter-all'));
     });
     expect(getByTestId('catalog-filter-all')).toBeTruthy();
+  });
+
+  it('loads catalog from getCatalog API when local storage is empty', async () => {
+    mockLoadCatalogFromStorage.mockResolvedValueOnce(null);
+    mockGetCatalog.mockResolvedValueOnce({
+      categories: [],
+      signs: [
+        { signCode: 'P.130', nameVi: 'Cấm dừng và đỗ xe', category: { nameVi: 'Biển báo cấm' } },
+      ],
+    });
+
+    const { getByTestId, getByText } = await render(
+      <ReturnedSubmissionItemScreen id="test-item-api" />
+    );
+
+    await waitFor(() => {
+      expect(mockGetCatalog).toHaveBeenCalledWith('tok-returned', expect.objectContaining({ signal: expect.anything() }));
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('add-box-btn'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('box-catalog-trigger-0'));
+    });
+    expect(getByText('P.130')).toBeTruthy();
+    expect(getByText('Cấm dừng và đỗ xe')).toBeTruthy();
   });
 
   it('displays the required warning text below the confirmation button', async () => {

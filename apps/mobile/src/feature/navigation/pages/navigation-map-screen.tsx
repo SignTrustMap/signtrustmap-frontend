@@ -457,24 +457,28 @@ export function NavigationMapScreen() {
   const {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
+    isPlaceholderData: isCarRoutePlaceholder,
     error: carRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'DRIVING');
 
   const {
     data: motorcycleRouteResult,
     isLoading: isMotorcycleRouteLoading,
+    isPlaceholderData: isMotorcycleRoutePlaceholder,
     error: motorcycleRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'BIKE');
 
   const {
     data: cyclingRouteResult,
     isLoading: isCyclingRouteLoading,
+    isPlaceholderData: isCyclingRoutePlaceholder,
     error: cyclingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'CYCLING');
 
   const {
     data: walkingRouteResult,
     isLoading: isWalkingRouteLoading,
+    isPlaceholderData: isWalkingRoutePlaceholder,
     error: walkingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'WALKING');
 
@@ -491,6 +495,17 @@ export function NavigationMapScreen() {
         : isMotorcycleMode
           ? motorcycleRouteResult
           : carRouteResult;
+
+  const isActiveRoutePlaceholder =
+    vehicleMode === 'CYCLING'
+      ? isCyclingRoutePlaceholder
+      : vehicleMode === 'WALKING'
+        ? isWalkingRoutePlaceholder
+        : isMotorcycleMode
+          ? isMotorcycleRoutePlaceholder
+          : isCarRoutePlaceholder;
+
+  const activeRouteGeometry = isActiveRoutePlaceholder ? undefined : activeRouteResult?.geometry;
 
   const activeRouteError =
     vehicleMode === 'CYCLING'
@@ -510,7 +525,7 @@ export function NavigationMapScreen() {
   const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
-    activeRouteResult?.geometry,
+    activeRouteGeometry,
     vehicleMode,
   );
 
@@ -586,7 +601,7 @@ export function NavigationMapScreen() {
   const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
 
   const visibleSigns = useMemo(() => {
-    const corridorSigns = savedRouteSignsData?.signs;
+    const corridorSigns = !swappedRoute ? savedRouteSignsData?.signs : undefined;
     const rawSigns =
       corridorSigns && corridorSigns.length > 0
         ? corridorSigns
@@ -626,6 +641,7 @@ export function NavigationMapScreen() {
     mapSigns,
     plannedSigns,
     savedRouteSignsData?.signs,
+    swappedRoute,
     activeRouteOrigin,
     selectedDestination?.coordinate,
     vehicleMode,
@@ -833,11 +849,12 @@ export function NavigationMapScreen() {
   ]);
 
   const isRouteBookmarked = Boolean(
-    activeSavedRouteId ||
-    (activePreset?.savedRoute &&
-      selectedDestination &&
-      activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
-      activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0]),
+    !swappedRoute &&
+      (activeSavedRouteId ||
+        (activePreset?.savedRoute &&
+          selectedDestination &&
+          activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
+          activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0])),
   );
 
   const maneuverProgresses = useMemo(
@@ -1118,6 +1135,7 @@ export function NavigationMapScreen() {
     if (!selectedDestination || !plannedRouteOrigin) return;
 
     setRerouteOrigin(undefined);
+    setSelectedMapSign(null);
     setMapFocus((current) => ({
       coordinate: undefined as any,
       requestId: (current?.requestId ?? 0) + 1,
@@ -1138,7 +1156,10 @@ export function NavigationMapScreen() {
         },
       });
     }
-  }, [selectedDestination, plannedRouteOrigin, routeStartTitle, swappedRoute]);
+
+    void queryClient.invalidateQueries({ queryKey: ['navigation-route'] });
+    void queryClient.invalidateQueries({ queryKey: ['signs-along-route'] });
+  }, [plannedRouteOrigin, queryClient, routeStartTitle, selectedDestination, swappedRoute]);
 
   const handleCloseRoute = () => {
     setSwappedRoute(null);
