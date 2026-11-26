@@ -97,12 +97,19 @@ export function BountyBoardScreen() {
   } = useAvailableBountyQuests(availableParams);
 
   // My claims query
+  const myClaimsParams = useMemo(() => {
+    return {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+    };
+  }, [coords.latitude, coords.longitude]);
+
   const {
     data: myClaims,
     isLoading: isLoadingClaims,
     isRefetching: isRefetchingClaims,
     refetch: refetchClaims,
-  } = useMyBountyClaims();
+  } = useMyBountyClaims(myClaimsParams);
 
   const activeClaims = useMemo(() => {
     if (!myClaims) return [];

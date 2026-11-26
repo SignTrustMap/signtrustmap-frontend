@@ -68,14 +68,22 @@ type SubmissionReviewScreenProps = {
 export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ resumeIndex?: string; targetSubmissionId?: string }>();
+  const params = useLocalSearchParams<{
+    resumeIndex?: string;
+    targetSubmissionId?: string;
+    candidateId?: string;
+    questClaimId?: string;
+  }>();
   const resumeIndexParam = params?.resumeIndex;
-  const targetSubmissionIdParam = params?.targetSubmissionId;
+  const targetSubmissionIdParam = params?.targetSubmissionId || params?.candidateId;
+  const claimedCandidateId = params?.candidateId;
+  const questClaimId = params?.questClaimId;
   const theme = useTheme();
   const { isSmallDevice, height: windowHeight } = useResponsive();
   const {
     cancelSubmissionCheck,
     completeCurrentReview,
+    ensureCandidateInQueue,
     isLoading,
     isSubmittingReview = false,
     jumpToSubmissionIndex,
@@ -91,6 +99,20 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
   const handledTargetSubmissionIdRef = useRef<string | null>(null);
+  const [isResolvingClaimedCandidate, setIsResolvingClaimedCandidate] = useState(false);
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    tone: 'default' | 'success' | 'danger';
+  }>();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (resumeIndexParam !== undefined && resumeIndexParam !== '') {
@@ -102,16 +124,67 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   }, [resumeIndexParam, jumpToSubmissionIndex]);
 
   useEffect(() => {
-    if (targetSubmissionIdParam) {
+    if (!targetSubmissionIdParam) {
+      handledTargetSubmissionIdRef.current = null;
+      setIsResolvingClaimedCandidate(false);
+      return;
+    }
+
+    const hasMatch =
+      pendingSubmissions.some((s) => s.id === targetSubmissionIdParam) ||
+      reviewHistory.some((h) => h.submission.id === targetSubmissionIdParam);
+
+    if (hasMatch) {
       if (handledTargetSubmissionIdRef.current !== targetSubmissionIdParam) {
         handledTargetSubmissionIdRef.current = targetSubmissionIdParam;
         jumpToSubmissionById?.(targetSubmissionIdParam);
-        router.setParams({ targetSubmissionId: undefined });
+        if (params?.targetSubmissionId) {
+          router.setParams?.({ targetSubmissionId: undefined });
+        }
       }
-    } else {
-      handledTargetSubmissionIdRef.current = null;
+      setIsResolvingClaimedCandidate(false);
+      return;
     }
-  }, [targetSubmissionIdParam, jumpToSubmissionById, router]);
+
+    if (handledTargetSubmissionIdRef.current === targetSubmissionIdParam) return;
+
+    if (!isLoading && claimedCandidateId && ensureCandidateInQueue) {
+      handledTargetSubmissionIdRef.current = targetSubmissionIdParam;
+      setIsResolvingClaimedCandidate(true);
+      void ensureCandidateInQueue(claimedCandidateId)
+        .then((found) => {
+          if (!isMountedRef.current) return;
+          if (!found) {
+            setToast((current) => ({
+              id: (current?.id ?? 0) + 1,
+              message: 'Nhiệm vụ này đã được xử lý hoặc không còn trong hàng đợi',
+              tone: 'default',
+            }));
+          }
+        })
+        .catch(() => {
+          if (!isMountedRef.current) return;
+          setToast((current) => ({
+            id: (current?.id ?? 0) + 1,
+            message: 'Không thể tải thông tin nhiệm vụ',
+            tone: 'default',
+          }));
+        })
+        .finally(() => {
+          if (isMountedRef.current) setIsResolvingClaimedCandidate(false);
+        });
+    }
+  }, [
+    targetSubmissionIdParam,
+    claimedCandidateId,
+    isLoading,
+    pendingSubmissions,
+    reviewHistory,
+    jumpToSubmissionById,
+    ensureCandidateInQueue,
+    router,
+    params?.targetSubmissionId,
+  ]);
 
   useEffect(() => {
     checkAndRequireLocationPermission().catch(() => {});
@@ -135,11 +208,6 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isSignFocused, setIsSignFocused] = useState(true);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
-  const [toast, setToast] = useState<{
-    id: number;
-    message: string;
-    tone: 'default' | 'success' | 'danger';
-  }>();
 
   const { data: catalog } = useGetCatalog();
   const catalogSigns = useMemo(() => catalog?.signs ?? [], [catalog]);
@@ -372,6 +440,13 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     return DEFAULT_REMEDY_SIGNS.filter((s) => !isCandidateSign(s)).slice(0, 4);
   }, [catalogSigns, submission]);
 
+  const activeQuestClaimId =
+    questClaimId &&
+    submission &&
+    (!claimedCandidateId || submission.id === claimedCandidateId)
+      ? questClaimId
+      : undefined;
+
   const completeReview = useCallback(
     async (
       action: ReviewActionType,
@@ -384,7 +459,10 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     ) => {
       if (!submission || isSubmittingReview) return;
 
-      const success = await completeCurrentReview(action, details);
+      const mergedDetails = activeQuestClaimId
+        ? { ...details, questClaimId: activeQuestClaimId }
+        : details;
+      const success = await completeCurrentReview(action, mergedDetails);
 
       if (!success) {
         setToast((current) => ({
@@ -413,7 +491,14 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
         router.replace('/work/reviewer-history');
       }
     },
-    [completeCurrentReview, isRecheckMode, isSubmittingReview, router, submission],
+    [
+      activeQuestClaimId,
+      completeCurrentReview,
+      isRecheckMode,
+      isSubmittingReview,
+      router,
+      submission,
+    ],
   );
 
   const handleConfirmNewSignType = (reportDto: CreateMissingTypeReportDto) => {
@@ -657,7 +742,9 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
           </View>
         </View>
 
-        {state === 'loading' || (isLoading && pendingSubmissions.length === 0) ? (
+        {state === 'loading' ||
+        (isLoading && pendingSubmissions.length === 0) ||
+        isResolvingClaimedCandidate ? (
           <SubmissionReviewSkeleton />
         ) : submission ? (
           <View style={styles.mainContainer}>

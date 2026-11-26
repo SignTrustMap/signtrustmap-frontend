@@ -20,6 +20,7 @@ import {
   useUndoVoteOnCandidate,
 } from '@/feature/review/hooks/use-review';
 import { useSession } from '@/context/session-provider';
+import { getCandidateSignDetails } from '@/api/reviews/review';
 import {
   toSubmission,
   type ReviewDecision,
@@ -58,8 +59,10 @@ export type ReviewWorkflowContextValue = {
       declineNote?: string;
       suggestedSignTypeId?: number | string;
       newSignReport?: CreateMissingTypeReportDto;
+      questClaimId?: string;
     },
   ) => Promise<boolean>;
+  ensureCandidateInQueue?: (candidateId: string) => Promise<boolean>;
   error?: string;
   finishSubmissionCheck: () => void;
   goToNextCheckedReview: () => void;
@@ -283,6 +286,69 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     [beginSubmissionCheck, pendingSubmissions, reviewHistory],
   );
 
+  const ensureCandidateInQueue = useCallback(
+    async (candidateId: string): Promise<boolean> => {
+      if (!candidateId) return false;
+
+      if (pendingSubmissions[0]?.id === candidateId) return true;
+
+      if (
+        pendingSubmissions.some((s) => s.id === candidateId) ||
+        reviewHistory.some((h) => h.submission.id === candidateId)
+      ) {
+        jumpToSubmissionById(candidateId);
+        return true;
+      }
+
+      if (!accessToken) return false;
+
+      try {
+        const res: any = await getCandidateSignDetails({ candidateId }, accessToken);
+        const candidate = res?.candidate;
+        if (!candidate?.id) return false;
+
+        if (
+          candidate.status &&
+          candidate.status !== 'PENDING_REVIEW' &&
+          candidate.status !== 'IN_CONSENSUS'
+        ) {
+          return false;
+        }
+
+        const mergedCandidate = {
+          ...candidate,
+          locationContext: res?.locationContext ?? candidate.locationContext,
+          possibleSigns: res?.possibleSigns ?? candidate.possibleSigns,
+          remedySigns: res?.remedySigns ?? candidate.remedySigns,
+        };
+        const submission = toSubmission(mergedCandidate);
+
+        setPendingSubmissions((prev) => {
+          if (prev.some((s) => s.id === submission.id)) {
+            const idx = prev.findIndex((s) => s.id === submission.id);
+            return idx > 0
+              ? [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)]
+              : prev;
+          }
+          return [submission, ...prev];
+        });
+        setInitialQueueSubmissions((prev) =>
+          prev.some((s) => s.id === submission.id) ? prev : [submission, ...prev],
+        );
+        setTotalSubmissions((prev) => Math.max(prev, pendingSubmissions.length + 1));
+        setIsCheckingSubmission(false);
+        setIsRecheckingSubmission(false);
+        setRecheckingReviewIndex(undefined);
+        setRecheckingPreviousAction(undefined);
+        return true;
+      } catch (err) {
+        console.warn('[ReviewWorkflow] Failed to load claimed candidate detail:', err);
+        return false;
+      }
+    },
+    [accessToken, beginSubmissionCheck, jumpToSubmissionById, pendingSubmissions, reviewHistory],
+  );
+
   const cancelSubmissionCheck = useCallback(() => {
     if (pendingSubmissions.length > 0) {
       const remainingReviews: CompletedReview[] = pendingSubmissions
@@ -391,6 +457,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
       declineNote?: string;
       suggestedSignTypeId?: number | string;
       newSignReport?: CreateMissingTypeReportDto;
+      questClaimId?: string;
     },
   ): Promise<boolean> => {
     const submission = pendingSubmissions[0];
@@ -486,6 +553,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
               : {}),
             ...(reason ? { declineReason: reason } : {}),
             ...(note ? { declineNote: note } : {}),
+            ...(details?.questClaimId ? { questClaimId: details.questClaimId } : {}),
             ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
@@ -571,6 +639,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         checkingSubmission: isCheckingSubmission,
         isCheckingSubmission,
         completeCurrentReview,
+        ensureCandidateInQueue,
         error,
         finishSubmissionCheck,
         goToNextCheckedReview,

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, fireEvent, act, cleanup } from '@testing-library/react-native';
 import { RevalidationReviewScreen } from '@/feature/revalidation/pages/revalidation-review-screen';
 import * as workflowContext from '@/feature/revalidation/context/revalidation-workflow-provider';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 // Mocks
 jest.mock('expo-router', () => ({
@@ -156,6 +156,7 @@ describe('RevalidationReviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
     (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(createMockWorkflow());
   });
 
@@ -163,7 +164,7 @@ describe('RevalidationReviewScreen', () => {
     cleanup();
   });
 
-  it('renders loading skeleton when workflow is loading with empty queue', async () => {
+  it('renders loading skeleton with a back button when workflow is loading with empty queue', async () => {
     (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(
       createMockWorkflow({ isLoading: true, queueItems: [], currentItem: undefined }),
     );
@@ -171,6 +172,17 @@ describe('RevalidationReviewScreen', () => {
     const { getByLabelText } = await render(<RevalidationReviewScreen />);
 
     expect(getByLabelText('Đang tải các lượt tái thẩm định')).toBeTruthy();
+    const backBtn = getByLabelText('Quay lại');
+    expect(backBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(backBtn);
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith({
+      pathname: '/work',
+      params: { currentRole: 'reviewer' },
+    });
   });
 
   it('renders empty queue state when there are no items and no review history', async () => {
@@ -545,5 +557,54 @@ describe('RevalidationReviewScreen', () => {
     });
 
     expect(queryByText('Hướng dẫn quẹt thẻ')).toBeNull();
+  });
+
+  it('jumps to claimed taskId when queue loads and passes questClaimId on vote', async () => {
+    const mockJumpToEvidenceById = jest.fn();
+    const mockWorkflow = createMockWorkflow({
+      jumpToEvidenceById: mockJumpToEvidenceById,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      taskId: 'task-1',
+      questClaimId: 'claim-123',
+    });
+
+    const { getByLabelText } = await render(<RevalidationReviewScreen />);
+
+    expect(mockJumpToEvidenceById).toHaveBeenCalledWith('task-1');
+
+    const agreeBtn = getByLabelText('Đồng ý với kết luận của điều tra viên');
+    await act(async () => {
+      fireEvent.press(agreeBtn);
+    });
+
+    expect(mockWorkflow.handleVote).toHaveBeenCalledWith(
+      'STILL_ACTIVE',
+      undefined,
+      undefined,
+      'AGREE',
+      'claim-123',
+    );
+  });
+
+  it('shows clear message when claimed taskId has no surveyor evidence yet', async () => {
+    const mockEnsureTaskEvidenceInQueue = jest.fn().mockResolvedValue('no_evidence');
+    const mockWorkflow = createMockWorkflow({
+      queueItems: [],
+      currentItem: undefined,
+      reviewHistory: [],
+      ensureTaskEvidenceInQueue: mockEnsureTaskEvidenceInQueue,
+    });
+    (workflowContext.useRevalidationWorkflow as jest.Mock).mockReturnValue(mockWorkflow);
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      taskId: 'task-open-no-ev',
+      questClaimId: 'claim-open-1',
+    });
+
+    const { findByText } = await render(<RevalidationReviewScreen />);
+
+    expect(mockEnsureTaskEvidenceInQueue).toHaveBeenCalledWith('task-open-no-ev');
+    expect(await findByText('Nhiệm vụ chưa có minh chứng')).toBeTruthy();
   });
 });

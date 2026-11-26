@@ -76,8 +76,14 @@ export function RevalidationReviewScreen() {
   const { isSmallDevice, height: windowHeight } = useResponsive();
 
   const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
-  const searchParams = useLocalSearchParams<{ targetSubmissionId?: string }>();
-  const targetId = searchParams?.targetSubmissionId;
+  const searchParams = useLocalSearchParams<{
+    targetSubmissionId?: string;
+    taskId?: string;
+    questClaimId?: string;
+  }>();
+  const targetId = searchParams?.targetSubmissionId || searchParams?.taskId;
+  const claimedTaskId = searchParams?.taskId;
+  const questClaimId = searchParams?.questClaimId;
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -89,6 +95,7 @@ export function RevalidationReviewScreen() {
     reviewPosition,
     progressPercent,
     counts,
+    ensureTaskEvidenceInQueue,
     handleVote: workflowVote,
     handleSkip: workflowSkip,
     finishReviews: workflowFinish,
@@ -109,26 +116,83 @@ export function RevalidationReviewScreen() {
     )?.previousReview ?? recheckingPreviousReview;
   const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
   const [isEditingVote, setIsEditingVote] = useState(false);
+  const [isResolvingClaimedTask, setIsResolvingClaimedTask] = useState(false);
+  const [claimMissingReason, setClaimMissingReason] = useState<'no_evidence' | 'not_found' | null>(null);
   const handledTargetIdRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setIsEditingVote(false);
   }, [currentItem?.evidenceId, isCheckingEvidence]);
 
   useEffect(() => {
-    if (targetId) {
+    if (!targetId) {
+      handledTargetIdRef.current = null;
+      setClaimMissingReason(null);
+      setIsResolvingClaimedTask(false);
+      return;
+    }
+
+    const hasMatch =
+      items.some((it) => it.evidenceId === targetId || it.taskId === targetId) ||
+      history.some((h) => h.item.evidenceId === targetId || h.item.taskId === targetId);
+
+    if (hasMatch) {
       if (handledTargetIdRef.current !== targetId) {
         handledTargetIdRef.current = targetId;
         jumpToEvidenceById?.(targetId);
-        router.setParams({ targetSubmissionId: undefined });
+        if (searchParams?.targetSubmissionId) {
+          router.setParams?.({ targetSubmissionId: undefined });
+        }
       }
-    } else {
-      handledTargetIdRef.current = null;
+      setClaimMissingReason(null);
+      setIsResolvingClaimedTask(false);
+      return;
     }
-  }, [targetId, jumpToEvidenceById, router]);
+
+    if (handledTargetIdRef.current === targetId) return;
+
+    if (!isLoading && claimedTaskId && ensureTaskEvidenceInQueue) {
+      handledTargetIdRef.current = targetId;
+      setIsResolvingClaimedTask(true);
+      void ensureTaskEvidenceInQueue(claimedTaskId)
+        .then((status) => {
+          if (!isMountedRef.current) return;
+          if (status !== 'found') {
+            setClaimMissingReason(status);
+          } else {
+            setClaimMissingReason(null);
+          }
+        })
+        .catch(() => {
+          if (!isMountedRef.current) return;
+          setClaimMissingReason('not_found');
+        })
+        .finally(() => {
+          if (isMountedRef.current) setIsResolvingClaimedTask(false);
+        });
+    }
+  }, [
+    targetId,
+    claimedTaskId,
+    isLoading,
+    items,
+    history,
+    jumpToEvidenceById,
+    ensureTaskEvidenceInQueue,
+    router,
+    searchParams?.targetSubmissionId,
+  ]);
 
   useEffect(() => {
-    checkAndRequireLocationPermission().catch(() => {});
+    checkAndRequireLocationPermission().catch(() => { });
   }, []);
 
   const handleKeepPreviousReview = useCallback(() => {
@@ -188,6 +252,13 @@ export function RevalidationReviewScreen() {
     [currentItem, requestRecaptureMutation, session?.accessToken, workflowSkip],
   );
 
+  const activeQuestClaimId =
+    questClaimId &&
+      currentItem &&
+      (!claimedTaskId || currentItem.taskId === claimedTaskId)
+      ? questClaimId
+      : undefined;
+
   // ---------------------------------------------------------------------------
   // Action Handler: calls workflow vote API upon swipe or action confirmation
   // ---------------------------------------------------------------------------
@@ -209,7 +280,9 @@ export function RevalidationReviewScreen() {
       };
 
       try {
-        await workflowVote(action, note, suggestedSignTypeId, verdict);
+        await (activeQuestClaimId
+          ? workflowVote(action, note, suggestedSignTypeId, verdict, activeQuestClaimId)
+          : workflowVote(action, note, suggestedSignTypeId, verdict));
         setToast({
           id: Date.now(),
           message: messages[action],
@@ -224,7 +297,7 @@ export function RevalidationReviewScreen() {
         });
       }
     },
-    [currentItem, isSubmittingVote, workflowVote],
+    [activeQuestClaimId, currentItem, isSubmittingVote, workflowVote],
   );
 
   // Reviewer agrees with surveyor conclusion
@@ -237,12 +310,20 @@ export function RevalidationReviewScreen() {
       rawVerdict === 'REMOVED' ? 'REMOVED' : rawVerdict === 'CHANGED' ? 'CHANGED' : 'STILL_ACTIVE';
 
     try {
-      await workflowVote(
-        decision,
-        undefined,
-        currentItem.evidence.suggestedSignTypeId ?? undefined,
-        'AGREE',
-      );
+      await (activeQuestClaimId
+        ? workflowVote(
+          decision,
+          undefined,
+          currentItem.evidence.suggestedSignTypeId ?? undefined,
+          'AGREE',
+          activeQuestClaimId,
+        )
+        : workflowVote(
+          decision,
+          undefined,
+          currentItem.evidence.suggestedSignTypeId ?? undefined,
+          'AGREE',
+        ));
       setToast({
         id: Date.now(),
         message: 'Đồng ý',
@@ -256,7 +337,7 @@ export function RevalidationReviewScreen() {
         tone: 'danger',
       });
     }
-  }, [currentItem, isSubmittingVote, workflowVote]);
+  }, [activeQuestClaimId, currentItem, isSubmittingVote, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion
   const handleDecline = useCallback(() => {
@@ -464,49 +545,54 @@ export function RevalidationReviewScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* Top Progress Bar & Navigation Controls (Active Evaluation Mode Only) */}
-        {currentItem ? (
-          <View style={styles.progressSection}>
-            <View style={styles.progressTopRow}>
-              <Pressable
-                accessibilityLabel="Quay lại"
-                hitSlop={Spacing.one}
-                onPress={() => {
-                  if (isRecheckMode) {
-                    cancelEvidenceCheck?.();
-                  }
+        {/* Top Progress Bar & Navigation Controls (Always visible so user can navigate back anytime) */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressTopRow}>
+            <Pressable
+              accessibilityLabel="Quay lại"
+              hitSlop={Spacing.one}
+              onPress={() => {
+                if (isRecheckMode) {
+                  cancelEvidenceCheck?.();
+                }
+                if (router.canGoBack?.()) {
+                  router.back();
+                } else {
                   router.replace(reviewerWorkRoute);
-                }}
-                style={styles.backButton}
-              >
-                <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
-              </Pressable>
+                }
+              }}
+              style={styles.backButton}
+              testID="revalidation-review-back-button"
+            >
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
+            </Pressable>
 
-              <View style={styles.progressTrackWrapper}>
-                <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        backgroundColor: theme.primary,
-                        width: `${progressPercent}%`,
-                      },
-                    ]}
-                  />
-                </View>
+            <View style={styles.progressTrackWrapper}>
+              <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: currentItem ? `${progressPercent}%` : '0%',
+                    },
+                  ]}
+                />
               </View>
-
-              <View style={styles.topBarSpacer} />
             </View>
+
+            <View style={styles.topBarSpacer} />
+          </View>
+          {currentItem ? (
             <View style={styles.progressCounterRow}>
               <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
                 ĐANG ĐÁNH GIÁ MINH CHỨNG {reviewPosition} / {Math.max(totalCount, 1)}
               </Text>
             </View>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
 
-        {isLoading && items.length === 0 && history.length === 0 ? (
+        {(isLoading && items.length === 0 && history.length === 0) || isResolvingClaimedTask ? (
           <RevalidationReviewSkeleton />
         ) : currentItem ? (
           <View style={styles.mainContainer}>
@@ -881,14 +967,31 @@ export function RevalidationReviewScreen() {
           </View>
         ) : (
           <View style={styles.completeState}>
-            <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
-              <MaterialCommunityIcons color="#16803A" name="check" size={36} />
+            <View
+              style={[
+                styles.completeIcon,
+                { backgroundColor: claimMissingReason ? '#FEF3C7' : '#E8F7ED' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={claimMissingReason ? '#D97706' : '#16803A'}
+                name={claimMissingReason ? 'alert-circle-outline' : 'check'}
+                size={36}
+              />
             </View>
             <Text style={[styles.completeTitle, { color: theme.text }]}>
-              Đã đánh giá tất cả minh chứng
+              {claimMissingReason === 'no_evidence'
+                ? 'Nhiệm vụ chưa có minh chứng'
+                : claimMissingReason === 'not_found'
+                  ? 'Không tìm thấy minh chứng'
+                  : 'Đã đánh giá tất cả minh chứng'}
             </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
-              Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.
+              {claimMissingReason === 'no_evidence'
+                ? 'Biển báo này chưa có ảnh minh chứng thực địa để duyệt.'
+                : claimMissingReason === 'not_found'
+                  ? 'Nhiệm vụ tái thẩm định này hiện không còn minh chứng khả dụng.'
+                  : 'Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.'}
             </Text>
             <AppButton
               label="Quay lại công việc"

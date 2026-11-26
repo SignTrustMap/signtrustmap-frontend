@@ -245,11 +245,14 @@ export function useVoteOnRevalidationEvidence() {
   return useMutation({
     mutationFn: ({ evidenceId, dto }: { evidenceId: string; dto: EvidenceVoteDto }) =>
       voteOnRevalidationEvidence(evidenceId, dto),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
       void queryClient.invalidateQueries({ queryKey: ['reviewer-stats'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
       void queryClient.invalidateQueries({ queryKey: ['daily-tasks'] });
+      if (variables?.dto?.questClaimId) {
+        void queryClient.invalidateQueries({ queryKey: ['bounty-board'] });
+      }
       if (data?.consensus?.evaluated) {
         void queryClient.invalidateQueries({ queryKey: ['wallet-transactions'] });
         void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
