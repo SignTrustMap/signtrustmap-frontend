@@ -19,6 +19,7 @@ import {
   useVoteOnRevalidationEvidence,
 } from '@/feature/revalidation/hooks/use-revalidation';
 import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
 export type RevalidationReviewAction =
   | 'STILL_ACTIVE'
@@ -159,6 +160,17 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
       const itemToVote = currentItem;
       const completesQueue = queueItems.length <= 1;
+
+      // Include GPS data if available, omit if GPS is disabled or unavailable
+      let gpsCoords: { latitude: number; longitude: number } | null = null;
+      try {
+        const freshLoc = await fetchFreshGpsLocation(2500);
+        if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
+        }
+      } catch (e) {
+        console.warn('[RevalidationWorkflow] Could not obtain GPS coordinates:', e);
+      }
 
       const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
         STILL_ACTIVE: 'STILL_ACTIVE',

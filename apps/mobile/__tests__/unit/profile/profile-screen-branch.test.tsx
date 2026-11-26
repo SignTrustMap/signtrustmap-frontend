@@ -99,7 +99,7 @@ describe('ProfileScreen Branch Coverage', () => {
 
     // Toggle collapsible roles card & toggle role switch
     await fireEvent.press(screen.getByLabelText('Tắt vai trò Thẩm định viên'));
-    expect(mockSetRoleEnabled).toHaveBeenCalledWith('reviewer', false);
+    expect(mockSetRoleEnabled).toHaveBeenCalledWith('reviewer', false, { throwOnError: true });
 
     await fireEvent.press(screen.getByLabelText('Thu gọn vai trò tài khoản'));
     await fireEvent.press(screen.getByLabelText('Mở rộng vai trò tài khoản'));

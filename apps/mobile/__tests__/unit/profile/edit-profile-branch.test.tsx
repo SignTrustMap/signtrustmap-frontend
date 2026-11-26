@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack }),
+  useLocalSearchParams: () => ({}),
 }));
 
 jest.mock('expo-image-picker', () => ({

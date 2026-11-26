@@ -165,6 +165,14 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  addressHelperText: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#64748B',
+    paddingLeft: 4,
+    marginTop: 2,
+  },
   lockedBadge: {
     fontFamily: Fonts.sans,
     fontSize: 11,

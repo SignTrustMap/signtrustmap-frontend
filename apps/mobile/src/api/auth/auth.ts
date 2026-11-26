@@ -112,7 +112,10 @@ export type UserProfileResponse = Pick<
   'id' | 'email' | 'fullName' | 'phone' | 'avatarUrl'
 > &
   Partial<
-    Pick<SharedUserProfileResponse, 'status' | 'roles' | 'walletBalance' | 'profileStats'>
+    Pick<
+      SharedUserProfileResponse,
+      'status' | 'roles' | 'registeredRoles' | 'walletBalance' | 'profileStats'
+    >
   > & {
     address?: string | null;
   };
@@ -141,6 +144,7 @@ export type ToggleRoleResponse = {
     email: string;
     fullName: string;
     roles: string[];
+    registeredRoles?: string[];
   };
 };
 

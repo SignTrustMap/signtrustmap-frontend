@@ -62,15 +62,36 @@ describe('SessionProvider, Navigation API & Spatial API Branch Coverage', () => 
     });
     expect(result.current.session?.account.roles).not.toContain('reviewer');
 
-    // Toggle role API success
+    // Toggle role API success with registeredRoles sync
     mockToggleRole.mockResolvedValueOnce({
       accessToken: 'jwt-new',
-      user: { roles: ['DRIVER', 'SURVEYOR', 'REVIEWER'] },
+      user: {
+        roles: ['DRIVER', 'SURVEYOR', 'REVIEWER'],
+        registeredRoles: ['DRIVER', 'SURVEYOR', 'REVIEWER'],
+      },
     });
     await act(async () => {
       await result.current.setRoleEnabled('reviewer', true);
     });
     expect(result.current.session?.accessToken).toBe('jwt-new');
+    expect(result.current.session?.account.registeredRoles).toEqual([
+      'driver',
+      'surveyor',
+      'reviewer',
+    ]);
+
+    // Toggle role with throwOnError: true propagates error
+    mockToggleRole.mockRejectedValueOnce(new Error('Server unavailable'));
+    let thrownError: unknown;
+    await act(async () => {
+      try {
+        await result.current.setRoleEnabled('surveyor', false, { throwOnError: true });
+      } catch (err) {
+        thrownError = err;
+      }
+    });
+    expect(thrownError).toBeInstanceOf(Error);
+    expect((thrownError as Error).message).toBe('Server unavailable');
 
     await act(async () => {
       await result.current.updateAccount?.({ displayName: 'Tên Mới' });

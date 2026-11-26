@@ -235,7 +235,7 @@ describe('Bounty Board API, hooks, cards, banner, and modal branch coverage', ()
     };
 
     const s1 = await render(<BountyQuestCard quest={fullQuest} onClaim={onClaim} />);
-    expect(s1.getByText('1.4 km')).toBeTruthy();
+    expect(s1.getByText('Cách 1.4 km')).toBeTruthy();
     expect(s1.getByText('Thưởng thêm')).toBeTruthy();
     expect(s1.getByText('Biển báo mới')).toBeTruthy();
 
@@ -255,7 +255,7 @@ describe('Bounty Board API, hooks, cards, banner, and modal branch coverage', ()
         }}
       />,
     );
-    expect(s1.getByText('350 mét')).toBeTruthy();
+    expect(s1.getByText('Cách 350 m')).toBeTruthy();
     expect(s1.getByText('Đang nhận...')).toBeTruthy();
     expect(s1.getByText('Biển cần kiểm tra lại')).toBeTruthy();
 
@@ -265,7 +265,7 @@ describe('Bounty Board API, hooks, cards, banner, and modal branch coverage', ()
         quest={{ ...fullQuest, distanceMeters: null, signCropUrl: null, bestFrameUrl: 'f.jpg' }}
       />,
     );
-    expect(s1.getByText('Chưa có vị trí')).toBeTruthy();
+    expect(s1.getByText('Chưa rõ khoảng cách')).toBeTruthy();
     await fireEvent.press(s1.getByLabelText('Nhận nhiệm vụ'));
     expect(onClaim).toHaveBeenCalled();
   });
@@ -320,7 +320,7 @@ describe('Bounty Board API, hooks, cards, banner, and modal branch coverage', ()
     );
     await fireEvent.press(sCard.getByLabelText('Đến vị trí xác thực'));
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/work/inspect-revalidate',
+      pathname: '/work/revalidation-review',
       params: { taskId: 'task-8', questClaimId: 'c-urg' },
     });
 
@@ -360,7 +360,7 @@ describe('Bounty Board API, hooks, cards, banner, and modal branch coverage', ()
     await waitFor(() => expect(sBanner.getByLabelText('Nhiệm vụ đang thực hiện')).toBeTruthy());
     await fireEvent.press(sBanner.getByLabelText('Nhiệm vụ đang thực hiện'));
     expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/work/inspect-revalidate',
+      pathname: '/work/revalidation-review',
       params: { taskId: 'task-9', questClaimId: 'c-urg' },
     });
 

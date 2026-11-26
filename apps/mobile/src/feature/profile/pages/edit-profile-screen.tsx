@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
@@ -21,14 +21,19 @@ import { getProfile, updateProfile } from '@/api/auth/auth';
 import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
 import { PrimaryGradientBackdrop } from '@/components/primary-gradient-backdrop';
-import { useSession } from '@/context/session-provider';
+import { useSession, type OptionalAccountRole } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 
 import { AddressAutocompleteField } from '../components/address-autocomplete-field';
 import { AvatarCropModal } from '../components/avatar-crop-modal';
 import { useAddressAutocomplete } from '../hooks/use-address-autocomplete';
-import { editProfileSchema, type EditProfileFormData } from '../schemas/edit-profile.schema';
+import { createEditProfileSchema, type EditProfileFormData } from '../schemas/edit-profile.schema';
 import { styles } from '../styles/edit-profile-screen.styles';
+
+const REGISTRATION_ROLE_LABELS: Record<OptionalAccountRole, string> = {
+  surveyor: 'Khảo sát viên',
+  reviewer: 'Thẩm định viên',
+};
 
 function getInitials(displayName?: string) {
   if (!displayName) return 'ST';
@@ -43,8 +48,17 @@ function getInitials(displayName?: string) {
 
 export function EditProfileScreen() {
   const router = useRouter();
+  const rawParams = useLocalSearchParams<{ mode?: string; role?: string }>();
+  const registeringRole: OptionalAccountRole | undefined =
+    rawParams?.mode === 'register' &&
+    (rawParams.role === 'surveyor' || rawParams.role === 'reviewer')
+      ? rawParams.role
+      : undefined;
+  const isRegisterMode = Boolean(registeringRole);
+  const registeringRoleLabel = registeringRole ? REGISTRATION_ROLE_LABELS[registeringRole] : '';
+
   const theme = useTheme();
-  const { session, updateAccount } = useSession();
+  const { session, setRoleEnabled, updateAccount } = useSession();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(session?.account.avatarUrl ?? null);
   const [tempAvatarUri, setTempAvatarUri] = useState<string | null>(null);
@@ -52,6 +66,11 @@ export function EditProfileScreen() {
   const [isCropModalVisible, setIsCropModalVisible] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const formSchema = useMemo(
+    () => createEditProfileSchema(isRegisterMode),
+    [isRegisterMode],
+  );
 
   const {
     control,
@@ -61,7 +80,7 @@ export function EditProfileScreen() {
     watch,
     formState: { errors },
   } = useForm<EditProfileFormData>({
-    resolver: zodResolver(editProfileSchema),
+    resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
       fullName: session?.account.displayName ?? '',
@@ -92,6 +111,7 @@ export function EditProfileScreen() {
   });
 
   const fullName = watch('fullName');
+  const addressValue = watch('address');
 
   useEffect(() => {
     let isMounted = true;
@@ -204,12 +224,22 @@ export function EditProfileScreen() {
         address: newAddress,
       });
 
-      Alert.alert('Thành công', 'Thông tin tài khoản đã được cập nhật.', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
-      ]);
+      if (registeringRole) {
+        await setRoleEnabled?.(registeringRole, true, { throwOnError: true });
+      }
+
+      Alert.alert(
+        'Thành công',
+        registeringRole
+          ? `Đăng ký vai trò ${registeringRoleLabel} thành công.`
+          : 'Thông tin tài khoản đã được cập nhật.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ],
+      );
     } catch (err: any) {
       Alert.alert('Lỗi', err.message || 'Không thể lưu thay đổi. Vui lòng thử lại.');
     } finally {
@@ -238,7 +268,9 @@ export function EditProfileScreen() {
           >
             <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={22} />
           </Pressable>
-          <Text style={styles.topBarTitle}>Chỉnh sửa hồ sơ</Text>
+          <Text style={styles.topBarTitle}>
+            {isRegisterMode ? `Đăng ký ${registeringRoleLabel}` : 'Chỉnh sửa hồ sơ'}
+          </Text>
           <View style={styles.topBarRight} />
         </View>
 
@@ -299,8 +331,14 @@ export function EditProfileScreen() {
             {/* Login-style Floating White Form Card */}
             <View style={styles.formCard}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Thông tin cá nhân</Text>
-                <Text style={styles.cardSubtitle}>Cập nhật hồ sơ SignTrustMap của bạn</Text>
+                <Text style={styles.cardTitle}>
+                  {isRegisterMode ? 'Thông tin đăng ký' : 'Thông tin cá nhân'}
+                </Text>
+                <Text style={styles.cardSubtitle}>
+                  {isRegisterMode
+                    ? `Nhập địa chỉ để kích hoạt vai trò ${registeringRoleLabel}`
+                    : 'Cập nhật hồ sơ SignTrustMap của bạn'}
+                </Text>
               </View>
 
               {/* Full Name Field */}
@@ -371,6 +409,9 @@ export function EditProfileScreen() {
                 <View style={styles.labelRow}>
                   <MaterialCommunityIcons color="#64748B" name="map-marker-outline" size={18} />
                   <Text style={styles.fieldLabel}>Địa chỉ</Text>
+                  {isRegisterMode ? (
+                    <Text style={[styles.requiredBadge, { color: theme.danger }]}>*</Text>
+                  ) : null}
                 </View>
                 <Controller
                   control={control}
@@ -400,6 +441,11 @@ export function EditProfileScreen() {
                     />
                   )}
                 />
+                {isRegisterMode ? (
+                  <Text style={styles.addressHelperText}>
+                    Chúng tôi lấy địa chỉ để hệ thống phân phối biển báo đến cho bạn một cách thuận tiện nhất.
+                  </Text>
+                ) : null}
               </View>
 
               {/* Email (Read-only) Field */}
@@ -426,15 +472,22 @@ export function EditProfileScreen() {
               {/* Save Button inside Login-style Card */}
               <View style={styles.saveActionContainer}>
                 <AppButton
-                  accessibilityLabel="Lưu thông tin hồ sơ"
-                  disabled={isSaving || !fullName?.trim()}
+                  accessibilityLabel={
+                    isRegisterMode ? 'Hoàn tất đăng ký vai trò' : 'Lưu thông tin hồ sơ'
+                  }
+                  disabled={
+                    isSaving || !fullName?.trim() || (isRegisterMode && !addressValue?.trim())
+                  }
                   onPress={handleSave}
                   style={[
                     styles.saveButton,
                     {
                       backgroundColor: theme.primary,
                       shadowColor: theme.primary,
-                      opacity: isSaving || !fullName?.trim() ? 0.6 : 1,
+                      opacity:
+                        isSaving || !fullName?.trim() || (isRegisterMode && !addressValue?.trim())
+                          ? 0.6
+                          : 1,
                     },
                   ]}
                 >
@@ -448,7 +501,7 @@ export function EditProfileScreen() {
                         size={20}
                       />
                       <Text style={[styles.saveButtonText, { color: theme.onPrimary }]}>
-                        Lưu thay đổi
+                        {isRegisterMode ? 'Hoàn tất đăng ký' : 'Lưu thay đổi'}
                       </Text>
                     </View>
                   )}

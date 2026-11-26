@@ -54,13 +54,26 @@ function getInitials(displayName?: string) {
     .join('');
 }
 
+function mapRolesList(roles?: readonly string[]): AccountRole[] {
+  if (!Array.isArray(roles)) return [];
+  return roles
+    .map(
+      (r) =>
+        roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole),
+    )
+    .filter((r): r is AccountRole => Boolean(roleLabels[r]));
+}
+
 export function ProfileScreen() {
   const router = useRouter();
-  const { logOut, session, setRoleEnabled } = useSession();
+  const { logOut, session, setRoleEnabled, updateAccount } = useSession();
   const theme = useTheme();
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const [togglingRole, setTogglingRole] = useState<OptionalAccountRole | null>(null);
   const isMountedRef = useRef(true);
+  const updateAccountRef = useRef(updateAccount);
+  updateAccountRef.current = updateAccount;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -75,6 +88,17 @@ export function ProfileScreen() {
       const data = await getProfile(session.accessToken);
       if (data && isMountedRef.current) {
         setProfile(data);
+        const mappedRoles = Array.isArray(data.roles) ? mapRolesList(data.roles) : undefined;
+        const mappedRegisteredRoles = Array.isArray(data.registeredRoles)
+          ? mapRolesList(data.registeredRoles)
+          : undefined;
+        void updateAccountRef.current?.({
+          ...(data.fullName ? { displayName: data.fullName } : {}),
+          ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+          ...(data.address !== undefined ? { address: data.address } : {}),
+          ...(mappedRoles ? { roles: mappedRoles } : {}),
+          ...(mappedRegisteredRoles ? { registeredRoles: mappedRegisteredRoles } : {}),
+        });
       }
     } catch {
       // ignore
@@ -120,18 +144,50 @@ export function ProfileScreen() {
     profile?.avatarUrl !== undefined ? profile.avatarUrl : (session?.account.avatarUrl ?? null);
 
   const rawRoles = profile?.roles ?? session?.account.roles ?? ['driver'];
-  const userRoles: AccountRole[] = rawRoles
-    .map(
-      (r) =>
-        roleMap[r.toUpperCase()] || roleMap[r.toLowerCase()] || (r.toLowerCase() as AccountRole),
-    )
-    .filter((r): r is AccountRole => Boolean(roleLabels[r]));
-  const effectiveRoles = userRoles.includes('driver') ? userRoles : ['driver', ...userRoles];
+  const userRoles = mapRolesList(rawRoles);
+  const effectiveRoles: AccountRole[] = userRoles.includes('driver')
+    ? userRoles
+    : ['driver', ...userRoles];
   const activeRolesCount = effectiveRoles.length;
 
+  const hasRegisteredRolesInfo =
+    Array.isArray(profile?.registeredRoles) || Array.isArray(session?.account.registeredRoles);
+  const rawRegisteredRoles = profile?.registeredRoles ?? session?.account.registeredRoles;
+  const registeredRoleSet = new Set<AccountRole>(
+    hasRegisteredRolesInfo
+      ? [
+          'driver' as AccountRole,
+          ...mapRolesList(rawRegisteredRoles),
+          ...effectiveRoles,
+          ...(profile?.profileStats?.surveyor ? (['surveyor'] as const) : []),
+          ...(profile?.profileStats?.reviewer ? (['reviewer'] as const) : []),
+        ]
+      : ACCOUNT_ROLES,
+  );
+
   const handleToggleRole = async (role: OptionalAccountRole, nextEnabled: boolean) => {
-    await setRoleEnabled(role, nextEnabled);
-    void fetchProfile();
+    if (togglingRole) return;
+    setTogglingRole(role);
+    try {
+      await setRoleEnabled(role, nextEnabled, { throwOnError: true });
+      await fetchProfile();
+    } catch (err: any) {
+      Alert.alert(
+        'Không thể cập nhật vai trò',
+        err?.message || 'Không thể thay đổi trạng thái vai trò. Vui lòng thử lại.',
+      );
+    } finally {
+      if (isMountedRef.current) {
+        setTogglingRole(null);
+      }
+    }
+  };
+
+  const handleRegisterRole = (role: OptionalAccountRole) => {
+    router.push({
+      pathname: '/(authenticated)/(tabs)/profile/edit',
+      params: { mode: 'register', role },
+    });
   };
 
   const handleEditPress = () => {
@@ -327,27 +383,27 @@ export function ProfileScreen() {
                 <View style={styles.roleList}>
                   {ACCOUNT_ROLES.map((role, index) => {
                     const isEnabled = effectiveRoles.includes(role);
+                    const isRegistered = role === 'driver' || registeredRoleSet.has(role);
+                    const isToggling = togglingRole === role;
                     const isLast = index === ACCOUNT_ROLES.length - 1;
 
-                    const rowContent = (
-                      <>
-                        <View style={[styles.iconTile]}>
-                          <MaterialCommunityIcons
-                            color={theme.primary}
-                            name={roleIcons[role]}
-                            size={20}
-                          />
-                        </View>
-                        <View style={styles.rowCopy}>
-                          <Text style={[styles.rowTitle, { color: theme.text }]}>
-                            {roleLabels[role]}
-                          </Text>
-                          <Text style={[styles.rowDescription, { color: theme.placeholder }]}>
-                            {role === 'driver'
-                              ? 'Quyền điều hướng bản đồ'
-                              : `Công cụ ${roleLabels[role]}`}
-                          </Text>
-                        </View>
+                    const trailingControl = !isRegistered ? (
+                      <Pressable
+                        accessibilityLabel={`Đăng ký vai trò ${roleLabels[role]}`}
+                        accessibilityRole="button"
+                        onPress={() => handleRegisterRole(role as OptionalAccountRole)}
+                        style={({ pressed }) => [
+                          styles.registerButton,
+                          {
+                            backgroundColor: theme.primary,
+                            borderColor: theme.primary,
+                          },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                      >
+                        <Text style={styles.registerButtonText}>Đăng ký</Text>
+                      </Pressable>
+                    ) : (
                         <View
                           style={[
                             styles.statusPill,
@@ -368,10 +424,32 @@ export function ProfileScreen() {
                             {isEnabled ? 'Bật' : 'Tắt'}
                           </Text>
                         </View>
+                      );
+
+                    const rowContent = (
+                      <>
+                        <View style={[styles.iconTile]}>
+                          <MaterialCommunityIcons
+                            color={theme.primary}
+                            name={roleIcons[role]}
+                            size={20}
+                          />
+                        </View>
+                        <View style={styles.rowCopy}>
+                          <Text style={[styles.rowTitle, { color: theme.text }]}>
+                            {roleLabels[role]}
+                          </Text>
+                          <Text style={[styles.rowDescription, { color: theme.placeholder }]}>
+                            {role === 'driver'
+                              ? 'Quyền điều hướng bản đồ'
+                              : `Công cụ ${roleLabels[role]}`}
+                          </Text>
+                        </View>
+                        {trailingControl}
                       </>
                     );
 
-                    if (role === 'driver') {
+                    if (role === 'driver' || !isRegistered) {
                       return (
                         <View
                           key={role}
@@ -392,7 +470,8 @@ export function ProfileScreen() {
                       <Pressable
                         accessibilityLabel={`${isEnabled ? 'Tắt' : 'Bật'} vai trò ${roleLabels[role]}`}
                         accessibilityRole="switch"
-                        accessibilityState={{ checked: isEnabled }}
+                        accessibilityState={{ checked: isEnabled, disabled: Boolean(togglingRole) }}
+                        disabled={Boolean(togglingRole)}
                         key={role}
                         onPress={() =>
                           void handleToggleRole(role as OptionalAccountRole, !isEnabled)
@@ -403,7 +482,7 @@ export function ProfileScreen() {
                             borderBottomWidth: StyleSheet.hairlineWidth,
                             borderBottomColor: theme.border,
                           },
-                          pressed && { opacity: 0.7 },
+                          (pressed || isToggling) && { opacity: 0.7 },
                         ]}
                       >
                         {rowContent}
@@ -843,6 +922,20 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 11,
     fontWeight: '800',
+  },
+  registerButton: {
+    borderWidth: 1,
+    borderRadius: Rounded.round,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  registerButtonText: {
+    fontFamily: Fonts.body,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   dropdownBackdrop: {
     flex: 1,
