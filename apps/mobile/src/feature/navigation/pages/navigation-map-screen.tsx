@@ -126,6 +126,7 @@ export function NavigationMapScreen() {
 
   const handleReturnToReviewer = useCallback(() => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
@@ -184,6 +185,7 @@ export function NavigationMapScreen() {
 
   useEffect(() => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
   }, [destinationId, destinationLat, destinationLng, paramSavedRouteId, startLat, startLng]);
 
   const baseSelectedDestination = useMemo(() => {
@@ -416,17 +418,35 @@ export function NavigationMapScreen() {
   }, []);
 
   const handleToggleTts = useCallback(() => {
-    setIsTtsEnabled((prev) => {
-      const next = !prev;
-      speechService.setEnabled(next);
-      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
-      setLocationToast({
-        id: Date.now(),
-        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
-      });
-      return next;
+    const next = !isTtsEnabled;
+    setIsTtsEnabled(next);
+    speechService.setEnabled(next);
+    void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
+    setLocationToast({
+      id: Date.now(),
+      message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
     });
-  }, []);
+  }, [isTtsEnabled]);
+
+  const renderTtsToggleButton = (testID?: string) => (
+    <AppButton
+      accessibilityLabel={isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'}
+      onPress={handleToggleTts}
+      style={[
+        styles.mapActionButton,
+        styles.locationActionButton,
+        styles.ttsActionButton,
+      ]}
+      testID={testID}
+      variant="surface"
+    >
+      <MaterialCommunityIcons
+        name={isTtsEnabled ? 'volume-high' : 'volume-off'}
+        size={22}
+        color="#000000"
+      />
+    </AppButton>
+  );
 
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
 
@@ -437,24 +457,28 @@ export function NavigationMapScreen() {
   const {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
+    isPlaceholderData: isCarRoutePlaceholder,
     error: carRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'DRIVING');
 
   const {
     data: motorcycleRouteResult,
     isLoading: isMotorcycleRouteLoading,
+    isPlaceholderData: isMotorcycleRoutePlaceholder,
     error: motorcycleRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'BIKE');
 
   const {
     data: cyclingRouteResult,
     isLoading: isCyclingRouteLoading,
+    isPlaceholderData: isCyclingRoutePlaceholder,
     error: cyclingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'CYCLING');
 
   const {
     data: walkingRouteResult,
     isLoading: isWalkingRouteLoading,
+    isPlaceholderData: isWalkingRoutePlaceholder,
     error: walkingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'WALKING');
 
@@ -471,6 +495,17 @@ export function NavigationMapScreen() {
         : isMotorcycleMode
           ? motorcycleRouteResult
           : carRouteResult;
+
+  const isActiveRoutePlaceholder =
+    vehicleMode === 'CYCLING'
+      ? isCyclingRoutePlaceholder
+      : vehicleMode === 'WALKING'
+        ? isWalkingRoutePlaceholder
+        : isMotorcycleMode
+          ? isMotorcycleRoutePlaceholder
+          : isCarRoutePlaceholder;
+
+  const activeRouteGeometry = isActiveRoutePlaceholder ? undefined : activeRouteResult?.geometry;
 
   const activeRouteError =
     vehicleMode === 'CYCLING'
@@ -490,7 +525,7 @@ export function NavigationMapScreen() {
   const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
-    activeRouteResult?.geometry,
+    activeRouteGeometry,
     vehicleMode,
   );
 
@@ -512,7 +547,9 @@ export function NavigationMapScreen() {
       setRerouteOrigin(newOrigin);
     },
     onRerouteApplied: (newOrigin) => {
-      setRerouteOrigin(undefined);
+      // Keep active rerouteOrigin anchored so plannedRouteOrigin (from params or saved route)
+      // never reverts the map back to the stale pre-reroute geometry.
+      setRerouteOrigin(newOrigin);
       setInitialGpsOrigin(newOrigin);
     },
     onClearNavigationError: () => setNavigationError(undefined),
@@ -564,7 +601,7 @@ export function NavigationMapScreen() {
   const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
 
   const visibleSigns = useMemo(() => {
-    const corridorSigns = savedRouteSignsData?.signs;
+    const corridorSigns = !swappedRoute ? savedRouteSignsData?.signs : undefined;
     const rawSigns =
       corridorSigns && corridorSigns.length > 0
         ? corridorSigns
@@ -604,6 +641,7 @@ export function NavigationMapScreen() {
     mapSigns,
     plannedSigns,
     savedRouteSignsData?.signs,
+    swappedRoute,
     activeRouteOrigin,
     selectedDestination?.coordinate,
     vehicleMode,
@@ -811,11 +849,12 @@ export function NavigationMapScreen() {
   ]);
 
   const isRouteBookmarked = Boolean(
-    activeSavedRouteId ||
-    (activePreset?.savedRoute &&
-      selectedDestination &&
-      activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
-      activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0]),
+    !swappedRoute &&
+      (activeSavedRouteId ||
+        (activePreset?.savedRoute &&
+          selectedDestination &&
+          activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
+          activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0])),
   );
 
   const maneuverProgresses = useMemo(
@@ -890,7 +929,7 @@ export function NavigationMapScreen() {
   }, [activeDuration, routeDistance, isNavigating, remainingNavDistance]);
 
   const { activeAlert: activeSignAlert } = useSignProximityAlert({
-    alertDistanceMeters: 50,
+    alertDistanceMeters: 75,
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
@@ -1096,6 +1135,7 @@ export function NavigationMapScreen() {
     if (!selectedDestination || !plannedRouteOrigin) return;
 
     setRerouteOrigin(undefined);
+    setSelectedMapSign(null);
     setMapFocus((current) => ({
       coordinate: undefined as any,
       requestId: (current?.requestId ?? 0) + 1,
@@ -1116,10 +1156,14 @@ export function NavigationMapScreen() {
         },
       });
     }
-  }, [selectedDestination, plannedRouteOrigin, routeStartTitle, swappedRoute]);
+
+    void queryClient.invalidateQueries({ queryKey: ['navigation-route'] });
+    void queryClient.invalidateQueries({ queryKey: ['signs-along-route'] });
+  }, [plannedRouteOrigin, queryClient, routeStartTitle, selectedDestination, swappedRoute]);
 
   const handleCloseRoute = () => {
     setSwappedRoute(null);
+    setRerouteOrigin(undefined);
     if (isNavigating) {
       setLastNavigatedDestinationTitle(selectedDestination?.title);
       setNavigationSession(undefined);
@@ -1213,7 +1257,7 @@ export function NavigationMapScreen() {
           hasLiveLocation={hasLiveLocation}
           isCustomStart={isCustomStart}
           routeCoordinates={routeCoordinates}
-          routeStart={plannedRouteOrigin}
+          routeStart={activeRouteOrigin}
           routeSigns={filteredSigns}
           signs={filteredSigns}
           showCurrentLocation={!isNavigating}
@@ -1299,16 +1343,20 @@ export function NavigationMapScreen() {
 
         <NavigationUpcomingSigns signs={upcomingSignsOnRoute} />
 
-        {/* Floating Re-center button during navigation */}
+        {/* Floating Re-center and Voice toggle buttons during navigation */}
         {isNavigating ? (
           <Animated.View
             pointerEvents="box-none"
             style={{
               position: 'absolute',
               left: 16,
+              right: 16,
               bottom: floatingButtonBottom,
               opacity: floatingButtonOpacity,
               zIndex: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
             <Pressable
@@ -1337,6 +1385,7 @@ export function NavigationMapScreen() {
               <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
               <Text style={[styles.navRecenterText, { color: theme.primary }]}>Căn giữa</Text>
             </Pressable>
+            {renderTtsToggleButton('btn-toggle-tts-nav')}
           </Animated.View>
         ) : null}
 
@@ -1419,24 +1468,7 @@ export function NavigationMapScreen() {
                     <View style={[styles.filterActiveBadge, { backgroundColor: theme.primary }]} />
                   ) : null}
                 </AppButton>
-                <AppButton
-                  accessibilityLabel={
-                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
-                  }
-                  onPress={handleToggleTts}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <MaterialCommunityIcons
-                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
-                    size={22}
-                    color="#000000"
-                  />
-                </AppButton>
+                {renderTtsToggleButton()}
 
                 <AppButton
                   accessibilityLabel={isLocating ? 'Đang xác định vị trí' : 'Về vị trí hiện tại'}

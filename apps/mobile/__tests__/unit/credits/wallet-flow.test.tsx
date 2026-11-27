@@ -179,9 +179,12 @@ describe('Wallet & Credits Flow Unit Test Suite', () => {
   // =========================================================================
   describe('2. TopUpScreen', () => {
     it('renders credit packages and defaults to 1,000 Credits package', async () => {
-      const { getByText, getByLabelText } = await render(<TopUpScreen />);
+      const { getByText, getByLabelText, getByTestId } = await render(<TopUpScreen />);
 
       expect(getByText('Chọn gói nạp')).toBeTruthy();
+      expect(getByTestId('icon-arrow-left').props.color).toBe('#0F172A');
+      expect(getByTestId('gateway-logo-MOMO')).toBeTruthy();
+      expect(getByTestId('gateway-logo-VIETQR')).toBeTruthy();
       expect(getByLabelText(/Gói.*1000 Credits/)).toBeTruthy();
       expect(getByLabelText(/Gói.*500 Credits/)).toBeTruthy();
     });

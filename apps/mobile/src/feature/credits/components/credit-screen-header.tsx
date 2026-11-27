@@ -1,9 +1,10 @@
-﻿import type { ReactNode } from 'react';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
-import { Fonts, Spacing } from '@/constants/theme';
+import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type CreditScreenHeaderProps = {
@@ -29,7 +30,7 @@ export function CreditScreenHeader({ onBack, rightContent, title }: CreditScreen
               style={styles.backButton}
               variant="ghost"
             >
-              <Text style={[styles.backIcon, { color: theme.primary }]}>{'‹'}</Text>
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={24} />
             </AppButton>
           ) : null}
         </View>
@@ -61,15 +62,11 @@ const styles = StyleSheet.create({
   },
   backButton: {
     width: 44,
+    height: 44,
     minHeight: 44,
     paddingHorizontal: 0,
     paddingVertical: 0,
-  },
-  backIcon: {
-    fontFamily: Fonts.body,
-    fontSize: 36,
-    fontWeight: 500,
-    lineHeight: 38,
+    borderRadius: Rounded.round,
   },
   title: {
     flex: 1,

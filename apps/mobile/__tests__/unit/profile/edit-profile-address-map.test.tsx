@@ -9,6 +9,7 @@ import * as placesApi from '@/api/navigation/places';
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockSetRoleEnabled = jest.fn();
 const mockUpdateAccount = jest.fn();
 let mockSessionData: any = {
   accessToken: 'test-token',
@@ -32,7 +33,7 @@ jest.mock('@/context/session-provider', () => {
       isInitializing: false,
       logIn: jest.fn(),
       logOut: jest.fn(),
-      setRoleEnabled: jest.fn(),
+      setRoleEnabled: mockSetRoleEnabled,
       updateAccount: mockUpdateAccount,
     }),
   };
@@ -57,6 +58,7 @@ jest.mock('@/hooks/use-theme', () => ({
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     back: mockBack,
@@ -64,7 +66,7 @@ jest.mock('expo-router', () => ({
     replace: jest.fn(),
     canGoBack: () => true,
   }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('@/api/auth/auth', () => ({
@@ -119,6 +121,17 @@ jest.mock('@/feature/upload/components/location-picker-modal', () => {
 describe('EditProfileScreen Address Autocomplete & Map Preview', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    mockSetRoleEnabled.mockResolvedValue(undefined);
+    (authApi.getProfile as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      fullName: 'Nguyen Van A',
+      phone: '0901234567',
+      avatarUrl: null,
+      roles: ['driver'],
+      address: '123 Le Loi, Ben Nghe, Quan 1, TP.HCM',
+    });
     mockSearchPlaces.mockResolvedValue([
       {
         id: 'place-1',
@@ -141,6 +154,9 @@ describe('EditProfileScreen Address Autocomplete & Map Preview', () => {
 
   it('renders address field with mini map preview card, pin, and floating zoom button', async () => {
     const screen = await render(<EditProfileScreen />);
+
+    expect(screen.getByTestId('edit-profile-gradient-bg')).toBeTruthy();
+    expect(screen.getByTestId('edit-profile-decor-circle')).toBeTruthy();
 
     // Address input should be present
     expect(screen.getByLabelText('Địa chỉ')).toBeTruthy();
@@ -252,5 +268,83 @@ describe('EditProfileScreen Address Autocomplete & Map Preview', () => {
 
     expect(addressInput.props.value).toBe('');
     expect(screen.queryByTestId('address-suggestions-container')).toBeNull();
+  });
+
+  it('enforces max 10 digits on phone input and shows validation error when exceeded', async () => {
+    const screen = await render(<EditProfileScreen />);
+
+    const phoneInput = screen.getByLabelText('Số điện thoại');
+    expect(phoneInput.props.maxLength).toBe(10);
+
+    await act(async () => {
+      fireEvent.changeText(phoneInput, '09876543210');
+    });
+
+    expect(await screen.findByText('Số điện thoại không được quá 10 số.')).toBeTruthy();
+  });
+
+  it('hides registration helper text in normal edit profile mode', async () => {
+    const screen = await render(<EditProfileScreen />);
+
+    expect(screen.getByText('Chỉnh sửa hồ sơ')).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'Chúng tôi lấy địa chỉ để hệ thống phân phối biển báo đến cho bạn một cách thuận tiện nhất.',
+      ),
+    ).toBeNull();
+  });
+
+  it('requires address, shows helper text, updates profile and enables role in registration mode', async () => {
+    mockSearchParams = { mode: 'register', role: 'surveyor' };
+    (authApi.getProfile as jest.Mock).mockResolvedValueOnce({
+      id: 'user-1',
+      email: 'user@example.com',
+      fullName: 'Nguyen Van A',
+      phone: '0901234567',
+      avatarUrl: null,
+      roles: ['DRIVER'],
+      registeredRoles: ['DRIVER'],
+      address: null,
+    });
+    mockSessionData = {
+      ...mockSessionData,
+      account: { ...mockSessionData.account, address: null },
+    };
+
+    const screen = await render(<EditProfileScreen />);
+
+    expect(screen.getByText('Đăng ký Khảo sát viên')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Chúng tôi lấy địa chỉ để hệ thống phân phối biển báo đến cho bạn một cách thuận tiện nhất.',
+      ),
+    ).toBeTruthy();
+
+    const submitBtn = screen.getByLabelText('Hoàn tất đăng ký vai trò');
+    expect(submitBtn.props.accessibilityState?.disabled).toBe(true);
+
+    const addressInput = screen.getByLabelText('Địa chỉ');
+    await act(async () => {
+      fireEvent.changeText(addressInput, '45 Nguyen Hue, Quan 1, TP.HCM');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Hoàn tất đăng ký vai trò').props.accessibilityState?.disabled).toBe(false);
+    });
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Hoàn tất đăng ký vai trò'));
+    });
+
+    await waitFor(() => {
+      expect(authApi.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fullName: 'Nguyen Van A',
+          address: '45 Nguyen Hue, Quan 1, TP.HCM',
+        }),
+        'test-token',
+      );
+      expect(mockSetRoleEnabled).toHaveBeenCalledWith('surveyor', true, { throwOnError: true });
+    });
   });
 });

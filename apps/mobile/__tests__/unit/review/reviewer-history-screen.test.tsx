@@ -106,8 +106,12 @@ describe('ReviewerHistoryScreen', () => {
 
     expect(getByText('Lịch sử thẩm định')).toBeTruthy();
     expect(getByText('Cấm đi ngược chiều')).toBeTruthy();
-    expect(getByTestId('btn-back-reviewer-history')).toBeTruthy();
-    expect(getByTestId('btn-refresh-reviewer-history')).toBeTruthy();
+    const backBtn = getByTestId('btn-back-reviewer-history');
+    const refreshBtn = getByTestId('btn-refresh-reviewer-history');
+    expect(backBtn).toBeTruthy();
+    expect(refreshBtn).toBeTruthy();
+    expect(getByTestId('icon-arrow-left').props.color).toBe('#0F172A');
+    expect(getByTestId('icon-reload').props.color).toBe('#0F172A');
   });
 
   it('allows clicking edit on eligible record and routes to submission review', async () => {

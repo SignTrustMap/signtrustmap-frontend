@@ -195,8 +195,6 @@ export interface EvidenceVoteDto {
   suggestedSignTypeId?: number;
   questClaimId?: string;
   note?: string;
-  latitude?: number;
-  longitude?: number;
 }
 
 export interface EvidenceVoteResponse {

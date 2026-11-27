@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppButton } from '@/components/button';
 import { DateFilterSortList } from '@/components/date-filter-sort-list';
@@ -140,8 +140,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -151,8 +155,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   refreshButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: Rounded.round,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -16,13 +16,20 @@ jest.mock('expo-image', () => {
   };
 });
 
+const mockSetStop = jest.fn();
+
 const mockMapLibre = {
   Map: ({ children, testID = 'maplibre-map', ...props }: any) => (
     <View testID={testID} {...props}>
       {children}
     </View>
   ),
-  Camera: (props: any) => <View testID="maplibre-camera" {...props} />,
+  Camera: React.forwardRef((props: any, ref: any) => {
+    React.useImperativeHandle(ref, () => ({
+      setStop: mockSetStop,
+    }));
+    return <View testID="maplibre-camera" {...props} />;
+  }),
   GeoJSONSource: ({ children, testID = 'maplibre-geojson-source', ...props }: any) => (
     <View testID={testID} {...props}>
       {children}
@@ -341,6 +348,92 @@ describe('NavigationMapView Component with Native MapLibre', () => {
 
     const outdated = getSignFreshness(0.2, 'NEEDS_REVALIDATION');
     expect(outdated).toHaveProperty('label');
+  });
+
+  it('locks camera heading on straight navigation and updates only on sharp turns or reroutes', async () => {
+    jest.useFakeTimers();
+    mockSetStop.mockClear();
+
+    // L-shaped route: heading North (~0 deg) first, then turning East (~90 deg)
+    const initialRoute: [number, number][] = [
+      [106.7000, 10.7700],
+      [106.70008, 10.7705], // slight ~9 deg drift
+      [106.7000, 10.7710],  // straight North
+      [106.7010, 10.7710],  // turn East (~90 deg)
+    ];
+
+    const screen = await render(
+      <NavigationMapView
+        hasLiveLocation={true}
+        navigationActive={true}
+        routeCoordinates={initialRoute}
+        routeStart={[106.7000, 10.7700]}
+        userCoordinate={[106.7000, 10.7700]}
+      />,
+    );
+
+    // Advance mount readiness timer so cameraReadyRef becomes true
+    await act(async () => {
+      jest.advanceTimersByTime(350);
+    });
+
+    expect(mockSetStop).toHaveBeenCalled();
+    const initialBearing = mockSetStop.mock.calls[mockSetStop.mock.calls.length - 1][0].bearing;
+    mockSetStop.mockClear();
+
+    // Small heading deviation along straight path (~10 deg, > 3m movement) -> keeps locked bearing
+    await screen.rerender(
+      <NavigationMapView
+        hasLiveLocation={true}
+        navigationActive={true}
+        routeCoordinates={initialRoute}
+        routeStart={[106.7000, 10.7700]}
+        userCoordinate={[106.70008, 10.7705]}
+      />,
+    );
+
+    expect(mockSetStop).toHaveBeenCalled();
+    expect(mockSetStop.mock.calls[mockSetStop.mock.calls.length - 1][0].bearing).toBe(initialBearing);
+
+    // Passed route coordinates before [106.70008, 10.7705] should be stripped from GeoJSON
+    const trimmedCoords = screen.getByTestId('maplibre-geojson-source').props.data.geometry.coordinates;
+    expect(trimmedCoords[0][1]).toBeCloseTo(10.7705, 4);
+    expect(trimmedCoords).not.toContainEqual([106.7000, 10.7700]);
+    mockSetStop.mockClear();
+
+    // Turn corner onto Eastbound segment (~90 deg) -> rotates camera bearing
+    await screen.rerender(
+      <NavigationMapView
+        hasLiveLocation={true}
+        navigationActive={true}
+        routeCoordinates={initialRoute}
+        routeStart={[106.7000, 10.7700]}
+        userCoordinate={[106.7000, 10.7710]}
+      />,
+    );
+
+    const turnedBearing = mockSetStop.mock.calls[mockSetStop.mock.calls.length - 1][0].bearing;
+    expect(turnedBearing).toBeGreaterThanOrEqual(80);
+    expect(turnedBearing).toBeLessThanOrEqual(100);
+
+    // Reroute arrives with brand-new coordinates -> GeoJSONSource updates in place with new polyline
+    const reroutedCoords: [number, number][] = [
+      [106.7005, 10.7712],
+      [106.7005, 10.7730],
+    ];
+    await screen.rerender(
+      <NavigationMapView
+        hasLiveLocation={true}
+        navigationActive={true}
+        routeCoordinates={reroutedCoords}
+        routeStart={[106.7005, 10.7712]}
+        userCoordinate={[106.7005, 10.7712]}
+      />,
+    );
+
+    const source = screen.getByTestId('maplibre-geojson-source');
+    expect(source.props.data.geometry.coordinates).toEqual(reroutedCoords);
+    jest.useRealTimers();
   });
 
   it('renders fallback icon badge when sign has missing or failing imageUrl', async () => {

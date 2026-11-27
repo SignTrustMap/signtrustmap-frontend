@@ -14,6 +14,7 @@ export type Account = {
   email: string;
   id: string;
   roles: AccountRole[];
+  registeredRoles?: AccountRole[];
   avatarUrl?: string | null;
   address?: string | null;
 };
@@ -23,13 +24,21 @@ export type AppSession = {
   account: Account;
 };
 
+export type SetRoleEnabledOptions = {
+  throwOnError?: boolean;
+};
+
 type SessionContextValue = {
   isInitializing: boolean;
   isLoading: boolean;
   logIn: (session: AppSession) => Promise<void>;
   logOut: () => Promise<void>;
   session: AppSession | null;
-  setRoleEnabled: (role: OptionalAccountRole, enabled: boolean) => Promise<void>;
+  setRoleEnabled: (
+    role: OptionalAccountRole,
+    enabled: boolean,
+    options?: SetRoleEnabledOptions,
+  ) => Promise<void>;
   updateAccount?: (updates: Partial<Account>) => Promise<void>;
 };
 
@@ -78,7 +87,11 @@ function parseStoredSession(value: string | null): AppSession | null {
         email: parsed.account.email ?? 'demo@example.com',
         id: parsed.account.id,
         roles: normalizeRoles(parsed.account.roles),
+        ...(Array.isArray(parsed.account.registeredRoles)
+          ? { registeredRoles: normalizeRoles(parsed.account.registeredRoles) }
+          : {}),
         avatarUrl: parsed.account.avatarUrl ?? null,
+        address: parsed.account.address ?? null,
       },
     };
   } catch {
@@ -154,41 +167,62 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
   }
 
-  async function setRoleEnabled(role: OptionalAccountRole, enabled: boolean) {
-    if (!session) return;
+  function mapBackendRoles(roles?: string[]): AccountRole[] {
+    if (!Array.isArray(roles)) return [];
+    return roles
+      .map((r) => backendRoleToAccountRole[r.toUpperCase()])
+      .filter((r): r is AccountRole => Boolean(r));
+  }
 
-    let updatedSession = session;
+  async function setRoleEnabled(
+    role: OptionalAccountRole,
+    enabled: boolean,
+    options?: SetRoleEnabledOptions,
+  ) {
+    const activeSession = sessionRef.current ?? session;
+    if (!activeSession) return;
+
+    let updatedSession = activeSession;
     try {
       const backendRole = role.toUpperCase();
-      const res = await toggleRole(backendRole, enabled, session.accessToken);
+      const res = await toggleRole(backendRole, enabled, activeSession.accessToken);
       if (res?.accessToken) {
-        const nextRoles = res.user.roles
-          .map((r) => backendRoleToAccountRole[r.toUpperCase()])
-          .filter((r): r is AccountRole => Boolean(r));
+        const nextRoles = normalizeRoles(mapBackendRoles(res.user.roles));
+        const nextRegisteredRoles = Array.isArray(res.user.registeredRoles)
+          ? normalizeRoles(mapBackendRoles(res.user.registeredRoles))
+          : normalizeRoles([
+              ...(activeSession.account.registeredRoles ?? activeSession.account.roles),
+              ...(enabled ? [role] : []),
+            ]);
 
         updatedSession = {
-          ...session,
+          ...activeSession,
           accessToken: res.accessToken,
           account: {
-            ...session.account,
-            roles: normalizeRoles(nextRoles),
+            ...activeSession.account,
+            roles: nextRoles,
+            registeredRoles: nextRegisteredRoles,
           },
         };
       }
-    } catch {
+    } catch (error) {
+      if (options?.throwOnError) {
+        throw error;
+      }
       // Fallback to local toggle if network unavailable
       const nextRoles = enabled
-        ? normalizeRoles([...session.account.roles, role])
-        : session.account.roles.filter((accountRole) => accountRole !== role);
+        ? normalizeRoles([...activeSession.account.roles, role])
+        : activeSession.account.roles.filter((accountRole) => accountRole !== role);
       updatedSession = {
-        ...session,
+        ...activeSession,
         account: {
-          ...session.account,
+          ...activeSession.account,
           roles: nextRoles,
         },
       };
     }
 
+    sessionRef.current = updatedSession;
     setSession(updatedSession);
     await setStorageItemAsync('session', JSON.stringify(updatedSession));
   }

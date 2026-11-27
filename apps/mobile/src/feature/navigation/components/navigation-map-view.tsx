@@ -2,11 +2,9 @@ import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-r
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   Modal,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -14,7 +12,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import {
   type MapCoordinate,
   type PreviousLocation,
@@ -27,7 +25,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { getMapLibre, type MapLibreModule } from '@/services/maplibre';
 import { offlineMapService } from '@/services/offline-map-service';
 import { MAP_BUILD_REQUIRED_DESCRIPTION, MAP_BUILD_REQUIRED_TITLE } from '@/constants/message';
-import { calculateDistanceMeters, getRouteForwardBearing, isValidCoordinate } from '../utils/geo';
+import {
+  calculateDistanceMeters,
+  getRemainingRouteCoordinates,
+  getRouteForwardBearing,
+  getSmallestAngleDiffDegrees,
+  isValidCoordinate,
+} from '../utils/geo';
 import {
   useGetSignEvidences,
   useGetTaskEvidences,
@@ -62,6 +66,7 @@ type NavigationMapViewProps = {
 };
 
 import { env } from '@/config/env';
+import { styles } from '@/feature/navigation/styles/navigation-map-view.styles';
 
 const mapTileUrl = env.mapTileUrl;
 
@@ -113,11 +118,11 @@ function SignCalloutImage({ imageUrl, title }: { imageUrl?: string; title: strin
   if (!imageUrl || hasError) return null;
 
   return (
-    <Image
+    <ExpoImage
       accessibilityLabel={title}
       source={{ uri: imageUrl }}
       onError={() => setHasError(true)}
-      resizeMode="contain"
+      contentFit="contain"
       style={styles.calloutImage}
     />
   );
@@ -153,7 +158,7 @@ function SignMarkerIcon({
   }
 
   return (
-    <Image
+    <ExpoImage
       accessibilityLabel={name || signCode}
       key={activeUrl}
       source={{ uri: activeUrl }}
@@ -164,7 +169,7 @@ function SignMarkerIcon({
           setHasError(true);
         }
       }}
-      resizeMode="contain"
+      contentFit="contain"
       style={styles.stopSignImage}
     />
   );
@@ -202,11 +207,11 @@ function SignCallout({ sign, freshness }: SignCalloutProps) {
           </View>
         </View>
         {sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl ? (
-          <Image
+          <ExpoImage
             accessibilityLabel="Ảnh thực địa camera"
             source={{ uri: sign.actualCropUrl }}
             style={styles.calloutActualCrop}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : null}
       </View>
@@ -562,6 +567,11 @@ export function NavigationMapView({
     return unsub;
   }, []);
 
+  // Reset selected callout when route origin or destination changes (e.g. route swap)
+  useEffect(() => {
+    setSelectedSignId(null);
+  }, [destination?.id, routeStart?.[0], routeStart?.[1]]);
+
   // Auto-dismiss the callout after 4 seconds ONLY when a destination is selected
   useEffect(() => {
     if (!selectedSignId || !destination) return;
@@ -598,7 +608,8 @@ export function NavigationMapView({
   const sortedRouteSigns = useMemo(() => {
     const effectiveRouteSigns = routeSigns.length > 0 ? routeSigns : (signs ?? []);
     // 1. Deduplicate signs at identical coordinates with the same sign type/code,
-    // prioritizing the selected sign, then the one with the highest freshness score.
+    // prioritizing the one with the highest freshness score. Keep order stable across taps
+    // so native Marker views never reorder or shift when selected.
     const dedup: Record<string, RouteSign> = {};
     for (const sign of effectiveRouteSigns) {
       if (!Array.isArray(sign.coordinate) || sign.coordinate.length < 2) continue;
@@ -607,26 +618,19 @@ export function NavigationMapView({
       if (!existing) {
         dedup[key] = sign;
       } else {
-        if (sign.id === selectedSignId) {
+        const existingScore = existing.freshnessScore ?? 0;
+        const currentScore = sign.freshnessScore ?? 0;
+        if (currentScore > existingScore) {
           dedup[key] = sign;
-        } else if (existing.id !== selectedSignId) {
-          const existingScore = existing.freshnessScore ?? 0;
-          const currentScore = sign.freshnessScore ?? 0;
-          if (currentScore > existingScore) {
-            dedup[key] = sign;
-          }
         }
       }
     }
 
-    // 2. Sort so lower freshness signs are drawn first, higher freshness signs
-    // are drawn on top, and any currently selected sign is drawn last (topmost).
+    // 2. Sort stably by freshness score so lower freshness signs are drawn first.
     return Object.values(dedup).sort((a: RouteSign, b: RouteSign) => {
-      if (a.id === selectedSignId) return 1;
-      if (b.id === selectedSignId) return -1;
       return (a.freshnessScore ?? 0) - (b.freshnessScore ?? 0);
     });
-  }, [routeSigns, signs, selectedSignId]);
+  }, [routeSigns, signs]);
 
   const selectedSign = useMemo(
     () => (selectedSignId ? (sortedRouteSigns.find((s) => s.id === selectedSignId) ?? null) : null),
@@ -738,41 +742,54 @@ export function NavigationMapView({
     }
     return destination && routeStart ? getRouteBounds(routeStart, destination.coordinate) : null;
   }, [destination, routeCoordinates, routeStart]);
+  const displayedRouteCoordinates = useMemo(() => {
+    if (!routeCoordinates?.length) return undefined;
+    if (!navigationActive || !userCoordinate) return routeCoordinates;
+    return getRemainingRouteCoordinates(routeCoordinates, userCoordinate);
+  }, [navigationActive, routeCoordinates, userCoordinate]);
+
   const routeGeoJson = useMemo(() => {
-    if (!routeCoordinates?.length) return null;
+    if (!displayedRouteCoordinates || displayedRouteCoordinates.length < 2) return null;
     return {
       type: 'Feature' as const,
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: routeCoordinates,
+        coordinates: displayedRouteCoordinates,
       },
     };
-  }, [routeCoordinates]);
+  }, [displayedRouteCoordinates]);
 
-  // Calculate forward bearing aligned with the route ahead for Google Maps-style navigation
-  const forwardBearing = useMemo(() => {
+  // Initial forward bearing aligned with the route ahead when navigation begins
+  const initialForwardBearing = useMemo(() => {
     const origin = userCoordinate ?? routeStart;
     return getRouteForwardBearing(origin, routeCoordinates);
-  }, [userCoordinate, routeStart, routeCoordinates]);
+    // Keep initialViewState bearing anchored when navigation is already active
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationActive, routeStart]);
 
   const cameraRef = useRef<CameraRef>(null);
+  const lockedBearingRef = useRef<number | null>(null);
+  const pendingTurnRef = useRef<{ bearing: number; count: number } | null>(null);
+  const lastCameraCenterRef = useRef<MapCoordinate | null>(null);
+  const lastRouteSignatureRef = useRef<string | null>(null);
   const navParamsRef = useRef({ cameraCenter, routeCoordinates, routeStart, userCoordinate });
   useEffect(() => {
     navParamsRef.current = { cameraCenter, routeCoordinates, routeStart, userCoordinate };
   }, [cameraCenter, routeCoordinates, routeStart, userCoordinate]);
 
   // Imperatively command the camera into Google Maps 3D navigation perspective.
-  // We defer all setStop calls until cameraReadyRef is true (native view mounted).
+  // Locks camera heading to user's initial route direction until an actual turn or re-center occurs.
   useEffect(() => {
     if (!navigationActive) {
-      // Reset readiness when leaving navigation so the next entry re-waits.
       cameraReadyRef.current = false;
+      lockedBearingRef.current = null;
+      pendingTurnRef.current = null;
+      lastCameraCenterRef.current = null;
+      lastRouteSignatureRef.current = null;
       return;
     }
 
-    // Prioritize userCoordinate so the camera flies to the user's actual position.
-    // For custom route starts, fall back to routeStart if userCoordinate is not yet available.
     const {
       cameraCenter: curCameraCenter,
       routeCoordinates: curRouteCoordinates,
@@ -781,6 +798,16 @@ export function NavigationMapView({
     } = navParamsRef.current;
     const origin = curUserCoordinate ?? curRouteStart ?? curCameraCenter;
     const bearing = getRouteForwardBearing(origin, curRouteCoordinates);
+    lockedBearingRef.current = bearing;
+    pendingTurnRef.current = null;
+    if (origin) {
+      lastCameraCenterRef.current = origin;
+    }
+    if (curRouteCoordinates?.length) {
+      const first = curRouteCoordinates[0];
+      const last = curRouteCoordinates[curRouteCoordinates.length - 1];
+      lastRouteSignatureRef.current = `${first?.[0]},${first?.[1]}:${last?.[0]},${last?.[1]}:${curRouteCoordinates.length}`;
+    }
 
     const triggerFly = () => {
       if (!cameraReadyRef.current) return;
@@ -788,7 +815,7 @@ export function NavigationMapView({
         center: origin,
         zoom: 18,
         pitch: 55,
-        bearing,
+        bearing: lockedBearingRef.current ?? bearing,
         padding: {
           bottom: 220,
           left: 24,
@@ -800,7 +827,6 @@ export function NavigationMapView({
       });
     };
 
-    // Give the native Camera node time to mount before issuing commands.
     const t0 = setTimeout(() => {
       cameraReadyRef.current = true;
       triggerFly();
@@ -815,17 +841,60 @@ export function NavigationMapView({
     };
   }, [navigationActive, focusRequestId]);
 
-  // Smoothly track user movement and update forward bearing during active navigation
+  // Lock map heading along the user's travel axis and rotate only on genuine turns or route changes
   useEffect(() => {
     if (!navigationActive || !userCoordinate || !cameraReadyRef.current) return;
 
-    const bearing = getRouteForwardBearing(userCoordinate, routeCoordinates);
+    const currentRouteSig = routeCoordinates?.length
+      ? `${routeCoordinates[0]?.[0]},${routeCoordinates[0]?.[1]}:${routeCoordinates[routeCoordinates.length - 1]?.[0]},${routeCoordinates[routeCoordinates.length - 1]?.[1]}:${routeCoordinates.length}`
+      : null;
+    const didRouteChange =
+      Boolean(currentRouteSig) && currentRouteSig !== lastRouteSignatureRef.current;
+    if (didRouteChange) {
+      lastRouteSignatureRef.current = currentRouteSig;
+    }
 
+    const movedMeters = lastCameraCenterRef.current
+      ? calculateDistanceMeters(lastCameraCenterRef.current, userCoordinate)
+      : Number.POSITIVE_INFINITY;
+
+    // Ignore stationary GPS jitter (< 3m) unless a reroute produced a new route
+    if (movedMeters < 3 && !didRouteChange) return;
+
+    const candidateBearing = getRouteForwardBearing(userCoordinate, routeCoordinates);
+    if (lockedBearingRef.current === null || didRouteChange) {
+      lockedBearingRef.current = candidateBearing;
+      pendingTurnRef.current = null;
+    } else {
+      const angleDiff = getSmallestAngleDiffDegrees(candidateBearing, lockedBearingRef.current);
+      if (angleDiff >= 40) {
+        lockedBearingRef.current = candidateBearing;
+        pendingTurnRef.current = null;
+      } else if (angleDiff >= 25) {
+        if (
+          pendingTurnRef.current &&
+          getSmallestAngleDiffDegrees(candidateBearing, pendingTurnRef.current.bearing) < 20
+        ) {
+          pendingTurnRef.current.count += 1;
+        } else {
+          pendingTurnRef.current = { bearing: candidateBearing, count: 1 };
+        }
+        if (pendingTurnRef.current.count >= 2) {
+          lockedBearingRef.current = candidateBearing;
+          pendingTurnRef.current = null;
+        }
+      } else {
+        // Keep current heading locked when moving straight (< 25 deg deviation)
+        pendingTurnRef.current = null;
+      }
+    }
+
+    lastCameraCenterRef.current = userCoordinate;
     cameraRef.current?.setStop({
       center: userCoordinate,
       zoom: 18,
       pitch: 55,
-      bearing,
+      bearing: lockedBearingRef.current,
       padding: {
         bottom: 220,
         left: 24,
@@ -889,7 +958,7 @@ export function NavigationMapView({
                     center: (userCoordinate ?? routeStart)!,
                     zoom: 18,
                     pitch: 55,
-                    bearing: forwardBearing,
+                    bearing: initialForwardBearing,
                     padding: {
                       bottom: 220,
                       left: 24,
@@ -949,7 +1018,7 @@ export function NavigationMapView({
           <GeoJSONSource
             data={routeGeoJson}
             id={`selected-route-source-${String(vehicleMode || 'driving').toLowerCase()}`}
-            key={`selected-route-source-${String(vehicleMode || 'driving').toLowerCase()}-${routeCoordinates?.length ?? 0}`}
+            key={`selected-route-source-${String(vehicleMode || 'driving').toLowerCase()}`}
           >
             <Layer
               id={`selected-route-casing-${String(vehicleMode || 'driving').toLowerCase()}`}
@@ -978,7 +1047,6 @@ export function NavigationMapView({
 
         {sortedRouteSigns.map((sign) => {
           const freshness = getSignFreshness(sign.freshnessScore, sign.status);
-          const isSelected = selectedSignId === sign.id;
           return (
             <Marker
               anchor="bottom"
@@ -987,10 +1055,7 @@ export function NavigationMapView({
               lngLat={sign.coordinate}
               onPress={() => handleSignPress(sign)}
             >
-              <View style={[styles.signMarkerRoot, isSelected && { zIndex: 999 }]}>
-                {isSelected && destination ? (
-                  <SignCallout freshness={freshness} sign={sign} />
-                ) : null}
+              <View style={styles.signMarkerRoot}>
                 <Pressable
                   accessibilityLabel={`Xem chi tiết cho ${sign.name || sign.signCode || 'biển báo'}`}
                   accessibilityRole="button"
@@ -1014,6 +1079,22 @@ export function NavigationMapView({
             </Marker>
           );
         })}
+
+        {selectedSign && destination ? (
+          <Marker
+            anchor="bottom"
+            id={`route-sign-callout-${selectedSign.id}`}
+            key={`route-sign-callout-${selectedSign.id}`}
+            lngLat={selectedSign.coordinate}
+          >
+            <View pointerEvents="box-none" style={styles.selectedCalloutAnchorContainer}>
+              <SignCallout
+                freshness={getSignFreshness(selectedSign.freshnessScore, selectedSign.status)}
+                sign={selectedSign}
+              />
+            </View>
+          </Marker>
+        ) : null}
 
         {navigationActive ? (
           <>
@@ -1079,488 +1160,3 @@ export function NavigationMapView({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    position: 'relative',
-  },
-  offlineIndicatorBadge: {
-    position: 'absolute',
-    top: 56,
-    right: 16,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Rounded.round,
-    borderWidth: 1,
-    borderColor: '#10B98150',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 3,
-    maxWidth: 220,
-  },
-  offlineIndicatorText: {
-    fontFamily: Fonts.title,
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#065F46',
-  },
-  map: {
-    flex: 1,
-  },
-  fallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.four,
-  },
-  fallbackPanel: {
-    gap: Spacing.one,
-    borderRadius: Rounded.lg,
-    padding: Spacing.four,
-  },
-  fallbackTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: 900,
-  },
-  fallbackCopy: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 600,
-    lineHeight: 19,
-  },
-  // ── Sign marker ─────────────────────────────────────────────────────────────
-  signMarkerRoot: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stopSignMarker: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.24,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  stopSignImage: {
-    width: 36,
-    height: 36,
-  },
-  fallbackSignBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#023C69',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.24,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  markerFreshnessDot: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 1.5,
-    elevation: 3,
-  },
-  // ── Callout tooltip ──────────────────────────────────────────────────────────
-  calloutWrapper: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  calloutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one + 2,
-    minWidth: 230,
-    maxWidth: 270,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  calloutImageContainer: {
-    position: 'relative',
-    width: 32,
-    height: 32,
-    flexShrink: 0,
-  },
-  calloutImage: {
-    width: 32,
-    height: 32,
-    flexShrink: 0,
-  },
-  calloutImageFreshnessDot: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  calloutText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  calloutTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 700,
-    lineHeight: 16,
-  },
-  calloutCode: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: 600,
-    lineHeight: 14,
-    marginTop: 1,
-  },
-  calloutFreshnessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  calloutFreshnessMiniDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  calloutFreshnessScore: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: 700,
-    lineHeight: 14,
-  },
-  // Downward-pointing CSS triangle
-  calloutArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 7,
-    borderLeftColor: 'transparent',
-    borderRightWidth: 7,
-    borderRightColor: 'transparent',
-    borderTopWidth: 7,
-    // borderTopColor is set inline from theme
-  },
-  // ── Location markers ─────────────────────────────────────────────────────────
-  navLocationHalo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(26, 115, 232, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navLocationDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#1A73E8',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  currentLocationHalo: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: 'rgba(0, 123, 139, 0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  currentLocationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  destinationMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#148594',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  destinationMarkerText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  startMarker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#1767D2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startMarkerText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 900,
-  },
-  locationPinWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locationPinIcon: {
-    textShadowColor: 'rgba(0, 0, 0, 0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  locationPinShadow: {
-    width: 10,
-    height: 4,
-    borderRadius: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    marginTop: -3,
-  },
-  calloutActualCrop: {
-    width: 32,
-    height: 32,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  // ── Bottom Sheet (Browsing mode, no destination) ───────────────────────────
-  bottomSheetContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: Rounded.xlg,
-    borderTopRightRadius: Rounded.xlg,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 16,
-    zIndex: 1000,
-  },
-  sheetHandleBar: {
-    alignItems: 'center',
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  sheetHandlePill: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  sheetHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    marginBottom: Spacing.two,
-  },
-  sheetSignIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 2,
-    flexShrink: 0,
-  },
-  sheetSignIcon: {
-    width: 40,
-    height: 40,
-  },
-  sheetHeaderInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sheetSignTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 700,
-    lineHeight: 18,
-  },
-  sheetFreshnessRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 2,
-  },
-  sheetFreshnessDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  sheetFreshnessText: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 700,
-  },
-  sheetDotSeparator: {
-    fontSize: 11,
-  },
-  sheetRoadName: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 500,
-  },
-  sheetCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  sheetSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.two,
-  },
-  sheetSectionTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 700,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  carouselContainer: {
-    gap: Spacing.two,
-    paddingBottom: Spacing.one,
-  },
-  carouselCard: {
-    width: 130,
-    height: 96,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  carouselImage: {
-    width: '100%',
-    height: '100%',
-  },
-  carouselLabelBadge: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  carouselLabelText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: 600,
-  },
-  carouselEmptyBox: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: Rounded.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.three,
-    gap: Spacing.one,
-  },
-  carouselEmptyText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.88)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.three,
-  },
-  modalCloseBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalImage: {
-    width: '100%',
-    height: '75%',
-  },
-  modalDateBadge: {
-    marginTop: Spacing.two,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-    borderRadius: Rounded.md,
-  },
-  modalDateText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 600,
-  },
-});

@@ -74,27 +74,20 @@ export function calculateBearing(coord1: MapCoordinate, coord2: MapCoordinate): 
 }
 
 /**
- * Calculates the forward route bearing (azimuth in degrees [0, 360))
- * for the route segment at or ahead of the given coordinate.
+ * Returns the smallest unsigned angular difference [0, 180] between two bearings in degrees.
  */
-export function getRouteForwardBearing(
-  coordinate: MapCoordinate | undefined,
-  routeCoordinates: MapCoordinate[] | undefined,
+export function getSmallestAngleDiffDegrees(bearingA: number, bearingB: number): number {
+  const diff = (((bearingA - bearingB) % 360) + 540) % 360 - 180;
+  return Math.abs(diff);
+}
+
+/**
+ * Finds the closest segment index along a polyline relative to the given coordinate.
+ */
+function findClosestRoutePointIndex(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
 ): number {
-  if (!routeCoordinates || routeCoordinates.length < 2) return 0;
-
-  // If no coordinate provided, take initial segment
-  if (!coordinate) {
-    for (let i = 1; i < routeCoordinates.length; i++) {
-      const d = calculateDistanceMeters(routeCoordinates[0], routeCoordinates[i]);
-      if (d >= 8) {
-        return calculateBearing(routeCoordinates[0], routeCoordinates[i]);
-      }
-    }
-    return calculateBearing(routeCoordinates[0], routeCoordinates[1]);
-  }
-
-  // Find the closest point index on the route
   let closestIndex = 0;
   let minDistance = Number.POSITIVE_INFINITY;
 
@@ -105,25 +98,112 @@ export function getRouteForwardBearing(
       closestIndex = i;
     }
   }
+  return closestIndex;
+}
 
-  // Look ahead from closestIndex along the route (at least 8 meters)
+/**
+ * Calculates the forward route bearing (azimuth in degrees [0, 360))
+ * using a smooth lookahead (>= 25m) ahead of the closest route point to reduce GPS jitter.
+ */
+export function getRouteForwardBearing(
+  coordinate: MapCoordinate | undefined,
+  routeCoordinates: MapCoordinate[] | undefined,
+  lookaheadMeters = 25,
+): number {
+  if (!routeCoordinates || routeCoordinates.length < 2) return 0;
+
+  if (!coordinate) {
+    for (let i = 1; i < routeCoordinates.length; i++) {
+      const d = calculateDistanceMeters(routeCoordinates[0], routeCoordinates[i]);
+      if (d >= lookaheadMeters) {
+        return calculateBearing(routeCoordinates[0], routeCoordinates[i]);
+      }
+    }
+    return calculateBearing(routeCoordinates[0], routeCoordinates[1]);
+  }
+
+  const closestIndex = findClosestRoutePointIndex(coordinate, routeCoordinates);
+
   for (let i = closestIndex + 1; i < routeCoordinates.length; i++) {
     const d = calculateDistanceMeters(routeCoordinates[closestIndex], routeCoordinates[i]);
-    if (d >= 8) {
+    if (d >= lookaheadMeters) {
       return calculateBearing(routeCoordinates[closestIndex], routeCoordinates[i]);
     }
   }
 
   if (closestIndex < routeCoordinates.length - 1) {
-    return calculateBearing(routeCoordinates[closestIndex], routeCoordinates[closestIndex + 1]);
+    return calculateBearing(
+      routeCoordinates[closestIndex],
+      routeCoordinates[routeCoordinates.length - 1],
+    );
   }
 
-  // If near the end of the route, use the final segment's bearing
-  if (closestIndex > 0) {
-    return calculateBearing(routeCoordinates[closestIndex - 1], routeCoordinates[closestIndex]);
+  // Near the end of the route: anchor from ~25m behind the last point if possible
+  for (let i = routeCoordinates.length - 2; i >= 0; i--) {
+    const d = calculateDistanceMeters(routeCoordinates[i], routeCoordinates[closestIndex]);
+    if (d >= lookaheadMeters || i === 0) {
+      return calculateBearing(routeCoordinates[i], routeCoordinates[closestIndex]);
+    }
   }
 
   return 0;
+}
+
+interface RouteProjectionResult {
+  bestSegmentIndex: number;
+  minDistMeters: number;
+  snappedCoordinate: MapCoordinate;
+  t: number;
+}
+
+/**
+ * Projects a coordinate onto the nearest polyline segment, returning the segment index (1-based),
+ * clamped segment ratio `t`, closest snapped coordinate on the route, and perpendicular distance in meters.
+ */
+function projectCoordinateOntoRoute(
+  coordinate: MapCoordinate,
+  routeCoordinates: MapCoordinate[],
+): RouteProjectionResult {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const [pLon, pLat] = coordinate;
+  const cosLat = Math.cos(toRad(pLat));
+  const scale = EARTH_RADIUS_METERS * toRad(1);
+
+  let minDistMeters = Number.POSITIVE_INFINITY;
+  let bestSegmentIndex = 1;
+  let bestT = 0;
+  let bestSnapped: MapCoordinate = routeCoordinates[0];
+
+  for (let i = 1; i < routeCoordinates.length; i++) {
+    const [aLon, aLat] = routeCoordinates[i - 1];
+    const [bLon, bLat] = routeCoordinates[i];
+
+    const ax = (aLon - pLon) * cosLat * scale;
+    const ay = (aLat - pLat) * scale;
+    const bx = (bLon - pLon) * cosLat * scale;
+    const by = (bLat - pLat) * scale;
+
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+
+    const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
+    const dist = lenSq === 0 ? Math.hypot(ax, ay) : Math.hypot(ax + t * dx, ay + t * dy);
+
+    if (dist < minDistMeters) {
+      minDistMeters = dist;
+      bestSegmentIndex = i;
+      bestT = t;
+      bestSnapped = [aLon + (bLon - aLon) * t, aLat + (bLat - aLat) * t];
+    }
+  }
+
+  return {
+    bestSegmentIndex,
+    minDistMeters,
+    snappedCoordinate: bestSnapped,
+    t: bestT,
+  };
 }
 
 /**
@@ -139,37 +219,34 @@ export function getDistanceToRouteMeters(
     return calculateDistanceMeters(coordinate, routeCoordinates[0]);
   }
 
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const [pLon, pLat] = coordinate;
-  const cosLat = Math.cos(toRad(pLat));
+  return projectCoordinateOntoRoute(coordinate, routeCoordinates).minDistMeters;
+}
 
-  let minDistMeters = Number.POSITIVE_INFINITY;
-
-  for (let i = 1; i < routeCoordinates.length; i++) {
-    const [aLon, aLat] = routeCoordinates[i - 1];
-    const [bLon, bLat] = routeCoordinates[i];
-
-    // Project to a flat metre-space centred on segment midpoint
-    const scale = EARTH_RADIUS_METERS * toRad(1);
-    const ax = (aLon - pLon) * cosLat * scale;
-    const ay = (aLat - pLat) * scale;
-    const bx = (bLon - pLon) * cosLat * scale;
-    const by = (bLat - pLat) * scale;
-
-    const dx = bx - ax;
-    const dy = by - ay;
-    const lenSq = dx * dx + dy * dy;
-
-    let dist: number;
-    if (lenSq === 0) {
-      dist = Math.hypot(ax, ay);
-    } else {
-      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / lenSq));
-      dist = Math.hypot(ax + t * dx, ay + t * dy);
-    }
-
-    if (dist < minDistMeters) minDistMeters = dist;
+/**
+ * Trims already-traversed portions of the route behind `userCoordinate` during active navigation,
+ * starting the visible polyline cleanly at the snapped position on the active segment.
+ */
+export function getRemainingRouteCoordinates(
+  routeCoordinates: MapCoordinate[] | undefined,
+  userCoordinate: MapCoordinate | undefined,
+): MapCoordinate[] {
+  if (!routeCoordinates || routeCoordinates.length < 2 || !userCoordinate) {
+    return routeCoordinates ?? [];
   }
 
-  return minDistMeters;
+  const { bestSegmentIndex, snappedCoordinate, t } = projectCoordinateOntoRoute(
+    userCoordinate,
+    routeCoordinates,
+  );
+
+  // Completed the entire route: hide the remaining colored line
+  if (bestSegmentIndex === routeCoordinates.length - 1 && t >= 0.999) {
+    return [];
+  }
+
+  if (bestSegmentIndex === 1 && t <= 0.001) {
+    return routeCoordinates;
+  }
+
+  return [snappedCoordinate, ...routeCoordinates.slice(bestSegmentIndex)];
 }

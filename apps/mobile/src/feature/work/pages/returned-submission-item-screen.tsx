@@ -23,15 +23,18 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AppButton } from '@/components/button';
 import { AppInput } from '@/components/input';
 import { VirtualList } from '@/components/virtual-list';
+import { getCatalog, type CatalogSign } from '@/api/reviews/catalog';
 import { loadCatalogFromStorage } from '@/api/reviews/catalog-storage';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { useOptionalSession } from '@/context/session-provider';
 import {
   useGetSurveySubmissionStatus,
   useResubmitFalseNegativeMutation,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { SIGN_CATEGORIES, getSignCategory, type SignCategory } from '@/constants/sign-categories';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { styles } from '@/feature/work/styles/returned-submission-item-screen.styles';
 
 export interface BoundingBox {
   id: string;
@@ -58,9 +61,6 @@ export interface ReturnedSubmissionItemScreenProps {
   signs?: CatalogSignItem[];
 }
 
-const DEFAULT_SAMPLE_IMAGE =
-  'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=1200&q=80';
-
 export const MAX_BOXES = 7;
 
 export const FILTER_TABS = [
@@ -72,90 +72,15 @@ export const FILTER_TABS = [
   { id: 'T', label: 'Biển phụ', color: '#F97316' },
 ] as const;
 
-export const STANDARD_SIGN_CATALOG: CatalogSignItem[] = [
-  // W - Featured in catalog top preview
-  { code: 'W.244', name: 'Đoạn đường hay xảy ra tai nạn', description: 'Báo trước đoạn đường thường hay xảy ra tai nạn giao thông', categoryName: 'Biển cảnh báo' },
-  { code: 'I.445g', name: 'Đoạn đường hay xảy ra tai nạn', description: 'Báo trước đoạn đường thường hay xảy ra tai nạn giao thông', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414a', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414b', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414c', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.414d', name: 'Chỉ hướng đường', description: 'Chỉ dẫn hướng đường đến các địa danh, đô thị lân cận', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.418', name: 'Lối đi ở những vị trí cấm rẽ', description: 'Chỉ dẫn lối đi ở những đoạn đường cấm rẽ', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.415', name: 'Mũi tên chỉ hướng đi', description: 'Chỉ dẫn hướng đi tại nơi đường giao nhau', categoryName: 'Biển chỉ dẫn' },
-
-  // P - Biển báo cấm (Prohibitory)
-  { code: 'P.101', name: 'Đường cấm', description: 'Cấm tất cả các loại phương tiện đi lại cả hai hướng', categoryName: 'Biển báo cấm' },
-  { code: 'P.102', name: 'Cấm đi ngược chiều', description: 'Cấm tất cả các loại xe đi vào theo chiều đặt biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.103a', name: 'Cấm xe ô tô', description: 'Cấm tất cả các loại xe cơ giới kể cả mô tô 3 bánh có thùng', categoryName: 'Biển báo cấm' },
-  { code: 'P.103b', name: 'Cấm xe ô tô rẽ phải', description: 'Cấm các loại xe cơ giới từ 3 bánh trở lên rẽ sang phải', categoryName: 'Biển báo cấm' },
-  { code: 'P.103c', name: 'Cấm xe ô tô rẽ trái', description: 'Cấm các loại xe cơ giới từ 3 bánh trở lên rẽ sang trái', categoryName: 'Biển báo cấm' },
-  { code: 'P.104', name: 'Cấm xe máy', description: 'Cấm các loại xe mô tô hai bánh và ba bánh', categoryName: 'Biển báo cấm' },
-  { code: 'P.106a', name: 'Cấm xe tải', description: 'Cấm tất cả các loại ô tô tải có khối lượng chuyên chở', categoryName: 'Biển báo cấm' },
-  { code: 'P.112', name: 'Cấm người đi bộ', description: 'Cấm người đi bộ qua lại khu vực đặt biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.115', name: 'Hạn chế tải trọng xe', description: 'Cấm các loại xe có tải trọng toàn bộ vượt quá trị số', categoryName: 'Biển báo cấm' },
-  { code: 'P.117', name: 'Hạn chế chiều cao', description: 'Cấm xe có chiều cao vượt quá giá trị ghi trên biển', categoryName: 'Biển báo cấm' },
-  { code: 'P.123a', name: 'Cấm rẽ trái', description: 'Cấm các loại xe cơ giới và thô sơ rẽ trái', categoryName: 'Biển báo cấm' },
-  { code: 'P.123b', name: 'Cấm rẽ phải', description: 'Cấm các loại xe cơ giới và thô sơ rẽ phải', categoryName: 'Biển báo cấm' },
-  { code: 'P.124a', name: 'Cấm quay đầu xe', description: 'Cấm các loại xe quay đầu theo kiểu chữ U', categoryName: 'Biển báo cấm' },
-  { code: 'P.124b', name: 'Cấm ô tô quay đầu xe', description: 'Cấm các loại ô tô quay đầu theo kiểu chữ U', categoryName: 'Biển báo cấm' },
-  { code: 'P.127', name: 'Tốc độ tối đa cho phép', description: 'Hạn chế tốc độ tối đa cho phép các xe cơ giới chạy', categoryName: 'Biển báo cấm' },
-  { code: 'P.130', name: 'Cấm dừng và đỗ xe', description: 'Cấm tất cả các loại xe cơ giới dừng và đỗ xe', categoryName: 'Biển báo cấm' },
-  { code: 'P.131a', name: 'Cấm đỗ xe', description: 'Cấm tất cả các loại xe cơ giới đỗ xe', categoryName: 'Biển báo cấm' },
-
-  // W - Biển cảnh báo (Warning)
-  { code: 'W.201a', name: 'Chỗ ngoặt nguy hiểm vòng bên trái', description: 'Báo trước sắp đến một chỗ ngoặt nguy hiểm vòng về phía bên trái', categoryName: 'Biển cảnh báo' },
-  { code: 'W.201b', name: 'Chỗ ngoặt nguy hiểm vòng bên phải', description: 'Báo trước sắp đến một chỗ ngoặt nguy hiểm vòng về phía bên phải', categoryName: 'Biển cảnh báo' },
-  { code: 'W.202a', name: 'Nhiều chỗ ngoặt nguy hiểm liên tiếp', description: 'Báo trước sắp đến các chỗ ngoặt nguy hiểm liên tiếp', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203a', name: 'Đường bị hẹp cả hai bên', description: 'Báo trước đoạn đường phía trước bị hẹp cả hai phía', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203b', name: 'Đường bị hẹp về phía trái', description: 'Báo trước đoạn đường phía trước bị thu hẹp về bên trái', categoryName: 'Biển cảnh báo' },
-  { code: 'W.203c', name: 'Đường bị hẹp về phía phải', description: 'Báo trước đoạn đường phía trước bị thu hẹp về bên phải', categoryName: 'Biển cảnh báo' },
-  { code: 'W.205a', name: 'Đường giao nhau cùng mức', description: 'Báo trước nơi giao nhau cùng mức của các tuyến đường cùng cấp', categoryName: 'Biển cảnh báo' },
-  { code: 'W.207a', name: 'Giao nhau với đường không ưu tiên', description: 'Báo trước sắp đến nơi giao nhau với đường không ưu tiên', categoryName: 'Biển cảnh báo' },
-  { code: 'W.208', name: 'Giao nhau với đường ưu tiên', description: 'Báo trước sắp đến nơi giao nhau với tuyến đường ưu tiên', categoryName: 'Biển cảnh báo' },
-  { code: 'W.209', name: 'Giao nhau có tín hiệu đèn', description: 'Báo trước nơi giao nhau có đèn tín hiệu điều khiển giao thông', categoryName: 'Biển cảnh báo' },
-  { code: 'W.210', name: 'Giao nhau với đường sắt có rào chắn', description: 'Báo trước nơi giao nhau giữa đường bộ và đường sắt có rào chắn', categoryName: 'Biển cảnh báo' },
-  { code: 'W.211a', name: 'Giao nhau với đường sắt không rào chắn', description: 'Báo trước nơi giao nhau với đường sắt không có rào chắn', categoryName: 'Biển cảnh báo' },
-  { code: 'W.224', name: 'Đường người đi bộ cắt ngang', description: 'Báo trước sắp đến vị trí có người đi bộ qua đường', categoryName: 'Biển cảnh báo' },
-  { code: 'W.225', name: 'Trẻ em qua đường', description: 'Báo trước đoạn đường thường có trẻ em đi lại hoặc gần trường học', categoryName: 'Biển cảnh báo' },
-  { code: 'W.227', name: 'Công trường', description: 'Báo trước sắp đến đoạn đường đang tiến hành thi công, sửa chữa', categoryName: 'Biển cảnh báo' },
-  { code: 'W.233', name: 'Nguy hiểm khác', description: 'Báo trước các tình huống nguy hiểm bất ngờ trên đường', categoryName: 'Biển cảnh báo' },
-  { code: 'W.245a', name: 'Đi chậm', description: 'Nhắc nhở người điều khiển phương tiện giảm tốc độ', categoryName: 'Biển cảnh báo' },
-
-  // R - Biển hiệu lệnh (Mandatory)
-  { code: 'R.301a', name: 'Hướng đi phải theo - Đi thẳng', description: 'Bắt buộc các loại xe chỉ được đi thẳng ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301b', name: 'Hướng đi phải theo - Rẽ phải', description: 'Bắt buộc các loại xe chỉ được rẽ phải ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301c', name: 'Hướng đi phải theo - Rẽ trái', description: 'Bắt buộc các loại xe chỉ được rẽ trái ở nơi đặt biển', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301d', name: 'Hướng đi phải theo - Rẽ phải hoặc đi thẳng', description: 'Các xe chỉ được rẽ phải hoặc đi thẳng', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.301e', name: 'Hướng đi phải theo - Rẽ trái hoặc đi thẳng', description: 'Các xe chỉ được rẽ trái hoặc đi thẳng', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.302a', name: 'Vòng chướng ngại vật sang phải', description: 'Báo cho các loại xe phải đi vòng sang phía bên phải', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.302b', name: 'Vòng chướng ngại vật sang trái', description: 'Báo cho các loại xe phải đi vòng sang phía bên trái', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.303', name: 'Nơi giao nhau chạy theo vòng xuyến', description: 'Báo trước nơi giao nhau phải chạy theo vòng xuyến', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.304', name: 'Đường dành cho người đi bộ', description: 'Đoạn đường dành riêng cho người đi bộ', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.305', name: 'Đường dành cho xe thô sơ', description: 'Đoạn đường dành riêng cho các loại xe thô sơ', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.306', name: 'Tốc độ tối thiểu cho phép', description: 'Quy định tốc độ tối thiểu cho phép các xe cơ giới chạy', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.403a', name: 'Đường dành cho xe ô tô', description: 'Chỉ dẫn đoạn đường dành riêng cho xe ô tô', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.407a', name: 'Đường một chiều', description: 'Chỉ dẫn đoạn đường chỉ được đi theo một chiều quy định', categoryName: 'Biển hiệu lệnh' },
-  { code: 'R.411', name: 'Hướng đi trên mỗi làn đường phải theo', description: 'Chỉ dẫn hướng đi bắt buộc trên từng làn xe', categoryName: 'Biển hiệu lệnh' },
-
-  // I - Biển chỉ dẫn (Information)
-  { code: 'I.401', name: 'Bắt đầu đường ưu tiên', description: 'Biểu thị bắt đầu đoạn đường được quyền ưu tiên', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.402', name: 'Hết đoạn đường ưu tiên', description: 'Biểu thị hết đoạn đường được quyền ưu tiên', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.405a', name: 'Đường cụt', description: 'Chỉ dẫn lối đi phía trước là đường cụt không có lối ra', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.407a', name: 'Đường một chiều', description: 'Chỉ dẫn những đoạn đường chỉ cho phép chạy một chiều', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.408', name: 'Nơi đỗ xe', description: 'Chỉ dẫn khu vực dành riêng cho việc đỗ xe', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.409', name: 'Chỗ quay xe', description: 'Chỉ dẫn vị trí được phép quay đầu xe ô tô', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.423a', name: 'Vị trí người đi bộ sang ngang', description: 'Chỉ dẫn vị trí người đi bộ qua đường', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.424a', name: 'Cầu vượt cho người đi bộ', description: 'Chỉ dẫn vị trí cầu vượt qua đường cho người đi bộ', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.434a', name: 'Bến xe buýt', description: 'Chỉ dẫn vị trí điểm dừng đỗ đón trả khách của xe buýt', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.443', name: 'Trạm xăng dầu', description: 'Chỉ dẫn vị trí trạm cung ứng nhiên liệu xăng dầu', categoryName: 'Biển chỉ dẫn' },
-  { code: 'I.444', name: 'Trạm sửa chữa xe', description: 'Chỉ dẫn nơi có cơ sở sửa chữa bảo dưỡng xe', categoryName: 'Biển chỉ dẫn' },
-
-  // T - Biển tạm thời (Temporary)
-  { code: 'T.501', name: 'Công trường đang thi công', description: 'Biển tạm thời cảnh báo đoạn đường đang sửa chữa', categoryName: 'Biển tạm thời' },
-  { code: 'T.502', name: 'Giảm tốc độ công trường', description: 'Biển tạm thời yêu cầu phương tiện giảm tốc độ', categoryName: 'Biển tạm thời' },
-  { code: 'T.503', name: 'Hướng rẽ tránh chướng ngại vật', description: 'Biển tạm thời chỉ dẫn hướng rẽ tránh chướng ngại vật', categoryName: 'Biển tạm thời' },
-  { code: 'T.504', name: 'Làn đường thu hẹp tạm thời', description: 'Biển tạm thời báo làn đường bị thu hẹp', categoryName: 'Biển tạm thời' },
-];
+function mapCatalogSignsToItems(signs: CatalogSign[]): CatalogSignItem[] {
+  return signs.map((s) => ({
+    code: s.signCode,
+    name: s.nameVi || s.nameEn,
+    description: s.description || s.signCode,
+    categoryName: (s.category as any)?.nameVi || s.category?.nameEn || '',
+    imageUrl: s.representativeImageKey ?? undefined,
+  }));
+}
 
 /**
  * Normalizes Vietnamese string for diacritic-insensitive, punctuation-insensitive search
@@ -201,7 +126,11 @@ export function getSignColorFromCode(signCode?: string, defaultColor = '#00838F'
 /**
  * Returns badge pill styling (background, text, and border) matching the sign category
  */
-export function getSignBadgeColors(signCode?: string): { bg: string; text: string; border: string } {
+export function getSignBadgeColors(signCode?: string): {
+  bg: string;
+  text: string;
+  border: string;
+} {
   if (!signCode) return { bg: '#F3F4F6', text: '#4B5563', border: '#E5E7EB' };
   const firstChar = signCode.trim().charAt(0).toUpperCase();
   switch (firstChar) {
@@ -463,7 +392,9 @@ function SignCatalogGridCard({
   const [imageError, setImageError] = useState(false);
   const badgeColors = getSignBadgeColors(item.code);
   const itemColor = getSignColorFromCode(item.code);
-  const hasValidUrl = Boolean(item.imageUrl && !item.imageUrl.includes('signtrustmap.vn') && !imageError);
+  const hasValidUrl = Boolean(
+    item.imageUrl && !item.imageUrl.includes('signtrustmap.vn') && !imageError,
+  );
 
   return (
     <Pressable
@@ -505,9 +436,7 @@ function SignCatalogGridCard({
           { backgroundColor: badgeColors.bg, borderColor: badgeColors.border },
         ]}
       >
-        <Text style={[styles.codeBadgeText, { color: badgeColors.text }]}>
-          {item.code}
-        </Text>
+        <Text style={[styles.codeBadgeText, { color: badgeColors.text }]}>{item.code}</Text>
       </View>
 
       {/* 3. Name Label */}
@@ -526,9 +455,10 @@ export function ReturnedSubmissionItemScreen({
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const session = useOptionalSession()?.session;
   const params = useLocalSearchParams<{ id?: string; imageUrl?: string }>();
 
-  const id = propId || params.id || 'mock-returned-sub-001';
+  const id = propId || params.id || '';
 
   const { data: statusData, isLoading: isStatusLoading } = useGetSurveySubmissionStatus(id);
   const resubmitMutation = useResubmitFalseNegativeMutation();
@@ -563,7 +493,7 @@ export function ReturnedSubmissionItemScreen({
       if (rawUrl && typeof rawUrl === 'string') return resolveS3Url(rawUrl);
     }
 
-    return DEFAULT_SAMPLE_IMAGE;
+    return '';
   }, [initialImageUrl, params.imageUrl, statusData]);
 
   const [isZoomed, setIsZoomed] = useState(false);
@@ -573,34 +503,50 @@ export function ReturnedSubmissionItemScreen({
   // Catalog Bottom Sheet states
   const [activePickerBoxId, setActivePickerBoxId] = useState<string | null>(null);
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'ALL' | 'P' | 'W' | 'R' | 'I' | 'T'>('ALL');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<
+    'ALL' | 'P' | 'W' | 'R' | 'I' | 'T'
+  >('ALL');
   const [storedCatalogSigns, setStoredCatalogSigns] = useState<CatalogSignItem[]>([]);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
 
   useEffect(() => {
+    if (propSigns && propSigns.length > 0) return;
+
     let isMounted = true;
-    loadCatalogFromStorage()
-      .then((cached) => {
-        if (isMounted && cached?.data?.signs && cached.data.signs.length > 0) {
-          const mapped = cached.data.signs.map((s) => ({
-            code: s.signCode,
-            name: s.nameVi || s.nameEn,
-            description: s.description || s.signCode,
-            categoryName: (s.category as any)?.nameVi || s.category?.nameEn || '',
-            imageUrl: s.representativeImageKey ?? undefined,
-          }));
-          setStoredCatalogSigns(mapped);
+    const abortController = new AbortController();
+
+    void (async () => {
+      try {
+        const cached = await loadCatalogFromStorage();
+        if (cached?.data?.signs && cached.data.signs.length > 0) {
+          if (isMounted) {
+            setStoredCatalogSigns(mapCatalogSignsToItems(cached.data.signs));
+          }
+          return;
         }
-      })
-      .catch(() => {});
+
+        if (!session?.accessToken) return;
+        if (isMounted) setIsCatalogLoading(true);
+        const remote = await getCatalog(session.accessToken, { signal: abortController.signal });
+        if (isMounted && remote?.signs && remote.signs.length > 0) {
+          setStoredCatalogSigns(mapCatalogSignsToItems(remote.signs));
+        }
+      } catch {
+        // Gracefully keep empty list if both local cache and API fail
+      } finally {
+        if (isMounted) setIsCatalogLoading(false);
+      }
+    })();
+
     return () => {
       isMounted = false;
+      abortController.abort();
     };
-  }, []);
+  }, [propSigns, session?.accessToken]);
 
   const availableSigns = useMemo(() => {
     if (propSigns && propSigns.length > 0) return propSigns;
-    if (storedCatalogSigns.length > 0) return storedCatalogSigns;
-    return STANDARD_SIGN_CATALOG;
+    return storedCatalogSigns;
   }, [propSigns, storedCatalogSigns]);
 
   const filteredSigns = useMemo(() => {
@@ -789,8 +735,6 @@ export function ReturnedSubmissionItemScreen({
 
   const activeBox =
     boxes.find((b) => b.id === activeBoxId) || (boxes.length > 0 ? boxes[boxes.length - 1] : null);
-  const activeBoxIndex = activeBox ? boxes.findIndex((b) => b.id === activeBox.id) : -1;
-  const activeBoxColor = activeBox ? getBoxColor(activeBox, theme.primary) : theme.primary;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
@@ -1006,17 +950,25 @@ export function ReturnedSubmissionItemScreen({
                       >
                         {box.signCode ? (
                           <View style={styles.selectedSignDisplay}>
-                            <View style={[styles.inlineCodeBadge, { backgroundColor: `${boxColor}22` }]}>
+                            <View
+                              style={[styles.inlineCodeBadge, { backgroundColor: `${boxColor}22` }]}
+                            >
                               <Text style={[styles.inlineCodeText, { color: boxColor }]}>
                                 {box.signCode}
                               </Text>
                             </View>
-                            <Text numberOfLines={1} style={[styles.inlineSignName, { color: theme.text }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.inlineSignName, { color: theme.text }]}
+                            >
                               {box.signName || box.signCode}
                             </Text>
                           </View>
                         ) : (
-                          <Text numberOfLines={1} style={[styles.catalogPlaceholder, { color: theme.placeholder }]}>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.catalogPlaceholder, { color: theme.placeholder }]}
+                          >
                             Chọn biển báo từ danh mục...
                           </Text>
                         )}
@@ -1209,7 +1161,9 @@ export function ReturnedSubmissionItemScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 containerStyle={styles.sheetSearchInputContainer}
-                leadingIcon={<MaterialCommunityIcons color={theme.placeholder} name="magnify" size={20} />}
+                leadingIcon={
+                  <MaterialCommunityIcons color={theme.placeholder} name="magnify" size={20} />
+                }
                 onChangeText={setCatalogSearchQuery}
                 placeholder="Tìm theo mã (P.102...), tên biển..."
                 returnKeyType="search"
@@ -1222,7 +1176,11 @@ export function ReturnedSubmissionItemScreen({
                       onPress={() => setCatalogSearchQuery('')}
                       testID="clear-catalog-search-btn"
                     >
-                      <MaterialCommunityIcons color={theme.placeholder} name="close-circle" size={18} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="close-circle"
+                        size={18}
+                      />
                     </Pressable>
                   ) : undefined
                 }
@@ -1247,8 +1205,17 @@ export function ReturnedSubmissionItemScreen({
                       style={[
                         styles.filterChip,
                         isSelected
-                          ? [styles.filterChipActive, { backgroundColor: theme.primary, borderColor: theme.primary }]
-                          : [styles.filterChipInactive, { backgroundColor: theme.backgroundElement, borderColor: theme.border }],
+                          ? [
+                              styles.filterChipActive,
+                              { backgroundColor: theme.primary, borderColor: theme.primary },
+                            ]
+                          : [
+                              styles.filterChipInactive,
+                              {
+                                backgroundColor: theme.backgroundElement,
+                                borderColor: theme.border,
+                              },
+                            ],
                       ]}
                       testID={`catalog-filter-${tab.id.toLowerCase()}`}
                     >
@@ -1272,25 +1239,34 @@ export function ReturnedSubmissionItemScreen({
 
             {/* VirtualList with 2-Column Grid */}
             <View style={styles.gridContainer}>
-              <VirtualList<CatalogSignItem>
-                contentContainerStyle={styles.signsGridContent}
-                data={filteredSigns}
-                emptyDescription='Thử tìm với từ khóa khác (ví dụ: "cấm", "nguy hiểm", "P.101")'
-                emptyTitle="Không tìm thấy biển báo"
-                estimatedItemSize={185}
-                keyExtractor={(item) => item.code}
-                keyboardShouldPersistTaps="handled"
-                numColumns={2}
-                renderItem={({ item }) => (
-                  <SignCatalogGridCard
-                    isSelected={activePickerBox?.signCode === item.code}
-                    item={item}
-                    onSelect={handleSelectCatalogSign}
-                    theme={theme}
-                  />
-                )}
-                testID="catalog-signs-list"
-              />
+              {isCatalogLoading && availableSigns.length === 0 ? (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator color={theme.primary} size="large" />
+                  <Text style={[styles.loadingText, { color: theme.placeholder }]}>
+                    Đang tải danh mục biển báo...
+                  </Text>
+                </View>
+              ) : (
+                <VirtualList<CatalogSignItem>
+                  contentContainerStyle={styles.signsGridContent}
+                  data={filteredSigns}
+                  emptyDescription='Thử tìm với từ khóa khác (ví dụ: "cấm", "nguy hiểm", "P.101")'
+                  emptyTitle="Không tìm thấy biển báo"
+                  estimatedItemSize={185}
+                  keyExtractor={(item) => item.code}
+                  keyboardShouldPersistTaps="handled"
+                  numColumns={2}
+                  renderItem={({ item }) => (
+                    <SignCatalogGridCard
+                      isSelected={activePickerBox?.signCode === item.code}
+                      item={item}
+                      onSelect={handleSelectCatalogSign}
+                      theme={theme}
+                    />
+                  )}
+                  testID="catalog-signs-list"
+                />
+              )}
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -1328,692 +1304,3 @@ export function ReturnedSubmissionItemScreen({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    gap: Spacing.two,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    minHeight: 40,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: Rounded.round,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    flex: 1,
-    gap: 2,
-  },
-  screenTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  screenSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statusPill: {
-    backgroundColor: 'rgba(217, 119, 6, 0.12)',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-    borderRadius: Rounded.round,
-  },
-  statusPillText: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.six,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
-    gap: Spacing.three,
-  },
-  instructionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    borderLeftWidth: 4,
-    gap: Spacing.two,
-  },
-  instructionText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: Fonts.body,
-    lineHeight: 18,
-  },
-  imageContainerCard: {
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  imageWrapper: {
-    width: '100%',
-    height: 360,
-    position: 'relative',
-    backgroundColor: '#000000',
-    overflow: 'hidden',
-  },
-  centerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  zoomButton: {
-    position: 'absolute',
-    bottom: Spacing.three,
-    right: Spacing.three,
-    width: 40,
-    height: 40,
-    minHeight: 40,
-    borderRadius: Rounded.round,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 10,
-  },
-  // Bounding Box styles
-  boxContainer: {
-    position: 'absolute',
-  },
-  boxBody: {
-    width: '100%',
-    height: '100%',
-    borderRadius: Rounded.sm,
-    position: 'relative',
-  },
-  cornerTL: {
-    position: 'absolute',
-    top: 2,
-    left: 2,
-    width: 8,
-    height: 8,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
-  },
-  cornerTR: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-  },
-  cornerBL: {
-    position: 'absolute',
-    bottom: 2,
-    left: 2,
-    width: 8,
-    height: 8,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-  },
-  boxLabelBadge: {
-    position: 'absolute',
-    top: -24,
-    left: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Rounded.sm,
-  },
-  boxLabelText: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  resizeHandleContainer: {
-    position: 'absolute',
-    bottom: -16,
-    right: -16,
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
-  },
-  resizeHandleCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-  },
-  // Classification Card & Rows
-  classificationCard: {
-    borderRadius: Rounded.lg,
-    borderWidth: 1,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  classificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    marginBottom: 2,
-  },
-  classificationIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: Rounded.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  classificationTitleCol: {
-    flex: 1,
-  },
-  classificationTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  classificationSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  classificationRowsContainer: {
-    gap: Spacing.two,
-  },
-  classificationRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    width: '100%',
-  },
-  boxIdBadge: {
-    paddingHorizontal: Spacing.two,
-    height: 40,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 58,
-  },
-  boxIdText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  catalogPickerTrigger: {
-    flex: 1,
-    minWidth: 0,
-    height: 40,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.two,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
-  selectedSignDisplay: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    overflow: 'hidden',
-  },
-  inlineCodeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  inlineCodeText: {
-    fontFamily: Fonts.mono,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  inlineSignName: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  catalogPlaceholder: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-  colorSquareIndicator: {
-    width: 36,
-    height: 36,
-    borderRadius: Rounded.md,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-  },
-  // Catalog Bottom Sheet styles
-  sheetOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-  },
-  sheetBackdropPressable: {
-    flex: 1,
-  },
-  sheetContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    height: '88%',
-    maxHeight: '92%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  sheetHandleBarWrapper: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  sheetHandleBar: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.35,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.two,
-  },
-  sheetHeaderTitles: {
-    flex: 1,
-    gap: 3,
-  },
-  sheetTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  sheetSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sheetCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  sheetSearchContainer: {
-    paddingHorizontal: Spacing.four,
-    marginBottom: 4,
-  },
-  sheetSearchInputContainer: {
-    marginBottom: 0,
-  },
-  filterTabsWrapper: {
-    paddingVertical: 8,
-  },
-  filterChipsRow: {
-    paddingHorizontal: Spacing.four,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  filterChipActive: {
-    elevation: 1,
-  },
-  filterChipInactive: {},
-  filterChipText: {
-    fontSize: 13,
-  },
-  gridContainer: {
-    flex: 1,
-  },
-  signsGridContent: {
-    paddingHorizontal: 10,
-    paddingBottom: Spacing.six,
-  },
-  cardItem: {
-    flex: 1,
-    margin: 6,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    paddingTop: 16,
-    paddingBottom: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 180,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  cardImageContainer: {
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  cardSignImage: {
-    width: 68,
-    height: 68,
-  },
-  codeBadgePill: {
-    borderRadius: 9999,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    borderWidth: 1,
-  },
-  codeBadgeText: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '700',
-  },
-  cardSignName: {
-    fontSize: 12,
-    fontFamily: Fonts.body,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  fallbackCircleRed: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    borderWidth: 5,
-    borderColor: '#EF4444',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackRedBar: {
-    width: 32,
-    height: 8,
-    borderRadius: 2,
-    backgroundColor: '#EF4444',
-  },
-  fallbackDiamondYellow: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    borderWidth: 3.5,
-    borderColor: '#D97706',
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackCircleBlue: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#2563EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackRectBlue: {
-    width: 62,
-    height: 46,
-    borderRadius: 8,
-    backgroundColor: '#1D4ED8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fallbackRectOrange: {
-    width: 62,
-    height: 46,
-    borderRadius: 8,
-    backgroundColor: '#EA580C',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.six,
-    gap: Spacing.one,
-  },
-  emptyTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  emptySubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  // Box Size Controls Card
-  boxControlsCard: {
-    padding: Spacing.three,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    gap: Spacing.two,
-  },
-  boxControlsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  boxBadgeGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  dotIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  boxControlsTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  boxSizeText: {
-    fontFamily: Fonts.mono,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  quickSizeRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  quickSizeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: Rounded.md,
-  },
-  quickSizeBtnText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // Button Row
-  buttonRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    width: '100%',
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: Spacing.two,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.12)',
-  },
-  undoBtn: {},
-  undoBtnText: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  addBoxBtn: {},
-  addBoxBtnText: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  btnDisabled: {
-    opacity: 0.45,
-  },
-  confirmBtnFullWidth: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: Spacing.three,
-    borderRadius: Rounded.md,
-    marginTop: 2,
-  },
-  confirmBtnText: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    marginTop: 2,
-  },
-  warningText: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-  },
-  modalSafeArea: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseBtn: {
-    position: 'absolute',
-    right: 16,
-    zIndex: 50,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalImage: {
-    width: '100%',
-    height: '80%',
-  },
-  modalFooterHint: {
-    position: 'absolute',
-    bottom: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Rounded.round,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  modalFooterText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  loadingOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    zIndex: 5,
-  },
-  loadingText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-});

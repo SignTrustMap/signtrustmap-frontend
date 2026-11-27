@@ -18,13 +18,15 @@ import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
 } from '@/feature/revalidation/hooks/use-revalidation';
-import type {
-  RevalDecision,
-  RevalidationQueueEvidenceItem,
-} from '@/types/revalidationType';
+import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
 import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
-export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
+export type RevalidationReviewAction =
+  | 'STILL_ACTIVE'
+  | 'REMOVED'
+  | 'CHANGED'
+  | 'UNCLEAR'
+  | 'INVALID';
 
 export type CompletedRevalidationReview = {
   action: RevalidationReviewAction;
@@ -98,7 +100,9 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const [totalCount, setTotalCount] = useState(0);
   const [isCheckingEvidence, setIsCheckingEvidence] = useState(false);
   const [recheckingIndex, setRecheckingIndex] = useState<number | undefined>(undefined);
-  const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<CompletedRevalidationReview | undefined>(undefined);
+  const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<
+    CompletedRevalidationReview | undefined
+  >(undefined);
   const [isSubmittingVote, setIsSubmittingVote] = useState(false);
   const inFlightVotesRef = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef(false);
@@ -124,10 +128,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     reviewHistory.length + (currentItem ? 1 : 0),
     Math.max(totalCount, 1),
   );
-  const progressPercent = Math.min(
-    100,
-    (reviewPosition / Math.max(totalCount, 1)) * 100,
-  );
+  const progressPercent = Math.min(100, (reviewPosition / Math.max(totalCount, 1)) * 100);
 
   const counts = useMemo(() => {
     return reviewHistory.reduce<Record<RevalidationReviewAction, number>>(
@@ -148,7 +149,10 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 
       // Concurrency guard: avoid duplicate vote calls for the same evidence
       if (inFlightVotesRef.current.has(currentItem.evidenceId)) {
-        console.warn('[RevalidationWorkflow] Blocked duplicate vote in flight for:', currentItem.evidenceId);
+        console.warn(
+          '[RevalidationWorkflow] Blocked duplicate vote in flight for:',
+          currentItem.evidenceId,
+        );
         return false;
       }
       inFlightVotesRef.current.add(currentItem.evidenceId);
@@ -211,8 +215,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
         } else {
           const nextItem = queueItems[1];
           setRecheckingPreviousReview(
-            (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-              ?.previousReview,
+            (
+              nextItem as RevalidationQueueEvidenceItem & {
+                previousReview?: CompletedRevalidationReview;
+              }
+            )?.previousReview,
           );
         }
 
@@ -253,8 +260,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     } else {
       const nextItem = queueItems[1];
       setRecheckingPreviousReview(
-        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-          ?.previousReview,
+        (
+          nextItem as RevalidationQueueEvidenceItem & {
+            previousReview?: CompletedRevalidationReview;
+          }
+        )?.previousReview,
       );
     }
 
@@ -350,8 +360,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
         if (evidences.length === 0) return 'no_evidence';
 
         const candidateEvidence =
-          evidences.find((ev) => !currentUserId || ev.surveyorId !== currentUserId) ??
-          evidences[0];
+          evidences.find((ev) => !currentUserId || ev.surveyorId !== currentUserId) ?? evidences[0];
 
         if (!candidateEvidence) return 'no_evidence';
 
@@ -385,9 +394,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
         setQueueItems((prev) => {
           if (prev.some((it) => it.evidenceId === hydratedItem.evidenceId)) {
             const idx = prev.findIndex((it) => it.evidenceId === hydratedItem.evidenceId);
-            return idx > 0
-              ? [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)]
-              : prev;
+            return idx > 0 ? [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)] : prev;
           }
           return [hydratedItem, ...prev];
         });
@@ -408,8 +415,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     if (!currentItem) return true;
 
     const prevReview =
-      (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-        ?.previousReview ?? recheckingPreviousReview;
+      (
+        currentItem as RevalidationQueueEvidenceItem & {
+          previousReview?: CompletedRevalidationReview;
+        }
+      )?.previousReview ?? recheckingPreviousReview;
 
     const completesQueue = queueItems.length <= 1;
 
@@ -426,8 +436,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     } else {
       const nextItem = queueItems[1];
       setRecheckingPreviousReview(
-        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-          ?.previousReview,
+        (
+          nextItem as RevalidationQueueEvidenceItem & {
+            previousReview?: CompletedRevalidationReview;
+          }
+        )?.previousReview,
       );
     }
 
@@ -552,8 +565,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
 }
 
 const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
-  beginEvidenceCheck: () => { },
-  cancelEvidenceCheck: () => { },
+  beginEvidenceCheck: () => {},
+  cancelEvidenceCheck: () => {},
   counts: { STILL_ACTIVE: 0, REMOVED: 0, CHANGED: 0, UNCLEAR: 0, INVALID: 0 },
   currentItem: undefined,
   finishReviews: () => 0,
@@ -562,15 +575,15 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   isCheckingEvidence: false,
   isLoading: false,
   isSubmittingVote: false,
-  jumpToEvidenceById: () => { },
+  jumpToEvidenceById: () => {},
   keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,
   queueItems: [],
   recheckingIndex: undefined,
   recheckingPreviousReview: undefined,
-  refetchQueue: async () => { },
-  resetWorkflow: () => { },
+  refetchQueue: async () => {},
+  resetWorkflow: () => {},
   reviewHistory: [],
   reviewPosition: 0,
   totalCount: 0,

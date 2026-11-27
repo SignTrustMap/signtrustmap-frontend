@@ -191,14 +191,6 @@ jest.mock('@/feature/upload/hooks/use-reverse-geocode', () => ({
   useReverseGeocode: (coord: any) => mockReverseGeocode(coord),
 }));
 
-jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
-  useGetFirstRevalidationSign: () => ({ data: null }),
-}));
-
-jest.mock('@/api/revalidation/revalidation', () => ({
-  fetchFirstRevalidationSign: jest.fn().mockResolvedValue(null),
-}));
-
 // 6. Mock chunk upload and crop sync managers
 const mockExecuteChunkedVideoUpload = jest.fn();
 jest.mock('@/feature/upload/utils/chunk-upload-manager', () => ({

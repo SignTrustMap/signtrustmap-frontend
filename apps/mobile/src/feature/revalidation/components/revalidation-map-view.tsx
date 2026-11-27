@@ -1,5 +1,5 @@
 import type { CameraRef, MapRef, StyleSpecification } from '@maplibre/maplibre-react-native';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { RouteSign } from '@/api/navigation/navigation';
@@ -84,20 +84,64 @@ export function RevalidationMapView({
   const mapRef = useRef<MapRef>(null);
   const cameraRef = useRef<CameraRef>(null);
 
-  const reportBounds = ([minLon, minLat, maxLon, maxLat]: [number, number, number, number]) => {
-    onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
-  };
+  const reportBounds = useCallback(
+    (rawBounds?: [number, number, number, number]) => {
+      if (!Array.isArray(rawBounds) || rawBounds.length < 4) return;
+      const [minLon, minLat, maxLon, maxLat] = rawBounds;
+      if (
+        !Number.isFinite(minLon) ||
+        !Number.isFinite(minLat) ||
+        !Number.isFinite(maxLon) ||
+        !Number.isFinite(maxLat)
+      ) {
+        return;
+      }
+      onBoundsChange?.({ minLon, minLat, maxLon, maxLat });
+    },
+    [onBoundsChange],
+  );
 
   const mapLibre = loadMapLibre();
 
   useEffect(() => {
-    if (zoomLevel === undefined || !cameraRef.current) return;
-    cameraRef.current.setStop({
-      zoom: zoomLevel,
-      duration: 600,
-      easing: 'ease',
-    });
+    if (zoomRequestId === 0 || zoomLevel === undefined || !cameraRef.current) return;
+    try {
+      void cameraRef.current.setStop({
+        zoom: zoomLevel,
+        duration: 600,
+        easing: 'ease',
+      });
+    } catch {
+      // Camera native view may not be attached yet; declarative zoom prop handles initial state.
+    }
   }, [zoomLevel, zoomRequestId]);
+
+  useEffect(() => {
+    if (focusRequestId === 0 || !isValidCoordinate(focusCoordinate)) return;
+    if (cameraRef.current) {
+      try {
+        cameraRef.current.flyTo({
+          center: focusCoordinate,
+          duration: 700,
+          zoom: zoomLevel ?? 14.5,
+        });
+      } catch {
+        // Ignore if native camera ref is not yet ready; declarative Camera stop still applies.
+      }
+    }
+    const timer = setTimeout(() => {
+      void mapRef.current?.getBounds().then(reportBounds).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [focusCoordinate, focusRequestId, zoomLevel, reportBounds]);
+
+  const cameraCenter: [number, number] = isValidCoordinate(focusCoordinate)
+    ? focusCoordinate
+    : isValidCoordinate(userCoordinate)
+      ? userCoordinate
+      : [106.6955, 10.7769];
+
+  const isFlyingToFocus = isValidCoordinate(focusCoordinate) || isValidCoordinate(userCoordinate);
 
   if (!mapLibre) {
     return (
@@ -134,39 +178,16 @@ export function RevalidationMapView({
       touchPitch={false}
       touchRotate
     >
-      {isValidCoordinate(focusCoordinate) ? (
-        <Camera
-          center={focusCoordinate}
-          duration={700}
-          easing="fly"
-          key={`reval-focus-${focusRequestId}`}
-          maxZoom={19}
-          minZoom={10}
-          ref={cameraRef}
-          zoom={zoomLevel ?? 16.5}
-        />
-      ) : isValidCoordinate(userCoordinate) ? (
-        <Camera
-          center={userCoordinate}
-          duration={800}
-          easing="fly"
-          key="reval-user-center"
-          maxZoom={19}
-          minZoom={10}
-          ref={cameraRef}
-          zoom={zoomLevel ?? 15.5}
-        />
-      ) : (
-        <Camera
-          center={[106.6955, 10.7769]}
-          duration={0}
-          key="reval-default-center"
-          maxZoom={19}
-          minZoom={10}
-          ref={cameraRef}
-          zoom={zoomLevel ?? 14}
-        />
-      )}
+      <Camera
+        center={cameraCenter}
+        duration={isFlyingToFocus ? 700 : 0}
+        easing={isFlyingToFocus ? 'fly' : undefined}
+        key="reval-camera"
+        maxZoom={19}
+        minZoom={10}
+        ref={cameraRef}
+        zoom={zoomLevel ?? 14.5}
+      />
 
       {/* Render Verified Signs with Freshness Indicators */}
       {signs

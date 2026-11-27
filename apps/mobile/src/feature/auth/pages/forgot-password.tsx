@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { PrimaryGradientBackdrop } from '@/components/primary-gradient-backdrop';
 import {
   useForgotPassword,
   useResendOtp,
@@ -231,14 +232,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.screenContainer}>
-      {/* Decorative ambient background motifs across the screen */}
-      <View pointerEvents="none" style={styles.decorCircleLarge} />
-      <View pointerEvents="none" style={styles.decorCircleMedium} />
-      <View pointerEvents="none" style={styles.decorCircleSmall} />
-      <View pointerEvents="none" style={styles.decorCircleFloat} />
-      <View pointerEvents="none" style={styles.decorCircleDot} />
-      <View pointerEvents="none" style={styles.decorCircleDot2} />
-      <View pointerEvents="none" style={styles.decorRoadCurve} />
+      <PrimaryGradientBackdrop showGradient={false} testIDPrefix="forgot-password" />
 
       {/* Top Bar with Back Button and Brand */}
       <SafeAreaView edges={['top']} style={styles.topSafeArea}>
@@ -826,73 +820,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.85)',
     fontFamily: Fonts.sans,
     textAlign: 'center',
-  },
-
-  /* Ambient Decorative Shapes */
-  decorCircleLarge: {
-    position: 'absolute',
-    top: -40,
-    right: -30,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  decorCircleMedium: {
-    position: 'absolute',
-    bottom: 30,
-    left: -35,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  decorCircleSmall: {
-    position: 'absolute',
-    top: 90,
-    right: 60,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  decorCircleFloat: {
-    position: 'absolute',
-    top: 140,
-    left: 20,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  decorCircleDot: {
-    position: 'absolute',
-    top: 80,
-    left: 40,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-  },
-  decorCircleDot2: {
-    position: 'absolute',
-    bottom: 120,
-    right: 40,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-  },
-  decorRoadCurve: {
-    position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderStyle: 'dashed',
-    borderWidth: 2,
   },
 
   /* Step Indicator Row */

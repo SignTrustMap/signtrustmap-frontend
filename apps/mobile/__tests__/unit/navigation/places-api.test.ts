@@ -67,21 +67,22 @@ describe('Places API Module', () => {
     });
 
     it('resolves places via internal backend spatial address search if available', async () => {
-      globalThis.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => [
-          {
-            communeCode: '79001',
-            communeName: 'Phường Bến Nghé',
-            displayName: 'Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
-            latitude: 10.776,
-            longitude: 106.702,
-          },
-        ],
-      });
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce([
+        {
+          communeCode: '79001',
+          communeName: 'Phường Bến Nghé',
+          displayName: 'Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+          latitude: 10.776,
+          longitude: 106.702,
+        },
+      ]);
 
       const results = await searchPlaces('Bến Nghé');
 
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/addresses/search?q=B%E1%BA%BFn%20Ngh%C3%A9&limit=8',
+        { signal: undefined },
+      );
       expect(results).toHaveLength(1);
       expect(results[0]).toEqual({
         id: 'spatial-79001',
@@ -94,14 +95,10 @@ describe('Places API Module', () => {
     });
 
     it('falls back to Photon OSM geocoder if internal search returns empty', async () => {
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce([]);
       globalThis.fetch = jest
         .fn()
-        // 1. Backend /addresses/search -> returns []
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => [],
-        })
-        // 2. Photon geocoder -> returns features
+        // Photon geocoder -> returns features
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
@@ -130,13 +127,12 @@ describe('Places API Module', () => {
     });
 
     it('falls back to Nominatim when Photon fails', async () => {
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce([]);
       globalThis.fetch = jest
         .fn()
-        // 1. Backend spatial -> returns []
-        .mockResolvedValueOnce({ ok: false })
-        // 2. Photon -> fails
+        // Photon -> fails
         .mockRejectedValueOnce(new Error('Photon timeout'))
-        // 3. Nominatim -> returns results
+        // Nominatim -> returns results
         .mockResolvedValueOnce({
           ok: true,
           json: async () => [

@@ -1,5 +1,5 @@
 import { API_PATHS } from '@/api/api';
-import { apiRequest, apiBaseUrl } from '@/api/api-client';
+import { apiRequest } from '@/api/api-client';
 
 export type ResolvedLocation = {
   latitude: number;
@@ -26,16 +26,18 @@ async function reverseGeocodeViaNominatim(
   signal?: AbortSignal,
 ): Promise<ResolvedLocation | null> {
   try {
-    const url = `${apiBaseUrl()}/spatial/resolve?lat=${latitude}&lon=${longitude}`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'SignTrustMap-Mobile/1.0 (contact@signmap.site)',
-        'Accept-Language': 'vi,en',
+    const data = await apiRequest<any>(
+      `${API_PATHS.SPATIAL_RESOLVE}?lat=${latitude}&lon=${longitude}`,
+      {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'SignTrustMap-Mobile/1.0 (contact@signmap.site)',
+          'Accept-Language': 'vi,en',
+        },
+        signal,
       },
-      signal,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
+    );
+    if (!data) return null;
     const addr = data.address || {};
     const roadName = data.roadName ?? (addr.road || addr.street || addr.neighbourhood || addr.suburb || null);
     const displayAddress = data.displayAddress || data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;

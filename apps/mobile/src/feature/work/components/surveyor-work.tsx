@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -6,22 +6,17 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
-import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import {
   useGetMyPendingSubmissions,
   useGetMySubmissions,
   useGetMySurveyStats,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
-import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
 import {
   getFallbackMissionsForRole,
   isTaskForRole,
   useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
-import type { RouteSign } from '@/api/navigation/navigation';
-import type { MapCoordinate } from '@/types/navigationType';
 import { WorkActionBadge } from './work-action-badge';
 
 export interface SurveyorWorkProps {
@@ -29,8 +24,6 @@ export interface SurveyorWorkProps {
   revalidationTaskCount?: number;
   recapturesCount?: number;
   returnedSubmissionsCount?: number;
-  firstRevalSign?: RouteSign | null;
-  userCoordinate?: MapCoordinate;
   onOpenOfflineMap?: () => void;
   onOpenRevalidationMap?: () => void;
   incompleteMissionsCount?: number;
@@ -41,8 +34,6 @@ export function SurveyorWork({
   revalidationTaskCount: propRevalidationTaskCount,
   recapturesCount: propRecapturesCount,
   returnedSubmissionsCount: propReturnedSubmissionsCount,
-  firstRevalSign: propFirstRevalSign,
-  userCoordinate: propUserCoordinate,
   onOpenOfflineMap,
   onOpenRevalidationMap,
   incompleteMissionsCount: propMissionsCount,
@@ -53,40 +44,6 @@ export function SurveyorWork({
 
   const isSurveyor = Boolean(session?.account?.roles?.includes('surveyor'));
 
-  const [deviceCoordinate, setDeviceCoordinate] = useState<MapCoordinate | undefined>(
-    propUserCoordinate,
-  );
-  const [gpsAttempted, setGpsAttempted] = useState(Boolean(propUserCoordinate));
-
-  useEffect(() => {
-    if (propUserCoordinate) {
-      setDeviceCoordinate(propUserCoordinate);
-      setGpsAttempted(true);
-      return;
-    }
-
-    if (!isSurveyor) return;
-
-    let isMounted = true;
-    void fetchFreshGpsPosition(3500)
-      .then((pos) => {
-        if (isMounted && pos) {
-          setDeviceCoordinate(pos);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setGpsAttempted(true);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [propUserCoordinate, isSurveyor]);
-
-  const effectiveCoordinate = propUserCoordinate ?? deviceCoordinate;
-
   // Surveyor queries live directly within the Surveyor component
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyor);
   const { data: mySubmissionsData } = useGetMySubmissions(
@@ -95,16 +52,11 @@ export function SurveyorWork({
   );
   const { data: surveyStats } = useGetMySurveyStats(isSurveyor);
   const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyor);
-  const { data: firstRevalSignData } = useGetFirstRevalidationSign(
-    effectiveCoordinate,
-    Boolean(isSurveyor && (effectiveCoordinate || gpsAttempted)),
-  );
 
   const pendingSurveyCount = propPendingSurveyCount ?? pendingData?.pending ?? 0;
   const revalidationTaskCount =
     propRevalidationTaskCount ?? surveyStats?.revalidationAvailable ?? 0;
   const recapturesCount = propRecapturesCount ?? recapturesData?.total ?? 0;
-  const firstRevalSign = propFirstRevalSign !== undefined ? propFirstRevalSign : firstRevalSignData;
 
   const returnedSubmissionsCount = useMemo(() => {
     if (propReturnedSubmissionsCount !== undefined) return propReturnedSubmissionsCount;
@@ -142,43 +94,13 @@ export function SurveyorWork({
     router.push('/work/returned-submissions-list');
   };
 
-  const handleOpenRevalidationMap = async () => {
+  const handleOpenRevalidationMap = () => {
     if (onOpenRevalidationMap) {
       onOpenRevalidationMap();
       return;
     }
 
-    let targetSign = firstRevalSign;
-    if (!targetSign) {
-      try {
-        const coord = effectiveCoordinate ?? (await fetchFreshGpsPosition(2000));
-        targetSign = await fetchFirstRevalidationSign(coord ?? undefined);
-      } catch {
-        targetSign = null;
-      }
-    }
-
-    if (targetSign) {
-      router.push({
-        pathname: '/work/revalidation-map',
-        params: {
-          autoSelectFirst: 'true',
-          selectedSignId: targetSign.id,
-          snapLon: String(targetSign.coordinate[0]),
-          snapLat: String(targetSign.coordinate[1]),
-          snapRequestId: String(Date.now()),
-          signJson: JSON.stringify(targetSign),
-        },
-      });
-    } else {
-      router.push({
-        pathname: '/work/revalidation-map',
-        params: {
-          autoSelectFirst: 'true',
-          snapRequestId: String(Date.now()),
-        },
-      });
-    }
+    router.push('/work/revalidation-map');
   };
 
   return (
