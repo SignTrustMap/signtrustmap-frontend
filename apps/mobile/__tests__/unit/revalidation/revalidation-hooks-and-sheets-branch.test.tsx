@@ -30,7 +30,6 @@ jest.mock('@/hooks/use-theme', () => ({
 
 jest.mock('@/api/revalidation/revalidation', () => ({
   checkInRevalidationTask: jest.fn(),
-  fetchFirstRevalidationSign: jest.fn(),
   finalizeRevalidationTask: jest.fn(),
   getAllRevalidationTasks: jest.fn(),
   getCheckInEligibility: jest.fn(),

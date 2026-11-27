@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act, cleanup } from '@testing-library/react-native';
+import { render, fireEvent, act, cleanup, waitFor } from '@testing-library/react-native';
 import { View } from 'react-native';
 import { RevalidationMapScreen } from '@/feature/revalidation/pages/revalidation-map-screen';
 import * as navigationGps from '@/feature/navigation/utils/gps';
@@ -316,5 +316,29 @@ describe('RevalidationMapScreen', () => {
     });
 
     expect(queryByText('Kiểm tra thực địa')).toBeNull();
+  });
+
+  it('flies camera to user location on initial navigate without opening sign details or sign list, while loading signs', async () => {
+    const { queryByText } = await render(<RevalidationMapScreen />);
+
+    await waitFor(() => {
+      expect(navigationGps.fetchFreshGpsPosition).toHaveBeenCalled();
+      expect(capturedMapProps.focusCoordinate).toEqual([106.7009, 10.7769]);
+      expect(capturedMapProps.focusRequestId).toBeGreaterThan(0);
+    });
+
+    expect(signsHooks.useGetSignsInBounds).toHaveBeenCalledWith(
+      expect.objectContaining({
+        minLon: expect.any(Number),
+        minLat: expect.any(Number),
+        maxLon: expect.any(Number),
+        maxLat: expect.any(Number),
+      }),
+      true,
+    );
+    expect(capturedMapProps.signs.length).toBeGreaterThan(0);
+    expect(capturedMapProps.selectedSignId).toBeUndefined();
+    expect(queryByText('Kiểm tra thực địa')).toBeNull();
+    expect(queryByText('Tất cả biển báo')).toBeNull();
   });
 });

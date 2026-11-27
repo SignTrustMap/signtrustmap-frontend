@@ -69,15 +69,7 @@ jest.mock('@/components/offline-map-modal', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. GPS Utility Mock
-// ---------------------------------------------------------------------------
-const mockFetchFreshGpsPosition = jest.fn();
-jest.mock('@/feature/navigation/utils/gps', () => ({
-  fetchFreshGpsPosition: (...args: any[]) => mockFetchFreshGpsPosition(...args),
-}));
-
-// ---------------------------------------------------------------------------
-// 4. Session Provider Mock
+// 3. Session Provider Mock
 // ---------------------------------------------------------------------------
 let mockSessionUser: {
   id: string;
@@ -128,15 +120,9 @@ jest.mock('@/feature/review/hooks/use-recapture', () => ({
   useGetMyRecaptures: (...args: any[]) => mockUseGetMyRecaptures(...args),
 }));
 
-const mockUseGetFirstRevalidationSign = jest.fn();
 const mockUseGetRevalidationEvidenceQueue = jest.fn();
-const mockFetchFirstRevalidationSign = jest.fn();
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
-  useGetFirstRevalidationSign: (...args: any[]) => mockUseGetFirstRevalidationSign(...args),
   useGetRevalidationEvidenceQueue: (...args: any[]) => mockUseGetRevalidationEvidenceQueue(...args),
-}));
-jest.mock('@/api/revalidation/revalidation', () => ({
-  fetchFirstRevalidationSign: (...args: any[]) => mockFetchFirstRevalidationSign(...args),
 }));
 
 jest.mock('@/feature/work/hooks/use-daily-tasks', () => ({
@@ -172,7 +158,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       roles: ['driver', 'surveyor', 'reviewer'],
     };
 
-    mockFetchFreshGpsPosition.mockResolvedValue([106.7009, 10.7769]);
     mockUseGetNavigationSessions.mockReturnValue({
       data: { total: 12, items: [] },
     });
@@ -201,15 +186,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
     });
     mockUseGetMyRecaptures.mockReturnValue({
       data: { total: 4, items: [] },
-    });
-    mockUseGetFirstRevalidationSign.mockReturnValue({
-      data: {
-        id: 'first-reval-1',
-        coordinate: [106.7009, 10.7769],
-        signCode: 'P.102',
-        name: 'Cấm đi ngược chiều',
-        imageUrl: 'https://example.com/p102.png',
-      },
     });
   });
 
@@ -378,10 +354,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(getByText('4')).toBeTruthy();
       expect(getByText('Tra cứu biển báo giao thông')).toBeTruthy();
       expect(getByText('Nhiệm vụ')).toBeTruthy();
-
-      await waitFor(() => {
-        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
-      });
     });
 
     it('navigates to survey-history when pressing vote history badge', async () => {
@@ -400,42 +372,14 @@ describe('Work Roles & Component Architecture Test Suite', () => {
 
       fireEvent.press(offlineCard);
       expect(mockOnOpenOfflineMap).toHaveBeenCalled();
-
-      await waitFor(() => {
-        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
-      });
     });
 
-    it('acquires real user coordinates via fetchFreshGpsPosition and passes to useGetFirstRevalidationSign', async () => {
-      mockFetchFreshGpsPosition.mockResolvedValue([106.69, 10.78]);
-
-      await render(<SurveyorWork />);
-
-      await waitFor(() => {
-        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
-      });
-
-      expect(mockUseGetFirstRevalidationSign).toHaveBeenCalledWith(expect.any(Array), true);
-    });
-
-    it('navigates to revalidation-map with snap coordinates when revalidation badge is pressed', async () => {
+    it('navigates to revalidation-map when revalidation badge is pressed', async () => {
       const { getByText } = await render(<SurveyorWork />);
 
       fireEvent.press(getByText('Tái xác nhận biển báo'));
 
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/work/revalidation-map',
-        params: expect.objectContaining({
-          autoSelectFirst: 'true',
-          selectedSignId: 'first-reval-1',
-          snapLon: '106.7009',
-          snapLat: '10.7769',
-        }),
-      });
-
-      await waitFor(() => {
-        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
-      });
+      expect(mockPush).toHaveBeenCalledWith('/work/revalidation-map');
     });
 
     it('SurveyorFab renders floating plus button and navigates to /work/new-survey', async () => {
@@ -463,7 +407,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
       expect(mockUseGetMyPendingSubmissions).toHaveBeenCalledWith(false);
       expect(mockUseGetMySurveyStats).toHaveBeenCalledWith(false);
       expect(mockUseGetMyRecaptures).toHaveBeenCalledWith({ page: 1, pageSize: 20 }, false);
-      expect(mockUseGetFirstRevalidationSign).toHaveBeenCalledWith(undefined, false);
     });
   });
 
@@ -502,7 +445,6 @@ describe('Work Roles & Component Architecture Test Suite', () => {
         expect(getByTestId('work-screen-title').props.children).toBe('Khảo sát');
         expect(getByText('Lịch sử xác nhận')).toBeTruthy();
         expect(getByLabelText('Tạo bản ghi khảo sát mới')).toBeTruthy();
-        expect(mockFetchFreshGpsPosition).toHaveBeenCalled();
       });
     });
 

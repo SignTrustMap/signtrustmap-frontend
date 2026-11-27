@@ -3,7 +3,6 @@ import {
   revalidationTaskToRouteSign,
   getRevalidationTasksInBounds,
   getAllRevalidationTasks,
-  fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
   voteOnRevalidationEvidence,
@@ -358,92 +357,6 @@ describe('Revalidation API Module', () => {
       const tasks = await getAllRevalidationTasks();
       expect(Array.isArray(tasks)).toBe(true);
       expect(tasks.length).toBe(0);
-    });
-  });
-
-  describe('fetchFirstRevalidationSign', () => {
-    it('returns first revalidation sign near user coordinates when available', async () => {
-      const userCoord: [number, number] = [106.7009, 10.7769];
-
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-near-1',
-            verified_sign_id: 'sign-near-1',
-            sign_code: 'P.102',
-            name_vi: 'Cấm đi ngược chiều',
-            latitude: '10.7769',
-            longitude: '106.7009',
-            freshness_score: 55,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-near-1');
-      expect(sign?.signCode).toBe('P.102');
-      expect(sign?.freshnessScore).toBeCloseTo(0.55);
-    });
-
-    it('falls back to broad query if near-user query returns no items', async () => {
-      // User is far from HCMC fallback tasks (e.g. Hanoi [105.85, 21.03])
-      const userCoord: [number, number] = [105.85, 21.03];
-
-      // First query (near): returns empty
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ items: [] });
-      // Second query (broad): returns a task
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-broad-1',
-            verified_sign_id: 'sign-broad-1',
-            sign_code: 'W.207a',
-            name_vi: 'Giao nhau với đường không ưu tiên',
-            latitude: '10.7554',
-            longitude: '106.6781',
-            freshness_score: 80,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-broad-1');
-      expect(sign?.signCode).toBe('W.207a');
-    });
-
-    it('returns null when all API queries fail', async () => {
-      const userCoord: [number, number] = [105.85, 21.03];
-      (apiClient.apiRequest as jest.Mock).mockRejectedValue(new Error('Complete offline'));
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).toBeNull();
-    });
-
-    it('works without userCoordinate provided', async () => {
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-anywhere-1',
-            verified_sign_id: 'sign-any-1',
-            sign_code: 'R.301a',
-            name_vi: 'Hướng đi phải theo',
-            latitude: '10.7981',
-            longitude: '106.7145',
-            freshness_score: 54,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(undefined);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-any-1');
-      expect(sign?.signCode).toBe('R.301a');
     });
   });
 

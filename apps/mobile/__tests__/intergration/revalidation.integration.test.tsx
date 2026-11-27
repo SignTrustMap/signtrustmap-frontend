@@ -18,7 +18,6 @@ import { SessionProvider, type AppSession } from '@/context/session-provider';
 import {
   getRevalidationTasksInBounds,
   getAllRevalidationTasks,
-  fetchFirstRevalidationSign,
   toRevalidationTaskItem,
   revalidationTaskToRouteSign,
   submitRevalidationEvidence,
@@ -497,15 +496,6 @@ describe('Revalidation Feature End-to-End Integration Tests', () => {
       const allTasks = await getAllRevalidationTasks();
       expect(allTasks).toHaveLength(2);
       expect(mapCallCount).toBeGreaterThanOrEqual(2);
-    });
-
-    it('fetches the first revalidation sign prioritizing user location proximity', async () => {
-      const userCoord: [number, number] = [106.6955, 10.7769];
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.taskId).toBe('task-reval-101');
-      expect(sign?.signCode).toBe('P.102');
     });
   });
 

@@ -48,7 +48,6 @@ import {
 import {
   checkInRevalidationTask,
   earlyClassifyRevalidationTask,
-  fetchFirstRevalidationSign,
   finalizeRevalidationTask,
   getAllRevalidationTasks,
   getCheckInEligibility,
@@ -172,7 +171,7 @@ describe('Revalidation API & Media Branch Coverage', () => {
   });
 
   describe('revalidation.ts', () => {
-    it('covers getRevalidationTasksInBounds, getAllRevalidationTasks fallbacks, and fetchFirstRevalidationSign', async () => {
+    it('covers getRevalidationTasksInBounds and getAllRevalidationTasks fallbacks', async () => {
       const ctrl = new AbortController();
       ctrl.abort();
       mockApiRequest.mockRejectedValueOnce(new Error('canceled'));
@@ -196,20 +195,6 @@ describe('Revalidation API & Media Branch Coverage', () => {
       // All fail
       mockApiRequest.mockRejectedValue(new Error('down'));
       expect(await getAllRevalidationTasks()).toEqual([]);
-
-      // fetchFirstRevalidationSign nearby hit, then broad hit, then empty
-      mockApiRequest.mockResolvedValueOnce({
-        items: [{ id: 'near-1', latitude: 10.77, longitude: 106.7, signCode: 'W.201' }],
-      });
-      expect((await fetchFirstRevalidationSign([106.7, 10.77]))?.id).toBeDefined();
-
-      mockApiRequest
-        .mockResolvedValueOnce({ items: [] })
-        .mockResolvedValueOnce({ items: [{ id: 'broad-1', latitude: 10.8, longitude: 106.8 }] });
-      expect(await fetchFirstRevalidationSign([106.7, 10.77])).toBeTruthy();
-
-      mockApiRequest.mockRejectedValue(new Error('fail'));
-      expect(await fetchFirstRevalidationSign()).toBeNull();
     });
 
     it('covers submitRevalidationEvidence native uploadAsync, HTTP error, fallback to apiRequest, and invalid taskId', async () => {

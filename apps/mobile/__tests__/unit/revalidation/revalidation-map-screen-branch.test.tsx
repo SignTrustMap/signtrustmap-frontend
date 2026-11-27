@@ -94,7 +94,7 @@ describe('RevalidationMapScreen Branch Coverage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedMapProps = {};
-    mockParams = { autoSelectFirst: 'true' };
+    mockParams = {};
     mockFetchGps.mockResolvedValue([106.7, 10.77]);
     mockSearchPlaces.mockResolvedValue([
       { id: 'pl-1', title: 'Chợ Bến Thành', address: 'Q1', latitude: 10.772, longitude: 106.698 },
@@ -113,7 +113,8 @@ describe('RevalidationMapScreen Branch Coverage', () => {
 
   it('covers search dropdown, urgency filter drawer, zoom threshold menu, sign list panel, snap location, and inspect navigation', async () => {
     const screen = await renderScreen();
-    await waitFor(() => expect(screen.getByTestId('mock-details-card')).toBeTruthy());
+    await waitFor(() => expect(capturedMapProps.focusCoordinate).toEqual([106.7, 10.77]));
+    expect(screen.queryByTestId('mock-details-card')).toBeNull();
 
     // Urgency filter drawer toggle & filter tabs
     await fireEvent.press(screen.getByLabelText('Hiển thị bộ lọc mức độ khẩn cấp'));

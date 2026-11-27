@@ -3,9 +3,7 @@ import { Platform } from 'react-native';
 
 import { API_PATHS } from '@/api/api';
 import { apiBaseUrl, ApiError, apiRequest } from '@/api/api-client';
-import type { RouteSign } from '@/api/navigation/navigation';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
-import type { MapCoordinate } from '@/types/navigationType';
 import type {
   CheckInEligibilityDto,
   EvidenceVoteDto,
@@ -170,60 +168,6 @@ export async function getAllRevalidationTasks(
   }
 
   return [];
-}
-
-/**
- * Fetches the first available sign that needs revalidation.
- * Prioritizes active revalidation tasks in user's area or Vietnam.
- */
-export async function fetchFirstRevalidationSign(
-  userCoordinate?: MapCoordinate,
-  signal?: AbortSignal,
-): Promise<RouteSign | null> {
-  const token = await getStoredAccessToken();
-
-  if (userCoordinate && Number.isFinite(userCoordinate[0]) && Number.isFinite(userCoordinate[1])) {
-    const [lon, lat] = userCoordinate;
-    try {
-      const nearTasks = await getRevalidationTasksInBounds(
-        {
-          minLat: lat - 0.45,
-          minLon: lon - 0.45,
-          maxLat: lat + 0.45,
-          maxLon: lon + 0.45,
-          pageSize: 10,
-        },
-        signal,
-        token,
-      );
-      if (nearTasks.length > 0) {
-        return revalidationTaskToRouteSign(nearTasks[0]);
-      }
-    } catch {
-      // fallback to broad search
-    }
-  }
-
-  try {
-    const broadTasks = await getRevalidationTasksInBounds(
-      {
-        minLat: 8.0,
-        minLon: 102.0,
-        maxLat: 24.0,
-        maxLon: 110.0,
-        pageSize: 10,
-      },
-      signal,
-      token,
-    );
-    if (broadTasks.length > 0) {
-      return revalidationTaskToRouteSign(broadTasks[0]);
-    }
-  } catch (err) {
-    console.warn('fetchFirstRevalidationSign broad query failed:', err);
-  }
-
-  return null;
 }
 
 /**

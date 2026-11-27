@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Image,
   Keyboard,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -83,7 +83,6 @@ type RevalidationMapParams = {
   snapLon?: string;
   snapLat?: string;
   snapRequestId?: string;
-  autoSelectFirst?: string;
   signJson?: string;
   filter?: FreshnessFilter;
 };
@@ -136,10 +135,10 @@ export function RevalidationMapScreen() {
   });
 
   // Zoom control state
-  const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 16.5);
+  const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 14.5);
   const [zoomRequestId, setZoomRequestId] = useState(0);
   const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(
-    initialFocusCoord ? 'detail' : 'street',
+    initialFocusCoord ? 'detail' : 'area',
   );
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -194,18 +193,29 @@ export function RevalidationMapScreen() {
   const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } =
     useGetAllRevalidationTasks(true);
 
-  // Fetch verified signs within current map bounds
-  const { data: boundsSigns = [] } = useGetSignsInBounds(bounds, true);
-
-  const taskBounds = useMemo<FindTasksInBoundsParams | undefined>(() => {
-    if (!bounds) return undefined;
+  const effectiveBounds = useMemo<FindSignsInBoundsParams>(() => {
+    if (bounds) return bounds;
+    const center = focusCoordinate ?? userCoordinate ?? [106.6955, 10.7769];
+    const delta = 0.025;
     return {
-      minLat: bounds.minLat,
-      minLon: bounds.minLon,
-      maxLat: bounds.maxLat,
-      maxLon: bounds.maxLon,
+      minLon: center[0] - delta,
+      minLat: center[1] - delta,
+      maxLon: center[0] + delta,
+      maxLat: center[1] + delta,
     };
-  }, [bounds]);
+  }, [bounds, focusCoordinate, userCoordinate]);
+
+  // Fetch verified signs within current map bounds
+  const { data: boundsSigns = [] } = useGetSignsInBounds(effectiveBounds, true);
+
+  const taskBounds = useMemo<FindTasksInBoundsParams>(() => {
+    return {
+      minLat: effectiveBounds.minLat,
+      minLon: effectiveBounds.minLon,
+      maxLat: effectiveBounds.maxLat,
+      maxLon: effectiveBounds.maxLon,
+    };
+  }, [effectiveBounds]);
 
   // Fetch revalidation tasks within current map bounds
   const { data: revalTasks = [] } = useGetRevalidationTasksInBounds(taskBounds, true);
@@ -218,23 +228,27 @@ export function RevalidationMapScreen() {
       signMap.set(sign.id, sign);
     }
 
-    for (const task of allRevalTasks) {
+    const mergeTask = (task: (typeof allRevalTasks)[number]) => {
       const converted = revalidationTaskToRouteSign(task);
       const existing = signMap.get(converted.id);
       signMap.set(converted.id, {
         ...(existing ?? {}),
         ...converted,
+        imageUrl: converted.imageUrl || existing?.imageUrl || '',
+        actualCropUrl: converted.actualCropUrl || existing?.actualCropUrl,
+        name:
+          converted.name && converted.name !== 'Traffic Sign'
+            ? converted.name
+            : existing?.name || converted.name,
+        signCode:
+          converted.signCode && converted.signCode !== 'Traffic Sign'
+            ? converted.signCode
+            : existing?.signCode || converted.signCode,
       });
-    }
+    };
 
-    for (const task of revalTasks) {
-      const converted = revalidationTaskToRouteSign(task);
-      const existing = signMap.get(converted.id);
-      signMap.set(converted.id, {
-        ...(existing ?? {}),
-        ...converted,
-      });
-    }
+    for (const task of allRevalTasks) mergeTask(task);
+    for (const task of revalTasks) mergeTask(task);
 
     if (initialSign) {
       const existing = signMap.get(initialSign.id);
@@ -248,7 +262,7 @@ export function RevalidationMapScreen() {
     return Array.from(signMap.values());
   }, [boundsSigns, allRevalTasks, revalTasks, initialSign]);
 
-  // Derive selectedSign dynamically: user override > initialSign > selectedSignId > autoSelectFirst
+  // Derive selectedSign dynamically: user override > initialSign > selectedSignId
   const selectedSign = useMemo<RouteSign | null>(() => {
     if (overrideSign !== undefined) {
       return overrideSign;
@@ -260,14 +274,10 @@ export function RevalidationMapScreen() {
       const found = rawSigns.find((s) => s.id === params.selectedSignId);
       if (found) return found;
     }
-    if (params.autoSelectFirst === 'true' && rawSigns.length > 0) {
-      const firstStale = rawSigns.find((s) => getFreshnessInfo(s).isStale);
-      return firstStale || rawSigns[0] || null;
-    }
     return null;
-  }, [overrideSign, initialSign, params.selectedSignId, params.autoSelectFirst, rawSigns]);
+  }, [overrideSign, initialSign, params.selectedSignId, rawSigns]);
 
-  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return or work card)
+  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return)
   useEffect(() => {
     let isMounted = true;
     void fetchFreshGpsPosition().then((pos) => {
@@ -1238,8 +1248,8 @@ export function RevalidationMapScreen() {
                     {/* Sign image or placeholder */}
                     <View style={[styles.signListRowImage, { borderColor: '#E11D48' }]}>
                       {item.imageUrl ? (
-                        <Image
-                          resizeMode="contain"
+                        <ExpoImage
+                          contentFit="contain"
                           source={{ uri: item.imageUrl }}
                           style={styles.signListRowImg}
                         />

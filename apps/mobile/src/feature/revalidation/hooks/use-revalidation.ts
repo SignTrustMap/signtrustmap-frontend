@@ -2,7 +2,6 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 
 import {
   checkInRevalidationTask,
-  fetchFirstRevalidationSign,
   finalizeRevalidationTask,
   getAllRevalidationTasks,
   getCheckInEligibility,
@@ -18,7 +17,6 @@ import {
   submitRevalidationEvidence,
   voteOnRevalidationEvidence,
 } from '@/api/revalidation/revalidation';
-import type { MapCoordinate } from '@/types/navigationType';
 import type {
   CheckInEligibilityDto,
   EvidenceVoteDto,
@@ -95,20 +93,6 @@ export function useGetRevalidationTasksInBounds(
       : skipToken,
     enabled: Boolean(enabled && validBounds && bounds),
     staleTime: 30_000,
-  });
-}
-
-export function useGetFirstRevalidationSign(
-  userCoordinate?: MapCoordinate,
-  enabled = true,
-) {
-  return useQuery({
-    queryKey: ['first-revalidation-sign', userCoordinate],
-    queryFn: enabled
-      ? ({ signal }) => fetchFirstRevalidationSign(userCoordinate, signal)
-      : skipToken,
-    enabled,
-    staleTime: 60_000,
   });
 }
 

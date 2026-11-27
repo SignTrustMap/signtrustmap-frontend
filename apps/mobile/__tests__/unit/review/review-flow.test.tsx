@@ -115,7 +115,6 @@ jest.mock('@/feature/credits/hooks/use-wallet', () => ({
 
 jest.mock('@/feature/revalidation/hooks/use-revalidation', () => ({
   useGetRevalidationEvidenceQueue: () => ({ data: { total: 2 } }),
-  useGetFirstRevalidationSign: () => ({ data: null }),
 }));
 
 jest.mock('@/feature/upload/hooks/use-survey-submission', () => ({

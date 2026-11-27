@@ -46,13 +46,22 @@ export function normalizeStatus(raw?: string): TaskStatus {
 export function toRevalidationTaskItem(
   raw: RevalidationTasksInBoundsResponse['items'][number],
 ): RevalidationTaskItem {
-  const code = raw.sign_code || raw.signCode || 'Traffic Sign';
-  const name = raw.name_vi || raw.nameVi || raw.name_en || raw.nameEn || code;
-  const rawCrop = raw.sign_crop_url || raw.signCropUrl || '';
-  const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
-  const repUrl = resolveRepresentativeSignUrl(raw.name_en || raw.nameEn, code);
-
   const rawAny = raw as any;
+  const rawSignType = rawAny.signType ?? rawAny.sign_type;
+  const code =
+    raw.sign_code ||
+    raw.signCode ||
+    rawSignType?.signCode ||
+    rawSignType?.sign_code ||
+    'Traffic Sign';
+  const nameEn = raw.name_en || raw.nameEn || rawSignType?.nameEn || rawSignType?.name_en;
+  const name =
+    raw.name_vi || raw.nameVi || rawSignType?.nameVi || rawSignType?.name_vi || nameEn || code;
+  const rawCrop =
+    raw.sign_crop_url || raw.signCropUrl || rawAny.cropUrl || rawAny.crop_url || '';
+  const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
+  const repUrl = resolveRepresentativeSignUrl(nameEn, code === 'Traffic Sign' ? undefined : code);
+
   const rawLat =
     raw.latitude ?? rawAny.lat ?? rawAny.location?.lat ?? rawAny.location?.latitude ?? rawAny.y;
   const rawLon =
@@ -102,7 +111,9 @@ export function toRevalidationTaskItem(
 export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSign {
   const code = task.code || 'Traffic Sign';
   const name = task.name || code;
-  const repUrl = task.representativeUrl || resolveRepresentativeSignUrl(name, code);
+  const repUrl =
+    task.representativeUrl ||
+    resolveRepresentativeSignUrl(name, code === 'Traffic Sign' ? undefined : code);
   const rawCrop = task.historicalCropUrl;
   const resolvedCrop = rawCrop ? resolveImageUrl(rawCrop) : undefined;
 
@@ -120,7 +131,7 @@ export function revalidationTaskToRouteSign(task: RevalidationTaskItem): RouteSi
     coordinate: [validLon, validLat],
     id: task.verifiedSignId || task.id,
     taskId: task.id,
-    imageUrl: repUrl,
+    imageUrl: repUrl || resolvedCrop || '',
     actualCropUrl: resolvedCrop,
     name,
     nameVi: task.name,

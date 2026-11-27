@@ -6,15 +6,12 @@ export function createEditProfileSchema(requireAddress = false) {
       .string({ required_error: 'Họ và tên không được để trống.' })
       .trim()
       .min(1, 'Họ và tên không được để trống.')
-      .max(100, 'Họ và tên không được quá 100 ký tự.'),
+      .max(20, 'Họ và tên không được quá 20 ký tự.'),
     phone: z
       .string()
       .trim()
       .max(10, 'Số điện thoại không được quá 10 số.')
-      .refine(
-        (val) => !val || /^[0-9]{7,10}$/.test(val),
-        'Số điện thoại không hợp lệ.',
-      )
+      .refine((val) => !val || /^[0-9]{7,10}$/.test(val), 'Số điện thoại không hợp lệ.')
       .optional()
       .or(z.literal('')),
     address: requireAddress

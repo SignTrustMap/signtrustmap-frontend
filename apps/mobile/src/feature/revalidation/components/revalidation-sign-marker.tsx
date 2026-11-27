@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { RouteSign } from '@/api/navigation/navigation';
 
@@ -39,8 +40,16 @@ export function RevalidationSignMarker({
   isSelected = false,
   isDimmed = false,
 }: RevalidationSignMarkerProps) {
+  const [triedActualCrop, setTriedActualCrop] = useState(false);
   const [hasError, setHasError] = useState(false);
   const { isStale, isModerate, isFresh } = getFreshnessInfo(sign);
+
+  const activeUrl =
+    !triedActualCrop && sign.imageUrl
+      ? sign.imageUrl
+      : sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl
+        ? sign.actualCropUrl
+        : null;
 
   return (
     <View
@@ -62,12 +71,19 @@ export function RevalidationSignMarker({
           isSelected && styles.markerBubbleSelected,
         ]}
       >
-        {sign.imageUrl && !hasError ? (
-          <Image
+        {activeUrl && !hasError ? (
+          <ExpoImage
             accessibilityLabel={sign.name || sign.signCode}
-            onError={() => setHasError(true)}
-            resizeMode="contain"
-            source={{ uri: sign.imageUrl }}
+            contentFit="contain"
+            key={activeUrl}
+            onError={() => {
+              if (!triedActualCrop && sign.actualCropUrl && sign.actualCropUrl !== sign.imageUrl) {
+                setTriedActualCrop(true);
+              } else {
+                setHasError(true);
+              }
+            }}
+            source={{ uri: activeUrl }}
             style={styles.signImage}
           />
         ) : (
