@@ -29,20 +29,11 @@
     "ci": "npm run lint:web && npm run build:web && npm run lint:ops && npm run build:ops && npm run lint:mobile && npm run typecheck:mobile",
     "test": "jest --watchAll",
     "test:ci": "jest --watchAll=false --coverage",
-    "test:unit:ci": "jest apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/work/work-roles.test.tsx apps/mobile/__tests__/unit/revalidation/revalidation-provider-gating.test.tsx apps/mobile/__tests__/unit/navigation/navigation-complete-modal.test.tsx apps/mobile/__tests__/unit/upload/survey-details-route-navigation.test.tsx apps/mobile/__tests__/unit/work/submission-complete-screen.test.tsx apps/mobile/__tests__/unit/navigation/spatial.test.ts apps/mobile/__tests__/unit/upload/high-res-cropper.test.ts apps/mobile/__tests__/unit/navigation/demo-route-signs.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-api.test.ts apps/mobile/__tests__/unit/navigation/saved-routes-match.test.ts apps/mobile/__tests__/unit/navigation/saved-routes.test.tsx apps/mobile/__tests__/unit/navigation/saved-routes-wishlist-sync.test.tsx apps/mobile/__tests__/unit/navigation/sign-filter-provider.test.tsx apps/mobile/__tests__/unit/navigation/map-location-pin.test.tsx apps/mobile/__tests__/unit/navigation/image-inspection-modal.test.tsx apps/mobile/__tests__/unit/navigation/notification-flow.test.tsx --watchAll=false --runInBand --forceExit --coverage",
+    "test:unit:ci": "jest apps/mobile/__tests__/unit --watchAll=false --runInBand --forceExit --coverage",
     "test:coverage": "jest --coverage --watchAll=false",
     "test:integration": "jest apps/mobile/__tests__/intergration --watchAll=false --coverage",
     "test:unit": "jest apps/mobile/__tests__/unit/upload apps/mobile/__tests__/unit/navigation apps/mobile/__tests__/unit/review apps/mobile/__tests__/unit/profile apps/mobile/__tests__/unit/ui apps/mobile/__tests__/unit/work apps/mobile/__tests__/unit/revalidation apps/mobile/__tests__/unit/credits apps/mobile/__tests__/unit/auth apps/mobile/__tests__/unit/splash --watchAll=false --runInBand --forceExit --coverage",
-    "test:report": "jest --coverage --watchAll=false",
-    "test:e2e:upload": "npm run test:e2e:upload --workspace=mobile",
-    "test:e2e:survey": "npm run test:e2e:survey --workspace=mobile",
-    "test:e2e:reviewer": "npm run test:e2e:reviewer --workspace=mobile",
-    "test:e2e:reval": "npm run test:e2e:reval --workspace=mobile",
-    "test:e2e:navigation": "npm run test:e2e:navigation --workspace=mobile",
-    "test:e2e:screens": "npm run test:e2e:screens --workspace=mobile",
-    "test:e2e:login": "npm run test:e2e:login --workspace=mobile",
-    "test:e2e": "npm run test:e2e --workspace=mobile",
-    "maestro:studio": "npm run maestro:studio --workspace=mobile"
+    "test:report": "jest --coverage --watchAll=false"
   },
   "repository": {
     "type": "git",
@@ -78,21 +69,24 @@
     "collectCoverageFrom": [
       "apps/mobile/src/**/*.{ts,tsx}",
       "!apps/mobile/src/**/*.d.ts",
-      "!apps/mobile/src/**/__mocks__/**"
+      "!apps/mobile/src/**/__mocks__/**",
+      "!apps/mobile/src/app/**",
+      "!apps/mobile/src/types/**"
     ],
     "transform": {
       "^.+\\.(js|jsx|ts|tsx|mjs)$": "babel-jest",
       "^.+\\.(bmp|gif|jpg|jpeg|mp4|png|psd|svg|webp)$": "<rootDir>/node_modules/@react-native/jest-preset/jest/assetFileTransformer.js"
     },
     "transformIgnorePatterns": [
-      "node_modules[\\\\/](?!.*(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|msw|@msw|@mswjs|rettime|outvariant|until-async|@open-draft|is-node-process|cookie))",
+      "node_modules[\\\\/](?!.*(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|msw|@msw|@mswjs|rettime|outvariant|until-async|@open-draft|is-node-process|cookie|@shopify))",
       "[\\\\/]node_modules[\\\\/]react-native-reanimated[\\\\/]plugin[\\\\/]",
       "[\\\\/]node_modules[\\\\/]@react-native[\\\\/]babel-preset[\\\\/]"
     ],
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/__mocks__/styleMock.js",
       "^@/assets/(.*)$": "<rootDir>/apps/mobile/assets/$1",
-      "^@/(.*)$": "<rootDir>/apps/mobile/src/$1"
+      "^@/(.*)$": "<rootDir>/apps/mobile/src/$1",
+      "^@shared/types$": "<rootDir>/packages/types/src/index.ts"
     }
   },
   "homepage": "https://github.com/SignTrustMap/signtrustmap-frontend#readme",

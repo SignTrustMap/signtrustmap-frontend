@@ -30,6 +30,8 @@ export const API_ENDPOINTS = {
     ASSIGN_ROLE: (userId: string) => `/api/v1/admin/users/${userId}/roles`,
     TOGGLE_STATUS: (userId: string) => `/api/v1/admin/users/${userId}/status`,
     UPDATE_STATUS: (userId: string) => `/api/v1/admin/users/${userId}/status`,
+    LOW_RELIABILITY: '/api/v1/admin/users/low-reliability',
+    BAN_WAVE: '/api/v1/admin/users/ban-wave',
   },
 
   ROLES: {
@@ -41,6 +43,8 @@ export const API_ENDPOINTS = {
   // ── Security & Audit Logs ─────────────────────────────────────────
   AUDIT: {
     LOGS: '/api/v1/admin/audit-logs',
+    TASK_HISTORY: '/api/v1/admin/tasks/history',
+    TASK_HISTORY_DETAIL: (taskId: string) => `/api/v1/admin/tasks/${encodeURIComponent(taskId)}/history`,
   },
 
   // ── GIS Spatial Data Export ───────────────────────────────────────
@@ -85,6 +89,7 @@ export const API_ENDPOINTS = {
     CASES: '/api/v1/moderation/cases',
     CASE_DETAIL: (id: string) => `/api/v1/moderation/cases/${id}`,
     RESOLVE_CASE: (id: string) => `/api/v1/moderation/cases/${id}/resolve`,
+    USER_PROFILE: (id: string) => `/api/v1/moderation/users/${id}`,
     REPORT_FROM_REVIEW: '/api/v1/reviews/missing-type',
     CANDIDATES: '/api/v1/reviews/candidates',
     CANDIDATE_QUEUE: '/api/v1/reviews/queue',
@@ -109,12 +114,18 @@ export const API_ENDPOINTS = {
     CONSENSUS_CONFIG: '/api/v1/admin/consensus/config',
     ROUTE_MATRIX: '/api/v1/admin/routes/matrix',
     ROUTE_MATRIX_DETAIL: (id: number | string) => `/api/v1/admin/routes/matrix/${id}`,
+    FRESHNESS_RULES: '/api/v1/admin/freshness-rules',
+    FRESHNESS_RULE_DETAIL: (id: number | string) => `/api/v1/admin/freshness-rules/${id}`,
     BASE: '/api/v1/admin/system-parameters',
     INGESTION: '/api/v1/admin/system-parameters',
     CONSENSUS: '/api/v1/admin/consensus/config',
     FRESHNESS: '/api/v1/admin/routes/matrix',
     MODERATION: '/api/v1/admin/system-parameters',
     MAINTENANCE: '/api/v1/admin/system-parameters/maintenance_mode',
+    SYSTEM_SWITCHES: '/api/v1/admin/system-switches',
+    SYSTEM_SWITCH_KEY: (key: string) => `/api/v1/admin/system-switches/${encodeURIComponent(key)}`,
+    DEMO_MODE_ENABLE: '/api/v1/admin/system-switches/demo-mode/enable',
+    DEMO_MODE_DISABLE: '/api/v1/admin/system-switches/demo-mode/disable',
   },
 
   // ── Economy, Rewards & Wallet Adjustments ─────────────────────────
@@ -141,6 +152,7 @@ export const API_ENDPOINTS = {
     DETAIL: (id: string) => `/api/v1/signs/${id}`,
     ALONG_ROUTE: '/api/v1/signs/along-route',
     CONFIRM: (id: string) => `/api/v1/signs/${id}/confirm`,
+    HISTORY: (id: string) => `/api/v1/signs/${id}/history`,
     NEARBY: '/api/v1/signs',
     REPORT_ISSUE: (id: string) => `/api/v1/signs/${id}/confirm`,
   },
@@ -160,6 +172,7 @@ export const API_ENDPOINTS = {
     TASKS: '/api/v1/revalidation/tasks',
     TASK_DETAIL: (id: string) => `/api/v1/revalidation/tasks/${id}`,
     TASK_MAP: '/api/v1/revalidation/tasks/map',
+    TASK_CHECK_IN: (id: string) => `/api/v1/revalidation/tasks/${id}/check-in`,
     TASK_EVIDENCES: (id: string) => `/api/v1/revalidation/tasks/${id}/evidences`,
     SIGN_EVIDENCES: (id: string) => `/api/v1/revalidation/signs/${id}/evidences`,
     TASK_SUBMIT_EVIDENCE: (id: string) => `/api/v1/revalidation/tasks/${id}/evidence`,
@@ -192,15 +205,38 @@ export const API_ENDPOINTS = {
   // ── AIOps & Edge AI Pipelines ─────────────────────────────────────
   AIOPS: {
     BASE: AIOPS_BASE_URL,
-    HEALTH: `${AIOPS_BASE_URL}/api/v1/system/health`,
+    HEALTH: '/api/v1/system/health',
     STREAM: `${AIOPS_BASE_URL}/api/v1/system/stream`,
-    MODELS: `${AIOPS_BASE_URL}/api/v1/models`,
-    STRATEGIES: `${AIOPS_BASE_URL}/api/v1/active-learning/strategies`,
-    CLASSES: `${AIOPS_BASE_URL}/api/v1/classes`,
-    CONFIG: `${AIOPS_BASE_URL}/api/v1/config`,
+    MODELS: '/api/v1/models',
+    STRATEGIES: '/api/v1/active-learning/strategies',
+    CLASSES: '/api/v1/classes',
+    CONFIG: '/api/v1/config',
+    CONFIG_GROUP: (groupName: string) => `/api/v1/config/${encodeURIComponent(groupName)}`,
+    CONFIG_RESET: '/api/v1/config/reset',
     PIPELINE_STATUS: '/api/v1/mlops/pipeline/status',
     RETRAINING_RUNS: '/api/v1/mlops/retraining-runs',
     TRIGGER_RUN: '/api/v1/mlops/retraining-runs/trigger',
     ACTIVE_LEARNING_CONFIG: '/api/v1/mlops/active-learning/config',
+
+    // ── MLOps Model Rebuild & Lifecycle Endpoints ──────────────────
+    TRAINING_DATA_STATUS: '/api/v1/training-data/status',
+    TRAINING_DATA_DIFF: (modelId?: number) =>
+      modelId ? `/api/v1/training-data/class-distribution/diff?model_id=${encodeURIComponent(modelId)}` : '/api/v1/training-data/class-distribution/diff',
+    TRAINING_DATA_DISTRIBUTION: '/api/v1/training-data/class-distribution',
+
+    // Classifier Lifecycle
+    CLASSIFIER_REBUILD: '/api/v1/classifier/rebuild',
+    CLASSIFIER_VERSIONS: '/api/v1/classifier/versions',
+    CLASSIFIER_EVALUATION: (versionId: number | string) => `/api/v1/classifier/versions/${versionId}/evaluation`,
+    CLASSIFIER_DEPLOY: (versionId: number | string) => `/api/v1/classifier/versions/${versionId}/deploy`,
+    CLASSIFIER_ROLLBACK: '/api/v1/classifier/rollback',
+    CLASSIFIER_SWITCH: (versionId: number | string) => `/api/v1/classifier/switch/${versionId}`,
+
+    // Detector Lifecycle (strictly no rebuild endpoint)
+    DETECTOR_VERSIONS: '/api/v1/detector/versions',
+    DETECTOR_EVALUATION: (versionId: number | string) => `/api/v1/detector/versions/${versionId}/evaluation`,
+    DETECTOR_DEPLOY: (versionId: number | string) => `/api/v1/detector/versions/${versionId}/deploy`,
+    DETECTOR_ROLLBACK: '/api/v1/detector/rollback',
+    DETECTOR_SWITCH: (versionId: number | string) => `/api/v1/detector/switch/${versionId}`,
   },
 } as const

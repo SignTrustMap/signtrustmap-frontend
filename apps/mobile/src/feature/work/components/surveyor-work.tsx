@@ -1,41 +1,42 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchFirstRevalidationSign } from '@/api/revalidation/revalidation';
-import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
 import {
   useGetMyPendingSubmissions,
+  useGetMySubmissions,
   useGetMySurveyStats,
 } from '@/feature/upload/hooks/use-survey-submission';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
-import { useGetFirstRevalidationSign } from '@/feature/revalidation/hooks/use-revalidation';
-import type { RouteSign } from '@/api/navigation/navigation';
-import type { MapCoordinate } from '@/types/navigationType';
-import { WorkActionCard } from './work-action-card';
+import {
+  getFallbackMissionsForRole,
+  isTaskForRole,
+  useGetMyTaskCompletions,
+} from '@/feature/work/hooks/use-daily-tasks';
+import { WorkActionBadge } from './work-action-badge';
 
 export interface SurveyorWorkProps {
   pendingSurveyCount?: number;
   revalidationTaskCount?: number;
   recapturesCount?: number;
-  firstRevalSign?: RouteSign | null;
-  userCoordinate?: MapCoordinate;
+  returnedSubmissionsCount?: number;
   onOpenOfflineMap?: () => void;
   onOpenRevalidationMap?: () => void;
+  incompleteMissionsCount?: number;
 }
 
 export function SurveyorWork({
   pendingSurveyCount: propPendingSurveyCount,
   revalidationTaskCount: propRevalidationTaskCount,
   recapturesCount: propRecapturesCount,
-  firstRevalSign: propFirstRevalSign,
-  userCoordinate: propUserCoordinate,
+  returnedSubmissionsCount: propReturnedSubmissionsCount,
   onOpenOfflineMap,
   onOpenRevalidationMap,
+  incompleteMissionsCount: propMissionsCount,
 }: SurveyorWorkProps = {}) {
   const router = useRouter();
   const theme = useTheme();
@@ -43,150 +44,153 @@ export function SurveyorWork({
 
   const isSurveyor = Boolean(session?.account?.roles?.includes('surveyor'));
 
-  const [deviceCoordinate, setDeviceCoordinate] = useState<MapCoordinate | undefined>(
-    propUserCoordinate,
-  );
-  const [gpsAttempted, setGpsAttempted] = useState(Boolean(propUserCoordinate));
-
-  useEffect(() => {
-    if (propUserCoordinate) {
-      setDeviceCoordinate(propUserCoordinate);
-      setGpsAttempted(true);
-      return;
-    }
-
-    if (!isSurveyor) return;
-
-    let isMounted = true;
-    void fetchFreshGpsPosition(3500)
-      .then((pos) => {
-        if (isMounted && pos) {
-          setDeviceCoordinate(pos);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setGpsAttempted(true);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [propUserCoordinate, isSurveyor]);
-
-  const effectiveCoordinate = propUserCoordinate ?? deviceCoordinate;
-
   // Surveyor queries live directly within the Surveyor component
   const { data: pendingData } = useGetMyPendingSubmissions(isSurveyor);
+  const { data: mySubmissionsData } = useGetMySubmissions(
+    { page: '1', pageSize: '50' },
+    isSurveyor && propReturnedSubmissionsCount === undefined,
+  );
   const { data: surveyStats } = useGetMySurveyStats(isSurveyor);
   const { data: recapturesData } = useGetMyRecaptures({ page: 1, pageSize: 20 }, isSurveyor);
-  const { data: firstRevalSignData } = useGetFirstRevalidationSign(
-    effectiveCoordinate,
-    Boolean(isSurveyor && (effectiveCoordinate || gpsAttempted)),
-  );
 
   const pendingSurveyCount = propPendingSurveyCount ?? pendingData?.pending ?? 0;
   const revalidationTaskCount =
     propRevalidationTaskCount ?? surveyStats?.revalidationAvailable ?? 0;
   const recapturesCount = propRecapturesCount ?? recapturesData?.total ?? 0;
-  const firstRevalSign = propFirstRevalSign !== undefined ? propFirstRevalSign : firstRevalSignData;
 
-  const handleOpenRevalidationMap = async () => {
+  const returnedSubmissionsCount = useMemo(() => {
+    if (propReturnedSubmissionsCount !== undefined) return propReturnedSubmissionsCount;
+
+    if (pendingData?.countsByStatus) {
+      const counts = pendingData.countsByStatus;
+      const totalFromCounts =
+        (counts.NO_SIGN_DETECTED ?? 0) +
+        (counts.PENDING_CORRECTION ?? 0) +
+        (counts.REJECTED ?? 0) +
+        (counts.FAILED ?? 0);
+      if (totalFromCounts > 0) return totalFromCounts;
+    }
+
+    const items = mySubmissionsData?.items ?? [];
+    return items.filter((item) =>
+      ['PENDING_CORRECTION', 'REJECTED', 'FAILED', 'NO_SIGN_DETECTED'].includes(item.status),
+    ).length;
+  }, [propReturnedSubmissionsCount, pendingData?.countsByStatus, mySubmissionsData?.items]);
+
+  const { data: completionsData } = useGetMyTaskCompletions(
+    undefined,
+    isSurveyor && propMissionsCount === undefined,
+  );
+
+  const incompleteMissionsCount = useMemo(() => {
+    if (propMissionsCount !== undefined) return propMissionsCount;
+    const rawList = Array.isArray(completionsData) ? completionsData : [];
+    const matched = rawList.filter((item) => isTaskForRole(item.dailyTask, 'surveyor'));
+    const items = matched.length > 0 ? matched : getFallbackMissionsForRole('surveyor');
+    return items.filter((item) => !item.isCompleted && !item.claimed).length;
+  }, [completionsData, propMissionsCount]);
+
+  const handleOpenReturnedSubmissions = () => {
+    router.push('/work/returned-submissions-list');
+  };
+
+  const handleOpenRevalidationMap = () => {
     if (onOpenRevalidationMap) {
       onOpenRevalidationMap();
       return;
     }
 
-    let targetSign = firstRevalSign;
-    if (!targetSign) {
-      try {
-        const coord = effectiveCoordinate ?? (await fetchFreshGpsPosition(2000));
-        targetSign = await fetchFirstRevalidationSign(coord ?? undefined);
-      } catch {
-        targetSign = null;
-      }
-    }
-
-    if (targetSign) {
-      router.push({
-        pathname: '/work/revalidation-map',
-        params: {
-          autoSelectFirst: 'true',
-          selectedSignId: targetSign.id,
-          snapLon: String(targetSign.coordinate[0]),
-          snapLat: String(targetSign.coordinate[1]),
-          snapRequestId: String(Date.now()),
-          signJson: JSON.stringify(targetSign),
-        },
-      });
-    } else {
-      router.push({
-        pathname: '/work/revalidation-map',
-        params: {
-          autoSelectFirst: 'true',
-          snapRequestId: String(Date.now()),
-        },
-      });
-    }
+    router.push('/work/revalidation-map');
   };
 
   return (
-    <View style={styles.actionList}>
-      {/* Standout Action: Survey History */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={pendingSurveyCount}
-        icon="cloud-upload-outline"
-        label="Lịch sử khảo sát"
-        onPress={() => router.push('/work/survey-history')}
-        subtitle="Lịch sử ghi nhận biển báo đã nộp, duyệt, từ chối"
-      />
+    <View style={styles.container}>
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tính năng</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Standout Action: Revalidation Map */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={revalidationTaskCount}
+            icon="map-search-outline"
+            label="Tái xác nhận biển báo"
+            onPress={handleOpenRevalidationMap}
+          />
 
-      {/* Standout Action: Revalidation Map */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        count={revalidationTaskCount}
-        icon="map-search-outline"
-        label="Tái xác nhận biển báo"
-        onPress={handleOpenRevalidationMap}
-        subtitle="Xem bản đồ để kiểm tra các biển báo cần xác nhận lại"
-      />
+          {/* Standout Action: Recaptures Requested */}
+          <WorkActionBadge
+            accentColor="#F59E0B"
+            count={recapturesCount}
+            icon="camera-retake-outline"
+            label="Yêu cầu chụp lại ảnh"
+            onPress={() => router.push('/work/recaptures')}
+          />
 
-      {/* Standout Action: Recaptures Requested */}
-      <WorkActionCard
-        accentColor="#F59E0B"
-        count={recapturesCount}
-        icon="camera-retake-outline"
-        label="Yêu cầu chụp lại ảnh"
-        onPress={() => router.push('/work/recaptures')}
-        subtitle="Chụp lại biển báo bị mờ hoặc thiếu thông tin theo yêu cầu"
-      />
+          {/* Standout Action: Offline Maps */}
+          {onOpenOfflineMap ? (
+            <WorkActionBadge
+              accentColor={theme.primary}
+              icon="map-marker-down"
+              label="Bản đồ ngoại tuyến"
+              onPress={onOpenOfflineMap}
+            />
+          ) : null}
 
-      {/* Standout Action: Offline Maps */}
-      {onOpenOfflineMap ? (
-        <WorkActionCard
-          accentColor={theme.primary}
-          icon="map-marker-down"
-          label="Bản đồ ngoại tuyến"
-          onPress={onOpenOfflineMap}
-          subtitle="Tải bản đồ để sử dụng cả khi ngoại tuyến."
-        />
-      ) : null}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={returnedSubmissionsCount > 0 ? returnedSubmissionsCount : undefined}
+            icon="camera-document-off"
+            label="Ảnh bị trả về"
+            onPress={handleOpenReturnedSubmissions}
+          />
+        </View>
+      </View>
 
-      {/* Action Card: Sign Catalog */}
-      <WorkActionCard
-        accentColor={theme.primary}
-        icon="database-search-outline"
-        label="Tra cứu biển báo giao thông"
-        onPress={() =>
-          router.push({
-            pathname: '/work/sign-catalog',
-            params: { role: 'surveyor' },
-          })
-        }
-        subtitle="Tra cứu biển báo chuẩn theo Quy chuẩn Việt Nam"
-      />
+      {/* Section 2: Nhiệm vụ và tiện ích */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Nhiệm vụ và tiện ích</Text>
+        </View>
+        <View style={styles.gridRow}>
+          {/* Missions */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={incompleteMissionsCount > 0 ? incompleteMissionsCount : undefined}
+            icon="trophy-outline"
+            label="Nhiệm vụ"
+            onPress={() =>
+              router.push({
+                pathname: '/work/missions',
+                params: { role: 'surveyor' },
+              })
+            }
+          />
+
+          {/* Survey / Vote History */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            count={pendingSurveyCount}
+            icon="cloud-upload-outline"
+            label="Lịch sử xác nhận"
+            onPress={() => router.push('/work/survey-history')}
+          />
+
+          {/* Action Badge: Sign Catalog */}
+          <WorkActionBadge
+            accentColor={theme.primary}
+            icon="database-search-outline"
+            label="Tra cứu biển báo giao thông"
+            onPress={() =>
+              router.push({
+                pathname: '/work/sign-catalog',
+                params: { role: 'surveyor' },
+              })
+            }
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -221,8 +225,27 @@ export function SurveyorFab() {
 }
 
 const styles = StyleSheet.create({
-  actionList: {
-    gap: Spacing.three,
+  container: {
+    gap: Spacing.four,
+  },
+  sectionContainer: {
+    gap: Spacing.two,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.two,
+  },
+  sectionTitle: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: Spacing.two,
   },
   floatingAction: {
     position: 'absolute',

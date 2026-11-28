@@ -194,9 +194,13 @@ export default function CandidatesListPage() {
             (lat && lng ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : 'Chưa có vị trí')
 
           const surveyorName =
-            item.submission?.surveyor_id || item.submission?.surveyorId || item.surveyorId
+            item.surveyorName ||
+            item.surveyor?.fullName ||
+            item.submission?.surveyorName ||
+            item.submission?.surveyor_name ||
+            (item.submission?.surveyor_id || item.submission?.surveyorId || item.surveyorId
               ? `#${String(item.submission?.surveyor_id || item.submission?.surveyorId || item.surveyorId).slice(0, 8)}`
-              : 'Khảo sát viên ẩn danh'
+              : 'Khảo sát viên ẩn danh')
 
           return {
             id: String(item.id),

@@ -2,6 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  type ImageSourcePropType,
   Linking,
   Platform,
   Pressable,
@@ -26,12 +28,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { CreditScreenHeader } from '../components/credit-screen-header';
 import { TransactionList } from '../components/transaction-list';
-import {
-  useGetWallet,
-  useGetTopUpPackages,
-  useTopUp,
-  useTopUpCustom,
-} from '../hooks/use-wallet';
+import { useGetWallet, useGetTopUpPackages, useTopUp, useTopUpCustom } from '../hooks/use-wallet';
+
+const GATEWAY_LOGOS: Record<PaymentGatewayOption['id'], ImageSourcePropType> = {
+  MOMO: require('../../../../assets/brand/logo-momo-circle.png'),
+  VIETQR: require('../../../../assets/brand/viet-qr-logo.png'),
+};
 
 export function TopUpScreen() {
   const router = useRouter();
@@ -165,11 +167,11 @@ export function TopUpScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Current balance */}
         <View style={[styles.balancePanel, { backgroundColor: theme.backgroundSelected }]}>
-          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>Số điểm hiện tại</Text>
+          <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
+            Số điểm hiện tại
+          </Text>
           <View style={styles.balanceRow}>
-            <Text style={[styles.balanceValue, { color: theme.text }]}>
-              {balance}
-            </Text>
+            <Text style={[styles.balanceValue, { color: theme.text }]}>{balance}</Text>
             <Text style={[styles.balanceUnit, { color: theme.textSecondary }]}>Credits</Text>
           </View>
         </View>
@@ -206,13 +208,16 @@ export function TopUpScreen() {
         {/* Package selection header */}
         <View style={styles.sectionHeaderRow}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Chọn gói nạp</Text>
-          {loadingPackages ? (
-            <ActivityIndicator color={theme.primary} size="small" />
-          ) : null}
+          {loadingPackages ? <ActivityIndicator color={theme.primary} size="small" /> : null}
         </View>
 
         {errorPackages && displayPackages.length === 0 ? (
-          <View style={[styles.errorBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+          <View
+            style={[
+              styles.errorBox,
+              { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+            ]}
+          >
             <Text style={[styles.errorText, { color: theme.danger ?? '#C62929' }]}>
               Không thể tải gói nạp từ hệ thống.
             </Text>
@@ -241,7 +246,9 @@ export function TopUpScreen() {
                       style={[
                         styles.packageCard,
                         {
-                          backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
+                          backgroundColor: selected
+                            ? theme.backgroundSelected
+                            : theme.backgroundElement,
                           borderColor: selected ? theme.primary : theme.border,
                         },
                       ]}
@@ -249,7 +256,9 @@ export function TopUpScreen() {
                     >
                       {isPopular ? (
                         <View style={[styles.popularBadge, { backgroundColor: theme.primary }]}>
-                          <Text style={[styles.popularBadgeText, { color: theme.onPrimary }]}>PHỔ BIẾN</Text>
+                          <Text style={[styles.popularBadgeText, { color: theme.onPrimary }]}>
+                            PHỔ BIẾN
+                          </Text>
                         </View>
                       ) : null}
                       <View style={styles.packageCardHeader}>
@@ -282,7 +291,12 @@ export function TopUpScreen() {
                         </Text>
                       </View>
                       <View style={[styles.packagePriceRow, { borderTopColor: theme.border }]}>
-                        <Text style={[styles.packagePrice, { color: selected ? theme.primary : theme.text }]}>
+                        <Text
+                          style={[
+                            styles.packagePrice,
+                            { color: selected ? theme.primary : theme.text },
+                          ]}
+                        >
                           {formatVnd(pkg.priceVnd)}
                         </Text>
                       </View>
@@ -302,7 +316,8 @@ export function TopUpScreen() {
           style={[
             styles.customAmountButton,
             {
-              backgroundColor: customCredit !== null ? theme.backgroundSelected : theme.backgroundElement,
+              backgroundColor:
+                customCredit !== null ? theme.backgroundSelected : theme.backgroundElement,
               borderColor: customCredit !== null ? theme.primary : theme.border,
             },
           ]}
@@ -325,7 +340,12 @@ export function TopUpScreen() {
               </Text>
             </View>
           </View>
-          <View style={[styles.radio, { borderColor: customCredit !== null ? theme.primary : theme.border }]}>
+          <View
+            style={[
+              styles.radio,
+              { borderColor: customCredit !== null ? theme.primary : theme.border },
+            ]}
+          >
             {customCredit !== null ? (
               <View style={[styles.radioDot, { backgroundColor: theme.primary }]} />
             ) : null}
@@ -333,9 +353,16 @@ export function TopUpScreen() {
         </AppButton>
 
         {/* Summary card */}
-        <View style={[styles.summaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+          ]}
+        >
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Số Credits nhận được</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>
+              Số Credits nhận được
+            </Text>
             <Text style={[styles.summaryValue, { color: theme.text }]}>
               +{displayAmount.toLocaleString('vi-VN')} Credits
             </Text>
@@ -351,17 +378,19 @@ export function TopUpScreen() {
 
         {/* Payment methods */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Phương thức thanh toán</Text>
-        <View style={[styles.paymentCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.paymentCard,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+          ]}
+        >
           {AVAILABLE_PAYMENT_GATEWAYS.map((gateway, index) => {
             const selected = gateway.id === selectedGateway;
             const isMoMo = gateway.id === 'MOMO';
-            const isMock = gateway.id === 'MOCK';
-            const isVietQR = gateway.id === 'VIETQR';
 
-            const badgeBg = isMoMo ? '#FCE7F3' : isMock ? '#FEF3C7' : theme.backgroundSelected;
-            const badgeTextColor = isMoMo ? '#BE185D' : isMock ? '#B45309' : theme.primary;
-            const iconBg = isMoMo ? '#FDF2F8' : isVietQR ? '#EFF6FF' : '#FFFBEB';
-            const iconColor = isMoMo ? '#D82D8B' : isVietQR ? '#0284C7' : '#D97706';
+            const badgeBg = isMoMo ? '#FCE7F3' : theme.backgroundSelected;
+            const badgeTextColor = isMoMo ? '#BE185D' : theme.primary;
+            const iconBg = isMoMo ? '#FDF2F8' : '#EFF6FF';
 
             return (
               <AppButton
@@ -377,15 +406,17 @@ export function TopUpScreen() {
                 variant="ghost"
               >
                 <View style={[styles.methodIcon, { backgroundColor: iconBg }]}>
-                  <Text style={[styles.methodSymbol, { color: iconColor }]}>
-                    {gateway.iconSymbol}
-                  </Text>
+                  <Image
+                    accessibilityIgnoresInvertColors
+                    resizeMode="contain"
+                    source={GATEWAY_LOGOS[gateway.id]}
+                    style={styles.methodLogo}
+                    testID={`gateway-logo-${gateway.id}`}
+                  />
                 </View>
                 <View style={styles.methodCopy}>
                   <View style={styles.methodTitleRow}>
-                    <Text style={[styles.methodLabel, { color: theme.text }]}>
-                      {gateway.name}
-                    </Text>
+                    <Text style={[styles.methodLabel, { color: theme.text }]}>{gateway.name}</Text>
                     {gateway.badge ? (
                       <View style={[styles.methodBadge, { backgroundColor: badgeBg }]}>
                         <Text style={[styles.methodBadgeText, { color: badgeTextColor }]}>
@@ -398,8 +429,12 @@ export function TopUpScreen() {
                     {gateway.detail}
                   </Text>
                 </View>
-                <View style={[styles.radio, { borderColor: selected ? theme.primary : theme.border }]}>
-                  {selected ? <View style={[styles.radioDot, { backgroundColor: theme.primary }]} /> : null}
+                <View
+                  style={[styles.radio, { borderColor: selected ? theme.primary : theme.border }]}
+                >
+                  {selected ? (
+                    <View style={[styles.radioDot, { backgroundColor: theme.primary }]} />
+                  ) : null}
                 </View>
               </AppButton>
             );
@@ -408,7 +443,9 @@ export function TopUpScreen() {
 
         {/* Error / success feedback */}
         {confirmError ? (
-          <Text style={[styles.feedbackText, { color: theme.danger ?? '#C62929' }]}>{confirmError}</Text>
+          <Text style={[styles.feedbackText, { color: theme.danger ?? '#C62929' }]}>
+            {confirmError}
+          </Text>
         ) : null}
         {confirmSuccess ? (
           <Text style={[styles.feedbackText, { color: '#087A3D' }]}>
@@ -421,7 +458,10 @@ export function TopUpScreen() {
 
       <SafeAreaView
         edges={['bottom']}
-        style={[styles.footer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+        style={[
+          styles.footer,
+          { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+        ]}
       >
         <AppButton
           accessibilityLabel={`Thanh toán ${displayPriceVnd} cho ${displayAmount} Credits`}
@@ -661,10 +701,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
-  methodIcon: { width: 44, height: 44, borderRadius: Rounded.md, alignItems: 'center', justifyContent: 'center' },
-  methodSymbol: { fontFamily: Fonts.body, fontSize: 18, fontWeight: 900 },
+  methodIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Rounded.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  methodLogo: { width: 28, height: 28 },
   methodCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 2 },
-  methodTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, flexWrap: 'wrap' },
+  methodTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    flexWrap: 'wrap',
+  },
   methodLabel: { fontFamily: Fonts.body, fontSize: 14, fontWeight: 800 },
   methodBadge: {
     paddingHorizontal: 6,
@@ -677,7 +729,14 @@ const styles = StyleSheet.create({
     fontWeight: 800,
   },
   methodDetail: { fontFamily: Fonts.body, fontSize: 12, fontWeight: 500, lineHeight: 16 },
-  radio: { width: 22, height: 22, borderWidth: 2, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  radio: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   footer: { borderTopWidth: 1, padding: Spacing.four, paddingTop: Spacing.two },
   payButton: { width: '100%', maxWidth: 600, alignSelf: 'center' },
@@ -706,4 +765,3 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
   },
 });
-

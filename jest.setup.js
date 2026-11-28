@@ -110,6 +110,7 @@ jest.mock('@/services/offline-map-service', () => ({
     subscribeToMetadata: jest.fn(() => () => {}),
     deleteMapPack: jest.fn().mockResolvedValue(undefined),
     setActivePack: jest.fn().mockResolvedValue(undefined),
+    getActiveOfflinePack: jest.fn().mockResolvedValue(null),
   },
   formatBytes: (bytes) => `${bytes} B`,
 }));
@@ -126,4 +127,32 @@ jest.mock('@react-native-community/datetimepicker', () => {
     },
   };
 });
+
+jest.mock('expo-blob', () => ({
+  Blob: class {},
+}));
+
+jest.mock('@/hooks/use-back-button', () => ({
+  useBackButton: jest.fn(),
+}));
+
+jest.mock('@/feature/work/hooks/use-bounty-board', () => ({
+  bountyKeys: {
+    all: (accountId) => ['bounty-board', accountId],
+    available: (accountId, params) => ['bounty-board', accountId, 'available', params],
+    myClaims: (accountId) => ['bounty-board', accountId, 'my-claims'],
+  },
+  useMyBountyClaims: () => ({ data: [], isLoading: false }),
+  useAvailableBountyQuests: () => ({ data: [], isLoading: false }),
+  useClaimBountyQuest: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useAbandonBountyQuest: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useCheckInCandidate: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+
+try {
+  require('@shopify/flash-list/jestSetup');
+} catch {
+  // Gracefully fallback if jestSetup is unavailable
+}
+
 

@@ -64,9 +64,12 @@ function useReviewMutation<TVariables extends { params: CandidateVoteParams }>(
       if (!session) throw new Error(SIGN_IN_TO_REVIEW_MESSAGE);
       return mutation(variables, session.accessToken);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       // Refresh the reviewer credit score / stats without invalidating the active review queue prematurely
       queryClient.invalidateQueries({ queryKey: reviewKeys.stats(session?.account.id) });
+      if ((variables as any)?.request?.questClaimId) {
+        queryClient.invalidateQueries({ queryKey: ['bounty-board'] });
+      }
     },
   });
 }
@@ -115,6 +118,18 @@ export function useGetReviewHistory(enabled = true) {
     queryFn: session ? ({ signal }) => getMyReviewHistory(params, session.accessToken, signal) : skipToken,
     select: selectReviewHistory,
     enabled,
+  });
+}
+
+/** Load raw review history with timestamps and vote values for history review & editing. */
+export function useGetMyRawReviewHistory(enabled = true) {
+  const { session } = useSession();
+  const params: MyReviewHistoryParams = { page: '1', pageSize: '100' };
+  return useQuery({
+    queryKey: ['my-raw-review-history', session?.account?.id],
+    queryFn: session ? ({ signal }) => getMyReviewHistory(params, session.accessToken, signal) : skipToken,
+    enabled,
+    staleTime: 15_000,
   });
 }
 

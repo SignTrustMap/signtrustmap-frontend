@@ -1,210 +1,201 @@
 import {
-    CandidateReportParams,
-    CandidateSignDetailsParams,
-    MyReviewHistoryParams,
-    ReportDto,
-    CandidateVoteParams,
-    VoteDto,
-    CannotIdentifySignReportParams,
-    ReviewQueueParams,
-    ReviewQueueResponse,
-    MyReviewHistoryResponse,
-    ReviewerStatsResponse,
-    CreateMissingTypeReportDto,
-    MyRecapturesResponse,
+  CandidateReportParams,
+  CandidateSignDetailsParams,
+  MyReviewHistoryParams,
+  ReportDto,
+  CandidateVoteParams,
+  VoteDto,
+  CannotIdentifySignReportParams,
+  ReviewQueueParams,
+  ReviewQueueResponse,
+  MyReviewHistoryResponse,
+  ReviewerStatsResponse,
+  CreateMissingTypeReportDto,
+  MyRecapturesResponse,
 } from '@/types/reviewsType';
 
 import { API_PATHS } from '@/api/api';
 import { apiRequest, jsonApiRequest } from '@/api/api-client';
 
-
 export function getMyReviewHistory(
-    params: MyReviewHistoryParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: MyReviewHistoryParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    const queryParams = new URLSearchParams({
-        page: params.page,
-        pageSize: params.pageSize,
-    });
-    if (params.status !== undefined) queryParams.set('status', params.status);
-    if (params.search !== undefined) queryParams.set('search', params.search);
-    if (params.surveyorId !== undefined) queryParams.set('surveyorId', params.surveyorId);
+  const queryParams = new URLSearchParams({
+    page: params.page,
+    pageSize: params.pageSize,
+  });
+  const statusValue = params.status ?? params.state;
+  if (statusValue !== undefined) queryParams.set('status', statusValue);
+  if (params.search !== undefined) queryParams.set('search', params.search);
+  if (params.surveyorId !== undefined) queryParams.set('surveyorId', params.surveyorId);
 
-    return apiRequest<MyReviewHistoryResponse>(
-        `${API_PATHS.REVIEWS}/me/history?${queryParams}`,
-        { signal },
-        accessToken,
-    );
+  return apiRequest<MyReviewHistoryResponse>(
+    `${API_PATHS.REVIEWS}/me/history?${queryParams}`,
+    { signal },
+    accessToken,
+  );
 }
 
 export function getCandidateSignDetails(
-    params: CandidateSignDetailsParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CandidateSignDetailsParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return apiRequest(
-        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}`,
-        { signal },
-        accessToken,
-    );
+  return apiRequest(
+    `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}`,
+    { signal },
+    accessToken,
+  );
 }
 
 export function reportSignCandidate(
-    params: CandidateReportParams,
-    request: ReportDto,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CandidateReportParams,
+  request: ReportDto,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return jsonApiRequest(
-        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/report`,
-        request,
-        accessToken,
-        signal,
-    );
+  return jsonApiRequest(
+    `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/report`,
+    request,
+    accessToken,
+    signal,
+  );
 }
 
 export function reportCannotIdentifySign(
-    params: CannotIdentifySignReportParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CannotIdentifySignReportParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return apiRequest(
-        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/can-not-identify`,
-        {
-            method: 'POST',
-            signal,
-        },
-        accessToken,
-    );
+  return apiRequest(
+    `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/can-not-identify`,
+    {
+      method: 'POST',
+      signal,
+    },
+    accessToken,
+  );
 }
 
 export function skipSign(
-    params: CannotIdentifySignReportParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CannotIdentifySignReportParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return apiRequest(
-        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/skip`,
-        {
-            method: 'POST',
-            signal,
-        },
-        accessToken,
-    );
+  return apiRequest(
+    `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(params.candidateId)}/skip`,
+    {
+      method: 'POST',
+      signal,
+    },
+    accessToken,
+  );
 }
 
 export function castVoteOnSignCandidate(
-    params: CandidateVoteParams,
-    request: VoteDto,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CandidateVoteParams,
+  request: VoteDto,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return jsonApiRequest(
-        `${API_PATHS.REVIEWS}/${encodeURIComponent(params.candidateId)}/vote`,
-        request,
-        accessToken,
-        signal,
-    );
+  return jsonApiRequest(
+    `${API_PATHS.REVIEWS}/${encodeURIComponent(params.candidateId)}/vote`,
+    request,
+    accessToken,
+    signal,
+  );
 }
 
 export function undoVoteOnCandidate(
-    params: CandidateVoteParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: CandidateVoteParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return jsonApiRequest(
-        `${API_PATHS.REVIEWS}/${encodeURIComponent(params.candidateId)}/vote`,
-        {},
-        accessToken,
-        signal,
-        'DELETE',
-    );
+  return jsonApiRequest(
+    `${API_PATHS.REVIEWS}/${encodeURIComponent(params.candidateId)}/vote`,
+    {},
+    accessToken,
+    signal,
+    'DELETE',
+  );
 }
 
 export async function getReviewQueue(
-    params: ReviewQueueParams,
-    accessToken: string,
-    signal?: AbortSignal,
+  params: ReviewQueueParams,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    const queryParams = new URLSearchParams({
-        page: params.page || '1',
-        pageSize: params.pageSize || '100',
-    });
+  const queryParams = new URLSearchParams({
+    page: params.page || '1',
+    pageSize: params.pageSize || '100',
+  });
 
-    const res = await apiRequest<ReviewQueueResponse>(
-        `${API_PATHS.REVIEWS}/queue?${queryParams}`,
-        { signal },
-        accessToken,
-    );
+  const res = await apiRequest<ReviewQueueResponse>(
+    `${API_PATHS.REVIEWS}/queue?${queryParams}`,
+    { signal },
+    accessToken,
+  );
 
-    return res;
+  return res;
 }
 
-export function getMyReviewerStats(
-    accessToken: string,
-    signal?: AbortSignal,
-) {
-    return apiRequest<ReviewerStatsResponse>(
-        `${API_PATHS.REVIEWS}/me/stats`,
-        { signal },
-        accessToken,
-    );
+export function getMyReviewerStats(accessToken: string, signal?: AbortSignal) {
+  return apiRequest<ReviewerStatsResponse>(
+    `${API_PATHS.REVIEWS}/me/stats`,
+    { signal },
+    accessToken,
+  );
 }
 
 export function reportMissingType(
-    request: CreateMissingTypeReportDto,
-    accessToken: string,
-    signal?: AbortSignal,
+  request: CreateMissingTypeReportDto,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return jsonApiRequest(
-        `${API_PATHS.REVIEWS}/missing-type`,
-        request,
-        accessToken,
-        signal,
-    );
+  return jsonApiRequest(`${API_PATHS.REVIEWS}/missing-type`, request, accessToken, signal);
 }
 
 export function getMyRecaptures(
-    params: { page?: number; pageSize?: number } = {},
-    accessToken: string,
-    signal?: AbortSignal,
+  params: { page?: number; pageSize?: number } = {},
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    const queryParams = new URLSearchParams({
-        page: String(params.page ?? 1),
-        pageSize: String(params.pageSize ?? 20),
-    });
+  const queryParams = new URLSearchParams({
+    page: String(params.page ?? 1),
+    pageSize: String(params.pageSize ?? 20),
+  });
 
-    return apiRequest<MyRecapturesResponse>(
-        `${API_PATHS.REVIEWS}/me/recaptures?${queryParams}`,
-        { signal },
-        accessToken,
-    );
+  return apiRequest<MyRecapturesResponse>(
+    `${API_PATHS.REVIEWS}/me/recaptures?${queryParams}`,
+    { signal },
+    accessToken,
+  );
 }
 
 export function submitCandidateRecapture(
-    candidateId: string,
-    formData: FormData,
-    accessToken: string,
-    signal?: AbortSignal,
+  candidateId: string,
+  formData: FormData,
+  accessToken: string,
+  signal?: AbortSignal,
 ) {
-    return apiRequest<{
-        success: boolean;
-        candidateId: string;
-        requestId: number;
-        status: string;
-        evidence: {
-            signCropUrl: string;
-            bestFrameUrl: string;
-        };
-    }>(
-        `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(candidateId)}/recapture`,
-        {
-            method: 'POST',
-            body: formData,
-            signal,
-        },
-        accessToken,
-    );
+  return apiRequest<{
+    success: boolean;
+    candidateId: string;
+    requestId: number;
+    status: string;
+    evidence: {
+      signCropUrl: string;
+      bestFrameUrl: string;
+    };
+  }>(
+    `${API_PATHS.REVIEWS}/candidates/${encodeURIComponent(candidateId)}/recapture`,
+    {
+      method: 'POST',
+      body: formData,
+      signal,
+    },
+    accessToken,
+  );
 }
-

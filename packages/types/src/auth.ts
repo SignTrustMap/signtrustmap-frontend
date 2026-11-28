@@ -144,9 +144,11 @@ export interface UserProfileResponse {
   email: string
   fullName: string
   phone?: string | null
+  address?: string | null
   avatarUrl?: string | null
   status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' | string
   roles: string[]
+  registeredRoles?: string[]
   walletBalance: number
   profileStats?: {
     driver?: Record<string, any> | null

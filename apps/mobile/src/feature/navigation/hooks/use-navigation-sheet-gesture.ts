@@ -26,11 +26,21 @@ export function useNavigationSheetGesture({
     : 160 + bottomInset;
   const midSheetHeight = hasPlannedRouteOrigin
     ? Math.min(420, windowHeight * 0.52)
-    : 188 + bottomInset;
+    : 160 + bottomInset;
   const maxSheetHeight = Math.max(midSheetHeight, Math.min(640, windowHeight * 0.82));
 
   const sheetHeightAnim = useRef(new Animated.Value(midSheetHeight)).current;
   const currentHeightRef = useRef(midSheetHeight);
+  const dragStartHeightRef = useRef(midSheetHeight);
+
+  useEffect(() => {
+    const id = sheetHeightAnim.addListener(({ value }) => {
+      currentHeightRef.current = value;
+    });
+    return () => {
+      sheetHeightAnim.removeListener(id);
+    };
+  }, [sheetHeightAnim]);
 
   const snapTo = useCallback(
     (index: 0 | 1 | 2) => {
@@ -38,14 +48,14 @@ export function useNavigationSheetGesture({
       setSheetSnapIndex(index);
       const targetHeight =
         index === 0 ? peekSheetHeight : index === 1 ? midSheetHeight : maxSheetHeight;
-      currentHeightRef.current = targetHeight;
+
       if (process.env.NODE_ENV === 'test') {
+        currentHeightRef.current = targetHeight;
         sheetHeightAnim.setValue(targetHeight);
         return;
       }
-      if (Math.abs(currentHeightRef.current - targetHeight) < 1) {
-        return;
-      }
+
+      currentHeightRef.current = targetHeight;
       Animated.spring(sheetHeightAnim, {
         toValue: targetHeight,
         damping: 24,
@@ -71,14 +81,18 @@ export function useNavigationSheetGesture({
         : snapIndexRef.current === 1
           ? midSheetHeight
           : maxSheetHeight;
-    currentHeightRef.current = targetHeight;
+
     if (process.env.NODE_ENV === 'test') {
+      currentHeightRef.current = targetHeight;
       sheetHeightAnim.setValue(targetHeight);
       return;
     }
+
     if (Math.abs(currentHeightRef.current - targetHeight) < 1) {
       return;
     }
+
+    currentHeightRef.current = targetHeight;
     Animated.spring(sheetHeightAnim, {
       toValue: targetHeight,
       damping: 24,
@@ -116,10 +130,12 @@ export function useNavigationSheetGesture({
         onPanResponderGrant: () => {
           sheetHeightAnim.stopAnimation((value) => {
             currentHeightRef.current = value;
+            dragStartHeightRef.current = value;
           });
+          dragStartHeightRef.current = currentHeightRef.current;
         },
         onPanResponderMove: (_, gesture) => {
-          const newHeight = currentHeightRef.current - gesture.dy;
+          const newHeight = dragStartHeightRef.current - gesture.dy;
           const clamped = Math.max(peekSheetHeight - 10, Math.min(maxSheetHeight + 15, newHeight));
           sheetHeightAnim.setValue(clamped);
         },
@@ -149,7 +165,7 @@ export function useNavigationSheetGesture({
           }
 
           // Distance-based snapping to nearest tier
-          const finalHeight = currentHeightRef.current - gesture.dy;
+          const finalHeight = dragStartHeightRef.current - gesture.dy;
           const thresholdPeekToMid = (peekSheetHeight + midSheetHeight) / 2;
           const thresholdMidToMax = (midSheetHeight + maxSheetHeight) / 2;
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Camera } from 'expo-camera';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { AppButton } from '@/components/button';
 import { AppToast } from '@/components/toast';
@@ -37,8 +37,8 @@ import { useSignProximityAlert } from '../hooks/use-sign-proximity-alert';
 import { speechService } from '@/services/speech';
 import { getStorageItemAsync, setStorageItemAsync } from '@/hooks/use-storage';
 import type { FindSignsInBoundsParams } from '@/types/signMapType';
-import { getRouteProgressMeters } from '../utils/route-progress';
-import { resolveImageUrl, TARGET_SIGN_IMAGE_URL } from '../utils/signs';
+import { getRouteProgressInfo, getRouteProgressMeters } from '../utils/route-progress';
+import { resolveImageUrl, TARGET_SIGN_IMAGE_URL, deduplicateRouteSigns } from '../utils/signs';
 import { applyDemoRouteSigns } from '../utils/demo-route-signs';
 import { getMapLibre } from '@/services/maplibre';
 import { useGetWallet } from '@/feature/credits/hooks/use-wallet';
@@ -80,9 +80,11 @@ export { SIGN_CATEGORIES, type SignCategory, getSignCategory };
 export function NavigationMapScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(Spacing.two, insets.bottom - Spacing.two);
+  const bottomInset =
+    insets.bottom > 0 ? insets.bottom - Spacing.four : Platform.OS === 'ios' ? 34 : 0;
 
   const { setNavigationActive } = useNavigationActive();
   const {
@@ -91,6 +93,10 @@ export function NavigationMapScreen() {
     destinationLng,
     destinationSubtitle,
     destinationTitle,
+    isFreeNavigation,
+    reviewerSubmissionId,
+    reviewerReturnPath,
+    returnToReviewer,
     savedRouteId: paramSavedRouteId,
     startId,
     startLat,
@@ -103,6 +109,10 @@ export function NavigationMapScreen() {
     destinationLng?: string;
     destinationSubtitle?: string;
     destinationTitle?: string;
+    isFreeNavigation?: string;
+    reviewerSubmissionId?: string;
+    reviewerReturnPath?: string;
+    returnToReviewer?: string;
     savedRouteId?: string;
     startId?: string;
     startLat?: string;
@@ -110,6 +120,22 @@ export function NavigationMapScreen() {
     startTitle?: string;
     vehicleMode?: string;
   }>();
+
+  const isFreeReviewerNavigation = isFreeNavigation === 'true';
+  const isReturnToReviewer = returnToReviewer === 'true';
+
+  const handleReturnToReviewer = useCallback(() => {
+    setSwappedRoute(null);
+    setRerouteOrigin(undefined);
+    setNavigationSession(undefined);
+    setActiveSavedRouteId(undefined);
+    resetReroute();
+    const targetPath = reviewerReturnPath || '/work/submission-review';
+    router.replace({
+      pathname: targetPath as any,
+      params: reviewerSubmissionId ? { targetSubmissionId: reviewerSubmissionId } : {},
+    });
+  }, [reviewerReturnPath, reviewerSubmissionId, router]);
 
   const [activeSavedRouteId, setActiveSavedRouteId] = useState<string | undefined>(
     paramSavedRouteId,
@@ -144,9 +170,25 @@ export function NavigationMapScreen() {
   const [lastNavigatedDestinationTitle, setLastNavigatedDestinationTitle] = useState<
     string | undefined
   >();
-  const { data: unreadNotificationCount = 0 } = useGetUnreadNotificationCount();
 
-  const selectedDestination = useMemo(() => {
+  const [swappedRoute, setSwappedRoute] = useState<{
+    origin: MapCoordinate;
+    originTitle: string;
+    destination: {
+      category: 'recent' | 'saved';
+      coordinate: MapCoordinate;
+      id: string;
+      subtitle: string;
+      title: string;
+    };
+  } | null>(null);
+
+  useEffect(() => {
+    setSwappedRoute(null);
+    setRerouteOrigin(undefined);
+  }, [destinationId, destinationLat, destinationLng, paramSavedRouteId, startLat, startLng]);
+
+  const baseSelectedDestination = useMemo(() => {
     if (destinationLat && destinationLng) {
       return {
         category: 'recent' as const,
@@ -193,6 +235,23 @@ export function NavigationMapScreen() {
     fallbackCurrentLocation,
   );
 
+  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
+
+  const basePlannedRouteOrigin =
+    savedRouteData && !fallbackCurrentLocation
+      ? ([savedRouteData.originLongitude, savedRouteData.originLatitude] as MapCoordinate)
+      : (fallbackCurrentLocation ?? initialGpsOrigin);
+
+  const baseRouteStartTitle =
+    startTitle ||
+    (savedRouteData && !fallbackCurrentLocation
+      ? savedRouteData.originName
+      : (resolvedOriginTitle ?? 'Vị trí của bạn'));
+
+  const selectedDestination = swappedRoute ? swappedRoute.destination : baseSelectedDestination;
+  const plannedRouteOrigin = swappedRoute ? swappedRoute.origin : basePlannedRouteOrigin;
+  const routeStartTitle = swappedRoute ? swappedRoute.originTitle : baseRouteStartTitle;
+
   useEffect(() => {
     if (fallbackCurrentLocation) {
       setInitialGpsOrigin(fallbackCurrentLocation);
@@ -213,19 +272,6 @@ export function NavigationMapScreen() {
       });
     }
   }, [selectedDestination, userCoordinate]);
-
-  const [resolvedOriginTitle, setResolvedOriginTitle] = useState<string>();
-
-  const plannedRouteOrigin =
-    savedRouteData && !fallbackCurrentLocation
-      ? ([savedRouteData.originLongitude, savedRouteData.originLatitude] as MapCoordinate)
-      : (fallbackCurrentLocation ?? initialGpsOrigin);
-
-  const routeStartTitle =
-    startTitle ||
-    (savedRouteData && !fallbackCurrentLocation
-      ? savedRouteData.originName
-      : (resolvedOriginTitle ?? 'Vị trí của bạn'));
 
   const [vehicleMode, setVehicleMode] = useState<VehicleMode['id']>(() => {
     if (paramVehicleMode) {
@@ -372,17 +418,35 @@ export function NavigationMapScreen() {
   }, []);
 
   const handleToggleTts = useCallback(() => {
-    setIsTtsEnabled((prev) => {
-      const next = !prev;
-      speechService.setEnabled(next);
-      void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
-      setLocationToast({
-        id: Date.now(),
-        message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
-      });
-      return next;
+    const next = !isTtsEnabled;
+    setIsTtsEnabled(next);
+    speechService.setEnabled(next);
+    void setStorageItemAsync('signtrust_tts_enabled', String(next)).catch(() => {});
+    setLocationToast({
+      id: Date.now(),
+      message: next ? 'Đã bật thông báo giọng nói' : 'Đã tắt thông báo giọng nói',
     });
-  }, []);
+  }, [isTtsEnabled]);
+
+  const renderTtsToggleButton = (testID?: string) => (
+    <AppButton
+      accessibilityLabel={isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'}
+      onPress={handleToggleTts}
+      style={[
+        styles.mapActionButton,
+        styles.locationActionButton,
+        styles.ttsActionButton,
+      ]}
+      testID={testID}
+      variant="surface"
+    >
+      <MaterialCommunityIcons
+        name={isTtsEnabled ? 'volume-high' : 'volume-off'}
+        size={22}
+        color="#000000"
+      />
+    </AppButton>
+  );
 
   const [selectedMapSign, setSelectedMapSign] = useState<RouteSign | null>(null);
 
@@ -393,24 +457,28 @@ export function NavigationMapScreen() {
   const {
     data: carRouteResult,
     isLoading: isCarRouteLoading,
+    isPlaceholderData: isCarRoutePlaceholder,
     error: carRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'DRIVING');
 
   const {
     data: motorcycleRouteResult,
     isLoading: isMotorcycleRouteLoading,
+    isPlaceholderData: isMotorcycleRoutePlaceholder,
     error: motorcycleRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'BIKE');
 
   const {
     data: cyclingRouteResult,
     isLoading: isCyclingRouteLoading,
+    isPlaceholderData: isCyclingRoutePlaceholder,
     error: cyclingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'CYCLING');
 
   const {
     data: walkingRouteResult,
     isLoading: isWalkingRouteLoading,
+    isPlaceholderData: isWalkingRoutePlaceholder,
     error: walkingRouteError,
   } = useGetNavigationRoute(activeRouteOrigin, selectedDestination?.coordinate, 'WALKING');
 
@@ -427,6 +495,17 @@ export function NavigationMapScreen() {
         : isMotorcycleMode
           ? motorcycleRouteResult
           : carRouteResult;
+
+  const isActiveRoutePlaceholder =
+    vehicleMode === 'CYCLING'
+      ? isCyclingRoutePlaceholder
+      : vehicleMode === 'WALKING'
+        ? isWalkingRoutePlaceholder
+        : isMotorcycleMode
+          ? isMotorcycleRoutePlaceholder
+          : isCarRoutePlaceholder;
+
+  const activeRouteGeometry = isActiveRoutePlaceholder ? undefined : activeRouteResult?.geometry;
 
   const activeRouteError =
     vehicleMode === 'CYCLING'
@@ -446,7 +525,7 @@ export function NavigationMapScreen() {
   const { data: plannedSigns = [], error: routeSignsError } = useGetSignsAlongRoute(
     activeRouteOrigin,
     selectedDestination?.coordinate,
-    activeRouteResult?.geometry,
+    activeRouteGeometry,
     vehicleMode,
   );
 
@@ -468,7 +547,9 @@ export function NavigationMapScreen() {
       setRerouteOrigin(newOrigin);
     },
     onRerouteApplied: (newOrigin) => {
-      setRerouteOrigin(undefined);
+      // Keep active rerouteOrigin anchored so plannedRouteOrigin (from params or saved route)
+      // never reverts the map back to the stale pre-reroute geometry.
+      setRerouteOrigin(newOrigin);
       setInitialGpsOrigin(newOrigin);
     },
     onClearNavigationError: () => setNavigationError(undefined),
@@ -486,17 +567,18 @@ export function NavigationMapScreen() {
     selectedDestination &&
     activeRouteResult?.coordinates?.length,
   );
-  const hasInsufficientCredits = isRoutePreviewReady && userCredits < 5;
+  const hasInsufficientCredits =
+    !isFreeReviewerNavigation && isRoutePreviewReady && userCredits < 5;
 
   useEffect(() => {
     if (activeRouteResult?.coordinates?.length && !isNavigating) {
-      if (userCredits < 5) {
+      if (!isFreeReviewerNavigation && userCredits < 5) {
         setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       } else {
         setNavigationError(undefined);
       }
     }
-  }, [activeRouteResult?.coordinates, isNavigating, userCredits]);
+  }, [activeRouteResult?.coordinates, isFreeReviewerNavigation, isNavigating, userCredits]);
 
   useEffect(() => {
     setNavigationActive(isNavigating);
@@ -519,31 +601,47 @@ export function NavigationMapScreen() {
   const hasLiveLocation = Boolean(isNavigating && navigationSession?.hasLiveLocation);
 
   const visibleSigns = useMemo(() => {
-    const corridorSigns = savedRouteSignsData?.signs;
+    const corridorSigns = !swappedRoute ? savedRouteSignsData?.signs : undefined;
     const rawSigns =
       corridorSigns && corridorSigns.length > 0
         ? corridorSigns
-        : hasSelectedRoute
+        : hasSelectedRoute || isNavigating
           ? plannedSigns
           : mapSigns;
-    const resolvedSigns = rawSigns.map((sign) => ({
-      ...sign,
-      imageUrl:
+    const resolvedSigns = rawSigns.map((sign) => {
+      const resolvedCrop = sign.actualCropUrl ? resolveImageUrl(sign.actualCropUrl) : undefined;
+      const resolvedFrame =
+        sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl
+          ? resolveImageUrl(sign.actualFrameUrl || (sign as any).actualFrameURl || sign.frameUrl)
+          : undefined;
+      const resolvedImage =
         sign.imageUrl && !sign.imageUrl.includes('mock/')
           ? resolveImageUrl(sign.imageUrl)
-          : TARGET_SIGN_IMAGE_URL,
-    }));
+          : resolvedCrop || resolvedFrame || TARGET_SIGN_IMAGE_URL;
+
+      return {
+        ...sign,
+        imageUrl: resolvedImage,
+        actualCropUrl: resolvedCrop,
+        actualFrameUrl: resolvedFrame,
+        actualFrameURl: resolvedFrame,
+        frameUrl: resolvedFrame,
+      };
+    });
+    const deduplicated = deduplicateRouteSigns(resolvedSigns);
     return applyDemoRouteSigns(
-      resolvedSigns,
+      deduplicated,
       activeRouteOrigin,
       selectedDestination?.coordinate,
       vehicleMode,
     );
   }, [
     hasSelectedRoute,
+    isNavigating,
     mapSigns,
     plannedSigns,
     savedRouteSignsData?.signs,
+    swappedRoute,
     activeRouteOrigin,
     selectedDestination?.coordinate,
     vehicleMode,
@@ -719,14 +817,6 @@ export function NavigationMapScreen() {
     setActivePresetId,
   ]);
 
-  const handleLivestreamPress = useCallback(async () => {
-    const cameraResult = await Camera.requestCameraPermissionsAsync();
-    if (!cameraResult.granted) return;
-    const micResult = await Camera.requestMicrophonePermissionsAsync();
-    if (!micResult.granted) return;
-    router.push('/(authenticated)/(tabs)/livestream');
-  }, [router]);
-
   const filteredSigns = useMemo(() => {
     const isCategoriesActive =
       isNavigating || filterViewMode === 'categories' || routeMatchingPresets.length === 0;
@@ -759,11 +849,12 @@ export function NavigationMapScreen() {
   ]);
 
   const isRouteBookmarked = Boolean(
-    activeSavedRouteId ||
-    (activePreset?.savedRoute &&
-      selectedDestination &&
-      activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
-      activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0]),
+    !swappedRoute &&
+      (activeSavedRouteId ||
+        (activePreset?.savedRoute &&
+          selectedDestination &&
+          activePreset.savedRoute.destinationLatitude === selectedDestination.coordinate[1] &&
+          activePreset.savedRoute.destinationLongitude === selectedDestination.coordinate[0])),
   );
 
   const maneuverProgresses = useMemo(
@@ -838,7 +929,7 @@ export function NavigationMapScreen() {
   }, [activeDuration, routeDistance, isNavigating, remainingNavDistance]);
 
   const { activeAlert: activeSignAlert } = useSignProximityAlert({
-    alertDistanceMeters: 50,
+    alertDistanceMeters: 75,
     isNavigating,
     signs: filteredSigns,
     userCoordinate: userCoordinate ?? plannedRouteOrigin,
@@ -852,16 +943,31 @@ export function NavigationMapScreen() {
     if (!navigationCoordinate) return [];
     const userProgress = getRouteProgressMeters(navigationCoordinate, routeCoordinates);
     const signsAhead = filteredSigns
-      .filter((sign) => sign.coordinate)
+      .filter((sign) => Array.isArray(sign.coordinate) && sign.coordinate.length >= 2)
       .map((sign) => {
-        const signProgress = getRouteProgressMeters(
+        const { progress: signProgress, distanceToRoute } = getRouteProgressInfo(
           sign.coordinate as [number, number],
           routeCoordinates,
         );
         const distanceMeters = Math.max(0, signProgress - userProgress);
-        return { ...sign, distanceMeters };
+        return { ...sign, distanceMeters, distanceToRoute };
       })
+      // 1. Must be strictly within the route corridor (<= 35m from the polyline)
+      .filter((sign) => sign.distanceToRoute <= 35)
+      // 2. Must be ahead of user (at least 5m)
       .filter((sign) => sign.distanceMeters > 5)
+      // 3. Deduplicate along route if any multiple records remain within 25m of each other
+      .filter((sign, idx, arr) => {
+        const firstIdx = arr.findIndex(
+          (other) =>
+            Math.abs(other.distanceMeters - sign.distanceMeters) <= 25 &&
+            ((sign.signCode &&
+              other.signCode &&
+              sign.signCode.toUpperCase() === other.signCode.toUpperCase()) ||
+              (sign.name && other.name && sign.name.toLowerCase() === other.name.toLowerCase())),
+        );
+        return firstIdx === idx;
+      })
       .sort((a, b) => a.distanceMeters - b.distanceMeters)
       .slice(0, 3)
       .reverse();
@@ -898,7 +1004,7 @@ export function NavigationMapScreen() {
       return;
     }
 
-    if (userCredits < 5) {
+    if (!isFreeReviewerNavigation && userCredits < 5) {
       setNavigationError(INSUFFICIENT_CREDITS_NAVIGATION_MESSAGE);
       setLocationToast({
         id: Date.now(),
@@ -921,7 +1027,7 @@ export function NavigationMapScreen() {
         return;
       }
 
-      if (session?.accessToken) {
+      if (session?.accessToken && !isFreeReviewerNavigation) {
         try {
           await initiateSessionMutation.mutateAsync({
             origin: {
@@ -1025,27 +1131,67 @@ export function NavigationMapScreen() {
     }
   };
 
+  const handleSwapRoute = useCallback(() => {
+    if (!selectedDestination || !plannedRouteOrigin) return;
+
+    setRerouteOrigin(undefined);
+    setSelectedMapSign(null);
+    setMapFocus((current) => ({
+      coordinate: undefined as any,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+
+    if (swappedRoute) {
+      setSwappedRoute(null);
+    } else {
+      setSwappedRoute({
+        origin: selectedDestination.coordinate,
+        originTitle: selectedDestination.title,
+        destination: {
+          category: 'recent',
+          coordinate: plannedRouteOrigin,
+          id: `swapped-${Date.now()}`,
+          subtitle: routeStartTitle !== 'Vị trí của bạn' ? routeStartTitle : '',
+          title: routeStartTitle,
+        },
+      });
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['navigation-route'] });
+    void queryClient.invalidateQueries({ queryKey: ['signs-along-route'] });
+  }, [plannedRouteOrigin, queryClient, routeStartTitle, selectedDestination, swappedRoute]);
+
   const handleCloseRoute = () => {
+    setSwappedRoute(null);
+    setRerouteOrigin(undefined);
     if (isNavigating) {
       setLastNavigatedDestinationTitle(selectedDestination?.title);
       setNavigationSession(undefined);
-      setActiveSavedRouteId(undefined);
       resetReroute();
-      setIsCompleteModalVisible(true);
+      snapTo(1);
       return;
     }
     setNavigationSession(undefined);
     setActiveSavedRouteId(undefined);
     resetReroute();
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
   const handleDismissCompleteModal = () => {
     setIsCompleteModalVisible(false);
+    if (isReturnToReviewer) {
+      handleReturnToReviewer();
+      return;
+    }
     router.replace('/home');
   };
 
   const handleChangeDestination = () => {
+    setSwappedRoute(null);
     router.push('/home/search');
   };
 
@@ -1111,7 +1257,7 @@ export function NavigationMapScreen() {
           hasLiveLocation={hasLiveLocation}
           isCustomStart={isCustomStart}
           routeCoordinates={routeCoordinates}
-          routeStart={plannedRouteOrigin}
+          routeStart={activeRouteOrigin}
           routeSigns={filteredSigns}
           signs={filteredSigns}
           showCurrentLocation={!isNavigating}
@@ -1144,10 +1290,11 @@ export function NavigationMapScreen() {
               try {
                 const lat = userCoordinate ? userCoordinate[1] : sign.coordinate[1];
                 const lon = userCoordinate ? userCoordinate[0] : sign.coordinate[0];
-                await confirmSignPresence(
+                const res = await confirmSignPresence(
                   sign.id,
                   {
                     isPresent,
+                    reportType: isPresent ? undefined : 'MISSING',
                     latitude: lat,
                     longitude: lon,
                     note: isPresent
@@ -1156,11 +1303,27 @@ export function NavigationMapScreen() {
                   },
                   session?.accessToken || '',
                 );
+
+                if (isPresent) {
+                  if (res?.creditsAwarded && res.creditsAwarded > 0) {
+                    void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+                  }
+                  void queryClient.invalidateQueries({ queryKey: ['signs', sign.id] });
+                } else {
+                  void queryClient.invalidateQueries({
+                    queryKey: ['revalidation-tasks-in-bounds'],
+                  });
+                  void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
+                  void queryClient.invalidateQueries({ queryKey: ['all-revalidation-tasks'] });
+                }
+
                 setLocationToast({
                   id: Date.now(),
                   message: isPresent
                     ? 'Đã ghi nhận xác nhận biển báo thành công!'
-                    : 'Đã ghi nhận báo cáo không thấy biển báo!',
+                    : res?.revalidationTaskId
+                      ? 'Đã ghi nhận báo cáo! Nhiệm vụ tái thẩm định ưu tiên cao đã được tạo.'
+                      : 'Đã ghi nhận báo cáo không thấy biển báo!',
                 });
               } catch (e: any) {
                 console.warn('[Navigation] Confirm sign error:', e?.message);
@@ -1180,16 +1343,20 @@ export function NavigationMapScreen() {
 
         <NavigationUpcomingSigns signs={upcomingSignsOnRoute} />
 
-        {/* Floating Re-center button during navigation */}
+        {/* Floating Re-center and Voice toggle buttons during navigation */}
         {isNavigating ? (
           <Animated.View
             pointerEvents="box-none"
             style={{
               position: 'absolute',
               left: 16,
+              right: 16,
               bottom: floatingButtonBottom,
               opacity: floatingButtonOpacity,
               zIndex: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
             <Pressable
@@ -1218,75 +1385,7 @@ export function NavigationMapScreen() {
               <MaterialCommunityIcons name="navigation-variant" size={16} color={theme.primary} />
               <Text style={[styles.navRecenterText, { color: theme.primary }]}>Căn giữa</Text>
             </Pressable>
-          </Animated.View>
-        ) : null}
-
-        {/* Floating Sign Filter button during navigation */}
-        {isNavigating ? (
-          <Animated.View
-            pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: Spacing.two,
-              bottom: floatingButtonBottom,
-              opacity: floatingButtonOpacity,
-              zIndex: 20,
-            }}
-          >
-            <Pressable
-              accessibilityLabel="Bộ lọc biển báo"
-              accessibilityRole="button"
-              onPress={() => {
-                setFilterViewMode('categories');
-                const nextSnap = sheetSnapIndex === 0 ? 1 : 0;
-                snapTo(nextSnap);
-              }}
-              style={({ pressed }) => [
-                styles.navFilterButton,
-                {
-                  position: 'relative',
-                  right: 0,
-                  backgroundColor:
-                    manualCategories.size < SIGN_CATEGORIES.length
-                      ? theme.backgroundSelected
-                      : theme.backgroundElement,
-                  borderColor:
-                    manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="filter-variant"
-                size={16}
-                color={manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text}
-              />
-              <Text
-                style={[
-                  styles.navRecenterText,
-                  {
-                    color:
-                      manualCategories.size < SIGN_CATEGORIES.length ? theme.primary : theme.text,
-                  },
-                ]}
-              >
-                Bộ lọc
-              </Text>
-              {manualCategories.size < SIGN_CATEGORIES.length ? (
-                <View
-                  style={[
-                    styles.filterActiveBadge,
-                    {
-                      backgroundColor: theme.primary,
-                      position: 'absolute',
-                      top: 6,
-                      right: 6,
-                    },
-                  ]}
-                />
-              ) : null}
-            </Pressable>
+            {renderTtsToggleButton('btn-toggle-tts-nav')}
           </Animated.View>
         ) : null}
 
@@ -1298,13 +1397,28 @@ export function NavigationMapScreen() {
               plannedRouteOrigin={plannedRouteOrigin}
               routeStartTitle={routeStartTitle}
               walletBalance={walletData?.wallet?.balance}
-              unreadNotificationCount={unreadNotificationCount}
               onSearchPress={() => router.push('/home/search')}
               onTopUpPress={() => router.push('/credits/top-up')}
               onNotificationsPress={() => router.push('/notifications')}
-              onLivestreamPress={handleLivestreamPress}
               onChangeDestinationPress={handleChangeDestination}
+              onSwapRoutePress={handleSwapRoute}
             />
+
+            {isReturnToReviewer ? (
+              <View pointerEvents="box-none" style={styles.returnToReviewerContainer}>
+                <Pressable
+                  accessibilityLabel="Quay lại thẩm định"
+                  onPress={handleReturnToReviewer}
+                  style={({ pressed }) => [
+                    styles.returnToReviewerPill,
+                    { opacity: pressed ? 0.8 : 1 },
+                  ]}
+                >
+                  <MaterialCommunityIcons color="#FFFFFF" name="arrow-left" size={16} />
+                  <Text style={styles.returnToReviewerText}>Quay lại thẩm định</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <HomeSignFilterCard
               isOpen={isHomeSignFilterOpen && !selectedDestination}
@@ -1318,34 +1432,12 @@ export function NavigationMapScreen() {
               onToggleManualCategory={handleToggleManualCategory}
               onNavigateToProfileFilter={() => {
                 setIsHomeSignFilterOpen(false);
-                router.push({
-                  pathname: '/(authenticated)/(tabs)/profile',
-                  params: { scrollTo: 'signFilter', t: Date.now().toString() },
-                });
+                router.push('/profile/sign-filters');
               }}
             />
 
             {!selectedDestination && !selectedMapSign ? (
               <View style={styles.mapActions}>
-                <AppButton
-                  accessibilityLabel={
-                    isTtsEnabled ? 'Tắt thông báo giọng nói' : 'Bật thông báo giọng nói'
-                  }
-                  onPress={handleToggleTts}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <MaterialCommunityIcons
-                    name={isTtsEnabled ? 'volume-high' : 'volume-off'}
-                    size={22}
-                    color="#000000"
-                  />
-                </AppButton>
-
                 <AppButton
                   accessibilityLabel={
                     isHomeSignFilterOpen
@@ -1376,24 +1468,7 @@ export function NavigationMapScreen() {
                     <View style={[styles.filterActiveBadge, { backgroundColor: theme.primary }]} />
                   ) : null}
                 </AppButton>
-
-                <AppButton
-                  accessibilityLabel={`Thông báo${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} chưa đọc` : ''}`}
-                  onPress={() => router.push('/notifications')}
-                  style={[
-                    styles.mapActionButton,
-                    styles.locationActionButton,
-                    styles.ttsActionButton,
-                  ]}
-                  variant="surface"
-                >
-                  <Ionicons name="notifications" size={22} color="#000000" />
-                  <Badge
-                    count={unreadNotificationCount}
-                    maxCount={9}
-                    style={styles.notificationBadge}
-                  />
-                </AppButton>
+                {renderTtsToggleButton()}
 
                 <AppButton
                   accessibilityLabel={isLocating ? 'Đang xác định vị trí' : 'Về vị trí hiện tại'}
@@ -1456,6 +1531,7 @@ export function NavigationMapScreen() {
         visibleSigns={visibleSigns}
         isStartingNavigation={isStartingNavigation}
         isStartDisabled={hasInsufficientCredits}
+        isFreeNavigation={isFreeReviewerNavigation}
         isRouteBookmarked={isRouteBookmarked}
         onBeginNavigation={handleBeginNavigation}
         onOpenBookmarkModal={() => setIsBookmarkModalOpen(true)}

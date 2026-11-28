@@ -6,9 +6,12 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
+import { DateFilterSortList } from '@/components/date-filter-sort-list';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
 import { useGetMySubmissions } from '@/feature/upload/hooks/use-survey-submission';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import type { SubmissionStatus, SubmissionType, SurveySubmission } from '@/types/surveySubmissionType';
 
 const submissionLabels: Record<SubmissionType, string> = {
@@ -171,6 +174,8 @@ export function SurveyHistoryScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>(initialTab);
   const [page, setPage] = useState(1);
   const listRef = useRef<FlatList<SurveySubmission>>(null);
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   const { data, isLoading, isFetching, isRefetching, error, refetch } = useGetMySubmissions({
     page: String(page),
@@ -263,67 +268,86 @@ export function SurveyHistoryScreen() {
           })}
         </View>
 
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {filteredItems.length} hồ sơ {activeTab === 'pending' ? 'đang xử lý' : activeTab === 'completed' ? 'đã hoàn tất' : ''} · Nhấn vào bản ghi để xem chi tiết
-        </Text>
+        <DateFilterSortList<SurveySubmission>
+          items={filteredItems}
+          getDate={(item) => item.createdAt || item.updatedAt}
+          headerTitle="Lọc theo ngày"
+          startDateLabel="Từ ngày"
+          endDateLabel="Đến ngày"
+          showPresets
+          showSortToggle
+          controlsCardStyle={{ marginHorizontal: Spacing.four, marginBottom: Spacing.two }}
+        >
+          {({ items: dateFilteredItems, totalCount, hasActiveFilters }) => (
+            <>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                {dateFilteredItems.length} hồ sơ {activeTab === 'pending' ? 'đang xử lý' : activeTab === 'completed' ? 'đã hoàn tất' : ''} · Nhấn vào bản ghi để xem chi tiết
+              </Text>
 
-        {error && data ? (
-          <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
-            Không thể làm mới lịch sử. Đang hiển thị bản ghi đã tải trước đó.
-          </Text>
-        ) : null}
+              {error && data ? (
+                <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
+                  Không thể làm mới lịch sử. Đang hiển thị bản ghi đã tải trước đó.
+                </Text>
+              ) : null}
 
-        <FlatList
-          contentContainerStyle={styles.listContent}
-          data={filteredItems}
-          keyExtractor={(item) => item.id}
-          onRefresh={() => {
-            void refetch();
-          }}
-          ref={listRef}
-          refreshing={isRefetching}
-          renderItem={({ item }) => (
-            <SubmissionRow
-              onPress={() => handleOpenSubmission(item.id)}
-              submission={item}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              {isLoading ? (
-                <ActivityIndicator accessibilityLabel="Đang tải lịch sử khảo sát" color={theme.primary} size="large" />
-              ) : error ? (
-                <>
-                  <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
-                    Không thể tải lịch sử khảo sát của bạn.
-                  </Text>
-                  <AppButton
-                    label="Thử lại"
-                    onPress={() => {
-                      void refetch();
-                    }}
+              <FlatList
+                contentContainerStyle={styles.listContent}
+                data={dateFilteredItems}
+                keyExtractor={(item) => item.id}
+                onRefresh={() => {
+                  void refetch();
+                }}
+                ref={listRef}
+                refreshing={isRefetching}
+                renderItem={({ item }) => (
+                  <SubmissionRow
+                    onPress={() => handleOpenSubmission(item.id)}
+                    submission={item}
                   />
-                </>
-              ) : (
-                <>
-                  <AntDesign color={theme.primary} name="file-text" size={36} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                    {activeTab === 'pending'
-                      ? 'Không có hồ sơ đang xử lý'
-                      : activeTab === 'completed'
-                        ? 'Chưa có hồ sơ đã hoàn tất'
-                        : 'Không tìm thấy hồ sơ nào'}
-                  </Text>
-                  <Text style={[styles.message, { color: theme.textSecondary }]}>
-                    {activeTab === 'pending'
-                      ? 'Tất cả bản ghi khảo sát gửi lên đã hoàn tất xử lý AI.'
-                      : 'Các khảo sát đã ghi và kết quả nhận diện của bạn sẽ xuất hiện tại đây.'}
-                  </Text>
-                </>
-              )}
-            </View>
-          }
-        />
+                )}
+                ListEmptyComponent={
+                  <View style={styles.empty}>
+                    {isLoading ? (
+                      <ActivityIndicator accessibilityLabel="Đang tải lịch sử khảo sát" color={theme.primary} size="large" />
+                    ) : error ? (
+                      <>
+                        <Text accessibilityRole="alert" style={[styles.message, { color: theme.text }]}>
+                          Không thể tải lịch sử khảo sát của bạn.
+                        </Text>
+                        <AppButton
+                          label="Thử lại"
+                          onPress={() => {
+                            void refetch();
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <AntDesign color={theme.primary} name="file-text" size={36} />
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                          {hasActiveFilters && totalCount > 0
+                            ? 'Không có hồ sơ phù hợp với bộ lọc ngày'
+                            : activeTab === 'pending'
+                              ? 'Không có hồ sơ đang xử lý'
+                              : activeTab === 'completed'
+                                ? 'Chưa có hồ sơ đã hoàn tất'
+                                : 'Không tìm thấy hồ sơ nào'}
+                        </Text>
+                        <Text style={[styles.message, { color: theme.textSecondary }]}>
+                          {hasActiveFilters && totalCount > 0
+                            ? 'Thử thay đổi khoảng thời gian hoặc đặt lại bộ lọc.'
+                            : activeTab === 'pending'
+                              ? 'Tất cả bản ghi khảo sát gửi lên đã hoàn tất xử lý AI.'
+                              : 'Các khảo sát đã ghi và kết quả nhận diện của bạn sẽ xuất hiện tại đây.'}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                }
+              />
+            </>
+          )}
+        </DateFilterSortList>
 
         {page > 1 || (data?.totalPages ?? 0) > 1 ? (
           <View style={styles.pagination}>

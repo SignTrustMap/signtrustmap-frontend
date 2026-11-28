@@ -1,7 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ModalPortal } from '@/components/common/ModalPortal'
-import { catalogService } from '@/api/services/catalog.service'
+import {
+  UserIdentityButton,
+  UserProfileDetailModal,
+} from '@/components/common/UserProfileDetailModal'
+import {
+  catalogService,
+  normalizeRecaptureRequestSummary,
+  type RecaptureRequestSummary,
+} from '@/api/services/catalog.service'
+import type { UserProfileSummary } from '@/api/services/user.service'
 import {
   X,
   Copy,
@@ -18,6 +27,7 @@ import {
   ShieldCheck,
   CircleNotch,
   ChatText,
+  Tag,
 } from '@phosphor-icons/react'
 import { SignMiniMap } from './SignMiniMap'
 import CustomSelect from '@/components/common/CustomSelect'
@@ -184,7 +194,8 @@ export function MissingSignInspectionModal({
   onDirectReject,
   onDirectRecapture,
 }: MissingSignInspectionModalProps) {
-  const { t } = useTranslation('ops')
+  const { t, i18n } = useTranslation('ops')
+  const isEn = i18n.language?.startsWith('en')
   const [activeImageTab, setActiveImageTab] = useState<'crop' | 'context'>('crop')
   const [imgLoadError, setImgLoadError] = useState(false)
   const [copiedTargetId, setCopiedTargetId] = useState(false)
@@ -201,18 +212,17 @@ export function MissingSignInspectionModal({
   const [recaptureNote, setRecaptureNote] = useState('')
   const [rejectReason, setRejectReason] = useState<MissingRejectReasonKey>('reason_not_sign')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [inspectingUser, setInspectingUser] = useState<{
+    id: string
+    summary?: UserProfileSummary | null
+  } | null>(null)
 
-  const [recaptureDetails, setRecaptureDetails] = useState<{
-    reason?: string
-    note?: string
-    createdAt?: string
-  } | null>(() => {
-    if (report.status !== 'Incomplete') return null
+  const [recaptureDetails, setRecaptureDetails] = useState<RecaptureRequestSummary | null>(() => {
     if (report.recaptureRequest) {
       if (report.candidateId) candidateRecaptureCache.set(report.candidateId, report.recaptureRequest)
       return report.recaptureRequest
     }
-    if (report.candidateId && candidateRecaptureCache.has(report.candidateId)) {
+    if (report.status === 'Incomplete' && report.candidateId && candidateRecaptureCache.has(report.candidateId)) {
       return candidateRecaptureCache.get(report.candidateId)!
     }
     return null
@@ -225,13 +235,20 @@ export function MissingSignInspectionModal({
   })
 
   useEffect(() => {
+    if (report.recaptureRequest) {
+      if (report.candidateId) candidateRecaptureCache.set(report.candidateId, report.recaptureRequest)
+      setRecaptureDetails(report.recaptureRequest)
+      setIsLoadingRecapture(false)
+      return
+    }
+
     if (report.status !== 'Incomplete' || !report.candidateId) {
       setRecaptureDetails(null)
       setIsLoadingRecapture(false)
       return
     }
 
-    const cached = report.recaptureRequest || candidateRecaptureCache.get(report.candidateId)
+    const cached = candidateRecaptureCache.get(report.candidateId)
     if (cached) {
       setRecaptureDetails(cached)
       setIsLoadingRecapture(false)
@@ -246,14 +263,11 @@ export function MissingSignInspectionModal({
       .then((res) => {
         if (!active) return
         if (Array.isArray(res) && res.length > 0) {
-          const latest = res[0]
-          const data = {
-            reason: latest.reason,
-            note: latest.note || '',
-            createdAt: latest.createdAt || latest.created_at,
+          const data = normalizeRecaptureRequestSummary(res[0])
+          if (data) {
+            candidateRecaptureCache.set(report.candidateId!, data)
+            setRecaptureDetails(data)
           }
-          candidateRecaptureCache.set(report.candidateId!, data)
-          setRecaptureDetails(data)
         }
       })
       .catch((err) => {
@@ -485,41 +499,57 @@ export function MissingSignInspectionModal({
                   <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
                     {report.tempLabel}
                   </h3>
-                  {report.id && (
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                      <span>Mã đối tượng:</span>
-                      <span className="font-mono text-gray-700 dark:text-gray-300 select-all break-all">
-                        #{report.id}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(report.id)
-                          setCopiedTargetId(true)
-                          setTimeout(() => setCopiedTargetId(false), 2000)
-                        }}
-                        className="text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0"
-                        title="Sao chép UUID đối tượng"
-                      >
-                        {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* Key-Value Specs Card (Clean, neutral layout) */}
                 <div className="rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] divide-y divide-gray-200/60 dark:divide-white/5 text-xs">
+                  {/* Mã đối tượng */}
+                  {report.id && (
+                    <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                      <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 shrink-0">
+                        <Tag size={12} className="text-gray-400 shrink-0" />
+                        <span>{isEn ? 'Target ID:' : 'Mã đối tượng:'}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0 font-mono">
+                        <span className="text-gray-700 dark:text-gray-300 select-all truncate">
+                          #{report.id}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(report.id)
+                            setCopiedTargetId(true)
+                            setTimeout(() => setCopiedTargetId(false), 2000)
+                          }}
+                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer shrink-0 transition-colors"
+                          title={isEn ? 'Copy full target UUID' : 'Sao chép UUID đối tượng'}
+                        >
+                          {copiedTargetId ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Reporter & Submitted Date */}
                   <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                     <div className="flex items-center gap-1 min-w-0">
                       <User size={12} className="text-gray-400 shrink-0" />
-                      <span className="truncate">
-                        {report.reporterId
-                          ? report.reporterId.startsWith('#')
-                            ? report.reporterId
-                            : '#' + report.reporterId
-                          : report.reportedBy || 'Hệ thống'}
-                      </span>
+                      {report.reporterId ? (
+                        <UserIdentityButton
+                          userId={report.reporterId}
+                          initialUser={report.reporter}
+                          prefix={isEn ? 'Reporter' : 'Người báo cáo'}
+                          isEn={isEn}
+                          onOpenProfile={(id, summary) => setInspectingUser({ id, summary })}
+                        />
+                      ) : (
+                        <span className="truncate">
+                          <span>{isEn ? 'Reporter:' : 'Người báo cáo:'}</span>{' '}
+                          <span className="text-gray-700 dark:text-gray-200">
+                            {report.reportedBy || 'Hệ thống'}
+                          </span>
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
                       <CalendarBlank size={12} />
@@ -532,11 +562,65 @@ export function MissingSignInspectionModal({
                     <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
                       <div className="flex items-center gap-1 min-w-0">
                         <User size={12} className="text-[#007b8b] dark:text-[#00c4de] shrink-0" />
-                        <span className="truncate">Staff #{report.reviewedBy.slice(0, 8)}</span>
+                        <UserIdentityButton
+                          userId={report.reviewedBy}
+                          initialUser={report.reviewer}
+                          prefix="Staff"
+                          isEn={isEn}
+                          onOpenProfile={(id, summary) => setInspectingUser({ id, summary })}
+                        />
                       </div>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
                         <Clock size={12} />
                         <span>{formatDate(report.updatedAt)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assigned Surveyor / Recapture Request */}
+                  {(recaptureDetails || (report.status === 'Incomplete' && isLoadingRecapture) || (report as any)?.assignedSurveyor) && (
+                    <div className="flex items-center justify-between py-1.5 px-3 text-gray-500 dark:text-gray-400 text-[11px] font-mono">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <Camera size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                        {(recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id) ? (
+                          <UserIdentityButton
+                            userId={recaptureDetails?.surveyorId || recaptureDetails?.assignedSurveyor?.id || (report as any)?.assignedSurveyor?.id}
+                            initialUser={recaptureDetails?.assignedSurveyor || (report as any)?.assignedSurveyor}
+                            prefix="Surveyor"
+                            isEn={isEn}
+                            onOpenProfile={(id, summary) => setInspectingUser({ id, summary })}
+                          />
+                        ) : (
+                          <span className="truncate">
+                            <span>Surveyor:</span>{' '}
+                            <span className="text-amber-700 dark:text-amber-400">
+                              {isEn ? 'Assigning' : 'Đang phân công'}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <span
+                          className={`text-[10px] font-semibold ${
+                            recaptureDetails?.completedAt
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}
+                        >
+                          {recaptureDetails?.completedAt
+                            ? isEn
+                              ? 'Done'
+                              : 'Đã chụp'
+                            : isEn
+                            ? 'Pending'
+                            : 'Chờ chụp'}
+                        </span>
+                        {recaptureDetails?.completedAt && (
+                          <>
+                            <span>•</span>
+                            <span>{formatDate(recaptureDetails.completedAt)}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -812,6 +896,13 @@ export function MissingSignInspectionModal({
           </div>
         </div>
       </div>
+
+      <UserProfileDetailModal
+        userId={inspectingUser?.id || null}
+        initialSummary={inspectingUser?.summary}
+        isEn={isEn}
+        onClose={() => setInspectingUser(null)}
+      />
     </ModalPortal>
   )
 }

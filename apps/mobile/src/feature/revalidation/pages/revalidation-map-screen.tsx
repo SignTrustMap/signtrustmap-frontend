@@ -3,22 +3,22 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Image,
   Keyboard,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
-import { Fonts, Rounded, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useBackButton } from '@/hooks/use-back-button';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { useDebounce } from '@/hooks/use-debounce';
 import { SearchSuggestionSkeleton } from '@/components/skeleton';
 import { searchPlaces, type ApiPlace } from '@/api/navigation/places';
@@ -37,16 +37,43 @@ import {
 import { RevalidationMapView } from '../components/revalidation-map-view';
 import { getFreshnessInfo } from '../components/revalidation-sign-marker';
 import { RevalidationSignDetailsCard } from '../components/revalidation-sign-details-card';
+import { FILTER_PANEL_WIDTH, styles } from '@/feature/revalidation/styles/revalidation-map-screen.styles';
 
 type FreshnessFilter = 'ALL' | 'NEEDS_REVALIDATION' | 'MODERATE' | 'FRESH';
 
-const FILTER_PANEL_WIDTH = 200;
-
 const ZOOM_THRESHOLDS = [
-  { id: 'detail', label: '17.5x', name: 'Chi tiết', zoom: 17.5, icon: 'magnify-plus-outline', desc: 'Cột & biển báo' },
-  { id: 'street', label: '16.5x', name: 'Đường phố', zoom: 16.5, icon: 'road-variant', desc: 'Cấp đường phố' },
-  { id: 'area', label: '14.5x', name: 'Khu vực', zoom: 14.5, icon: 'home-city-outline', desc: 'Khu dân cư' },
-  { id: 'city', label: '12.0x', name: 'Toàn cảnh', zoom: 12.0, icon: 'city-variant-outline', desc: 'Toàn thành phố' },
+  {
+    id: 'detail',
+    label: '17.5x',
+    name: 'Chi tiết',
+    zoom: 17.5,
+    icon: 'magnify-plus-outline',
+    desc: 'Cột & biển báo',
+  },
+  {
+    id: 'street',
+    label: '16.5x',
+    name: 'Đường phố',
+    zoom: 16.5,
+    icon: 'road-variant',
+    desc: 'Cấp đường phố',
+  },
+  {
+    id: 'area',
+    label: '14.5x',
+    name: 'Khu vực',
+    zoom: 14.5,
+    icon: 'home-city-outline',
+    desc: 'Khu dân cư',
+  },
+  {
+    id: 'city',
+    label: '12.0x',
+    name: 'Toàn cảnh',
+    zoom: 12.0,
+    icon: 'city-variant-outline',
+    desc: 'Toàn thành phố',
+  },
 ] as const;
 
 type ZoomThresholdId = (typeof ZOOM_THRESHOLDS)[number]['id'];
@@ -56,7 +83,6 @@ type RevalidationMapParams = {
   snapLon?: string;
   snapLat?: string;
   snapRequestId?: string;
-  autoSelectFirst?: string;
   signJson?: string;
   filter?: FreshnessFilter;
 };
@@ -66,6 +92,8 @@ export function RevalidationMapScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<RevalidationMapParams>();
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   // Pre-parse signJson if supplied for instant first-frame snapping & display
   const initialSign = useMemo<RouteSign | null>(() => {
@@ -97,23 +125,21 @@ export function RevalidationMapScreen() {
     return undefined;
   }, [params.snapLon, params.snapLat, initialSign]);
 
-  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate | undefined>(initialFocusCoord);
+  const [focusCoordinate, setFocusCoordinate] = useState<MapCoordinate | undefined>(
+    initialFocusCoord,
+  );
   const [focusRequestId, setFocusRequestId] = useState(initialFocusCoord ? 1 : 0);
   const [activeFilter, setActiveFilter] = useState<FreshnessFilter>(() => {
     if (params.filter) return params.filter;
-    if (initialSign) {
-      const info = getFreshnessInfo(initialSign);
-      if (info.isFresh) return 'FRESH';
-      if (info.isModerate) return 'MODERATE';
-      return 'NEEDS_REVALIDATION';
-    }
     return 'ALL';
   });
 
   // Zoom control state
-  const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 16.5);
+  const [zoomLevel, setZoomLevel] = useState<number>(initialFocusCoord ? 17.5 : 14.5);
   const [zoomRequestId, setZoomRequestId] = useState(0);
-  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(initialFocusCoord ? 'detail' : 'street');
+  const [activeZoomId, setActiveZoomId] = useState<ZoomThresholdId>(
+    initialFocusCoord ? 'detail' : 'area',
+  );
   const [isZoomMenuOpen, setIsZoomMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSignListOpen, setIsSignListOpen] = useState(false);
@@ -137,18 +163,21 @@ export function RevalidationMapScreen() {
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
   const filterSlideAnim = useRef(new Animated.Value(0)).current; // 0 = collapsed/hidden, 1 = expanded
 
-  const toggleFilter = useCallback((forceState?: boolean) => {
-    setIsFilterExpanded((current) => {
-      const nextState = forceState !== undefined ? forceState : !current;
-      Animated.spring(filterSlideAnim, {
-        toValue: nextState ? 1 : 0,
-        useNativeDriver: true,
-        bounciness: 4,
-        speed: 16,
-      }).start();
-      return nextState;
-    });
-  }, [filterSlideAnim]);
+  const toggleFilter = useCallback(
+    (forceState?: boolean) => {
+      setIsFilterExpanded((current) => {
+        const nextState = forceState !== undefined ? forceState : !current;
+        Animated.spring(filterSlideAnim, {
+          toValue: nextState ? 1 : 0,
+          useNativeDriver: true,
+          bounciness: 4,
+          speed: 16,
+        }).start();
+        return nextState;
+      });
+    },
+    [filterSlideAnim],
+  );
 
   const filterTranslateX = filterSlideAnim.interpolate({
     inputRange: [0, 1],
@@ -161,20 +190,32 @@ export function RevalidationMapScreen() {
   const [buttonsTranslateY] = useState(() => new Animated.Value(0));
 
   // Fetch all revalidation tasks from backend (global, independent of viewport)
-  const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } = useGetAllRevalidationTasks(true);
+  const { data: allRevalTasks = [], isLoading: isLoadingAllTasks } =
+    useGetAllRevalidationTasks(true);
+
+  const effectiveBounds = useMemo<FindSignsInBoundsParams>(() => {
+    if (bounds) return bounds;
+    const center = focusCoordinate ?? userCoordinate ?? [106.6955, 10.7769];
+    const delta = 0.025;
+    return {
+      minLon: center[0] - delta,
+      minLat: center[1] - delta,
+      maxLon: center[0] + delta,
+      maxLat: center[1] + delta,
+    };
+  }, [bounds, focusCoordinate, userCoordinate]);
 
   // Fetch verified signs within current map bounds
-  const { data: boundsSigns = [] } = useGetSignsInBounds(bounds, true);
+  const { data: boundsSigns = [] } = useGetSignsInBounds(effectiveBounds, true);
 
-  const taskBounds = useMemo<FindTasksInBoundsParams | undefined>(() => {
-    if (!bounds) return undefined;
+  const taskBounds = useMemo<FindTasksInBoundsParams>(() => {
     return {
-      minLat: bounds.minLat,
-      minLon: bounds.minLon,
-      maxLat: bounds.maxLat,
-      maxLon: bounds.maxLon,
+      minLat: effectiveBounds.minLat,
+      minLon: effectiveBounds.minLon,
+      maxLat: effectiveBounds.maxLat,
+      maxLon: effectiveBounds.maxLon,
     };
-  }, [bounds]);
+  }, [effectiveBounds]);
 
   // Fetch revalidation tasks within current map bounds
   const { data: revalTasks = [] } = useGetRevalidationTasksInBounds(taskBounds, true);
@@ -187,23 +228,27 @@ export function RevalidationMapScreen() {
       signMap.set(sign.id, sign);
     }
 
-    for (const task of allRevalTasks) {
+    const mergeTask = (task: (typeof allRevalTasks)[number]) => {
       const converted = revalidationTaskToRouteSign(task);
       const existing = signMap.get(converted.id);
       signMap.set(converted.id, {
         ...(existing ?? {}),
         ...converted,
+        imageUrl: converted.imageUrl || existing?.imageUrl || '',
+        actualCropUrl: converted.actualCropUrl || existing?.actualCropUrl,
+        name:
+          converted.name && converted.name !== 'Traffic Sign'
+            ? converted.name
+            : existing?.name || converted.name,
+        signCode:
+          converted.signCode && converted.signCode !== 'Traffic Sign'
+            ? converted.signCode
+            : existing?.signCode || converted.signCode,
       });
-    }
+    };
 
-    for (const task of revalTasks) {
-      const converted = revalidationTaskToRouteSign(task);
-      const existing = signMap.get(converted.id);
-      signMap.set(converted.id, {
-        ...(existing ?? {}),
-        ...converted,
-      });
-    }
+    for (const task of allRevalTasks) mergeTask(task);
+    for (const task of revalTasks) mergeTask(task);
 
     if (initialSign) {
       const existing = signMap.get(initialSign.id);
@@ -217,7 +262,7 @@ export function RevalidationMapScreen() {
     return Array.from(signMap.values());
   }, [boundsSigns, allRevalTasks, revalTasks, initialSign]);
 
-  // Derive selectedSign dynamically: user override > initialSign > selectedSignId > autoSelectFirst
+  // Derive selectedSign dynamically: user override > initialSign > selectedSignId
   const selectedSign = useMemo<RouteSign | null>(() => {
     if (overrideSign !== undefined) {
       return overrideSign;
@@ -229,14 +274,10 @@ export function RevalidationMapScreen() {
       const found = rawSigns.find((s) => s.id === params.selectedSignId);
       if (found) return found;
     }
-    if (params.autoSelectFirst === 'true' && rawSigns.length > 0) {
-      const firstStale = rawSigns.find((s) => getFreshnessInfo(s).isStale);
-      return firstStale || rawSigns[0] || null;
-    }
     return null;
-  }, [overrideSign, initialSign, params.selectedSignId, params.autoSelectFirst, rawSigns]);
+  }, [overrideSign, initialSign, params.selectedSignId, rawSigns]);
 
-  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return or work card)
+  // Initial user location fetch (guarded so it doesn't overwrite snap coords from inspect return)
   useEffect(() => {
     let isMounted = true;
     void fetchFreshGpsPosition().then((pos) => {
@@ -335,16 +376,19 @@ export function RevalidationMapScreen() {
 
   const lastSignPressTimeRef = useRef(0);
 
-  const handleSignPress = useCallback((sign: RouteSign) => {
-    lastSignPressTimeRef.current = Date.now();
-    setOverrideSign((prev) => {
-      const current = prev !== undefined ? prev : selectedSign;
-      return current?.id === sign.id ? null : sign;
-    });
-    setFocusCoordinate(sign.coordinate);
-    setFocusRequestId((prev) => prev + 1);
-    setIsZoomMenuOpen(false);
-  }, [selectedSign]);
+  const handleSignPress = useCallback(
+    (sign: RouteSign) => {
+      lastSignPressTimeRef.current = Date.now();
+      setOverrideSign((prev) => {
+        const current = prev !== undefined ? prev : selectedSign;
+        return current?.id === sign.id ? null : sign;
+      });
+      setFocusCoordinate(sign.coordinate);
+      setFocusRequestId((prev) => prev + 1);
+      setIsZoomMenuOpen(false);
+    },
+    [selectedSign],
+  );
 
   const handleMapPress = useCallback(() => {
     if (Date.now() - lastSignPressTimeRef.current < 300) {
@@ -459,8 +503,8 @@ export function RevalidationMapScreen() {
     const matchedTask = sign.taskId
       ? undefined
       : allRevalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id) ||
-      revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
-    const resolvedTaskId = sign.taskId || matchedTask?.id || '';
+        revalTasks.find((t) => t.verifiedSignId === sign.id || t.id === sign.id);
+    const resolvedTaskId = sign.taskId || matchedTask?.id || sign.id || '';
 
     router.replace({
       pathname: '/work/inspect-revalidate',
@@ -508,7 +552,7 @@ export function RevalidationMapScreen() {
             accessibilityLabel="Quay lại Công việc"
             accessibilityRole="button"
             hitSlop={8}
-            onPress={() => router.back()}
+            onPress={() => router.replace(surveyorWorkRoute)}
             style={[
               styles.backCircleButton,
               {
@@ -613,20 +657,41 @@ export function RevalidationMapScreen() {
                             pressed && { backgroundColor: theme.backgroundSelected },
                           ]}
                         >
-                          <View style={[styles.dropdownItemIcon, { backgroundColor: 'rgba(6, 113, 235, 0.1)' }]}>
-                            <MaterialCommunityIcons color={theme.primary} name="sign-caution" size={18} />
+                          <View
+                            style={[
+                              styles.dropdownItemIcon,
+                              { backgroundColor: 'rgba(6, 113, 235, 0.1)' },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.primary}
+                              name="sign-caution"
+                              size={18}
+                            />
                           </View>
                           <View style={styles.dropdownItemTextCol}>
-                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
-                              {sign.signCode ? `${sign.signCode} - ${sign.name || ''}` : sign.name || 'Biển báo'}
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.dropdownItemTitle, { color: theme.text }]}
+                            >
+                              {sign.signCode
+                                ? `${sign.signCode} - ${sign.name || ''}`
+                                : sign.name || 'Biển báo'}
                             </Text>
                             {sign.roadName ? (
-                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}
+                              >
                                 {sign.roadName}
                               </Text>
                             ) : null}
                           </View>
-                          <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={16} />
+                          <MaterialCommunityIcons
+                            color={theme.placeholder}
+                            name="chevron-right"
+                            size={16}
+                          />
                         </Pressable>
                       ))}
                     </View>
@@ -649,15 +714,30 @@ export function RevalidationMapScreen() {
                             pressed && { backgroundColor: theme.backgroundSelected },
                           ]}
                         >
-                          <View style={[styles.dropdownItemIcon, { backgroundColor: `${theme.grey}15` }]}>
-                            <MaterialCommunityIcons color={theme.primary} name="map-marker-outline" size={18} />
+                          <View
+                            style={[
+                              styles.dropdownItemIcon,
+                              { backgroundColor: `${theme.grey}15` },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              color={theme.primary}
+                              name="map-marker-outline"
+                              size={18}
+                            />
                           </View>
                           <View style={styles.dropdownItemTextCol}>
-                            <Text numberOfLines={1} style={[styles.dropdownItemTitle, { color: theme.text }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.dropdownItemTitle, { color: theme.text }]}
+                            >
                               {place.title}
                             </Text>
                             {place.address ? (
-                              <Text numberOfLines={1} style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}>
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.dropdownItemSubtitle, { color: theme.placeholder }]}
+                              >
                                 {place.address}
                               </Text>
                             ) : null}
@@ -670,7 +750,11 @@ export function RevalidationMapScreen() {
                   {/* Empty State */}
                   {!isSearchLoading && searchResults.length === 0 && matchingSigns.length === 0 ? (
                     <View style={styles.dropdownEmptyRow}>
-                      <MaterialCommunityIcons color={theme.placeholder} name="map-marker-off-outline" size={20} />
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="map-marker-off-outline"
+                        size={20}
+                      />
                       <Text style={[styles.dropdownEmptyText, { color: theme.placeholder }]}>
                         Không tìm thấy địa điểm nào
                       </Text>
@@ -730,7 +814,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('ALL')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'ALL' && [styles.filterOptionItemActive, { backgroundColor: `${theme.primary}16`, borderColor: theme.primary }],
+                activeFilter === 'ALL' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: `${theme.primary}16`, borderColor: theme.primary },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -747,7 +834,12 @@ export function RevalidationMapScreen() {
                 </Text>
               </View>
               <View style={[styles.filterOptionBadge, { backgroundColor: `${theme.grey}20` }]}>
-                <Text style={[styles.filterOptionBadgeText, { color: activeFilter === 'ALL' ? theme.primary : theme.text }]}>
+                <Text
+                  style={[
+                    styles.filterOptionBadgeText,
+                    { color: activeFilter === 'ALL' ? theme.primary : theme.text },
+                  ]}
+                >
                   {rawSigns.length}
                 </Text>
               </View>
@@ -760,7 +852,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('NEEDS_REVALIDATION')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'NEEDS_REVALIDATION' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(225, 29, 72, 0.12)', borderColor: '#E11D48' }],
+                activeFilter === 'NEEDS_REVALIDATION' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(225, 29, 72, 0.12)', borderColor: '#E11D48' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -776,7 +871,9 @@ export function RevalidationMapScreen() {
                   Cần kiểm tra
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(225, 29, 72, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(225, 29, 72, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#E11D48' }]}>
                   {staleCount}
                 </Text>
@@ -790,7 +887,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('MODERATE')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'MODERATE' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' }],
+                activeFilter === 'MODERATE' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(245, 158, 11, 0.12)', borderColor: '#F59E0B' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -806,7 +906,9 @@ export function RevalidationMapScreen() {
                   Trung bình
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(245, 158, 11, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#D97706' }]}>
                   {moderateCount}
                 </Text>
@@ -820,7 +922,10 @@ export function RevalidationMapScreen() {
               onPress={() => setActiveFilter('FRESH')}
               style={[
                 styles.filterOptionItem,
-                activeFilter === 'FRESH' && [styles.filterOptionItemActive, { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' }],
+                activeFilter === 'FRESH' && [
+                  styles.filterOptionItemActive,
+                  { backgroundColor: 'rgba(16, 185, 129, 0.12)', borderColor: '#10B981' },
+                ],
               ]}
             >
               <View style={styles.filterOptionLeft}>
@@ -836,7 +941,9 @@ export function RevalidationMapScreen() {
                   Tươi mới
                 </Text>
               </View>
-              <View style={[styles.filterOptionBadge, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}>
+              <View
+                style={[styles.filterOptionBadge, { backgroundColor: 'rgba(16, 185, 129, 0.14)' }]}
+              >
                 <Text style={[styles.filterOptionBadgeText, { color: '#059669' }]}>
                   {freshCount}
                 </Text>
@@ -847,7 +954,9 @@ export function RevalidationMapScreen() {
 
         {/* Protruding Handle on the Right of the Filter Drawer */}
         <Pressable
-          accessibilityLabel={isFilterExpanded ? 'Ẩn bộ lọc mức độ khẩn cấp' : 'Hiển thị bộ lọc mức độ khẩn cấp'}
+          accessibilityLabel={
+            isFilterExpanded ? 'Ẩn bộ lọc mức độ khẩn cấp' : 'Hiển thị bộ lọc mức độ khẩn cấp'
+          }
           accessibilityRole="button"
           hitSlop={8}
           onPress={() => toggleFilter()}
@@ -916,7 +1025,10 @@ export function RevalidationMapScreen() {
                   onPress={() => handleSelectZoomThreshold(item.id, item.zoom)}
                   style={[
                     styles.zoomMenuItem,
-                    isSelected && [styles.zoomMenuItemActive, { backgroundColor: `${theme.primary}14` }],
+                    isSelected && [
+                      styles.zoomMenuItemActive,
+                      { backgroundColor: `${theme.primary}14` },
+                    ],
                   ]}
                 >
                   <MaterialCommunityIcons
@@ -925,7 +1037,12 @@ export function RevalidationMapScreen() {
                     size={18}
                   />
                   <View style={styles.zoomMenuItemText}>
-                    <Text style={[styles.zoomItemName, { color: isSelected ? theme.primary : theme.text }]}>
+                    <Text
+                      style={[
+                        styles.zoomItemName,
+                        { color: isSelected ? theme.primary : theme.text },
+                      ]}
+                    >
                       {item.name}
                     </Text>
                     <Text style={[styles.zoomItemDesc, { color: theme.placeholder }]}>
@@ -963,7 +1080,10 @@ export function RevalidationMapScreen() {
           }}
           style={[
             styles.floatingCircleButton,
-            isSignListOpen && { borderColor: '#E11D48', backgroundColor: 'rgba(225, 29, 72, 0.08)' },
+            isSignListOpen && {
+              borderColor: '#E11D48',
+              backgroundColor: 'rgba(225, 29, 72, 0.08)',
+            },
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
@@ -993,7 +1113,10 @@ export function RevalidationMapScreen() {
           }}
           style={[
             styles.floatingCircleButton,
-            isZoomMenuOpen && { borderColor: theme.primary, backgroundColor: theme.backgroundSelected },
+            isZoomMenuOpen && {
+              borderColor: theme.primary,
+              backgroundColor: theme.backgroundSelected,
+            },
             {
               backgroundColor: theme.backgroundElement,
               borderColor: theme.border,
@@ -1055,7 +1178,9 @@ export function RevalidationMapScreen() {
           {/* Panel Header */}
           <View style={styles.signListHeader}>
             <View style={styles.signListHeaderLeft}>
-              <View style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+              <View
+                style={[styles.signListHeaderIcon, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}
+              >
                 <MaterialCommunityIcons color="#E11D48" name="alert-decagram-outline" size={18} />
               </View>
               <View>
@@ -1123,8 +1248,8 @@ export function RevalidationMapScreen() {
                     {/* Sign image or placeholder */}
                     <View style={[styles.signListRowImage, { borderColor: '#E11D48' }]}>
                       {item.imageUrl ? (
-                        <Image
-                          resizeMode="contain"
+                        <ExpoImage
+                          contentFit="contain"
                           source={{ uri: item.imageUrl }}
                           style={styles.signListRowImg}
                         />
@@ -1136,27 +1261,45 @@ export function RevalidationMapScreen() {
                     {/* Sign info */}
                     <View style={styles.signListRowInfo}>
                       <View style={styles.signListRowTop}>
-                        <Text numberOfLines={1} style={[styles.signListRowName, { color: theme.text }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.signListRowName, { color: theme.text }]}
+                        >
                           {item.signCode || 'Biển báo'}
                         </Text>
                         {info.scorePercent !== undefined ? (
-                          <View style={[styles.signListScoreBadge, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
+                          <View
+                            style={[
+                              styles.signListScoreBadge,
+                              { backgroundColor: 'rgba(239, 68, 68, 0.10)' },
+                            ]}
+                          >
                             <Text style={styles.signListScoreText}>{info.scorePercent}%</Text>
                           </View>
                         ) : null}
                       </View>
-                      <Text numberOfLines={1} style={[styles.signListRowLabel, { color: theme.text }]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.signListRowLabel, { color: theme.text }]}
+                      >
                         {item.name || item.signCode || 'Biển báo chưa xác định'}
                       </Text>
                       {item.roadName ? (
-                        <Text numberOfLines={1} style={[styles.signListRowRoad, { color: theme.placeholder }]}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.signListRowRoad, { color: theme.placeholder }]}
+                        >
                           {item.roadName}
                         </Text>
                       ) : null}
                     </View>
 
                     {/* Chevron */}
-                    <MaterialCommunityIcons color={theme.placeholder} name="chevron-right" size={18} />
+                    <MaterialCommunityIcons
+                      color={theme.placeholder}
+                      name="chevron-right"
+                      size={18}
+                    />
                   </Pressable>
                 );
               }}
@@ -1179,472 +1322,11 @@ export function RevalidationMapScreen() {
             allRevalTasks.find(
               (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
             )?.id ||
-            revalTasks.find(
-              (t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id,
-            )?.id
+            revalTasks.find((t) => t.verifiedSignId === selectedSign.id || t.id === selectedSign.id)
+              ?.id
           }
         />
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.one,
-  },
-  searchHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.two,
-  },
-  backCircleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  searchBarWrapper: {
-    flex: 1,
-    position: 'relative',
-    zIndex: 100,
-  },
-  searchBarContainer: {
-    width: '100%',
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    gap: 8,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-    paddingVertical: 0,
-  },
-  searchDropdownCard: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    borderRadius: 16,
-    borderWidth: 1,
-    maxHeight: 300,
-    overflow: 'hidden',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
-    zIndex: 100,
-  },
-  searchDropdownScroll: {
-    flexGrow: 0,
-  },
-  dropdownSection: {
-    paddingVertical: 4,
-  },
-  dropdownSectionHeader: {
-    fontSize: 10,
-    fontFamily: Fonts.sans,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  dropdownItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    gap: 10,
-  },
-  dropdownItemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropdownItemTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  dropdownItemTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  dropdownItemSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-  },
-  dropdownEmptyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  dropdownEmptyText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-
-  /* ── Filter Drawer on Left Edge ─────────────────────── */
-  filterDrawerContainer: {
-    position: 'absolute',
-    left: 0,
-    zIndex: 25,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filterPanelCard: {
-    width: FILTER_PANEL_WIDTH,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    padding: 12,
-    gap: 8,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 3, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  filterPanelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  filterPanelTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  filterPanelTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: -0.1,
-  },
-  filterPanelCloseBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterPanelDivider: {
-    height: 1,
-  },
-  filterOptionsCol: {
-    gap: 4,
-  },
-  filterOptionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  filterOptionItemActive: {
-    borderWidth: 1,
-  },
-  filterOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flex: 1,
-  },
-  filterOptionDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  filterOptionLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  filterOptionLabelActive: {
-    fontWeight: '700',
-  },
-  filterOptionBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-  },
-  filterOptionBadgeText: {
-    fontFamily: Fonts.sans,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  filterHandleButton: {
-    width: 32,
-    height: 44,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    borderWidth: 1,
-    borderLeftWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#09233C',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  filterHandleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 2,
-  },
-  floatingControlsGroup: {
-    position: 'absolute',
-    right: 16,
-    zIndex: 30,
-    alignItems: 'flex-end',
-    gap: 10,
-  },
-  floatingCircleButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  zoomIndicatorBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    elevation: 3,
-  },
-  zoomIndicatorText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  zoomPopoverMenu: {
-    width: 215,
-    borderRadius: 16,
-    borderWidth: 1.2,
-    padding: 10,
-    gap: 4,
-    marginBottom: 4,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  zoomMenuTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    paddingHorizontal: 6,
-  },
-  zoomMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    gap: 8,
-  },
-  zoomMenuItemActive: {
-    backgroundColor: 'rgba(6, 113, 235, 0.1)',
-  },
-  zoomMenuItemText: {
-    flex: 1,
-  },
-  zoomItemName: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  zoomItemDesc: {
-    fontSize: 10,
-  },
-  zoomLevelPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  zoomLevelPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-
-  /* ── Sign List Panel ──────────────────────────────────── */
-  signListPanel: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    maxHeight: 380,
-    borderRadius: 18,
-    borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 10,
-    zIndex: 25,
-    overflow: 'hidden',
-  },
-  signListHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 10,
-  },
-  signListHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  signListHeaderIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signListTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  signListSubtitle: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  signListCloseBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  signListDivider: {
-    height: 1,
-    marginHorizontal: 14,
-  },
-  signListScroll: {
-    flexGrow: 0,
-  },
-  signListEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    gap: 8,
-  },
-  signListEmptyText: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  signListRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  signListRowImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  signListRowImg: {
-    width: 26,
-    height: 26,
-  },
-  signListRowInfo: {
-    flex: 1,
-    gap: 1,
-  },
-  signListRowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  signListRowName: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: -0.1,
-  },
-  signListRowLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  signListRowRoad: {
-    fontSize: 11,
-  },
-  signListScoreBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 6,
-  },
-  signListScoreText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#E11D48',
-  },
-});

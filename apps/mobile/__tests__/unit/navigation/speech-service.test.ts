@@ -109,7 +109,7 @@ describe('SpeechService', () => {
       const speechError = new Error('Language not supported on device');
       internalOnError(speechError);
 
-      // Verify fallback was attempted without explicit language option
+      // Fallback assertion verifies second call avoids doomed language retry
       expect(Speech.speak).toHaveBeenCalledTimes(2);
       expect(Speech.speak).toHaveBeenLastCalledWith(
         'Chú ý đường cong nguy hiểm',
@@ -119,6 +119,15 @@ describe('SpeechService', () => {
           onDone: mockOnDone,
           onError: mockOnError,
         })
+      );
+
+      // Subsequent call with the previously failed language immediately skips to default voice
+      speechService.speak('Phía trước có Biển cấm rẽ', { language: 'vi-VN' });
+      expect(Speech.speak).toHaveBeenLastCalledWith(
+        'Phía trước có Biển cấm rẽ',
+        expect.objectContaining({
+          language: undefined,
+        }),
       );
     });
 

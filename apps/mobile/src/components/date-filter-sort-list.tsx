@@ -112,7 +112,7 @@ export function DateFilterSortList<T>({
   endDateLabel = 'Đến ngày',
   showPresets = true,
   showSortToggle = true,
-  showCountBadge = true,
+  showCountBadge = false,
   hideControls = false,
   containerStyle,
   controlsCardStyle,
@@ -205,10 +205,7 @@ export function DateFilterSortList<T>({
     }
   };
 
-  const pickerValue =
-    activePicker === 'start'
-      ? startDate || new Date()
-      : endDate || new Date();
+  const pickerValue = activePicker === 'start' ? startDate || new Date() : endDate || new Date();
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -245,10 +242,7 @@ export function DateFilterSortList<T>({
                 accessibilityLabel="Đặt lại bộ lọc ngày"
                 accessibilityRole="button"
                 onPress={resetFilters}
-                style={({ pressed }) => [
-                  styles.resetButton,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
+                style={({ pressed }) => [styles.resetButton, { opacity: pressed ? 0.7 : 1 }]}
               >
                 <Ionicons name="refresh-outline" size={14} color={theme.primary} />
                 <Text style={[styles.resetButtonText, { color: theme.primary }]}>Đặt lại</Text>
@@ -272,10 +266,7 @@ export function DateFilterSortList<T>({
                 accessibilityLabel={`Chọn ${startDateLabel}`}
                 accessibilityRole="button"
                 onPress={() => openPicker('start')}
-                style={({ pressed }) => [
-                  styles.dateButtonInner,
-                  { opacity: pressed ? 0.8 : 1 },
-                ]}
+                style={({ pressed }) => [styles.dateButtonInner, { opacity: pressed ? 0.8 : 1 }]}
               >
                 <Ionicons
                   name="calendar-clear-outline"
@@ -308,7 +299,12 @@ export function DateFilterSortList<T>({
               )}
             </View>
 
-            <Ionicons name="arrow-forward" size={14} color={theme.placeholder} style={styles.arrowIcon} />
+            <Ionicons
+              name="arrow-forward"
+              size={14}
+              color={theme.placeholder}
+              style={styles.arrowIcon}
+            />
 
             {/* End Date Button Container */}
             <View
@@ -324,10 +320,7 @@ export function DateFilterSortList<T>({
                 accessibilityLabel={`Chọn ${endDateLabel}`}
                 accessibilityRole="button"
                 onPress={() => openPicker('end')}
-                style={({ pressed }) => [
-                  styles.dateButtonInner,
-                  { opacity: pressed ? 0.8 : 1 },
-                ]}
+                style={({ pressed }) => [styles.dateButtonInner, { opacity: pressed ? 0.8 : 1 }]}
               >
                 <Ionicons
                   name="calendar-clear-outline"
@@ -381,7 +374,8 @@ export function DateFilterSortList<T>({
                 style={({ pressed }) => [
                   styles.sortButton,
                   {
-                    backgroundColor: sortOrder !== 'none' ? theme.secondary : theme.backgroundElement,
+                    backgroundColor:
+                      sortOrder !== 'none' ? theme.secondary : theme.backgroundElement,
                     borderColor: sortOrder !== 'none' ? theme.primary : theme.border,
                     opacity: pressed ? 0.75 : 1,
                   },

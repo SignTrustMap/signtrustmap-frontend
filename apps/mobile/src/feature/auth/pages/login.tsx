@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors, Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { PrimaryGradientBackdrop } from '@/components/primary-gradient-backdrop';
 import { useLogin } from '@/feature/auth/hooks/use-login';
 import { useTheme } from '@/hooks/use-theme';
 import { GoogleAuthCancelledError, useGoogleLogin } from '../hooks/use-google-login';
@@ -118,14 +119,7 @@ export default function LoginScreen() {
         >
           {/* Top Hero Themed Section */}
           <View style={styles.heroSection}>
-            {/* Subtle decorative curved background motifs */}
-            <View pointerEvents="none" style={styles.decorCircleLarge} />
-            <View pointerEvents="none" style={styles.decorCircleMedium} />
-            <View pointerEvents="none" style={styles.decorCircleSmall} />
-            <View pointerEvents="none" style={styles.decorCircleFloat} />
-            <View pointerEvents="none" style={styles.decorCircleDot} />
-            <View pointerEvents="none" style={styles.decorCircleDot2} />
-            <View pointerEvents="none" style={styles.decorRoadCurve} />
+            <PrimaryGradientBackdrop showGradient={false} testIDPrefix="login" />
 
             <SafeAreaView edges={['top']} style={styles.heroSafeArea}>
               <View style={styles.heroHeader}>
@@ -424,74 +418,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.four,
-  },
-  decorCircleLarge: {
-    position: 'absolute',
-    top: -40,
-    right: -30,
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  decorCircleMedium: {
-    position: 'absolute',
-    bottom: 20,
-    left: -35,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  decorCircleSmall: {
-    position: 'absolute',
-    top: 60,
-    right: 70,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-  },
-  decorCircleFloat: {
-    position: 'absolute',
-    bottom: 35,
-    right: 40,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  decorCircleDot: {
-    position: 'absolute',
-    top: 28,
-    left: 24,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  decorCircleDot2: {
-    position: 'absolute',
-    bottom: 70,
-    right: 120,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.20)',
-  },
-  decorRoadCurve: {
-    position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderStyle: 'dashed',
   },
   heroSafeArea: {
     paddingTop: Platform.OS === 'android' ? 12 : 8,

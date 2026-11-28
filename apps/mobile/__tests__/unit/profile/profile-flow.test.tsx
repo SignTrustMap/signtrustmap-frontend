@@ -10,6 +10,7 @@ import { ProfileScreen } from '@/feature/profile/pages/profile-screen';
 // 1. Mock session provider
 const mockLogOut = jest.fn();
 const mockSetRoleEnabled = jest.fn();
+const mockGetProfile = jest.fn();
 let mockSessionData: any = {
   accessToken: 'mock-access-token',
   account: {
@@ -19,6 +20,14 @@ let mockSessionData: any = {
     roles: ['driver', 'reviewer'],
   },
 };
+
+jest.mock('@/api/auth/auth', () => {
+  const actual = jest.requireActual('@/api/auth/auth');
+  return {
+    ...actual,
+    getProfile: (...args: any[]) => mockGetProfile(...args),
+  };
+});
 
 jest.mock('@/context/session-provider', () => {
   const actual = jest.requireActual('@/context/session-provider');
@@ -141,6 +150,8 @@ jest.mock('@/components/update-modal', () => {
 describe('ProfileScreen Unit Test Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetProfile.mockRejectedValue(new Error('Use session fallback by default'));
+    mockSetRoleEnabled.mockResolvedValue(undefined);
     mockLocalSearchParams = {};
     mockSessionData = {
       accessToken: 'mock-access-token',
@@ -168,7 +179,10 @@ describe('ProfileScreen Unit Test Suite', () => {
   // =========================================================================
   describe('Case 1: User Identity and Avatar Rendering', () => {
     it('renders the user full name, email, and initials avatar badge', async () => {
-      const { getByText, getByLabelText } = await render(<ProfileScreen />);
+      const { getByText, getByLabelText, getByTestId } = await render(<ProfileScreen />);
+
+      expect(getByTestId('profile-gradient-bg')).toBeTruthy();
+      expect(getByTestId('profile-decor-circle')).toBeTruthy();
 
       // Identity
       expect(getByText('Alex Rivera')).toBeTruthy();
@@ -237,12 +251,12 @@ describe('ProfileScreen Unit Test Suite', () => {
       // Switch should have label "Tắt vai trò Thẩm định viên"
       const reviewerSwitch = getByLabelText('Tắt vai trò Thẩm định viên');
       expect(reviewerSwitch.props.accessibilityRole).toBe('switch');
-      expect(reviewerSwitch.props.accessibilityState).toEqual({ checked: true });
+      expect(reviewerSwitch.props.accessibilityState).toEqual({ checked: true, disabled: false });
 
       // Toggle off
       fireEvent.press(reviewerSwitch);
       expect(mockSetRoleEnabled).toHaveBeenCalledTimes(1);
-      expect(mockSetRoleEnabled).toHaveBeenCalledWith('reviewer', false);
+      expect(mockSetRoleEnabled).toHaveBeenCalledWith('reviewer', false, { throwOnError: true });
     });
 
     it('displays Surveyor role as Off when not in user roles and toggles it On', async () => {
@@ -254,38 +268,65 @@ describe('ProfileScreen Unit Test Suite', () => {
       // Switch should have label "Bật vai trò Khảo sát viên"
       const surveyorSwitch = getByLabelText('Bật vai trò Khảo sát viên');
       expect(surveyorSwitch.props.accessibilityRole).toBe('switch');
-      expect(surveyorSwitch.props.accessibilityState).toEqual({ checked: false });
+      expect(surveyorSwitch.props.accessibilityState).toEqual({
+        checked: false,
+        disabled: false,
+      });
 
       // Toggle on
       fireEvent.press(surveyorSwitch);
       expect(mockSetRoleEnabled).toHaveBeenCalledTimes(1);
-      expect(mockSetRoleEnabled).toHaveBeenCalledWith('surveyor', true);
+      expect(mockSetRoleEnabled).toHaveBeenCalledWith('surveyor', true, { throwOnError: true });
+    });
+
+    it('renders Đăng ký button instead of toggle when role is never registered and navigates to edit profile with mode=register', async () => {
+      mockGetProfile.mockResolvedValue({
+        id: 'user-profile-test',
+        email: 'alex.rivera@stm.dev',
+        fullName: 'Alex Rivera',
+        roles: ['DRIVER'],
+        registeredRoles: ['DRIVER', 'SURVEYOR'],
+      });
+
+      const { getByLabelText, queryByLabelText, findByLabelText } = await render(<ProfileScreen />);
+
+      // Surveyor is registered but toggled off -> shows switch "Bật vai trò Khảo sát viên"
+      const surveyorSwitch = await findByLabelText('Bật vai trò Khảo sát viên');
+      expect(surveyorSwitch).toBeTruthy();
+      expect(queryByLabelText('Đăng ký vai trò Khảo sát viên')).toBeNull();
+
+      // Reviewer has never registered -> shows Đăng ký button instead of switch
+      const registerReviewerBtn = getByLabelText('Đăng ký vai trò Thẩm định viên');
+      expect(registerReviewerBtn).toBeTruthy();
+      expect(queryByLabelText(/Tắt vai trò Thẩm định viên|Bật vai trò Thẩm định viên/)).toBeNull();
+
+      fireEvent.press(registerReviewerBtn);
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        pathname: '/(authenticated)/(tabs)/profile/edit',
+        params: { mode: 'register', role: 'reviewer' },
+      });
     });
   });
 
   // =========================================================================
-  // CASE 3: Sign Filter Manager Section
+  // CASE 3: Sign Filter Navigation Section
   // =========================================================================
-  describe('Case 3: Sign Filter Manager Section', () => {
-    it('renders the embedded SignFilterManager component when section is opened', async () => {
-      const { getByTestId, getByText, getByLabelText } = await render(<ProfileScreen />);
+  describe('Case 3: Sign Filter Navigation Section', () => {
+    it('navigates to sign-filters screen when sign filter card is pressed', async () => {
+      const { getByText, getByLabelText } = await render(<ProfileScreen />);
 
-      const openFilterButton = getByLabelText('Mở rộng bộ lọc biển báo');
+      expect(getByText('Bộ lọc biển báo')).toBeTruthy();
+      const openFilterButton = getByLabelText('Mở màn hình bộ lọc biển báo');
       fireEvent.press(openFilterButton);
 
-      await waitFor(() => {
-        expect(getByTestId('sign-filter-manager')).toBeTruthy();
-        expect(getByText('Sign Filter Manager Section')).toBeTruthy();
-      });
+      expect(mockRouter.push).toHaveBeenCalledWith('/(authenticated)/(tabs)/profile/sign-filters');
     });
 
-    it('handles scrollTo="signFilter" param and automatically expands section', async () => {
+    it('handles scrollTo="signFilter" param and navigates to sign-filters screen', async () => {
       mockLocalSearchParams = { scrollTo: 'signFilter' };
 
-      const { getByTestId } = await render(<ProfileScreen />);
-      await waitFor(() => {
-        expect(getByTestId('sign-filter-manager')).toBeTruthy();
-      });
+      await render(<ProfileScreen />);
+      expect(mockRouter.push).toHaveBeenCalledWith('/(authenticated)/(tabs)/profile/sign-filters');
     });
   });
 

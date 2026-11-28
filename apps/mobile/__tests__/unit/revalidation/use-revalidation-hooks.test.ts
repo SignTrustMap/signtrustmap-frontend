@@ -10,7 +10,6 @@ jest.mock('@/api/revalidation/revalidation', () => ({
   getRevalidationTasks: jest.fn().mockResolvedValue([{ id: 'task-1' }]),
   getRevalidationTask: jest.fn().mockResolvedValue({ id: 'task-1', status: 'PENDING' }),
   getRevalidationTasksInBounds: jest.fn().mockResolvedValue([{ id: 'task-1' }]),
-  fetchFirstRevalidationSign: jest.fn().mockResolvedValue({ id: 'sign-1' }),
   getTaskEvidences: jest.fn().mockResolvedValue([{ id: 'ev-1' }]),
   getSignEvidences: jest.fn().mockResolvedValue([{ id: 'ev-1' }]),
   getRevalidationEvidenceQueue: jest.fn().mockResolvedValue({ items: [{ id: 'ev-1' }], total: 1 }),
@@ -26,7 +25,6 @@ import {
   useGetRevalidationTasks,
   useGetRevalidationTask,
   useGetRevalidationTasksInBounds,
-  useGetFirstRevalidationSign,
   useGetTaskEvidences,
   useGetSignEvidences,
   useGetRevalidationEvidenceQueue,
@@ -81,12 +79,6 @@ describe('use-revalidation hooks and bounds validation', () => {
         { wrapper }
       );
       await waitFor(() => expect(inBounds.current.isSuccess).toBe(true));
-
-      const { result: firstSign } = await renderHook(
-        () => useGetFirstRevalidationSign([106.7, 10.77]),
-        { wrapper }
-      );
-      await waitFor(() => expect(firstSign.current.isSuccess).toBe(true));
 
       const { result: taskEv } = await renderHook(() => useGetTaskEvidences('task-1'), { wrapper });
       await waitFor(() => expect(taskEv.current.isSuccess).toBe(true));

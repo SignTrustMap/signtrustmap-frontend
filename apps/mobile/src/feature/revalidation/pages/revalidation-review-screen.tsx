@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -10,7 +10,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -22,18 +21,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AppButton } from '@/components/button';
 import { AppToast } from '@/components/toast';
 import { CANNOT_RECORD_VOTE_MESSAGE } from '@/constants/message';
-import { Colors, Fonts, Rounded, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { formatDate } from '@/utils/format-date';
 import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
 import {
   useGetRevalidationEvidenceQueue,
+  useRequestEvidenceRecapture,
   useVoteOnRevalidationEvidence,
 } from '../hooks/use-revalidation';
-import { resolveS3Url } from '@/api/reviews/review-workflow';
+import { useSession } from '@/context/session-provider';
+import { extractCoordinateFromCandidate, resolveS3Url } from '@/api/reviews/review-workflow';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import type { CatalogSign } from '@/api/reviews/catalog';
 import { RevalidationSignPickerModal } from '../components/revalidation-sign-picker-modal';
+import { checkAndRequireLocationPermission } from '@/services/location-permission';
 import {
   RevalidationDecisionBadge,
   RevalidationSwipeBadges,
@@ -47,529 +51,39 @@ import {
   useRevalidationWorkflow,
 } from '../context/revalidation-workflow-provider';
 import { useResponsive } from '@/utils/responsive';
+import { useReviewerSignNavigation } from '@/feature/review/hooks/use-reviewer-sign-navigation';
+import { styles } from '@/feature/revalidation/styles/revalidation-review-screen.styles';
+import {
+  RevalReviewedSignRow,
+  RevalSummaryMetric,
+  RevalidationBottomSheet,
+  RevalidationReviewSkeleton,
+  revalActionDetails,
+  type RevalidationReviewAction,
+  type RevalidationSheetType,
+} from '../components/revalidation-review-sheets';
 
-export type RevalidationReviewAction =
-  | 'STILL_ACTIVE'
-  | 'REMOVED'
-  | 'CHANGED'
-  | 'UNCLEAR'
-  | 'INVALID';
+export { revalActionDetails, type RevalidationReviewAction };
 
-type SheetType = 'decline' | 'report';
-
-export const revalActionDetails: Record<
-  RevalidationReviewAction,
-  {
-    bgAlpha: string;
-    color: string;
-    icon: keyof typeof MaterialCommunityIcons.glyphMap;
-    label: string;
-    summary: string;
-    symbol: string;
-    title: string;
-  }
-> = {
-  STILL_ACTIVE: {
-    bgAlpha: 'rgba(22, 163, 74, 0.12)',
-    color: '#16A34A',
-    icon: 'check-circle',
-    label: 'Vẫn hoạt động',
-    summary: 'Xác nhận biển báo vẫn tồn tại trên thực địa.',
-    symbol: '✓',
-    title: 'ĐÃ XÁC NHẬN HOẠT ĐỘNG',
-  },
-  REMOVED: {
-    bgAlpha: 'rgba(239, 68, 68, 0.12)',
-    color: Colors.danger,
-    icon: 'close-circle',
-    label: 'Đã gỡ bỏ',
-    summary: 'Xác nhận biển báo đã không còn trên thực địa.',
-    symbol: '×',
-    title: 'ĐÃ XÁC NHẬN GỠ BỎ',
-  },
-  CHANGED: {
-    bgAlpha: 'rgba(249, 115, 22, 0.12)',
-    color: '#F97316',
-    icon: 'cached',
-    label: 'Đã thay đổi',
-    summary: 'Loại biển báo hoặc thông tin đã thay đổi.',
-    symbol: '⟳',
-    title: 'ĐÃ GHI NHẬN THAY ĐỔI',
-  },
-  UNCLEAR: {
-    bgAlpha: 'rgba(37, 99, 235, 0.12)',
-    color: '#2563EB',
-    icon: 'arrow-up-circle',
-    label: 'Bỏ qua',
-    summary: 'Đã bỏ qua do không thể nhận diện được biển báo.',
-    symbol: '?',
-    title: 'ĐÃ BỎ QUA',
-  },
-  INVALID: {
-    bgAlpha: 'rgba(100, 116, 139, 0.12)',
-    color: '#64748B',
-    icon: 'alert-circle',
-    label: 'Không hợp lệ',
-    summary: 'Minh chứng không hợp lệ hoặc bị báo cáo vi phạm.',
-    symbol: '!',
-    title: 'ĐÃ BÁO CÁO VI PHẠM',
-  },
-};
-
-const revalSummaryActionDetails = revalActionDetails;
-
-function RevalSummaryMetric({
-  action,
-  count,
-}: {
-  action: RevalidationReviewAction;
-  count: number;
-}) {
-  const theme = useTheme();
-  const details = revalSummaryActionDetails[action];
-
-  return (
-    <View
-      style={[
-        styles.summaryMetric,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-      ]}
-    >
-      <View style={[styles.summaryMetricSymbol, { borderColor: details.color }]}>
-        <Text style={[styles.summaryMetricSymbolLabel, { color: details.color }]}>
-          {details.symbol}
-        </Text>
-      </View>
-      <Text style={[styles.summaryMetricCount, { color: theme.text }]}>{count}</Text>
-      <Text style={[styles.summaryMetricLabel, { color: details.color }]}>
-        {details.label.toUpperCase()}
-      </Text>
-    </View>
-  );
-}
-
-function RevalReviewedSignRow({
-  record,
-}: {
-  record: {
-    item: RevalidationQueueEvidenceItem;
-    action: RevalidationReviewAction;
-    note?: string;
-  };
-}) {
-  const theme = useTheme();
-  const details = revalSummaryActionDetails[record.action];
-  const imageUri = record.item.evidence.mediaUrl || record.item.verifiedSign.signCropUrl;
-
-  return (
-    <View
-      style={[
-        styles.summarySignRow,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-      ]}
-    >
-      {imageUri ? (
-        <Image
-          accessibilityLabel={record.item.verifiedSign.signCode}
-          contentFit="cover"
-          source={{ uri: resolveS3Url(imageUri) }}
-          style={styles.summarySignImage}
-        />
-      ) : (
-        <View
-          style={[
-            styles.summarySignImage,
-            { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' },
-          ]}
-        >
-          <MaterialCommunityIcons color={theme.placeholder} name="traffic-light" size={24} />
-        </View>
-      )}
-      <View style={styles.summarySignCopy}>
-        <Text numberOfLines={1} style={[styles.summarySignName, { color: theme.text }]}>
-          {record.item.verifiedSign.nameVi ||
-            record.item.verifiedSign.nameEn ||
-            record.item.verifiedSign.signCode ||
-            'Traffic Sign'}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={[styles.summarySignLocation, { color: theme.textSecondary }]}
-        >
-          {record.item.verifiedSign.signCode}
-          {record.item.evidence.distanceMeters != null
-            ? ` Khoảng cách so với vị trí gốc: ${record.item.evidence.distanceMeters}m`
-            : ' Đã xác minh vị trí'}
-        </Text>
-        <Text numberOfLines={1} style={[styles.summarySignSummary, { color: theme.placeholder }]}>
-          {record.note ? `Ghi chú: ${record.note}` : details.summary}
-        </Text>
-      </View>
-      <View style={[styles.summaryStatusBadge, { backgroundColor: `${details.color}18` }]}>
-        <Text style={[styles.summaryStatusLabel, { color: details.color }]}>{details.label}</Text>
-      </View>
-    </View>
-  );
-}
-
-function RevalidationReviewSkeleton() {
-  return (
-    <View accessibilityLabel="Đang tải các lượt tái thẩm định" style={styles.skeletonContainer}>
-      <View style={[styles.skeletonBlock, { width: '100%', height: 4, marginVertical: 8 }]} />
-      <View style={styles.skeletonCard} />
-      <View style={styles.skeletonInfoBox} />
-      <View style={styles.skeletonDiamond}>
-        <View style={[styles.skeletonCircleButton, styles.diamondTop]} />
-        <View style={[styles.skeletonCircleButton, styles.diamondLeft]} />
-        <View style={[styles.skeletonCircleButton, styles.diamondRight]} />
-        <View style={[styles.skeletonCircleButton, styles.diamondBottom]} />
-      </View>
-    </View>
-  );
-}
-
-type RevalidationBottomSheetProps = {
-  type?: SheetType;
-  surveyorVerdict?: string;
-  selectedCatalogSign?: CatalogSign | null;
-  onOpenCatalog?: () => void;
-  onClearCatalogSign?: () => void;
-  onClose: () => void;
-  onConfirmDecline: (decision: string, note?: string, suggestedSignTypeId?: number) => void;
-  onConfirmReport: (reason: string, note?: string) => void;
-};
-
-const DECLINE_COUNTER_CHOICES: Array<{
-  id: string;
-  label: string;
-  desc: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  color: string;
-}> = [
-  {
-    id: 'STILL_ACTIVE',
-    label: 'Biển báo vẫn còn hoạt động',
-    desc: 'Biển báo thực tế vẫn đang đứng vững và hoạt động bình thường.',
-    icon: 'check-circle-outline',
-    color: '#16A34A',
-  },
-  {
-    id: 'REMOVED',
-    label: 'Biển báo đã bị gỡ bỏ',
-    desc: 'Không còn thấy biển báo tại vị trí chỉ định.',
-    icon: 'close-circle-outline',
-    color: '#DC2626',
-  },
-  {
-    id: 'CHANGED',
-    label: 'Biển báo đã thay đổi',
-    desc: 'Biển báo đã được thay thế hoặc đổi sang mã biển khác.',
-    icon: 'swap-horizontal',
-    color: '#D97706',
-  },
-];
-
-const REPORT_ISSUE_CHOICES = [
-  'Ảnh mờ / Không rõ biển báo',
-  'Ảnh bị che khuất hoặc góc chụp xấu',
-  'Chói sáng ban đêm / Không nhận diện được',
-  'Sai lệch vị trí tọa độ GPS quá xa',
-  'Vi phạm quy tắc / Ảnh không hợp lệ',
-];
-
-function RevalidationBottomSheet({
-  type,
-  surveyorVerdict,
-  selectedCatalogSign,
-  onOpenCatalog,
-  onClearCatalogSign,
-  onClose,
-  onConfirmDecline,
-  onConfirmReport,
-}: RevalidationBottomSheetProps) {
-  const theme = useTheme();
-  const [selectedDeclineAction, setSelectedDeclineAction] = useState<string>('STILL_ACTIVE');
-  const [selectedReportReason, setSelectedReportReason] = useState<string>(REPORT_ISSUE_CHOICES[0]);
-  const [note, setNote] = useState('');
-
-  const title =
-    type === 'decline' ? 'Từ chối kết luận của điều tra viên' : 'Báo cáo sự cố minh chứng';
-
-  const helperText =
-    type === 'decline'
-      ? `Điều tra viên kết luận: "${surveyorVerdict || 'Chưa rõ'}". Hãy chọn tình trạng đúng theo quan sát của bạn:`
-      : 'Chọn lý do minh chứng không hợp lệ hoặc khó nhận diện:';
-
-  const confirmColor = type === 'decline' ? Colors.danger : '#EA580C';
-
-  const handleConfirm = () => {
-    if (type === 'decline') {
-      onConfirmDecline(
-        selectedDeclineAction,
-        note.trim() || undefined,
-        selectedDeclineAction === 'CHANGED' && selectedCatalogSign
-          ? selectedCatalogSign.id
-          : undefined,
-      );
-    } else if (type === 'report') {
-      onConfirmReport(selectedReportReason, note.trim() || undefined);
-    }
-    setNote('');
-    onClose();
-  };
-
-  const handleClose = () => {
-    setNote('');
-    onClose();
-  };
-
-  return (
-    <Modal
-      animationType="slide"
-      onRequestClose={handleClose}
-      statusBarTranslucent
-      transparent
-      visible={Boolean(type)}
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityLabel="Đóng tùy chọn thẩm định"
-          onPress={handleClose}
-          style={styles.backdrop}
-        />
-        <KeyboardAvoidingView
-          behavior={
-            Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined
-          }
-          enabled={Platform.OS !== 'web'}
-          pointerEvents="box-none"
-          style={styles.sheetPositioner}
-        >
-          <SafeAreaView
-            edges={['bottom']}
-            style={[styles.sheet, { backgroundColor: theme.backgroundElement }]}
-          >
-            <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
-            <View style={[styles.sheetHeader, { borderBottomColor: theme.border }]}>
-              <Text style={[styles.sheetTitle, { color: theme.text }]}>{title}</Text>
-              <AppButton
-                accessibilityLabel="Đóng"
-                onPress={handleClose}
-                style={styles.sheetCloseButton}
-                variant="ghost"
-              >
-                <MaterialCommunityIcons color={theme.text} name="close" size={22} />
-              </AppButton>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.sheetBody}
-              keyboardShouldPersistTaps="handled"
-              style={styles.sheetBodyScroll}
-            >
-              <Text style={[styles.sheetHelper, { color: theme.textSecondary }]}>{helperText}</Text>
-
-              {/* Decline counter options */}
-              {type === 'decline' ? (
-                <View style={{ gap: 8, marginBottom: 14 }}>
-                  <View style={{ gap: 6 }}>
-                    {DECLINE_COUNTER_CHOICES.map((choice) => {
-                      const isSelected = selectedDeclineAction === choice.id;
-                      return (
-                        <Pressable
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected: isSelected }}
-                          key={choice.id}
-                          onPress={() => setSelectedDeclineAction(choice.id)}
-                          style={[
-                            styles.reasonOption,
-                            {
-                              backgroundColor: isSelected
-                                ? theme.backgroundSelected
-                                : theme.surface,
-                              borderColor: isSelected ? choice.color : theme.border,
-                            },
-                          ]}
-                        >
-                          <MaterialCommunityIcons
-                            color={choice.color}
-                            name={choice.icon}
-                            size={22}
-                          />
-                          <View style={{ flex: 1, marginLeft: 10 }}>
-                            <Text style={[styles.reasonLabel, { color: theme.text }]}>
-                              {choice.label}
-                            </Text>
-                            <Text
-                              style={{ fontSize: 11, color: theme.textSecondary, marginTop: 1 }}
-                            >
-                              {choice.desc}
-                            </Text>
-                          </View>
-                          <View
-                            style={[
-                              styles.radio,
-                              { borderColor: isSelected ? choice.color : theme.placeholder },
-                            ]}
-                          >
-                            {isSelected ? (
-                              <View style={[styles.radioDot, { backgroundColor: choice.color }]} />
-                            ) : null}
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* If CHANGED is selected, allow picking sign from catalog */}
-                  {selectedDeclineAction === 'CHANGED' ? (
-                    <View
-                      style={{
-                        padding: 10,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: theme.border,
-                        backgroundColor: theme.surface,
-                        marginTop: 4,
-                        gap: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.text }}>
-                        Biển báo thực tế thay thế (tùy chọn):
-                      </Text>
-                      {selectedCatalogSign ? (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            backgroundColor: theme.backgroundElement,
-                            padding: 8,
-                            borderRadius: 8,
-                          }}
-                        >
-                          <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={{ fontWeight: '700', fontSize: 13, color: theme.text }}>
-                              {selectedCatalogSign.signCode} - {selectedCatalogSign.nameVi}
-                            </Text>
-                          </View>
-                          <AppButton
-                            accessibilityLabel="Xóa biển báo đã chọn"
-                            onPress={onClearCatalogSign}
-                            style={{ paddingHorizontal: 8, minHeight: 32 }}
-                            variant="ghost"
-                          >
-                            <MaterialCommunityIcons color={Colors.danger} name="close" size={18} />
-                          </AppButton>
-                        </View>
-                      ) : (
-                        <AppButton
-                          accessibilityLabel="Chọn biển báo từ danh mục"
-                          label="Tra cứu danh mục biển báo"
-                          onPress={onOpenCatalog}
-                          style={{ borderColor: theme.border }}
-                          variant="surface"
-                        />
-                      )}
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {/* Report issue choices */}
-              {type === 'report' ? (
-                <View style={{ gap: 6, marginBottom: 14 }}>
-                  {REPORT_ISSUE_CHOICES.map((reason) => {
-                    const isSelected = selectedReportReason === reason;
-                    return (
-                      <Pressable
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected }}
-                        key={reason}
-                        onPress={() => setSelectedReportReason(reason)}
-                        style={[
-                          styles.reasonOption,
-                          {
-                            backgroundColor: isSelected ? theme.backgroundSelected : theme.surface,
-                            borderColor: isSelected ? '#EA580C' : theme.border,
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons color="#EA580C" name="flag-outline" size={20} />
-                        <Text
-                          style={[
-                            styles.reasonLabel,
-                            { flex: 1, marginLeft: 10, color: theme.text },
-                          ]}
-                        >
-                          {reason}
-                        </Text>
-                        <View
-                          style={[
-                            styles.radio,
-                            { borderColor: isSelected ? '#EA580C' : theme.placeholder },
-                          ]}
-                        >
-                          {isSelected ? (
-                            <View style={[styles.radioDot, { backgroundColor: '#EA580C' }]} />
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
-
-              {/* Notes Input Group */}
-              <View style={styles.reasonInputGroup}>
-                <Text style={[styles.inputLabel, { color: theme.text }]}>
-                  Ghi chú chi tiết (tùy chọn)
-                </Text>
-                <TextInput
-                  accessibilityLabel="Ghi chú quan sát của thẩm định viên"
-                  multiline
-                  onChangeText={setNote}
-                  placeholder="Nhập thêm chi tiết nếu cần..."
-                  placeholderTextColor={theme.placeholder}
-                  style={[
-                    styles.reasonInput,
-                    {
-                      backgroundColor: theme.background,
-                      borderColor: theme.border,
-                      color: theme.text,
-                    },
-                  ]}
-                  textAlignVertical="top"
-                  value={note}
-                />
-              </View>
-            </ScrollView>
-
-            <View style={[styles.sheetFooter, { borderTopColor: theme.border }]}>
-              <AppButton
-                label="Hủy"
-                onPress={handleClose}
-                style={[styles.sheetFooterButton, { borderColor: theme.border }]}
-                variant="surface"
-              />
-              <AppButton
-                label={type === 'decline' ? 'Xác nhận từ chối' : 'Gửi báo cáo'}
-                onPress={handleConfirm}
-                style={[styles.sheetFooterButton, { backgroundColor: confirmColor }]}
-              />
-            </View>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-}
+type SheetType = RevalidationSheetType;
 
 export function RevalidationReviewScreen() {
   const router = useRouter();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const reviewerWorkRoute = useWorkRoute('/work', { currentRole: 'reviewer' });
+  useBackButton(reviewerWorkRoute);
   const { isSmallDevice, height: windowHeight } = useResponsive();
+
+  const { isNavigatingToSign, navigateToSign } = useReviewerSignNavigation();
+  const searchParams = useLocalSearchParams<{
+    targetSubmissionId?: string;
+    taskId?: string;
+    questClaimId?: string;
+  }>();
+  const targetId = searchParams?.targetSubmissionId || searchParams?.taskId;
+  const claimedTaskId = searchParams?.taskId;
+  const questClaimId = searchParams?.questClaimId;
 
   const workflow = useRevalidationWorkflow();
   const {
@@ -581,32 +95,119 @@ export function RevalidationReviewScreen() {
     reviewPosition,
     progressPercent,
     counts,
+    ensureTaskEvidenceInQueue,
     handleVote: workflowVote,
     handleSkip: workflowSkip,
     finishReviews: workflowFinish,
     isLoading,
     isCheckingEvidence,
+    isSubmittingVote = false,
+    jumpToEvidenceById,
     keepCurrentEvidenceAndNext,
     recheckingPreviousReview,
     cancelEvidenceCheck,
   } = workflow;
 
   const displayedPreviousReview =
-    (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))?.previousReview ??
-    recheckingPreviousReview;
+    (
+      currentItem as RevalidationQueueEvidenceItem & {
+        previousReview?: CompletedRevalidationReview;
+      }
+    )?.previousReview ?? recheckingPreviousReview;
   const isRecheckMode = Boolean(isCheckingEvidence && displayedPreviousReview);
   const [isEditingVote, setIsEditingVote] = useState(false);
+  const [isResolvingClaimedTask, setIsResolvingClaimedTask] = useState(false);
+  const [claimMissingReason, setClaimMissingReason] = useState<'no_evidence' | 'not_found' | null>(null);
+  const handledTargetIdRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     setIsEditingVote(false);
   }, [currentItem?.evidenceId, isCheckingEvidence]);
 
-  const handleKeepPreviousReview = useCallback(() => {
-    const completes = keepCurrentEvidenceAndNext?.() ?? true;
-    if (completes) {
-      router.replace('/work/revalidation-summary');
+  useEffect(() => {
+    if (!targetId) {
+      handledTargetIdRef.current = null;
+      setClaimMissingReason(null);
+      setIsResolvingClaimedTask(false);
+      return;
     }
-  }, [keepCurrentEvidenceAndNext, router]);
+
+    const hasMatch =
+      items.some((it) => it.evidenceId === targetId || it.taskId === targetId) ||
+      history.some((h) => h.item.evidenceId === targetId || h.item.taskId === targetId);
+
+    if (hasMatch) {
+      if (handledTargetIdRef.current !== targetId) {
+        handledTargetIdRef.current = targetId;
+        jumpToEvidenceById?.(targetId);
+        if (searchParams?.targetSubmissionId) {
+          router.setParams?.({ targetSubmissionId: undefined });
+        }
+      }
+      setClaimMissingReason(null);
+      setIsResolvingClaimedTask(false);
+      return;
+    }
+
+    if (handledTargetIdRef.current === targetId) return;
+
+    if (!isLoading && claimedTaskId && ensureTaskEvidenceInQueue) {
+      handledTargetIdRef.current = targetId;
+      setIsResolvingClaimedTask(true);
+      void ensureTaskEvidenceInQueue(claimedTaskId)
+        .then((status) => {
+          if (!isMountedRef.current) return;
+          if (status !== 'found') {
+            setClaimMissingReason(status);
+          } else {
+            setClaimMissingReason(null);
+          }
+        })
+        .catch(() => {
+          if (!isMountedRef.current) return;
+          setClaimMissingReason('not_found');
+        })
+        .finally(() => {
+          if (isMountedRef.current) setIsResolvingClaimedTask(false);
+        });
+    }
+  }, [
+    targetId,
+    claimedTaskId,
+    isLoading,
+    items,
+    history,
+    jumpToEvidenceById,
+    ensureTaskEvidenceInQueue,
+    router,
+    searchParams?.targetSubmissionId,
+  ]);
+
+  useEffect(() => {
+    checkAndRequireLocationPermission().catch(() => { });
+  }, []);
+
+  const handleKeepPreviousReview = useCallback(() => {
+    keepCurrentEvidenceAndNext?.();
+  }, [keepCurrentEvidenceAndNext]);
+
+  const { session } = useSession();
+  const requestRecaptureMutation = useRequestEvidenceRecapture();
+  const currentUserId = session?.account?.id || (session as any)?.userId;
+  const isSelfEvidence = Boolean(
+    currentUserId &&
+    currentItem &&
+    (currentItem.evidence.userId === currentUserId ||
+      currentItem.evidence.surveyorId === currentUserId),
+  );
 
   // Active view toggle between surveyor evidence photo and baseline catalog sign
   const [viewMode, setViewMode] = useState<'evidence' | 'baseline'>('evidence');
@@ -620,15 +221,43 @@ export function RevalidationReviewScreen() {
   const [toast, setToast] = useState<{
     id: number;
     message: string;
-    tone: 'default' | 'success';
+    tone: 'default' | 'success' | 'danger';
   }>();
 
-  // If reviews completed, automatically navigate to Recheck voted evidence screen
-  useEffect(() => {
-    if (!currentItem && history.length > 0 && !isLoading) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [currentItem, history.length, isLoading, router]);
+  const handleConfirmRecapture = useCallback(
+    async (reason: string, note?: string) => {
+      if (!currentItem) return;
+      try {
+        await requestRecaptureMutation.mutateAsync({
+          evidenceId: currentItem.evidenceId,
+          dto: { reason, note },
+          accessToken: session?.accessToken,
+        });
+        setToast({
+          id: Date.now(),
+          message: 'Đã gửi yêu cầu chụp lại ảnh cho điều tra viên',
+          tone: 'success',
+        });
+        workflowSkip();
+      } catch (err: any) {
+        console.warn('[RevalidationReview] Request recapture error:', err);
+        setToast({
+          id: Date.now(),
+          message: err?.message || 'Không thể gửi yêu cầu chụp lại',
+          tone: 'default',
+        });
+      }
+      setActiveSheet(undefined);
+    },
+    [currentItem, requestRecaptureMutation, session?.accessToken, workflowSkip],
+  );
+
+  const activeQuestClaimId =
+    questClaimId &&
+      currentItem &&
+      (!claimedTaskId || currentItem.taskId === claimedTaskId)
+      ? questClaimId
+      : undefined;
 
   // ---------------------------------------------------------------------------
   // Action Handler: calls workflow vote API upon swipe or action confirmation
@@ -640,7 +269,7 @@ export function RevalidationReviewScreen() {
       suggestedSignTypeId?: number,
       verdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
     ) => {
-      if (!currentItem) return;
+      if (!currentItem || isSubmittingVote) return;
 
       const messages: Record<RevalidationReviewAction, string> = {
         STILL_ACTIVE: 'Đã xác nhận: Biển báo vẫn hoạt động',
@@ -650,49 +279,65 @@ export function RevalidationReviewScreen() {
         INVALID: 'Đã báo cáo minh chứng không hợp lệ',
       };
 
-      setToast({
-        id: Date.now(),
-        message: messages[action],
-        tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
-      });
-
-      const completesQueue = await workflowVote(action, note, suggestedSignTypeId, verdict);
-      setViewMode('evidence');
-
-      if (completesQueue) {
-        router.replace('/work/revalidation-summary');
+      try {
+        await (activeQuestClaimId
+          ? workflowVote(action, note, suggestedSignTypeId, verdict, activeQuestClaimId)
+          : workflowVote(action, note, suggestedSignTypeId, verdict));
+        setToast({
+          id: Date.now(),
+          message: messages[action],
+          tone: action === 'STILL_ACTIVE' ? 'success' : 'default',
+        });
+        setViewMode('evidence');
+      } catch (err) {
+        setToast({
+          id: Date.now(),
+          message: 'Đã xảy ra lỗi, vui lòng thử lại',
+          tone: 'danger',
+        });
       }
     },
-    [currentItem, router, workflowVote],
+    [activeQuestClaimId, currentItem, isSubmittingVote, workflowVote],
   );
 
   // Reviewer agrees with surveyor conclusion
   const handleAgree = useCallback(async () => {
-    if (!currentItem) return;
+    if (!currentItem || isSubmittingVote) return;
 
     // Follow surveyor's concluded evidenceType directly
     const rawVerdict = currentItem.evidence.evidenceType;
     const decision: RevalidationReviewAction =
       rawVerdict === 'REMOVED' ? 'REMOVED' : rawVerdict === 'CHANGED' ? 'CHANGED' : 'STILL_ACTIVE';
 
-    setToast({
-      id: Date.now(),
-      message: 'Đã đồng ý với kết luận của điều tra viên',
-      tone: 'success',
-    });
-
-    const completesQueue = await workflowVote(
-      decision,
-      undefined,
-      currentItem.evidence.suggestedSignTypeId ?? undefined,
-      'AGREE',
-    );
-    setViewMode('evidence');
-
-    if (completesQueue) {
-      router.replace('/work/revalidation-summary');
+    try {
+      await (activeQuestClaimId
+        ? workflowVote(
+          decision,
+          undefined,
+          currentItem.evidence.suggestedSignTypeId ?? undefined,
+          'AGREE',
+          activeQuestClaimId,
+        )
+        : workflowVote(
+          decision,
+          undefined,
+          currentItem.evidence.suggestedSignTypeId ?? undefined,
+          'AGREE',
+        ));
+      setToast({
+        id: Date.now(),
+        message: 'Đồng ý',
+        tone: 'success',
+      });
+      setViewMode('evidence');
+    } catch (err) {
+      setToast({
+        id: Date.now(),
+        message: 'Đã xảy ra lỗi, vui lòng thử lại',
+        tone: 'danger',
+      });
     }
-  }, [currentItem, router, workflowVote]);
+  }, [activeQuestClaimId, currentItem, isSubmittingVote, workflowVote]);
 
   // Reviewer disagrees with surveyor conclusion
   const handleDecline = useCallback(() => {
@@ -705,17 +350,13 @@ export function RevalidationReviewScreen() {
 
     setToast({
       id: Date.now(),
-      message: 'Đã bỏ qua minh chứng',
+      message: 'Đã bỏ qua',
       tone: 'default',
     });
 
-    const completesQueue = workflowSkip();
+    workflowSkip();
     setViewMode('evidence');
-
-    if (completesQueue) {
-      router.replace('/work/revalidation-summary');
-    }
-  }, [currentItem, router, workflowSkip]);
+  }, [currentItem, workflowSkip]);
 
   // Reviewer reports invalid / bad evidence
   const handleReport = useCallback(() => {
@@ -801,7 +442,7 @@ export function RevalidationReviewScreen() {
           }
         },
         onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
-          if (isRecheckMode && !isEditingVote) {
+          if ((isRecheckMode && !isEditingVote) || isSubmittingVote) {
             gestureAxis.current = 'none';
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
@@ -884,7 +525,7 @@ export function RevalidationReviewScreen() {
           }).start();
         },
       }),
-    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, pan],
+    [handleAgree, handleDecline, handleReport, handleSkip, isEditingVote, isRecheckMode, isSubmittingVote, pan],
   );
 
   // Active displayed image URI
@@ -904,61 +545,54 @@ export function RevalidationReviewScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: theme.background }]}>
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-        {/* Top Progress Bar & Navigation Controls (Active Evaluation Mode Only) */}
-        {currentItem ? (
-          <View style={styles.progressSection}>
-            <View style={styles.progressTopRow}>
-              <Pressable
-                accessibilityLabel="Quay lại"
-                hitSlop={Spacing.one}
-                onPress={() => {
-                  if (isRecheckMode) {
-                    cancelEvidenceCheck?.();
-                  }
+        {/* Top Progress Bar & Navigation Controls (Always visible so user can navigate back anytime) */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressTopRow}>
+            <Pressable
+              accessibilityLabel="Quay lại"
+              hitSlop={Spacing.one}
+              onPress={() => {
+                if (isRecheckMode) {
+                  cancelEvidenceCheck?.();
+                }
+                if (router.canGoBack?.()) {
                   router.back();
-                }}
-                style={styles.backButton}
-              >
-                <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
-              </Pressable>
+                } else {
+                  router.replace(reviewerWorkRoute);
+                }
+              }}
+              style={styles.backButton}
+              testID="revalidation-review-back-button"
+            >
+              <MaterialCommunityIcons color={theme.text} name="arrow-left" size={22} />
+            </Pressable>
 
-              <View style={styles.progressTrackWrapper}>
-                <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        backgroundColor: theme.primary,
-                        width: `${progressPercent}%`,
-                      },
-                    ]}
-                  />
-                </View>
+            <View style={styles.progressTrackWrapper}>
+              <View style={[styles.progressTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: currentItem ? `${progressPercent}%` : '0%',
+                    },
+                  ]}
+                />
               </View>
-
-              <Pressable
-                accessibilityLabel="Xem tổng kết đánh giá"
-                hitSlop={Spacing.one}
-                onPress={() => {
-                  if (isRecheckMode) {
-                    cancelEvidenceCheck?.();
-                  }
-                  router.replace('/work/revalidation-summary');
-                }}
-                style={styles.summaryTopButton}
-              >
-                <MaterialCommunityIcons color={theme.text} name="format-list-checks" size={22} />
-              </Pressable>
             </View>
+
+            <View style={styles.topBarSpacer} />
+          </View>
+          {currentItem ? (
             <View style={styles.progressCounterRow}>
               <Text style={[styles.progressCounterText, { color: theme.textSecondary }]}>
                 ĐANG ĐÁNH GIÁ MINH CHỨNG {reviewPosition} / {Math.max(totalCount, 1)}
               </Text>
             </View>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
 
-        {isLoading && items.length === 0 && history.length === 0 ? (
+        {(isLoading && items.length === 0 && history.length === 0) || isResolvingClaimedTask ? (
           <RevalidationReviewSkeleton />
         ) : currentItem ? (
           <View style={styles.mainContainer}>
@@ -1040,7 +674,8 @@ export function RevalidationReviewScreen() {
                       ]}
                     >
                       <Text style={styles.statusBadgeLabel}>
-                        {revalActionDetails[displayedPreviousReview.action]?.title ?? 'ĐÃ THẨM ĐỊNH'}
+                        {revalActionDetails[displayedPreviousReview.action]?.title ??
+                          'ĐÃ THẨM ĐỊNH'}
                       </Text>
                     </View>
                   ) : null}
@@ -1098,13 +733,9 @@ export function RevalidationReviewScreen() {
                   </Pressable>
                 </View>
               </Animated.View>
-              <Text style={[styles.zoomHintText, { color: theme.placeholder }]}>
-                Nhấn để phóng to nếu chưa nhìn rõ biển báo
-              </Text>
             </View>
-            {/* =============================================================== */}
-            {/* 2. COMPARISON SECTION: NEW EVIDENCE (LEFT) VS BASELINE (RIGHT)  */}
-            {/* =============================================================== */}
+
+            {/* Comparison Section (Option 1: Target Sign + Surveyor Verdict + Timestamps) */}
             <View
               style={[
                 styles.comparisonBox,
@@ -1114,176 +745,168 @@ export function RevalidationReviewScreen() {
                 },
               ]}
             >
-              <View style={styles.comparisonColumnsRow}>
-                {/* ----------------------------------------------------------- */}
-                {/* LEFT COLUMN: NEW EVIDENCE (ON-SITE SUBMISSION)               */}
-                {/* ----------------------------------------------------------- */}
-                <View style={styles.comparisonColumn}>
-                  <Text
-                    style={[styles.columnLabel, { color: theme.textSecondary, marginBottom: 4 }]}
+              {/* Row 1: Target Sign Name & Code Badge */}
+              <View style={styles.comparisonHeaderRow}>
+                {currentItem.verifiedSign.signCode ? (
+                  <View
+                    style={[
+                      styles.signCodeBadge,
+                      {
+                        backgroundColor: `${theme.primary}15`,
+                        borderColor: theme.primary,
+                      },
+                    ]}
                   >
-                    MINH CHỨNG MỚI
-                  </Text>
-
-                  {/* Condition Title */}
-                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Ghi nhận: Đã thay thế'
-                      : currentItem.evidence.evidenceType === 'REMOVED'
-                        ? 'Ghi nhận: Đã gỡ bỏ'
-                        : 'Ghi nhận: Vẫn còn'}
-                  </Text>
-
-                  {/* Distance & Timestamp Telemetry */}
-                  <View style={styles.columnTelemetryList}>
-                    {currentItem.evidence.distanceMeters != null ? (
-                      <View style={styles.telemetryItem}>
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.telemetryText, { color: theme.placeholder }]}
-                        >
-                          Cách vị trí cũ {Math.round(currentItem.evidence.distanceMeters)}m
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.telemetryItem}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.telemetryText, { color: theme.placeholder }]}
-                      >
-                        Thời gian chụp: {formatDate(currentItem.evidence.submittedAt)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* ----------------------------------------------------------- */}
-                {/* CENTER DIVIDER LINE                                         */}
-                {/* ----------------------------------------------------------- */}
-                <View style={[styles.columnDivider, { backgroundColor: theme.border }]} />
-
-                {/* ----------------------------------------------------------- */}
-                {/* RIGHT COLUMN: BASELINE RECORD (HISTORICAL SIGN)             */}
-                {/* ----------------------------------------------------------- */}
-                <View style={styles.comparisonColumn}>
-                  <View style={styles.columnHeaderRow}>
-                    <Text style={[styles.columnLabel, { color: theme.textSecondary }]}>
-                      BIỂN BÁO GỐC
+                    <Text style={[styles.signCodeText, { color: theme.primary }]}>
+                      {currentItem.verifiedSign.signCode}
                     </Text>
                   </View>
-
-                  {/* Baseline Sign Name */}
-                  <Text numberOfLines={1} style={[styles.comparisonTitle, { color: theme.text }]}>
-                    {currentItem.verifiedSign.nameVi ||
-                      currentItem.verifiedSign.nameEn ||
-                      currentItem.verifiedSign.signCode ||
-                      'Biển báo giao thông'}
-                  </Text>
-
-                  {/* Thumbnail & Freshness Score Row */}
-                  <View style={styles.baselineMetaRow}>
-                    <View style={styles.baselineScoreContainer}>
-                      {currentItem.verifiedSign.lastVerifiedAt ? (
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.baselineLastVerified, { color: theme.placeholder }]}
-                        >
-                          Lần cuối xác minh {formatDate(currentItem.verifiedSign.lastVerifiedAt)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Conclusion Section (Surveyor Report Conclusion) */}
-              <View
-                style={[
-                  styles.conclusionBanner,
-                  currentItem.evidence.evidenceType === 'REMOVED'
-                    ? styles.surveyorStatusRemoved
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? styles.surveyorStatusChanged
-                      : styles.surveyorStatusActive,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  color={
-                    currentItem.evidence.evidenceType === 'REMOVED'
-                      ? '#DC2626'
-                      : currentItem.evidence.evidenceType === 'CHANGED'
-                        ? '#D97706'
-                        : '#16A34A'
-                  }
-                  name={
-                    currentItem.evidence.evidenceType === 'REMOVED'
-                      ? 'alert-circle-outline'
-                      : currentItem.evidence.evidenceType === 'CHANGED'
-                        ? 'swap-horizontal'
-                        : 'check-circle-outline'
-                  }
-                  size={12}
-                />
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.conclusionText,
-                    {
-                      color:
-                        currentItem.evidence.evidenceType === 'REMOVED'
-                          ? '#DC2626'
-                          : currentItem.evidence.evidenceType === 'CHANGED'
-                            ? '#D97706'
-                            : '#16A34A',
-                    },
-                  ]}
-                >
-                  {currentItem.evidence.evidenceType === 'REMOVED'
-                    ? 'Biển báo đã gỡ bỏ'
-                    : currentItem.evidence.evidenceType === 'CHANGED'
-                      ? 'Biển báo đã thay đổi'
-                      : 'Biển báo vẫn còn hoạt động'}
+                ) : null}
+                <Text numberOfLines={1} style={[styles.comparisonSignName, { color: theme.text }]}>
+                  {currentItem.verifiedSign.nameVi ||
+                    currentItem.verifiedSign.nameEn ||
+                    currentItem.verifiedSign.signCode ||
+                    'Biển báo gốc'}
                 </Text>
               </View>
 
-              {/* Bottom Summary Bar */}
-              <View style={[styles.comparisonBottomBar, { borderTopColor: theme.border }]}>
-                <View style={styles.bottomBarItem}>
-                  <MaterialCommunityIcons color={theme.placeholder} name="vote-outline" size={12} />
-                  <Text style={[styles.bottomBarText, { color: theme.placeholder }]}>
-                    Đã có {currentItem.currentVoteCount} người bình chọn trước bạn
+              {/* Row 2: Surveyor Verdict Chip */}
+              <View style={styles.surveyorVerdictRow}>
+                <Text style={[styles.surveyorVerdictLabel, { color: theme.textSecondary }]}>
+                  Báo cáo thực địa:
+                </Text>
+                <View
+                  style={[
+                    styles.surveyorVerdictBadge,
+                    currentItem.evidence.evidenceType === 'REMOVED'
+                      ? styles.surveyorStatusRemoved
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? styles.surveyorStatusChanged
+                        : styles.surveyorStatusActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.surveyorVerdictText,
+                      {
+                        color:
+                          currentItem.evidence.evidenceType === 'REMOVED'
+                            ? '#DC2626'
+                            : currentItem.evidence.evidenceType === 'CHANGED'
+                              ? '#D97706'
+                              : '#16A34A',
+                      },
+                    ]}
+                  >
+                    {currentItem.evidence.evidenceType === 'REMOVED'
+                      ? 'Biển báo đã gỡ bỏ'
+                      : currentItem.evidence.evidenceType === 'CHANGED'
+                        ? 'Biển báo đã thay đổi'
+                        : 'Biển báo vẫn còn hoạt động'}
                   </Text>
                 </View>
-                <View style={styles.bottomBarItem}>
-                  <MaterialCommunityIcons color="#16A34A" name="gift-outline" size={12} />
-                  <Text style={[styles.bottomBarText, { color: '#16A34A' }]}>
-                    +{currentItem.rewardCredits} Credits thưởng
+              </View>
+
+              {/* Row 3: Timestamps Comparison (Old vs New, without distance) */}
+              <View style={styles.timestampsRow}>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons
+                    color={theme.placeholder}
+                    name="camera-outline"
+                    size={13}
+                  />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Chụp mới: {formatDate(currentItem.evidence.submittedAt)}
+                  </Text>
+                </View>
+                <Text style={[styles.timestampDivider, { color: theme.placeholder }]}>•</Text>
+                <View style={styles.timestampItem}>
+                  <MaterialCommunityIcons color={theme.placeholder} name="history" size={13} />
+                  <Text style={[styles.timestampText, { color: theme.placeholder }]}>
+                    Lần cuối:{' '}
+                    {currentItem.verifiedSign.lastVerifiedAt
+                      ? formatDate(currentItem.verifiedSign.lastVerifiedAt)
+                      : 'Chưa có dữ liệu'}
                   </Text>
                 </View>
               </View>
             </View>
 
-            {/* Action button right below the comparison box, to the right edge of the screen */}
+            {/* Action button right below comparison box: Location button */}
             <View style={styles.skipToSummaryRow}>
               <AppButton
-                accessibilityHint="Bỏ qua các minh chứng còn lại và chuyển đến màn hình tổng kết"
-                accessibilityLabel="Chuyển đến màn hình tổng kết"
-                disabled={history.length === 0}
-                label="Tổng kết"
+                accessibilityHint="Di chuyển đến vị trí biển báo trên bản đồ"
+                accessibilityLabel="Di chuyển đến vị trí biển báo"
+                disabled={isNavigatingToSign}
                 onPress={() => {
-                  cancelEvidenceCheck?.();
-                  router.replace('/work/revalidation-summary');
+                  const coord =
+                    (currentItem.evidence as any)?.location ??
+                    (currentItem.verifiedSign as any)?.location ??
+                    {};
+                  const lat =
+                    coord.latitude ??
+                    currentItem.evidence?.latitude ??
+                    (currentItem.verifiedSign as any)?.latitude ??
+                    (currentItem as any)?.latitude;
+                  const lng =
+                    coord.longitude ??
+                    currentItem.evidence?.longitude ??
+                    (currentItem.verifiedSign as any)?.longitude ??
+                    (currentItem as any)?.longitude;
+
+                  void navigateToSign({
+                    latitude: lat,
+                    longitude: lng,
+                    title:
+                      currentItem.verifiedSign?.nameVi ||
+                      currentItem.verifiedSign?.signCode ||
+                      'Biển báo tái xác thực',
+                    subtitle: currentItem.verifiedSign?.signCode,
+                    signId: currentItem.evidenceId || currentItem.taskId,
+                    returnPath: '/work/revalidation-review',
+                  });
                 }}
                 style={[
                   styles.summaryShortcutButton,
                   {
-                    borderColor: history.length > 0 ? theme.primary : theme.border,
+                    borderColor: theme.border,
                   },
                 ]}
-                testID="reval-skip-to-summary-button"
-                textStyle={styles.summaryShortcutButtonText}
-                variant={history.length > 0 ? 'primary' : 'surface'}
-              />
+                testID="reval-move-to-sign-location-button"
+                variant="surface"
+              >
+                <View style={styles.locationButtonContent}>
+                  <MaterialCommunityIcons
+                    color={theme.primary}
+                    name="map-marker-outline"
+                    size={15}
+                  />
+                  <Text style={[styles.summaryShortcutButtonText, { color: theme.text }]}>
+                    {isNavigatingToSign ? 'Đang định vị...' : 'Vị trí biển báo'}
+                  </Text>
+                </View>
+              </AppButton>
+
+              <AppButton
+                accessibilityLabel="Yêu cầu chụp lại ảnh"
+                disabled={Boolean(isSelfEvidence || isLoading)}
+                onPress={() => setActiveSheet('recapture')}
+                style={[
+                  styles.summaryShortcutButton,
+                  {
+                    borderColor: '#D97706',
+                    marginLeft: 8,
+                  },
+                ]}
+                variant="surface"
+              >
+                <View style={styles.locationButtonContent}>
+                  <MaterialCommunityIcons color="#D97706" name="camera-retake-outline" size={15} />
+                  <Text style={[styles.summaryShortcutButtonText, { color: '#D97706' }]}>
+                    Chụp lại
+                  </Text>
+                </View>
+              </AppButton>
             </View>
 
             {/* Bottom Actions: Separate Revalidation Decision Badge Component */}
@@ -1299,76 +922,80 @@ export function RevalidationReviewScreen() {
                   <RevalidationEditingBanner onCancel={() => setIsEditingVote(false)} />
                 ) : null}
 
-                <RevalidationDecisionBadge
-                  disabled={isLoading}
-                  handleAgree={handleAgree}
-                  handleDecline={handleDecline}
-                  handleReport={handleReport}
-                  handleSkip={handleSkip}
-                  onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
-                  onOpenHelp={() => setIsHelpModalVisible(true)}
-                />
+                {isSelfEvidence ? (
+                  <View
+                    style={{
+                      padding: 14,
+                      marginHorizontal: 16,
+                      borderRadius: 12,
+                      backgroundColor: 'rgba(217, 119, 6, 0.08)',
+                      borderColor: '#D97706',
+                      borderWidth: 1,
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <MaterialCommunityIcons
+                        color="#D97706"
+                        name="shield-alert-outline"
+                        size={20}
+                      />
+                      <Text style={{ fontWeight: '700', fontSize: 14, color: '#D97706' }}>
+                        Tự thẩm định bị chặn
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: theme.textSecondary, textAlign: 'center' }}>
+                      Bạn là người nộp minh chứng này. Theo quy chế tự thẩm định (Self-review), bạn
+                      không thể bỏ phiếu hoặc yêu cầu chụp lại bài nộp của chính mình.
+                    </Text>
+                    <AppButton label="Bỏ qua minh chứng này" onPress={handleSkip} variant="ghost" />
+                  </View>
+                ) : (
+                  <RevalidationDecisionBadge
+                    disabled={isLoading}
+                    handleAgree={handleAgree}
+                    handleDecline={handleDecline}
+                    handleReport={handleReport}
+                    handleSkip={handleSkip}
+                    onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
+                    onOpenHelp={() => setIsHelpModalVisible(true)}
+                  />
+                )}
               </>
             )}
           </View>
-        ) : history.length > 0 ? (
-          /* Revalidation Summary Screen (mirrors reviewer flow) */
-          <View style={styles.summaryContent}>
-            <View style={styles.summaryHeading}>
-              <Text style={[styles.summaryTitle, { color: theme.text }]}>
-                Tổng kết tái thẩm định
-              </Text>
-              <Text style={[styles.summarySubtitle, { color: theme.textSecondary }]}>
-                Hôm nay • Đã đánh giá {history.length} biển báo
-              </Text>
-            </View>
-
-            <View style={styles.summaryMetrics}>
-              <RevalSummaryMetric action="STILL_ACTIVE" count={counts.STILL_ACTIVE} />
-              <RevalSummaryMetric action="REMOVED" count={counts.REMOVED} />
-              <RevalSummaryMetric action="CHANGED" count={counts.CHANGED} />
-              <RevalSummaryMetric action="UNCLEAR" count={counts.UNCLEAR} />
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.summaryReviewListContent}
-              showsVerticalScrollIndicator={false}
-              style={styles.summaryReviewList}
-            >
-              {history.map((record, index) => (
-                <RevalReviewedSignRow key={`${record.item.evidenceId}-${index}`} record={record} />
-              ))}
-            </ScrollView>
-
-            <View style={styles.summaryFooterActions}>
-              <AppButton
-                label="Quay lại công việc"
-                onPress={() => router.back()}
-                style={[styles.summaryCheckButton, { borderColor: theme.border }]}
-                textStyle={{ color: theme.textSecondary }}
-                variant="surface"
-              />
-              <AppButton
-                label="Hoàn tất"
-                onPress={handleFinishReviews}
-                style={styles.summarySubmitButton}
-              />
-            </View>
-          </View>
         ) : (
           <View style={styles.completeState}>
-            <View style={[styles.completeIcon, { backgroundColor: '#E8F7ED' }]}>
-              <MaterialCommunityIcons color="#16803A" name="check" size={36} />
+            <View
+              style={[
+                styles.completeIcon,
+                { backgroundColor: claimMissingReason ? '#FEF3C7' : '#E8F7ED' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                color={claimMissingReason ? '#D97706' : '#16803A'}
+                name={claimMissingReason ? 'alert-circle-outline' : 'check'}
+                size={36}
+              />
             </View>
             <Text style={[styles.completeTitle, { color: theme.text }]}>
-              Đã đánh giá tất cả minh chứng
+              {claimMissingReason === 'no_evidence'
+                ? 'Nhiệm vụ chưa có minh chứng'
+                : claimMissingReason === 'not_found'
+                  ? 'Không tìm thấy minh chứng'
+                  : 'Đã đánh giá tất cả minh chứng'}
             </Text>
             <Text style={[styles.completeCopy, { color: theme.textSecondary }]}>
-              Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.
+              {claimMissingReason === 'no_evidence'
+                ? 'Biển báo này chưa có ảnh minh chứng thực địa để duyệt.'
+                : claimMissingReason === 'not_found'
+                  ? 'Nhiệm vụ tái thẩm định này hiện không còn minh chứng khả dụng.'
+                  : 'Bạn đã xem xét tất cả các minh chứng tái thẩm định thực địa trong hàng đợi.'}
             </Text>
             <AppButton
               label="Quay lại công việc"
-              onPress={() => router.back()}
+              onPress={() => router.replace(reviewerWorkRoute)}
               style={styles.completeSummaryButton}
             />
           </View>
@@ -1388,6 +1015,7 @@ export function RevalidationReviewScreen() {
           handleVote('UNCLEAR', fullNote, undefined, 'REPORT');
           setActiveSheet(undefined);
         }}
+        onConfirmRecapture={handleConfirmRecapture}
         onOpenCatalog={() => setIsCatalogBrowserOpen(true)}
         selectedCatalogSign={selectedCatalogSign}
         surveyorVerdict={
@@ -1602,1148 +1230,10 @@ export function RevalidationReviewScreen() {
           key={toast.id}
           message={toast.message}
           onDismiss={() => setToast(undefined)}
-          placement="center"
+          placement="bottom"
           tone={toast.tone}
         />
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  progressSection: {
-    paddingHorizontal: Spacing.two,
-    paddingTop: Spacing.one,
-    paddingBottom: Spacing.one,
-  },
-  progressTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-  },
-  topBarSpacer: {
-    width: 36,
-    height: 36,
-  },
-  summaryTopButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Rounded.md,
-  },
-  progressTrackWrapper: {
-    flex: 1,
-  },
-  progressTrack: {
-    height: 4,
-    width: '100%',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  progressCounterRow: {
-    alignItems: 'center',
-    marginTop: Spacing.one,
-    marginBottom: Spacing.two,
-  },
-  progressCounterText: {
-    fontFamily: Fonts.body,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  mainContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-  },
-  cardArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: Spacing.two,
-    position: 'relative',
-  },
-  zoomHintText: {
-    marginTop: Spacing.two,
-    marginBottom: Spacing.one,
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  mainCard: {
-    width: '88%',
-    maxWidth: 324,
-    height: '100%',
-    maxHeight: 380,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-    zIndex: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  mainCardOffset: {
-    transform: [{ translateX: -12 }],
-  },
-  peekCard: {
-    position: 'absolute',
-    width: '88%',
-    maxWidth: 324,
-    height: '100%',
-    maxHeight: 380,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-    zIndex: 1,
-    transform: [{ translateX: 22 }, { scale: 0.94 }],
-    opacity: 0.82,
-    shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  peekDimOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardInnerPressable: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  imageSourceToggleContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    borderRadius: 20,
-    padding: 3,
-    gap: 3,
-    zIndex: 20,
-    elevation: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  imageSourcePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-  },
-  imageSourcePillActive: {
-    backgroundColor: '#0671EB',
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  imageSourcePillText: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  imageSourcePillTextActive: {
-    color: '#FFFFFF',
-  },
-  swipeBadge: {
-    position: 'absolute',
-    borderWidth: 2.5,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    zIndex: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  swipeBadgeText: {
-    fontFamily: Fonts.body,
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-  },
-  activeBadge: {
-    top: 24,
-    left: 20,
-    borderColor: '#16A34A',
-    backgroundColor: 'rgba(22, 163, 74, 0.9)',
-    transform: [{ rotate: '-14deg' }],
-  },
-  removedBadge: {
-    top: 24,
-    right: 20,
-    borderColor: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    transform: [{ rotate: '14deg' }],
-  },
-  changedBadge: {
-    top: 24,
-    alignSelf: 'center',
-    borderColor: '#F97316',
-    backgroundColor: 'rgba(249, 115, 22, 0.9)',
-  },
-  unclearBadge: {
-    bottom: 24,
-    alignSelf: 'center',
-    borderColor: '#2563EB',
-    backgroundColor: 'rgba(37, 99, 235, 0.9)',
-  },
-  zoomButton: {
-    position: 'absolute',
-    right: 14,
-    top: 14,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  comparisonBox: {
-    width: '92%',
-    maxWidth: 348,
-    alignSelf: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    marginVertical: Spacing.two,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 5,
-    elevation: 2,
-  },
-  comparisonColumnsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.two,
-  },
-  comparisonColumn: {
-    flex: 1,
-    paddingHorizontal: 3,
-    justifyContent: 'flex-start',
-  },
-  columnHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  columnLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  evidenceStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  surveyorStatusActive: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#22C55E',
-  },
-  surveyorStatusRemoved: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#EF4444',
-  },
-  surveyorStatusChanged: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#F59E0B',
-  },
-  surveyorStatusText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  conclusionBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: Spacing.one,
-    borderRadius: 8,
-    borderWidth: 1.2,
-    marginBottom: Spacing.two,
-    alignSelf: 'stretch',
-    overflow: 'hidden',
-  },
-  conclusionText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  baselineCodeBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginBottom: 4,
-  },
-  baselineCodeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  comparisonTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-    marginBottom: 4,
-  },
-  columnTelemetryList: {
-    gap: 2,
-  },
-  telemetryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  telemetryText: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  columnDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: 8,
-    marginVertical: 2,
-  },
-  baselineMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  baselineMiniCrop: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  baselineMiniCropPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  baselineScoreContainer: {
-    flex: 1,
-  },
-  baselineScoreLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  baselineLastVerified: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  comparisonBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    paddingTop: 8,
-    paddingHorizontal: 2,
-  },
-  bottomBarItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  bottomBarText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  actionsFooter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 2,
-    position: 'relative',
-    width: '100%',
-  },
-  undoCornerButton: {
-    position: 'absolute',
-    right: 12,
-    bottom: 8,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  diamondContainer: {
-    width: 168,
-    height: 196,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 2,
-  },
-  diamondButton: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  diamondTop: {
-    top: 0,
-    left: 57,
-  },
-  diamondBottom: {
-    top: 114,
-    left: 57,
-  },
-  diamondLeft: {
-    left: 0,
-    top: 57,
-  },
-  diamondRight: {
-    right: 0,
-    top: 57,
-  },
-  circleButtonPressed: {
-    transform: [{ scale: 0.92 }],
-    opacity: 0.88,
-  },
-  neutralDiamondButton: {
-    borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  declineButton: {
-    borderWidth: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  approveButton: {
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.38,
-    shadowRadius: 16,
-    elevation: 7,
-  },
-  undoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  undoText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  undoSpacer: {
-    height: 30,
-  },
-  completeState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-    padding: Spacing.four,
-  },
-  completeIcon: {
-    width: 64,
-    height: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 32,
-    marginBottom: Spacing.one,
-  },
-  completeTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 26,
-  },
-  completeCopy: {
-    maxWidth: 320,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  completeSummaryButton: {
-    minWidth: 200,
-    marginTop: Spacing.two,
-  },
-
-  /* ── Summary Screen Styles (Reviewer Flow Match) ──────────── */
-  summaryContent: {
-    width: '100%',
-    maxWidth: 600,
-    flex: 1,
-    alignSelf: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
-  },
-  summaryHeading: { gap: 2 },
-  summaryTitle: { fontFamily: Fonts.body, fontSize: 24, fontWeight: '900', lineHeight: 31 },
-  summarySubtitle: { fontFamily: Fonts.body, fontSize: 13, fontWeight: '500', lineHeight: 18 },
-  summaryMetrics: { flexDirection: 'row', gap: Spacing.one },
-  summaryMetric: {
-    minWidth: 0,
-    flex: 1,
-    gap: Spacing.half,
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.three,
-  },
-  summaryMetricSymbol: {
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderRadius: 10,
-  },
-  summaryMetricSymbolLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 15,
-  },
-  summaryMetricCount: { fontFamily: Fonts.body, fontSize: 23, fontWeight: '900', lineHeight: 28 },
-  summaryMetricLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  summaryReviewList: { flex: 1 },
-  summaryReviewListContent: { gap: Spacing.one },
-  summarySignRow: {
-    minHeight: 88,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    padding: Spacing.one,
-  },
-  summarySignImage: { width: 66, height: 66, flexShrink: 0, borderRadius: Rounded.md },
-  summarySignCopy: { minWidth: 0, flex: 1, gap: 2 },
-  summarySignName: { fontFamily: Fonts.body, fontSize: 15, fontWeight: '800', lineHeight: 20 },
-  summarySignLocation: { fontFamily: Fonts.body, fontSize: 11, fontWeight: '500', lineHeight: 15 },
-  summarySignSummary: { fontFamily: Fonts.body, fontSize: 10, fontWeight: '500', lineHeight: 14 },
-  summaryStatusBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  summaryStatusLabel: { fontFamily: Fonts.body, fontSize: 9, fontWeight: '800' },
-  summaryFooterActions: { gap: Spacing.one, marginTop: 'auto' },
-  summaryCheckButton: { minHeight: 48, borderWidth: 1 },
-  summarySubmitButton: { minHeight: 50 },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.48)',
-  },
-  sheetPositioner: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    width: '100%',
-    maxWidth: 560,
-    maxHeight: '92%',
-    alignSelf: 'center',
-    overflow: 'hidden',
-    borderTopLeftRadius: Rounded.lg,
-    borderTopRightRadius: Rounded.lg,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    elevation: 16,
-  },
-  sheetHandle: {
-    width: 34,
-    height: 4,
-    alignSelf: 'center',
-    borderRadius: 2,
-    marginTop: Spacing.one,
-  },
-  sheetHeader: {
-    minHeight: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    paddingLeft: Spacing.three,
-    paddingRight: Spacing.half,
-  },
-  sheetTitle: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  sheetCloseButton: {
-    width: 44,
-    height: 44,
-    minHeight: 44,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  sheetBody: {
-    gap: Spacing.three,
-    padding: Spacing.three,
-  },
-  sheetBodyScroll: {
-    flexShrink: 1,
-  },
-  sheetHelper: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-  },
-  reasonInputGroup: {
-    gap: Spacing.half,
-  },
-  inputLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  reasonInput: {
-    height: 88,
-    minHeight: 88,
-    maxHeight: 88,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  singleLineInput: {
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-  },
-  selectedSignCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 12,
-  },
-  selectedSignImageWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedSignImage: {
-    width: 44,
-    height: 44,
-  },
-  selectedSignInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  selectedSignBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  selectedSignCodeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-  },
-  selectedSignCodeText: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  selectedSignCategoryText: {
-    fontFamily: Fonts.body,
-    fontSize: 10,
-    fontWeight: '600',
-    flex: 1,
-  },
-  selectedSignNameText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  selectedSignActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  changeSignBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signPickerTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 52,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-  },
-  signPickerTriggerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  signPickerTriggerText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  sheetFooter: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-    borderTopWidth: 1,
-    paddingHorizontal: Spacing.two,
-    paddingTop: Spacing.two,
-  },
-  sheetFooterButton: {
-    flex: 1,
-    minHeight: 46,
-    borderWidth: 1,
-  },
-  skeletonContainer: {
-    flex: 1,
-    padding: Spacing.three,
-    justifyContent: 'space-between',
-  },
-  skeletonBlock: {
-    backgroundColor: '#E2E8F0',
-    borderRadius: 4,
-  },
-  skeletonCard: {
-    width: '88%',
-    maxWidth: 324,
-    height: 300,
-    borderRadius: 24,
-    backgroundColor: '#E2E8F0',
-    alignSelf: 'center',
-  },
-  skeletonInfoBox: {
-    height: 48,
-    width: '88%',
-    maxWidth: 324,
-    borderRadius: 18,
-    backgroundColor: '#E2E8F0',
-    alignSelf: 'center',
-    marginVertical: 6,
-  },
-  skeletonDiamond: {
-    width: 168,
-    height: 168,
-    position: 'relative',
-    alignSelf: 'center',
-    marginVertical: Spacing.two,
-  },
-  skeletonCircleButton: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#E2E8F0',
-  },
-  zoomBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.92)',
-  },
-  zoomSafeArea: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  zoomCloseBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 999,
-    elevation: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  zoomedImage: {
-    width: '100%',
-    height: '85%',
-  },
-
-  /* ── Floating Action Buttons (FABs) ─────────────── */
-  fabColumn: {
-    position: 'absolute',
-    right: 8,
-    bottom: 8,
-    gap: 10,
-    zIndex: 10,
-  },
-  fabButton: {
-    width: 44,
-    height: 44,
-    minHeight: 44,
-    borderRadius: 22,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 4,
-    borderWidth: 1,
-  },
-
-  /* ── Swipe Guide Help Dialog ─────────────────────── */
-  helpModalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.three,
-  },
-  helpDialogCard: {
-    width: '100%',
-    maxWidth: 348,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 18,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  helpDialogHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 14,
-  },
-  helpHeaderIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpDialogTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  helpDialogSubtitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  helpCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpGuideList: {
-    gap: 8,
-    marginBottom: 12,
-  },
-  helpGuideItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  helpItemIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  helpItemContent: {
-    flex: 1,
-  },
-  helpItemTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  helpItemDesc: {
-    fontFamily: Fonts.body,
-    fontSize: 10.5,
-    fontWeight: '500',
-    lineHeight: 14,
-    marginTop: 1,
-  },
-  helpTipBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
-    marginBottom: 14,
-  },
-  helpTipText: {
-    flex: 1,
-    fontSize: 10.5,
-    fontWeight: '500',
-    lineHeight: 14,
-  },
-  helpConfirmBtn: {
-    minHeight: 44,
-    borderRadius: 12,
-  },
-  reasonOption: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 8,
-  },
-  reasonLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  radio: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 9,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  statusBadge: {
-    position: 'absolute',
-    bottom: 14,
-    left: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  statusBadgeLabel: {
-    color: '#FFFFFF',
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  recheckResultContainer: {
-    width: '100%',
-    maxWidth: 380,
-    alignSelf: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.two,
-  },
-  recheckResultCard: {
-    borderWidth: 1.5,
-    borderRadius: Rounded.lg,
-    padding: Spacing.two,
-    gap: 8,
-  },
-  recheckResultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-  },
-  recheckResultIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recheckResultTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  recheckResultSubLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  recheckResultTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  recheckResultSummary: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  recheckActionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    alignItems: 'center',
-  },
-  recheckFixButton: {
-    flex: 1,
-    minHeight: 46,
-  },
-  recheckKeepButton: {
-    flex: 1,
-    minHeight: 46,
-  },
-  editingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 8,
-    marginBottom: Spacing.one,
-  },
-  editingBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  editingBannerText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cancelEditButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  cancelEditText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  skipToSummaryRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: -2,
-    marginBottom: 4,
-  },
-  summaryShortcutButton: {
-    minHeight: 32,
-    height: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 0,
-    borderRadius: Rounded.round,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryShortcutButtonText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-});

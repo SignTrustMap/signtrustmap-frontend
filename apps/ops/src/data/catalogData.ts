@@ -1,3 +1,6 @@
+import type { RecaptureRequestSummary } from '@/api/services/catalog.service'
+import type { UserProfileSummary } from '@/api/services/user.service'
+
 export type CatalogCategory =
   | 'prohibitory'
   | 'warning'
@@ -60,20 +63,15 @@ export interface MissingSignTypeReport {
   mergedIntoSignTypeId?: number | null
   staffNotes?: string | null
   reviewedBy?: string | null
+  reporter?: UserProfileSummary | null
+  reviewer?: UserProfileSummary | null
   createdAt?: string
   updatedAt?: string
   resolvedAt?: string | null
-  recaptureRequest?: {
-    reason: string
-    note: string
-    createdAt?: string
-  } | null
+  recaptureRequest?: RecaptureRequestSummary | null
 }
 
-export const candidateRecaptureCache = new Map<
-  string,
-  { reason: string; note: string; createdAt?: string }
->()
+export const candidateRecaptureCache = new Map<string, RecaptureRequestSummary>()
 
 export interface AvailableSignOption {
   id?: number

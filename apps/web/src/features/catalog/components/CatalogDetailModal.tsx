@@ -16,8 +16,6 @@ import {
   ShieldCheck,
   Tag,
   FileText,
-  Shapes,
-  Palette,
 } from '@phosphor-icons/react'
 import { useToast } from '@/context/ToastContext'
 import { Modal } from '@/components/common/Modal'
@@ -106,6 +104,8 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
                 imageUrl: sign.representativeImageKey || undefined,
                 nameVi: sign.nameVi,
                 name: sign.nameEn,
+                shape: sign.shape || undefined,
+                color: sign.colorScheme || undefined,
               }}
               className="w-full h-full object-contain drop-shadow-md"
             />
@@ -125,13 +125,15 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
               )}
 
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded border font-mono ${
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-md border ${
                   sign.isActive
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                     : 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30'
                 }`}
               >
-                {sign.isActive ? 'Active' : 'Inactive'}
+                {sign.isActive
+                  ? isEnglish ? 'Active' : 'Hoạt động'
+                  : isEnglish ? 'Inactive' : 'Ngừng áp dụng'}
               </span>
             </div>
 
@@ -291,23 +293,23 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
             </div>
           )}
 
-          {/* Real Metadata Grid (Category info, OSM Mapping, Shape, Color if provided by API) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Metadata Grid: Category info and OSM Mapping */}
+          <div className={`grid gap-3 ${sign.osmMapping ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             {sign.category && (
               <div
-                className={`p-3 rounded-xl border ${
+                className={`p-3.5 rounded-xl border ${
                   isDark ? 'bg-white/[0.03] border-white/10' : 'bg-gray-50 border-gray-200'
                 }`}
               >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                  <SquaresFour size={14} weight="bold" />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                  <SquaresFour size={16} weight="bold" />
                   <span>{t('catalog.category_lbl')}</span>
                 </div>
-                <div className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">
-                  {isEnglish ? sign.category.nameEn : sign.category.nameVi} ({sign.category.code})
+                <div className="font-extrabold text-sm sm:text-base text-gray-900 dark:text-white">
+                  {isEnglish ? sign.category.nameEn : sign.category.nameVi}
                 </div>
                 {sign.category.description && (
-                  <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1 line-clamp-1">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
                     {sign.category.description}
                   </p>
                 )}
@@ -317,50 +319,16 @@ export const CatalogDetailModal: React.FC<CatalogDetailModalProps> = ({
             {/* OSM Mapping Tag (rendered only if present in API response) */}
             {sign.osmMapping && (
               <div
-                className={`p-3 rounded-xl border ${
+                className={`p-3.5 rounded-xl border ${
                   isDark ? 'bg-white/[0.03] border-white/10' : 'bg-gray-50 border-gray-200'
                 }`}
               >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                  <Tag size={14} weight="bold" />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                  <Tag size={16} weight="bold" />
                   <span>OpenStreetMap Tag</span>
                 </div>
                 <div className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 truncate">
                   {sign.osmMapping}
-                </div>
-              </div>
-            )}
-
-            {/* Shape (rendered only if present in API response) */}
-            {sign.shape && (
-              <div
-                className={`p-3 rounded-xl border ${
-                  isDark ? 'bg-white/[0.03] border-white/10' : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                  <Shapes size={14} weight="bold" />
-                  <span>{t('catalog.geometry')}</span>
-                </div>
-                <div className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">
-                  {sign.shape}
-                </div>
-              </div>
-            )}
-
-            {/* Color Scheme (rendered only if present in API response) */}
-            {sign.colorScheme && (
-              <div
-                className={`p-3 rounded-xl border ${
-                  isDark ? 'bg-white/[0.03] border-white/10' : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-0.5">
-                  <Palette size={14} weight="bold" />
-                  <span>{t('catalog.colors')}</span>
-                </div>
-                <div className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">
-                  {sign.colorScheme}
                 </div>
               </div>
             )}

@@ -10,7 +10,8 @@
     "ios": {
       "icon": "./assets/images/app-logo.png",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route."
+        "NSLocationWhenInUseUsageDescription": "SignTrustMap uses your location and heading to guide you along the selected route.",
+        "NSCameraUsageDescription": "SignTrustMap uses your camera to capture traffic signs."
       }
     },
     "android": {
@@ -33,13 +34,13 @@
       "navigationBar": {
         "visible": "always",
         "barStyle": "dark-content",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#000000"
       }
     },
     "androidNavigationBar": {
       "visible": "always",
       "barStyle": "dark-content",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#000000"
     },
     "web": {
       "output": "static",
@@ -50,7 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F8F7F7",
           "image": "./assets/images/app-logo.png",
           "imageWidth": 120
         }
@@ -60,7 +61,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow SignTrustMap to access photos and videos for survey records.",
-          "cameraPermission": false,
+          "cameraPermission": "Allow SignTrustMap to access your camera to capture traffic signs.",
           "microphonePermission": false
         }
       ],
@@ -70,10 +71,7 @@
           "photosPermission": "Allow SignTrustMap to read the selected photo's location metadata.",
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": true,
-          "granularPermissions": [
-            "photo",
-            "video"
-          ]
+          "granularPermissions": ["photo", "video"]
         }
       ],
       [

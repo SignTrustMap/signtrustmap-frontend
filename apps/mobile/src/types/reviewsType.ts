@@ -12,6 +12,9 @@ export type VoteDto = {
     suggestedSignTypeId?: string | number;
     declineReason?: string;
     declineNote?: string;
+    latitude?: number;
+    longitude?: number;
+    questClaimId?: string;
 }
 
 export type CreateMissingTypeReportDto = {
@@ -46,6 +49,7 @@ export type MyReviewHistoryParams = {
     page: string,
     pageSize: string,
     status?: string,
+    state?: string,
     search?: string,
     surveyorId?: string,
 }
@@ -101,6 +105,7 @@ export type ReviewCandidate = {
     };
     latitude?: number | null;
     longitude?: number | null;
+    status?: string;
 };
 
 export type ReviewQueueResponse = {

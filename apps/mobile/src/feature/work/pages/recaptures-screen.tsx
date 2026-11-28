@@ -17,7 +17,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/button';
 import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import { resolveS3Url } from '@/api/reviews/review-workflow';
 import { useGetMyRecaptures } from '@/feature/review/hooks/use-recapture';
 import { calculateDistanceMeters } from '@/feature/navigation/utils/geo';
@@ -42,6 +44,8 @@ function formatDistance(meters: number): string {
 export function RecapturesScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   const { data, isLoading, refetch, isRefetching } = useGetMyRecaptures({ page: 1, pageSize: 50 });
   const items = data?.items ?? [];
@@ -259,7 +263,7 @@ export function RecapturesScreen() {
         >
           <AppButton
             accessibilityLabel="Quay lại công việc"
-            onPress={() => router.back()}
+            onPress={() => router.replace(surveyorWorkRoute)}
             pressedOpacity={0.6}
             style={styles.backButton}
             variant="ghost"

@@ -12,17 +12,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSegments } from 'expo-router';
 
 import { useSession } from '@/context/session-provider';
+import { getRevalidationTask } from '@/api/revalidation/revalidation';
 import { useInvalidateWalletAndStats } from '@/feature/credits/hooks/use-wallet';
 import {
   useGetRevalidationEvidenceQueue,
   useVoteOnRevalidationEvidence,
 } from '@/feature/revalidation/hooks/use-revalidation';
-import type {
-  RevalDecision,
-  RevalidationQueueEvidenceItem,
-} from '@/types/revalidationType';
+import type { RevalDecision, RevalidationQueueEvidenceItem } from '@/types/revalidationType';
+import { fetchFreshGpsLocation } from '@/feature/navigation/utils/gps';
 
-export type RevalidationReviewAction = 'STILL_ACTIVE' | 'REMOVED' | 'CHANGED' | 'UNCLEAR' | 'INVALID';
+export type RevalidationReviewAction =
+  | 'STILL_ACTIVE'
+  | 'REMOVED'
+  | 'CHANGED'
+  | 'UNCLEAR'
+  | 'INVALID';
 
 export type CompletedRevalidationReview = {
   action: RevalidationReviewAction;
@@ -37,16 +41,20 @@ export type RevalidationWorkflowContextValue = {
   cancelEvidenceCheck?: () => void;
   counts: Record<RevalidationReviewAction, number>;
   currentItem?: RevalidationQueueEvidenceItem;
+  ensureTaskEvidenceInQueue?: (taskId: string) => Promise<'found' | 'no_evidence' | 'not_found'>;
   finishReviews: () => number;
   handleVote: (
     action: RevalidationReviewAction,
     note?: string,
     suggestedSignTypeId?: number,
     userVerdict?: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT',
+    questClaimId?: string,
   ) => Promise<boolean>;
   handleSkip: () => boolean;
   isCheckingEvidence: boolean;
   isLoading: boolean;
+  isSubmittingVote?: boolean;
+  jumpToEvidenceById?: (targetId: string) => void;
   keepCurrentEvidenceAndNext?: () => boolean;
   nextItem?: RevalidationQueueEvidenceItem;
   progressPercent: number;
@@ -92,7 +100,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   const [totalCount, setTotalCount] = useState(0);
   const [isCheckingEvidence, setIsCheckingEvidence] = useState(false);
   const [recheckingIndex, setRecheckingIndex] = useState<number | undefined>(undefined);
-  const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<CompletedRevalidationReview | undefined>(undefined);
+  const [recheckingPreviousReview, setRecheckingPreviousReview] = useState<
+    CompletedRevalidationReview | undefined
+  >(undefined);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
+  const inFlightVotesRef = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef(false);
 
   // Sync with incoming queue response initially
@@ -116,10 +128,7 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     reviewHistory.length + (currentItem ? 1 : 0),
     Math.max(totalCount, 1),
   );
-  const progressPercent = Math.min(
-    100,
-    (reviewPosition / Math.max(totalCount, 1)) * 100,
-  );
+  const progressPercent = Math.min(100, (reviewPosition / Math.max(totalCount, 1)) * 100);
 
   const counts = useMemo(() => {
     return reviewHistory.reduce<Record<RevalidationReviewAction, number>>(
@@ -134,40 +143,35 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       note?: string,
       suggestedSignTypeId?: number,
       userVerdict: 'AGREE' | 'DECLINE' | 'SKIP' | 'REPORT' = 'AGREE',
+      questClaimId?: string,
     ): Promise<boolean> => {
       if (!currentItem) return false;
+
+      // Concurrency guard: avoid duplicate vote calls for the same evidence
+      if (inFlightVotesRef.current.has(currentItem.evidenceId)) {
+        console.warn(
+          '[RevalidationWorkflow] Blocked duplicate vote in flight for:',
+          currentItem.evidenceId,
+        );
+        return false;
+      }
+      inFlightVotesRef.current.add(currentItem.evidenceId);
+      setIsSubmittingVote(true);
 
       const itemToVote = currentItem;
       const completesQueue = queueItems.length <= 1;
 
-      // 1. Advance queue state
-      setQueueItems((prev) => prev.slice(1));
-      setReviewHistory((prev) => {
-        const next = [...prev];
-        const newReview: CompletedRevalidationReview = {
-          item: itemToVote,
-          action,
-          note,
-          suggestedSignTypeId,
-          userVerdict,
-        };
-        next.push(newReview);
-        return next;
-      });
-
-      if (completesQueue) {
-        setIsCheckingEvidence(false);
-        setRecheckingIndex(undefined);
-        setRecheckingPreviousReview(undefined);
-      } else {
-        const nextItem = queueItems[1];
-        setRecheckingPreviousReview(
-          (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-            ?.previousReview,
-        );
+      // Include GPS data if available, omit if GPS is disabled or unavailable
+      let gpsCoords: { latitude: number; longitude: number } | null = null;
+      try {
+        const freshLoc = await fetchFreshGpsLocation(2500);
+        if (freshLoc && typeof freshLoc.latitude === 'number' && typeof freshLoc.longitude === 'number') {
+          gpsCoords = { latitude: freshLoc.latitude, longitude: freshLoc.longitude };
+        }
+      } catch (e) {
+        console.warn('[RevalidationWorkflow] Could not obtain GPS coordinates:', e);
       }
 
-      // 2. Dispatch vote API
       const decisionMap: Record<RevalidationReviewAction, RevalDecision> = {
         STILL_ACTIVE: 'STILL_ACTIVE',
         REMOVED: 'REMOVED',
@@ -184,13 +188,49 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
             note: note?.trim() || undefined,
             suggestedSignTypeId:
               action === 'CHANGED' && suggestedSignTypeId ? suggestedSignTypeId : undefined,
+            ...(questClaimId ? { questClaimId } : {}),
+            ...(gpsCoords ? { latitude: gpsCoords.latitude, longitude: gpsCoords.longitude } : {}),
           },
         });
+
+        // Only on successful API execution: advance queue state
+        setQueueItems((prev) => prev.slice(1));
+        setReviewHistory((prev) => {
+          const next = [...prev];
+          const newReview: CompletedRevalidationReview = {
+            item: itemToVote,
+            action,
+            note,
+            suggestedSignTypeId,
+            userVerdict,
+          };
+          next.push(newReview);
+          return next;
+        });
+
+        if (completesQueue) {
+          setIsCheckingEvidence(false);
+          setRecheckingIndex(undefined);
+          setRecheckingPreviousReview(undefined);
+        } else {
+          const nextItem = queueItems[1];
+          setRecheckingPreviousReview(
+            (
+              nextItem as RevalidationQueueEvidenceItem & {
+                previousReview?: CompletedRevalidationReview;
+              }
+            )?.previousReview,
+          );
+        }
+
+        return completesQueue;
       } catch (err) {
         console.warn('[RevalidationWorkflow] vote mutation error:', err);
+        throw err;
+      } finally {
+        inFlightVotesRef.current.delete(itemToVote.evidenceId);
+        setIsSubmittingVote(false);
       }
-
-      return completesQueue;
     },
     [currentItem, queueItems, voteMutation],
   );
@@ -220,8 +260,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     } else {
       const nextItem = queueItems[1];
       setRecheckingPreviousReview(
-        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-          ?.previousReview,
+        (
+          nextItem as RevalidationQueueEvidenceItem & {
+            previousReview?: CompletedRevalidationReview;
+          }
+        )?.previousReview,
       );
     }
 
@@ -260,12 +303,123 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     [reviewHistory],
   );
 
+  const jumpToEvidenceById = useCallback(
+    (targetId: string) => {
+      if (!targetId) return;
+
+      // 1. If already the current item, do nothing
+      if (queueItems[0]?.evidenceId === targetId || queueItems[0]?.taskId === targetId) return;
+
+      // 2. If present in remaining queue items, bring it to the front
+      const queueIdx = queueItems.findIndex(
+        (it) => it.evidenceId === targetId || it.taskId === targetId,
+      );
+      if (queueIdx > 0) {
+        setQueueItems((prev) => {
+          const target = prev[queueIdx];
+          return [target, ...prev.slice(0, queueIdx), ...prev.slice(queueIdx + 1)];
+        });
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+        return;
+      }
+
+      // 3. If present in reviewHistory, start rechecking that history item
+      const historyIdx = reviewHistory.findIndex(
+        (h) => h.item.evidenceId === targetId || h.item.taskId === targetId,
+      );
+      if (historyIdx !== -1) {
+        beginEvidenceCheck(historyIdx);
+      }
+    },
+    [queueItems, reviewHistory, beginEvidenceCheck],
+  );
+
+  const ensureTaskEvidenceInQueue = useCallback(
+    async (taskId: string): Promise<'found' | 'no_evidence' | 'not_found'> => {
+      if (!taskId) return 'not_found';
+
+      const inQueueOrHistory =
+        queueItems.some((it) => it.taskId === taskId || it.evidenceId === taskId) ||
+        reviewHistory.some((h) => h.item.taskId === taskId || h.item.evidenceId === taskId);
+
+      if (inQueueOrHistory) {
+        jumpToEvidenceById(taskId);
+        return 'found';
+      }
+
+      if (!session?.accessToken) return 'not_found';
+
+      try {
+        const task = await getRevalidationTask(taskId, undefined, session.accessToken);
+        if (!task) return 'not_found';
+
+        const currentUserId = session.account?.id || (session as any)?.userId;
+        const evidences = Array.isArray(task.evidences) ? task.evidences : [];
+        if (evidences.length === 0) return 'no_evidence';
+
+        const candidateEvidence =
+          evidences.find((ev) => !currentUserId || ev.surveyorId !== currentUserId) ?? evidences[0];
+
+        if (!candidateEvidence) return 'no_evidence';
+
+        const hydratedItem: RevalidationQueueEvidenceItem = {
+          evidenceId: candidateEvidence.id,
+          taskId: task.id,
+          verifiedSign: {
+            id: task.verifiedSignId,
+            signCode: task.code || '',
+            nameVi: task.name,
+            signCropUrl: task.signCropUrl || task.historicalCropUrl,
+            lastVerifiedAt: task.lastVerifiedDate,
+            freshnessScore: task.currentTrustScore,
+          },
+          evidence: {
+            id: candidateEvidence.id,
+            surveyorId: candidateEvidence.surveyorId,
+            mediaUrl: candidateEvidence.mediaUrl,
+            evidenceType: candidateEvidence.evidenceType,
+            submittedAt: candidateEvidence.submittedAt,
+            latitude: task.latitude ?? task.location?.lat ?? 0,
+            longitude: task.longitude ?? task.location?.lon ?? 0,
+            distanceMeters: candidateEvidence.distanceMeters ?? null,
+            suggestedSignTypeId: candidateEvidence.suggestedSignTypeId ?? undefined,
+          },
+          currentVoteCount: 0,
+          taskStatus: String(task.status || 'EVALUATING'),
+          rewardCredits: task.rewardCredits ?? task.bounty ?? 0,
+        };
+
+        setQueueItems((prev) => {
+          if (prev.some((it) => it.evidenceId === hydratedItem.evidenceId)) {
+            const idx = prev.findIndex((it) => it.evidenceId === hydratedItem.evidenceId);
+            return idx > 0 ? [prev[idx], ...prev.slice(0, idx), ...prev.slice(idx + 1)] : prev;
+          }
+          return [hydratedItem, ...prev];
+        });
+        setTotalCount((prev) => Math.max(prev, queueItems.length + 1));
+        setIsCheckingEvidence(false);
+        setRecheckingIndex(undefined);
+        setRecheckingPreviousReview(undefined);
+        return 'found';
+      } catch (err) {
+        console.warn('[RevalidationWorkflow] Failed to load claimed task detail:', err);
+        return 'not_found';
+      }
+    },
+    [beginEvidenceCheck, jumpToEvidenceById, queueItems, reviewHistory, session],
+  );
+
   const keepCurrentEvidenceAndNext = useCallback((): boolean => {
     if (!currentItem) return true;
 
     const prevReview =
-      (currentItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-        ?.previousReview ?? recheckingPreviousReview;
+      (
+        currentItem as RevalidationQueueEvidenceItem & {
+          previousReview?: CompletedRevalidationReview;
+        }
+      )?.previousReview ?? recheckingPreviousReview;
 
     const completesQueue = queueItems.length <= 1;
 
@@ -282,8 +436,11 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
     } else {
       const nextItem = queueItems[1];
       setRecheckingPreviousReview(
-        (nextItem as (RevalidationQueueEvidenceItem & { previousReview?: CompletedRevalidationReview }))
-          ?.previousReview,
+        (
+          nextItem as RevalidationQueueEvidenceItem & {
+            previousReview?: CompletedRevalidationReview;
+          }
+        )?.previousReview,
       );
     }
 
@@ -309,6 +466,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [recheckingPreviousReview, recheckingIndex]);
 
   const finishReviews = useCallback((): number => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     const count = reviewHistory.length;
     void queryClient.invalidateQueries({ queryKey: ['revalidation-evidence-queue'] });
     void queryClient.invalidateQueries({ queryKey: ['revalidation-tasks'] });
@@ -326,6 +485,8 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
   }, [invalidateWalletAndStats, queryClient, reviewHistory.length]);
 
   const resetWorkflow = useCallback(() => {
+    inFlightVotesRef.current.clear();
+    setIsSubmittingVote(false);
     setReviewHistory([]);
     setQueueItems([]);
     setIsCheckingEvidence(false);
@@ -349,11 +510,14 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       cancelEvidenceCheck,
       counts,
       currentItem,
+      ensureTaskEvidenceInQueue,
       finishReviews,
       handleVote,
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -371,11 +535,14 @@ export function RevalidationWorkflowProvider({ children }: { children: ReactNode
       cancelEvidenceCheck,
       counts,
       currentItem,
+      ensureTaskEvidenceInQueue,
       finishReviews,
       handleVote,
       handleSkip,
       isCheckingEvidence,
       isLoading,
+      isSubmittingVote,
+      jumpToEvidenceById,
       keepCurrentEvidenceAndNext,
       nextItem,
       progressPercent,
@@ -407,6 +574,8 @@ const fallbackRevalidationWorkflowValue: RevalidationWorkflowContextValue = {
   handleSkip: () => false,
   isCheckingEvidence: false,
   isLoading: false,
+  isSubmittingVote: false,
+  jumpToEvidenceById: () => {},
   keepCurrentEvidenceAndNext: () => false,
   nextItem: undefined,
   progressPercent: 0,

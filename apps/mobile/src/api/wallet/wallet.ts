@@ -33,9 +33,27 @@ export type TopUpPackage = {
 
 export const DEFAULT_TOP_UP_PACKAGES: TopUpPackage[] = [
   { id: 1, packageName: 'Gói Khởi đầu', priceVnd: '50000.00', creditAmount: 500, isActive: true },
-  { id: 2, packageName: 'Gói Tiêu chuẩn', priceVnd: '100000.00', creditAmount: 1000, isActive: true },
-  { id: 3, packageName: 'Gói Chuyên nghiệp', priceVnd: '200000.00', creditAmount: 2000, isActive: true },
-  { id: 4, packageName: 'Gói Doanh nghiệp', priceVnd: '500000.00', creditAmount: 5000, isActive: true },
+  {
+    id: 2,
+    packageName: 'Gói Tiêu chuẩn',
+    priceVnd: '100000.00',
+    creditAmount: 1000,
+    isActive: true,
+  },
+  {
+    id: 3,
+    packageName: 'Gói Chuyên nghiệp',
+    priceVnd: '200000.00',
+    creditAmount: 2000,
+    isActive: true,
+  },
+  {
+    id: 4,
+    packageName: 'Gói Doanh nghiệp',
+    priceVnd: '500000.00',
+    creditAmount: 5000,
+    isActive: true,
+  },
 ];
 
 export function formatVnd(value: number | string | undefined | null): string {
@@ -46,7 +64,7 @@ export function formatVnd(value: number | string | undefined | null): string {
 }
 
 export type PaymentGatewayOption = {
-  id: 'MOMO' | 'VIETQR' | 'MOCK';
+  id: 'MOMO' | 'VIETQR';
   name: string;
   detail: string;
   iconSymbol: string;
@@ -58,21 +76,14 @@ export const AVAILABLE_PAYMENT_GATEWAYS: PaymentGatewayOption[] = [
     id: 'MOMO',
     name: 'Ví điện tử MoMo',
     detail: 'Thanh toán trực tiếp qua MoMo hoặc quét mã MoMo QR',
-    iconSymbol: '▰',
-    badge: 'Khuyên dùng',
+    iconSymbol: '',
+    badge: 'Phổ biến',
   },
   {
     id: 'VIETQR',
     name: 'Chuyển khoản VietQR',
     detail: 'Quét mã VietQR chuyển khoản nhanh 24/7 liên ngân hàng',
     iconSymbol: '▦',
-  },
-  {
-    id: 'MOCK',
-    name: 'Thanh toán Sandbox (Thử nghiệm)',
-    detail: 'Tạo đơn nạp & cộng Credits trực tiếp vào ví để kiểm thử',
-    iconSymbol: '⚡',
-    badge: 'Sandbox',
   },
 ];
 
@@ -113,14 +124,13 @@ export type TopUpOrderResponse = {
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export function getWallet(accessToken: string, signal?: AbortSignal) {
-  return apiRequest<WalletResponse>(
-    `${API_PATHS.WALLET}`,
-    { signal },
-    accessToken,
-  );
+  return apiRequest<WalletResponse>(`${API_PATHS.WALLET}`, { signal }, accessToken);
 }
 
-export async function getTopUpPackages(accessToken?: string, signal?: AbortSignal): Promise<TopUpPackage[]> {
+export async function getTopUpPackages(
+  accessToken?: string,
+  signal?: AbortSignal,
+): Promise<TopUpPackage[]> {
   try {
     const data = await apiRequest<TopUpPackage[]>(
       `${API_PATHS.WALLET}/top-up/packages`,
@@ -185,4 +195,3 @@ export function getPaymentMethods(accessToken: string, signal?: AbortSignal) {
     accessToken,
   );
 }
-

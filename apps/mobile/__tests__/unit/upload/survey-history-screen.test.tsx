@@ -57,6 +57,16 @@ jest.mock('@expo/vector-icons', () => {
   const { View } = require('react-native');
   return {
     MaterialCommunityIcons: (props: any) => <View testID={`mc-icon-${props.name}`} {...props} />,
+    Ionicons: (props: any) => <View testID={`ion-icon-${props.name}`} {...props} />,
+  };
+});
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: () => React.createElement(View, { testID: 'mock-date-picker' }),
   };
 });
 
@@ -196,7 +206,7 @@ describe('SurveyHistoryScreen', () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/work/survey-submission-details',
-      params: { id: 'sub-comp-1' },
+      params: { id: 'sub-failed-3' },
     });
   });
 
@@ -242,5 +252,27 @@ describe('SurveyHistoryScreen', () => {
       fireEvent.press(nextBtn);
     });
     // Triggers internal page state update
+  });
+
+  it('renders date filter and sort controls and responds to sorting', async () => {
+    const { getByText, getByLabelText } = await render(<SurveyHistoryScreen />);
+
+    // Date filter headers and inputs
+    expect(getByText('Lọc theo ngày')).toBeTruthy();
+    expect(getByLabelText('Chọn Từ ngày')).toBeTruthy();
+    expect(getByLabelText('Chọn Đến ngày')).toBeTruthy();
+
+    // Presets
+    expect(getByText('Hôm nay')).toBeTruthy();
+    expect(getByText('7 ngày')).toBeTruthy();
+
+    // Toggle sort order
+    expect(getByText('Mới nhất')).toBeTruthy();
+    const sortBtn = getByLabelText('Sắp xếp ngày: Mới nhất');
+    await act(async () => {
+      fireEvent.press(sortBtn);
+    });
+
+    expect(getByText('Cũ nhất')).toBeTruthy();
   });
 });

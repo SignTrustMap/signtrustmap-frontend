@@ -84,11 +84,40 @@ export function isFreshGpsLocation(position: any, maxAgeMs = 60_000): boolean {
   return ageMs <= maxAgeMs;
 }
 
+export type FreshGpsLocationResult = {
+  coordinate: MapCoordinate;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  heading?: number;
+};
+
 /**
- * Actively fetches the current GPS position from MapLibre.LocationManager
- * with a reasonable timeout (default 3500ms).
+ * Actively fetches the current GPS position with full coordinate, accuracy,
+ * and heading metadata from MapLibre.LocationManager with a reasonable timeout.
  */
-export async function fetchFreshGpsPosition(timeoutMs = 3500): Promise<MapCoordinate | null> {
+export async function fetchFreshGpsLocation(timeoutMs = 3500): Promise<FreshGpsLocationResult | null> {
+  if (Platform.OS === 'web') {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      return null;
+    }
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          resolve({
+            coordinate: [coords.longitude, coords.latitude],
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            heading: coords.heading ?? undefined,
+          });
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 10_000 },
+      );
+    });
+  }
+
   const mapLibre = getMapLibre();
   if (!mapLibre) {
     console.warn('[GPS] MapLibre module not available for getCurrentPosition');
@@ -125,7 +154,7 @@ export async function fetchFreshGpsPosition(timeoutMs = 3500): Promise<MapCoordi
       return null;
     }
 
-    const { latitude, longitude, accuracy } = position.coords;
+    const { latitude, longitude, accuracy, heading } = position.coords;
     const timestamp = position.timestamp;
     const isFresh = isFreshGpsLocation(position);
 
@@ -133,13 +162,29 @@ export async function fetchFreshGpsPosition(timeoutMs = 3500): Promise<MapCoordi
       latitude,
       longitude,
       accuracy,
+      heading,
       timestamp,
       freshness: isFresh ? 'fresh' : 'cached',
     });
 
-    return [longitude, latitude];
+    return {
+      coordinate: [longitude, latitude],
+      latitude,
+      longitude,
+      accuracy: typeof accuracy === 'number' && Number.isFinite(accuracy) ? accuracy : undefined,
+      heading: typeof heading === 'number' && Number.isFinite(heading) ? heading : undefined,
+    };
   } catch (error) {
     console.error('[GPS] Failed to get current position:', error);
     return null;
   }
+}
+
+/**
+ * Actively fetches the current GPS position from MapLibre.LocationManager
+ * with a reasonable timeout (default 3500ms).
+ */
+export async function fetchFreshGpsPosition(timeoutMs = 3500): Promise<MapCoordinate | null> {
+  const loc = await fetchFreshGpsLocation(timeoutMs);
+  return loc ? loc.coordinate : null;
 }

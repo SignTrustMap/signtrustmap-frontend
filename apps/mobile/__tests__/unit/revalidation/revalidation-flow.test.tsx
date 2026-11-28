@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { act, render, fireEvent, waitFor } from '@testing-library/react-native';
 
 import {
   getFreshnessInfo,
@@ -265,6 +265,30 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       // Stale exclamation badge should be rendered
       expect(getByText('!')).toBeTruthy();
     });
+
+    it('renders sign image with fallback to actualCropUrl on error', async () => {
+      const signWithFallback = createMockSign({
+        imageUrl: 'https://s3.signmap.site/stm-catalog-images/representative/P.102.svg',
+        actualCropUrl: 'https://s3.signmap.site/stm-sign-crops/crop-102.jpg',
+      });
+      const { getByLabelText } = await render(
+        <RevalidationSignMarker sign={signWithFallback} isSelected={false} />,
+      );
+
+      const img = getByLabelText('Cấm đi ngược chiều');
+      expect(img.props.source).toEqual({
+        uri: 'https://s3.signmap.site/stm-catalog-images/representative/P.102.svg',
+      });
+
+      await act(async () => {
+        fireEvent(img, 'error');
+      });
+      await waitFor(() => {
+        expect(getByLabelText('Cấm đi ngược chiều').props.source).toEqual({
+          uri: 'https://s3.signmap.site/stm-sign-crops/crop-102.jpg',
+        });
+      });
+    });
   });
 
   describe('RevalidationSignDetailsCard component', () => {
@@ -290,7 +314,7 @@ describe('Revalidation Flow: Business Logic & UI Verification', () => {
       // Check sign metadata
       expect(getAllByText('Cấm đi ngược chiều').length).toBeGreaterThan(0);
       expect(getAllByText('Đường Nguyễn Huệ, Quận 1').length).toBeGreaterThan(0);
-      expect(getByText(/Độ (tươi )?mới trung bình|Moderate Freshness/)).toBeTruthy();
+      expect(getByText(/Độ mới của biển báo:|Độ (tươi )?mới trung bình|Moderate Freshness/)).toBeTruthy();
       expect(getByText('55%')).toBeTruthy();
 
       // Find and click Inspect button

@@ -394,7 +394,7 @@ export function MissingSignApproveCreateModal({
                 <div>
                   <input
                     type="url"
-                    placeholder="https://s3.signmap.site/stm-sign-crops/representative/..."
+                    placeholder="https://s3.signmap.site/stm-catalog-images/representative/..."
                     value={imageUrl}
                     onChange={(e) => handleUrlChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-white dark:bg-[#061115] border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"

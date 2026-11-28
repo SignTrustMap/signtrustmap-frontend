@@ -25,7 +25,9 @@ import {
   useGetMyMissions,
   useGetMyTaskCompletions,
 } from '@/feature/work/hooks/use-daily-tasks';
+import { useBackButton } from '@/hooks/use-back-button';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkRoute } from '@/hooks/use-work-route';
 import type {
   DailyTask,
   DailyTaskCompletion,
@@ -46,12 +48,12 @@ interface TabMeta {
 const MISSION_TABS: TabMeta[] = [
   {
     key: 'daily',
-    label: 'Hàng ngày',
+    label: 'Ngày',
     icon: 'calendar-today',
   },
   {
     key: 'weekly',
-    label: 'Hàng tuần',
+    label: 'Tuần',
     icon: 'calendar-week',
   },
   {
@@ -68,6 +70,8 @@ interface MissionsScreenProps {
 export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) {
   const router = useRouter();
   const theme = useTheme();
+  const targetWorkRoute = useWorkRoute('/work', { currentRole: initialRole });
+  useBackButton(targetWorkRoute);
 
   const [activeTab, setActiveTab] = useState<MissionTabType>('daily');
 
@@ -315,7 +319,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
         <View style={[styles.topBar, { borderBottomColor: theme.border }]}>
           <AppButton
             accessibilityLabel="Quay lại trang Công việc"
-            onPress={() => router.back()}
+            onPress={() => router.replace(targetWorkRoute)}
             pressedOpacity={0.6}
             style={styles.backButton}
             variant="ghost"
@@ -473,9 +477,7 @@ export function MissionsScreen({ initialRole = 'driver' }: MissionsScreenProps) 
                     {tab.label}
                   </Text>
 
-                  {pendingCount > 0 ? (
-                    <Badge count={pendingCount} size="sm" />
-                  ) : null}
+                  {pendingCount > 0 ? <Badge count={pendingCount} size="sm" /> : null}
                 </Pressable>
               );
             })}

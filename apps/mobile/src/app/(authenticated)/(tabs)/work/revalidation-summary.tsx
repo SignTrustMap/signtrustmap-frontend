@@ -1,5 +1,5 @@
-import { RecheckEvidenceScreen } from '@/feature/revalidation/pages/recheck-evidence-screen';
+import { Redirect } from 'expo-router';
 
 export default function RevalidationSummaryRoute() {
-  return <RecheckEvidenceScreen />;
+  return <Redirect href={{ pathname: '/work', params: { currentRole: 'reviewer' } }} />;
 }

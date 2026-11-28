@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/context/ToastContext'
+import { extractApiErrorMessage } from '@/api/client'
 import CustomSelect from '@/components/common/CustomSelect'
-import { CircleNotch, Check } from '@phosphor-icons/react'
+import { CircleNotch, ChatText } from '@phosphor-icons/react'
 import {
   catalogService,
   STANDARD_SIGN_CATEGORIES,
@@ -10,7 +11,7 @@ import {
   type VehicleType,
 } from '@/api/services/catalog.service'
 import { escalationService } from '@/api/services/escalation.service'
-import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
+import { resolveImageUrl, normalizeSignCodeCase } from '@/features/map/utils/signUrlHelpers'
 
 export interface CatalogProposalStepViewProps {
   caseId: string
@@ -23,19 +24,6 @@ export interface CatalogProposalStepViewProps {
   onBack: () => void
   onSuccess: () => void
 }
-
-// Shape & Color options according to Vietnamese traffic sign standards (QCVN 41:2019/BGTVT)
-const SHAPE_OPTIONS = [
-  { value: 'Circle', labelVi: 'Hình tròn', labelEn: 'Circle' },
-  { value: 'Triangle', labelVi: 'Hình tam giác', labelEn: 'Triangle' },
-  { value: 'Inverted Triangle', labelVi: 'Hình tam giác ngược', labelEn: 'Inverted Triangle' },
-  { value: 'Octagon', labelVi: 'Hình bát giác', labelEn: 'Octagon' },
-  { value: 'Rectangle', labelVi: 'Hình chữ nhật', labelEn: 'Rectangle' },
-  { value: 'Square', labelVi: 'Hình vuông', labelEn: 'Square' },
-  { value: 'Diamond', labelVi: 'Hình thoi', labelEn: 'Diamond' },
-  { value: 'Other', labelVi: 'Khác', labelEn: 'Other' },
-]
-
 
 /**
  * Maps a sign category entity to its standard QCVN 41:2019 code prefix (with trailing dot).
@@ -94,6 +82,139 @@ export function getCategoryPrefix(category?: SignCategoryItem): string {
   return 'P.'
 }
 
+/**
+ * Visual specifications (Shape & Color) for a sign category according to standard regulations.
+ * Evaluated automatically when a category is selected. Users cannot edit these fields directly.
+ */
+export interface CategoryVisualSpec {
+  shape: string
+  color: string
+  standardShape: string
+  standardColor: string
+}
+
+export function getCategoryVisualSpec(category?: SignCategoryItem, isEn = false): CategoryVisualSpec {
+  if (!category) {
+    return {
+      shape: '',
+      color: '',
+      standardShape: '',
+      standardColor: '',
+    }
+  }
+
+  const code = (category.code || '').toUpperCase().trim()
+  const name = `${category.nameVi || ''} ${category.nameEn || ''}`.toLowerCase()
+
+  // 1. Biển tốc độ tối đa: Hình tròn, Viền đỏ, nền trắng
+  if (code.includes('SPEED') || name.includes('tốc độ')) {
+    return {
+      shape: isEn ? 'Circle' : 'Hình tròn',
+      color: isEn ? 'Red border, white background' : 'Viền đỏ, nền trắng',
+      standardShape: 'Circle',
+      standardColor: 'Red - White',
+    }
+  }
+
+  // 2. Biển báo tạm thời / Biển báo công trường: Nền màu vàng, Hình dạng không quan trọng
+  if (
+    code.includes('TEMP') ||
+    code.includes('CONSTRUCT') ||
+    code.includes('WORK') ||
+    name.includes('tạm thời') ||
+    name.includes('công trường')
+  ) {
+    return {
+      shape: isEn ? 'Unspecified' : 'Không quy định',
+      color: isEn ? 'Yellow background' : 'Nền màu vàng',
+      standardShape: 'Any',
+      standardColor: 'Yellow',
+    }
+  }
+
+  // 3. Biển báo cấm: hình tròn, Viền đỏ, nền màu trắng
+  if (code === 'P' || code.includes('PROHIBIT') || code.includes('CAM') || name.includes('cấm')) {
+    return {
+      shape: isEn ? 'Circle' : 'Hình tròn',
+      color: isEn ? 'Red border, white background' : 'Viền đỏ, nền màu trắng',
+      standardShape: 'Circle',
+      standardColor: 'Red - White',
+    }
+  }
+
+  // 4. Biển báo nguy hiểm: Hình tam giác đều, Viền đỏ, nền màu vàng
+  if (
+    code === 'W' ||
+    code.includes('WARN') ||
+    code.includes('CANH_BAO') ||
+    name.includes('nguy hiểm') ||
+    name.includes('cảnh báo')
+  ) {
+    return {
+      shape: isEn ? 'Equilateral triangle' : 'Hình tam giác đều',
+      color: isEn ? 'Red border, yellow background' : 'Viền đỏ, nền màu vàng',
+      standardShape: 'Triangle',
+      standardColor: 'Red - Yellow',
+    }
+  }
+
+  // 5. Biển hiệu lệnh: Hình tròn, Nền màu xanh lam
+  if (
+    code === 'R' ||
+    code.includes('MANDAT') ||
+    code.includes('ORDER') ||
+    code.includes('HIEU_LENH') ||
+    name.includes('hiệu lệnh')
+  ) {
+    return {
+      shape: isEn ? 'Circle' : 'Hình tròn',
+      color: isEn ? 'Blue background' : 'Nền màu xanh lam',
+      standardShape: 'Circle',
+      standardColor: 'Blue',
+    }
+  }
+
+  // 6. Biển chỉ dẫn: Hình chữ nhật/hình vuông, Nền màu xanh lam
+  if (
+    code === 'I' ||
+    code === 'IE' ||
+    code.includes('INFO') ||
+    code.includes('GUIDE') ||
+    code.includes('EXPRESS') ||
+    name.includes('chỉ dẫn') ||
+    name.includes('cao tốc')
+  ) {
+    return {
+      shape: isEn ? 'Rectangle / Square' : 'Hình chữ nhật/hình vuông',
+      color: isEn ? 'Blue background' : 'Nền màu xanh lam',
+      standardShape: 'Rectangle',
+      standardColor: 'Blue',
+    }
+  }
+
+  // 7. Biển phụ: Hình chữ nhật, Viền đen, nền màu trắng
+  if (code === 'S' || code.includes('SUPPLE') || code.includes('PHU') || name.includes('phụ')) {
+    return {
+      shape: isEn ? 'Rectangle' : 'Hình chữ nhật',
+      color: isEn ? 'Black border, white background' : 'Viền đen, nền màu trắng',
+      standardShape: 'Rectangle',
+      standardColor: 'Black - White',
+    }
+  }
+
+  // Fallback
+  return {
+    shape: isEn ? 'Circle' : 'Hình tròn',
+    color: isEn ? 'Standard' : 'Theo quy chuẩn',
+    standardShape: 'Circle',
+    standardColor: 'Standard',
+  }
+}
+
+export const DEFAULT_ALLOWED_VEHICLES: VehicleType[] = VEHICLE_TYPE_OPTIONS.map((v) => v.value).filter(
+  (v) => v !== 'PEDESTRIAN'
+)
+
 export function CatalogProposalStepView({
   caseId,
   reportId,
@@ -112,12 +233,9 @@ export function CatalogProposalStepView({
   const [nameVi, setNameVi] = useState('')
   const [nameEn, setNameEn] = useState('')
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined)
-  const [shape, setShape] = useState('Circle')
-  const [colorScheme, setColorScheme] = useState('')
   const [description, setDescription] = useState('')
-  const [aiLabelPrompt, setAiLabelPrompt] = useState('')
   const [staffNotes, setStaffNotes] = useState('')
-  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>([])
+  const [allowedVehicles, setAllowedVehicles] = useState<VehicleType[]>(DEFAULT_ALLOWED_VEHICLES)
 
   // Categories list from live backend
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
@@ -208,52 +326,27 @@ export function CatalogProposalStepView({
           .catch(() => {})
       })
 
-    // Pre-fill fields from report
-    const proposedName = String(raw.proposedName || raw.tempLabel || '').trim()
-    const rawCode = String(raw.suggestedCode || raw.signCode || '').trim()
-
-    // Smart auto-detection of sign code (e.g. if name is "P.130" or matches code regex)
-    let candidateCode = rawCode
-    if (!candidateCode && proposedName) {
-      const match = proposedName.match(/\b([A-Z]{1,3}\.?)?\s*([0-9]{1,4})\b/i)
-      if (match) {
-        candidateCode = match[0].toUpperCase()
-      }
-    }
-
-    const digitsOnly = candidateCode.replace(/\D/g, '')
-    if (digitsOnly) {
-      setCodeNumber(digitsOnly)
-    }
-
-    const prefixMatch = candidateCode.match(/^([A-Za-z]+)\./)
-    if (prefixMatch) {
-      setCodePrefix(`${prefixMatch[1].toUpperCase()}.`)
-    }
-
-    setNameVi(proposedName)
-    setNameEn(raw.suggestedNameEn || raw.nameEn || proposedName)
-    const effectiveShape =
-      raw.suggestedShape ||
-      raw.suggested_shape ||
-      raw.shape ||
-      rawCandidate?.shape ||
-      rawCandidate?.predictedSignType?.shape ||
-      'Circle'
-    const extractedColor =
-      raw.suggestedColorScheme ||
-      raw.suggested_color_scheme ||
-      raw.colorScheme ||
-      raw.color_scheme ||
-      raw.color ||
-      rawCandidate?.colorScheme ||
-      rawCandidate?.color_scheme ||
-      rawCandidate?.predictedSignType?.colorScheme ||
-      rawCandidate?.predictedSignType?.color ||
+    // Pre-fill fields from report - keep code and names blank for manual admin specification
+    setCodeNumber('')
+    setNameVi('')
+    setNameEn('')
+    const initialAllowedVehicles =
+      Array.isArray(raw.allowedVehicles) && raw.allowedVehicles.length > 0
+        ? raw.allowedVehicles
+        : DEFAULT_ALLOWED_VEHICLES
+    setAllowedVehicles(initialAllowedVehicles)
+    const extractedDescription =
+      raw.description ||
+      raw.reporterNote ||
+      raw.reporter_note ||
+      raw.note ||
+      raw.regulationNotes ||
+      raw.fieldNotes ||
+      rawCandidate?.submission?.note ||
+      rawCandidate?.note ||
+      raw.submission?.note ||
       ''
-    setShape(effectiveShape)
-    setColorScheme(extractedColor || '')
-    setDescription(raw.description || raw.reporterNote || '')
+    setDescription(extractedDescription)
     setStaffNotes(
       initialNotes ||
         raw.staffNotes ||
@@ -322,7 +415,7 @@ export function CatalogProposalStepView({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+    const fullCode = normalizeSignCodeCase(`${codePrefix}${codeNumber.trim()}`)
     const cleanNameVi = nameVi.trim()
     const cleanStaffNotes = staffNotes.trim()
 
@@ -331,11 +424,11 @@ export function CatalogProposalStepView({
       return
     }
 
-    if (existingSignCodes.some((c) => c.toUpperCase() === fullCode)) {
+    if (existingSignCodes.some((c) => normalizeSignCodeCase(c) === fullCode)) {
       warning(
         isEn
           ? `Sign code "${fullCode}" already exists in the catalog! Please choose another number or merge into existing catalog sign.`
-          : `Mã biển "${fullCode}" đã bị trùng (đã tồn tại trong Catalog)! Vui lòng chọn số khác hoặc chuyển sang chức năng Gộp Catalog.`
+          : `Mã biển "${fullCode}" đã bị trùng trong danh mục! Vui lòng chọn số khác hoặc chuyển sang chức năng Gộp Catalog.`
       )
       return
     }
@@ -382,10 +475,7 @@ export function CatalogProposalStepView({
           nameVi: cleanNameVi,
           nameEn: nameEn.trim() || cleanNameVi,
           proposedCategoryId: categoryId,
-          suggestedShape: shape,
-          suggestedColorScheme: colorScheme,
           description: description.trim() || undefined,
-          aiLabelPrompt: aiLabelPrompt.trim() || undefined,
           staffNotes: cleanStaffNotes,
           allowedVehicles: allowedVehicles as any,
         },
@@ -399,12 +489,19 @@ export function CatalogProposalStepView({
       // BƯỚC 2: Cập nhật trạng thái ca Escalation sang RESOLVED
       // (Chỉ được phép thực thi sau khi Bước 1 trả về thành công)
       // =========================================================================
-      await escalationService.resolveCase(caseId, {
-        resolutionNote: cleanStaffNotes,
-        actionType: 'APPROVED',
-        targetSignTypeId: newSignTypeId,
-        reportId,
-      })
+      try {
+        await escalationService.resolveCase(caseId, {
+          resolutionNote: cleanStaffNotes,
+          actionType: 'APPROVED',
+          targetSignTypeId: newSignTypeId,
+          reportId,
+        })
+      } catch (resolveErr: any) {
+        const resolveMsg = extractApiErrorMessage(resolveErr)
+        if (!resolveMsg.toLowerCase().includes('already resolved')) {
+          throw resolveErr
+        }
+      }
 
       success(
         isEn
@@ -414,10 +511,10 @@ export function CatalogProposalStepView({
 
       onSuccess()
     } catch (err: any) {
-      console.error('Failed to approve and create sign type:', err)
-      const status = err?.response?.status || err?.status
-      const msg = String(err?.response?.data?.message || err?.message || '')
-      if (status === 409 || msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('trùng')) {
+      const status = err?.response?.status || err?.status || err?.statusCode
+      const formattedMessage = extractApiErrorMessage(err)
+      console.error('Failed to approve and create sign type:', formattedMessage || err)
+      if (status === 409 || formattedMessage.toLowerCase().includes('already exists') || formattedMessage.toLowerCase().includes('trùng')) {
         error(
           isEn
             ? `Sign code "${fullCode}" already exists in the catalog! Please choose another code.`
@@ -425,8 +522,7 @@ export function CatalogProposalStepView({
         )
       } else {
         const errorMsg =
-          err?.response?.data?.message ||
-          err?.message ||
+          formattedMessage ||
           (isEn ? 'Failed to create sign type. Escalation case status remains unchanged.' : 'Không thể tạo biển mới. Ca chuyển tiếp vẫn được giữ nguyên trạng thái!')
         error(errorMsg)
       }
@@ -435,7 +531,7 @@ export function CatalogProposalStepView({
     }
   }
 
-  const fullCode = `${codePrefix}${codeNumber.trim()}`.toUpperCase()
+  const fullCode = normalizeSignCodeCase(`${codePrefix}${codeNumber.trim()}`)
   const hasInputNumber = Boolean(codeNumber.trim())
 
   // Real-time API check for code duplication with debounce
@@ -447,7 +543,7 @@ export function CatalogProposalStepView({
     }
 
     // 1. Instant check against already known sign codes
-    const isLocalDuplicate = existingSignCodes.some((c) => c.toUpperCase() === fullCode)
+    const isLocalDuplicate = existingSignCodes.some((c) => normalizeSignCodeCase(c) === fullCode)
     if (isLocalDuplicate) {
       setIsDuplicateCode(true)
     }
@@ -586,9 +682,31 @@ export function CatalogProposalStepView({
           </div>
 
           {/* ─── CỘT PHẢI: TOÀN BỘ THÔNG SỐ & PHÊ DUYỆT (7 cols) ───── */}
-          <div className="md:col-span-7 flex flex-col h-full justify-between gap-3">
-            {/* Hàng 1: Mã biển & Nhóm biển */}
+          <div className="md:col-span-7 flex flex-col gap-3">
+            {/* Hàng 1: Nhóm biển & Mã biển */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
+                  {isEn ? 'Category' : 'Nhóm biển'} <span className="text-red-500">*</span>
+                </label>
+                <CustomSelect
+                  value={categoryId ? String(categoryId) : ''}
+                  onChange={(val) => {
+                    const newId = val ? Number(val) : undefined
+                    setCategoryId(newId)
+                    if (newId) {
+                      const cat = categories.find((c) => c.id === newId)
+                      if (cat) {
+                        setCodePrefix(getCategoryPrefix(cat))
+                      }
+                    }
+                  }}
+                  options={categoryOptions}
+                  placeholder={isLoadingCategories ? (isEn ? 'Loading...' : 'Đang tải...') : (isEn ? 'Select category' : 'Chọn nhóm biển')}
+                  className="w-full text-xs"
+                />
+              </div>
+
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
@@ -628,15 +746,12 @@ export function CatalogProposalStepView({
                   <div className="flex-1">
                     <input
                       type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
                       required
                       value={codeNumber}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '')
-                        setCodeNumber(val)
+                        setCodeNumber(e.target.value)
                       }}
-                      placeholder="130"
+                      placeholder="127a hoặc 130"
                       className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-black/50 text-gray-900 dark:text-white font-mono text-xs placeholder:text-gray-400 outline-none transition-colors ${
                         hasInputNumber
                           ? isDuplicateCode
@@ -647,28 +762,6 @@ export function CatalogProposalStepView({
                     />
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'Category' : 'Nhóm biển'} <span className="text-red-500">*</span>
-                </label>
-                <CustomSelect
-                  value={categoryId ? String(categoryId) : ''}
-                  onChange={(val) => {
-                    const newId = val ? Number(val) : undefined
-                    setCategoryId(newId)
-                    if (newId) {
-                      const cat = categories.find((c) => c.id === newId)
-                      if (cat) {
-                        setCodePrefix(getCategoryPrefix(cat))
-                      }
-                    }
-                  }}
-                  options={categoryOptions}
-                  placeholder={isLoadingCategories ? (isEn ? 'Loading...' : 'Đang tải...') : (isEn ? 'Select category' : 'Chọn nhóm biển')}
-                  className="w-full text-xs"
-                />
               </div>
             </div>
 
@@ -702,39 +795,7 @@ export function CatalogProposalStepView({
               </div>
             </div>
 
-            {/* Hàng 3: Hình dạng & Màu sắc */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'Shape' : 'Hình dạng'}
-                </label>
-                <CustomSelect
-                  value={shape}
-                  onChange={(val) => setShape(val)}
-                  options={SHAPE_OPTIONS.map((s) => ({
-                    value: s.value,
-                    label: isEn ? s.labelEn : s.labelVi,
-                  }))}
-                  className="w-full text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'Color scheme' : 'Màu sắc'}
-                </label>
-                <input
-                  type="text"
-                  maxLength={30}
-                  value={colorScheme}
-                  onChange={(e) => setColorScheme(e.target.value)}
-                  placeholder={isEn ? 'Red - White' : 'Đỏ - Trắng'}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white text-xs placeholder:text-gray-400 outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
-                />
-              </div>
-            </div>
-
-            {/* Hàng 3.5: Phương tiện áp dụng (allowedVehicles) */}
+            {/* Hàng 3: Phương tiện áp dụng (allowedVehicles) */}
             <div className="space-y-1.5 shrink-0">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
@@ -773,14 +834,13 @@ export function CatalogProposalStepView({
                           setAllowedVehicles([...allowedVehicles, v.value])
                         }
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                         selected
                           ? 'bg-[#007b8b]/10 border-[#007b8b] text-[#007b8b] dark:bg-[#00c4de]/15 dark:border-[#00c4de] dark:text-[#00c4de]'
                           : 'bg-white dark:bg-black/30 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:border-gray-300'
                       }`}
                     >
                       <span className="truncate">{isEn ? v.labelEn : v.labelVi}</span>
-                      {selected && <Check size={12} weight="bold" className="shrink-0 ml-1" />}
                     </button>
                   )
                 })}
@@ -800,46 +860,31 @@ export function CatalogProposalStepView({
               </div>
             </div>
 
-            {/* Hàng 4: Mô tả biển & Mô tả nhận diện AI (2 cột song song) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'Description' : 'Mô tả biển'}
-                </label>
-                <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Mô tả ý nghĩa và quy định..."
-                  className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 text-xs resize-none outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
-                />
+            {/* Mô tả từ người gửi (Mô tả của người gửi / ghi chú quy định từ hiện trường - hiển thị giống bên staff) */}
+            {description ? (
+              <div className="space-y-1 shrink-0">
+                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <ChatText size={12} className="text-gray-400 shrink-0" />
+                  <span>{isEn ? 'Reporter Description:' : 'Mô tả từ người gửi:'}</span>
+                </span>
+                <div className="px-2.5 py-1.5 rounded-lg border border-gray-200/80 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.02] text-gray-800 dark:text-gray-200 text-xs leading-relaxed max-h-[64px] overflow-y-auto">
+                  {description}
+                </div>
               </div>
+            ) : null}
 
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block">
-                  {isEn ? 'AI prompt' : 'Mô tả nhận diện AI'}
-                </label>
-                <textarea
-                  rows={2}
-                  value={aiLabelPrompt}
-                  onChange={(e) => setAiLabelPrompt(e.target.value)}
-                  placeholder="Mô tả nhận diện hình ảnh..."
-                  className="w-full p-2 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 text-xs resize-none outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
-                />
-              </div>
-            </div>
-
-            {/* Hàng 5: Ghi chú phê duyệt * (Kéo dài tự nhiên bằng flex-1 để bằng khít chiều cao cột trái) */}
-            <div className="space-y-1 flex-1 flex flex-col min-h-[70px]">
+            {/* Hàng 5: Ghi chú phê duyệt * (Kích thước chuẩn, vừa vặn không bị kéo dãn bất thường) */}
+            <div className="space-y-1 shrink-0">
               <label className="text-[11px] font-bold text-gray-700 dark:text-gray-300 block shrink-0">
                 {isEn ? 'Review notes' : 'Ghi chú phê duyệt'} <span className="text-red-500">*</span>
               </label>
               <textarea
+                rows={3}
                 required
                 value={staffNotes}
                 onChange={(e) => setStaffNotes(e.target.value)}
                 placeholder={isEn ? 'Enter review notes...' : 'Nhập ghi chú xử lý lưu vào lịch sử...'}
-                className="w-full flex-1 min-h-[64px] p-2.5 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 text-xs resize-none outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20"
+                className="w-full h-20 p-2.5 rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-black/50 text-gray-900 dark:text-white placeholder:text-gray-400 text-xs resize-none outline-none focus:border-[#007b8b] dark:focus:border-[#00c4de] focus:ring-1 focus:ring-[#007b8b]/20 transition-colors"
               />
             </div>
           </div>

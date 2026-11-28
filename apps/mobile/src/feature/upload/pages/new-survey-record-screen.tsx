@@ -18,12 +18,16 @@ import {
   type SelectedSurveyMedia,
 } from '@/feature/upload/types/survey-media';
 import { useTheme } from '@/hooks/use-theme';
+import { useBackButton } from '@/hooks/use-back-button';
+import { useWorkRoute } from '@/hooks/use-work-route';
 
 export type { SelectedGpxFile, SelectedSurveyMedia };
 
 export function NewSurveyRecordScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const surveyorWorkRoute = useWorkRoute('/work', { currentRole: 'surveyor' });
+  useBackButton(surveyorWorkRoute);
 
   const picker = useSurveyMediaPicker();
   const {
@@ -84,6 +88,7 @@ export function NewSurveyRecordScreen() {
               startLon: String(initialGps.longitude),
               latitude: String(initialGps.latitude),
               longitude: String(initialGps.longitude),
+              ...(initialGps.heading != null ? { heading: String(initialGps.heading) } : {}),
             }
           : {}),
         ...(initialAsset?.duration
@@ -174,7 +179,7 @@ export function NewSurveyRecordScreen() {
             <AppButton
               accessibilityLabel="Quay lại công việc khảo sát"
               hitSlop={Spacing.one}
-              onPress={() => router.back()}
+              onPress={() => router.replace(surveyorWorkRoute)}
               pressedOpacity={0.7}
               style={styles.backButton}
               variant="ghost"

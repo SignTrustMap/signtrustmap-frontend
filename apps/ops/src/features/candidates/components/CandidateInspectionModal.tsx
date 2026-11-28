@@ -422,9 +422,13 @@ export function CandidateInspectionModal({
                       <div className="flex items-center gap-1 min-w-0">
                         <User size={12} className="text-gray-400 shrink-0" />
                         <span className="truncate">
-                          {submission?.surveyor_id
-                            ? `#${submission.surveyor_id.slice(0, 8)}`
-                            : 'Khảo sát viên ẩn danh'}
+                          {candidate?.surveyorName ||
+                            candidate?.surveyor?.fullName ||
+                            submission?.surveyorName ||
+                            submission?.surveyor_name ||
+                            (submission?.surveyor_id
+                              ? `#${submission.surveyor_id.slice(0, 8)}`
+                              : 'Khảo sát viên ẩn danh')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -556,6 +560,56 @@ export function CandidateInspectionModal({
                         Ứng viên đang trong hàng đợi thẩm định cộng đồng. Hệ thống cần đạt ngưỡng đồng thuận để tự động xuất bản lên bản đồ số.
                       </p>
                     </div>
+
+                    {Array.isArray(candidate?.reviews) && candidate.reviews.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        {candidate.reviews.map((rev: any) => (
+                          <div
+                            key={rev.id}
+                            className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white dark:bg-black/20 text-[11px]"
+                          >
+                            <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                              {rev.reviewer?.fullName || rev.reviewerName || 'Người đánh giá'}
+                            </span>
+                            <span
+                              className={`font-bold shrink-0 ${
+                                rev.vote === 1
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : rev.vote === -1
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-gray-500'
+                              }`}
+                            >
+                              {rev.vote === 1 ? 'Đồng ý' : rev.vote === -1 ? 'Từ chối' : 'Bỏ qua'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {Array.isArray(candidate?.recaptures) && candidate.recaptures.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        {candidate.recaptures.slice(0, 3).map((rec: any) => (
+                          <div
+                            key={rec.id}
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-50/70 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 text-[11px] space-y-0.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-amber-800 dark:text-amber-300">
+                                Yêu cầu chụp lại: {rec.reviewer?.fullName || rec.reviewerName || 'Quản trị'}
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400 font-mono">
+                                {rec.completedAt ? 'Đã chụp' : 'Đang chờ'}
+                              </span>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-300">
+                              Người nhận: {rec.surveyor?.fullName || rec.surveyorName || 'Chưa giao'}
+                              {rec.note ? ` • ${rec.note}` : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* ─── INLINE ACTION FORMS ────────────────────────────── */}

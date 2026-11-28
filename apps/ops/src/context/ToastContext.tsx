@@ -106,7 +106,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="fixed top-6 right-6 sm:top-20 sm:right-8 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0 select-none left-0 right-0 sm:left-auto sm:right-8 mx-auto sm:mx-0"
+        className="fixed top-6 right-6 sm:top-20 sm:right-8 z-[100000] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0 select-none left-0 right-0 sm:left-auto sm:right-8 mx-auto sm:mx-0"
       >
         {toasts.map((toast) => {
           let icon = <CheckCircle size={20} weight="fill" className="text-emerald-500 shrink-0 mt-0.5" />

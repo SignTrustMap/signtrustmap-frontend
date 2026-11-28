@@ -1,5 +1,75 @@
 import { http } from '../client'
 import { API_ENDPOINTS } from '../endpoints'
+import type { UserProfileSummary } from './user.service'
+
+export interface RecaptureRequestSummary {
+  id?: string
+  candidateId?: string | null
+  surveyorId?: string | null
+  assignedSurveyor?: UserProfileSummary | null
+  isRandomOrOpenQuest?: boolean
+  reviewerId?: string | null
+  reviewer?: UserProfileSummary | null
+  reason?: string
+  note?: string | null
+  createdAt?: string
+  completedAt?: string | null
+}
+
+/**
+ * Normalizes recapture payloads from either report/case detail or candidate/recaptures endpoints.
+ */
+export function normalizeRecaptureRequestSummary(raw: any): RecaptureRequestSummary | null {
+  if (!raw || typeof raw !== 'object') return null
+  const surveyorId = raw.surveyorId ?? raw.surveyor_id ?? raw.assignedSurveyor?.id ?? raw.surveyor?.id ?? null
+  const rawSurveyor = raw.assignedSurveyor || raw.surveyor
+  const assignedSurveyor: UserProfileSummary | null =
+    rawSurveyor && (rawSurveyor.id || rawSurveyor.fullName || rawSurveyor.full_name || rawSurveyor.email)
+      ? {
+          id: rawSurveyor.id ?? surveyorId ?? undefined,
+          fullName: rawSurveyor.fullName ?? rawSurveyor.full_name ?? raw.surveyorName ?? raw.surveyor_name ?? null,
+          email: rawSurveyor.email ?? raw.surveyorEmail ?? raw.surveyor_email ?? null,
+          avatarUrl: rawSurveyor.avatarUrl ?? rawSurveyor.avatar_url ?? null,
+        }
+      : surveyorId
+      ? {
+          id: surveyorId,
+          fullName: raw.surveyorName ?? raw.surveyor_name ?? null,
+          email: raw.surveyorEmail ?? raw.surveyor_email ?? null,
+        }
+      : null
+
+  const reviewerId = raw.reviewerId ?? raw.reviewer_id ?? raw.reviewer?.id ?? null
+  const rawReviewer = raw.reviewer
+  const reviewer: UserProfileSummary | null =
+    rawReviewer && (rawReviewer.id || rawReviewer.fullName || rawReviewer.full_name || rawReviewer.email)
+      ? {
+          id: rawReviewer.id ?? reviewerId ?? undefined,
+          fullName: rawReviewer.fullName ?? rawReviewer.full_name ?? raw.reviewerName ?? raw.reviewer_name ?? null,
+          email: rawReviewer.email ?? raw.reviewerEmail ?? raw.reviewer_email ?? null,
+        }
+      : reviewerId
+      ? {
+          id: reviewerId,
+          fullName: raw.reviewerName ?? raw.reviewer_name ?? null,
+          email: raw.reviewerEmail ?? raw.reviewer_email ?? null,
+        }
+      : null
+
+  return {
+    id: raw.id,
+    candidateId: raw.candidateId ?? raw.candidate_id ?? null,
+    surveyorId,
+    assignedSurveyor,
+    isRandomOrOpenQuest: raw.isRandomOrOpenQuest ?? !surveyorId,
+    reviewerId,
+    reviewer,
+    reason: raw.reason,
+    note: raw.note ?? '',
+    createdAt: raw.createdAt ?? raw.created_at,
+    completedAt: raw.completedAt ?? raw.completed_at ?? null,
+  }
+}
 
 export interface SignCategoryItem {
   id: number
@@ -28,6 +98,7 @@ export interface CatalogSignTypeItem {
   aiLabelPrompt?: string | null
   osmMapping?: string | null
   representativeImageKey?: string | null
+  allowedVehicles?: VehicleType[] | null
 }
 
 export interface PaginatedSignTypesResponse {
@@ -61,6 +132,7 @@ export interface CreateSignTypeInput {
   shape?: string
   colorScheme?: string
   isActive?: boolean
+  allowedVehicles?: VehicleType[]
 }
 
 export interface UpdateSignTypeInput extends Partial<CreateSignTypeInput> {}
@@ -111,6 +183,9 @@ export interface MissingTypeReportItem {
   createdAt: string
   updatedAt: string
   candidate?: CandidateEnriched | null
+  reporter?: UserProfileSummary | null
+  reviewer?: UserProfileSummary | null
+  recaptureRequest?: RecaptureRequestSummary | null
 }
 
 export interface PaginatedMissingReportsResponse {
@@ -286,7 +361,7 @@ export const catalogService = {
     return http.post<CatalogSignTypeItem>(
       API_ENDPOINTS.CATALOG.SIGN_TYPES,
       data,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
     )
   },
 
@@ -295,7 +370,7 @@ export const catalogService = {
     return http.patch<CatalogSignTypeItem>(
       API_ENDPOINTS.CATALOG.SIGN_TYPE_DETAIL(id),
       data,
-      isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
     )
   },
 
@@ -304,7 +379,16 @@ export const catalogService = {
   },
 
   getMissingReports: async (
-    params?: { status?: string; page?: number; pageSize?: number; size?: number; search?: string; q?: string },
+    params?: {
+      status?: string
+      page?: number
+      pageSize?: number
+      size?: number
+      search?: string
+      q?: string
+      sortBy?: string
+      sortOrder?: string
+    },
     config?: Record<string, any>
   ): Promise<PaginatedMissingReportsResponse> => {
     const q: Record<string, any> = {}
@@ -320,6 +404,12 @@ export const catalogService = {
     q.limit = size
     if (params?.search || params?.q) {
       q.search = params.search || params.q
+    }
+    if (params?.sortBy) {
+      q.sortBy = params.sortBy
+    }
+    if (params?.sortOrder) {
+      q.sortOrder = params.sortOrder
     }
 
     let res: any
@@ -409,17 +499,7 @@ export const catalogService = {
 
   getCandidateRecaptures: async (
     candidateId: string
-  ): Promise<
-    Array<{
-      id: string
-      candidateId?: string
-      candidate_id?: string
-      reason: string
-      note?: string
-      createdAt?: string
-      created_at?: string
-    }>
-  > => {
+  ): Promise<any[]> => {
     return http.get(API_ENDPOINTS.MODERATION.CANDIDATE_RECAPTURES(candidateId))
   },
 
@@ -484,7 +564,12 @@ export const catalogService = {
   },
 
   addSupportShot: async (signTypeId: number, data: any): Promise<any> => {
-    return http.post<any>(API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId), data)
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData
+    return http.post<any>(
+      API_ENDPOINTS.CATALOG.SUPPORT_SHOTS(signTypeId),
+      data,
+      isFormData ? { headers: { 'Content-Type': undefined } } : undefined
+    )
   },
 
   deleteSupportShot: async (signTypeId: number, imageId: string): Promise<any> => {

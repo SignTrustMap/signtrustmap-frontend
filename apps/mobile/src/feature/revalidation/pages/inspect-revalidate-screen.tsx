@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -19,6 +20,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import * as LegacyMediaLibrary from 'expo-media-library/legacy';
 import type { Asset as MediaLibraryAsset } from 'expo-media-library/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,7 +38,7 @@ import {
 } from '@/constants/message';
 
 import { AppButton } from '@/components/button';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/context/session-provider';
 import {
@@ -44,12 +46,22 @@ import {
   type ImageGpsCoordinates,
 } from '@/feature/upload/utils/image-gps';
 import { extractVideoMetadataAsync } from '@/feature/upload/utils/video-gps';
-import { fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
-import { resolveS3Url } from '@/api/revalidation/revalidation';
-import { useSubmitRevalidation } from '@/feature/revalidation/hooks/use-revalidation';
-import type { RevalidationEvidenceType } from '@/types/revalidationType';
+import { compressAndResizeSurveyImage } from '@/feature/upload/utils/survey-image';
+import { fetchFreshGpsLocation, fetchFreshGpsPosition } from '@/feature/navigation/utils/gps';
+import { ensureCameraPermission } from '@/services/camera-permission';
+import { checkInRevalidationTask, resolveS3Url } from '@/api/revalidation/revalidation';
+import {
+  useGetAllRevalidationTasks,
+  useSubmitRevalidation,
+} from '@/feature/revalidation/hooks/use-revalidation';
+import type {
+  AmbiguousSignCandidate,
+  RevalidationCheckInResponse,
+  RevalidationEvidenceType,
+} from '@/types/revalidationType';
 import { formatFreshnessScore } from '@/utils/freshness';
 import { useReverseGeocode } from '@/feature/upload/hooks/use-reverse-geocode';
+import { styles } from '@/feature/revalidation/styles/inspect-revalidate-screen.styles';
 
 export type InspectRevalidateParams = {
   signId?: string;
@@ -67,6 +79,7 @@ export type InspectRevalidateParams = {
   roadName?: string;
   displayAddress?: string;
   lastVerifiedAt?: string;
+  questClaimId?: string;
 };
 
 type SelectedMedia = {
@@ -77,6 +90,8 @@ type SelectedMedia = {
   capturedAt?: string;
   duration?: number;
   assetId?: string;
+  isLiveCapture?: boolean;
+  isCompressed?: boolean;
 };
 
 const ANDROID_GALLERY_PAGE_SIZE = 60;
@@ -195,8 +210,16 @@ export function InspectRevalidateScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Carried target sign metadata
-  const signId = params.signId || 'sign-target';
+  const signId = params.signId || '';
   const taskId = params.taskId;
+  const { data: allRevalTasks = [] } = useGetAllRevalidationTasks(!taskId && Boolean(signId));
+  const resolvedTaskId = useMemo(() => {
+    if (taskId && taskId !== 'sign-target') return taskId;
+    if (!signId) return taskId || '';
+    const matched = allRevalTasks.find((t) => t.verifiedSignId === signId || t.id === signId);
+    return matched?.id || taskId || signId;
+  }, [taskId, signId, allRevalTasks]);
+  const targetTaskId = resolvedTaskId || taskId || signId;
   const signCode = params.signCode || 'Biển báo giao thông';
   const signName = params.name || params.nameVi || params.nameEn || 'Kiểm tra biển báo';
   const targetLat = params.latitude ? parseFloat(params.latitude) : undefined;
@@ -240,6 +263,13 @@ export function InspectRevalidateScreen() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
 
+  // Real-time server check-in & ambiguous candidate resolution
+  const [checkInResult, setCheckInResult] = useState<RevalidationCheckInResponse | null>(null);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [ambiguousCandidates, setAmbiguousCandidates] = useState<AmbiguousSignCandidate[]>([]);
+  const [isAmbiguousModalVisible, setIsAmbiguousModalVisible] = useState(false);
+  const [confirmedSignId, setConfirmedSignId] = useState<string | undefined>(signId);
+
   // Android custom gallery modal state
   const [isAndroidGalleryVisible, setIsAndroidGalleryVisible] = useState(false);
   const [androidGalleryAssets, setAndroidGalleryAssets] = useState<MediaLibraryAsset[]>([]);
@@ -250,24 +280,40 @@ export function InspectRevalidateScreen() {
   const [selectingAndroidAssetId, setSelectingAndroidAssetId] = useState<string>();
   const isLoadingAndroidGallery = useRef(false);
 
-  // Proximity Calculation
+  // Proximity Calculation (prioritize server check-in distance if available)
   const distanceFromTarget =
-    detectedGps && targetLat !== undefined && targetLon !== undefined
+    checkInResult?.distanceMeters ??
+    (detectedGps && targetLat !== undefined && targetLon !== undefined
       ? calculateDistanceMeters(detectedGps.latitude, detectedGps.longitude, targetLat, targetLon)
-      : null;
+      : null);
 
   const isWithinProximity =
-    distanceFromTarget !== null ? distanceFromTarget <= MAX_PROXIMITY_METERS : null;
+    checkInResult !== null
+      ? checkInResult.isWithinProximity
+      : distanceFromTarget !== null
+        ? distanceFromTarget <= MAX_PROXIMITY_METERS
+        : null;
+
+  const isDailyLimitReached = Boolean(checkInResult?.dailyLimitReached);
 
   // Validation rules: Location, media, and selected evidence status are required
-  const isLocationValid = Boolean(detectedGps && isWithinProximity === true);
+  const isLocationValid = Boolean(
+    detectedGps && isWithinProximity === true && !isDailyLimitReached,
+  );
   const isSubmitDisabled =
-    !selectedMedia || !isLocationValid || !evidenceType || isSubmitting || isOpeningGallery;
+    !selectedMedia ||
+    !isLocationValid ||
+    !evidenceType ||
+    isSubmitting ||
+    isOpeningGallery ||
+    isDailyLimitReached;
 
   // Dynamic submit button label based on current validation state
   let submitButtonLabel = 'Gửi bằng chứng tái thẩm định';
   if (isSubmitting) {
     submitButtonLabel = 'Đang gửi bằng chứng…';
+  } else if (isDailyLimitReached) {
+    submitButtonLabel = 'Đã đạt giới hạn 3 lượt nộp/24h';
   } else if (!selectedMedia) {
     submitButtonLabel = 'Tải lên ảnh hoặc video bằng chứng';
   } else if (!detectedGps) {
@@ -277,6 +323,36 @@ export function InspectRevalidateScreen() {
   } else if (!evidenceType) {
     submitButtonLabel = 'Vui lòng chọn kết luận.';
   }
+
+  // Trigger GPS eligibility check-in when coordinates become available
+  useEffect(() => {
+    if (detectedGps && targetTaskId && session?.accessToken) {
+      let isCurrent = true;
+      setIsCheckingIn(true);
+      checkInRevalidationTask(
+        targetTaskId,
+        {
+          latitude: detectedGps.latitude,
+          longitude: detectedGps.longitude,
+          accuracyMeters: detectedGps.accuracy,
+        },
+        undefined,
+        session.accessToken,
+      )
+        .then((res) => {
+          if (isCurrent) setCheckInResult(res);
+        })
+        .catch((err) => {
+          console.warn('[InspectRevalidate] Check-in call notice:', err);
+        })
+        .finally(() => {
+          if (isCurrent) setIsCheckingIn(false);
+        });
+      return () => {
+        isCurrent = false;
+      };
+    }
+  }, [detectedGps?.latitude, detectedGps?.longitude, targetTaskId, session?.accessToken]);
 
   /**
    * Top navigation Back button:
@@ -303,11 +379,13 @@ export function InspectRevalidateScreen() {
     setIsLocatingDevice(true);
     setPickerError(undefined);
     try {
-      const pos = await fetchFreshGpsPosition();
-      if (pos) {
+      const loc = await fetchFreshGpsLocation();
+      if (loc) {
         setDetectedGps({
-          latitude: pos[1],
-          longitude: pos[0],
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: loc.accuracy,
+          heading: loc.heading,
         });
       } else {
         setPickerError(COULD_NOT_ACQUIRE_GPS_MESSAGE);
@@ -396,6 +474,7 @@ export function InspectRevalidateScreen() {
           duration: videoMeta.durationSeconds,
           capturedAt: videoMeta.capturedAt,
           assetId: asset.id,
+          isLiveCapture: false,
         });
         setDetectedGps(
           videoMeta.hasDeviceGps
@@ -406,13 +485,33 @@ export function InspectRevalidateScreen() {
             : null,
         );
       } else {
+        let finalImageUri = assetInfo.localUri ?? asset.uri;
+        let finalImageName = asset.filename;
+        try {
+          const compressed = await compressAndResizeSurveyImage(finalImageUri);
+          if (compressed.uri) {
+            finalImageUri = compressed.uri;
+            if (
+              !finalImageName.toLowerCase().endsWith('.jpg') &&
+              !finalImageName.toLowerCase().endsWith('.jpeg')
+            ) {
+              finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+            }
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Pre-compression skipped:', compErr);
+        }
+
         setSelectedMedia({
-          uri: assetInfo.localUri ?? asset.uri,
+          uri: finalImageUri,
           type: 'image',
-          fileName: asset.filename,
+          fileName: finalImageName,
+          mimeType: 'image/jpeg',
           capturedAt:
             asset.creationTime > 0 ? new Date(asset.creationTime).toISOString() : undefined,
           assetId: asset.id,
+          isLiveCapture: false,
+          isCompressed: true,
         });
         setDetectedGps(gpsCoordinates ?? null);
       }
@@ -430,16 +529,15 @@ export function InspectRevalidateScreen() {
   const handleLaunchCamera = async () => {
     setPickerError(undefined);
     try {
-      const ImagePicker = await import('expo-image-picker');
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
+      const hasPermission = await ensureCameraPermission();
+      if (!hasPermission) {
         setPickerError(CAMERA_PERMISSION_REQUIRED_MESSAGE);
         return;
       }
 
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: false,
-        quality: 0.9,
+        quality: 0.65,
         exif: true,
       });
 
@@ -447,12 +545,31 @@ export function InspectRevalidateScreen() {
         const asset: ImagePickerAsset = result.assets[0];
         const gps = extractImageGpsCoordinates(asset.exif);
 
+        let finalImageUri = asset.uri;
+        let finalImageName = asset.fileName || 'anh-kiem-tra.jpg';
+        try {
+          const compressed = await compressAndResizeSurveyImage(finalImageUri);
+          if (compressed.uri) {
+            finalImageUri = compressed.uri;
+            if (
+              !finalImageName.toLowerCase().endsWith('.jpg') &&
+              !finalImageName.toLowerCase().endsWith('.jpeg')
+            ) {
+              finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+            }
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Camera image compression skipped:', compErr);
+        }
+
         setSelectedMedia({
-          uri: asset.uri,
+          uri: finalImageUri,
           type: 'image',
-          fileName: asset.fileName || 'anh-kiem-tra.jpg',
-          mimeType: asset.mimeType,
+          fileName: finalImageName,
+          mimeType: 'image/jpeg',
           capturedAt: new Date().toISOString(),
+          isLiveCapture: true,
+          isCompressed: true,
         });
 
         if (gps) {
@@ -479,12 +596,11 @@ export function InspectRevalidateScreen() {
         return;
       }
 
-      const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
         exif: true,
         mediaTypes: ['images', 'videos'],
-        quality: 0.9,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -492,13 +608,37 @@ export function InspectRevalidateScreen() {
         const isVideo = asset.type === 'video';
         const gps = extractImageGpsCoordinates(asset.exif);
 
+        let finalImageUri = asset.uri;
+        let finalImageName = asset.fileName || (isVideo ? 'video.mp4' : 'anh-kiem-tra.jpg');
+        let finalMimeType = asset.mimeType || (isVideo ? 'video/mp4' : 'image/jpeg');
+
+        if (!isVideo) {
+          try {
+            const compressed = await compressAndResizeSurveyImage(finalImageUri);
+            if (compressed.uri) {
+              finalImageUri = compressed.uri;
+              finalMimeType = 'image/jpeg';
+              if (
+                !finalImageName.toLowerCase().endsWith('.jpg') &&
+                !finalImageName.toLowerCase().endsWith('.jpeg')
+              ) {
+                finalImageName = `${finalImageName.replace(/\.[^/.]+$/, '')}.jpg`;
+              }
+            }
+          } catch (compErr) {
+            console.warn('[InspectRevalidate] Gallery image compression skipped:', compErr);
+          }
+        }
+
         setSelectedMedia({
-          uri: asset.uri,
+          uri: finalImageUri,
           type: isVideo ? 'video' : 'image',
-          fileName: asset.fileName,
-          mimeType: asset.mimeType,
+          fileName: finalImageName,
+          mimeType: finalMimeType,
           duration: asset.duration ? asset.duration / 1000 : undefined,
           capturedAt: new Date().toISOString(),
+          isLiveCapture: false,
+          isCompressed: !isVideo,
         });
         setDetectedGps(gps ?? null);
       }
@@ -510,59 +650,120 @@ export function InspectRevalidateScreen() {
     }
   };
 
-  // Submit Evidence Action
-  const handleSubmitEvidence = async () => {
-    if (isSubmitDisabled) return;
+  // Submit Evidence Action (supports ambiguous candidate resolution override)
+  const handleSubmitEvidence = async (overrideConfirmedSignId?: string) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(undefined);
 
     const lat = detectedGps?.latitude;
     const lon = detectedGps?.longitude;
-    const targetTaskId = taskId || signId;
+    const targetTaskId = resolvedTaskId || taskId || signId;
+
+    if (!targetTaskId || targetTaskId === 'sign-target') {
+      setSubmitError('Mã nhiệm vụ tái thẩm định hoặc ID biển báo không hợp lệ.');
+      setIsSubmitting(false);
+      return;
+    }
 
     if (!lat || !lon) {
       setSubmitError(COORDINATES_REQUIRED_EVIDENCE_MESSAGE);
+      setIsSubmitting(false);
       return;
     }
 
     if (!evidenceType) {
       setSubmitError('Vui lòng chọn kết luận tái thẩm định.');
+      setIsSubmitting(false);
       return;
     }
 
+    const effectiveConfirmedSignId =
+      (typeof overrideConfirmedSignId === 'string' ? overrideConfirmedSignId : undefined) ||
+      confirmedSignId ||
+      signId;
+
     try {
+      let uploadMedia = selectedMedia;
+      if (
+        selectedMedia &&
+        selectedMedia.type === 'image' &&
+        selectedMedia.uri &&
+        !selectedMedia.isCompressed
+      ) {
+        try {
+          const compressed = await compressAndResizeSurveyImage(selectedMedia.uri);
+          if (compressed.uri && compressed.uri !== selectedMedia.uri) {
+            uploadMedia = {
+              ...selectedMedia,
+              uri: compressed.uri,
+              mimeType: 'image/jpeg',
+              isCompressed: true,
+            };
+          }
+        } catch (compErr) {
+          console.warn('[InspectRevalidate] Submit image compression fallback:', compErr);
+        }
+      }
+
       await submitRevalidation({
         taskIdOrSignId: targetTaskId,
         data: {
           latitude: lat,
           longitude: lon,
-          capturedAt: selectedMedia?.capturedAt || new Date().toISOString(),
+          accuracyMeters: detectedGps?.accuracy,
+          headingDegrees: detectedGps?.heading,
+          isLiveCapture: uploadMedia?.isLiveCapture ?? uploadMedia?.type === 'image',
+          confirmedSignId: effectiveConfirmedSignId,
+          capturedAt: uploadMedia?.capturedAt || new Date().toISOString(),
           note: customNote.trim() || undefined,
           evidenceType,
+          questClaimId: params.questClaimId,
         },
-        mediaFile: selectedMedia
+        mediaFile: uploadMedia
           ? {
-              uri: selectedMedia.uri,
-              fileName: selectedMedia.fileName || 'evidence.jpg',
-              mimeType: selectedMedia.mimeType,
+              uri: uploadMedia.uri,
+              fileName: uploadMedia.fileName || 'evidence.jpg',
+              mimeType: uploadMedia.mimeType,
             }
           : undefined,
         accessToken: session?.accessToken,
       });
 
       setSubmitSuccess(true);
-      setTimeout(() => {
-        router.replace({
-          pathname: '/work/submission-complete',
-          params: {
-            type: 'upload_revalidation',
-            taskId: targetTaskId,
-            signCode,
-          },
-        });
-      }, 1000);
-    } catch (err) {
+      router.replace({
+        pathname: '/work/submission-complete',
+        params: {
+          type: 'upload_revalidation',
+          taskId: targetTaskId,
+          signCode,
+        },
+      });
+    } catch (err: any) {
       console.error('[InspectRevalidate] Submission failed:', err);
+      const errData = err?.data;
+      if (
+        (err?.status === 409 && errData?.error === 'AMBIGUOUS_TARGET_SIGN') ||
+        (typeof err?.message === 'string' && err.message.includes('AMBIGUOUS_TARGET_SIGN'))
+      ) {
+        const candidates = errData?.candidates || [];
+        setAmbiguousCandidates(candidates);
+        setIsAmbiguousModalVisible(true);
+        setSubmitError(
+          'Phát hiện nhiều biển báo cùng loại trong bán kính 50m. Vui lòng xác nhận đúng vị trí biển báo bạn vừa chụp.',
+        );
+        return;
+      }
+      if (err?.status === 409) {
+        setSubmitError('Bạn đã nộp bằng chứng cho nhiệm vụ này rồi (đang chờ thẩm định).');
+        return;
+      }
+      if (err?.status === 429) {
+        setSubmitError(
+          'Nhiệm vụ này đã đạt giới hạn 3 lượt nộp trong 24 giờ. Vui lòng thử lại sau.',
+        );
+        return;
+      }
       setSubmitError(err instanceof Error ? err.message : SUBMIT_EVIDENCE_FAILED_MESSAGE);
     } finally {
       setIsSubmitting(false);
@@ -700,6 +901,112 @@ export function InspectRevalidateScreen() {
               }}
             />
           </SafeAreaView>
+        </View>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* 409 AMBIGUOUS TARGET SIGN RESOLUTION MODAL                          */}
+      {/* =================================================================== */}
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsAmbiguousModalVisible(false)}
+        transparent
+        visible={isAmbiguousModalVisible}
+      >
+        <View style={styles.ambiguousModalBackdrop}>
+          <View
+            style={[
+              styles.ambiguousModalCard,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.ambiguousModalHeader}>
+              <View style={[styles.ambiguousIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialCommunityIcons
+                  color="#D97706"
+                  name="map-marker-multiple-outline"
+                  size={24}
+                />
+              </View>
+              <View style={styles.ambiguousHeadingCol}>
+                <Text style={[styles.ambiguousTitle, { color: theme.text }]}>
+                  Xác nhận biển báo mục tiêu
+                </Text>
+                <Text style={[styles.ambiguousSubtitle, { color: theme.textSecondary }]}>
+                  Có nhiều biển báo cùng loại trong bán kính 50m. Vui lòng chọn đúng biển bạn vừa
+                  kiểm tra:
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView style={styles.ambiguousCandidateList}>
+              {ambiguousCandidates.map((c, idx) => (
+                <Pressable
+                  key={c.id || String(idx)}
+                  onPress={() => {
+                    setIsAmbiguousModalVisible(false);
+                    setConfirmedSignId(c.id);
+                    void handleSubmitEvidence(c.id);
+                  }}
+                  style={({ pressed }) => [
+                    styles.ambiguousCandidateCard,
+                    {
+                      backgroundColor: theme.background,
+                      borderColor: confirmedSignId === c.id ? theme.primary : theme.border,
+                      opacity: pressed ? 0.75 : 1,
+                    },
+                  ]}
+                >
+                  {c.signCropUrl ? (
+                    <Image
+                      contentFit="cover"
+                      source={{ uri: resolveS3Url(c.signCropUrl) }}
+                      style={styles.ambiguousCropImage}
+                    />
+                  ) : (
+                    <View
+                      style={[styles.ambiguousCropFallback, { backgroundColor: theme.neutral }]}
+                    >
+                      <MaterialCommunityIcons
+                        color={theme.placeholder}
+                        name="traffic-light"
+                        size={20}
+                      />
+                    </View>
+                  )}
+                  <View style={styles.ambiguousCandidateInfo}>
+                    <View style={styles.ambiguousCandidateCodeRow}>
+                      <Text style={[styles.ambiguousCandidateCode, { color: theme.primary }]}>
+                        {c.signCode || signCode}
+                      </Text>
+                      {c.distanceMeters != null ? (
+                        <Text
+                          style={[styles.ambiguousCandidateDist, { color: theme.textSecondary }]}
+                        >
+                          cách {Math.round(c.distanceMeters)}m
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.ambiguousCandidateName, { color: theme.text }]}
+                    >
+                      {c.nameVi || c.nameEn || 'Biển báo giao thông'}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons color={theme.primary} name="chevron-right" size={20} />
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <View style={styles.ambiguousFooter}>
+              <AppButton
+                label="Hủy bỏ"
+                onPress={() => setIsAmbiguousModalVisible(false)}
+                variant="ghost"
+              />
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -955,6 +1262,26 @@ export function InspectRevalidateScreen() {
                 </Text>
               ) : null}
 
+              {checkInResult ? (
+                <View style={styles.checkInStatusBadge}>
+                  <MaterialCommunityIcons
+                    color={checkInResult.dailyLimitReached ? '#EF4444' : '#10B981'}
+                    name={checkInResult.dailyLimitReached ? 'alert-octagon' : 'check-decagram'}
+                    size={16}
+                  />
+                  <Text
+                    style={[
+                      styles.checkInStatusText,
+                      { color: checkInResult.dailyLimitReached ? '#EF4444' : '#10B981' },
+                    ]}
+                  >
+                    {checkInResult.dailyLimitReached
+                      ? 'Nhiệm vụ đã đủ lượt nộp hôm nay (3/3).'
+                      : `Còn ${checkInResult.remainingSubmissionsToday} lượt hôm nay`}
+                  </Text>
+                </View>
+              ) : null}
+
               {/* Stamp Live GPS Fallback Button */}
               {!detectedGps || isWithinProximity === false ? (
                 <AppButton
@@ -1093,23 +1420,15 @@ export function InspectRevalidateScreen() {
               </Text>
             ) : null}
 
-            {/* Success Banner */}
-            {submitSuccess ? (
-              <View style={styles.successBanner}>
-                <MaterialCommunityIcons color="#059669" name="check-circle" size={20} />
-                <Text style={styles.successBannerText}>
-                  Đã gửi bằng chứng! Đang quay lại bản đồ tái thẩm định…
-                </Text>
-              </View>
-            ) : null}
-
             {/* =============================================================== */}
             {/* 5. SUBMIT EVIDENCE CTA (DISABLED IF LOCATION INVALID)           */}
             {/* =============================================================== */}
             <AppButton
               accessibilityLabel={submitButtonLabel}
               disabled={isSubmitDisabled}
-              onPress={handleSubmitEvidence}
+              onPress={() => {
+                void handleSubmitEvidence();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -1128,499 +1447,3 @@ export function InspectRevalidateScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardAvoiding: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: 160,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.three,
-    gap: Spacing.three,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  headerTitleCol: {
-    flex: 1,
-  },
-  headerBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  signCodePill: {
-    backgroundColor: '#0671EB',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  signCodePillText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  // Target Sign Card
-  targetSignCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: Spacing.three,
-    marginBottom: Spacing.three,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  cardTitleCol: {
-    flex: 1,
-  },
-  targetSignName: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  targetSignMeta: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  freshnessBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  freshnessBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  evidenceComparisonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.two,
-    paddingTop: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E2E8F0',
-  },
-  miniEvidenceBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 6,
-    width: 120,
-    height: 72,
-    backgroundColor: '#FFFFFF',
-  },
-  miniImgFrame: {
-    width: 80,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  miniImg: {
-    width: 50,
-    height: 50,
-  },
-  miniImgCrop: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-  },
-  noCropMini: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  noCropMiniText: {
-    fontSize: 9,
-  },
-  // Section Headings
-  sectionHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
-  },
-  // Redesigned Upload Placeholder (matches survey record screen & user mockup)
-  uploadPlaceholder: {
-    position: 'relative',
-    overflow: 'hidden',
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: Rounded.lg,
-    padding: Spacing.four,
-  },
-  uploadLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  helperText: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
-  },
-  selectedImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: Rounded.lg,
-  },
-  videoPreview: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#0F172A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: Spacing.three,
-  },
-  videoFileName: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cameraTileInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    gap: 6,
-  },
-  cameraTileIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#0671EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cameraTileText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  // GPS Guardrail
-  gpsGuardrailCard: {
-    borderRadius: 12,
-    borderWidth: 0,
-    padding: Spacing.three,
-    marginTop: 4,
-    gap: Spacing.two,
-  },
-  gpsErrorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: Spacing.one,
-    marginHorizontal: 2,
-  },
-  gpsErrorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
-    flex: 1,
-  },
-  gpsCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  gpsCardTitleCol: {
-    flex: 1,
-  },
-  gpsCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  gpsCardSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  stampGpsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  stampGpsBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  // Status Options Cards
-  statusOptionsWrap: {
-    gap: 10,
-    marginBottom: Spacing.two,
-  },
-  statusOptionCard: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    gap: 4,
-  },
-  statusOptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusOptionRadio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusOptionRadioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusOptionLabel: {
-    fontSize: 14,
-  },
-  statusOptionDesc: {
-    fontSize: 12,
-    paddingLeft: 26,
-    lineHeight: 16,
-  },
-  aiNoticeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: Spacing.two,
-  },
-  aiNoticeText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#92400E',
-    lineHeight: 16,
-    fontWeight: '500',
-  },
-  // Input Label Row & Notes
-  inputLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.two,
-    marginBottom: 6,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  requiredTag: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
-  optionalTag: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  notesInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  // Alerts & Messages
-  errorAlertText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  successBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-    borderWidth: 1,
-    padding: 12,
-    borderRadius: 10,
-    marginTop: Spacing.three,
-  },
-  successBannerText: {
-    color: '#065F46',
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-  },
-  // Submit Button
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: Spacing.four,
-  },
-  submitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  // Gallery Modal Styles
-  galleryModalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  galleryBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-  },
-  galleryScreen: {
-    height: '80%',
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    borderTopLeftRadius: Rounded.xlg,
-    borderTopRightRadius: Rounded.xlg,
-    overflow: 'hidden',
-  },
-  galleryHandleArea: {
-    minHeight: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  galleryHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-  },
-  galleryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-    borderBottomWidth: 1,
-  },
-  galleryHeading: {
-    flex: 1,
-  },
-  galleryTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  gallerySubtitle: {
-    fontSize: 12,
-  },
-  galleryCloseButton: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-  },
-  galleryErrorText: {
-    color: '#DC2626',
-    padding: Spacing.three,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  galleryGrid: {
-    padding: 2,
-  },
-  galleryEmptyContent: {
-    flexGrow: 1,
-  },
-  galleryEmptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.four,
-  },
-  galleryEmptyText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  galleryItem: {
-    width: '33.333%',
-    aspectRatio: 1,
-    padding: 2,
-    position: 'relative',
-  },
-  galleryImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 4,
-  },
-  galleryVideoBadge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    borderRadius: 4,
-    padding: 2,
-  },
-  gallerySelectingOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  galleryFooterLoader: {
-    padding: Spacing.three,
-  },
-});

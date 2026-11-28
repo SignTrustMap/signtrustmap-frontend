@@ -1,5 +1,5 @@
-import { SubmissionSummaryScreen } from '@/feature/review/pages/submission-summary-screen';
+import { Redirect } from 'expo-router';
 
 export default function SubmissionSummaryRoute() {
-  return <SubmissionSummaryScreen />;
+  return <Redirect href="/work/reviewer-history" />;
 }

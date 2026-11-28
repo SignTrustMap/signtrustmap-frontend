@@ -283,4 +283,105 @@ describe('SurveySubmissionDetailsScreen', () => {
       },
     });
   });
+
+  it('supports image zoom modal opening and closing', async () => {
+    mockStatusData = {
+      submission: sampleCompletedSubmission,
+      mediaFiles: sampleCompletedSubmission.mediaFiles,
+    };
+
+    const { getByLabelText, queryByLabelText } = await render(
+      <SurveySubmissionDetailsScreen submissionId="sub-comp-1234567890" />
+    );
+
+    const zoomBtn = getByLabelText('Phóng to ảnh khảo sát');
+    await act(async () => {
+      fireEvent.press(zoomBtn);
+    });
+
+    const closeZoomBtn = getByLabelText('Đóng xem phóng to');
+    expect(closeZoomBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(closeZoomBtn);
+    });
+
+    expect(queryByLabelText('Đóng xem phóng to')).toBeNull();
+  });
+
+  it('renders video submission with GPX route track details', async () => {
+    mockStatusData = {
+      submission: {
+        ...sampleCompletedSubmission,
+        submissionType: 'VIDEO_GPX',
+        mediaFiles: [
+          { id: 'v-1', mediaType: 'VIDEO', fileUrl: 'https://example.com/survey.mp4', fileName: 'survey.mp4' },
+          { id: 'g-1', mediaType: 'GPX', fileUrl: 'https://example.com/route.gpx', fileName: 'route.gpx' },
+        ],
+      },
+      mediaFiles: [
+        { id: 'v-1', mediaType: 'VIDEO', fileUrl: 'https://example.com/survey.mp4', fileName: 'survey.mp4' },
+        { id: 'g-1', mediaType: 'GPX', fileUrl: 'https://example.com/route.gpx', fileName: 'route.gpx' },
+      ],
+    };
+
+    const { getByText, getByLabelText } = await render(
+      <SurveySubmissionDetailsScreen submissionId="sub-comp-1234567890" />
+    );
+
+    expect(getByText('Bản ghi video khảo sát')).toBeTruthy();
+    expect(getByText(/Nhật ký lộ trình GPX: route\.gpx/)).toBeTruthy();
+
+    const playBtn = getByLabelText('Phát video khảo sát');
+    expect(playBtn).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(playBtn);
+    });
+  });
+
+  it('copies submission ID to clipboard and shows copied toast', async () => {
+    mockStatusData = {
+      submission: sampleCompletedSubmission,
+    };
+
+    const { getByLabelText, getByText } = await render(
+      <SurveySubmissionDetailsScreen submissionId="sub-comp-1234567890" />
+    );
+
+    const copyIdBtn = getByLabelText('Sao chép mã hồ sơ');
+    await act(async () => {
+      fireEvent.press(copyIdBtn);
+    });
+    expect(mockSetStringAsync).toHaveBeenCalledWith('sub-comp-1234567890');
+    expect(getByText('Đã sao chép!')).toBeTruthy();
+  });
+
+  it('renders extracted candidate signs list and zooms candidate crop image', async () => {
+    mockStatusData = {
+      submission: sampleCompletedSubmission,
+      mediaFiles: sampleCompletedSubmission.mediaFiles,
+      candidates: [
+        {
+          id: 'cand-1',
+          predictedSignType: { name: 'Biển cấm đi ngược chiều', code: 'P.102' },
+          confidence: 0.95,
+          signCropUrl: 'https://example.com/cand-crop.jpg',
+        },
+      ],
+    };
+
+    const { getByText, getByLabelText } = await render(
+      <SurveySubmissionDetailsScreen submissionId="sub-comp-1234567890" />
+    );
+
+    expect(getByText('Biển #1')).toBeTruthy();
+    expect(getByText('Độ tin cậy: 95%')).toBeTruthy();
+
+    const candidateCard = getByLabelText('Biển báo Biển #1');
+    await act(async () => {
+      fireEvent.press(candidateCard);
+    });
+
+    expect(getByLabelText('Đóng xem phóng to')).toBeTruthy();
+  });
 });

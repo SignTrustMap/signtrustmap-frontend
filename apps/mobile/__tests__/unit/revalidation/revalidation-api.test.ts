@@ -3,13 +3,17 @@ import {
   revalidationTaskToRouteSign,
   getRevalidationTasksInBounds,
   getAllRevalidationTasks,
-  fetchFirstRevalidationSign,
   getTaskEvidences,
   submitRevalidationEvidence,
+  voteOnRevalidationEvidence,
   getRevalidationTasks,
   getRevalidationTask,
   finalizeRevalidationTask,
   getEvidenceDecisions,
+  checkInRevalidationTask,
+  getCheckInEligibility,
+  requestEvidenceRecapture,
+  getSignHistory,
 } from '@/api/revalidation/revalidation';
 import type { RevalidationTaskItem } from '@/types/revalidationType';
 import * as apiClient from '@/api/api-client';
@@ -356,92 +360,6 @@ describe('Revalidation API Module', () => {
     });
   });
 
-  describe('fetchFirstRevalidationSign', () => {
-    it('returns first revalidation sign near user coordinates when available', async () => {
-      const userCoord: [number, number] = [106.7009, 10.7769];
-
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-near-1',
-            verified_sign_id: 'sign-near-1',
-            sign_code: 'P.102',
-            name_vi: 'Cấm đi ngược chiều',
-            latitude: '10.7769',
-            longitude: '106.7009',
-            freshness_score: 55,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-near-1');
-      expect(sign?.signCode).toBe('P.102');
-      expect(sign?.freshnessScore).toBeCloseTo(0.55);
-    });
-
-    it('falls back to broad query if near-user query returns no items', async () => {
-      // User is far from HCMC fallback tasks (e.g. Hanoi [105.85, 21.03])
-      const userCoord: [number, number] = [105.85, 21.03];
-
-      // First query (near): returns empty
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({ items: [] });
-      // Second query (broad): returns a task
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-broad-1',
-            verified_sign_id: 'sign-broad-1',
-            sign_code: 'W.207a',
-            name_vi: 'Giao nhau với đường không ưu tiên',
-            latitude: '10.7554',
-            longitude: '106.6781',
-            freshness_score: 80,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-broad-1');
-      expect(sign?.signCode).toBe('W.207a');
-    });
-
-    it('returns null when all API queries fail', async () => {
-      const userCoord: [number, number] = [105.85, 21.03];
-      (apiClient.apiRequest as jest.Mock).mockRejectedValue(new Error('Complete offline'));
-
-      const sign = await fetchFirstRevalidationSign(userCoord);
-
-      expect(sign).toBeNull();
-    });
-
-    it('works without userCoordinate provided', async () => {
-      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce({
-        items: [
-          {
-            id: 'task-anywhere-1',
-            verified_sign_id: 'sign-any-1',
-            sign_code: 'R.301a',
-            name_vi: 'Hướng đi phải theo',
-            latitude: '10.7981',
-            longitude: '106.7145',
-            freshness_score: 54,
-          },
-        ],
-      });
-
-      const sign = await fetchFirstRevalidationSign(undefined);
-
-      expect(sign).not.toBeNull();
-      expect(sign?.id).toBe('sign-any-1');
-      expect(sign?.signCode).toBe('R.301a');
-    });
-  });
-
   describe('getTaskEvidences', () => {
     it('fetches evidence reviews for a task with authorization header', async () => {
       const mockEvidences = [
@@ -559,6 +477,44 @@ describe('Revalidation API Module', () => {
       expect((FileSystem.uploadAsync as jest.Mock).mock.calls[0][2].parameters.note).toBeUndefined();
     });
 
+    it('downsizes local image file before uploading when compression succeeds', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-compressed-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
+
+      const surveyImageUtils = require('@/feature/upload/utils/survey-image');
+      const spy = jest.spyOn(surveyImageUtils, 'compressAndResizeSurveyImage').mockResolvedValueOnce({
+        uri: 'file:///cache/downsized-evidence.jpg',
+        width: 1280,
+        height: 960,
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/huge-camera-photo.png',
+        fileName: 'huge-camera-photo.png',
+        mimeType: 'image/png',
+      };
+
+      const result = await submitRevalidationEvidence('task-101', dto, mediaFile);
+
+      expect(spy).toHaveBeenCalledWith('file:///data/huge-camera-photo.png');
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks/task-101/evidence'),
+        'file:///cache/downsized-evidence.jpg',
+        expect.objectContaining({
+          mimeType: 'image/jpeg',
+        }),
+      );
+      expect(result.id).toBe('evidence-compressed-1');
+      spy.mockRestore();
+    });
+
     it('submits evidence with mediaUrl when no file is passed, auto-resolving token from storage', async () => {
       const mockSuccessResponse = {
         id: 'evidence-1000',
@@ -654,6 +610,95 @@ describe('Revalidation API Module', () => {
             longitude: '106.7009',
           }),
         }),
+      );
+    });
+
+    it('submits evidence with all Swagger fields (accuracyMeters, confirmedSignId, headingDegrees, isLiveCapture)', async () => {
+      const mockSuccessResponse = {
+        id: 'evidence-full-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (FileSystem.uploadAsync as jest.Mock).mockResolvedValueOnce({
+        status: 201,
+        body: JSON.stringify(mockSuccessResponse),
+      });
+
+      const mediaFile = {
+        uri: 'file:///data/live-photo.jpg',
+        fileName: 'live-photo.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      await submitRevalidationEvidence(
+        'task-101',
+        {
+          latitude: 10.7769,
+          longitude: 106.7009,
+          accuracyMeters: 4.8,
+          confirmedSignId: 'sign-uuid-123',
+          headingDegrees: 180,
+          isLiveCapture: true,
+          capturedAt: '2026-11-17T11:00:00.000Z',
+          evidenceType: 'STILL_ACTIVE',
+          note: 'This client note should be omitted from parameters',
+        },
+        mediaFile,
+      );
+
+      expect(FileSystem.uploadAsync).toHaveBeenCalledWith(
+        'https://api.signmap.site/api/v1/revalidation/tasks/task-101/evidence',
+        'file:///data/live-photo.jpg',
+        expect.objectContaining({
+          parameters: {
+            latitude: '10.7769',
+            longitude: '106.7009',
+            evidenceType: 'STILL_ACTIVE',
+            accuracyMeters: '4.8',
+            capturedAt: '2026-11-17T11:00:00.000Z',
+            confirmedSignId: 'sign-uuid-123',
+            headingDegrees: '180',
+            isLiveCapture: 'true',
+          },
+        }),
+      );
+    });
+
+    it('falls back to fetch(FormData) when uploadAsync fails with PROTOCOL_ERROR', async () => {
+      (FileSystem.uploadAsync as jest.Mock).mockRejectedValueOnce(
+        new Error('stream was reset: PROTOCOL_ERROR'),
+      );
+      const mockSuccessResponse = {
+        id: 'evidence-fallback-1',
+        taskId: 'task-101',
+        status: 'EVALUATING',
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockSuccessResponse);
+
+      const mediaFile = {
+        uri: 'file:///data/local-photo.jpg',
+        fileName: 'local-photo.jpg',
+        mimeType: 'image/jpeg',
+      };
+
+      const result = await submitRevalidationEvidence(
+        'task-101',
+        {
+          latitude: 10.7769,
+          longitude: 106.7009,
+          evidenceType: 'STILL_ACTIVE',
+        },
+        mediaFile,
+      );
+
+      expect(result.id).toBe('evidence-fallback-1');
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-101/evidence',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+        }),
+        expect.any(String),
       );
     });
 
@@ -842,6 +887,175 @@ describe('Revalidation API Module', () => {
 
       const res = await getEvidenceDecisions('ev-error');
       expect(res).toEqual([]);
+    });
+  });
+
+  describe('checkInRevalidationTask & getCheckInEligibility', () => {
+    it('calls POST /revalidation/tasks/:taskId/check-in with GPS coordinates', async () => {
+      const mockCheckInRes = {
+        eligible: true,
+        canCaptureLive: true,
+        taskId: 'task-100',
+        signId: 'sign-100',
+        taskStatus: 'OPEN',
+        distanceMeters: 12.5,
+        maxProximityMeters: 50,
+        isWithinProximity: true,
+        remainingDistanceMeters: 0,
+        dailyLimitReached: false,
+        recentSubmissionsCount: 0,
+        dailySubmissionLimit: 3,
+        remainingSubmissionsToday: 3,
+        targetLocation: { lat: 10.7769, lon: 106.7009 },
+        surveyorLocation: { lat: 10.777, lon: 106.7009 },
+        message: 'Vị trí hợp lệ để chụp ảnh tại hiện trường (cách biển báo 12.5m <= 50m).',
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockCheckInRes);
+
+      const res = await checkInRevalidationTask('task-100', {
+        latitude: 10.777,
+        longitude: 106.7009,
+        accuracyMeters: 4.5,
+      });
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/tasks/task-100/check-in',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            latitude: 10.777,
+            longitude: 106.7009,
+            accuracyMeters: 4.5,
+          }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockCheckInRes);
+      expect(res.eligible).toBe(true);
+      expect(res.isWithinProximity).toBe(true);
+      expect(res.dailyLimitReached).toBe(false);
+    });
+
+    it('calls GET /revalidation/tasks/:taskId/check-in with query params', async () => {
+      const mockRes = { eligible: true, isWithinProximity: true };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRes);
+
+      const res = await getCheckInEligibility('task-101', 10.7769, 106.7009, 5);
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        expect.stringContaining('/revalidation/tasks/task-101/check-in?lat=10.7769&lon=106.7009&accuracyMeters=5'),
+        { signal: undefined },
+        'mock-stored-jwt-token',
+      );
+      expect(res).toEqual(mockRes);
+    });
+  });
+
+  describe('requestEvidenceRecapture', () => {
+    it('calls POST /revalidation/evidence/:evidenceId/request-recapture with reason and note', async () => {
+      const mockRecaptureRes = {
+        success: true,
+        evidenceId: 'ev-rec-1',
+        taskId: 'task-rec-1',
+        surveyorId: 'surv-1',
+        reason: 'BLURRY',
+        note: 'Ảnh bị lóa sáng',
+        notificationSent: true,
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockRecaptureRes);
+
+      const res = await requestEvidenceRecapture('ev-rec-1', {
+        reason: 'BLURRY',
+        note: 'Ảnh bị lóa sáng',
+      });
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/evidence/ev-rec-1/request-recapture',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ reason: 'BLURRY', note: 'Ảnh bị lóa sáng' }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res.success).toBe(true);
+      expect(res.notificationSent).toBe(true);
+    });
+  });
+
+  describe('voteOnRevalidationEvidence', () => {
+    it('sends only decision, suggestedSignTypeId, and note without extra GPS fields', async () => {
+      const mockVoteRes = {
+        vote: {
+          id: 'vote-1',
+          evidenceId: 'ev-vote-1',
+          reviewerId: 'rev-1',
+          decision: 'CHANGED',
+          suggestedSignTypeId: 42,
+          note: 'Biển mới thay',
+          decidedAt: '2026-11-25T10:00:00Z',
+        },
+        consensus: { evaluated: false },
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockVoteRes);
+
+      const res = await voteOnRevalidationEvidence('ev-vote-1', {
+        decision: 'CHANGED',
+        suggestedSignTypeId: 42,
+        note: 'Biển mới thay',
+        latitude: 10.77,
+        longitude: 106.7,
+      } as any);
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/revalidation/evidence/ev-vote-1/vote',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            decision: 'CHANGED',
+            suggestedSignTypeId: 42,
+            note: 'Biển mới thay',
+          }),
+        }),
+        'mock-stored-jwt-token',
+      );
+      expect(res.vote.decision).toBe('CHANGED');
+    });
+  });
+
+  describe('getSignHistory (Public)', () => {
+    it('fetches sign history without requiring Authorization header', async () => {
+      const mockHistory = {
+        signId: 'sign-hist-1',
+        currentSign: { signCode: 'P.102' },
+        history: [
+          {
+            id: 'h-1',
+            signId: 'sign-hist-1',
+            previousSignCode: 'P.101',
+            changeReason: 'Updated sign in 2026',
+            changedAt: '2026-09-01T00:00:00Z',
+          },
+        ],
+        lifecycleEvents: [
+          {
+            id: 'le-1',
+            signId: 'sign-hist-1',
+            eventType: 'REVALIDATED',
+            eventAt: '2026-10-01T00:00:00Z',
+          },
+        ],
+      };
+      (apiClient.apiRequest as jest.Mock).mockResolvedValueOnce(mockHistory);
+
+      const res = await getSignHistory('sign-hist-1');
+
+      expect(apiClient.apiRequest).toHaveBeenCalledWith(
+        '/signs/sign-hist-1/history',
+        { signal: undefined },
+      );
+      expect(res.signId).toBe('sign-hist-1');
+      expect(res.history).toHaveLength(1);
+      expect(res.lifecycleEvents[0].eventType).toBe('REVALIDATED');
     });
   });
 });

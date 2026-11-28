@@ -1,4 +1,4 @@
-import { apiBaseUrl, apiRequest, jsonApiRequest } from '@/api/api-client';
+import { apiRequest, jsonApiRequest } from '@/api/api-client';
 import {
     formatNominatimHttpErrorMessage,
     formatPhotonHttpErrorMessage,
@@ -136,23 +136,19 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
 
     // 1. Primary: Internal Backend Spatial Admin Search (Official 2-tier units & legacy district aliases)
     try {
-        const baseUrl = apiBaseUrl();
-        const res = await fetch(
-            `${baseUrl}/addresses/search?q=${encodeURIComponent(trimmed)}&limit=8`,
+        const spatialResults = await apiRequest<any[]>(
+            `/addresses/search?q=${encodeURIComponent(trimmed)}&limit=8`,
             { signal },
         );
-        if (res.ok) {
-            const spatialResults = await res.json();
-            if (Array.isArray(spatialResults) && spatialResults.length > 0) {
-                return spatialResults.map((item: any) => ({
-                    address: item.displayName,
-                    id: `spatial-${item.communeCode}`,
-                    latitude: item.latitude,
-                    longitude: item.longitude,
-                    title: item.communeName,
-                    type: 'recent' as const,
-                }));
-            }
+        if (Array.isArray(spatialResults) && spatialResults.length > 0) {
+            return spatialResults.map((item: any) => ({
+                address: item.displayName,
+                id: `spatial-${item.communeCode}`,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                title: item.communeName,
+                type: 'recent' as const,
+            }));
         }
     } catch (spatialErr) {
         if (signal?.aborted) throw spatialErr;
@@ -180,25 +176,21 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
         console.warn('[Places] Nominatim geocoding failed, trying backend:', nomErr);
     }
 
-    // 3. Final fallback: Backend /geocoding/search endpoint via safe fetch
+    // 3. Final fallback: Backend /geocoding/search endpoint via shared apiRequest
     try {
-        const baseUrl = apiBaseUrl();
-        const res = await fetch(
-            `${baseUrl}/geocoding/search?q=${encodeURIComponent(trimmed)}&limit=8&countryCode=vn`,
+        const data = await apiRequest<GeocodingResponse>(
+            `/geocoding/search?q=${encodeURIComponent(trimmed)}&limit=8&countryCode=vn`,
             { signal },
         );
-        if (res.ok) {
-            const data: GeocodingResponse = await res.json();
-            if (Array.isArray(data?.results)) {
-                return data.results.map((place) => ({
-                    address: place.displayName,
-                    id: `geocoding-${place.providerPlaceId}`,
-                    latitude: place.latitude,
-                    longitude: place.longitude,
-                    title: place.name || place.displayName || trimmed,
-                    type: 'recent' as const,
-                }));
-            }
+        if (Array.isArray(data?.results)) {
+            return data.results.map((place) => ({
+                address: place.displayName,
+                id: `geocoding-${place.providerPlaceId}`,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                title: place.name || place.displayName || trimmed,
+                type: 'recent' as const,
+            }));
         }
     } catch (backendErr) {
         if (signal?.aborted) throw backendErr;

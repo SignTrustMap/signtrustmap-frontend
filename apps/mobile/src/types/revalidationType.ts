@@ -120,6 +120,8 @@ export interface RevalidationTaskDetail {
   longitude?: number;
   signCropUrl?: string;
   historicalCropUrl?: string;
+  lastVerifiedDate?: string;
+  currentTrustScore?: number;
 }
 
 export type RevalidationFilterPriority = 'ALL' | TaskPriority;
@@ -153,6 +155,9 @@ export interface RevalidationQueueEvidenceItem {
     freshnessScore?: number;
   };
   evidence: {
+    id?: string;
+    userId?: string;
+    surveyorId?: string;
     mediaUrl?: string;
     evidenceType: RevalidationEvidenceType | string;
     submittedAt: string;
@@ -160,6 +165,7 @@ export interface RevalidationQueueEvidenceItem {
     longitude: number;
     distanceMeters: number | null;
     suggestedSignTypeId?: number;
+  questClaimId?: string;
   };
   currentVoteCount: number;
   taskStatus: string;
@@ -187,6 +193,7 @@ export interface RevalidationDecisionItem {
 export interface EvidenceVoteDto {
   decision: RevalDecision | string;
   suggestedSignTypeId?: number;
+  questClaimId?: string;
   note?: string;
 }
 
@@ -219,12 +226,18 @@ export interface EvidenceVoteResponse {
 export type SubmitRevalidationEvidenceDto = {
   latitude: number;
   longitude: number;
+  accuracyMeters?: number;
   capturedAt?: string;
+  confirmedSignId?: string;
+  evidenceType?: RevalidationEvidenceType;
+  headingDegrees?: number;
+  isLiveCapture?: boolean;
+  mediaUrl?: string;
+  suggestedSignTypeId?: number;
+  questClaimId?: string;
+  // UI-only helper fields (omitted from outgoing payload)
   note?: string;
   condition?: string;
-  mediaUrl?: string;
-  evidenceType?: RevalidationEvidenceType;
-  suggestedSignTypeId?: number;
 };
 
 export type SubmitRevalidationEvidenceResponse = {
@@ -242,4 +255,95 @@ export type SubmitRevalidationEvidenceResponse = {
   remainingDailySubmissions?: number;
   status?: string;
 };
+
+export interface CheckInEligibilityDto {
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+}
+
+export interface RevalidationCheckInResponse {
+  eligible: boolean;
+  canCaptureLive: boolean;
+  taskId: string;
+  signId: string;
+  taskStatus: string;
+  distanceMeters: number;
+  maxProximityMeters: number;
+  isWithinProximity: boolean;
+  remainingDistanceMeters: number;
+  dailyLimitReached: boolean;
+  recentSubmissionsCount: number;
+  dailySubmissionLimit: number;
+  remainingSubmissionsToday: number;
+  targetLocation: { lat: number; lon: number };
+  surveyorLocation: { lat: number; lon: number };
+  message: string;
+}
+
+export interface RequestEvidenceRecaptureDto {
+  reason: string;
+  note?: string;
+}
+
+export interface RequestEvidenceRecaptureResponse {
+  success: boolean;
+  evidenceId: string;
+  taskId: string;
+  surveyorId: string;
+  reason: string;
+  note?: string;
+  notificationSent: boolean;
+}
+
+export interface AmbiguousSignCandidate {
+  id: string;
+  signCode: string;
+  nameVi?: string;
+  nameEn?: string;
+  signCropUrl?: string;
+  distanceMeters?: number;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface AmbiguousTargetSignErrorData {
+  error: 'AMBIGUOUS_TARGET_SIGN';
+  targetSignId: string;
+  candidates: AmbiguousSignCandidate[];
+}
+
+export interface VerifiedSignHistoryItem {
+  id: string;
+  signId: string;
+  previousSignCode?: string;
+  previousSignNameVi?: string;
+  previousCropUrl?: string;
+  changeReason?: string;
+  changedAt: string;
+  changedBy?: string;
+}
+
+export interface SignLifecycleEventItem {
+  id: string;
+  signId: string;
+  eventType:
+    | 'CONFIRMED'
+    | 'DISPUTED'
+    | 'REVALIDATED'
+    | 'REVALIDATION_CHANGED'
+    | 'DECOMMISSIONED'
+    | 'AUTO_DELISTED'
+    | string;
+  eventAt: string;
+  metadata?: Record<string, any>;
+}
+
+export interface SignHistoryResponse {
+  signId: string;
+  currentSign?: any;
+  history: VerifiedSignHistoryItem[];
+  lifecycleEvents: SignLifecycleEventItem[];
+}
+
 

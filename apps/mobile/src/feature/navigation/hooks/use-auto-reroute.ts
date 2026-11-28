@@ -86,7 +86,8 @@ export function useAutoReroute({
   // Reset reroute lock and clear rerouteOrigin whenever genuinely new route coordinates arrive
   useEffect(() => {
     if (!routeCoordinates?.length) return;
-    const currentRouteKey = `${routeCoordinates[0]?.[0]},${routeCoordinates[0]?.[1]}:${routeCoordinates.length}`;
+    const midIdx = Math.floor(routeCoordinates.length / 2);
+    const currentRouteKey = `${routeCoordinates[0]?.[0]},${routeCoordinates[0]?.[1]}:${routeCoordinates[midIdx]?.[0]},${routeCoordinates[midIdx]?.[1]}:${routeCoordinates[routeCoordinates.length - 1]?.[0]},${routeCoordinates[routeCoordinates.length - 1]?.[1]}:${routeCoordinates.length}`;
     if (prevRouteKeyRef.current !== currentRouteKey) {
       prevRouteKeyRef.current = currentRouteKey;
       if (rerouteOrigin) {

@@ -1,5 +1,7 @@
 import { API_PATHS } from '@/api/api';
 import { apiRequest, jsonApiRequest } from '@/api/api-client';
+import type { ConfirmSignDto, ConfirmSignResponse } from '@/types/navigationType';
+import type { SignHistoryResponse } from '@/types/revalidationType';
 import type {
     CreateVerifiedSignDto,
     CreateVerifiedSignResponse,
@@ -92,20 +94,14 @@ export function getNearbySignCandidates(
     );
 }
 
-/** Submit driver or surveyor verification confirming or reporting missing a verified sign */
+/** Submit driver or surveyor verification confirming or reporting missing/outdated a verified sign */
 export function confirmSignPresence(
     id: string,
-    body: {
-        isPresent: boolean;
-        latitude?: number;
-        longitude?: number;
-        photoEvidenceUrl?: string;
-        note?: string;
-    },
+    body: ConfirmSignDto,
     accessToken: string,
     signal?: AbortSignal,
-): Promise<{ success: boolean; message?: string }> {
-    return jsonApiRequest<{ success: boolean; message?: string }>(
+): Promise<ConfirmSignResponse> {
+    return jsonApiRequest<ConfirmSignResponse>(
         `${API_PATHS.SIGNS}/${encodeURIComponent(id)}/confirm`,
         body,
         accessToken,
@@ -113,5 +109,20 @@ export function confirmSignPresence(
         'POST',
     );
 }
+
+/**
+ * Public endpoint to fetch the snapshot history and lifecycle events of a verified traffic sign.
+ * Does not require JWT authentication (@Public).
+ */
+export function getSignHistory(
+    id: string,
+    signal?: AbortSignal,
+): Promise<SignHistoryResponse> {
+    return apiRequest<SignHistoryResponse>(
+        `${API_PATHS.SIGNS}/${encodeURIComponent(id)}/history`,
+        { signal },
+    );
+}
+
 
 

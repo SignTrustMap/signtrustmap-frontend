@@ -108,9 +108,13 @@ export function createDirectionalDivIcon(options: DirectionalMarkerIconOptions):
 const S3_BASE = 'https://s3.signmap.site'
 
 /**
- * Resolves standard representative traffic sign image URL (vector/PNG) from S3 CDN.
+ * Resolves standard representative traffic sign image URL (SVG vector) from S3 CDN.
  */
 export function resolveRepresentativeSignUrl(nameEn?: string, signCode?: string): string {
+  const code = (signCode || '').trim()
+  if (code) {
+    return `${S3_BASE}/stm-catalog-images/representative/${code}.svg`
+  }
   if (nameEn) {
     const slug = nameEn
       .trim()
@@ -118,11 +122,8 @@ export function resolveRepresentativeSignUrl(nameEn?: string, signCode?: string)
       .replace(/[^A-Z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '')
     if (slug) {
-      return `${S3_BASE}/stm-sign-crops/representative/${slug}.png`
+      return `${S3_BASE}/stm-catalog-images/representative/${slug}.svg`
     }
-  }
-  if (signCode) {
-    return `${S3_BASE}/stm-sign-crops/representative/${signCode.toUpperCase().trim()}.png`
   }
   return ''
 }

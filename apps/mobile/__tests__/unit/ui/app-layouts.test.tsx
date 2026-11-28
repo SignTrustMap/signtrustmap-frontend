@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, act } from '@testing-library/react-native';
+import { AppState } from 'react-native';
+import { render, act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -28,13 +29,10 @@ jest.mock('expo-router', () => {
         <Text>{href}</Text>
       </View>
     ),
-    Stack: Object.assign(
-      ({ children }: any) => <View testID="stack">{children}</View>,
-      {
-        Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
-        Protected: ({ children, guard }: any) => (guard ? children : null),
-      }
-    ),
+    Stack: Object.assign(({ children }: any) => <View testID="stack">{children}</View>, {
+      Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
+      Protected: ({ children, guard }: any) => (guard ? children : null),
+    }),
     Slot: () => <View testID="slot" />,
     useSegments: () => mockSegments,
     DefaultTheme: { dark: false, colors: { background: '#ffffff' } },
@@ -45,13 +43,10 @@ jest.mock('expo-router', () => {
 jest.mock('expo-router/stack', () => {
   const { View } = require('react-native');
   return {
-    Stack: Object.assign(
-      ({ children }: any) => <View testID="stack">{children}</View>,
-      {
-        Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
-        Protected: ({ children, guard }: any) => (guard ? children : null),
-      }
-    ),
+    Stack: Object.assign(({ children }: any) => <View testID="stack">{children}</View>, {
+      Screen: ({ name }: any) => <View testID={`screen-${name}`} />,
+      Protected: ({ children, guard }: any) => (guard ? children : null),
+    }),
   };
 });
 
@@ -63,8 +58,22 @@ jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(),
 }));
 
+jest.mock('@/constants/const', () => ({
+  MINIMUM_SPLASH_DURATION_MS: 10,
+  SPLASH_PROGRESS_DURATION_MS: 10,
+  EXIT_ANIMATION_DURATION_MS: 10,
+  NAVIGATION_COMPLETE_MODAL_AUTO_DISMISS_MS: 10,
+}));
+
+const mockCheckMandatoryGpsStatus = jest
+  .fn()
+  .mockResolvedValue({ status: 'granted', reason: null });
+const mockOpenLocationSettings = jest.fn().mockResolvedValue(undefined);
+
 jest.mock('@/services/location-permission', () => ({
-  requestLocationPermissionOnFirstLaunch: jest.fn().mockResolvedValue(true),
+  requestLocationPermissionOnFirstLaunch: jest.fn().mockResolvedValue(undefined),
+  checkMandatoryGpsStatus: (...args: any[]) => mockCheckMandatoryGpsStatus(...args),
+  openLocationSettings: (...args: any[]) => mockOpenLocationSettings(...args),
 }));
 
 jest.mock('@/feature/upload/utils/crop-sync-manager', () => ({
@@ -79,9 +88,20 @@ jest.mock('@/api/saved-routes/saved-routes', () => ({
 }));
 
 jest.mock('@/feature/splash/pages/splash-screen', () => {
-  const { View } = require('react-native');
+  const { Pressable, Text, View } = require('react-native');
   return {
-    AppSplashScreen: () => <View testID="app-splash-screen" />,
+    AppSplashScreen: ({ gpsStatus, gpsDenialReason, onRetryGps, onOpenSettings }: any) => (
+      <View testID="app-splash-screen">
+        <Text testID="splash-gps-status">{gpsStatus ?? 'checking'}</Text>
+        <Text testID="splash-gps-reason">{gpsDenialReason ?? 'none'}</Text>
+        {gpsStatus === 'denied' ? (
+          <View>
+            <Pressable testID="mock-splash-retry" onPress={onRetryGps} />
+            <Pressable testID="mock-splash-settings" onPress={onOpenSettings} />
+          </View>
+        ) : null}
+      </View>
+    ),
   };
 });
 
@@ -89,13 +109,6 @@ jest.mock('@/feature/notifications/pages/notifications-screen', () => {
   const { View } = require('react-native');
   return {
     NotificationsScreen: () => <View testID="notifications-screen" />,
-  };
-});
-
-jest.mock('@/feature/streaming/pages/livestream-screen', () => {
-  const { View } = require('react-native');
-  return {
-    LivestreamScreen: () => <View testID="livestream-screen" />,
   };
 });
 
@@ -124,7 +137,6 @@ import IndexRoute from '@/app/index';
 import AuthenticatedLayout from '@/app/(authenticated)/_layout';
 import NotificationsRoute from '@/app/(authenticated)/notifications';
 import AppTabsLayout from '@/app/(authenticated)/(tabs)/_layout';
-import LivestreamRoute from '@/app/(authenticated)/(tabs)/livestream';
 import { Divider } from '@/components/divider';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -141,9 +153,77 @@ describe('App Layouts & Navigation Roots', () => {
   });
 
   describe('Root TabLayout (_layout.tsx)', () => {
-    it('renders root TabLayout successfully', async () => {
-      const { getByTestId } = await render(<TabLayout />);
-      expect(getByTestId('stack')).toBeTruthy();
+    beforeEach(() => {
+      mockCheckMandatoryGpsStatus.mockResolvedValue({ status: 'granted', reason: null });
+    });
+
+    it('renders root TabLayout successfully and hides splash once timer elapsed and GPS granted', async () => {
+      await render(<TabLayout />);
+      expect(screen.getByTestId('stack')).toBeTruthy();
+      expect(mockCheckMandatoryGpsStatus).toHaveBeenCalledWith({ promptPermission: true });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+    });
+
+    it('keeps splash screen visible with GPS prompt when device GPS is turned off, and hides after retry enables it', async () => {
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'denied', reason: 'service' });
+
+      await render(<TabLayout />);
+
+      await waitFor(() => {
+        expect(screen.getByText('denied')).toBeTruthy();
+        expect(screen.getByText('service')).toBeTruthy();
+      });
+
+      // Wait longer than SPLASH_PROGRESS_DURATION_MS (10ms) to confirm splash still blocks
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+      expect(screen.getByTestId('app-splash-screen')).toBeTruthy();
+
+      await fireEvent.press(screen.getByTestId('mock-splash-settings'));
+      expect(mockOpenLocationSettings).toHaveBeenCalledWith('service');
+
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'granted', reason: null });
+      await fireEvent.press(screen.getByTestId('mock-splash-retry'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+    });
+
+    it('dismisses splash screen when returning from Settings with GPS enabled', async () => {
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'denied', reason: 'permission' });
+      let appStateListener: ((state: any) => void) | undefined;
+      const removeMock = jest.fn();
+      const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, cb) => {
+        appStateListener = cb;
+        return { remove: removeMock } as any;
+      });
+
+      await render(<TabLayout />);
+
+      await waitFor(() => {
+        expect(screen.getByText('denied')).toBeTruthy();
+      });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+
+      mockCheckMandatoryGpsStatus.mockResolvedValueOnce({ status: 'granted', reason: null });
+      await act(async () => {
+        appStateListener?.('active');
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('app-splash-screen')).toBeNull();
+      });
+      expect(mockCheckMandatoryGpsStatus).toHaveBeenLastCalledWith({ promptPermission: false });
+      expect(removeMock).toHaveBeenCalled();
+      spy.mockRestore();
     });
   });
 
@@ -196,11 +276,6 @@ describe('App Layouts & Navigation Roots', () => {
       expect(getByTestId('slot')).toBeTruthy();
       expect(queryByTestId('app-bottom-tabs')).toBeNull();
     });
-
-    it('renders LivestreamRoute correctly', async () => {
-      const { getByTestId } = await render(<LivestreamRoute />);
-      expect(getByTestId('livestream-screen')).toBeTruthy();
-    });
   });
 
   describe('UI Base Components: Divider, ThemedText, ThemedView', () => {
@@ -220,7 +295,7 @@ describe('App Layouts & Navigation Roots', () => {
           <ThemedText type="link">Link Text</ThemedText>
           <ThemedText type="linkPrimary">Primary Link Text</ThemedText>
           <ThemedText type="code">Code Text</ThemedText>
-        </>
+        </>,
       );
       expect(getByText('Default Text')).toBeTruthy();
       expect(getByText('Title Text')).toBeTruthy();
@@ -233,7 +308,7 @@ describe('App Layouts & Navigation Roots', () => {
       const { toJSON } = await render(
         <ThemedView type="background">
           <Text>View Content</Text>
-        </ThemedView>
+        </ThemedView>,
       );
       expect(toJSON()).toBeTruthy();
     });

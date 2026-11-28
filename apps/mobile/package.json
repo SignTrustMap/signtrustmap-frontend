@@ -9,6 +9,7 @@
     "@maplibre/maplibre-react-native": "^11.3.6",
     "@react-native-community/datetimepicker": "^9.3.0",
     "@react-native-google-signin/google-signin": "^17.0.0",
+    "@shopify/flash-list": "^2.3.3",
     "@tanstack/react-query": "^5.102.3",
     "clsx": "^2.1.1",
     "expo": "~57.0.9",
@@ -25,9 +26,11 @@
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.1",
+    "expo-image-manipulator": "~57.0.1",
     "expo-image-picker": "~57.0.11",
     "expo-linking": "~57.0.4",
     "expo-media-library": "~57.0.3",
+    "expo-navigation-bar": "~57.0.3",
     "expo-router": "~57.0.9",
     "expo-secure-store": "~57.0.1",
     "expo-speech": "~57.0.2",
@@ -69,16 +72,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "pretypecheck": "expo customize tsconfig.json",
-    "typecheck": "tsc --noEmit",
-    "test:e2e:survey": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/survey-record-flow.yaml",
-    "test:e2e:upload": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/survey-record-flow.yaml",
-    "test:e2e:login": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/login-flow.yaml",
-    "test:e2e:reviewer": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/reviewer-flow.yaml",
-    "test:e2e:reval": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/revalidation-review-flow.yaml",
-    "test:e2e:navigation": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/navigation-flow.yaml",
-    "test:e2e:screens": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e/capture-app-screens.yaml",
-    "test:e2e": "node scripts/run-maestro.mjs test --test-output-dir __tests__/report --format HTML __tests__/e2e",
-    "maestro:studio": "node scripts/run-maestro.mjs studio"
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }

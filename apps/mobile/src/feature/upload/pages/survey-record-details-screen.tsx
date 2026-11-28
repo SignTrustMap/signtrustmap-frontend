@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import * as DocumentPicker from 'expo-document-picker';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, Controller, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -54,7 +54,7 @@ import {
   USE_MEDIA_WITH_GPS_OR_LOCATION_MESSAGE,
   VIDEO_SIZE_EXCEEDED_MESSAGE,
 } from '@/constants/message';
-import { Fonts, MaxContentWidth, Rounded, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useSession } from '@/context/session-provider';
 import { NavigationMapView } from '@/feature/navigation/components/navigation-map-view';
 import { type MapCoordinate } from '@/types/navigationType';
@@ -94,89 +94,17 @@ import {
 } from '@/feature/upload/utils/video-processor';
 
 import { getMapLibre } from '@/services/maplibre';
+import { styles } from '@/feature/upload/styles/survey-record-details-screen.styles';
+import {
+  formatNoteWithDirection,
+  getCardinalDirectionLabel,
+  getCurrentSurveyCoordinate,
+  isValidCoordinate,
+  parseDateToDateObject,
+  parseInitialCapturedDate,
+} from '@/feature/upload/utils/survey-record-details.utils';
 
-export function isValidCoordinate(coord?: MapCoordinate | null): coord is MapCoordinate {
-  if (!coord) return false;
-  const [lon, lat] = coord;
-  return (
-    typeof lon === 'number' &&
-    typeof lat === 'number' &&
-    Number.isFinite(lon) &&
-    Number.isFinite(lat) &&
-    Math.abs(lat) <= 90 &&
-    Math.abs(lon) <= 180 &&
-    !(lat === 0 && lon === 0)
-  );
-}
-
-async function getCurrentSurveyCoordinate(): Promise<MapCoordinate> {
-  if (Platform.OS === 'web') {
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      throw new Error(LOCATION_NOT_AVAILABLE_IN_BROWSER_MESSAGE);
-    }
-
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        ({ coords }) => resolve([coords.longitude, coords.latitude]),
-        (error) => {
-          reject(
-            new Error(
-              error.code === error.PERMISSION_DENIED
-                ? ALLOW_LOCATION_ACCESS_MESSAGE
-                : ENABLE_LOCATION_SERVICE_MESSAGE,
-            ),
-          );
-        },
-        { enableHighAccuracy: true, maximumAge: 10_000, timeout: 10_000 },
-      );
-    });
-  }
-
-  const mapLibre = getMapLibre();
-  if (!mapLibre) {
-    throw new Error(LOCATION_NATIVE_BUILD_REQUIRED_MESSAGE);
-  }
-
-  const hasPermission = await mapLibre.LocationManager.requestPermissions();
-
-  if (!hasPermission) {
-    throw new Error(ALLOW_LOCATION_ACCESS_MESSAGE);
-  }
-
-  const position = await mapLibre.LocationManager.getCurrentPosition();
-
-  if (!position) {
-    throw new Error(ENABLE_LOCATION_SERVICE_MESSAGE);
-  }
-
-  return [position.coords.longitude, position.coords.latitude];
-}
-
-// validation functions are imported from survey-record.schema
-
-function parseInitialCapturedDate(dateVal?: string | null): string {
-  if (!dateVal) return '';
-  const trimmed = dateVal.trim();
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
-    return trimmed;
-  }
-  return formatDate(dateVal);
-}
-
-function parseDateToDateObject(dateStr?: string): Date {
-  if (!dateStr) return new Date();
-  const trimmed = dateStr.trim();
-  const parts = trimmed.split('/');
-  if (parts.length === 3) {
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const year = parseInt(parts[2], 10);
-    const date = new Date(year, month, day);
-    if (!Number.isNaN(date.getTime())) return date;
-  }
-  const parsed = new Date(dateStr);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-}
+export { formatNoteWithDirection, getCardinalDirectionLabel, isValidCoordinate };
 
 export function SurveyRecordDetailsScreen() {
   const router = useRouter();
@@ -200,6 +128,7 @@ export function SurveyRecordDetailsScreen() {
     duration,
     assetId,
     capturedAt: paramCapturedAt,
+    heading: paramHeading,
   } = useLocalSearchParams<{
     submissionId?: string;
     batchSubmissionIds?: string;
@@ -217,6 +146,7 @@ export function SurveyRecordDetailsScreen() {
     duration?: string;
     assetId?: string;
     capturedAt?: string;
+    heading?: string;
   }>();
 
   type LocalBatchAsset = {
@@ -225,7 +155,7 @@ export function SurveyRecordDetailsScreen() {
     mimeType?: string;
     type?: string;
     capturedAt?: string;
-    gps?: { latitude: number; longitude: number } | null;
+    gps?: { latitude: number; longitude: number; heading?: number } | null;
     duration?: number;
     assetId?: string;
   };
@@ -240,6 +170,7 @@ export function SurveyRecordDetailsScreen() {
     if (paramImageUri) {
       const lat = paramLatitude ? Number(paramLatitude) : startLat ? Number(startLat) : undefined;
       const lon = paramLongitude ? Number(paramLongitude) : startLon ? Number(startLon) : undefined;
+      const heading = paramHeading ? Number(paramHeading) : undefined;
       return [
         {
           uri: paramImageUri,
@@ -247,7 +178,10 @@ export function SurveyRecordDetailsScreen() {
           mimeType: paramImageMimeType,
           type: paramImageType,
           capturedAt: paramCapturedAt,
-          gps: lat != null && lon != null ? { latitude: lat, longitude: lon } : null,
+          gps:
+            lat != null && lon != null
+              ? { latitude: lat, longitude: lon, heading }
+              : null,
           duration: duration ? Number(duration) : undefined,
           assetId,
         },
@@ -265,6 +199,7 @@ export function SurveyRecordDetailsScreen() {
     startLat,
     startLon,
     paramCapturedAt,
+    paramHeading,
     duration,
     assetId,
   ]);
@@ -353,6 +288,80 @@ export function SurveyRecordDetailsScreen() {
 
   const [batchNotes, setBatchNotes] = useState<Record<string, string>>({});
   const [batchCapturedAts, setBatchCapturedAts] = useState<Record<string, string>>({});
+
+  // Sign direction (traffic direction) state in degrees [0..359] or undefined if not set.
+  // Default is the heading extracted from photo GPS/EXIF if available; otherwise left undefined (chưa chọn / để trống).
+  const initialDefaultHeading = useMemo<number | undefined>(() => {
+    const assetHeading = parsedAssets[0]?.gps?.heading;
+    if (assetHeading != null && Number.isFinite(assetHeading)) {
+      return Math.round(((assetHeading % 360) + 360) % 360);
+    }
+    if (paramHeading != null && !isNaN(Number(paramHeading)) && paramHeading.trim() !== '') {
+      return Math.round(((Number(paramHeading) % 360) + 360) % 360);
+    }
+    return undefined;
+  }, [parsedAssets, paramHeading]);
+
+  const [batchDirections, setBatchDirections] = useState<Record<string, number | undefined>>(() => {
+    const initial: Record<string, number | undefined> = {};
+    parsedAssets.forEach((asset, idx) => {
+      const id = batchIds[idx] ?? `local-${idx}`;
+      const h = asset.gps?.heading;
+      initial[id] = h != null && Number.isFinite(h) ? Math.round(((h % 360) + 360) % 360) : undefined;
+    });
+    return initial;
+  });
+
+  const [singleSignDirection, setSingleSignDirection] = useState<number | undefined>(initialDefaultHeading);
+
+  // Synchronize directions whenever parsedAssets or paramHeading arrives with heading data
+  useEffect(() => {
+    if (parsedAssets.length > 0) {
+      setBatchDirections((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        parsedAssets.forEach((asset, idx) => {
+          const id = batchIds[idx] ?? `local-${idx}`;
+          const h = asset.gps?.heading;
+          if (h != null && Number.isFinite(h) && next[id] === undefined) {
+            next[id] = Math.round(((h % 360) + 360) % 360);
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+    if (initialDefaultHeading !== undefined) {
+      setSingleSignDirection((prev) => (prev === undefined ? initialDefaultHeading : prev));
+    }
+  }, [parsedAssets, batchIds, initialDefaultHeading]);
+
+  const activeSignDirection = useMemo<number | undefined>(() => {
+    const currentId = batchIds[currentBatchIndex];
+    if (currentId && batchDirections[currentId] !== undefined) {
+      return batchDirections[currentId];
+    }
+    const assetHeading = parsedAssets[currentBatchIndex]?.gps?.heading;
+    if (assetHeading != null && Number.isFinite(assetHeading)) {
+      return Math.round(((assetHeading % 360) + 360) % 360);
+    }
+    return singleSignDirection;
+  }, [batchIds, currentBatchIndex, batchDirections, parsedAssets, singleSignDirection]);
+
+  const setSignDirection = useCallback(
+    (degrees: number | undefined) => {
+      const normalized =
+        degrees !== undefined
+          ? Math.round(((degrees % 360) + 360) % 360)
+          : undefined;
+      const currentId = batchIds[currentBatchIndex];
+      if (currentId) {
+        setBatchDirections((prev) => ({ ...prev, [currentId]: normalized }));
+      }
+      setSingleSignDirection(normalized);
+    },
+    [batchIds, currentBatchIndex],
+  );
 
   useEffect(() => {
     if (!session || batchIds.length <= 1 || !submissionId) return;
@@ -1054,7 +1063,7 @@ export function SurveyRecordDetailsScreen() {
             coordinateSource: 'FILE_GPX',
             latitude: effectiveStart[1],
             longitude: effectiveStart[0],
-            note: note.trim(),
+            note: formatNoteWithDirection(note, activeSignDirection),
           };
           const createRes = await createSubmission({ request: createPayload });
           targetSubmissionId = readSubmissionId(createRes);
@@ -1094,7 +1103,7 @@ export function SurveyRecordDetailsScreen() {
             coordinateSource: 'FILE_GPX',
             latitude: effectiveStart[1],
             longitude: effectiveStart[0],
-            note: note.trim(),
+            note: formatNoteWithDirection(note, activeSignDirection),
           },
         });
         console.log('[Surveyor] Submission metadata updated successfully.');
@@ -1126,6 +1135,7 @@ export function SurveyRecordDetailsScreen() {
                   (asset.gps ? [asset.gps.longitude, asset.gps.latitude] : effectiveStart));
             const itemNote =
               i === currentBatchIndex ? note.trim() : (batchNotes[batchIds[i]] ?? '');
+            const itemDirection = batchDirections[batchIds[i]] ?? activeSignDirection;
             const itemCapturedAt = asset.capturedAt
               ? new Date(asset.capturedAt).toISOString()
               : formattedCapturedAt;
@@ -1136,7 +1146,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: coord[1],
               longitude: coord[0],
-              note: itemNote,
+              note: formatNoteWithDirection(itemNote, itemDirection),
             };
             const createRes = await createSubmission({ request: createPayload });
             const subId = readSubmissionId(createRes);
@@ -1187,7 +1197,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: effectiveStart[1],
               longitude: effectiveStart[0],
-              note: note.trim(),
+              note: formatNoteWithDirection(note, activeSignDirection),
             };
             const createRes = await createSubmission({ request: createPayload });
             targetSubmissionId = readSubmissionId(createRes);
@@ -1199,7 +1209,7 @@ export function SurveyRecordDetailsScreen() {
               coordinateSource: coordinateSource ?? 'IMAGE_EXIF',
               latitude: effectiveStart[1],
               longitude: effectiveStart[0],
-              note: note.trim(),
+              note: formatNoteWithDirection(note, activeSignDirection),
             };
             const { submissionType: _submissionType, ...updates } = request;
             await updateSubmission({ submissionId: targetSubmissionId, request: updates });
@@ -1936,6 +1946,183 @@ export function SurveyRecordDetailsScreen() {
             ) : null}
           </View>
 
+          {/* Sign Direction Selector Section (for Image Submissions) */}
+          {isImageSubmission ? (
+            <View style={styles.section}>
+              <View style={styles.directionHeaderRow}>
+                <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
+                  Hướng biển báo
+                </Text>
+                {activeSignDirection !== undefined ? (
+                  <View style={[styles.directionBadge, { backgroundColor: '#E0F2FE' }]}>
+                    <MaterialCommunityIcons name="compass-outline" size={16} color="#0284C7" />
+                    <Text style={styles.directionBadgeText}>
+                      {activeSignDirection}° ({getCardinalDirectionLabel(activeSignDirection)})
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+                Hướng luồng giao thông mà biển báo áp dụng (mặc định là hướng phía sau biển báo / chiều xe chạy qua biển).
+              </Text>
+
+              {/* Map Preview with Interactive Direction Indicator */}
+              <View
+                accessibilityLabel={
+                  activeSignDirection !== undefined
+                    ? `Bản đồ chọn hướng biển báo: hiện tại ${activeSignDirection} độ, hướng ${getCardinalDirectionLabel(activeSignDirection)}`
+                    : 'Bản đồ chọn hướng biển báo: chưa chọn hướng'
+                }
+                style={[
+                  styles.mapPlaceholder,
+                  {
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                {effectiveStartCoord ? (
+                  <View style={StyleSheet.absoluteFill}>
+                    <NavigationMapView
+                      focusCoordinate={effectiveStartCoord}
+                      focusRequestId={focusRequestId}
+                      locationPin={effectiveStartCoord}
+                      showFocusPin={true}
+                      showCurrentLocation={false}
+                      isNavigatingFeature={false}
+                    />
+
+                    {/* Direction Indicator Overlay in Center of Map */}
+                    <View pointerEvents="none" style={styles.directionOverlayCenter}>
+                      {activeSignDirection !== undefined ? (
+                        /* Direction pointer pointing along activeSignDirection */
+                        <View
+                          style={[
+                            styles.directionConeContainer,
+                            { transform: [{ rotate: `${activeSignDirection}deg` }] },
+                          ]}
+                        >
+                          <View style={styles.directionBeam} />
+                          <View style={styles.directionArrowHead} />
+                        </View>
+                      ) : null}
+
+                      {/* Center Marker Pin */}
+                      <View style={styles.centerCompassHub}>
+                        <MaterialCommunityIcons name="traffic-light" size={18} color="#FFFFFF" />
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.mapEmptyState}>
+                    <MaterialCommunityIcons name="compass-off" size={28} color={theme.placeholder} />
+                    <Text style={[styles.mapEmptyText, { color: theme.placeholder }]}>
+                      Chưa có tọa độ GPS để hiển thị bản đồ hướng biển báo.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Angle floating badge on map - only show when a direction is selected */}
+                {activeSignDirection !== undefined ? (
+                  <View style={[styles.floatingAngleBadge, { backgroundColor: 'rgba(15, 23, 42, 0.85)' }]}>
+                    <Text style={styles.floatingAngleText}>
+                      {activeSignDirection}° {getCardinalDirectionLabel(activeSignDirection)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Controls to adjust direction */}
+              <View style={styles.directionControlsContainer}>
+                {/* Quick Cardinal Direction Buttons */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.cardinalScrollContent}
+                >
+                  {[
+                    { label: 'Bắc (0°)', deg: 0 },
+                    { label: 'ĐB (45°)', deg: 45 },
+                    { label: 'Đông (90°)', deg: 90 },
+                    { label: 'ĐN (135°)', deg: 135 },
+                    { label: 'Nam (180°)', deg: 180 },
+                    { label: 'TN (225°)', deg: 225 },
+                    { label: 'Tây (270°)', deg: 270 },
+                    { label: 'TB (315°)', deg: 315 },
+                  ].map(({ label, deg }) => {
+                    const isSelected =
+                      activeSignDirection !== undefined &&
+                      (Math.abs(activeSignDirection - deg) < 10 || (deg === 0 && activeSignDirection > 350));
+                    return (
+                      <Pressable
+                        key={deg}
+                        accessibilityLabel={`Chọn hướng ${label}`}
+                        onPress={() => {
+                          if (isSelected) {
+                            setSignDirection(undefined);
+                          } else {
+                            setSignDirection(deg);
+                          }
+                        }}
+                        style={[
+                          styles.cardinalChip,
+                          {
+                            backgroundColor: isSelected ? '#0671EB' : theme.backgroundElement,
+                            borderColor: isSelected ? '#0671EB' : theme.border,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.cardinalChipText,
+                            { color: isSelected ? '#FFFFFF' : theme.text },
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Fine-tuning & Reset row */}
+                <View style={styles.fineTuneRow}>
+                  <Pressable
+                    accessibilityLabel="Quay ngược chiều kim đồng hồ 15 độ"
+                    onPress={() => setSignDirection(((activeSignDirection ?? 0) - 15 + 360) % 360)}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="rotate-left" size={18} color={theme.text} />
+                    <Text style={[styles.stepBtnText, { color: theme.text }]}>-15°</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityLabel="Quay cùng chiều kim đồng hồ 15 độ"
+                    onPress={() => setSignDirection(((activeSignDirection ?? 0) + 15) % 360)}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="rotate-right" size={18} color={theme.text} />
+                    <Text style={[styles.stepBtnText, { color: theme.text }]}>+15°</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityLabel="Đặt lại hướng mặc định"
+                    onPress={() => {
+                      const defaultH =
+                        parsedAssets[currentBatchIndex]?.gps?.heading ?? initialDefaultHeading;
+                      setSignDirection(defaultH);
+                    }}
+                    style={[styles.stepBtn, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  >
+                    <MaterialCommunityIcons name="restore" size={18} color={theme.textSecondary} />
+                    <Text style={[styles.stepBtnText, { color: theme.textSecondary }]}>Mặc định</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.section}>
             <Controller
               control={control}
@@ -2066,448 +2253,3 @@ export function SurveyRecordDetailsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  content: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.five,
-  },
-  header: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    marginBottom: Spacing.three,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    minHeight: 40,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
-  backFallback: {
-    fontFamily: Fonts.body,
-    fontSize: 24,
-    fontWeight: 700,
-  },
-  title: {
-    flex: 1,
-    fontFamily: Fonts.title,
-    fontSize: 24,
-    fontWeight: 700,
-    lineHeight: 32,
-  },
-  imageFrame: {
-    height: 176,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    marginBottom: Spacing.four,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  imageFallback: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 900,
-  },
-  placeholderLabel: {
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    fontWeight: 600,
-  },
-  section: {
-    gap: Spacing.one,
-    marginBottom: Spacing.four,
-  },
-  label: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 18,
-  },
-  mapPlaceholder: {
-    height: 164,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-  },
-  imageLocationInput: {
-    paddingLeft: Spacing.two,
-  },
-  multilineAddressInput: {
-    height: 'auto',
-    minHeight: 48,
-    paddingVertical: Spacing.one,
-  },
-  calendarIconButton: {
-    paddingHorizontal: Spacing.one,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  attachGpxButton: {
-    marginTop: Spacing.two,
-  },
-  mapEmptyState: {
-    alignItems: 'center',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.four,
-  },
-  mapZoomButton: {
-    position: 'absolute',
-    right: Spacing.one,
-    bottom: Spacing.one,
-    width: 44,
-    height: 44,
-    minHeight: 44,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    shadowColor: '#09233C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  mapEmptyText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 600,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  coordinateText: {
-    fontFamily: Fonts.mono,
-    fontSize: 12,
-    fontWeight: 600,
-    lineHeight: 17,
-  },
-  pinFallback: {
-    fontFamily: Fonts.body,
-    fontSize: 11,
-    fontWeight: 900,
-  },
-  locationButton: {
-    minHeight: 42,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: Spacing.half,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-  },
-  locationButtonText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 18,
-  },
-  locationMessage: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 600,
-    lineHeight: 17,
-  },
-  noteInputContainer: {
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    paddingHorizontal: 0,
-    paddingLeft: 0,
-  },
-  noteInput: {
-    minHeight: 112,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.two,
-    fontFamily: Fonts.body,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  secondarySubmitButton: {
-    alignSelf: 'stretch',
-    marginBottom: Spacing.two,
-    borderWidth: 1,
-  },
-  submitButton: {
-    alignSelf: 'stretch',
-  },
-  submitError: {
-    color: '#C62828',
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 600,
-    lineHeight: 18,
-    marginTop: Spacing.one,
-  },
-  subSectionTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 700,
-    lineHeight: 18,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.half,
-  },
-  locationSmallButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: 2,
-    minHeight: 32,
-  },
-  locationSmallButtonText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: 600,
-  },
-  accordionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-  },
-  accordionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    flex: 1,
-  },
-  accordionTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: 600,
-  },
-  accordionBody: {
-    padding: Spacing.two,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: Rounded.md,
-    borderBottomRightRadius: Rounded.md,
-    gap: Spacing.two,
-  },
-  accordionDesc: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  gpxActionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    flexWrap: 'wrap',
-  },
-  progressModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(9, 35, 60, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
-  },
-  progressModalCard: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: Rounded.xlg,
-    borderWidth: 1,
-    padding: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.two,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  progressModalTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 18,
-    fontWeight: 700,
-    marginTop: Spacing.one,
-  },
-  progressModalStatus: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: Spacing.one,
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressMetaRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: Spacing.half,
-  },
-  progressMetaText: {
-    fontFamily: Fonts.mono,
-    fontSize: 12,
-  },
-  addressResolvedCard: {
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    padding: Spacing.two,
-    marginTop: Spacing.one,
-    gap: 4,
-  },
-  addressResolvedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  addressResolvedTitle: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  addressResolvedText: {
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  addressRoadText: {
-    fontFamily: Fonts.body,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  batchCard: {
-    borderWidth: 1,
-    borderRadius: Rounded.lg,
-    padding: Spacing.two,
-    marginBottom: Spacing.three,
-    gap: Spacing.two,
-  },
-  batchHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  batchTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  batchTitle: {
-    fontFamily: Fonts.title,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  batchNavButtons: {
-    flexDirection: 'row',
-    gap: Spacing.one,
-  },
-  batchNavBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: Rounded.md,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  batchThumbnailScroll: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingVertical: 2,
-  },
-  batchThumbWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: Rounded.md,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  batchThumbImage: {
-    width: '100%',
-    height: '100%',
-  },
-  batchThumbPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  batchThumbBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  batchThumbBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  batchThumbGpsStatus: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  gpsWarningCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: 1,
-    borderRadius: Rounded.md,
-    padding: Spacing.two,
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
-  },
-  gpsWarningText: {
-    flex: 1,
-    fontFamily: Fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
-  captureTimeErrorText: {
-    color: '#DC2626',
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 2,
-    fontWeight: '500',
-  },
-});

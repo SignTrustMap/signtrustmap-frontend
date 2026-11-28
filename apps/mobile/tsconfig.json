@@ -3,7 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "types": [
-      "jest"
+      "jest",
+      "node"
     ],
     "paths": {
       "@/*": [
@@ -11,6 +12,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@shared/types": [
+        "../../packages/types/src/index.ts"
       ]
     }
   },

@@ -15,10 +15,13 @@ import {
 import { resolveImageUrl } from '@/features/map/utils/signUrlHelpers'
 import {
   catalogService,
+  normalizeRecaptureRequestSummary,
   type MissingTypeReportItem,
   type SignCategoryItem,
   type ApproveAndCreateSignTypeInput,
 } from '@/api/services/catalog.service'
+import { getCachedUserProfile, type UserProfileSummary } from '@/api/services/user.service'
+import { UserProfileDetailModal } from '@/components/common/UserProfileDetailModal'
 import {
   MissingSignsTableView,
   MissingSignInspectionModal,
@@ -87,6 +90,8 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem | any): MissingS
 
   const reporterId = r.reporterId || r.reporter_id || r.userId || r.user_id || undefined
   const reportedBy =
+    r.reporter?.fullName ||
+    r.reporter?.email ||
     r.reportedBy ||
     r.reported_by ||
     r.submittedBy ||
@@ -186,7 +191,29 @@ function mapBackendReportToMissingSign(r: MissingTypeReportItem | any): MissingS
       null,
     mergedIntoSignTypeId: r.mergedIntoSignTypeId || r.merged_into_sign_type_id || null,
     staffNotes: r.staffNotes || r.staff_notes || null,
+    reporter: r.reporter || null,
+    reviewer: r.reviewer || null,
+    recaptureRequest: normalizeRecaptureRequestSummary(
+      r.recaptureRequest ||
+      (r.assignedSurveyor || r.surveyorId || r.surveyor_id
+        ? {
+            surveyorId: r.surveyorId || r.surveyor_id || r.assignedSurveyor?.id,
+            assignedSurveyor: r.assignedSurveyor,
+          }
+        : null)
+    ),
   }
+}
+
+function removeAccents(str?: string | null): string {
+  if (!str) return ''
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim()
 }
 
 export default function MissingSignsPage() {
@@ -213,18 +240,42 @@ export default function MissingSignsPage() {
 
   const [categories, setCategories] = useState<SignCategoryItem[]>([])
   const [availableSigns, setAvailableSigns] = useState<AvailableSignOption[]>([])
+  const [inspectingUser, setInspectingUser] = useState<{
+    id: string
+    summary?: UserProfileSummary | null
+  } | null>(null)
+
+  const handleInspectUser = useCallback(
+    (userId: string, summary?: UserProfileSummary | null) => {
+      setInspectingUser({ id: userId, summary })
+    },
+    []
+  )
 
   const [selectedReport, setSelectedReport] = useState<MissingSignTypeReport | null>(null)
   const [activeTab, setActiveTab] = useState<
     'all' | 'Open' | 'Escalated' | 'Approved' | 'Merged' | 'Incomplete' | 'Rejected'
   >('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedSort, setSelectedSort] = useState<
-    'newest' | 'oldest' | 'confidence_asc' | 'confidence_desc' | 'name_asc'
+    'newest' | 'oldest' | 'confidence_asc' | 'confidence_desc' | 'name_asc' | 'name_desc'
   >('newest')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    const normalized = searchQuery.trim().replace(/^#+/, '').trim()
+    if (!normalized) {
+      setDebouncedSearch('')
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(normalized)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [searchQuery])
 
   // Sub-Modals
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false)
@@ -284,13 +335,35 @@ export default function MissingSignsPage() {
       else if (activeTab === 'Incomplete') statusQuery = 'INCOMPLETE'
       else if (activeTab === 'Rejected') statusQuery = 'REJECTED'
 
+      let sortByParam: string | undefined = undefined
+      let sortOrderParam: 'ASC' | 'DESC' | undefined = undefined
+      if (selectedSort === 'newest') {
+        sortByParam = 'newest'
+        sortOrderParam = 'DESC'
+      } else if (selectedSort === 'oldest') {
+        sortByParam = 'oldest'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'name_asc') {
+        sortByParam = 'a_z'
+        sortOrderParam = 'ASC'
+      } else if (selectedSort === 'name_desc') {
+        sortByParam = 'z_a'
+        sortOrderParam = 'DESC'
+      }
+
+      const hasRemoteFilter = Boolean(debouncedSearch) || selectedCategory !== 'all'
       const [response, summaryRes] = await Promise.all([
         catalogService.getMissingReports({
-          page: currentPage,
-          pageSize,
+          page: hasRemoteFilter ? 1 : currentPage,
+          pageSize: hasRemoteFilter ? 100 : pageSize,
           status: statusQuery,
+          search: debouncedSearch || undefined,
+          sortBy: sortByParam,
+          sortOrder: sortOrderParam,
         }),
-        catalogService.getMissingReports({ page: 1, pageSize: 100 }).catch(() => null),
+        debouncedSearch
+          ? Promise.resolve(null)
+          : catalogService.getMissingReports({ page: 1, pageSize: 100 }).catch(() => null),
       ])
 
       const hasLiveItems = response && Array.isArray(response.items) && response.items.length > 0
@@ -310,14 +383,11 @@ export default function MissingSignsPage() {
               try {
                 const recaptures = await catalogService.getCandidateRecaptures(rep.candidateId!)
                 if (Array.isArray(recaptures) && recaptures.length > 0) {
-                  const latest = recaptures[0]
-                  const req = {
-                    reason: latest.reason,
-                    note: latest.note || '',
-                    createdAt: latest.createdAt || latest.created_at,
+                  const req = normalizeRecaptureRequestSummary(recaptures[0])
+                  if (req) {
+                    rep.recaptureRequest = req
+                    candidateRecaptureCache.set(rep.candidateId!, req)
                   }
-                  rep.recaptureRequest = req
-                  candidateRecaptureCache.set(rep.candidateId!, req)
                 }
               } catch {}
             })
@@ -349,7 +419,7 @@ export default function MissingSignsPage() {
           incomplete: items.filter((i) => i.status === 'INCOMPLETE').length,
           rejected: items.filter((i) => i.status === 'REJECTED').length,
         })
-      } else {
+      } else if (!debouncedSearch) {
         setKpiCounts({
           total: 0,
           pending: 0,
@@ -364,20 +434,22 @@ export default function MissingSignsPage() {
       console.warn('Live missing sign reports fetch failed:', err)
       setReports([])
       setTotalCount(0)
-      setKpiCounts({
-        total: 0,
-        pending: 0,
-        escalated: 0,
-        approved: 0,
-        merged: 0,
-        incomplete: 0,
-        rejected: 0,
-      })
+      if (!debouncedSearch) {
+        setKpiCounts({
+          total: 0,
+          pending: 0,
+          escalated: 0,
+          approved: 0,
+          merged: 0,
+          incomplete: 0,
+          rejected: 0,
+        })
+      }
     } finally {
       setIsLoading(false)
       window.dispatchEvent(new CustomEvent('stm:refresh-badges'))
     }
-  }, [currentPage, pageSize, activeTab])
+  }, [currentPage, pageSize, activeTab, debouncedSearch, selectedCategory, selectedSort])
 
   useEffect(() => {
     fetchReports()
@@ -447,9 +519,10 @@ export default function MissingSignsPage() {
   const sortOptions: OptionItem[] = useMemo(() => [
     { value: 'newest', label: isEn ? 'Newest first' : 'Mới nhất' },
     { value: 'oldest', label: isEn ? 'Oldest' : 'Cũ nhất' },
-    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
-    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
     { value: 'name_asc', label: isEn ? 'Sign Name: A → Z' : 'Tên biển: A → Z' },
+    { value: 'name_desc', label: isEn ? 'Sign Name: Z → A' : 'Tên biển: Z → A' },
+    { value: 'confidence_desc', label: isEn ? 'AI Confidence: High → Low' : 'Độ tin cậy AI: Cao → Thấp' },
+    { value: 'confidence_asc', label: isEn ? 'AI Confidence: Low → High' : 'Độ tin cậy AI: Thấp → Cao' },
   ], [isEn])
 
   // Catalog search filtering for Merge modal
@@ -462,17 +535,37 @@ export default function MissingSignsPage() {
   }, [availableSigns, catalogSearch])
 
   // Main reports filtering & sorting
+  const normalizedSearchQuery = searchQuery.trim().replace(/^#+/, '').trim().toLowerCase()
+  const cleanSearchQuery = removeAccents(normalizedSearchQuery)
+  const hasLocalFilter = Boolean(normalizedSearchQuery) || selectedCategory !== 'all'
+
   const filteredReports = useMemo(() => {
     const list = reports.filter((r) => {
-      const q = searchQuery.toLowerCase().trim()
+      const q = normalizedSearchQuery
+      const qClean = cleanSearchQuery
+      const cachedProfile = getCachedUserProfile(r.reporterId)
+      const cachedName = (cachedProfile?.fullName || cachedProfile?.full_name || cachedProfile?.email || '').toLowerCase()
+      const staffReviewer = (r.reviewedBy || (r as any).staff?.fullName || (r as any).staff?.email || '').toLowerCase()
       const matchesSearch =
         !q ||
         r.id.toLowerCase().includes(q) ||
+        (r.candidateId && r.candidateId.toLowerCase().includes(q)) ||
         r.tempLabel.toLowerCase().includes(q) ||
+        (r.clipPrompt && r.clipPrompt.toLowerCase().includes(q)) ||
         r.reporterNote.toLowerCase().includes(q) ||
         r.reportedBy.toLowerCase().includes(q) ||
+        (r.reporter?.fullName && r.reporter.fullName.toLowerCase().includes(q)) ||
+        (r.reporter?.email && r.reporter.email.toLowerCase().includes(q)) ||
+        (cachedName && cachedName.includes(q)) ||
+        (staffReviewer && staffReviewer.includes(q)) ||
         (r.roadAddress && r.roadAddress.toLowerCase().includes(q)) ||
-        r.similarCatalogEntries.some((code) => code.toLowerCase().includes(q))
+        r.similarCatalogEntries.some((code) => code.toLowerCase().includes(q)) ||
+        removeAccents(r.tempLabel).includes(qClean) ||
+        removeAccents(r.reporterNote).includes(qClean) ||
+        removeAccents(r.reportedBy).includes(qClean) ||
+        removeAccents(r.reporter?.fullName).includes(qClean) ||
+        removeAccents(cachedName).includes(qClean) ||
+        removeAccents(staffReviewer).includes(qClean)
 
       const matchesCategory = selectedCategory === 'all' || r.category === selectedCategory
 
@@ -500,13 +593,18 @@ export default function MissingSignsPage() {
         case 'name_asc': {
           return a.tempLabel.localeCompare(b.tempLabel, 'vi')
         }
+        case 'name_desc': {
+          return b.tempLabel.localeCompare(a.tempLabel, 'vi')
+        }
         default:
           return 0
       }
     })
-  }, [reports, searchQuery, selectedCategory, selectedSort])
+  }, [reports, normalizedSearchQuery, cleanSearchQuery, selectedCategory, selectedSort])
 
-  const paginatedReports = filteredReports
+  const paginatedReports = hasLocalFilter
+    ? filteredReports.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filteredReports
 
   // Handlers
   async function handleMergeSubmit(overrideCode?: string, overrideSignTypeId?: number, noteOverride?: string) {
@@ -590,12 +688,15 @@ export default function MissingSignsPage() {
     const candidateId = selectedReport.candidateId
     setIsSubmittingRecapture(true)
     try {
-      await catalogService.updateMissingReport(reportId, {
+      const res: any = await catalogService.updateMissingReport(reportId, {
         actionType: 'REQUEST_RECAPTURE',
         staffNotes: note,
       })
 
-      if (candidateId) {
+      const rec = normalizeRecaptureRequestSummary(res?.recaptureRequest || res)
+      if (candidateId && rec) {
+        candidateRecaptureCache.set(candidateId, rec)
+      } else if (candidateId) {
         candidateRecaptureCache.set(candidateId, {
           reason,
           note,
@@ -603,7 +704,16 @@ export default function MissingSignsPage() {
         })
       }
 
-      success(`Đã phân bổ Surveyor thực địa chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      const assignedSurveyor = res?.assignedSurveyor || rec?.assignedSurveyor
+      const surveyorName =
+        assignedSurveyor?.fullName ||
+        (rec?.surveyorId ? `#${rec.surveyorId.slice(0, 8)}` : null)
+
+      if (surveyorName) {
+        success(`Đã phân công cho Surveyor ${surveyorName} chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      } else {
+        success(`Đã phân bổ Surveyor thực địa chụp lại biển cho báo cáo #${reportId.slice(0, 8)}`)
+      }
       setIsRecaptureModalOpen(false)
       setSelectedReport(null)
       fetchReports()
@@ -725,7 +835,7 @@ export default function MissingSignsPage() {
       ) : (
         <MissingSignsTableView
           reports={paginatedReports}
-          totalItems={filteredReports.length === reports.length ? totalCount : filteredReports.length}
+          totalItems={hasLocalFilter ? filteredReports.length : totalCount}
           currentPage={currentPage}
           pageSize={pageSize}
           isCollapsed={isCollapsed}
@@ -739,10 +849,12 @@ export default function MissingSignsPage() {
               const cached = candidateRecaptureCache.get(rep.candidateId)
               if (cached) {
                 setSelectedReport({ ...rep, recaptureRequest: cached })
-                return
+              } else {
+                setSelectedReport(rep)
               }
+            } else {
+              setSelectedReport(rep)
             }
-            setSelectedReport(rep)
 
             if (rep.id) {
               catalogService
@@ -750,12 +862,16 @@ export default function MissingSignsPage() {
                 .then((fresh) => {
                   if (fresh) {
                     const freshMapped = mapBackendReportToMissingSign(fresh)
+                    if (freshMapped.recaptureRequest && freshMapped.candidateId) {
+                      candidateRecaptureCache.set(freshMapped.candidateId, freshMapped.recaptureRequest)
+                    }
                     setSelectedReport((cur) => (cur?.id === rep.id ? { ...cur, ...freshMapped } : cur))
                   }
                 })
                 .catch(() => {})
             }
           }}
+          onInspectUser={handleInspectUser}
         />
       )}
 
@@ -839,6 +955,13 @@ export default function MissingSignsPage() {
         onClose={() => setIsRecaptureModalOpen(false)}
         onSubmit={handleRecaptureSubmit}
         isSubmitting={isSubmittingRecapture}
+      />
+
+      <UserProfileDetailModal
+        userId={inspectingUser?.id || null}
+        initialSummary={inspectingUser?.summary}
+        isEn={isEn}
+        onClose={() => setInspectingUser(null)}
       />
     </div>
   )

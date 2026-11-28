@@ -43,8 +43,7 @@ jest.mock('react-native-safe-area-context', () => {
   const R = require('react');
   const { View } = require('react-native');
   return {
-    SafeAreaView: ({ children, ...props }: any) =>
-      R.createElement(View, props, children),
+    SafeAreaView: ({ children, ...props }: any) => R.createElement(View, props, children),
     useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }),
   };
 });
@@ -67,9 +66,27 @@ describe('TopUpScreen', () => {
 
     jest.spyOn(walletHooks, 'useGetTopUpPackages').mockReturnValue({
       data: [
-        { id: 101, packageName: 'Gói Cơ bản', creditAmount: 300, priceVnd: '30000.00', isActive: true },
-        { id: 102, packageName: 'Gói Tiêu chuẩn', creditAmount: 1000, priceVnd: '100000.00', isActive: true },
-        { id: 103, packageName: 'Gói VIP', creditAmount: 3000, priceVnd: '280000.00', isActive: true },
+        {
+          id: 101,
+          packageName: 'Gói Cơ bản',
+          creditAmount: 300,
+          priceVnd: '30000.00',
+          isActive: true,
+        },
+        {
+          id: 102,
+          packageName: 'Gói Tiêu chuẩn',
+          creditAmount: 1000,
+          priceVnd: '100000.00',
+          isActive: true,
+        },
+        {
+          id: 103,
+          packageName: 'Gói VIP',
+          creditAmount: 3000,
+          priceVnd: '280000.00',
+          isActive: true,
+        },
       ],
       isLoading: false,
       isError: false,
@@ -113,9 +130,8 @@ describe('TopUpScreen', () => {
 
     // Available gateways from backend
     expect(await findByText('Ví điện tử MoMo')).toBeTruthy();
-    expect(await findByText('Khuyên dùng')).toBeTruthy();
+    expect(await findByText('Phổ biến')).toBeTruthy();
     expect(await findByText('Chuyển khoản VietQR')).toBeTruthy();
-    expect(await findByText('Thanh toán Sandbox (Thử nghiệm)')).toBeTruthy();
   });
 
   it('allows selecting a different package and updates confirm button', async () => {
@@ -148,18 +164,18 @@ describe('TopUpScreen', () => {
     });
   });
 
-  it('allows selecting VietQR or Sandbox gateway and passes gateway to topUp', async () => {
+  it('allows selecting VietQR gateway and passes gateway to topUp', async () => {
     const { findByLabelText, findByText } = await render(<TopUpScreen />);
 
-    // Select Sandbox gateway
-    const sandboxBtn = await findByLabelText(/Thanh toán bằng Thanh toán Sandbox/);
-    fireEvent.press(sandboxBtn);
+    // Select VietQR gateway
+    const vietQrBtn = await findByLabelText(/Thanh toán bằng Chuyển khoản VietQR/);
+    fireEvent.press(vietQrBtn);
 
     const payBtn = await findByText('Xác nhận thanh toán 100.000 ₫');
     fireEvent.press(payBtn);
 
     await waitFor(() => {
-      expect(mockMutateTopUp).toHaveBeenCalledWith({ packageId: 102, gateway: 'MOCK' });
+      expect(mockMutateTopUp).toHaveBeenCalledWith({ packageId: 102, gateway: 'VIETQR' });
     });
   });
 
