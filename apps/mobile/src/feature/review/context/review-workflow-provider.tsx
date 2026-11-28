@@ -74,6 +74,7 @@ export type ReviewWorkflowContextValue = {
   keepCurrentReviewAndNext?: () => boolean;
   loadSubmissionForEdit?: (record: ReviewHistoryRecord) => void;
   pendingSubmissions: ReviewSubmission[];
+  queueLoadVersion?: number;
   refresh: () => Promise<void>;
   recheckingPreviousAction?: ReviewActionType;
   recheckingReviewIndex?: number;
@@ -121,7 +122,9 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string>();
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [sessionReviewCount, setSessionReviewCount] = useState(0);
+  const [queueLoadVersion, setQueueLoadVersion] = useState(0);
   const hasLoadedRef = useRef(false);
+  const injectedSubmissionsRef = useRef<ReviewSubmission[]>([]);
 
   const segments = useSegments();
   const rawSegments = segments as string[];
@@ -159,11 +162,18 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!accessToken) {
       hasLoadedRef.current = false;
+      injectedSubmissionsRef.current = [];
+      setQueueLoadVersion(0);
       return;
     }
     // Only load initial queue when actively on a review screen, preventing background
     // cache invalidations and calls when browsing other work tabs or app sections
-    if (!isReviewActive) return;
+    if (!isReviewActive) {
+      hasLoadedRef.current = false;
+      injectedSubmissionsRef.current = [];
+      setQueueLoadVersion(0);
+      return;
+    }
 
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
@@ -173,9 +183,19 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
     refetchWorkflow()
       .then((data) => {
         if (!active || !data?.queue) return;
-        setPendingSubmissions(data.queue.submissions);
-        setInitialQueueSubmissions(data.queue.submissions);
-        setTotalSubmissions(data.queue.total);
+        const injected = injectedSubmissionsRef.current;
+        const merged =
+          injected.length > 0
+            ? [
+                ...injected,
+                ...data.queue.submissions.filter(
+                  (sub) => !injected.some((inj) => inj.id === sub.id),
+                ),
+              ]
+            : data.queue.submissions;
+        setPendingSubmissions(merged);
+        setInitialQueueSubmissions(merged);
+        setTotalSubmissions(Math.max(data.queue.total, merged.length));
         setError(undefined);
       })
       .catch((cause: unknown) => {
@@ -185,7 +205,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           );
       })
       .finally(() => {
-        if (active) setIsLoading(false);
+        if (active) {
+          setIsLoading(false);
+          setQueueLoadVersion((v) => v + 1);
+        }
       });
     return () => {
       active = false;
@@ -322,6 +345,10 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
           remedySigns: res?.remedySigns ?? candidate.remedySigns,
         };
         const submission = toSubmission(mergedCandidate);
+
+        if (!injectedSubmissionsRef.current.some((s) => s.id === submission.id)) {
+          injectedSubmissionsRef.current = [submission, ...injectedSubmissionsRef.current];
+        }
 
         setPendingSubmissions((prev) => {
           if (prev.some((s) => s.id === submission.id)) {
@@ -651,6 +678,7 @@ export function ReviewWorkflowProvider({ children }: { children: ReactNode }) {
         keepCurrentReviewAndNext,
         loadSubmissionForEdit,
         pendingSubmissions,
+        queueLoadVersion,
         refresh,
         recheckingPreviousAction,
         recheckingReviewIndex,

@@ -90,6 +90,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     jumpToSubmissionById,
     keepCurrentReviewAndNext,
     pendingSubmissions,
+    queueLoadVersion,
     recheckingPreviousAction,
     recheckingSubmission,
     reviewHistory,
@@ -147,6 +148,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     }
 
     if (handledTargetSubmissionIdRef.current === targetSubmissionIdParam) return;
+    if (queueLoadVersion === 0) return;
 
     if (!isLoading && claimedCandidateId && ensureCandidateInQueue) {
       handledTargetSubmissionIdRef.current = targetSubmissionIdParam;
@@ -179,6 +181,7 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
     claimedCandidateId,
     isLoading,
     pendingSubmissions,
+    queueLoadVersion,
     reviewHistory,
     jumpToSubmissionById,
     ensureCandidateInQueue,
@@ -744,7 +747,8 @@ export function SubmissionReviewScreen({ state = 'ready' }: SubmissionReviewScre
 
         {state === 'loading' ||
         (isLoading && pendingSubmissions.length === 0) ||
-        isResolvingClaimedCandidate ? (
+        isResolvingClaimedCandidate ||
+        (Boolean(claimedCandidateId) && queueLoadVersion === 0 && !submission) ? (
           <SubmissionReviewSkeleton />
         ) : submission ? (
           <View style={styles.mainContainer}>

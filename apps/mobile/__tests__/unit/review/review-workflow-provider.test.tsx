@@ -445,4 +445,46 @@ describe('ReviewWorkflowProvider and useReviewWorkflow', () => {
       },
     });
   });
+
+  it('preserves injected claimed candidate if queue refetch resolves afterward and resets load state when leaving screen', async () => {
+    let resolveQueue!: (val: any) => void;
+    mockRefetchQueue.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveQueue = resolve;
+        }),
+    );
+
+    mockGetCandidateSignDetails.mockResolvedValue({
+      candidate: {
+        id: 'cand-injected-1',
+        submissionId: 'sub-inj-1',
+        status: 'PENDING_REVIEW',
+        createdAt: '2026-11-25T10:00:00Z',
+        predictedSignType: {
+          id: 12,
+          signCode: 'P.102',
+          nameVi: 'Cấm đi ngược chiều',
+          nameEn: 'No Entry',
+        },
+      },
+    });
+
+    const { result } = await renderHook(() => useReviewWorkflow(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.ensureCandidateInQueue?.('cand-injected-1');
+    });
+
+    expect(result.current.pendingSubmissions[0]?.id).toBe('cand-injected-1');
+
+    await act(async () => {
+      resolveQueue({ data: { submissions: [], total: 0 } });
+    });
+
+    expect(result.current.pendingSubmissions[0]?.id).toBe('cand-injected-1');
+    expect(result.current.queueLoadVersion).toBeGreaterThanOrEqual(1);
+  });
 });
